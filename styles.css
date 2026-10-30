@@ -70,6 +70,11 @@
 .vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
+/* Mind-map-only polish (decision 35). None of these starts with a class the share viewer collects (scripts/viewer-css.mjs), so the viewer's stylesheet is unchanged. The parent line is a thin low-saturation line, lighter than the semantic lines; AIM, the sample and skippable edges do not carry the attribute. */
+path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35%, var(--text-muted)); stroke-width: 1.5px; }
+/* An ordinary card's frame was invisible on the dotted canvas: use the hover token, one step deeper on hover. The typed cards' own border rules are more specific and keep winning. :where keeps the specificity of the rules above and below (status, selected, relevance) so they still win. */
+:where([data-node-id]).vam-node:where(:not([data-aim-kind])) { border-color: var(--background-modifier-border-hover); }
+:where([data-node-id]).vam-node:where(:not([data-aim-kind], .is-selected)):hover { border-color: color-mix(in srgb, var(--background-modifier-border-hover) 55%, var(--text-muted)); }
 .vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }
 .vam-node[data-aim-kind="topic"] { border-radius: 48% / 28%; padding: 22px 24px; }
 .vam-node[data-aim-kind="question"] { isolation: isolate; border-color: transparent; background: transparent; box-shadow: none; }
@@ -79,28 +84,30 @@
 .vam-node[data-aim-kind="synthesis"] { border-style: dashed; border-color: var(--interactive-accent); }
 .vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
 /* Semantic lines (V1.6): six patterns in the text colour, told apart by pattern and end, not by hue. Every rule starts with .vam-relation, so the share viewer, which draws none, does not pick them up. */
-.vam-relation { fill: none; stroke: var(--text-normal); stroke-width: var(--vam-relation-width, 2px); pointer-events: none; }
+.vam-relation { fill: none; stroke: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke-width: var(--vam-relation-width, 1.75px); pointer-events: none; }
 .vam-relation-supports { stroke-dasharray: none; }
 .vam-relation-contradicts { stroke-dasharray: 8 4; }
 .vam-relation-verifies { stroke-dasharray: 1 5; stroke-linecap: round; }
-.vam-relation-derives_from { --vam-relation-width: 5px; }
+.vam-relation-derives_from { --vam-relation-width: 4.5px; }
 .vam-relation-related { --vam-relation-width: 1.25px; }
 .vam-relation-prerequisite { stroke-dasharray: 10 4 2 4; }
-.vam-relation-gap { fill: none; stroke: var(--background-primary); stroke-width: 2px; pointer-events: none; }
-.vam-relation-arrow { fill: var(--text-normal); stroke: none; }
-.vam-relation-arrow-bar { fill: none; stroke: var(--text-normal); stroke-width: 2px; }
+.vam-relation-gap { fill: none; stroke: var(--background-primary); stroke-width: 1.5px; pointer-events: none; }
+.vam-relation-arrow { fill: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke: none; }
+.vam-relation-arrow-bar { fill: none; stroke: color-mix(in srgb, var(--text-normal) 78%, var(--background-primary)); stroke-width: 2px; }
 .vam-relation-hit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
-.vam-relation.is-related { stroke-width: calc(var(--vam-relation-width, 2px) + 1px); }
+.vam-relation.is-related { stroke-width: calc(var(--vam-relation-width, 1.75px) + 1px); }
 .vam-relation.is-dimmed { opacity: 0.75; }
-.vam-relation.is-selected { stroke: var(--interactive-accent); stroke-width: calc(var(--vam-relation-width, 2px) + 1px); opacity: 1; }
+.vam-relation.is-selected { stroke: var(--interactive-accent); stroke-width: calc(var(--vam-relation-width, 1.75px) + 1px); opacity: 1; }
 /* The name sits on the line's midpoint with a canvas-coloured halo; a selected or hovered line also gives the ends and the note. */
-.vam-relation-label { fill: var(--text-normal); stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.vam-relation-label { fill: var(--text-muted); font-weight: 500; stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 /* Zoomed out far enough that names would only crowd the lines (view.ts sets the attribute below 60%). */
 [data-relation-labels="hidden"] .vam-relation-label { display: none; }
 /* Written with the class first so the share viewer, which draws no relations, does not pick the rule up (scripts/viewer-css.mjs). */
 .is-relation-end.vam-node { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .vam-relation-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-hypothesis-tag { display: inline-flex; align-items: center; max-width: 100%; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; white-space: nowrap; color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
+/* Every typed card names its type in this tag; the hue is the type's own, mixed toward the text colour to stay at 4.5:1 on the type's tint. */
+[data-topic-kind="atomic"].vam-node .vam-hypothesis-tag, [data-topic-kind="hypothesis"].vam-node .vam-hypothesis-tag, [data-topic-kind="evidence"].vam-node .vam-hypothesis-tag, [data-topic-kind="conclusion"].vam-node .vam-hypothesis-tag, [data-topic-kind="action"].vam-node .vam-hypothesis-tag { color: color-mix(in srgb, var(--vam-kind-hue) 45%, var(--text-normal)); }
 .vam-hypothesis-strengths { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
 .vam-relation-list { margin: 4px 0 8px; padding: 0; list-style: none; }
 .vam-relation-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; }
@@ -193,6 +200,9 @@
 .vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-linejoin: round; }
 /* An atomic title keeps two lines at most; the full text is the title attribute (hover). */
 [data-topic-kind="atomic"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* A hypothesis diamond grows with its text: its title keeps three lines and the summary of a diamond or an ellipse two (the full text is the title attribute). */
+[data-topic-kind="hypothesis"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+[data-topic-kind="hypothesis"] .vam-card-summary, [data-topic-kind="atomic"] .vam-card-summary { -webkit-line-clamp: 2; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @property --vam-orbit { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes vam-orbit { to { --vam-orbit: 360deg; } }

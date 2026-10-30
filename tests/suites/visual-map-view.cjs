@@ -3049,12 +3049,12 @@ integrationTest('hypothesis-evidence: "derives from" is a double line: the outer
   assert.ok(kids.indexOf(gaps[0]) > kids.indexOf(line('derives_from')), 'the gap line is painted over the outer line');
   assert.equal(gaps[0].classes.includes('vam-relation'), false, 'the gap line takes no selection class');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  assert.match(css, /^\.vam-relation-derives_from \{ --vam-relation-width: 5px; \}/m); assert.match(css, /^\.vam-relation-gap \{[^}]*stroke: var\(--background-primary\);[^}]*stroke-width: 2px;/m);
+  assert.match(css, /^\.vam-relation-derives_from \{ --vam-relation-width: 4\.5px; \}/m); assert.match(css, /^\.vam-relation-gap \{[^}]*stroke: var\(--background-primary\);[^}]*stroke-width: 1\.5px;/m); // decision 35 A2: 5px/2px became 4.5px/1.5px
 });
 integrationTest('hypothesis-evidence: styles.css gives the six kinds their widths and patterns: 2px solid, 8 4, 1 5 round, 5px double, 1.25px, 10 4 2 4', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = selector => css.match(new RegExp(`^${selector.replace(/[.[\]"=_-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))[1];
-  assert.match(rule('.vam-relation'), /stroke-width:\s*var\(--vam-relation-width, 2px\)/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
+  assert.match(rule('.vam-relation'), /stroke-width:\s*var\(--vam-relation-width, 1\.75px\)/); /* decision 35 A2: 2px became 1.75px */ assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
   assert.match(rule('.vam-relation-supports'), /stroke-dasharray:\s*none/); assert.match(rule('.vam-relation-contradicts'), /stroke-dasharray:\s*8 4/);
   assert.match(rule('.vam-relation-verifies'), /stroke-dasharray:\s*1 5/); assert.match(rule('.vam-relation-verifies'), /stroke-linecap:\s*round/);
   assert.match(rule('.vam-relation-related'), /--vam-relation-width:\s*1\.25px/); assert.match(rule('.vam-relation-prerequisite'), /stroke-dasharray:\s*10 4 2 4/);
@@ -3129,4 +3129,70 @@ integrationTest('hypothesis-evidence: the end cards of a selected line outline t
   assert.ok(!line.includes('"action"'), 'action keeps the rectangular outline');
   assert.match(line, /outline: 0;[^}]*--vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px/);
   assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
+});
+// ---- hypothesis-evidence (P19, decision 35): visual polish of cards and lines ----
+integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM, the built-in sample and a skippable branch keep the plain accent edge (A1)', () => {
+  const topics = [node('root'), node('kid', 'root'), node('skip', 'root')];
+  const notes = heNotes([['root', {}], ['kid', {}], ['skip', { relevance: { tier: 'side' } }]]);
+  const edges = options => { const fx = heFixture({ topics, notes, ...options }); return heDrawn(fx.view, { root: [0, 0], kid: [400, 0], skip: [400, 200] }); };
+  const plain = edges({});
+  assert.equal(plain.length, 2);
+  const kid = plain.find(p => !p.classes.includes('vam-edge-side')), skip = plain.find(p => p.classes.includes('vam-edge-side'));
+  assert.ok(kid.classes.includes('vam-edge') && 'data-parent-line' in kid.attrs, 'an ordinary parent line is marked');
+  assert.equal('data-parent-line' in skip.attrs, false, 'a skippable branch keeps its own muted edge');
+  for (const options of [{ aim: true }, { builtIn: true }]) for (const p of edges(options)) { assert.equal('data-parent-line' in p.attrs, false); assert.deepEqual(p.classes.filter(c => c !== 'vam-edge'), []); }
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^path\[data-parent-line\] \{ stroke: color-mix\(in srgb, var\(--interactive-accent\) 35%, var\(--text-muted\)\); stroke-width: 1\.5px; \}/m);
+  assert.match(css, /^\.vam-edge \{ fill: none; stroke: var\(--interactive-accent\); stroke-width: 2; opacity: 1; \}/m, 'the shared .vam-edge rule is untouched');
+});
+integrationTest('hypothesis-evidence: atomic, evidence, conclusion and action cards carry a type tag in the header, a hypothesis keeps "Hypothesis · strength", an ordinary topic and AIM show none (B1)', () => {
+  const render = (kind, options = {}) => {
+    const f = heFixture({ notes: heNotes([['fact', kind === 'topic' ? {} : kind === 'hypothesis' ? heHyp('medium') : { topicKind: kind }], ['hyp', {}], ['other', {}]]), ...options });
+    f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === 'fact'));
+    const card = f.view.stageEl.children[0], tags = []; dom.find(card, c => { if ((c.cls ?? '').split(/\s+/).includes('vam-hypothesis-tag')) tags.push(c); return false; });
+    return tags;
+  };
+  for (const kind of ['atomic', 'evidence', 'conclusion', 'action']) {
+    const tags = render(kind); assert.equal(tags.length, 1, `${kind} has one tag`);
+    assert.equal(tags[0].text, heKindNames[heKindIds.indexOf(kind)]); assert.match(tags[0].cls, /vam-kind-tag/);
+  }
+  const hyp = render('hypothesis'); assert.equal(hyp.length, 1); assert.equal(hyp[0].text, 'Hypothesis · Medium'); assert.doesNotMatch(hyp[0].cls, /vam-kind-tag/, 'the hypothesis tag is the existing one');
+  assert.equal(render('topic').length, 0, 'an ordinary topic has no tag');
+  assert.equal(render('evidence', { aim: true }).length, 0, 'AIM has no tag');
+  assert.equal(render('evidence', { builtIn: true }).length, 0, 'the built-in sample has no tag');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) assert.ok(css.includes(`[data-topic-kind="${kind}"].vam-node .vam-hypothesis-tag`), `${kind} tag rule`);
+  assert.match(css, /\.vam-hypothesis-tag \{ color: color-mix\(in srgb, var\(--vam-kind-hue\) \d+%, var\(--text-normal\)\); \}/, 'the tag takes the type hue');
+});
+integrationTest('hypothesis-evidence: a hypothesis title clamps at 3 lines, a hypothesis or atomic summary at 2, an atomic title stays at 2, and the clipped text is in the title attribute (B2)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\[data-topic-kind="hypothesis"\] \.vam-card-title \{[^}]*-webkit-line-clamp: 3;[^}]*overflow: hidden;/m);
+  assert.match(css, /^\[data-topic-kind="atomic"\] \.vam-card-title \{[^}]*-webkit-line-clamp: 2;/m);
+  assert.match(css, /^\[data-topic-kind="hypothesis"\] \.vam-card-summary, \[data-topic-kind="atomic"\] \.vam-card-summary \{ -webkit-line-clamp: 2; \}/m);
+  const long = 'A long claim that would stretch the diamond far past the card height '.repeat(4).trim();
+  const f = heFixture({ notes: heNotes([['fact', { title: long, summary: long.toUpperCase() }], ['hyp', heHyp('weak')], ['other', {}]]) });
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === 'fact'));
+  const card = f.view.stageEl.children[0], has = name => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes(name));
+  assert.equal(has('vam-card-title').attrs.title, long); assert.equal(has('vam-card-summary').attrs.title, long.toUpperCase());
+});
+integrationTest('hypothesis-evidence: the polish rules start with a selector the share viewer does not collect, so its stylesheet carries none of them and keeps the plain .vam-edge and .vam-node rules (A1, A3, B1, B3)', async () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const { parseCss, extractViewerRules } = await import(require('node:url').pathToFileURL(path.join(root, 'scripts/viewer-css.mjs')).href);
+  const mine = parseCss(css).filter(chunk => /data-parent-line|:where\(\[data-node-id\]\)|\.vam-hypothesis-tag/.test(chunk.prelude));
+  assert.ok(mine.length >= 4, 'the polish rules exist');
+  const viewer = extractViewerRules(css).map(item => item.text).join('\n');
+  for (const chunk of mine) assert.equal(viewer.includes(chunk.text), false, `not in the viewer: ${chunk.prelude.slice(0, 60)}`);
+  assert.doesNotMatch(viewer, /data-parent-line|:where\(|vam-hypothesis-tag|vam-relation/);
+  assert.match(viewer, /^\.vam-edge \{ fill: none; stroke: var\(--interactive-accent\); stroke-width: 2; opacity: 1; \}$/m, 'the viewer still draws the accent edge');
+  assert.match(viewer, /^\.vam-node \{[^}]*border: 1px solid var\(--background-modifier-border\); border-radius: 12px;/m, 'and the unchanged card frame');
+});
+integrationTest('hypothesis-evidence: relation labels are muted and medium weight with a canvas halo; semantic lines mix the text colour with the canvas; an ordinary card frame uses the hover border token, below status and selection rules (A2, A3, B3)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => css.match(new RegExp(`^${selector.replace(/[.[\]"=_-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))[1];
+  assert.match(rule('.vam-relation-label'), /fill: var\(--text-muted\); font-weight: 500; stroke: var\(--background-primary\)/);
+  for (const name of ['.vam-relation', '.vam-relation-arrow', '.vam-relation-arrow-bar']) assert.match(rule(name), /color-mix\(in srgb, var\(--text-normal\) 78%, var\(--background-primary\)\)/, name);
+  assert.match(rule('.vam-relation.is-selected'), /stroke: var\(--interactive-accent\)/, 'a selected line stays accent');
+  const base = css.indexOf(':where([data-node-id]).vam-node:where(:not([data-aim-kind])) {'), running = css.indexOf('.vam-node:not([data-aim-kind])[data-status="running"] {'), selected = css.indexOf('.vam-node.is-selected {');
+  assert.ok(base > 0 && base < running && base < selected, 'the frame rule comes before the status and selection rules, which are at least as specific');
+  assert.match(css.slice(base, base + 200), /border-color: var\(--background-modifier-border-hover\)/);
 });

@@ -4130,6 +4130,7 @@ export class VisualAgentMapView extends ItemView {
     summary.empty();
     summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text });
+    summary.setAttr("title", text);
   }
   /**
    * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
@@ -4149,7 +4150,10 @@ export class VisualAgentMapView extends ItemView {
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
-      else summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+      else {
+        summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+        summary.setAttr("title", text);
+      }
       this.fitKindShape(card, this.topicKindOf(node.id));
       return;
     }
@@ -4159,6 +4163,7 @@ export class VisualAgentMapView extends ItemView {
     else {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
+      summary.setAttr("title", note.summary);
     }
     this.fitKindShape(card, this.topicKindOf(node.id));
   }
@@ -6584,6 +6589,8 @@ export class VisualAgentMapView extends ItemView {
       const strength = this.hypothesisStrengthOf(node.id);
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength) renderHypothesisTag(header, strength, kindText);
+      // The other typed cards name their type in the same quiet tag, coloured by the type's hue (decision 35); an ordinary topic shows none.
+      else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
@@ -6819,7 +6826,8 @@ export class VisualAgentMapView extends ItemView {
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -7392,6 +7400,7 @@ export class VisualAgentMapView extends ItemView {
         title.after(summary);
       }
       summary?.setText(note.summary);
+      summary?.setAttr("title", note.summary);
       summary?.removeClass("is-preview");
     }
     const header = card.querySelector<HTMLElement>(".vam-node-header");
@@ -12565,6 +12574,9 @@ export class VisualAgentMapView extends ItemView {
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
         if (!this.map.aim && !this.builtIn && this.notes.get(node.id)?.relevance?.tier === "side")
           path.addClass("vam-edge-side");
+        // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM, the sample and the share viewer keep the accent line.
+        else if (!this.map.aim && !this.builtIn && parentId === node.parentId)
+          path.setAttribute("data-parent-line", "");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
       }

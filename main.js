@@ -40177,6 +40177,7 @@ ${request.requirements}` : preset.text,
     summary.empty();
     summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text: text11 });
+    summary.setAttr("title", text11);
   }
   /**
    * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
@@ -40197,7 +40198,10 @@ ${request.requirements}` : preset.text,
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text11);
-      else (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
+      else {
+        (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
+        summary.setAttr("title", text11);
+      }
       this.fitKindShape(card, this.topicKindOf(node.id));
       return;
     }
@@ -40207,6 +40211,7 @@ ${request.requirements}` : preset.text,
     else {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
+      summary.setAttr("title", note.summary);
     }
     this.fitKindShape(card, this.topicKindOf(node.id));
   }
@@ -42278,7 +42283,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -42396,6 +42401,7 @@ ${request.requirements}` : preset.text,
       const strength = this.hypothesisStrengthOf(node.id);
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength) renderHypothesisTag(header, strength, kindText);
+      else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
       const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
@@ -42601,13 +42607,14 @@ ${request.requirements}` : preset.text,
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_M = note == null ? void 0 : note.summary) != null ? _M : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: (_M = note == null ? void 0 : note.summary) != null ? _M : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_N = note == null ? void 0 : note.summary) != null ? _N : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_N = this.map) == null ? void 0 : _N.aim) && !this.builtIn) {
+    if (node.aimKind === "conclusion" && ((_O = this.map) == null ? void 0 : _O.aim) && !this.builtIn) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -42620,7 +42627,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_O = this.map) == null ? void 0 : _O.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_P = this.map) == null ? void 0 : _P.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -42656,11 +42663,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_P = this.map) == null ? void 0 : _P.aim)) {
+    if (node.aimKind === "question" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_R = (_Q = node.aimQuestion) == null ? void 0 : _Q.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _R : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = node.aimQuestion) == null ? void 0 : _R.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -42703,11 +42710,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_S = this.map) == null ? void 0 : _S.aim)) {
+    if (node.aimKind === "answer" && ((_T = this.map) == null ? void 0 : _T.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_U = (_T = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _T.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _U : branch.answerSnapshot.selections;
+        const labels = (_V = (_U = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _U.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _V : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -43139,6 +43146,7 @@ ${request.requirements}` : preset.text,
         title.after(summary);
       }
       summary == null ? void 0 : summary.setText(note.summary);
+      summary == null ? void 0 : summary.setAttr("title", note.summary);
       summary == null ? void 0 : summary.removeClass("is-preview");
     }
     const header = card.querySelector(".vam-node-header");
@@ -47909,6 +47917,8 @@ ${addition}` : addition });
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
         if (!this.map.aim && !this.builtIn && ((_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier) === "side")
           path.addClass("vam-edge-side");
+        else if (!this.map.aim && !this.builtIn && parentId === node.parentId)
+          path.setAttribute("data-parent-line", "");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
       }

@@ -176,6 +176,8 @@ export interface MapChatHost {
   send(): void;
   /** The panel asks to stop the running request. */
   stop(): void;
+  /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button (the built-in sample already has one). */
+  createEmptyMap?(): void;
   /** The clock the stage seconds are counted on (tests); the real time when absent. */
   now?(): number;
   /** Resolves a `[[link]]` target to the vault path of the note it names, or null. */
@@ -294,6 +296,7 @@ export class MapChatPanel {
   private hintEl!: HTMLElement;
   private logEl!: HTMLElement;
   private suggestEl!: HTMLElement;
+  private emptyMapEl!: HTMLButtonElement;
   private suggestKey = "";
   private suggestInHero = false;
   private resizerEl!: HTMLElement;
@@ -1067,6 +1070,14 @@ export class MapChatPanel {
     });
     // Suggested messages (examples on the opening screen). Tab order: these, the chips, the message field, the controls.
     this.suggestEl = this.bodyEl.createDiv({ cls: "vam-map-chat-suggest", attr: { role: "group" } });
+    // Opening screen only: a secondary way in that needs no model. Placed after the examples when the screen is the opening one.
+    this.emptyMapEl = this.bodyEl.createEl("button", {
+      cls: "vam-map-chat-empty-map",
+      text: t("ui.create_an_empty_mind_map"),
+      attr: { type: "button" }
+    });
+    this.emptyMapEl.hidden = true;
+    this.emptyMapEl.addEventListener("click", () => this.host.createEmptyMap?.());
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -1445,6 +1456,13 @@ export class MapChatPanel {
     this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
     this.applyWidth();
     this.renderSuggestions();
+    const showEmptyMap = hero && !!this.host.createEmptyMap;
+    this.emptyMapEl.hidden = !showEmptyMap;
+    this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
+    if (showEmptyMap && this.bodyEl.children[this.bodyEl.children.length - 1] !== this.emptyMapEl) {
+      this.emptyMapEl.remove();
+      this.bodyEl.insertBefore(this.emptyMapEl, null);
+    }
     this.renderGuide();
     this.refreshSave();
     // Someone opens the window because a reply came in while it was folded: they land on the newest message.

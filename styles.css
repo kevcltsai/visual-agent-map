@@ -1427,3 +1427,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-relation-reason { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-modal .vam-relation-remaining { align-self: flex-end; color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-topic-modal .vam-relation-footer { margin-top: 20px; }
+.vam-map-chat button.vam-map-chat-empty-map { align-self: center; margin-top: 8px; }
+.vam-map-chat button.vam-map-chat-empty-map[hidden] { display: none; }

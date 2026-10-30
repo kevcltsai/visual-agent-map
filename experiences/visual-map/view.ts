@@ -6285,11 +6285,7 @@ export class VisualAgentMapView extends ItemView {
       this.button(actions, t("ui.duplicate_to_my_workspace"), () =>
         this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
-      this.button(actions, t("ui.create_an_empty_mind_map"), () =>
-        new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-          this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-        ).open()
-      );
+      this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
       if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
       // The opening screen of the chat: one sentence builds a new map of the user's own, which the sample cannot be.
       start.createDiv("vam-sample-start-chat");
@@ -10835,8 +10831,19 @@ export class VisualAgentMapView extends ItemView {
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
+  /** Asks for a name, then makes and opens an empty map. No AI. */
+  private promptEmptyMap(): void {
+    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
+      this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
+    ).open();
+  }
   private chatHost(): MapChatHost {
+    const emptyMap = (): (() => void) | undefined => (this.builtIn ? undefined : () => this.promptEmptyMap());
     return {
+      // The built-in sample's start card already has this button; read each time, the view can switch to the sample.
+      get createEmptyMap() {
+        return emptyMap();
+      },
       topicTitle: id => {
         const node = this.map?.nodes.find(item => item.id === id);
         return node ? (this.notes.get(id)?.title ?? node.path) : null;

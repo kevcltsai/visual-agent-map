@@ -2682,6 +2682,43 @@ integrationTest('B1 ui: the read-only sample shows the opening screen in its sta
   assert.equal(chat.hasMessages, true); assert.equal(chat.isHero, false, 'after the message it is the side window');
 });
 
+// ---- opening screen: create an empty map without AI ----------------------------------------------------------------
+
+integrationTest('45 ui: the opening screen has a secondary "create an empty mind map" button after the examples; reachable by Tab, named by its text, not the call to action', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  const button = chat.emptyMapEl; assert.equal(button.hidden, false); assert.equal(button.text, 'Create an empty mind map'); assert.equal(button.attrs.type, 'button'); assert.equal(button.hasClass('mod-cta'), false);
+  assert.equal(button.tabIndex === undefined || button.tabIndex >= 0, true, 'in the tab order');
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl || i === button); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === chat.suggestEl ? 'examples' : 'empty'), ['title', 'input', 'examples', 'empty']);
+});
+
+integrationTest('45 ui: the button opens the name box, makes no request, and cancelling the box makes no file', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  const created = []; h.plugin.repo.createMap = async title => { created.push(title); return 'Maps/x.vam'; }; h.view.openMapInMutation = async () => {};
+  const requests = h.control.requests.length, modals = (h.control.modals ?? []).length;
+  chat.emptyMapEl.click(); await tick();
+  assert.equal(h.control.modals.length, modals + 1, 'the name box opened'); assert.equal(h.control.modals.at(-1).constructor.name, 'NameModal');
+  // Cancel = the submit callback is never called.
+  h.control.modals.at(-1).close(); await tick();
+  assert.equal(created.length, 0, 'cancel creates nothing'); assert.equal(h.control.requests.length, requests, 'no AI request'); assert.equal(chat.isHero, true);
+  // Confirm = the callback runs and the map is made, still with no AI request.
+  chat.emptyMapEl.click(); await tick(); h.control.modals.at(-1).submit('My map'); await tick();
+  assert.deepEqual(created, ['My map']); assert.equal(h.control.requests.length, requests, 'still no AI request');
+});
+
+integrationTest('45 ui: after the first message the button is hidden, and a map with cards never shows it', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  assert.equal(chat.emptyMapEl.hidden, false);
+  h.type('Coffee'); await h.view.sendMapChat();
+  assert.equal(chat.isHero, false); assert.equal(chat.emptyMapEl.hidden, true, 'side window: hidden');
+  const g = await harness(); await g.view.hydrate(); g.repaint(); g.open(); assert.equal(g.view.chat.isHero, false); assert.equal(g.view.chat.emptyMapEl.hidden, true, 'a map with cards');
+});
+
+integrationTest('45 ui: the read-only sample\'s opening screen does not get a second button (its start card has one)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
+  const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore();
+  assert.equal(h.view.chat.isHero, true); assert.equal(h.view.chat.emptyMapEl.hidden, true);
+});
+
 // ---- suggestions -------------------------------------------------------------------------------------------------
 
 test('B1 ui: there are two to four suggestions in every situation, and they change with the selection and with a note beside the map', () => {

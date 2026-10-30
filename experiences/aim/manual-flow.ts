@@ -1101,7 +1101,7 @@ export class AimManualFlow {
           (node.parentId === result.nodeId || node.aimConvergesFromNodeIds?.includes(result.nodeId))
       );
       if (existing) continue;
-      const model = attempt.model ?? "gpt-6-luna",
+      const model = attempt.model ?? this.repository.settings.cliModel,
         reasoning = attempt.reasoningLevel ?? "low";
       const answerOptions = normalizePersistedAnswerOptions(review.answerOptions);
       const saved = await this.saveManualQuestion(
@@ -1167,7 +1167,7 @@ export class AimManualFlow {
     const answeredQuestionCount = this.answerCountInLineage(map, branch.id);
     const floor = this.floorFor(topic.detail, map);
     // The attempt's own model wins: readNote().model is always filled (it follows the workspace model).
-    const model = priorAttempt.model || diagnostic.model || "gpt-6-luna";
+    const model = priorAttempt.model || diagnostic.model || this.repository.settings.cliModel;
     const taskDefaults: TaskContext = {
       timeoutMs: branch.retryTimeoutMs,
       title: topic.title,
@@ -1571,7 +1571,7 @@ export class AimManualFlow {
     const floor = this.floorFor(topicNote.detail, map);
     const explorationTarget = map.aim?.minimumAnswersBeforeConclusion ?? 2;
     const questionsAlreadyAsked = await this.questionHistory(map, branch.id);
-    const modelToUse = model?.trim() || priorAttempt.model || "gpt-6-luna";
+    const modelToUse = model?.trim() || priorAttempt.model || this.repository.settings.cliModel;
     const taskDefaults: TaskContext = {
       timeoutMs: branch.retryTimeoutMs,
       title: topicNote.title,

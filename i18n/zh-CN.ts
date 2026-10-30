@@ -1049,6 +1049,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_do_research_standard": "对选取的议题开始标准研究",
   "ui.map_chat_do_expand_0": "为 {0} 个议题展开子议题",
   "ui.map_chat_do_synthesize": "整合选取的议题（以你的消息为方向，不打开窗口）",
+  "ui.map_chat_model_suffix_0": "（{0}）",
+  "ui.map_chat_model_separator": "、",
   "ui.map_chat_do_rate_0": "依目标“{0}”分级议题",
   "ui.map_chat_do_merge_0": "把选取的议题合并成“{0}”",
   "ui.map_chat_do_create_map_0": "建立新地图“{0}”",

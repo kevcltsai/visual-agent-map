@@ -80,6 +80,7 @@
 .vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
 .vam-relation { fill: none; stroke-width: 2; pointer-events: none; }
 .vam-relation-evidence { stroke: var(--text-muted); stroke-dasharray: 12 5; }
+.vam-relation-prerequisite { stroke: var(--text-muted); stroke-dasharray: 1 6; stroke-linecap: round; }
 .vam-relation-arrow { fill: var(--text-muted); stroke: none; }
 /* Written with the attribute first so the share viewer, which does not show hypotheses, does not pick the rule up (scripts/viewer-css.mjs). */
 [data-topic-kind="hypothesis"].vam-node { border-width: 2px; border-color: var(--text-muted); }

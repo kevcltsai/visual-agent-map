@@ -318,6 +318,19 @@ integrationTest('hypothesis-evidence: a merge that would close a prerequisite cy
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
+integrationTest('hypothesis-evidence: a merge that drops a cycle-closing prerequisite shows the count in a Notice, and undo brings the link back; a merge that drops none shows nothing', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.f2)]);
+  const original = await h.relations();
+  await h.mergeKeys(['f1', 'f2']);
+  assert.deepEqual(h.notices, ['Removed 1 prerequisite link(s) that would form a cycle']);
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original, 'undo restores the dropped link too');
+  const quiet = await heHarness();
+  await quiet.relate([heRel('prerequisite', quiet.ids.f1, quiet.ids.x)]);
+  await quiet.mergeKeys(['f1', 'f2']);
+  assert.deepEqual(quiet.notices, [], 'nothing dropped: no Notice');
+});
 integrationTest('hypothesis-evidence: merging subtopics into a parent re-points their links to the parent and dedupes', async () => {
   const h = await heHarness();
   // f1 and f2 become children of x; x is the parent that keeps its identity.

@@ -37,7 +37,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 </div>
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
-    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/><defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><path class="vam-relation vam-relation-evidence" d="M0 50 L200 50" marker-end="url(#m)"/></svg>
+    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/><defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><path class="vam-relation vam-relation-prerequisite" d="M0 70 L200 70" marker-end="url(#m)"/><path class="vam-relation vam-relation-evidence" d="M0 50 L200 50" marker-end="url(#m)"/></svg>
     ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
     ${card('data-topic-kind="hypothesis" data-status="completed"', 660, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">Hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
@@ -63,6 +63,7 @@ const CASES = [
   ['edge-skippable', '.vam-edge.vam-edge-side', 'stroke', 3],
   ['edge-convergence', '.vam-edge-convergence', 'stroke', 3],
   ['edge-evidence', '.vam-relation-evidence', 'stroke', 3],
+  ['edge-prerequisite', '.vam-relation-prerequisite', 'stroke', 3],
   ['evidence-arrow', '.vam-relation-arrow', 'fill', 3],
   ['hypothesis-border', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])', 'border', 3],
   ['hypothesis-border-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]', 'border', 3],
@@ -260,8 +261,8 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         const details = await evaluate(`(() => {
           const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
           const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
-          const evidence = document.querySelector('.vam-relation-evidence'), convergence = document.querySelector('.vam-edge-convergence'), hyp = document.querySelector('.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])'), hypSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]');
-          return { evidenceDash: getComputedStyle(evidence).strokeDasharray, convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, evidencePointer: getComputedStyle(evidence).pointerEvents, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
+          const evidence = document.querySelector('.vam-relation-evidence'), prerequisite = document.querySelector('.vam-relation-prerequisite'), convergence = document.querySelector('.vam-edge-convergence'), hyp = document.querySelector('.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])'), hypSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]');
+          return { prerequisiteDash: getComputedStyle(prerequisite).strokeDasharray, prerequisiteCap: getComputedStyle(prerequisite).strokeLinecap, prerequisitePointer: getComputedStyle(prerequisite).pointerEvents, evidenceDash: getComputedStyle(evidence).strokeDasharray, convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, evidencePointer: getComputedStyle(evidence).pointerEvents, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
             hypWidth: getComputedStyle(hyp).borderTopWidth, hypStyle: getComputedStyle(hyp).borderTopStyle, hypSideWidth: getComputedStyle(hypSide).borderTopWidth, hypSideStyle: getComputedStyle(hypSide).borderTopStyle, coreWidth: getComputedStyle(core).borderTopWidth,
             sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
             edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
@@ -293,6 +294,11 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
       // hypothesis-evidence: the new line type and frame stay distinguishable without colour (dash pattern, frame weight) and leave the old ones alone.
       assert.notEqual(details.evidenceDash, 'none', `${scheme}: an evidence link is dashed`);
       assert.notEqual(details.evidenceDash, details.convergenceDash, `${scheme}: evidence dashes differ from the AIM 5 5 convergence dashes`);
+      assert.notEqual(details.prerequisiteDash, 'none', `${scheme}: a prerequisite link is dotted`);
+      assert.notEqual(details.prerequisiteDash, details.evidenceDash, `${scheme}: prerequisite dots differ from the evidence dashes`);
+      assert.notEqual(details.prerequisiteDash, details.convergenceDash, `${scheme}: prerequisite dots differ from the AIM 5 5 dashes`);
+      assert.equal(details.prerequisiteCap, 'round', `${scheme}: the dots are round`);
+      assert.equal(details.prerequisitePointer, 'none', `${scheme}: a prerequisite link does not take pointer events`);
       assert.equal(details.edgeDash, 'none', `${scheme}: the parent-child line stays solid`);
       assert.equal(details.edgesPointer, 'none', `${scheme}: the edge layer keeps pointer-events none`);
       assert.equal(details.evidencePointer, 'none', `${scheme}: an evidence link does not take pointer events`);

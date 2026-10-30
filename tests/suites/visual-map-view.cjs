@@ -2190,3 +2190,77 @@ integrationTest('hypothesis-evidence: a strength change rewrites the note and Ma
   assert.deepEqual(writes, [['hyp.md', 'strong']]); assert.equal(pushed.length, 1, 'one undo step');
   assert.deepEqual(pressed(), ['Strong']);
 });
+
+// ---- hypothesis-evidence (P4): prerequisite picker, dotted line, panel rows ----
+integrationTest('hypothesis-evidence: the prerequisite picker lists neither itself, an existing source nor a source that would close a cycle (direct or indirect), and ends on a hand-written cycle', () => {
+  const topics = [node('a'), node('b'), node('c'), node('d'), node('e')];
+  const notes = heNotes(topics.map(n => [n.id, {}]));
+  const relations = [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'c' }, { kind: 'prerequisite', from: 'd', to: 'c' }];
+  const { view, modals, notices } = heFixture({ topics, notes, relations });
+  view.choosePrerequisiteSource(view.map.nodes[0]);
+  assert.equal(modals.length, 1); assert.deepEqual(notices, []);
+  const pickable = id => modals[0].selectable(view.map.nodes.find(n => n.id === id));
+  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(pickable), ['d', 'e'], 'for A: not itself, and not b or c, which A already leads to (b->a or c->a would close a cycle, directly or through b)');
+  const forC = heFixture({ topics, notes, relations }); forC.view.choosePrerequisiteSource(forC.view.map.nodes[2]);
+  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(id => forC.modals[0].selectable(forC.view.map.nodes.find(n => n.id === id))), ['a', 'e'], 'for C: not itself, not the existing sources b and d');
+  const loop = heFixture({ topics, notes, relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'a' }] });
+  loop.view.choosePrerequisiteSource(loop.view.map.nodes[0]);
+  assert.equal(loop.modals.length, 1, 'a hand-written cycle does not hang or hide the picker');
+  const all = [node('a'), node('b')];
+  const none = heFixture({ topics: all, notes: heNotes(all.map(n => [n.id, {}])), relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'a' }] });
+  none.view.choosePrerequisiteSource(none.view.map.nodes[0]);
+  assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic that can be a prerequisite for this one.']);
+});
+integrationTest('hypothesis-evidence: a prerequisite line is dotted, runs from A to B with the arrowhead at B, and shares the view marker with evidence', () => {
+  const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'evidence', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
+  const { view } = heFixture({ relations });
+  const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
+  const pre = kids.filter(k => k.classes.includes('vam-relation-prerequisite'));
+  assert.equal(pre.length, 2); assert.ok(pre.every(k => k.classes.includes('vam-relation')));
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-evidence')).length, 1, 'the evidence line for the same pair is separate');
+  const marker = kids.find(k => k.tag === 'defs').children[0].attrs.id;
+  assert.equal(kids.filter(k => k.tag === 'defs').length, 1, 'one marker serves both kinds');
+  const aToB = pre.find(k => / 0 50$/.test(k.attrs.d));
+  assert.ok(aToB, 'other (A) at (0,200) to fact (B): ends at the left edge of B'); assert.match(aToB.attrs.d, /^M 280 250 C /, 'starts at A');
+  assert.equal(aToB.attrs['marker-end'], `url(#${marker})`, 'the arrowhead is at the end, which is B');
+  const toHyp = pre.find(k => / 500 90$/.test(k.attrs.d)); assert.ok(toHyp); assert.equal(toHyp.attrs['marker-end'], `url(#${marker})`);
+  const drag = view.dragEdges('other', view.cardEls.get('other')); drag.update(0, 400);
+  assert.match(aToB.attrs.d, /^M 280 450 C /, 'dragging A moves the prerequisite line');
+});
+integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is, and an AIM map or the built-in sample draws no prerequisite', () => {
+  const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
+  const { view, logs } = heFixture({ relations });
+  const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-prerequisite')).length, 2, 'both halves of the cycle are drawn'); assert.deepEqual(logs, [], 'and nothing is logged or dropped');
+  assert.equal(view.map.topicRelations.length, 2);
+  view.map.aim = { mode: 'x' };
+  assert.equal(heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
+  const sample = heFixture({ relations, builtIn: true });
+  assert.equal(heDrawn(sample.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
+  const collapsed = heFixture({ relations }); assert.equal(heDrawn(collapsed.view, { fact: [0, 0], hyp: [500, 40] }).filter(k => k.classes.includes('vam-relation-prerequisite')).length, 0, 'an off-screen end is skipped');
+});
+integrationTest('hypothesis-evidence: styles.css gives the prerequisite line a dotted round-capped pattern unlike evidence, AIM and the solid parent line', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm')); assert.ok(m, `rule ${selector}`); return m[1]; };
+  const pre = rule('.vam-relation-prerequisite'), dash = pre.match(/stroke-dasharray:\s*([^;]+);/)[1].trim(), evidence = rule('.vam-relation-evidence').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
+  assert.match(pre, /stroke-linecap:\s*round/); assert.notEqual(dash, evidence); assert.notEqual(dash, '5 5'); assert.ok(dash !== 'none');
+  assert.match(rule('.vam-relation'), /pointer-events:\s*none/); assert.match(rule('.vam-edges'), /pointer-events:\s*none/);
+});
+integrationTest('hypothesis-evidence: the panel lists prerequisites at both ends, each row is removable through mapChange, and the add button is on topics and hypotheses alike', async () => {
+  const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'evidence', from: 'fact', to: 'hyp' }];
+  const { view, doc } = heFixture({ relations });
+  const changes = []; view.enqueue = work => work();
+  view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
+  const bPanel = dom.element('panel'); view.renderHypothesisSection(bPanel, view.map.nodes[2]);
+  assert.ok(dom.texts(bPanel).includes('Prerequisites') && dom.texts(bPanel).includes('This topic is a prerequisite for'), 'both headings');
+  assert.ok(dom.byLabel(bPanel, 'Remove prerequisite link: FACT'), 'A is listed on B'); assert.ok(dom.byLabel(bPanel, 'Remove prerequisite link: HYP'), 'B is listed on A');
+  for (const id of ['hyp', 'fact']) { const p = dom.element('panel'); view.renderHypothesisSection(p, view.map.nodes.find(n => n.id === id)); assert.ok(dom.buttons(p).includes('Add prerequisite…'), `add button for ${id}`); }
+  await dom.byLabel(bPanel, 'Remove prerequisite link: FACT').fire('click'); await dom.tick();
+  assert.equal(changes.length, 1); assert.equal(changes[0], false);
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'evidence', from: 'fact', to: 'hyp' }], 'only that link is removed');
+  const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
+  await dom.byLabel(hypPanel, 'Remove prerequisite link: OTHER').fire('click'); await dom.tick();
+  assert.equal(changes.length, 2); assert.equal(doc.topicRelations.some(r => r.kind === 'prerequisite'), false, 'removable from the other end too');
+  await view.addPrerequisite('fact', 'other'); await view.addPrerequisite('fact', 'other'); await view.addPrerequisite('other', 'fact'); await view.addPrerequisite('hyp', 'hyp');
+  assert.deepEqual(plain(doc.topicRelations.filter(r => r.kind === 'prerequisite')), [{ kind: 'prerequisite', from: 'fact', to: 'other' }], 'added once; duplicate, cycle-closing and self links refused');
+});

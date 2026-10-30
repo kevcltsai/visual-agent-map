@@ -45662,7 +45662,7 @@ ${request.requirements}` : preset.text,
         () => this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
       this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
-      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      if (this.needsConnectionCheck()) this.renderConnectionCheck(actions);
       start.createDiv("vam-sample-start-chat");
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
@@ -48352,6 +48352,10 @@ ${request.requirements}` : preset.text,
     }
   }
   /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  /** No model is usable yet: neither Codex models nor a ready Claude Code. Claude counts, so a Claude-only setup gets no check button. */
+  needsConnectionCheck() {
+    return !this.plugin.availableModels().length;
+  }
   renderConnectionCheck(actions) {
     const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
     return this.button(

@@ -1290,7 +1290,7 @@ export class Repository {
     modelSource: ModelSource,
     initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> & {
       topicKind?: TopicKind;
-      /** Deprecated alias of `topicKind: "hypothesis"`; kept until merge-topics.cjs moves to `topicKind` (P14). */
+      /** Deprecated alias of `topicKind: "hypothesis"`, kept per decision #30. */
       hypothesis?: true;
     } = {},
     onCreate?: (path: string) => void

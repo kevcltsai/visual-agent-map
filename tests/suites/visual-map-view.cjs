@@ -2305,6 +2305,63 @@ integrationTest('hypothesis-evidence: dragging a card moves the evidence line wi
   const dragHyp = view.dragEdges('hyp', view.cardEls.get('hyp')); dragHyp.update(900, 0);
   assert.match(line.attrs.d, / 900 50$/);
 });
+integrationTest('hypothesis-evidence: the barred marker puts the bar on the line before the arrowhead base, and both tips sit on refX (R3-1)', () => {
+  const { kids } = heSix();
+  const [arrow, bar] = kids.find(k => k.tag === 'defs').children;
+  const tip = m => Math.max(...heNums(m.children[0].attrs.d).filter((_, i) => i % 2 === 0));
+  const baseX = m => Math.min(...heNums(m.children[0].attrs.d).filter((_, i) => i % 2 === 0));
+  assert.equal(arrow.attrs.refX, '10'); assert.equal(tip(arrow), Number(arrow.attrs.refX), 'plain arrow: the tip is the reference point, so it stops at the card edge');
+  assert.equal(tip(bar), Number(bar.attrs.refX), 'barred arrow: the tip is the reference point');
+  assert.equal(Number(bar.attrs.viewBox.split(' ')[2]), tip(bar), 'nothing is drawn past the tip, where the opaque card would hide it');
+  const barX = heNums(bar.children[1].attrs.d).filter((_, i) => i % 2 === 0);
+  assert.equal(new Set(barX).size, 1, 'the bar is vertical'); assert.ok(barX[0] >= 0 && barX[0] <= baseX(bar), `bar x ${barX[0]} is on the line, before the arrowhead base ${baseX(bar)}`);
+  assert.ok(baseX(bar) < tip(bar));
+});
+integrationTest('hypothesis-evidence: relationOffsets gives a single line 0 and fans parallel lines out in list order, either direction, per pair (R3-2)', () => {
+  const { relationOffsets } = heGeo();
+  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }])), [0]);
+  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'a', to: 'b' }])), [0, 12]);
+  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'a', to: 'b' }])), [0, 12, -12, 24, -24]);
+  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }])), [0, -12], 'the reverse of the pair counts as the same pair, mirrored into its own frame');
+  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }, { from: 'b', to: 'a' }])), [0, 0, -12], 'another pair in between does not take a slot');
+  const { relationPathData } = heGeo(), a = heBox(0, 0), b = heBox(500, 0);
+  const forward = heNums(relationPathData(a, b, 12)), backward = heNums(relationPathData(b, a, -12));
+  assert.deepEqual(forward, [280, 62, 340, 62, 440, 62, 500, 62], 'a to b shifts 12 down');
+  assert.equal(backward[1], 62, 'the reversed line (own frame -12) lands on the same side, so the two do not cross');
+  assert.equal(relationPathData(a, b, 0), relationPathData(a, b), 'offset 0 is the plain path');
+  const vertical = heNums(relationPathData(heBox(0, 0), heBox(0, 200), 12));
+  assert.deepEqual([vertical[0], vertical[6]], [128, 128], 'top-bottom layout shifts sideways');
+});
+integrationTest('hypothesis-evidence: several relations on one pair of topics are drawn apart; path, hit, derives-from gap and label move together (R3-2)', () => {
+  const rel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'other' }];
+  const fx = heFixture({ relations: rel });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 0], other: [0, 300] });
+  const ys = cls => kids.filter(k => k.classes.includes(cls));
+  const supports = ys('vam-relation-supports'), derives = ys('vam-relation-derives_from')[0], contradicts = ys('vam-relation-contradicts')[0], gap = ys('vam-relation-gap')[0];
+  assert.equal(supports[0].attrs.d, 'M 280 50 C 340 50, 440 50, 500 50', 'the first line of the pair is unshifted');
+  assert.equal(derives.attrs.d, 'M 280 62 C 340 62, 440 62, 500 62', 'the second is 12 down');
+  assert.equal(contradicts.attrs.d, 'M 500 38 C 440 38, 340 38, 280 38', 'the third (reversed) is 12 up');
+  assert.notEqual(supports[1].attrs.d, supports[0].attrs.d); assert.match(supports[1].attrs.d, /^M 140 100 /, 'a different pair is unaffected');
+  assert.equal(gap.attrs.d, derives.attrs.d, 'the inner gap line follows its line');
+  const hits = ys('vam-relation-hit').map(h => h.attrs.d);
+  for (const line of [supports[0], derives, contradicts]) assert.ok(hits.includes(line.attrs.d), 'every line has a hit path on the same curve');
+  assert.deepEqual(ys('vam-relation-label').map(l => l.attrs.y).slice(0, 3), ['50', '62', '38'], 'labels sit on their own line');
+  const drag = fx.view.dragEdges('fact', fx.view.cardEls.get('fact')); drag.update(0, 100);
+  assert.match(derives.attrs.d, /^M 280 162 C .* 500 62$/, 'dragging keeps the 12px shift'); assert.match(supports[0].attrs.d, /^M 280 150 /); assert.match(contradicts.attrs.d, / 280 138$/);
+  assert.equal(gap.attrs.d, derives.attrs.d); assert.ok(ys('vam-relation-hit').map(h => h.attrs.d).includes(derives.attrs.d), 'the hit path follows too');
+  assert.equal(ys('vam-relation-label')[1].attrs.y, '112', 'and so does the label');
+});
+integrationTest('hypothesis-evidence: after a relation is added from the panel the focus is on the new "Add relation…" button (R3-3)', async () => {
+  const { view, modals, menus } = heFixture();
+  view.enqueue = work => work(); view.mapChange = async (change) => { change(view.map); };
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  const before = dom.button(panel, 'Add relation…'); before.click();
+  menus.at(-1).clicks[0](); modals[0].choose(view.map.nodes[2]); await dom.tick();
+  const after = dom.button(panel, 'Add relation…');
+  assert.notEqual(after, before, 'the panel was repainted, so the old button is gone');
+  assert.ok(after.focused, 'the keyboard user lands on the replacement button, not on the body');
+  assert.ok(!before.focused);
+});
 integrationTest('hypothesis-evidence: adding and removing a relation in the panel go through mapChange (undoable); an illegal target is refused', async () => {
   const { view, doc } = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] });
   const changes = []; view.enqueue = work => work();
@@ -2397,7 +2454,7 @@ integrationTest('hypothesis-evidence: a prerequisite line runs from A to B along
   const aToB = pre.find(k => / 140 100$/.test(k.attrs.d));
   assert.ok(aToB, 'other (A) is below fact (B): the line ends on the bottom edge of B'); assert.match(aToB.attrs.d, /^M 140 200 C /, 'and starts on the top edge of A');
   assert.equal(aToB.attrs['marker-end'], `url(#${marker})`, 'the arrowhead is at the end, which is B');
-  const toHyp = pre.find(k => / 500 90$/.test(k.attrs.d)); assert.ok(toHyp); assert.equal(toHyp.attrs['marker-end'], `url(#${marker})`);
+  const toHyp = pre.find(k => / 500 102$/.test(k.attrs.d)); assert.ok(toHyp, 'second line on the fact/hyp pair: shifted 12px down (R3-2), 90 + 12'); assert.equal(toHyp.attrs['marker-end'], `url(#${marker})`);
   const drag = view.dragEdges('other', view.cardEls.get('other')); drag.update(0, 400);
   assert.match(aToB.attrs.d, /^M 140 400 C /, 'dragging A moves the prerequisite line');
 });

@@ -17,7 +17,7 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import { relationMidpoint, relationPathData, type RelationBox } from "./relation-geometry";
+import { relationMidpoint, relationOffsets, relationPathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -753,6 +753,8 @@ export class VisualAgentMapView extends ItemView {
   private relationLabelEls = new Map<string, SVGTextElement>();
   /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
   private relationGapEls = new Map<string, SVGPathElement>();
+  /** Sideways shift of each line from the others on the same pair of topics (see `relationOffsets`). */
+  private relationOffsetBy = new Map<string, number>();
   private relationData = new Map<string, TopicRelation>();
   /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
   private relationPainted = new Set<string>();
@@ -8189,7 +8191,7 @@ export class VisualAgentMapView extends ItemView {
       });
     });
     const body = section.createDiv("vam-hypothesis-body");
-    const paint = (focusStrength = false, focusKind = false): void => {
+    const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading" });
@@ -8261,8 +8263,12 @@ export class VisualAgentMapView extends ItemView {
       const addRelation = body.createEl("button", { text: t("ui.add_relation") });
       addRelation.addEventListener("click", event => {
         event.stopPropagation();
-        this.openRelationKindMenu(event, kind => this.chooseRelationTarget(node, kind, paint));
+        this.openRelationKindMenu(event, kind =>
+          this.chooseRelationTarget(node, kind, () => paint(false, false, true))
+        );
       });
+      // Repainting replaced the button that started the flow; a keyboard user lands back on its replacement.
+      if (focusAdd) addRelation.focus();
     };
     paint();
   }
@@ -12510,11 +12516,12 @@ export class VisualAgentMapView extends ItemView {
           const mine = { x, y, ...size },
             from = link.dragIsFrom ? mine : link.far,
             to = link.dragIsFrom ? link.far : mine,
-            d = relationPathData(from, to);
+            offset = this.relationOffsetBy.get(link.key) ?? 0,
+            d = relationPathData(from, to, offset);
           path.setAttribute("d", d);
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationMidpoint(from, to));
+          this.placeRelationLabel(link.key, relationMidpoint(from, to, offset));
         }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
@@ -12578,6 +12585,7 @@ export class VisualAgentMapView extends ItemView {
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
     this.relationGapEls.clear();
+    this.relationOffsetBy.clear();
     this.relationData.clear();
     this.relationLabelAt.clear();
     this.relationPainted.clear();
@@ -12597,12 +12605,14 @@ export class VisualAgentMapView extends ItemView {
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
+    const offsets = relationOffsets(links.map(link => link.relation));
+    links.forEach((link, index) => this.relationOffsetBy.set(link.key, offsets[index]));
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to)),
+      const d = relationPathData(boxOf(link.from), boxOf(link.to), this.relationOffsetBy.get(link.key) ?? 0),
         marker =
           link.kind === "related"
             ? null
@@ -12658,34 +12668,43 @@ export class VisualAgentMapView extends ItemView {
       label.addClass("vam-relation-label");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
+      this.placeRelationLabel(
+        link.key,
+        relationMidpoint(boxOf(link.from), boxOf(link.to), this.relationOffsetBy.get(link.key) ?? 0)
+      );
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
-  /** An arrowhead whose tip sits on the end of the line; the barred one adds a bar across the line just past the tip. */
+  /**
+   * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The
+   * barred one puts the bar on the line before the arrowhead's base: past the tip it would sit under the opaque card.
+   * Plain: viewBox 10 wide, base x 0, tip x 10. Barred: 14 wide, bar x 1, base x 4, tip x 14.
+   */
   private relationMarker(id: string, barred: boolean): SVGMarkerElement {
     const marker = createSvg("marker"),
-      arrow = createSvg("path");
+      arrow = createSvg("path"),
+      width = barred ? 14 : 10,
+      base = barred ? 4 : 0;
     marker.setAttribute("id", id);
-    marker.setAttribute("viewBox", barred ? "0 0 14 10" : "0 0 10 10");
-    marker.setAttribute("refX", "9");
+    marker.setAttribute("viewBox", `0 0 ${width} 10`);
+    marker.setAttribute("refX", String(width));
     marker.setAttribute("refY", "5");
-    marker.setAttribute("markerWidth", barred ? "14" : "10");
+    marker.setAttribute("markerWidth", String(width));
     marker.setAttribute("markerHeight", "10");
     marker.setAttribute("markerUnits", "userSpaceOnUse");
     marker.setAttribute("orient", "auto");
-    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.setAttribute("d", `M ${base} 0 L ${width} 5 L ${base} 10 z`);
     arrow.addClass("vam-relation-arrow");
-    marker.appendChild(arrow);
     if (barred) {
       const bar = createSvg("path");
-      bar.setAttribute("d", "M 12 0 L 12 10");
+      bar.setAttribute("d", "M 1 0 L 1 10");
       bar.addClass("vam-relation-arrow-bar");
+      marker.appendChild(arrow);
       marker.appendChild(bar);
-    }
+    } else marker.appendChild(arrow);
     return marker;
   }
   /**

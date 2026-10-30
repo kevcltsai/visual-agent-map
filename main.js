@@ -17201,22 +17201,46 @@ function nearestSides(a, b) {
   };
 }
 var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
-function curveOf(a, b) {
+var RELATION_OFFSET_STEP = 12;
+function curveOf(a, b, offset = 0) {
   const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
+  let sx = 0, sy = 0;
+  if (offset) {
+    let nx = from.nx, ny = from.ny;
+    if (!nx && !ny) {
+      nx = to.x - from.x;
+      ny = to.y - from.y;
+      const size = Math.hypot(nx, ny) || 1;
+      nx /= size;
+      ny /= size;
+    }
+    sx = -ny * offset;
+    sy = nx * offset;
+  }
   return {
-    p1: { x: from.x, y: from.y },
-    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
-    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
-    p2: { x: to.x, y: to.y }
+    p1: { x: from.x + sx, y: from.y + sy },
+    c1: { x: from.x + from.nx * length + sx, y: from.y + from.ny * length + sy },
+    c2: { x: to.x + to.nx * length + sx, y: to.y + to.ny * length + sy },
+    p2: { x: to.x + sx, y: to.y + sy }
   };
 }
-function relationPathData(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
+function relationPathData(a, b, offset = 0) {
+  const { p1, c1, c2, p2 } = curveOf(a, b, offset);
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
-function relationMidpoint(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
+function relationMidpoint(a, b, offset = 0) {
+  const { p1, c1, c2, p2 } = curveOf(a, b, offset);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+function relationOffsets(relations) {
+  const seen = /* @__PURE__ */ new Map();
+  return relations.map(({ from, to }) => {
+    var _a2;
+    const forward = from <= to, key2 = forward ? `${from}\0${to}` : `${to}\0${from}`, index = (_a2 = seen.get(key2)) != null ? _a2 : 0;
+    seen.set(key2, index + 1);
+    const step = Math.ceil(index / 2) * RELATION_OFFSET_STEP, signed = index % 2 === 1 ? step : -step;
+    return signed * (forward ? 1 : -1) || 0;
+  });
 }
 
 // experiences/visual-map/topic-kind-shape.ts
@@ -36981,6 +37005,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "relationLabelEls", /* @__PURE__ */ new Map());
     /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
     __publicField(this, "relationGapEls", /* @__PURE__ */ new Map());
+    /** Sideways shift of each line from the others on the same pair of topics (see `relationOffsets`). */
+    __publicField(this, "relationOffsetBy", /* @__PURE__ */ new Map());
     __publicField(this, "relationData", /* @__PURE__ */ new Map());
     /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
     __publicField(this, "relationPainted", /* @__PURE__ */ new Set());
@@ -43854,7 +43880,7 @@ ${request.requirements}` : preset.text,
       });
     });
     const body = section3.createDiv("vam-hypothesis-body");
-    const paint = (focusStrength = false, focusKind = false) => {
+    const paint = (focusStrength = false, focusKind = false, focusAdd = false) => {
       var _a2, _b2, _c, _d;
       body.empty();
       const currentKind = this.topicKindOf(node.id);
@@ -43924,8 +43950,12 @@ ${request.requirements}` : preset.text,
       const addRelation = body.createEl("button", { text: t("ui.add_relation") });
       addRelation.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.openRelationKindMenu(event, (kind) => this.chooseRelationTarget(node, kind, paint));
+        this.openRelationKindMenu(
+          event,
+          (kind) => this.chooseRelationTarget(node, kind, () => paint(false, false, true))
+        );
       });
+      if (focusAdd) addRelation.focus();
     };
     paint();
   }
@@ -47828,15 +47858,15 @@ ${addition}` : addition });
     }
     return {
       update: (x, y) => {
-        var _a2, _b2;
+        var _a2, _b2, _c;
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
-          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, d = relationPathData(from, to);
+          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, offset = (_a2 = this.relationOffsetBy.get(link.key)) != null ? _a2 : 0, d = relationPathData(from, to, offset);
           path.setAttribute("d", d);
-          (_a2 = this.relationHitEls.get(link.key)) == null ? void 0 : _a2.setAttribute("d", d);
-          (_b2 = this.relationGapEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationMidpoint(from, to));
+          (_b2 = this.relationHitEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
+          (_c = this.relationGapEls.get(link.key)) == null ? void 0 : _c.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationMidpoint(from, to, offset));
         }
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
@@ -47895,11 +47925,12 @@ ${addition}` : addition });
    * draws none, and its file keeps the key.
    */
   drawRelations() {
-    var _a2;
+    var _a2, _b2, _c;
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
     this.relationGapEls.clear();
+    this.relationOffsetBy.clear();
     this.relationData.clear();
     this.relationLabelAt.clear();
     this.relationPainted.clear();
@@ -47912,12 +47943,14 @@ ${addition}` : addition });
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
+    const offsets = relationOffsets(links.map((link) => link.relation));
+    links.forEach((link, index) => this.relationOffsetBy.set(link.key, offsets[index]));
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to)), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
+      const d = relationPathData(boxOf(link.from), boxOf(link.to), (_b2 = this.relationOffsetBy.get(link.key)) != null ? _b2 : 0), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
       const path = createSvg("path");
       path.setAttribute("d", d);
       if (marker5) path.setAttribute("marker-end", marker5);
@@ -47965,32 +47998,39 @@ ${addition}` : addition });
       label.addClass("vam-relation-label");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
+      this.placeRelationLabel(
+        link.key,
+        relationMidpoint(boxOf(link.from), boxOf(link.to), (_c = this.relationOffsetBy.get(link.key)) != null ? _c : 0)
+      );
     }
     if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
-  /** An arrowhead whose tip sits on the end of the line; the barred one adds a bar across the line just past the tip. */
+  /**
+   * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The
+   * barred one puts the bar on the line before the arrowhead's base: past the tip it would sit under the opaque card.
+   * Plain: viewBox 10 wide, base x 0, tip x 10. Barred: 14 wide, bar x 1, base x 4, tip x 14.
+   */
   relationMarker(id, barred) {
-    const marker5 = createSvg("marker"), arrow = createSvg("path");
+    const marker5 = createSvg("marker"), arrow = createSvg("path"), width = barred ? 14 : 10, base = barred ? 4 : 0;
     marker5.setAttribute("id", id);
-    marker5.setAttribute("viewBox", barred ? "0 0 14 10" : "0 0 10 10");
-    marker5.setAttribute("refX", "9");
+    marker5.setAttribute("viewBox", `0 0 ${width} 10`);
+    marker5.setAttribute("refX", String(width));
     marker5.setAttribute("refY", "5");
-    marker5.setAttribute("markerWidth", barred ? "14" : "10");
+    marker5.setAttribute("markerWidth", String(width));
     marker5.setAttribute("markerHeight", "10");
     marker5.setAttribute("markerUnits", "userSpaceOnUse");
     marker5.setAttribute("orient", "auto");
-    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.setAttribute("d", `M ${base} 0 L ${width} 5 L ${base} 10 z`);
     arrow.addClass("vam-relation-arrow");
-    marker5.appendChild(arrow);
     if (barred) {
       const bar = createSvg("path");
-      bar.setAttribute("d", "M 12 0 L 12 10");
+      bar.setAttribute("d", "M 1 0 L 1 10");
       bar.addClass("vam-relation-arrow-bar");
+      marker5.appendChild(arrow);
       marker5.appendChild(bar);
-    }
+    } else marker5.appendChild(arrow);
     return marker5;
   }
   /**

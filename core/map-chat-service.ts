@@ -14,8 +14,14 @@ import {
 export { MapChatError, parseMapChat, MAP_CHAT_SCHEMA };
 export type { MapChatRequest, MapChatResult };
 export type MapChatRunner = ProviderStepRunner<MapChatRequest, MapChatResult>;
-/** A model event of one chat turn, for the progress stage: Claude's first stream event, or Codex's activity. */
-export type MapChatProgressEvent = { kind: "first-event" } | { kind: "activity"; activity: CodexActivity };
+/**
+ * What the runtime reports of one chat turn, for the progress stage: Claude's first stream event, or Codex's activity (both are
+ * model events). `stream-mode` is not one: it says, before anything is sent, whether Claude's events can be watched at all.
+ */
+export type MapChatProgressEvent =
+  | { kind: "first-event" }
+  | { kind: "activity"; activity: CodexActivity }
+  | { kind: "stream-mode"; mode: "stream-json" | "json" | "json-fallback" };
 
 export function buildMapChatPrompt(request: MapChatRequest): string {
   return mapChatStep.render(request);
@@ -202,6 +208,9 @@ export class MapChatService {
                   },
                   onActivity: (activity: CodexActivity) => {
                     if (!signal.aborted) onProgress({ kind: "activity", activity });
+                  },
+                  onStreamMode: mode => {
+                    if (!signal.aborted) onProgress({ kind: "stream-mode", mode });
                   }
                 }
               : {})

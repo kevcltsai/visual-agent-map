@@ -1212,6 +1212,8 @@ export const en = {
   "ui.map_chat_stage_writing": "Writing",
   "ui.map_chat_stage_applying": "Applying",
   "ui.map_chat_stage_elapsed_0": " · {0}",
+  "ui.map_chat_slow_0": "{0} is responding slowly; still waiting",
+  "ui.map_chat_resend": "Resend",
   "ui.map_chat_skip_stopped": "you stopped it",
   "ui.map_chat_live_plan_0": "A plan is waiting for you: {0}",
   "ui.map_chat_model_follow_short_0": "Default: {0}",

@@ -605,6 +605,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-progress { color: var(--text-muted); font-size: var(--font-ui-small); }
 .vam-map-chat-progress.is-compact { margin-top: 2px; font-size: var(--font-ui-smaller); }
 .vam-map-chat-progress-elapsed { font-variant-numeric: tabular-nums; }
+.vam-map-chat-progress-slow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; color: var(--text-normal); }
+.vam-map-chat-progress-resend { font-size: var(--font-ui-smaller); }
 .vam-map-chat-text.is-markdown { white-space: normal; }
 .vam-map-chat-text.is-markdown > :first-child { margin-top: 0; }
 .vam-map-chat-text.is-markdown > :last-child { margin-bottom: 0; }

@@ -11178,82 +11178,115 @@ export class VisualAgentMapView extends ItemView {
     };
     // Where this turn is anchored. A create_map / open_map of the turn itself moves it (see applyMapChatActions).
     const anchor = { path: this.path, id: this.map.id as string | undefined };
+    // The press is answered at once: the messages and a "Preparing" bubble appear before the AI is checked, the request is built
+    // or the usage notice is asked. Until the request really goes out, every early end takes the messages back (see `abandon`).
+    const draft = chat.draft;
+    const turn = chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again), "preparing");
+    let sent = false;
+    // Takes the turn back and puts the draft into the field again (a "more detail" or retry has no draft to put back). `reason`
+    // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
+    const abandon = (reason?: string): void => {
+      if (!chat.retract(turn, again ? undefined : draft)) return;
+      if (reason !== undefined) new Notice(reason);
+    };
+    const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
       request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
-      new Notice(errorMessage(error));
+      abandon(errorMessage(error));
       return;
     }
-    await this.plugin.confirmAiUsage(request.model, async () => {
-      if (this.closed || chat.isBusy || this.chatApplying || this.path !== anchor.path || this.map?.id !== anchor.id)
-        return;
-      const controller = new AbortController();
-      const key = `map-chat-view:${++mapChatTaskSequence}`;
-      this.chatController = controller;
-      this.chatTaskKey = key;
-      this.plugin.activeTasks?.set(key, controller);
-      // A reply that arrives after Stop, closing the view or switching maps changes nothing.
-      const alive = (): boolean =>
-        !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
-      // A plan still waiting for its yes belongs to the question before this one.
-      this.supersedeChatPlan();
-      chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
-      // The first message of a conversation moves the opening screen's panel into the side window.
-      this.relocateMapChat();
-      try {
-        const result = await this.plugin.mapChat.chat(
-          request,
-          controller.signal,
-          text => {
-            if (alive()) chat.streamReply(text);
-          },
-          event => {
-            // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
-            if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+    let confirmed = false;
+    try {
+      confirmed = await this.plugin.confirmAiUsage(request.model, async () => {
+        // The view closed, the map changed or a plan began applying while the notice was open: nothing is sent.
+        if (
+          this.closed ||
+          this.chatApplying ||
+          !chat.hasTurn(turn) ||
+          this.path !== anchor.path ||
+          this.map?.id !== anchor.id
+        ) {
+          abandon();
+          return;
+        }
+        sent = true;
+        const controller = new AbortController();
+        const key = `map-chat-view:${++mapChatTaskSequence}`;
+        this.chatController = controller;
+        this.chatTaskKey = key;
+        this.plugin.activeTasks?.set(key, controller);
+        // A reply that arrives after Stop, closing the view or switching maps changes nothing.
+        const alive = (): boolean =>
+          !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
+        // A plan still waiting for its yes belongs to the question before this one.
+        this.supersedeChatPlan();
+        // The first message of a conversation moves the opening screen's panel into the side window.
+        this.relocateMapChat();
+        // From here the request goes out: the bubble leaves "Preparing".
+        chat.setStage("waiting");
+        try {
+          const result = await this.plugin.mapChat.chat(
+            request,
+            controller.signal,
+            text => {
+              if (alive()) chat.streamReply(text);
+            },
+            event => {
+              // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
+              if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+            }
+          );
+          if (!alive()) return;
+          // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
+          if (redo) {
+            const lines = result.actions.length
+              ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
+              : [];
+            if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+            return;
           }
-        );
-        if (!alive()) return;
-        // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-        if (redo) {
-          const lines = result.actions.length
-            ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
-            : [];
+          const plan = result.actions.length
+            ? planFor(result.actions, request.context, {
+                diagrams: this.plugin.settings.addDiagramsAfterResearch,
+                mapAiMode: this.map?.aiMode
+              })
+            : null;
+          if (plan) {
+            // Nothing is touched until the user applies the plan.
+            if (chat.isBusy) {
+              chat.finish(result.reply, []);
+              this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, request.message);
+            }
+            return;
+          }
+          // A pure answer has nothing to apply: the reader is not told "applying" for it.
+          if (result.actions.length) chat.setStage("applying");
+          const lines = await this.applyMapChatActions(
+            { ...result, message: request.message },
+            request.context,
+            alive,
+            anchor
+          );
           if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-          return;
-        }
-        const plan = result.actions.length
-          ? planFor(result.actions, request.context, {
-              diagrams: this.plugin.settings.addDiagramsAfterResearch,
-              mapAiMode: this.map?.aiMode
-            })
-          : null;
-        if (plan) {
-          // Nothing is touched until the user applies the plan.
-          if (chat.isBusy) {
-            chat.finish(result.reply, []);
-            this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, request.message);
+        } catch (error) {
+          if (alive()) {
+            const failure = this.chatErrorText(error);
+            chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
           }
-          return;
+        } finally {
+          if (this.chatController === controller) this.releaseChatTask();
         }
-        // A pure answer has nothing to apply: the reader is not told "applying" for it.
-        if (result.actions.length) chat.setStage("applying");
-        const lines = await this.applyMapChatActions(
-          { ...result, message: request.message },
-          request.context,
-          alive,
-          anchor
-        );
-        if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-      } catch (error) {
-        if (alive()) {
-          const failure = this.chatErrorText(error);
-          chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
-        }
-      } finally {
-        if (this.chatController === controller) this.releaseChatTask();
-      }
-    });
+      });
+    } catch (error) {
+      // Only a failure before the request went out is taken back; once sent, the turn reports its own failures.
+      if (sent) throw error;
+      abandon(errorMessage(error));
+      return;
+    }
+    // The AI is not ready (it said why itself) or the usage notice was declined.
+    if (!confirmed && !sent) abandon(this.closed ? undefined : notSent());
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {

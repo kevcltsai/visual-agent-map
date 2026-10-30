@@ -13,6 +13,10 @@ export const MAP_CHAT_DETAIL_BUDGET = 60000;
 export const MAP_CHAT_MAP_TITLE_LIMIT = 200;
 const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
+const ERROR_LIMIT = 200;
+
+const errorFields = (node: { status?: "error"; error?: string }): { status?: "error"; error?: string } =>
+  node.status === "error" ? { status: "error", ...(node.error ? { error: clip(node.error, ERROR_LIMIT) } : {}) } : {};
 
 export interface MapChatOutlineNode {
   id: string;
@@ -20,6 +24,10 @@ export interface MapChatOutlineNode {
   summary: string;
   parentId: string | null;
   depth: number;
+  /** Set only for a card whose last AI task failed. */
+  status?: "error";
+  /** Why it failed; only with `status: "error"`. */
+  error?: string;
 }
 export interface MapChatTopicRef {
   id: string;
@@ -28,6 +36,10 @@ export interface MapChatTopicRef {
   /** The whole Detail text; sent to the model, and hashed as the baseline `edit_topic_note` is checked against. */
   detail: string;
   path: string;
+  /** Set only for a card whose last AI task failed. */
+  status?: "error";
+  /** Why it failed; only with `status: "error"`. */
+  error?: string;
 }
 export interface MapChatSnippet {
   path: string;
@@ -147,6 +159,7 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       summary: ref.summary,
       ...(withDetail ? { detail: ref.detail } : { detailOmitted: true }),
       path: ref.path,
+      ...errorFields(ref),
       ...(withLinks
         ? {
             parent: node?.parentId ? brief(node.parentId) : null,
@@ -204,7 +217,8 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
       title: clip(node.title, TITLE_LIMIT),
       summary: clip(node.summary, SUMMARY_LIMIT),
       parentId: node.parentId,
-      depth: node.depth
+      depth: node.depth,
+      ...errorFields(node)
     })),
     selected: input.selected.map(ref => topic(ref, true)),
     references: input.references.map(ref => topic(ref, false)),

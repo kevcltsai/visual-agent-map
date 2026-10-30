@@ -900,3 +900,25 @@ test('B4 Codex streaming: with an explanation item before the JSON, the final re
   assert.equal(result.reply, 'final');
   assert.equal(controlsSeen[0].resolveLast, true);
 });
+
+// ---- failure reason on error cards ----
+test('map chat context names the failure of an error card in the outline and in selected and references', () => {
+  const failed = outline.map(node => (node.id === 'a' ? { ...node, status: 'error', error: 'You hit your usage limit' } : node));
+  const ctx = JSON.parse(context({ outline: failed, selected: [topic('a', { status: 'error', error: 'You hit your usage limit' })], references: [topic('a', { status: 'error', error: 'x'.repeat(500) })] }).json);
+  assert.equal(ctx.outline.find(node => node.id === 'a').status, 'error');
+  assert.equal(ctx.outline.find(node => node.id === 'a').error, 'You hit your usage limit');
+  assert.equal(ctx.selected[0].status, 'error');
+  assert.equal(ctx.selected[0].error, 'You hit your usage limit');
+  assert.equal([...ctx.references[0].error].length, 200, 'a long reason is cut to 200 characters');
+});
+test('map chat context adds no status or error field to a card that did not fail', () => {
+  const ctx = JSON.parse(context({ selected: [topic('a')], references: [topic('b')] }).json);
+  for (const node of [...ctx.outline, ...ctx.selected, ...ctx.references]) {
+    assert.equal('status' in node, false);
+    assert.equal('error' in node, false);
+  }
+  const noReason = JSON.parse(context({ outline: outline.map(node => (node.id === 'a' ? { ...node, status: 'error' } : node)) }).json);
+  assert.equal(noReason.outline.find(node => node.id === 'a').status, 'error');
+  assert.equal('error' in noReason.outline.find(node => node.id === 'a'), false, 'no reason stored, none invented');
+  assert.equal(JSON.parse(context({ outline: outline.map(node => (node.id === 'a' ? { ...node, error: 'stray' } : node)) }).json).outline[1].error, undefined, 'error without status error is not sent');
+});

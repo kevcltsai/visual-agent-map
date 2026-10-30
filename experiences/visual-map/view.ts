@@ -4265,10 +4265,6 @@ export class VisualAgentMapView extends ItemView {
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
-    if (adopterId && (this.isHypothesis(node.id) || this.isHypothesis(adopterId))) {
-      new Notice(t("ui.merge_adopt_hypothesis"));
-      return;
-    }
     const removableQuestions = new Set(
       node.aimKind === "question"
         ? before.nodes.filter(item => ids.has(item.id) && item.aimKind === "question").map(item => item.id)
@@ -4349,8 +4345,7 @@ export class VisualAgentMapView extends ItemView {
       ids,
       nodes: this.map?.nodes ?? [],
       hasNote: id => this.notes.has(id),
-      busy: node => this.mergeBusy(node, except),
-      isHypothesis: id => this.isHypothesis(id)
+      busy: node => this.mergeBusy(node, except)
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
@@ -4727,18 +4722,23 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     const model = content?.task.model ?? (await this.mergeModel(check.parentId));
+    // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
+    const firstNote = this.notes.get(sources[0].id),
+      firstKind = firstNote?.topicKind,
+      firstStrength = firstNote?.topicKind === "hypothesis" ? firstNote.hypothesisStrength : undefined;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
       check.parentId ? "inherited" : "workspace",
-      content ? undefined : { detail }
+      { ...(content ? {} : { detail }), ...(firstKind ? { topicKind: firstKind } : {}) }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"),
       viewport = clone(this.map?.viewport ?? before.viewport);
     let entry: TransactionEntry;
     try {
+      if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (content) {
         const detailTemplate = this.mapDetailTemplate(language);
         await repo.updateNote(
@@ -4894,7 +4894,7 @@ export class VisualAgentMapView extends ItemView {
     this.multiSelected.clear();
     await this.finishMerge(target.id);
   }
-  /** Tells the user how many prerequisite links the last merge removed because they would have formed a cycle. */
+  /** Tells the user how many derives-from and prerequisite links the last merge removed because they would have formed a cycle. */
   private noticeDroppedCycles(): void {
     if (this.lastDroppedCycles > 0) new Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
@@ -12703,10 +12703,14 @@ export class VisualAgentMapView extends ItemView {
     }
     label.textContent = "";
     const titleOf = (id: string): string => this.notes.get(id)?.title ?? id,
-      joint = link.kind === "related" ? "—" : "→",
       at = this.relationLabelAt.get(key),
       head = createSvg("tspan");
-    head.textContent = `${name}: ${titleOf(link.from)} ${joint} ${titleOf(link.to)}`;
+    head.textContent = t(
+      link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
+      name,
+      titleOf(link.from),
+      titleOf(link.to)
+    );
     if (at) head.setAttribute("x", String(at.x));
     label.appendChild(head);
     if (link.description) {

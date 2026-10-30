@@ -594,7 +594,9 @@ var en = {
   "ui.relation_apply": "Apply",
   "ui.relation_delete": "Delete relation",
   "ui.relation_gone": "This relation no longer exists.",
-  "ui.merge_dropped_cycles_0": "Removed {0} prerequisite link(s) that would form a cycle",
+  "ui.merge_dropped_cycles_0": "Removed {0} derives-from or prerequisite link(s) that would form a cycle",
+  "ui.relation_label_full_0_1_2": "{0}: {1} \u2192 {2}",
+  "ui.relation_label_full_related_0_1_2": "{0}: {1} \u2014 {2}",
   "ui.collapse_levels": "Collapse or expand the whole map",
   "ui.collapse_all": "Collapse all",
   "ui.expand_all": "Expand all",
@@ -760,8 +762,6 @@ var en = {
   "ui.merge_target_changed": "The merged topic was edited after the merge, so Undo or Redo was not applied.",
   "ui.merge_busy": "An AI task is running on a selected topic; merge after it finishes",
   "ui.merge_missing_note": "A selected topic's note is missing, so it cannot be merged",
-  "ui.merge_hypothesis": "A hypothesis cannot be merged; only ordinary topics can be merged",
-  "ui.merge_adopt_hypothesis": "A hypothesis cannot be merged into another topic or take one over",
   "ui.merge_title_label": "Name of the merged topic",
   "ui.merge_ai_untitled": "(AI names the merged topic)",
   "ui.merge_confirm_desc": "{0} cards become 1 new topic that replaces them. The original notes move to this map's Unassigned folder; Undo restores them.",
@@ -2611,7 +2611,9 @@ var zhCN = {
   "ui.relation_apply": "\u5E94\u7528",
   "ui.relation_delete": "\u5220\u9664\u5173\u7CFB",
   "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
-  "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u524D\u7F6E\u77E5\u8BC6",
+  "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u63A8\u5BFC\u6216\u524D\u7F6E\u77E5\u8BC6",
+  "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
+  "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u5F00",
@@ -2777,8 +2779,6 @@ var zhCN = {
   "ui.merge_target_changed": "\u5408\u5E76\u540E\u7684\u8BAE\u9898\u5DF2\u88AB\u4FEE\u6539\uFF0C\u64A4\u9500\u6216\u91CD\u505A\u672A\u8FD0\u884C\u3002",
   "ui.merge_busy": "\u6709\u8BAE\u9898\u6B63\u5728\u8FD0\u884C AI \u4EFB\u52A1\uFF0C\u5B8C\u6210\u540E\u624D\u80FD\u5408\u5E76",
   "ui.merge_missing_note": "\u6709\u8BAE\u9898\u7684\u7B14\u8BB0\u627E\u4E0D\u5230\uFF0C\u65E0\u6CD5\u5408\u5E76",
-  "ui.merge_hypothesis": "\u5047\u8BBE\u4E0D\u80FD\u5408\u5E76\uFF0C\u53EA\u6709\u4E00\u822C\u8BAE\u9898\u53EF\u4EE5\u5408\u5E76",
-  "ui.merge_adopt_hypothesis": "\u5047\u8BBE\u4E0D\u80FD\u88AB\u5408\u5E76\uFF0C\u4E5F\u4E0D\u80FD\u5408\u5E76\u5176\u4ED6\u8BAE\u9898",
   "ui.merge_title_label": "\u5408\u5E76\u540E\u7684\u8BAE\u9898\u540D\u79F0",
   "ui.merge_ai_untitled": "\uFF08\u7531 AI \u66FF\u5408\u5E76\u540E\u7684\u8BAE\u9898\u547D\u540D\uFF09",
   "ui.merge_confirm_desc": "{0} \u5F20\u5361\u4F1A\u5408\u5E76\u6210 1 \u5F20\u65B0\u8BAE\u9898\u5E76\u53D6\u4EE3\u539F\u672C\u7684\u5361\uFF1B\u539F\u7B14\u8BB0\u79FB\u5230\u8FD9\u5F20\u56FE\u7684 Unassigned\uFF0C\u53EF\u4EE5\u7528\u64A4\u9500\u8FD8\u539F\u3002",
@@ -4628,7 +4628,9 @@ var zhTW = {
   "ui.relation_apply": "\u5957\u7528",
   "ui.relation_delete": "\u522A\u9664\u95DC\u4FC2",
   "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
-  "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u524D\u7F6E\u77E5\u8B58",
+  "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u63A8\u5C0E\u6216\u524D\u7F6E\u77E5\u8B58",
+  "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
+  "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u958B",
@@ -4794,8 +4796,6 @@ var zhTW = {
   "ui.merge_target_changed": "\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u5DF2\u88AB\u4FEE\u6539\uFF0C\u5FA9\u539F\u6216\u91CD\u505A\u672A\u57F7\u884C\u3002",
   "ui.merge_busy": "\u6709\u8B70\u984C\u6B63\u5728\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u5B8C\u6210\u5F8C\u624D\u80FD\u5408\u4F75",
   "ui.merge_missing_note": "\u6709\u8B70\u984C\u7684\u7B46\u8A18\u627E\u4E0D\u5230\uFF0C\u7121\u6CD5\u5408\u4F75",
-  "ui.merge_hypothesis": "\u5047\u8A2D\u4E0D\u80FD\u5408\u4F75\uFF0C\u53EA\u6709\u4E00\u822C\u8B70\u984C\u53EF\u4EE5\u5408\u4F75",
-  "ui.merge_adopt_hypothesis": "\u5047\u8A2D\u4E0D\u80FD\u88AB\u5408\u4F75\uFF0C\u4E5F\u4E0D\u80FD\u5408\u4F75\u5176\u4ED6\u8B70\u984C",
   "ui.merge_title_label": "\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u540D\u7A31",
   "ui.merge_ai_untitled": "\uFF08\u7531 AI \u66FF\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u547D\u540D\uFF09",
   "ui.merge_confirm_desc": "{0} \u500B\u8B70\u984C\u6703\u5408\u4F75\u6210 1 \u500B\u65B0\u8B70\u984C\u4E26\u53D6\u4EE3\u539F\u672C\u7684\u8B70\u984C\uFF1B\u539F\u7B46\u8A18\u79FB\u5230\u9019\u5F35\u5716\u7684 Unassigned\uFF0C\u53EF\u4EE5\u7528\u5FA9\u539F\u9084\u539F\u3002",
@@ -36536,13 +36536,10 @@ function readingOrder(nodes) {
   return [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
 }
 function mergeEligibility(input) {
-  var _a2;
-  const isHypothesis = (_a2 = input.isHypothesis) != null ? _a2 : () => false;
   const wanted = new Set(input.ids);
   const picked = input.nodes.filter((node) => wanted.has(node.id));
   if (wanted.size < 2 || picked.length < 2 || picked.length !== wanted.size)
     return { ok: false, reason: "ui.merge_needs_two" };
-  if (picked.some((node) => isHypothesis(node.id))) return { ok: false, reason: "ui.merge_hypothesis" };
   const related = picked.filter((node) => {
     const below = descendants(input.nodes, node.id);
     return below.size && picked.some((other) => below.has(other.id));
@@ -40288,10 +40285,6 @@ ${request.requirements}` : preset.text,
     if (!this.map) return;
     const before = clone(this.map), ids = branch ? /* @__PURE__ */ new Set([node.id, ...descendants(before.nodes, node.id)]) : /* @__PURE__ */ new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
-    if (adopterId && (this.isHypothesis(node.id) || this.isHypothesis(adopterId))) {
-      new import_obsidian30.Notice(t("ui.merge_adopt_hypothesis"));
-      return;
-    }
     const removableQuestions = new Set(
       node.aimKind === "question" ? before.nodes.filter((item) => ids.has(item.id) && item.aimKind === "question").map((item) => item.id) : []
     );
@@ -40362,8 +40355,7 @@ ${request.requirements}` : preset.text,
       ids,
       nodes: (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [],
       hasNote: (id) => this.notes.has(id),
-      busy: (node) => this.mergeBusy(node, except),
-      isHypothesis: (id) => this.isHypothesis(id)
+      busy: (node) => this.mergeBusy(node, except)
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
@@ -40697,17 +40689,19 @@ ${request.requirements}` : preset.text,
       );
     }
     const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : await this.mergeModel(check.parentId);
+    const firstNote = this.notes.get(sources2[0].id), firstKind = firstNote == null ? void 0 : firstNote.topicKind, firstStrength = (firstNote == null ? void 0 : firstNote.topicKind) === "hypothesis" ? firstNote.hypothesisStrength : void 0;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
       check.parentId ? "inherited" : "workspace",
-      content ? void 0 : { detail }
+      { ...content ? {} : { detail }, ...firstKind ? { topicKind: firstKind } : {} }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_d = (_c = this.map) == null ? void 0 : _c.viewport) != null ? _d : before.viewport);
     let entry;
     try {
+      if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (content) {
         const detailTemplate = this.mapDetailTemplate(language2);
         await repo.updateNote(
@@ -40831,7 +40825,7 @@ ${request.requirements}` : preset.text,
     this.multiSelected.clear();
     await this.finishMerge(target.id);
   }
-  /** Tells the user how many prerequisite links the last merge removed because they would have formed a cycle. */
+  /** Tells the user how many derives-from and prerequisite links the last merge removed because they would have formed a cycle. */
   noticeDroppedCycles() {
     if (this.lastDroppedCycles > 0) new import_obsidian30.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
@@ -48015,8 +48009,13 @@ ${addition}` : addition });
     const titleOf = (id) => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
-    }, joint = link.kind === "related" ? "\u2014" : "\u2192", at = this.relationLabelAt.get(key2), head = createSvg("tspan");
-    head.textContent = `${name}: ${titleOf(link.from)} ${joint} ${titleOf(link.to)}`;
+    }, at = this.relationLabelAt.get(key2), head = createSvg("tspan");
+    head.textContent = t(
+      link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
+      name,
+      titleOf(link.from),
+      titleOf(link.to)
+    );
     if (at) head.setAttribute("x", String(at.x));
     label.appendChild(head);
     if (link.description) {

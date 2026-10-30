@@ -12,8 +12,7 @@ export type MergeBlock =
   | "ui.merge_parent_direct_only"
   | "ui.merge_needs_same_parent"
   | "ui.merge_missing_note"
-  | "ui.merge_busy"
-  | "ui.merge_hypothesis";
+  | "ui.merge_busy";
 
 export type MergeEligibility =
   /**
@@ -39,15 +38,11 @@ export function mergeEligibility(input: {
   nodes: MapNode[];
   hasNote: (id: string) => boolean;
   busy: (node: MapNode) => boolean;
-  /** Hypotheses are never merged, in either direction; omitted means no topic is one. */
-  isHypothesis?: (id: string) => boolean;
 }): MergeEligibility {
-  const isHypothesis = input.isHypothesis ?? (() => false);
   const wanted = new Set(input.ids);
   const picked = input.nodes.filter(node => wanted.has(node.id));
   if (wanted.size < 2 || picked.length < 2 || picked.length !== wanted.size)
     return { ok: false, reason: "ui.merge_needs_two" };
-  if (picked.some(node => isHypothesis(node.id))) return { ok: false, reason: "ui.merge_hypothesis" };
   // A selection that includes a topic with its own subtopic is only allowed as one parent plus its direct subtopics.
   const related = picked.filter(node => {
     const below = descendants(input.nodes, node.id);

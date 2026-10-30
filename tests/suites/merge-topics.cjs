@@ -251,19 +251,18 @@ test('draft review (still used by synthesis) has no name field: merging no longe
 const heObsidian = require('../support.cjs').obsidian;
 const heDom = require('../support-dom.cjs');
 const heRel = (kind, from, to) => ({ kind, from, to });
-test('hypothesis-evidence: a selection that includes a hypothesis cannot be merged, in sibling and in parent mode', () => {
-  const isHypothesis = id => id === 'b' || id === 'root';
-  const base = { nodes: family(), hasNote: () => true, busy: () => false, isHypothesis };
-  assert.deepEqual(plain(mergeEligibility({ ...base, ids: ['a', 'b'] })), { ok: false, reason: 'ui.merge_hypothesis' });
-  assert.deepEqual(plain(mergeEligibility({ ...base, ids: ['root', 'a', 'c'] })), { ok: false, reason: 'ui.merge_hypothesis' }, 'a hypothesis parent cannot take its subtopics');
-  assert.equal(mergeEligibility({ ...base, ids: ['a', 'c'] }).ok, true, 'ordinary topics still merge');
-  assert.equal(mergeEligibility({ nodes: family(), hasNote: () => true, busy: () => false, ids: ['a', 'b'] }).ok, true, 'no isHypothesis input: nothing is a hypothesis');
+test('hypothesis-evidence: mergeEligibility has no type input: any selection of ordinary eligibility merges, in sibling and in parent mode', () => {
+  const base = { nodes: family(), hasNote: () => true, busy: () => false };
+  assert.equal(mergeEligibility({ ...base, ids: ['a', 'b'] }).ok, true);
+  assert.equal(mergeEligibility({ ...base, ids: ['root', 'a', 'c'] }).ok, true);
+  // A leftover isHypothesis input is ignored: types never block a merge.
+  assert.equal(mergeEligibility({ ...base, ids: ['a', 'b'], isHypothesis: () => true }).ok, true);
 });
 async function heHarness() {
   const { repo, app, contents } = fixture(), path = await repo.createMap('Relations', []), mapDoc = await repo.readMap(path);
   const ids = {}, notes = {};
-  const add = async (key, parentKey, hypothesis) => {
-    const n = await repo.createNote(key, 'a', mapDoc, path, 'workspace', hypothesis ? { hypothesis: true } : {});
+  const add = async (key, parentKey, kind) => {
+    const n = await repo.createNote(key, 'a', mapDoc, path, 'workspace', kind ? { topicKind: kind === true ? 'hypothesis' : kind } : {});
     n.parentId = parentKey ? ids[parentKey] : null; n.x = 400; n.y = 100 * mapDoc.nodes.length; mapDoc.nodes.push(n); ids[key] = n.id; notes[key] = n;
   };
   await add('root'); await add('f1', 'root'); await add('f2', 'root'); await add('x', 'root'); await add('hyp', 'root', true); await add('hyp2', 'root', true);
@@ -323,7 +322,7 @@ integrationTest('hypothesis-evidence: a merge that drops a cycle-closing prerequ
   await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.f2)]);
   const original = await h.relations();
   await h.mergeKeys(['f1', 'f2']);
-  assert.deepEqual(h.notices, ['Removed 1 prerequisite link(s) that would form a cycle']);
+  assert.deepEqual(h.notices, ['Removed 1 derives-from or prerequisite link(s) that would form a cycle']);
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original, 'undo restores the dropped link too');
   const quiet = await heHarness();
@@ -343,15 +342,21 @@ integrationTest('hypothesis-evidence: merging subtopics into a parent re-points 
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
-integrationTest('hypothesis-evidence: mergeSelected with a hypothesis selected is refused with a Notice and changes nothing', async () => {
+integrationTest('hypothesis-evidence: mergeSelected with two hypotheses merges them into a new hypothesis that keeps the first one\'s strength; undo restores both and the links', async () => {
   const h = await heHarness();
-  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp)]);
-  const before = JSON.stringify(await h.saved());
-  h.view.multiSelected = new Set([h.ids.hyp, h.ids.hyp2]);
-  assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_hypothesis' });
-  await h.view.mergeSelected('Merged', { path: h.path, mapId: h.mapDoc.id, sources: [h.notes.hyp, h.notes.hyp2].map(n => ({ id: n.id, path: n.path })) });
-  assert.deepEqual(h.notices, ['A hypothesis cannot be merged; only ordinary topics can be merged']);
-  assert.equal(JSON.stringify(await h.saved()), before);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('verifies', h.ids.f2, h.ids.hyp2)]);
+  await h.repo.writeHypothesisStrength(h.notes.hyp.path, 'strong');
+  await h.view.hydrate();
+  const original = await h.relations();
+  assert.equal(h.view.mergeCheck([h.ids.hyp, h.ids.hyp2]).ok, true);
+  await h.mergeKeys(['hyp', 'hyp2']);
+  const merged = await h.mergedId(), note = await h.repo.readNote((await h.saved()).nodes.find(n => n.id === merged).path, await h.saved());
+  assert.equal(h.notices.length, 0);
+  assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'strong');
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f1, merged), heRel('verifies', h.ids.f2, merged)]);
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+  assert.ok((await h.saved()).nodes.some(n => n.id === h.ids.hyp) && (await h.saved()).nodes.some(n => n.id === h.ids.hyp2));
 });
 integrationTest('hypothesis-evidence: removing a fact or a hypothesis leaves no dangling link (both kinds) and undo restores the links', async () => {
   for (const [removeKey, branch, expected] of [['f1', false, 2], ['hyp', false, 2]]) {
@@ -377,16 +382,107 @@ integrationTest('hypothesis-evidence: removing the selection (removeSelected) dr
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
-integrationTest('hypothesis-evidence: a structure-review merge with a hypothesis on either side is refused; otherwise links move to the adopter', async () => {
+integrationTest('hypothesis-evidence: a structure-review merge allows a hypothesis on either side; links move to the adopter, the adopter keeps its type, undo restores', async () => {
   const h = await heHarness();
   await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
-  const before = JSON.stringify(await h.saved());
+  const original = await h.relations();
   await h.view.removeToUnassigned(h.notes.hyp, false, h.ids.x);
-  await h.view.removeToUnassigned(h.notes.f1, false, h.ids.hyp);
-  assert.deepEqual(h.notices, ['A hypothesis cannot be merged into another topic or take one over', 'A hypothesis cannot be merged into another topic or take one over']);
-  assert.equal(JSON.stringify(await h.saved()), before, 'nothing changed');
-  await h.view.removeToUnassigned(h.notes.f1, false, h.ids.f2);
-  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f2, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x)], 'links now start at the adopter');
+  assert.deepEqual(h.notices, [], 'a hypothesis can be merged into another topic');
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.f1, h.ids.x)]);
   await h.view.travel(false);
-  assert.deepEqual(plain((await h.saved()).topicRelations), [heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  assert.deepEqual(await h.relations(), original);
+  await h.view.removeToUnassigned(h.notes.f1, false, h.ids.hyp);
+  assert.deepEqual(h.notices, [], 'a hypothesis can take over another topic');
+  assert.deepEqual(await h.relations(), [heRel('prerequisite', h.ids.hyp, h.ids.x)]);
+  assert.equal((await h.repo.readNote(h.notes.hyp.path, await h.saved())).topicKind, 'hypothesis', 'the adopter keeps its own type');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
+// ---- hypothesis-evidence (P14): any type merges, the first source's type carries over ----
+const heMergedNote = async h => { const map = await h.saved(), node = map.nodes.find(n => n.id === h.mergedIdNow); return { ...(await h.repo.readNote(node.path, map)), path: node.path }; };
+async function heKindOf(h, keys) {
+  await h.mergeKeys(keys);
+  h.mergedIdNow = await h.mergedId();
+  return heMergedNote(h);
+}
+integrationTest('hypothesis-evidence: sibling merge with a strong hypothesis first gives a strong hypothesis; the frontmatter has both keys', async () => {
+  const h = await heHarness();
+  h.notes.hyp.y = 1; await h.relate([]); await h.repo.writeHypothesisStrength(h.notes.hyp.path, 'strong'); await h.view.hydrate();
+  const note = await heKindOf(h, ['hyp', 'f1']);
+  assert.equal(note.topicKind, 'hypothesis'); assert.equal(note.hypothesisStrength, 'strong');
+  const raw = h.contents.get(note.path);
+  assert.match(raw, /topic-kind: hypothesis/); assert.match(raw, /hypothesis-strength: strong/);
+});
+integrationTest('hypothesis-evidence: sibling merge follows reading order, not selection order: an ordinary topic first gives an ordinary topic with no topic-kind key', async () => {
+  const h = await heHarness();
+  h.notes.f1.y = 1; h.notes.hyp.y = 500; await h.relate([]);
+  const note = await heKindOf(h, ['hyp', 'f1']);
+  assert.equal(note.topicKind, undefined); assert.equal(note.hypothesisStrength, undefined);
+  assert.doesNotMatch(h.contents.get(note.path), /topic-kind|hypothesis-strength/);
+});
+integrationTest('hypothesis-evidence: sibling merge with an evidence topic first (or any of the other four kinds) gives that kind', async () => {
+  for (const kind of ['evidence', 'action', 'atomic', 'conclusion']) {
+    const h = await heHarness();
+    await h.repo.writeTopicKind(h.notes.f1.path, kind); await h.view.hydrate();
+    h.notes.f1.y = 1; h.notes.f2.y = 500; await h.relate([]);
+    const note = await heKindOf(h, ['f2', 'f1']);
+    assert.equal(note.topicKind, kind, kind);
+    assert.equal(note.hypothesisStrength, undefined, `${kind}: no strength key`);
+    assert.doesNotMatch(h.contents.get(note.path), /hypothesis-strength/);
+  }
+});
+integrationTest('hypothesis-evidence: parent mode keeps the target\'s own type and strength whatever the children are', async () => {
+  const h = await heHarness();
+  for (const key of ['f1', 'hyp']) h.mapDoc.nodes.find(n => n.id === h.ids[key]).parentId = h.ids.x;
+  await h.relate([]); await h.repo.writeTopicKind(h.notes.x.path, 'conclusion'); await h.view.hydrate();
+  const check = await h.mergeKeys(['x', 'f1', 'hyp']);
+  assert.equal(check.targetId, h.ids.x);
+  const note = await h.repo.readNote(h.notes.x.path, await h.saved());
+  assert.equal(note.topicKind, 'conclusion'); assert.equal(note.hypothesisStrength, undefined);
+});
+integrationTest('hypothesis-evidence: a derives-from merge that closes a cycle drops the link, the Notice names derives-from or prerequisite, and undo restores everything including the type', async () => {
+  const h = await heHarness();
+  await h.repo.writeTopicKind(h.notes.f1.path, 'atomic'); await h.view.hydrate();
+  h.notes.f1.y = 1;
+  await h.relate([heRel('derives_from', h.ids.f1, h.ids.x), heRel('derives_from', h.ids.x, h.ids.f2), heRel('prerequisite', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.hyp, h.ids.f2)]);
+  const original = await h.relations();
+  await h.mergeKeys(['f1', 'f2']);
+  const merged = await h.mergedId();
+  assert.deepEqual(await h.relations(), [heRel('derives_from', merged, h.ids.x), heRel('prerequisite', merged, h.ids.hyp)]);
+  assert.equal(h.view.droppedCyclesOfLastMerge(), 2);
+  assert.deepEqual(h.notices, ['Removed 2 derives-from or prerequisite link(s) that would form a cycle']);
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+  const map = await h.saved();
+  assert.ok(map.nodes.some(n => n.id === h.ids.f1) && map.nodes.some(n => n.id === h.ids.f2) && !map.nodes.some(n => n.id === merged));
+  assert.equal((await h.repo.readNote(h.notes.f1.path, map)).topicKind, 'atomic', 'the source keeps its type');
+});
+integrationTest('hypothesis-evidence: merging A and C that both relate to B leaves one related link (either direction); undo brings both back', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('related', h.ids.f1, h.ids.x), heRel('related', h.ids.x, h.ids.f2)]);
+  const original = await h.relations();
+  await h.mergeKeys(['f1', 'f2']);
+  const merged = await h.mergedId(), left = await h.relations();
+  assert.equal(left.length, 1); assert.equal(left[0].kind, 'related');
+  assert.deepEqual([left[0].from, left[0].to].sort(), [merged, h.ids.x].sort());
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
+integrationTest('hypothesis-evidence: removing an endpoint of each of the six relation kinds deletes the relation; undo restores all six', async () => {
+  const h = await heHarness();
+  await h.relate(['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map((kind, i) => heRel(kind, h.ids.f1, [h.ids.f2, h.ids.x, h.ids.hyp, h.ids.hyp2, h.ids.root, h.ids.f2][i])));
+  const original = await h.relations();
+  assert.equal(original.length, 6);
+  assert.equal(new Set(original.map(r => r.kind)).size, 6);
+  await h.view.removeToUnassigned(h.notes.f1, false);
+  assert.equal((await h.saved()).topicRelations, undefined, 'every relation touching the removed topic is gone');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
+integrationTest('hypothesis-evidence: the full selected-line label comes from i18n: half-width colon in English, full-width in Chinese, related uses the dash', () => {
+  const { translate } = load('i18n.ts');
+  for (const [lang, colon] of [['en', ': '], ['zh-TW', '：'], ['zh-CN', '：']]) {
+    assert.equal(translate(lang, 'ui.relation_label_full_0_1_2', 'N', 'A', 'B'), `N${colon}A → B`, lang);
+    assert.equal(translate(lang, 'ui.relation_label_full_related_0_1_2', 'N', 'A', 'B'), `N${colon}A — B`, lang);
+  }
 });

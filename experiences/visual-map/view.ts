@@ -12743,12 +12743,17 @@ export class VisualAgentMapView extends ItemView {
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
+    // A parent and child that also hold a relation show only the relation line, so one pair draws one line (decision 39).
+    const related = new Set(
+      this.relationsEnabled() ? (this.map.topicRelations ?? []).map(r => relationPairKey(r.from, r.to)) : []
+    );
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
         const parent = this.cardEls.get(parentId),
           child = this.cardEls.get(node.id);
         if (!parent || !child) continue;
+        if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         path.setAttribute(
           "d",

@@ -48073,15 +48073,19 @@ ${addition}` : addition });
     };
   }
   drawEdges() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
+    const related = new Set(
+      this.relationsEnabled() ? ((_a2 = this.map.topicRelations) != null ? _a2 : []).map((r) => relationPairKey(r.from, r.to)) : []
+    );
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
         const parent = this.cardEls.get(parentId), child = this.cardEls.get(node.id);
         if (!parent || !child) continue;
+        if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         path.setAttribute(
           "d",
@@ -48094,7 +48098,7 @@ ${addition}` : addition });
         );
         path.addClass("vam-edge");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
-        if (!this.map.aim && !this.builtIn && ((_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier) === "side")
+        if (!this.map.aim && !this.builtIn && ((_c = (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.relevance) == null ? void 0 : _c.tier) === "side")
           path.addClass("vam-edge-side");
         else if (!this.map.aim && !this.builtIn && parentId === node.parentId)
           path.setAttribute("data-parent-line", "");

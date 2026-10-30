@@ -2257,6 +2257,18 @@ integrationTest('hypothesis-evidence: styles.css gives a hypothesis no 2px card 
   assert.match(css, /\.vam-edge \{[^}]*\}/); assert.doesNotMatch(rule('.vam-edge'), /dasharray/);
   assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
 });
+integrationTest('hypothesis-evidence: a parent and child that also hold a relation draw only the relation line; other parent lines, AIM maps and the sample keep theirs (decision 39)', () => {
+  const topics = [node('root'), node('kid', 'root'), node('other', 'root')], boxes = { root: [0, 0], kid: [500, 0], other: [500, 200] };
+  const fx = heFixture({ topics, relations: [{ kind: 'contradicts', from: 'root', to: 'kid' }], notes: heNotes([['root', {}], ['kid', {}], ['other', {}]]) });
+  const kids = heDrawn(fx.view, boxes), edges = kids.filter(k => (k.classes ?? []).includes('vam-edge'));
+  assert.equal(edges.length, 1, 'only root -> other keeps its parent line'); assert.ok(kids.some(k => (k.classes ?? []).includes('vam-relation-contradicts')), 'the relation line is drawn');
+  fx.view.map.topicRelations = [{ kind: 'related', from: 'kid', to: 'root' }];
+  assert.equal(heDrawn(fx.view, boxes).filter(k => (k.classes ?? []).includes('vam-edge')).length, 1, 'either direction and any kind hide the parent line');
+  fx.view.map.topicRelations = [];
+  assert.equal(heDrawn(fx.view, boxes).filter(k => (k.classes ?? []).includes('vam-edge')).length, 2, 'without a relation both parent lines are drawn');
+  fx.view.map.topicRelations = [{ kind: 'supports', from: 'root', to: 'kid' }]; fx.view.map.aim = { mode: 'x' };
+  assert.equal(heDrawn(fx.view, boxes).filter(k => (k.classes ?? []).includes('vam-edge')).length, 2, 'an AIM map draws no relation, so it keeps every parent line');
+});
 integrationTest('hypothesis-evidence: an evidence line is drawn from the fact to the hypothesis with an arrowhead whose marker id is unique per view', () => {
   const relations = [{ kind: 'supports', from: 'fact', to: 'hyp' }];
   const a = heFixture({ relations }), b = heFixture({ relations, shared: { VisualAgentMapView: a.VisualAgentMapView } });
@@ -3102,11 +3114,12 @@ integrationTest('hypothesis-evidence: dragging a card moves the line, its gap li
   assert.ok(labels[0].children.every(c => c.attrs.x === labels[0].attrs.x), 'both tspans follow the label');
 });
 integrationTest('hypothesis-evidence: a press on any of the six lines stops here (no pan, no marquee); the parent-child edge keeps its DOM, class and no handlers', () => {
-  const fx = heFixture({ relations: heSixRel, topics: [node('fact'), node('hyp', 'fact'), node('other'), node('extra')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}]]) });
-  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300], extra: [500, 300] });
+  // decision 39: a parent and child that hold a relation draw no parent line, so the parent-child pair here (fact -> kid) has none.
+  const fx = heFixture({ relations: heSixRel, topics: [node('fact'), node('hyp'), node('other'), node('extra'), node('kid', 'fact')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}], ['kid', {}]]) });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300], extra: [500, 300], kid: [500, 600] });
   const hits = kids.filter(k => k.classes.includes('vam-relation-hit')); assert.equal(hits.length, 6);
   for (const hit of hits) { let stopped = 0; hit.fire('pointerdown', { stopPropagation() { stopped++; } }); assert.equal(stopped, 1); }
-  const edge = fx.view.edgeEls.get('fact\u0000hyp'); assert.ok(edge, 'the parent-child edge is drawn');
+  const edge = fx.view.edgeEls.get('fact\u0000kid'); assert.ok(edge, 'the parent-child edge is drawn');
   assert.deepEqual(edge.classes, ['vam-edge']); assert.deepEqual(Object.keys(edge.listeners), []); assert.equal(edge.attrs['marker-end'], undefined);
   assert.match(edge.attrs.d, /^M 280 50 C /, 'it still leaves the parent right edge as before');
 });

@@ -2349,8 +2349,59 @@ integrationTest('hypothesis-evidence: several relations on one pair of topics ar
   const drag = fx.view.dragEdges('fact', fx.view.cardEls.get('fact')); drag.update(0, 100);
   assert.match(derives.attrs.d, /^M 280 162 C .* 500 62$/, 'dragging keeps the 12px shift'); assert.match(supports[0].attrs.d, /^M 280 150 /); assert.match(contradicts.attrs.d, / 280 138$/);
   assert.equal(gap.attrs.d, derives.attrs.d); assert.ok(ys('vam-relation-hit').map(h => h.attrs.d).includes(derives.attrs.d), 'the hit path follows too');
-  assert.equal(ys('vam-relation-label')[1].attrs.y, '112', 'and so does the label');
+  const moved = ys('vam-relation-label')[1].attrs, expected = heGeo().relationMidpoint(heBox(0, 100), heBox(500, 0), 12, 1);
+  assert.deepEqual([Number(moved.x), Number(moved.y)], [expected.x, expected.y], 'and so does the label (same offset and label slot; the drag tilts the line, so the slot slides along the tilt)');
 });
+// Label boxes as drawn: centred on the label's x/y, 14px high, 7px per character plus 8px (the estimate of the review).
+const heLabelBoxes = labels => labels.map(l => { const w = Array.from(l.text ?? '').length * 7 + 8, x = Number(l.attrs.x), y = Number(l.attrs.y); return { x: x - w / 2, y: y - 7, w, h: 14 }; });
+const heOverlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const heStaggerKinds = ['supports', 'derives_from', 'contradicts', 'prerequisite', 'verifies', 'related'];
+const heStagger = (count, boxes, reverse = []) => {
+  const rel = Array.from({ length: count }, (_, i) => reverse.includes(i) ? { kind: heStaggerKinds[i], from: 'hyp', to: 'fact' } : { kind: heStaggerKinds[i], from: 'fact', to: 'hyp' });
+  const fx = heFixture({ relations: rel }), kids = heDrawn(fx.view, boxes);
+  fx.view.syncRelationClasses();
+  return { fx, labels: kids.filter(k => k.classes.includes('vam-relation-label')) };
+};
+const heAssertApart = (labels, why) => {
+  const boxes = heLabelBoxes(labels);
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${why}: label ${i} ${JSON.stringify(boxes[i])} overlaps label ${j} ${JSON.stringify(boxes[j])}`);
+};
+integrationTest('hypothesis-evidence: the labels of 2, 3 and 4 relations on one pair never overlap, whatever the layout, and a lone relation stays on the midpoint (F5, R3-2)', () => {
+  const layouts = { horizontal: { fact: [0, 0], hyp: [500, 0], other: [0, 300] }, 'horizontal reversed': { fact: [500, 0], hyp: [0, 0], other: [0, 300] }, vertical: { fact: [0, 0], hyp: [0, 300], other: [600, 0] }, 'vertical reversed': { fact: [0, 300], hyp: [0, 0], other: [600, 0] }, diagonal: { fact: [0, 0], hyp: [400, 260], other: [600, 0] }, 'offset sideways': { fact: [0, 0], hyp: [120, 300], other: [600, 0] } };
+  for (const [name, boxes] of Object.entries(layouts)) for (const count of [2, 3, 4, 5]) for (const reverse of [[], [2], [1, 3]]) {
+    const { labels } = heStagger(count, boxes, reverse);
+    assert.equal(labels.length, count);
+    assert.ok(labels.every(l => l.text), 'every label carries its name ');
+    heAssertApart(labels, `${name} x${count} reverse ${JSON.stringify(reverse)}`);
+  }
+  const { labels } = heStagger(1, layouts.vertical);
+  assert.deepEqual([labels[0].attrs.x, labels[0].attrs.y], ['140', '200'], 'a single relation sits on the midpoint of its line');
+  const { relationMidpoint, relationOffsets, relationLabelSlots } = heGeo();
+  for (let degrees = 0; degrees < 360; degrees += 7) for (const reach of [250, 400, 700]) for (const count of [2, 3, 4, 5]) {
+    const a = heBox(0, 0), b = heBox(Math.round(Math.cos(degrees * Math.PI / 180) * reach), Math.round(Math.sin(degrees * Math.PI / 180) * reach));
+    const rel = Array.from({ length: count }, () => ({ from: 'a', to: 'b' })), offsets = relationOffsets(rel), slots = relationLabelSlots(rel);
+    const boxes = rel.map((_, i) => { const p = relationMidpoint(a, b, offsets[i], slots[i]); return { x: p.x - 45, y: p.y - 7, w: 90, h: 14 }; });
+    for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${degrees} deg, reach ${reach}, ${count} lines: ${i} and ${j} overlap (widest 11-letter name box)`);
+  }
+  assert.deepEqual(plain(relationLabelSlots([{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }, { from: 'a', to: 'c' }, { from: 'a', to: 'b' }, { from: 'b', to: 'a' }])), [0, -1, 0, 2, -3], 'slots count per pair, negated against the pair frame');
+  assert.deepEqual(plain(relationMidpoint(heBox(0, 0), heBox(500, 0), 12)), plain(relationMidpoint(heBox(0, 0), heBox(500, 0), 12, 0)), 'slot 0 is the plain midpoint');
+});
+integrationTest('hypothesis-evidence: after a drag the labels of parallel relations are still apart, and the lines and hit paths are unchanged by the label slot (F5)', () => {
+  for (const [name, boxes, to] of [['vertical', { fact: [0, 0], hyp: [0, 300] }, [40, 420]], ['horizontal', { fact: [0, 0], hyp: [500, 0] }, [700, 20]], ['vertical to horizontal', { fact: [0, 0], hyp: [0, 300] }, [600, 0]]]) {
+    const { fx, labels } = heStagger(4, boxes, [3]);
+    const paths = heDrawnPaths(fx.view);
+    fx.view.dragEdges('hyp', fx.view.cardEls.get('hyp')).update(...to);
+    heAssertApart(labels, `${name} after drag`);
+    assert.equal(paths.length, 8, 'four lines and four hit paths');
+  }
+  const { fx } = heStagger(4, { fact: [0, 0], hyp: [0, 300] });
+  const kids = fx.view.edgesEl.kids, lines = kids.filter(k => k.classes.includes('vam-relation')).map(k => k.attrs.d);
+  assert.deepEqual(lines.map(d => d.split(' ')[1]), ['140', '128', '152', '116'], 'vertical lines keep the 0/+12/-12/+24 sideways shift (turned a quarter: leftward on a downward line)');
+  assert.deepEqual(kids.filter(k => k.classes.includes('vam-relation-hit')).map(k => k.attrs.d), lines, 'hit paths equal the lines');
+  const sorted = kids.filter(k => k.classes.includes('vam-relation-label')).map(k => Number(k.attrs.y)).sort((a, b) => a - b);
+  assert.ok(sorted[3] - sorted[0] >= 3 * 14, 'on a vertical pair the labels are spread along the line');
+});
+const heDrawnPaths = view => view.edgesEl.kids.filter(k => k.classes.includes('vam-relation') || k.classes.includes('vam-relation-hit'));
 integrationTest('hypothesis-evidence: after a relation is added from the panel the focus is on the new "Add relation…" button (R3-3)', async () => {
   const { view, modals, menus } = heFixture();
   view.enqueue = work => work(); view.mapChange = async (change) => { change(view.map); };

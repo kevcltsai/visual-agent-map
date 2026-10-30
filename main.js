@@ -17204,33 +17204,34 @@ var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2
 var RELATION_OFFSET_STEP = 12;
 function curveOf(a, b, offset = 0) {
   const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
-  let sx = 0, sy = 0;
-  if (offset) {
-    let nx = from.nx, ny = from.ny;
-    if (!nx && !ny) {
-      nx = to.x - from.x;
-      ny = to.y - from.y;
-      const size = Math.hypot(nx, ny) || 1;
-      nx /= size;
-      ny /= size;
-    }
-    sx = -ny * offset;
-    sy = nx * offset;
+  let nx = from.nx, ny = from.ny;
+  if (!nx && !ny) {
+    nx = to.x - from.x;
+    ny = to.y - from.y;
+    const size = Math.hypot(nx, ny) || 1;
+    nx /= size;
+    ny /= size;
   }
+  const sx = offset ? -ny * offset : 0, sy = offset ? nx * offset : 0;
   return {
     p1: { x: from.x + sx, y: from.y + sy },
     c1: { x: from.x + from.nx * length + sx, y: from.y + from.ny * length + sy },
     c2: { x: to.x + to.nx * length + sx, y: to.y + to.ny * length + sy },
-    p2: { x: to.x + sx, y: to.y + sy }
+    p2: { x: to.x + sx, y: to.y + sy },
+    along: { x: nx, y: ny }
   };
 }
 function relationPathData(a, b, offset = 0) {
   const { p1, c1, c2, p2 } = curveOf(a, b, offset);
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
-function relationMidpoint(a, b, offset = 0) {
-  const { p1, c1, c2, p2 } = curveOf(a, b, offset);
-  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+var RELATION_LABEL_SPACING_W = 90;
+var RELATION_LABEL_SPACING_H = 16;
+function relationMidpoint(a, b, offset = 0, slot = 0) {
+  const { p1, c1, c2, p2, along } = curveOf(a, b, offset), mid = { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+  if (!slot) return mid;
+  const step = Math.abs(along.x) * RELATION_LABEL_SPACING_W + Math.abs(along.y) * RELATION_LABEL_SPACING_H;
+  return { x: mid.x + along.x * step * slot, y: mid.y + along.y * step * slot };
 }
 function relationOffsets(relations) {
   const seen = /* @__PURE__ */ new Map();
@@ -17240,6 +17241,15 @@ function relationOffsets(relations) {
     seen.set(key2, index + 1);
     const step = Math.ceil(index / 2) * RELATION_OFFSET_STEP, signed = index % 2 === 1 ? step : -step;
     return signed * (forward ? 1 : -1) || 0;
+  });
+}
+function relationLabelSlots(relations) {
+  const seen = /* @__PURE__ */ new Map();
+  return relations.map(({ from, to }) => {
+    var _a2;
+    const forward = from <= to, key2 = forward ? `${from}\0${to}` : `${to}\0${from}`, index = (_a2 = seen.get(key2)) != null ? _a2 : 0;
+    seen.set(key2, index + 1);
+    return (forward ? index : -index) || 0;
   });
 }
 
@@ -37007,6 +37017,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "relationGapEls", /* @__PURE__ */ new Map());
     /** Sideways shift of each line from the others on the same pair of topics (see `relationOffsets`). */
     __publicField(this, "relationOffsetBy", /* @__PURE__ */ new Map());
+    /** Place of each label along its line among the relations of the same pair (see `relationLabelSlots`). */
+    __publicField(this, "relationSlotBy", /* @__PURE__ */ new Map());
     __publicField(this, "relationData", /* @__PURE__ */ new Map());
     /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
     __publicField(this, "relationPainted", /* @__PURE__ */ new Set());
@@ -47858,7 +47870,7 @@ ${addition}` : addition });
     }
     return {
       update: (x, y) => {
-        var _a2, _b2, _c;
+        var _a2, _b2, _c, _d;
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
@@ -47866,7 +47878,7 @@ ${addition}` : addition });
           path.setAttribute("d", d);
           (_b2 = this.relationHitEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
           (_c = this.relationGapEls.get(link.key)) == null ? void 0 : _c.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationMidpoint(from, to, offset));
+          this.placeRelationLabel(link.key, relationMidpoint(from, to, offset, (_d = this.relationSlotBy.get(link.key)) != null ? _d : 0));
         }
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
@@ -47925,12 +47937,13 @@ ${addition}` : addition });
    * draws none, and its file keeps the key.
    */
   drawRelations() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
     this.relationGapEls.clear();
     this.relationOffsetBy.clear();
+    this.relationSlotBy.clear();
     this.relationData.clear();
     this.relationLabelAt.clear();
     this.relationPainted.clear();
@@ -47944,7 +47957,11 @@ ${addition}` : addition });
     }
     if (!links.length) return;
     const offsets = relationOffsets(links.map((link) => link.relation));
-    links.forEach((link, index) => this.relationOffsetBy.set(link.key, offsets[index]));
+    const slots = relationLabelSlots(links.map((link) => link.relation));
+    links.forEach((link, index) => {
+      this.relationOffsetBy.set(link.key, offsets[index]);
+      this.relationSlotBy.set(link.key, slots[index]);
+    });
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
@@ -48000,7 +48017,12 @@ ${addition}` : addition });
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(
         link.key,
-        relationMidpoint(boxOf(link.from), boxOf(link.to), (_c = this.relationOffsetBy.get(link.key)) != null ? _c : 0)
+        relationMidpoint(
+          boxOf(link.from),
+          boxOf(link.to),
+          (_c = this.relationOffsetBy.get(link.key)) != null ? _c : 0,
+          (_d = this.relationSlotBy.get(link.key)) != null ? _d : 0
+        )
       );
     }
     if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;

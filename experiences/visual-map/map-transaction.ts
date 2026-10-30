@@ -279,8 +279,10 @@ export function begin(deps: TransactionDeps): Transaction {
       }
     }
     // Last, once nothing of this step links to them: a file changed since it was written or linked from any note stays.
+    // Any earlier rollback problem means a note or Map.md may still link to them, so every file is kept for the retry.
     const trashed = new Set<string>();
     for (const item of [...(journal.attachments ?? [])].reverse()) {
+      if (problems.length > 0) break;
       if (!item.created || trashed.has(item.path)) continue;
       trashed.add(item.path);
       try {

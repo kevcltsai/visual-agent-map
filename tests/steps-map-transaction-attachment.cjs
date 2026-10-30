@@ -338,6 +338,30 @@ test('A16: unload during commit makes trashFile reject: rollback-failed, the fil
   assert.equal(fresh.seen.at(-1), `${MEDIA}/pic.png`);
 });
 
+test('A17: a rollback step that fails too keeps every attachment: trashFile is never called and the file stays', async () => {
+  const h = await harness();
+  h.fail.saveMap = n => n === 2;
+  h.fail.rebuild = n => n === 1;
+  const error = await h.rejected(h.step({ park: false }).commit());
+  assert.equal(error.kind, 'rollback-failed');
+  assert.equal(h.counts.trashFile, 0);
+  assert.equal(h.exists(`${MEDIA}/pic.png`), true);
+});
+
+test('A18: two different files in one step and the second createBinary throws: only the first is trashed', async () => {
+  const h = await harness();
+  const before = h.snapshot();
+  h.fail.createBinary = n => n === 2;
+  const transaction = begin(h.deps)
+    .createAttachment('one', { name: 'one.png', data: PNG(), sourcePath: h.parent })
+    .createAttachment('two', { name: 'two.png', data: bytes(5, 5, 5, 5, 5, 5, 5, 5), sourcePath: h.parent })
+    .rewriteNote(h.parent, async (path, attachment) => { await h.repo.updateNote(path, { detail: `![[${attachment('one')}]] ![[${attachment('two')}]]` }); });
+  assert.equal((await h.rejected(transaction.commit())).message, 'injected createBinary 2');
+  assert.deepEqual(h.trashed, [`${MEDIA}/one.png`]);
+  assert.deepEqual(h.inFolder(MEDIA), []);
+  assert.equal(h.contents.get(h.parent), before.get(h.parent));
+});
+
 test('A12: no test called vault.delete, vault.trash or adapter.remove', () => {
   assert.deepEqual(forbidden, { 'vault.delete': 0, 'vault.trash': 0, 'adapter.remove': 0 });
 });

@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
 // Not tests: shared helpers and the entry point itself.
-export const helpers = new Set(["run.cjs", "build.cjs", "aim-literal-scan.cjs"]);
+export const helpers = new Set(["run.cjs", "build.cjs"]);
 const isHelper = name => helpers.has(name) || name.startsWith("support");
 
 const toRegExp = pattern => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`);

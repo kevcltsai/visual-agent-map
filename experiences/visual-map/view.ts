@@ -45,7 +45,7 @@ import {
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { providerForModel } from "../../ai/providers/provider";
-import { FALLBACK_MODEL } from "../../ai/model-resolution";
+import { FALLBACK_MODEL, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -688,6 +688,9 @@ export class VisualAgentMapView extends ItemView {
     step: "directions" | "draft";
     directions: Suggestion[];
     progress: string;
+    /** The model (and reasoning) this run uses, resolved when it started; a retry asks its usage notice for the same one. */
+    model: string;
+    reasoning: ModelChoice["reasoning"];
   } | null = null;
   /** A multi-select synthesis step is starting (before its task exists), so a second request is refused. */
   private selectionStarting = false;
@@ -5291,6 +5294,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([target.id, ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])]))
       return;
     const copies: MapNode[] = [],
+      pairs: Array<{ from: string; to: string }> = [],
       replacement = new Map<string, string>(),
       repo = this.plugin.repo,
       parkFolder = repo.topicFolder(this.path, "Unassigned");
@@ -5310,8 +5314,11 @@ export class VisualAgentMapView extends ItemView {
           copy.x = target.x + 340 + (original.x - root.x);
           copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
         }
       }
+      // Only the new copies are written, before the transaction; a failure parks them like any other.
+      await repo.rewriteCopiedNoteLinks(pairs);
       const tx = this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       entry = await tx
@@ -6356,7 +6363,7 @@ export class VisualAgentMapView extends ItemView {
         this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
       this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
-      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      if (this.needsConnectionCheck()) this.renderConnectionCheck(actions);
       // The opening screen of the chat: one sentence builds a new map of the user's own, which the sample cannot be.
       start.createDiv("vam-sample-start-chat");
     }
@@ -9156,7 +9163,26 @@ export class VisualAgentMapView extends ItemView {
       .map(id => this.map!.nodes.find(node => node.id === id))
       .filter((node): node is MapNode => !!node);
     try {
-      await this.plugin.confirmAiUsage(request.model ?? this.plugin.settings.cliModel, async () => {
+      // The usage notice of every model the batch will really use, once each, in order; a refusal starts nothing.
+      const models = request.model
+        ? [request.model]
+        : [
+            ...new Set(
+              (
+                await Promise.all(
+                  selected.map(node => this.plugin.repo.resolveTopicModel(node.path, this.map ?? undefined))
+                )
+              ).map(item => (item.origin === "override" ? item.model : this.currentModelId()))
+            )
+          ];
+      if (!models.length) models.push(this.plugin.settings.cliModel);
+      const confirmEach = async (index: number, run: () => Promise<void>): Promise<boolean> =>
+        index >= models.length
+          ? (await run(), true)
+          : this.plugin.confirmAiUsage(models[index], async () => {
+              await confirmEach(index + 1, run);
+            });
+      await confirmEach(0, async () => {
         if (this.plugin.expansionCoordinator.isRunning(key)) {
           new Notice(t("ui.multi_research_already_running"));
           return;
@@ -9317,6 +9343,10 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  /** No model is usable yet: neither Codex models nor a ready Claude Code. Claude counts, so a Claude-only setup gets no check button. */
+  private needsConnectionCheck(): boolean {
+    return !this.plugin.availableModels().length;
+  }
   private renderConnectionCheck(actions: HTMLElement): HTMLButtonElement {
     const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
     return this.button(actions, t(claude ? "ui.check_claude_code" : "ui.check_codex"), () =>
@@ -10104,8 +10134,10 @@ export class VisualAgentMapView extends ItemView {
       );
     };
     try {
+      const chosen = await this.selectionModel(sources);
       if (step === "draft") {
         await this.createIntegratedNode(title, sources, direction ?? "", "", runOptions, {
+          model: chosen,
           observer,
           accepted: markAccepted,
           controller,
@@ -10132,7 +10164,9 @@ export class VisualAgentMapView extends ItemView {
         state: "running",
         step: "directions",
         directions: [],
-        progress: ""
+        progress: "",
+        model: chosen.model,
+        reasoning: chosen.reasoning
       };
       this.integrationTask = task;
       own = task;
@@ -10161,8 +10195,8 @@ export class VisualAgentMapView extends ItemView {
           researchDepth: runOptions.researchDepth,
           visualMode: "off"
         },
-        this.plugin.settings.cliModel,
-        this.plugin.settings.cliReasoning,
+        chosen.model,
+        chosen.reasoning,
         controller.signal,
         undefined,
         markAccepted,
@@ -10218,15 +10252,40 @@ export class VisualAgentMapView extends ItemView {
     if (task.state !== "failed" && task.state !== "cancelled") return;
     // The stored options may carry the stopped run's aborted signal; a retry must start with its own.
     const { signal: _staleSignal, onProgress: _staleProgress, ...retained } = task.options;
-    void this.plugin.confirmAiUsage(this.plugin.settings.cliModel, async () => {
-      await this.startSelectionSynthesis(
-        task.sources,
-        { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
-        task.step === "directions" ? null : task.goal,
-        message => new Notice(message),
-        () => {}
-      );
-    });
+    void this.selectionModel(task.sources)
+      .then(chosen =>
+        this.plugin.confirmAiUsage(chosen.model, async () => {
+          await this.startSelectionSynthesis(
+            task.sources,
+            { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
+            task.step === "directions" ? null : task.goal,
+            message => new Notice(message),
+            () => {}
+          );
+        })
+      )
+      .catch(error => new Notice(errorMessage(error)));
+  }
+  /**
+   * The model for a run over several cards: when every card has the same manual model (its own or an ancestor's) that
+   * model, else the current model. The reasoning follows the override only when all of them agree on it too.
+   */
+  private async selectionModel(nodes: MapNode[]): Promise<ModelChoice> {
+    const settings = this.plugin.settings;
+    const current: ModelChoice = {
+      model: settings.cliModel?.trim() || FALLBACK_MODEL,
+      reasoning: normalizeReasoningLevel(settings.cliReasoning)
+    };
+    if (!nodes.length) return current;
+    const resolved = await Promise.all(
+      nodes.map(node => this.plugin.repo.resolveTopicModel(node.path, this.map ?? undefined))
+    );
+    const first = resolved[0];
+    if (!resolved.every(item => item.origin === "override" && item.model === first.model)) return current;
+    return {
+      model: first.model,
+      reasoning: resolved.every(item => item.reasoning === first.reasoning) ? first.reasoning : current.reasoning
+    };
   }
   private async topicReferenceGroup(
     sources: Pick<MapNode, "path">[],
@@ -10273,9 +10332,11 @@ export class VisualAgentMapView extends ItemView {
       accepted?: () => void;
       controller?: AbortController;
       directions?: Suggestion[];
+      model?: ModelChoice;
     }
   ): Promise<void> {
     if (!this.map || sources.length < 2) return;
+    const chosen = flow?.model ?? (await this.selectionModel(sources));
     const controller = flow?.controller ?? new AbortController();
     const mapPath = this.path,
       mapId = this.map.id;
@@ -10299,12 +10360,14 @@ export class VisualAgentMapView extends ItemView {
       state: "running",
       step: "draft",
       directions: flow?.directions ?? [],
-      progress: ""
+      progress: "",
+      model: chosen.model,
+      reasoning: chosen.reasoning
     };
     this.integrationTask = task;
     this.render();
     const progress = this.startTaskProgress(this.taskProgressKey("integration"));
-    const model = this.plugin.settings.cliModel;
+    const model = chosen.model;
     const language = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
     try {
@@ -10336,7 +10399,7 @@ export class VisualAgentMapView extends ItemView {
       const result = await this.plugin.askModel(
         integrationContext,
         model,
-        this.plugin.settings.cliReasoning,
+        chosen.reasoning,
         controller.signal,
         undefined,
         flow?.accepted,
@@ -11673,32 +11736,65 @@ export class VisualAgentMapView extends ItemView {
       case "run_map_action":
         switch (action.action) {
           case "research_standard":
-            return t(
-              chatResearchMode(action, this.map?.aiMode) === "quick"
-                ? "ui.map_chat_do_research_quick"
-                : "ui.map_chat_do_research_standard"
+            return (
+              t(
+                chatResearchMode(action, this.map?.aiMode) === "quick"
+                  ? "ui.map_chat_do_research_quick"
+                  : "ui.map_chat_do_research_standard"
+              ) + this.chatModelSuffix(this.chatTargetModels(action.nodeIds))
             );
           case "expand":
-            return t("ui.map_chat_do_expand_0", targets(action.nodeIds));
-          case "synthesize":
-            return t("ui.map_chat_do_synthesize");
+            return (
+              t("ui.map_chat_do_expand_0", targets(action.nodeIds)) +
+              this.chatModelSuffix(this.chatTargetModels(action.nodeIds))
+            );
+          case "synthesize": {
+            const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
+            const models = this.chatTargetModels(ids);
+            return (
+              t("ui.map_chat_do_synthesize") +
+              // Several cards run on the one shared override, else the current model (see selectionModel).
+              this.chatModelSuffix(ids.length > 1 && models.length > 1 ? [this.currentModelId()] : models)
+            );
+          }
           case "rate_by_goal":
-            return t("ui.map_chat_do_rate_0", action.goal);
+            return t("ui.map_chat_do_rate_0", action.goal) + this.chatModelSuffix([this.currentModelId()]);
           case "merge":
             return t("ui.map_chat_do_merge_0", action.title);
           case "find_images": {
             const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
-            return t("ui.map_chat_do_find_images_0", ids.length === 1 ? title(ids[0]) : action.direction || "…");
+            return (
+              t("ui.map_chat_do_find_images_0", ids.length === 1 ? title(ids[0]) : action.direction || "…") +
+              this.chatModelSuffix(this.chatTargetModels(ids))
+            );
           }
         }
     }
+  }
+  private currentModelId(): string {
+    return this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
+  }
+  /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
+  private chatTargetModels(ids: string[]): string[] {
+    const list = ids.length ? ids : this.chatSelectionIds();
+    const models = list.map(id => this.notes.get(id)?.model || this.currentModelId());
+    return [...new Set(models.length ? models : [this.currentModelId()])];
+  }
+  /** "（label）" after a result row: the model(s) the task really runs on. */
+  private chatModelSuffix(models: string[]): string {
+    return t(
+      "ui.map_chat_model_suffix_0",
+      models.map(model => this.plugin.modelLabel(model)).join(t("ui.map_chat_model_separator"))
+    );
   }
   private chatLine(label: string, outcome: ChatOutcome): MapChatLine {
     // A picture search that has only started says so; its line follows the candidate block from then on (settledLine).
     if (outcome.status === "done" && outcome.images)
       return {
         status: "done",
-        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle),
+        text:
+          t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle) +
+          (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
         images: outcome.images
       };
     if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
@@ -12418,6 +12514,7 @@ export class VisualAgentMapView extends ItemView {
             query,
             nodeId: node.id,
             nodeTitle: note.title,
+            modelLabel: this.plugin.modelLabel(note.model),
             mapPath: anchor.path,
             mapId: anchor.id,
             state: "searching",
@@ -12729,7 +12826,8 @@ export class VisualAgentMapView extends ItemView {
     });
     // The run lives on the selection bar, so the sources are the selection while it runs.
     this.chatSelect(nodes.map(node => node.id));
-    return this.launchChatTask(settings.cliModel, (failed, accepted) =>
+    const chosen = await this.selectionModel(nodes);
+    return this.launchChatTask(chosen.model, (failed, accepted) =>
       this.startSelectionSynthesis(nodes, options, message, failed, accepted)
     );
   }

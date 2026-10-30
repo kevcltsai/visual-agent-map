@@ -1516,7 +1516,8 @@ export class MapChatPanel {
         attr: { title: choice.label }
       });
     this.modelEl.value = this.host.model();
-    this.modelEl.setAttr("title", choices.find(choice => choice.value === this.modelEl.value)?.label ?? "");
+    const shown = choices.find(choice => choice.value === this.modelEl.value)?.label;
+    this.modelEl.setAttr("title", shown ? `${t("ui.map_chat_model_label")}\n${shown}` : t("ui.map_chat_model_label"));
   }
 
   private chipLabel(chip: MapChatChip): string {

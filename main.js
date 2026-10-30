@@ -884,8 +884,8 @@ var en = {
   "ui.my_core_topic": "My core topic",
   "ui.select_at_least_two_topics": "Select at least two topics.",
   "ui.enter_a_question_or_task_for_ai_first": "Enter a question or task for AI first.",
-  "ui.workspace_default_model": "Workspace default model",
-  "ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics": "Models are offered by the installed AI services. This default applies only to new root topics.",
+  "ui.current_model": "Current model",
+  "ui.current_model_description": "Chat and every new AI task use this model, except topics with a model override. The menu above the chat panel changes this same setting.",
   "ui.ai_reasoning_level": "AI reasoning level",
   "ui.reasoning_level": "Reasoning level",
   "ui.low": "Low",
@@ -1039,8 +1039,7 @@ var en = {
   "ui.map_chat_style_label": "Answer length",
   "ui.map_chat_style_concise": "Concise",
   "ui.map_chat_style_detailed": "Detailed",
-  "ui.map_chat_model_label": "Model for this chat",
-  "ui.map_chat_model_follow_0": "Follow default (now: {0})",
+  "ui.map_chat_model_label": "Current model: chat and new AI tasks use this one",
   "ui.map_chat_more_detail": "Say it in more detail",
   "ui.map_chat_more_detail_asked": "Say it in more detail.",
   "ui.map_chat_redo_actions_ignored": "Actions are not applied again in a more-detail answer.",
@@ -1194,7 +1193,6 @@ var en = {
   "ui.map_chat_resend": "Resend",
   "ui.map_chat_skip_stopped": "you stopped it",
   "ui.map_chat_live_plan_0": "A plan is waiting for you: {0}",
-  "ui.map_chat_model_follow_short_0": "Default: {0}",
   "ui.map_chat_toggle_command": "Toggle the map AI chat",
   "ui.map_chat_do_find_images_0": "Start looking for pictures for \u201C{0}\u201D",
   "ui.map_chat_skip_images_one_card": "name exactly one card first",
@@ -2916,8 +2914,8 @@ var zhCN = {
   "ui.my_core_topic": "\u6211\u7684\u6838\u5FC3\u8BAE\u9898",
   "ui.select_at_least_two_topics": "\u8BF7\u81F3\u5C11\u9009\u62E9\u4E24\u4E2A\u8BAE\u9898\u3002",
   "ui.enter_a_question_or_task_for_ai_first": "\u8BF7\u5148\u8F93\u5165\u8981\u4EA4\u7ED9 AI \u7684\u95EE\u9898\u6216\u4EFB\u52A1\u3002",
-  "ui.workspace_default_model": "\u5DE5\u4F5C\u533A\u9ED8\u8BA4 Model",
-  "ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics": "\u6A21\u578B\u4F9D\u5DF2\u5B89\u88C5\u7684 AI \u670D\u52A1\u63D0\u4F9B\uFF1B\u6B64\u9ED8\u8BA4\u8BBE\u7F6E\u53EA\u5E94\u7528\u4E8E\u65B0\u6839\u8BAE\u9898\u3002",
+  "ui.current_model": "\u5F53\u524D\u6A21\u578B",
+  "ui.current_model_description": "\u804A\u5929\u4E0E\u6240\u6709\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A\u6A21\u578B\uFF1B\u6709\u6A21\u578B\u8986\u5199\u7684\u8BAE\u9898\u9664\u5916\u3002\u804A\u5929\u9762\u677F\u4E0A\u65B9\u7684\u83DC\u5355\u6539\u7684\u4E5F\u662F\u8FD9\u91CC\u3002",
   "ui.ai_reasoning_level": "AI \u63A8\u7406\u7B49\u7EA7",
   "ui.reasoning_level": "\u63A8\u7406\u7B49\u7EA7",
   "ui.low": "\u4F4E (Low)",
@@ -3071,8 +3069,7 @@ var zhCN = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u957F\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7B80",
   "ui.map_chat_style_detailed": "\u8BE6\u7EC6",
-  "ui.map_chat_model_label": "\u8FD9\u4E2A\u5BF9\u8BDD\u4F7F\u7528\u7684\u6A21\u578B",
-  "ui.map_chat_model_follow_0": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5F53\u524D\uFF1A{0}\uFF09",
+  "ui.map_chat_model_label": "\u5F53\u524D\u6A21\u578B\uFF1A\u804A\u5929\u4E0E\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A",
   "ui.map_chat_more_detail": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9",
   "ui.map_chat_more_detail_asked": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9\u3002",
   "ui.map_chat_redo_actions_ignored": "\u8BE6\u7EC6\u7248\u56DE\u7B54\u4E0D\u4F1A\u518D\u6B21\u5E94\u7528\u64CD\u4F5C\u3002",
@@ -3226,7 +3223,6 @@ var zhCN = {
   "ui.map_chat_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8BA1\u5212\u7B49\u4F60\u786E\u8BA4\uFF1A{0}",
-  "ui.map_chat_model_follow_short_0": "\u9ED8\u8BA4\uFF1A{0}",
   "ui.map_chat_toggle_command": "\u5F00\u5173\u5730\u56FE AI \u5BF9\u8BDD",
   "ui.map_chat_do_find_images_0": "\u5F00\u59CB\u4E3A\u201C{0}\u201D\u627E\u56FE",
   "ui.map_chat_skip_images_one_card": "\u8BF7\u6307\u5B9A\u4E00\u5F20\u5361",
@@ -4948,8 +4944,8 @@ var zhTW = {
   "ui.my_core_topic": "\u6211\u7684\u6838\u5FC3\u8B70\u984C",
   "ui.select_at_least_two_topics": "\u8ACB\u81F3\u5C11\u9078\u53D6\u5169\u500B\u8B70\u984C\u3002",
   "ui.enter_a_question_or_task_for_ai_first": "\u8ACB\u5148\u8F38\u5165\u8981\u4EA4\u7D66 AI \u7684\u554F\u984C\u6216\u4EFB\u52D9\u3002",
-  "ui.workspace_default_model": "\u5DE5\u4F5C\u5340\u9810\u8A2D Model",
-  "ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics": "\u6A21\u578B\u4F9D\u5DF2\u5B89\u88DD\u7684 AI \u670D\u52D9\u63D0\u4F9B\uFF1B\u6B64\u9810\u8A2D\u53EA\u5957\u7528\u81F3\u65B0\u6839\u8B70\u984C\u3002",
+  "ui.current_model": "\u76EE\u524D\u6A21\u578B",
+  "ui.current_model_description": "\u804A\u5929\u8207\u6240\u6709\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B\u6A21\u578B\uFF1B\u6709\u6A21\u578B\u8986\u5BEB\u7684\u8B70\u984C\u9664\u5916\u3002\u804A\u5929\u9762\u677F\u4E0A\u65B9\u7684\u9078\u55AE\u6539\u7684\u4E5F\u662F\u9019\u88E1\u3002",
   "ui.ai_reasoning_level": "AI \u63A8\u7406\u7B49\u7D1A",
   "ui.reasoning_level": "\u63A8\u7406\u7B49\u7D1A",
   "ui.low": "\u4F4E (Low)",
@@ -5103,8 +5099,7 @@ var zhTW = {
   "ui.map_chat_style_label": "\u56DE\u7B54\u9577\u5EA6",
   "ui.map_chat_style_concise": "\u7CBE\u7C21",
   "ui.map_chat_style_detailed": "\u8A73\u7D30",
-  "ui.map_chat_model_label": "\u9019\u500B\u5C0D\u8A71\u4F7F\u7528\u7684\u6A21\u578B",
-  "ui.map_chat_model_follow_0": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u76EE\u524D\uFF1A{0}\uFF09",
+  "ui.map_chat_model_label": "\u76EE\u524D\u6A21\u578B\uFF1A\u804A\u5929\u8207\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B",
   "ui.map_chat_more_detail": "\u8AAA\u8A73\u7D30\u4E00\u9EDE",
   "ui.map_chat_more_detail_asked": "\u8AAA\u8A73\u7D30\u4E00\u9EDE\u3002",
   "ui.map_chat_redo_actions_ignored": "\u8A73\u7D30\u7248\u56DE\u7B54\u4E0D\u6703\u518D\u6B21\u5957\u7528\u52D5\u4F5C\u3002",
@@ -5258,7 +5253,6 @@ var zhTW = {
   "ui.map_chat_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8A08\u756B\u7B49\u4F60\u78BA\u8A8D\uFF1A{0}",
-  "ui.map_chat_model_follow_short_0": "\u9810\u8A2D\uFF1A{0}",
   "ui.map_chat_toggle_command": "\u958B\u95DC\u5FC3\u667A\u5716 AI \u5C0D\u8A71",
   "ui.map_chat_do_find_images_0": "\u958B\u59CB\u70BA\u300C{0}\u300D\u627E\u5716",
   "ui.map_chat_skip_images_one_card": "\u8ACB\u6307\u5B9A\u4E00\u5F35\u5361",
@@ -23350,7 +23344,7 @@ ${text11}` : text11;
   }
   /** Puts the answer-length buttons and the model list back in step with what the view remembers. */
   refreshControls() {
-    var _a2, _b2, _c;
+    var _a2, _b2;
     if (!this.built || !this.styleEls) return;
     const style = this.host.style();
     for (const choice2 of ["concise", "detailed"]) {
@@ -23366,7 +23360,9 @@ ${text11}` : text11;
         attr: { title: choice2.label }
       });
     this.modelEl.value = this.host.model();
-    this.modelEl.setAttr("title", (_c = (_b2 = choices.find((choice2) => choice2.value === this.modelEl.value)) == null ? void 0 : _b2.label) != null ? _c : "");
+    const shown = (_b2 = choices.find((choice2) => choice2.value === this.modelEl.value)) == null ? void 0 : _b2.label;
+    this.modelEl.setAttr("title", shown ? `${t("ui.map_chat_model_label")}
+${shown}` : t("ui.map_chat_model_label"));
   }
   chipLabel(chip) {
     if (chip.kind === "topic") {
@@ -52294,6 +52290,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian31.PluginSettingTab 
     this.plugin = plugin;
     __publicField(this, "modelSelects", /* @__PURE__ */ new Set());
     __publicField(this, "modelStatusEls", /* @__PURE__ */ new Set());
+    __publicField(this, "unsubscribeCurrentModel", null);
     plugin.subscribeModelDiscovery(() => {
       for (const select of [...this.modelSelects]) {
         if (!select.isConnected) {
@@ -52314,6 +52311,35 @@ var VisualAgentMapSettingTab = class extends import_obsidian31.PluginSettingTab 
         else element.setText(status);
       }
     });
+  }
+  /** Shows the current model in one dropdown, keeping an unavailable id as a disabled entry. */
+  showCurrentModel(select, model) {
+    if (!Array.from(select.options).some((option2) => option2.value === model)) select.add(new Option(model, model));
+    select.value = model;
+    syncModelSelect(
+      select,
+      this.plugin.availableModels(),
+      (id) => this.plugin.modelLabel(id),
+      t("ui.current_model_is_unavailable")
+    );
+    select.value = model;
+  }
+  /** The chat menu and this page edit one value: follow it while the page is open, drop it when the page closes. */
+  followCurrentModel() {
+    var _a2;
+    (_a2 = this.unsubscribeCurrentModel) == null ? void 0 : _a2.call(this);
+    this.unsubscribeCurrentModel = this.plugin.subscribeCurrentModel((model) => {
+      for (const select of [...this.modelSelects]) {
+        if (!select.isConnected) this.modelSelects.delete(select);
+        else this.showCurrentModel(select, model);
+      }
+    });
+  }
+  hide() {
+    var _a2;
+    (_a2 = this.unsubscribeCurrentModel) == null ? void 0 : _a2.call(this);
+    this.unsubscribeCurrentModel = null;
+    super.hide();
   }
   refreshAfterLanguageChange() {
     const focused = typeof document !== "undefined" && document.activeElement && this.containerEl.contains(document.activeElement) && document.activeElement.instanceOf(HTMLSelectElement) && offersEveryLanguage(Array.from(document.activeElement.options).map((option2) => option2.value));
@@ -52357,24 +52383,15 @@ var VisualAgentMapSettingTab = class extends import_obsidian31.PluginSettingTab 
       text11(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
       text11(t("ui.claude_cli_path"), "claudePath", t("ui.vam_uses_the_claude_code_cli_installed_on_this_computer")),
       {
-        name: t("ui.workspace_default_model"),
-        desc: t("ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics"),
+        name: t("ui.current_model"),
+        desc: t("ui.current_model_description"),
         render: (setting) => {
-          setting.setName(t("ui.workspace_default_model")).setDesc("").addDropdown((dropdown) => {
+          this.followCurrentModel();
+          setting.setName(t("ui.current_model")).setDesc(t("ui.current_model_description")).addDropdown((dropdown) => {
             const select = dropdown.selectEl;
             this.modelSelects.add(select);
             const selected = this.plugin.settings.cliModel;
-            syncModelSelect(
-              select,
-              this.plugin.availableModels(),
-              (id) => this.plugin.modelLabel(id),
-              t("ui.current_model_is_unavailable")
-            );
-            if (!Array.from(select.options).some((option2) => option2.value === selected)) {
-              const unavailable = new Option(`${selected} (${t("ui.current_model_is_unavailable")})`, selected);
-              unavailable.disabled = true;
-              select.add(unavailable);
-            }
+            this.showCurrentModel(select, selected);
             dropdown.setValue(selected);
             dropdown.onChange((value) => {
               void this.setControlValue("cliModel", value);
@@ -52385,8 +52402,9 @@ var VisualAgentMapSettingTab = class extends import_obsidian31.PluginSettingTab 
               void this.plugin.refreshModelDiscovery("claude");
             })
           );
-          this.modelStatusEls.add(setting.descEl);
-          setting.descEl.setText(
+          const statusEl = setting.descEl.createDiv({ cls: "vam-model-discovery-status" });
+          this.modelStatusEls.add(statusEl);
+          statusEl.setText(
             modelDiscoverySummary(this.plugin.modelDiscoveryState("codex"), this.plugin.modelDiscoveryState("claude"))
           );
           if (this.plugin.modelDiscoveryState("codex").status === "idle")
@@ -52542,7 +52560,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian31.PluginSettingTab 
     if (key2 === "language") {
       await this.plugin.changeLanguage(value);
       return;
-    } else if (typeof value === "string" && (key2 === "codexPath" || key2 === "claudePath" || key2 === "cliModel"))
+    } else if (key2 === "cliModel") {
+      if (typeof value === "string") await this.plugin.setCurrentModel(value);
+      return;
+    } else if (typeof value === "string" && (key2 === "codexPath" || key2 === "claudePath"))
       this.plugin.settings[key2] = value.trim();
     else if (key2 === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;

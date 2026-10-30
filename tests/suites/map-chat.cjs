@@ -1268,7 +1268,8 @@ test('map chat C1: the answer-length choice survives a repaint and a brand new p
 test('map chat C1: the model list has no follow-default entry, shows the current model, and a change is handed to the view', () => {
   const f = panelFixture(); f.prefs.model = 'claude:haiku'; f.panel.detach(); f.panel.mount(f.overlay);
   const select = f.panel.modelEl;
-  assert.equal(select.attrs['aria-label'], 'Model for this chat');
+  assert.equal(select.attrs['aria-label'], 'Current model: chat and new AI tasks use this one');
+  assert.equal(select.attrs.title, 'Current model: chat and new AI tasks use this one\nHaiku', 'the tooltip is the new label followed by the full model label');
   eq(select.children.map(o => o.text), ['Haiku', 'GPT 6']); assert.ok(select.children.every(o => o.optionValue !== ''), 'no empty follow-default value');
   assert.equal(select.value, 'claude:haiku', 'the current model is selected');
   select.value = 'gpt-6'; select.change();
@@ -1421,7 +1422,7 @@ integrationTest('map chat C1 F2: model discovery going from idle to ready makes 
   eq(chat.modelEl.children.map(o => o.optionValue), ['gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
   h.plugin.settings.cliModel = 'gpt-6-luna'; chat.setOpen(false); chat.setOpen(true);
   assert.equal(chat.modelEl.value, 'gpt-6-luna', 'the selected model follows cliModel when the window is opened');
-  assert.equal(chat.modelEl.attrs.title, 'label(gpt-6-luna)', 'the select names it in its tooltip');
+  assert.equal(chat.modelEl.attrs.title, 'Current model: chat and new AI tasks use this one\nlabel(gpt-6-luna)', 'the tooltip is the new label followed by the full model label');
   await h.view.onClose(); assert.equal(h.control.listeners.length, 0); assert.equal(h.plugin.currentModelListeners.size, 0, 'both notifications are unsubscribed');
 });
 

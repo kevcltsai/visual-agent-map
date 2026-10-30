@@ -233,3 +233,64 @@ test('model resolution (MS-01 review): an override brings its own reasoning-leve
   await app.vault.process(repo.file(root.path), content => content.replace(/^reasoning-level:.*\n/m, ''));
   assert.equal((await repo.resolveTopicModel(root.path, map)).reasoning, 'low', 'no reasoning-level in the note: fall back to cliReasoning');
 });
+
+function settingsTabHarness(initial = 'gpt-a') {
+  const { VisualAgentMapSettingTab } = load('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: class {} } });
+  const listeners = new Set(), saved = [];
+  const plugin = {
+    settings: { cliModel: initial },
+    currentModelListeners: listeners,
+    subscribeModelDiscovery: () => () => {},
+    subscribeCurrentModel: fn => { listeners.add(fn); return () => listeners.delete(fn); },
+    codexDiagnostic: () => ({ installed: true, executable: 'codex' }), claudeDiagnostic: () => ({ installed: true, executable: 'claude' }),
+    availableModels: () => ['gpt-a', 'claude:sonnet'], modelLabel: id => `label:${id}`,
+    modelDiscoveryState: () => ({ status: 'ready', models: [] }), refreshModelDiscovery: async () => {},
+    async setCurrentModel(model) { if (typeof model !== 'string' || !model.trim()) return; this.settings.cliModel = model.trim(); saved.push(model.trim()); for (const fn of [...listeners]) fn(this.settings.cliModel); }
+  };
+  const tab = new VisualAgentMapSettingTab({}, plugin);
+  const select = { options: [], value: '', isConnected: true, add(option) { this.options.push(option); }, replaceChildren() { this.options = []; } };
+  let onChange; const status = { text: '', isConnected: true, setText(v) { this.text = v; } }; const descEl = { createDiv: () => status };
+  const setting = { descEl, desc: undefined, setName() { return this; }, setDesc(v) { this.desc = v; return this; }, addDropdown(cb) { cb({ selectEl: select, setValue: v => { select.value = v; }, onChange: fn => { onChange = fn; } }); return this; }, addButton() { return this; } };
+  const item = tab.getSettingDefinitions().find(d => d.render && /Current model|目前模型|当前模型/.test(d.name));
+  item.render(setting);
+  return { tab, plugin, select, listeners, saved, status, setting, choose: v => onChange(v) };
+}
+
+test('MS-02: settings page picks the current model, the chat listener hears it, and an outside change updates the dropdown', async () => {
+  const h = settingsTabHarness('gpt-a');
+  const chat = []; h.plugin.subscribeCurrentModel(m => chat.push(m));
+  assert.equal(h.select.value, 'gpt-a');
+  assert.equal(h.listeners.size, 2, 'settings page and the chat listener');
+  h.choose('claude:sonnet'); await new Promise(r => setImmediate(r));
+  assert.equal(h.plugin.settings.cliModel, 'claude:sonnet'); assert.deepEqual(chat, ['claude:sonnet']);
+  await h.plugin.setCurrentModel('gpt-a');
+  assert.equal(h.select.value, 'gpt-a', 'the chat menu changed it, the page follows');
+  await h.plugin.setCurrentModel('gone-model');
+  assert.equal(h.select.value, 'gone-model');
+  const gone = h.select.options.find(o => o.value === 'gone-model');
+  assert.ok(gone && gone.disabled && /label:gone-model/.test(gone.text), 'unavailable model stays visible and disabled');
+  await h.tab.setControlValue('cliModel', '  '); await h.tab.setControlValue('cliModel', 7);
+  assert.equal(h.plugin.settings.cliModel, 'gone-model', 'blank and non-string values do nothing');
+});
+
+test('MS-02: the settings page stops listening when it is hidden, and re-rendering never stacks listeners', () => {
+  const h = settingsTabHarness();
+  assert.equal(h.listeners.size, 1);
+  const again = h.tab.getSettingDefinitions().find(d => d.render && /Current model|目前模型|当前模型/.test(d.name));
+  again.render(h.setting);
+  assert.equal(h.listeners.size, 1, 'a second render replaces the first subscription');
+  h.tab.hide(); assert.equal(h.listeners.size, 0);
+  h.tab.hide(); assert.equal(h.listeners.size, 0, 'hide is safe twice');
+});
+
+test('MS-02: settings description and the discovery summary are two separate elements; old i18n keys are gone', () => {
+  const h = settingsTabHarness();
+  assert.match(h.setting.desc, /聊天|Chat|聊天/);
+  assert.notEqual(h.status.text, ''); assert.notEqual(h.status.text, h.setting.desc);
+  const fs = require('node:fs'), path = require('node:path');
+  for (const lang of ['zh-TW', 'zh-CN', 'en']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'i18n', `${lang}.ts`), 'utf8');
+    for (const key of ['ui.map_chat_model_follow_0', 'ui.map_chat_model_follow_short_0', 'ui.workspace_default_model', 'ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics']) assert.equal(source.includes(`"${key}"`), false, `${lang} no longer has ${key}`);
+    assert.ok(source.includes('"ui.current_model"') && source.includes('"ui.current_model_description"'));
+  }
+});

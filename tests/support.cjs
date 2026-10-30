@@ -7,8 +7,14 @@ const path = require('node:path');
 const { test: nodeTest } = require('node:test');
 const layer = process.argv.find(value => value.startsWith('--layer='))?.split('=')[1];
 if (layer && !['unit', 'integration'].includes(layer)) throw new Error('Unknown test layer');
-const test = (name, fn) => { if (!layer || layer === 'unit') nodeTest(name, fn); };
-const integrationTest = (name, fn) => { if (!layer || layer === 'integration') nodeTest(name, fn); };
+// A test that never settles fails after this long instead of hanging the run; VAM_TEST_TIMEOUT_MS overrides it (the timeout test uses a tiny value), and options a test passes itself win.
+const testTimeout = Number(process.env.VAM_TEST_TIMEOUT_MS) || 60000;
+const register = (name, optionsOrFn, maybeFn) => {
+  if (typeof optionsOrFn === 'function') nodeTest(name, { timeout: testTimeout }, optionsOrFn);
+  else nodeTest(name, { timeout: testTimeout, ...optionsOrFn }, maybeFn);
+};
+const test = (name, optionsOrFn, maybeFn) => { if (!layer || layer === 'unit') register(name, optionsOrFn, maybeFn); };
+const integrationTest = (name, optionsOrFn, maybeFn) => { if (!layer || layer === 'integration') register(name, optionsOrFn, maybeFn); };
 const { buildSync } = require('./build.cjs');
 // Obsidian's own YAML options, so frontmatter in tests round-trips like the real app (not a one-line-per-key stub).
 const YAML = require('yaml');

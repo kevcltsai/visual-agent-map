@@ -582,3 +582,33 @@ integrationTest('B2 W1 Codex: a web-search-only turn starts its thread with web_
   assert.deepEqual(JSON.parse(JSON.stringify(local.spawnArgs)), ['--config', 'web_search="disabled"', 'app-server'], 'local mode: web search disabled at launch');
   assert.equal(local.thread.config, undefined);
 });
+
+integrationTest('Codex App Server with onText resolves to every message joined, unless resolveLast asks for the last message item only', async () => {
+  const { EventEmitter } = require('node:events');
+  const final = JSON.stringify({ reply: 'Done', actions: [] });
+  const run = async controls => {
+    const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {};
+    const emit = message => process.nextTick(() => child.stdout.emit('data', Buffer.from(`${JSON.stringify(message)}\n`)));
+    child.stdin = { write: line => {
+      const message = JSON.parse(line.trim());
+      if (message.method === 'initialize') emit({ id: message.id, result: {} });
+      else if (message.method === 'config/read') emit({ id: message.id, result: { config: {} } });
+      else if (message.method === 'thread/start') emit({ id: message.id, result: { thread: { id: 'thread-1' } } });
+      else if (message.method === 'turn/start') {
+        emit({ id: message.id, result: { turn: { id: 'turn-1' } } });
+        emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { id: 'm1', type: 'agentMessage', text: 'I will answer now.' } } });
+        emit({ method: 'item/agentMessage/delta', params: { threadId: 'thread-1', itemId: 'm2', delta: '{"reply":"Do' } });
+        emit({ method: 'item/completed', params: { threadId: 'thread-1', item: { id: 'm2', type: 'agentMessage', text: final } } });
+        emit({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { status: 'completed' } } });
+      } else if (message.method === 'thread/unsubscribe') emit({ id: message.id, result: { status: 'unsubscribed' } });
+    } };
+    const { CodexAppServerRuntime } = load('ai/runtime/codex-app-server.ts', { 'node:child_process': { spawn: () => child } });
+    const runtime = new CodexAppServerRuntime({ executable: 'codex', cwd: '/plugin', env: {}, clientVersion: 'test' });
+    const texts = [];
+    try { return { raw: await runtime.runTask('chat', 'gpt-6-luna', 'low', { type: 'object' }, { textOnly: true, onText: text => texts.push(text), ...controls }), texts }; } finally { runtime.stop(); }
+  };
+  const last = await run({ resolveLast: true });
+  assert.equal(last.raw, final, 'only the last message item, so a strict JSON.parse works');
+  assert.equal(last.texts.at(-1), `I will answer now.\n\n${final}`, 'the stream still carries every visible message');
+  assert.equal((await run({})).raw, `I will answer now.\n\n${final}`, 'without the control the result is unchanged: every message joined');
+});

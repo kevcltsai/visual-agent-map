@@ -566,6 +566,35 @@ integrationTest('topic remembers its content template and format issues in front
   assert.equal(note.detailTemplateId, undefined); assert.deepEqual(plain(note.detailFormatIssues), []);
   assert.doesNotMatch(await app.vault.read(app.vault.getAbstractFileByPath(node.path)), /detail-format-issues|detail-template/);
 });
+const { failureReason, LAST_ERROR_LIMIT } = load('repository.ts', { obsidian });
+test('failureReason keeps the raw message, collapses whitespace and cuts it to the limit', () => {
+  assert.equal(failureReason(new Error("You've hit\n your   usage limit ")), "You've hit your usage limit");
+  assert.equal(failureReason('plain'), 'plain');
+  const long = failureReason(new Error('y'.repeat(LAST_ERROR_LIMIT + 50)));
+  assert.equal([...long].length, LAST_ERROR_LIMIT);
+  assert.ok(long.endsWith('…'));
+});
+integrationTest('last-error is written for a failed topic, cleared by a completed write and kept by a status-only restore', async () => {
+  const { repo, app } = fixture('en');
+  const map = { id: 'm', title: 'M', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  const mapPath = 'Agent Workspace/Topics/M/Map.md';
+  await repo.ensureTopicFolders('Agent Workspace/Topics/M'); await app.vault.create(mapPath, core.serializeMap(map));
+  const node = await repo.createNote('T', 'model-a', map, mapPath, 'workspace');
+  const raw = async () => app.vault.read(app.vault.getAbstractFileByPath(node.path));
+  assert.equal((await repo.readNote(node.path)).lastError, '');
+  await repo.updateNote(node.path, { status: 'error', lastError: "You've hit your usage limit" });
+  assert.equal((await repo.readNote(node.path)).lastError, "You've hit your usage limit");
+  assert.match(await raw(), /last-error:/);
+  await repo.updateNote(node.path, { status: 'running' });
+  await repo.updateNote(node.path, { status: 'error' });
+  assert.equal((await repo.readNote(node.path)).lastError, "You've hit your usage limit", 'a status-only write (stopped run restoring its status) leaves the reason');
+  await repo.updateNote(node.path, { status: 'completed' });
+  assert.equal((await repo.readNote(node.path)).lastError, '');
+  assert.doesNotMatch(await raw(), /last-error/, 'success clears the stored reason');
+  await repo.updateNote(node.path, { status: 'error', lastError: 'again' });
+  await repo.updateNote(node.path, { lastError: '' });
+  assert.doesNotMatch(await raw(), /last-error/, 'an empty reason writes no key');
+});
 integrationTest('topic remembers its tone override in frontmatter `tone`; clearing removes it', async () => {
   const { repo, app } = fixture('en');
   const map = { id: 'm', title: 'M', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };

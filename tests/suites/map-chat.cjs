@@ -20,6 +20,7 @@ const { contentHash, buildMapChatContext } = load('core/map-chat-context.ts');
 const outlineApi = load('experiences/visual-map/outline-import.ts', { obsidian });
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
 const { chatResearchRequest } = load('core/map-chat-plan.ts');
+const realPlugin = load('main.ts', { obsidian: { ...obsidian, MarkdownView: class MarkdownView {} } }).default;
 
 // ---- panel on its own -------------------------------------------------------------------------------------------
 
@@ -44,10 +45,10 @@ function panelFixture(overrides = {}, windowValues = {}) {
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
   let visibleNote = null;
-  const prefs = { style: 'concise', model: '', saved: [], watchers: [] };
+  const prefs = { style: 'concise', model: 'claude:haiku', saved: [], watchers: [] };
   const host = {
     style: () => prefs.style, setStyle: style => { prefs.style = style; prefs.saved.push(['style', style]); },
-    modelChoices: () => [{ value: '', label: 'Follow default (now: X)' }, { value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }],
+    modelChoices: () => [{ value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }],
     watchModels: changed => { prefs.watchers.push(changed); return () => { prefs.watchers.splice(prefs.watchers.indexOf(changed), 1); }; },
     model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); }, moreDetail: origin => { calls.more.push(origin); },
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
@@ -356,6 +357,10 @@ async function harness({ aim = false, document = false, empty = false, realRende
       return result;
     },
     saveSettings: async () => { control.saves = (control.saves ?? 0) + 1; },
+    // The real plugin's methods (main.ts) on this stand-in, so the view is tested against the shipped current-model logic.
+    currentModelListeners: new Set(),
+    setCurrentModel: model => realPlugin.prototype.setCurrentModel.call(plugin, model),
+    subscribeCurrentModel: listener => realPlugin.prototype.subscribeCurrentModel.call(plugin, listener),
     availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
     subscribeModelDiscovery: listener => { control.listeners.push(listener); return () => { control.listeners.splice(control.listeners.indexOf(listener), 1); }; },
     refreshModelDiscovery: async provider => { control.refreshes.push(provider); return { provider, status: 'ready', models: [] }; },
@@ -370,8 +375,10 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {}, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: (fn, delay) => { ctx.timers.push(fn); const id = ctx.timers.length; ctx.clock.pending.push({ id, fn, at: ctx.clock.now + (delay ?? 0) }); return id; }, clearTimeout: id => { ctx.clock.pending = ctx.clock.pending.filter(entry => entry.id !== id); }, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
   ctx.timers = []; ctx.intervals = new Map(); ctx.intervalSeq = 0;
+  // A fake clock for the timers the view sets: `advance(n)` runs every timer that falls due within n milliseconds, in order. Nothing waits in real time.
+  ctx.clock = { now: 0, pending: [], advance(by) { const target = this.now + by; for (;;) { const due = this.pending.filter(entry => entry.at <= target).sort((l, r) => l.at - r.at)[0]; if (!due) break; this.pending = this.pending.filter(entry => entry !== due); this.now = due.at; due.fn(); } this.now = target; } };
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
@@ -396,7 +403,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, clock: ctx.clock, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -1227,15 +1234,13 @@ integrationTest('map chat R2 N3: edit_topic_note on a card whose Detail was over
 
 // ---- Packet C1: answer length, "say it in more detail", answer-length switch, chat model ----------------------------------------
 
-const { normalizeMapChatStyle, normalizeMapChatModel } = load('repository.ts', { obsidian });
+const { normalizeMapChatStyle } = load('repository.ts', { obsidian });
 const styleBtn = (f, label) => byLabel(f.panel.el, label);
 
-test('map chat C1: settings default to concise and follow-default model; an invalid saved style or model is sanitised', () => {
-  assert.equal(DEFAULT_SETTINGS.mapChatStyle, 'concise'); assert.equal(DEFAULT_SETTINGS.mapChatModel, '');
+test('map chat C1: settings default to concise and have no separate chat model (MS-02); an invalid saved style is sanitised', () => {
+  assert.equal(DEFAULT_SETTINGS.mapChatStyle, 'concise'); assert.equal('mapChatModel' in DEFAULT_SETTINGS, false);
   for (const bad of [undefined, null, 'long', 'DETAILED', 7, {}, '']) assert.equal(normalizeMapChatStyle(bad), 'concise', String(bad));
   assert.equal(normalizeMapChatStyle('detailed'), 'detailed'); assert.equal(normalizeMapChatStyle('concise'), 'concise');
-  for (const bad of [undefined, null, 7, {}, [], '   ']) assert.equal(normalizeMapChatModel(bad), '', String(bad));
-  assert.equal(normalizeMapChatModel(' claude:haiku '), 'claude:haiku');
 });
 
 test('map chat C1: the answer-length switch is a labelled group of toggle buttons that follows the remembered style', () => {
@@ -1260,15 +1265,15 @@ test('map chat C1: the answer-length choice survives a repaint and a brand new p
   assert.equal(option(again.panel, 'Concise').attrs['aria-pressed'], 'false');
 });
 
-test('map chat C1: the model list starts with the follow-default entry, shows the remembered pick, and a change is handed to the view', () => {
+test('map chat C1: the model list has no follow-default entry, shows the current model, and a change is handed to the view', () => {
   const f = panelFixture(); f.prefs.model = 'claude:haiku'; f.panel.detach(); f.panel.mount(f.overlay);
   const select = f.panel.modelEl;
-  assert.equal(select.attrs['aria-label'], 'Model for this chat');
-  eq(select.children.map(o => o.text), ['Follow default (now: X)', 'Haiku', 'GPT 6']); assert.equal(select.children[0].optionValue, '');
-  assert.equal(select.value, 'claude:haiku', 'the remembered model is selected');
-  select.value = ''; select.change();
-  eq(f.prefs.saved, [['model', '']], 'following the default is saved as an empty string');
+  assert.equal(select.attrs['aria-label'], 'Current model: chat and new AI tasks use this one');
+  assert.equal(select.attrs.title, 'Current model: chat and new AI tasks use this one\nHaiku', 'the tooltip is the new label followed by the full model label');
+  eq(select.children.map(o => o.text), ['Haiku', 'GPT 6']); assert.ok(select.children.every(o => o.optionValue !== ''), 'no empty follow-default value');
+  assert.equal(select.value, 'claude:haiku', 'the current model is selected');
   select.value = 'gpt-6'; select.change();
+  eq(f.prefs.saved, [['model', 'gpt-6']], 'a pick is handed to the view as that model id');
   assert.equal(f.prefs.model, 'gpt-6');
   f.panel.detach(); f.panel.mount(f.overlay); assert.equal(f.panel.modelEl.value, 'gpt-6', 'kept across a repaint');
 });
@@ -1296,7 +1301,7 @@ test('map chat C1: the more-detail button hands the original question and refere
   f.panel.finish('Again.', []); assert.equal(moreButtons(f).every(b => !b.disabled), true, 'enabled again when the reply is done');
 });
 
-integrationTest('map chat C1: a normal send is concise on the workspace model, and the usage notice is asked for that model', async () => {
+integrationTest('map chat C1: a normal send is concise on the current model, and the usage notice is asked for that model', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
   h.type('hello'); await h.view.sendMapChat();
   const request = h.control.requests[0];
@@ -1304,15 +1309,15 @@ integrationTest('map chat C1: a normal send is concise on the workspace model, a
   eq(h.control.models, ['claude:sonnet']);
 });
 
-integrationTest('map chat C1: a chat model of claude:haiku is what is sent and what the usage notice is asked about; empty follows cliModel', async () => {
+integrationTest('map chat C1: the current model (cliModel) is what is sent and what the usage notice is asked about; there is no follow-default entry', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
-  h.plugin.settings.mapChatModel = 'claude:haiku';
+  h.plugin.settings.cliModel = 'claude:haiku';
   h.type('hello'); await h.view.sendMapChat();
   assert.equal(h.control.requests[0].model, 'claude:haiku'); eq(h.control.models, ['claude:haiku']);
-  h.plugin.settings.mapChatModel = '';
+  h.plugin.settings.cliModel = 'claude:sonnet';
   h.type('again'); await h.view.sendMapChat();
   assert.equal(h.control.requests[1].model, 'claude:sonnet'); eq(h.control.models, ['claude:haiku', 'claude:sonnet']);
-  assert.equal(h.view.chatModelChoices()[0].label, 'Follow default (now: label(claude:sonnet))');
+  assert.equal(h.view.chatModelChoices().some(c => c.value === '' || /Follow default/.test(c.label)), false);
 });
 
 integrationTest('map chat C1: choosing detailed in the switch is remembered, saved, and sent on the next message; the model pick is saved too', async () => {
@@ -1324,13 +1329,13 @@ integrationTest('map chat C1: choosing detailed in the switch is remembered, sav
   assert.equal(h.control.requests[0].style, 'detailed');
   h.repaint(); assert.equal(option('Detailed').attrs['aria-pressed'], 'true', 'kept after render()');
   chat.modelEl.value = 'claude:haiku'; chat.modelEl.change();
-  assert.equal(h.plugin.settings.mapChatModel, 'claude:haiku'); assert.equal(h.control.saves, 2);
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku', 'the menu pick is the current model'); assert.equal(h.control.saves, 2);
 });
 
-integrationTest('map chat C1: the chat model list is the settings list plus follow-default, and a saved model that is gone stays selectable', async () => {
+integrationTest('map chat C1: the chat model list is the settings list (no follow-default), and a current model that is gone stays selectable', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
-  eq(h.view.chatModelChoices().map(c => c.value), ['', 'gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
-  h.plugin.settings.mapChatModel = 'claude:gone';
+  eq(h.view.chatModelChoices().map(c => c.value), ['gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
+  h.plugin.settings.cliModel = 'claude:gone';
   eq(h.view.chatModelChoices().at(-1), { value: 'claude:gone', label: 'label(claude:gone) (Current model is unavailable)' });
 });
 
@@ -1400,34 +1405,87 @@ test('map chat C1 F1: the redo prompt tells the model that actions must be an em
 test('map chat C1 F2: the panel listens for model changes while built, repaints its model list on a change, and stops on dispose', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   assert.equal(f.prefs.watchers.length, 1);
-  let choices = [{ value: '', label: 'Follow default (now: X)' }];
+  let choices = [{ value: 'claude:haiku', label: 'Haiku' }];
   const host = f.panel.host; host.modelChoices = () => choices;
-  f.panel.refreshControls(); eq(f.panel.modelEl.children.map(o => o.text), ['Follow default (now: X)']);
-  choices = [{ value: '', label: 'Follow default (now: Y)' }, { value: 'claude:haiku', label: 'Haiku' }];
+  f.panel.refreshControls(); eq(f.panel.modelEl.children.map(o => o.text), ['Haiku']);
+  choices = [{ value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }];
   f.prefs.watchers[0]();
-  eq(f.panel.modelEl.children.map(o => o.text), ['Follow default (now: Y)', 'Haiku'], 'the list and the follow-default label were refreshed');
+  eq(f.panel.modelEl.children.map(o => o.text), ['Haiku', 'GPT 6'], 'the list was refreshed');
   f.panel.dispose(); assert.equal(f.prefs.watchers.length, 0);
 });
 
 integrationTest('map chat C1 F2: model discovery going from idle to ready makes the Claude models appear; closing the view unsubscribes', async () => {
   const h = await harness(); h.control.claudeReady = false; await h.view.hydrate(); const chat = h.open();
-  eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna']);
-  assert.equal(h.control.listeners.length, 1); assert.ok(h.control.refreshes.includes('claude'), 'a refresh was started');
+  eq(chat.modelEl.children.map(o => o.optionValue), ['gpt-6-luna', 'claude:sonnet']);
+  assert.equal(h.control.listeners.length, 1); assert.equal(h.plugin.currentModelListeners.size, 1); assert.ok(h.control.refreshes.includes('claude'), 'a refresh was started');
   h.control.claudeReady = true; for (const listener of [...h.control.listeners]) listener();
-  eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
+  eq(chat.modelEl.children.map(o => o.optionValue), ['gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
   h.plugin.settings.cliModel = 'gpt-6-luna'; chat.setOpen(false); chat.setOpen(true);
-  assert.equal(chat.modelEl.children[0].text, 'Default: label(gpt-6-luna)', 'the shown label (shortened so it fits 340px) follows cliModel when the window is opened');
-  assert.equal(chat.modelEl.children[0].attrs.title, 'Follow default (now: label(gpt-6-luna))', 'the full wording is its tooltip'); assert.equal(chat.modelEl.attrs.title, 'Follow default (now: label(gpt-6-luna))', 'and the select names it too');
-  await h.view.onClose(); assert.equal(h.control.listeners.length, 0);
+  assert.equal(chat.modelEl.value, 'gpt-6-luna', 'the selected model follows cliModel when the window is opened');
+  assert.equal(chat.modelEl.attrs.title, 'Current model: chat and new AI tasks use this one\nlabel(gpt-6-luna)', 'the tooltip is the new label followed by the full model label');
+  await h.view.onClose(); assert.equal(h.control.listeners.length, 0); assert.equal(h.plugin.currentModelListeners.size, 0, 'both notifications are unsubscribed');
 });
 
-test('map chat C1 F3: loading saved settings sanitises an invalid chat style and model, and keeps valid ones', () => {
+test('map chat C1 F3: loading saved settings sanitises an invalid chat style, keeps a valid one, and never carries a chat model key (MS-02)', () => {
   const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
   const bad = settingsFromSaved({ mapChatStyle: 'long', mapChatModel: 7 });
-  assert.equal(bad.mapChatStyle, 'concise'); assert.equal(bad.mapChatModel, '');
-  const good = settingsFromSaved({ mapChatStyle: 'detailed', mapChatModel: ' claude:haiku ' });
-  assert.equal(good.mapChatStyle, 'detailed'); assert.equal(good.mapChatModel, 'claude:haiku');
-  const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal(none.mapChatModel, '');
+  assert.equal(bad.mapChatStyle, 'concise'); assert.equal('mapChatModel' in bad, false);
+  const good = settingsFromSaved({ mapChatStyle: 'detailed' });
+  assert.equal(good.mapChatStyle, 'detailed');
+  const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal('mapChatModel' in none, false);
+});
+
+// ---- MS-02: one current model; the old chat model is migrated once ---------------------------------------------------------
+test('MS-02 migration: a saved chat model becomes the current model (trimmed) and the key is dropped; unset values leave cliModel alone', () => {
+  const { settingsFromSaved, hasLegacyChatModel } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const moved = settingsFromSaved({ cliModel: 'gpt-6-luna', mapChatModel: ' claude:sonnet ' });
+  assert.equal(moved.cliModel, 'claude:sonnet'); assert.equal('mapChatModel' in moved, false);
+  assert.equal(settingsFromSaved({ mapChatModel: 'claude:haiku' }).cliModel, 'claude:haiku', 'no saved cliModel: the chat model still wins');
+  for (const bad of [7, '', '  ', null, undefined, {}, []]) {
+    assert.equal(settingsFromSaved({ cliModel: 'gpt-6-luna', mapChatModel: bad }).cliModel, 'gpt-6-luna', `cliModel stays for ${JSON.stringify(bad)}`);
+    assert.equal(settingsFromSaved({ mapChatModel: bad }).cliModel, DEFAULT_SETTINGS.cliModel, `the original default stays for ${JSON.stringify(bad)}`);
+    assert.equal('mapChatModel' in settingsFromSaved({ mapChatModel: bad }), false);
+  }
+  assert.equal(settingsFromSaved({ cliModel: 'gpt-6-luna' }).cliModel, 'gpt-6-luna'); assert.equal(settingsFromSaved(null).cliModel, DEFAULT_SETTINGS.cliModel);
+  assert.equal(hasLegacyChatModel({ mapChatModel: '' }), true, 'even an empty old key is dropped by a rewrite'); assert.equal(hasLegacyChatModel({ mapChatModel: null }), true);
+  assert.equal(hasLegacyChatModel({ cliModel: 'x' }), false); assert.equal(hasLegacyChatModel(null), false);
+});
+
+test('MS-02 migration: a second load of the migrated data does not migrate again and gives the same settings (idempotent)', () => {
+  const { settingsFromSaved, hasLegacyChatModel } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const old = { cliModel: 'gpt-6-luna', mapChatModel: 'claude:sonnet', mapChatStyle: 'detailed' };
+  const once = settingsFromSaved(old); const written = JSON.parse(JSON.stringify(once));
+  assert.equal(hasLegacyChatModel(written), false, 'what was saved no longer triggers a rewrite');
+  const twice = settingsFromSaved(written);
+  eq(twice, once); assert.equal(twice.cliModel, 'claude:sonnet');
+  // The user then picks another model: a later load keeps it (nothing from the old key can come back).
+  eq(settingsFromSaved({ ...written, cliModel: 'gpt-6-luna' }).cliModel, 'gpt-6-luna');
+});
+
+integrationTest('MS-02 migration: migrating does not touch any note frontmatter (a manual note reads the same before and after)', async () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const h = await harness(); await h.view.hydrate();
+  const path = h.node('a').path;
+  await h.repo.updateNote(path, { modelSource: 'manual', model: 'gpt-x', reasoning: 'high' });
+  const before = { content: new Map(h.contents), note: plain(await h.repo.readNote(path)) };
+  Object.assign(h.plugin.settings, settingsFromSaved({ cliModel: 'gpt-6-luna', mapChatModel: 'claude:haiku' }));
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku');
+  eq([...h.contents], [...before.content]); eq(await h.repo.readNote(path), before.note);
+});
+
+integrationTest('MS-02: picking a model in the chat menu sets cliModel, saves once, and tells every listener; a closed view no longer hears it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const heard = []; const stop = h.plugin.subscribeCurrentModel(model => heard.push(model));
+  chat.modelEl.value = 'claude:haiku'; chat.modelEl.change(); await tick();
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku'); assert.equal(h.control.saves, 1); eq(heard, ['claude:haiku']);
+  assert.equal(h.plugin.currentModelListeners.size, 2, 'the open view and this listener');
+  // A change made elsewhere (the settings page) refreshes the open menu.
+  await h.plugin.setCurrentModel('gpt-6-luna'); assert.equal(chat.modelEl.value, 'gpt-6-luna'); eq(heard, ['claude:haiku', 'gpt-6-luna']);
+  await h.view.onClose(); assert.equal(h.plugin.currentModelListeners.size, 1, 'only the other listener is left');
+  const stale = chat.modelEl.value;
+  await h.plugin.setCurrentModel('claude:sonnet'); assert.equal(chat.modelEl.value, stale, 'the closed view got no update'); eq(heard.at(-1), 'claude:sonnet');
+  for (const bad of ['', '  ', 7, null]) { const saves = h.control.saves; await h.plugin.setCurrentModel(bad); assert.equal(h.plugin.settings.cliModel, 'claude:sonnet'); assert.equal(h.control.saves, saves, 'an empty pick saves nothing'); }
+  stop(); assert.equal(h.plugin.currentModelListeners.size, 0);
 });
 
 // ---- Packet D1: only the note on screen is sent; the reply is laid out as Markdown --------------------------------
@@ -2207,8 +2265,12 @@ test('map chat E2: the cut is found while parsing: a reply is parsed once, whate
 test('map chat E2: laying a dense single-line reply out costs about one parse of it, not a search that parses many prefixes', () => {
   const spy = spyRender();
   for (const text of [DENSE.repeat(1850), SPARSE.repeat(900)]) {
-    const one = bestOf(9, () => spy.parseInline(text.slice(0, 50000)));
-    const cut = bestOf(9, () => spy.__layoutReply(text));
+    // KF-013: one parse takes a few ms, below what a wall-clock ratio can tell apart on a CI runner. Each sample repeats both
+    // sides until the parse baseline is at least 25 ms; the ratio itself is unchanged.
+    const reps = Math.max(1, Math.ceil(25 / Math.max(bestOf(3, () => spy.parseInline(text.slice(0, 50000))), 0.05)));
+    const repeated = run => () => { for (let i = 0; i < reps; i++) run(); };
+    const one = bestOf(9, repeated(() => spy.parseInline(text.slice(0, 50000))));
+    const cut = bestOf(9, repeated(() => spy.__layoutReply(text)));
     assert.ok(cut <= one * 2, `layout ${cut.toFixed(1)} ms against ${one.toFixed(1)} ms for one parse`);
   }
 });
@@ -2674,6 +2736,43 @@ integrationTest('B1 ui: the read-only sample shows the opening screen in its sta
   h.type('Coffee map'); await h.view.sendMapChat();
   assert.equal(h.control.requests.length, 1); assert.equal(h.control.requests[0].context.noEditableMap, true); assert.equal(JSON.parse(h.control.requests[0].context.json).noEditableMap ?? true, true);
   assert.equal(chat.hasMessages, true); assert.equal(chat.isHero, false, 'after the message it is the side window');
+});
+
+// ---- opening screen: create an empty map without AI ----------------------------------------------------------------
+
+integrationTest('45 ui: the opening screen has a secondary "create an empty mind map" button after the examples; reachable by Tab, named by its text, not the call to action', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  const button = chat.emptyMapEl; assert.equal(button.hidden, false); assert.equal(button.text, 'Create an empty mind map'); assert.equal(button.attrs.type, 'button'); assert.equal(button.hasClass('mod-cta'), false);
+  assert.equal(button.tabIndex === undefined || button.tabIndex >= 0, true, 'in the tab order');
+  const order = findAll(chat.bodyEl, i => i === chat.heroTitleEl || i === chat.inputEl || i === chat.suggestEl || i === button); eq(order.map(i => i === chat.heroTitleEl ? 'title' : i === chat.inputEl ? 'input' : i === chat.suggestEl ? 'examples' : 'empty'), ['title', 'input', 'examples', 'empty']);
+});
+
+integrationTest('45 ui: the button opens the name box, makes no request, and cancelling the box makes no file', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  const created = []; h.plugin.repo.createMap = async title => { created.push(title); return 'Maps/x.vam'; }; h.view.openMapInMutation = async () => {};
+  const requests = h.control.requests.length, modals = (h.control.modals ?? []).length;
+  chat.emptyMapEl.click(); await tick();
+  assert.equal(h.control.modals.length, modals + 1, 'the name box opened'); assert.equal(h.control.modals.at(-1).constructor.name, 'NameModal');
+  // Cancel = the submit callback is never called.
+  h.control.modals.at(-1).close(); await tick();
+  assert.equal(created.length, 0, 'cancel creates nothing'); assert.equal(h.control.requests.length, requests, 'no AI request'); assert.equal(chat.isHero, true);
+  // Confirm = the callback runs and the map is made, still with no AI request.
+  chat.emptyMapEl.click(); await tick(); h.control.modals.at(-1).submit('My map'); await tick();
+  assert.deepEqual(created, ['My map']); assert.equal(h.control.requests.length, requests, 'still no AI request');
+});
+
+integrationTest('45 ui: after the first message the button is hidden, and a map with cards never shows it', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat;
+  assert.equal(chat.emptyMapEl.hidden, false);
+  h.type('Coffee'); await h.view.sendMapChat();
+  assert.equal(chat.isHero, false); assert.equal(chat.emptyMapEl.hidden, true, 'side window: hidden');
+  const g = await harness(); await g.view.hydrate(); g.repaint(); g.open(); assert.equal(g.view.chat.isHero, false); assert.equal(g.view.chat.emptyMapEl.hidden, true, 'a map with cards');
+});
+
+integrationTest('45 ui: the read-only sample\'s opening screen does not get a second button (its start card has one)', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
+  const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore();
+  assert.equal(h.view.chat.isHero, true); assert.equal(h.view.chat.emptyMapEl.hidden, true);
 });
 
 // ---- suggestions -------------------------------------------------------------------------------------------------
@@ -3181,16 +3280,15 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 });
 
 // ---- B2-0 F3: the model menu keeps its width at 340px --------------------------------------------------------------------
-integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and the default entry shows the model without its provider prefix, the tooltip keeps the full name', async () => {
+integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
   // B3-fix rule change: with the save button in the header the model asks for 146px (basis) and the title gives way first (flex-shrink 100, min 64px).
   assert.match(rule, /flex: 1 1 146px;/); assert.match(rule, /min-width: 0;/);
   const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 100 auto;/); assert.match(title, /min-width: 64px;/); assert.doesNotMatch(rule, /min-width: 120px/);
   const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
-  const first = h.view.chatModelChoices()[0];
-  assert.equal(first.label, 'Follow default (now: OpenAI Codex · gpt-6-luna)', 'the full name stays in the tooltip'); assert.equal(first.short, 'Default: gpt-6-luna');
-  h.plugin.settings.cliModel = 'claude:sonnet'; assert.equal(h.view.chatModelChoices()[0].short, 'Default: Claude Sonnet', 'a label without a provider prefix is unchanged');
+  const choices = h.view.chatModelChoices(); const current = choices.find(c => c.value === 'gpt-6-luna');
+  assert.equal(current.label, 'OpenAI Codex · gpt-6-luna', 'the full name is the label'); assert.equal(current.short, undefined); assert.equal(choices.some(c => c.value === ''), false);
 });
 
 // ---- B2-0 F5: maps with the same name can be told apart in the list --------------------------------------------------------
@@ -4114,4 +4212,153 @@ integrationTest('map chat 16: after a map switch with the usage notice open, ans
   h.type('hello'); const sending = h.view.sendMapChat(); await tick(); assert.equal(chat.liveEl.text, 'Preparing');
   h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.liveEl.text, '', 'the switch itself clears what was said');
   gate.resolve(); await sending; assert.equal(chat.liveEl.text, '', 'and answering the notice afterwards says nothing');
+});
+
+// ---- ticket 18: slow notice after FIRST_EVENT_WAIT_MS without a model event, and "Resend" -------------------------------------
+const slowNotice = chat => find(chat.logEl, i => hasClass(i, 'vam-map-chat-progress-slow'));
+const resendButton = chat => find(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-progress-resend'));
+
+test('map chat 18: the panel shows the slow notice only while waiting, says it once, and any later stage or text removes it', () => {
+  const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text; let resent = 0;
+  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model'); f.panel.showSlow('X is responding slowly; still waiting', () => { resent++; });
+  assert.ok(slowNotice(f.panel), 'shown'); assert.match(visibleText(slowNotice(f.panel)), /X is responding slowly; still waiting/); assert.equal(resendButton(f.panel).text, 'Resend'); assert.equal(resendButton(f.panel).attrs.type, 'button');
+  assert.equal(live(), 'X is responding slowly; still waiting', 'said once through the live region'); assert.equal(f.panel.isSlow, true);
+  resendButton(f.panel).click(); assert.equal(resent, 1);
+  f.panel.streamReply('He'); assert.equal(slowNotice(f.panel), undefined, 'text removes the notice'); assert.equal(f.panel.isSlow, false);
+  f.panel.showSlow('again', () => {}); assert.equal(slowNotice(f.panel), undefined, 'writing already: no notice');
+  for (const end of [p => p.finish('a', []), p => p.fail('e'), p => p.markStopped(), p => p.reset()]) {
+    const t2 = stageFixture(); t2.f.panel.begin('q'); t2.f.panel.showSlow('slow', () => {}); assert.ok(slowNotice(t2.f.panel)); end(t2.f.panel);
+    assert.equal(slowNotice(t2.f.panel), undefined, 'every way a turn ends clears the notice'); assert.equal(t2.f.panel.isSlow, false);
+  }
+  const p2 = stageFixture(); p2.f.panel.begin('q'); p2.f.panel.setStage('writing'); p2.f.panel.showSlow('late', () => {}); assert.equal(p2.f.panel.isSlow, false, 'a notice after the first model event is refused');
+});
+
+test('map chat 18: restartWaiting counts the seconds again, removes the notice and keeps one stage line and one timer', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('q'); s.tickSeconds(25); assert.match(s.elapsed().text, /0:25/); f.panel.showSlow('slow', () => {}); assert.ok(resendButton(f.panel));
+  f.panel.restartWaiting();
+  assert.equal(slowNotice(f.panel), undefined); assert.equal(s.label(), 'Waiting for the model'); assert.match(s.elapsed().text, /0:00/, 'the seconds start again'); assert.equal(s.intervals.size, 1, 'one timer');
+  assert.equal(f.panel.transcript().length, 2, 'no second pair of messages'); assert.equal(f.panel.liveEl.text, 'Waiting for the model');
+  f.panel.markStopped(); f.panel.restartWaiting(); assert.equal(f.panel.stage, null, 'a turn that is not running is not restarted');
+});
+
+integrationTest('map chat 18: 19.9 s without a model event shows nothing, the 20 s mark shows the notice with the model name, and a model event removes it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress;
+  h.control.reply = async (_request, _signal, _onReply, onProgress) => { progress = onProgress; await gate.promise; return { reply: 'done', actions: [], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  progress({ kind: 'stream-mode', mode: 'stream-json' });
+  h.clock.advance(19_900); assert.equal(slowNotice(chat), undefined, '19.9 s: nothing yet'); assert.equal(chat.isSlow, false);
+  h.clock.advance(100); assert.ok(slowNotice(chat), '20 s: the notice'); assert.equal(visibleText(slowNotice(chat)).startsWith(`label(${h.control.requests[0].model}) is responding slowly; still waiting`), true, 'it names the model');
+  assert.ok(resendButton(chat)); assert.equal(chat.liveEl.text.endsWith('is responding slowly; still waiting'), true, 'read out once'); assert.doesNotMatch(visibleText(slowNotice(chat)), /switch|another model|faster/i, 'it never suggests another model');
+  progress({ kind: 'first-event' }); assert.equal(slowNotice(chat), undefined, 'a model event removes it');
+  gate.resolve(); await sending; assert.equal(chat.transcript().at(-1).text, 'done');
+});
+
+integrationTest('map chat 18: a model event before 20 s means the notice never shows (Claude first event, Codex searching / reading / writing, any text)', async () => {
+  for (const event of [{ kind: 'first-event' }, { kind: 'activity', activity: 'searching' }, { kind: 'activity', activity: 'reading' }, { kind: 'activity', activity: 'writing' }, { kind: 'text' }]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress; let onText;
+    h.control.reply = async (_request, _signal, onReply, onProgress) => { progress = onProgress; onText = onReply; await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(10_000); if (event.kind === 'text') onText('Hel'); else progress(event);
+    h.clock.advance(60_000); assert.equal(slowNotice(chat), undefined, `${event.kind}/${event.activity ?? ''}: no notice`);
+    gate.resolve(); await sending;
+  }
+});
+
+integrationTest('map chat 18 counter-example: json mode (no events can be seen) never shows the notice', async () => {
+  for (const mode of ['json', 'json-fallback']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred();
+    h.control.reply = async (_request, _signal, _onReply, onProgress) => { onProgress({ kind: 'stream-mode', mode }); await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined, `${mode}: no notice however long it takes`); assert.equal(chat.isBusy, true);
+    gate.resolve(); await sending; assert.equal(chat.transcript().at(-1).text, 'ok');
+  }
+});
+
+integrationTest('map chat 18 counter-example: after Resend the old attempt\'s late text, progress and result are dropped, the seconds start again and no bubble is duplicated', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal, onReply, onProgress) => new Promise((resolve, reject) => { attempts.push({ request, signal, onReply, onProgress, resolve, reject }); });
+  h.type('explain this'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  h.clock.advance(20_000); assert.ok(resendButton(chat));
+  const task = h.plugin.activeTasks.size;
+  resendButton(chat).click(); await until(() => attempts.length === 2);
+  assert.equal(attempts[0].signal.aborted, true, 'the old request is aborted'); assert.equal(attempts[1].signal.aborted, false); assert.equal(h.plugin.activeTasks.size, task, 'one task registered, the old one released');
+  assert.equal(attempts[1].request, attempts[0].request, 'the same request (same question, same mode)'); assert.equal(chat.transcript().length, 2, 'no second user bubble'); assert.equal(slowNotice(chat), undefined); assert.equal(chat.stage.kind, 'waiting');
+  attempts[0].onReply('OLD TEXT'); attempts[0].onProgress({ kind: 'activity', activity: 'writing' }); attempts[0].onProgress({ kind: 'first-event' });
+  assert.equal(chat.transcript().at(-1).text, '', 'late text of the old attempt is dropped'); assert.equal(chat.stage.kind, 'waiting', 'late progress of the old attempt is dropped');
+  h.clock.advance(19_900); assert.equal(slowNotice(chat), undefined, 'the 20 s count starts again from the resend'); h.clock.advance(100); assert.ok(slowNotice(chat), 'the new attempt gets its own notice');
+  attempts[0].resolve({ reply: 'OLD RESULT', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'OLD' }], rejected: [] });
+  await tick(); assert.equal(chat.isBusy, true, 'the old result finishes nothing'); assert.notEqual(chat.transcript().at(-1).text, 'OLD RESULT');
+  attempts[1].onProgress({ kind: 'first-event' }); attempts[1].resolve({ reply: 'NEW RESULT', actions: [], rejected: [] }); await sending;
+  assert.equal(chat.transcript().at(-1).text, 'NEW RESULT'); assert.equal(chat.transcript().length, 2); assert.equal(attempts.length, 2, 'never resent by itself'); assert.equal(h.control.mutates, 0, 'the old actions were not applied'); assert.equal(h.plugin.activeTasks.size, 0, 'the task is released');
+  h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined); assert.equal(chat.stage, null);
+});
+
+integrationTest('map chat 18 counter-example: Stop and Resend together, either order, end as Stopped and send nothing more', async () => {
+  for (const order of ['stop-then-resend', 'resend-then-stop-at-once', 'resend-sent-then-stop']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+    h.control.reply = (request, signal) => new Promise((resolve, reject) => { attempts.push({ signal, resolve, reject }); signal.addEventListener('abort', () => reject(new Error('aborted'))); });
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+    const resend = resendButton(chat);
+    if (order === 'stop-then-resend') { chat.stopEl.click(); resend.click(); } else if (order === 'resend-then-stop-at-once') { resend.click(); chat.stopEl.click(); } else { resend.click(); await until(() => attempts.length === 2); chat.stopEl.click(); }
+    await sending;
+    assert.equal(chat.transcript().at(-1).text, 'Stopped.', `${order}: ends as stopped`); assert.equal(chat.isBusy, false); assert.equal(chat.stage, null); assert.equal(slowNotice(chat), undefined);
+    assert.equal(attempts.length, order === 'resend-sent-then-stop' ? 2 : 1, `${order}: a request that was stopped before it went out is never sent`); assert.ok(attempts.every(a => a.signal.aborted), 'every request is aborted'); assert.equal(h.plugin.activeTasks.size, 0);
+    h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined); assert.equal(chat.transcript().at(-1).text, 'Stopped.');
+  }
+});
+
+integrationTest('map chat 18: the 3-minute timeout still ends a slow turn and clears the notice; a resent turn too', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (_request, _signal) => new Promise((resolve, reject) => { attempts.push({ resolve, reject }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); assert.ok(slowNotice(chat));
+  resendButton(chat).click(); await until(() => attempts.length === 2); h.clock.advance(20_000); assert.ok(slowNotice(chat));
+  attempts[1].reject(Object.assign(new Error('Map chat timed out'), { name: 'MapChatError', code: 'failed' })); await sending;
+  assert.equal(chat.isBusy, false); assert.equal(slowNotice(chat), undefined); assert.equal(chat.transcript().at(-1).error, true); assert.equal(chat.stage, null); assert.equal(h.plugin.activeTasks.size, 0); assert.equal(h.intervals.size, 0, 'no one-second timer left');
+  h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined);
+});
+
+integrationTest('map chat 18: "Say it in more detail" keeps its mode through a resend, and a resent answer that needs a plan still shows the plan card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request) => new Promise(resolve => { attempts.push({ request, resolve }); });
+  const origin = { text: 'why', chips: [], selectedIds: [] };
+  const detail = h.view.sendMapChat(origin); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
+  assert.equal(attempts[0].request.style, 'detailed'); assert.equal(attempts[1].request.style, 'detailed', 'the resend keeps the detailed mode'); assert.equal(attempts[1].request.redo, true); assert.equal(attempts[1].request.message, attempts[0].request.message);
+  attempts[1].resolve({ reply: 'More detail.', actions: [], rejected: [] }); await detail; assert.equal(chat.transcript().at(-1).text, 'More detail.');
+  chat.reset(); attempts.length = 0; h.type('add many'); const planned = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
+  attempts[1].resolve({ reply: 'sixteen cards', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] }); await planned;
+  assert.equal(planCard(h).length, 1, 'the plan card shows after a resend'); assert.equal(chat.pendingPlan().state, 'pending'); assert.equal(slowNotice(chat), undefined); assert.equal(h.control.mutates, 0, 'nothing was written before Apply');
+});
+
+integrationTest('map chat 18: a Claude stream-mode event alone (before any model event) is not a model event, and closing the view leaves no live notice', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress;
+  h.control.reply = async (_request, _signal, _onReply, onProgress) => { progress = onProgress; await gate.promise; return { reply: 'x', actions: [], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  progress({ kind: 'stream-mode', mode: 'stream-json' }); h.clock.advance(20_000); assert.ok(slowNotice(chat), 'only a real model event stops the watch');
+  await h.view.onClose(); gate.resolve(); await sending; assert.equal(chat.stage, null);
+});
+
+integrationTest('map chat 18 counter-example: Codex "started" (any item, even the echo of our own prompt, ~3 s in) is not a model event; the notice still shows at 20 s, and writing or text removes it', async () => {
+  for (const later of [{ kind: 'activity', activity: 'writing' }, { kind: 'text' }]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress; let onText;
+    h.control.reply = async (_request, _signal, onReply, onProgress) => { progress = onProgress; onText = onReply; await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(3_000); progress({ kind: 'activity', activity: 'started' });
+    assert.equal(chat.stage.kind, 'waiting', 'started does not move the stage');
+    h.clock.advance(16_900); assert.equal(slowNotice(chat), undefined, '19.9 s: not yet');
+    h.clock.advance(100); assert.ok(slowNotice(chat), 'started 17 s ago did not stop the watch: the notice shows at 20 s');
+    if (later.kind === 'text') onText('Hel'); else progress(later);
+    assert.equal(slowNotice(chat), undefined, `${later.kind}: removes the notice`);
+    gate.resolve(); await sending;
+  }
+});
+
+integrationTest('map chat 18: pressing Resend moves the focus to Stop instead of letting it fall to the page', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal, onReply, onProgress) => new Promise(resolve => { attempts.push({ resolve }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+  const button = resendButton(chat); button.focus(); assert.equal(h.page.doc.activeElement, button);
+  button.click(); await until(() => attempts.length === 2);
+  assert.equal(h.page.doc.activeElement, chat.stopEl, 'the focus is on Stop');
+  attempts[1].resolve({ reply: 'ok', actions: [], rejected: [] }); await sending;
 });

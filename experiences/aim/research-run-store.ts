@@ -892,7 +892,7 @@ export class AimRunStore {
         if (draft.status === "creating") {
           await this.repository.createNoteAt(
             draft.title,
-            draft.model ?? "gpt-6-luna",
+            draft.model ?? this.repository.settings.cliModel,
             map,
             mapPath,
             "inherited",

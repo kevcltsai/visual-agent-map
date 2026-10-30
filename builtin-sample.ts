@@ -73,6 +73,7 @@ export function builtInSample(language: NoteLanguage, useEmbeddedAssets = true):
       researchMode: "research",
       visualMode: "auto",
       detailFormatIssues: [],
+      lastError: "",
       mapId: map.id,
       topicId: map.id,
       topicState: "active",

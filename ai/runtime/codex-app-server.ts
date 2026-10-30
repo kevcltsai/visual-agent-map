@@ -96,6 +96,7 @@ interface TurnState {
   streamText?: string;
   onRequest?: (request: unknown) => void;
   onText?: (text: string) => void;
+  resolveLast?: boolean;
   onWebSearchEvent?: (event: CodexWebSearchEvent) => void;
   onActivity?: (activity: CodexActivity) => void;
   sawActivity?: boolean;
@@ -235,6 +236,8 @@ export class CodexAppServerRuntime {
       onRequest?: (request: unknown) => void;
       onAccepted?: () => void;
       onText?: (text: string) => void;
+      /** The turn resolves to the last message item even with `onText` (which otherwise resolves to every message joined), for a structured reply that is parsed strictly. */
+      resolveLast?: boolean;
       onWebSearchEvent?: (event: CodexWebSearchEvent) => void;
       /** Progress for the research card: the first event, then searching, reading and writing. */
       onActivity?: (activity: CodexActivity) => void;
@@ -335,6 +338,7 @@ export class CodexAppServerRuntime {
         steered: false,
         onRequest: controls?.onRequest,
         onText: controls?.onText,
+        resolveLast: controls?.resolveLast,
         onWebSearchEvent: controls?.onWebSearchEvent,
         onActivity: controls?.onActivity,
         generateImage: controls?.generateImage
@@ -577,7 +581,7 @@ export class CodexAppServerRuntime {
           );
       } else if (turn?.status === "completed")
         state.resolve(
-          state.onText
+          state.onText && !state.resolveLast
             ? [...state.visibleMessages.values()].join("\n\n").trim() || state.messages.at(-1)?.trim() || ""
             : state.messages.at(-1)?.trim() || ""
         );

@@ -42,3 +42,13 @@ test('han search: simplified query finds traditional text and vice versa, Turkis
   assert.ok(!foldOutlineSearch('圖書館').includes(foldOutlineSearch('旅')));
   assert.ok(foldOutlineSearch('İstanbul 圖').includes('istanbul 图'));
 });
+
+test('outline search folds Turkish İ to i and keeps ordinary case folding', () => {
+  const { foldOutlineSearch } = load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class {}, Notice: class {} } });
+  assert.ok(foldOutlineSearch('İstanbul').includes(foldOutlineSearch('istanbul')));
+  assert.ok(foldOutlineSearch('İSTANBUL').includes('istanbul'));
+  assert.equal(foldOutlineSearch('Alpha'), 'alpha');
+  assert.ok(foldOutlineSearch('Zürich').includes('zü'));
+  assert.ok(!foldOutlineSearch('Berlin').includes('istanbul'));
+});
+

@@ -1,0 +1,94 @@
+/** A card's rectangle on the stage. */
+export interface RelationBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Where a line meets a card: the point, and the unit vector pointing away from the card there. */
+export interface RelationAnchor {
+  x: number;
+  y: number;
+  nx: number;
+  ny: number;
+}
+
+export const MIN_CONTROL = 16;
+export const MAX_CONTROL = 60;
+
+/** Distance between two cards along one axis; negative when they overlap on that axis. */
+function axisGap(aStart: number, aSize: number, bStart: number, bSize: number): number {
+  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
+}
+
+const centreOf = (box: RelationBox): { x: number; y: number } => ({
+  x: box.x + box.width / 2,
+  y: box.y + box.height / 2
+});
+
+/**
+ * The two edge midpoints a semantic line joins. When the horizontal gap is at least the vertical gap the cards face each
+ * other left and right; otherwise top and bottom. Cards that overlap on both axes join centre to centre (no normal).
+ * `gap` is the distance the line crosses, which sets the length of the curve's control arms.
+ */
+export function nearestSides(
+  a: RelationBox,
+  b: RelationBox
+): { from: RelationAnchor; to: RelationAnchor; gap: number } {
+  const horizontal = axisGap(a.x, a.width, b.x, b.width),
+    vertical = axisGap(a.y, a.height, b.y, b.height);
+  if (horizontal < 0 && vertical < 0) {
+    const from = centreOf(a),
+      to = centreOf(b);
+    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
+  }
+  if (horizontal >= vertical) {
+    const rightward = centreOf(b).x >= centreOf(a).x,
+      sign = rightward ? 1 : -1;
+    return {
+      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign, ny: 0 },
+      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign, ny: 0 },
+      gap: horizontal
+    };
+  }
+  const downward = centreOf(b).y >= centreOf(a).y,
+    sign = downward ? 1 : -1;
+  return {
+    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
+    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
+    gap: vertical
+  };
+}
+
+const controlLength = (gap: number): number => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
+
+interface Curve {
+  p1: { x: number; y: number };
+  c1: { x: number; y: number };
+  c2: { x: number; y: number };
+  p2: { x: number; y: number };
+}
+
+function curveOf(a: RelationBox, b: RelationBox): Curve {
+  const { from, to, gap } = nearestSides(a, b),
+    length = gap > 0 ? controlLength(gap) : 0;
+  return {
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
+  };
+}
+
+/** Cubic Bezier from the nearest edge of `a` to the nearest edge of `b`; the arms follow the edges' normals, so it never takes a wide arc. */
+export function relationPathData(a: RelationBox, b: RelationBox): string {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+
+/** Midpoint of the same curve (t = 0.5), where the label sits. */
+export function relationMidpoint(a: RelationBox, b: RelationBox): { x: number; y: number } {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}

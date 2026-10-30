@@ -23,6 +23,13 @@ const BUTTON_SURFACE = {
 const svg = '<svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14"><path d="M4 12h16" stroke="currentColor"/></svg>';
 const tag = (tier, label) => `<button class="vam-relevance-tag vam-relevance-tag-button" data-tier="${tier}"><span class="vam-relevance-icon">${svg}</span><span>${label}</span></button>`;
 const card = (attrs, left, top, inner) => `<div class="vam-node" ${attrs} style="left:${left}px;top:${top}px">${inner}</div>`;
+// hypothesis-evidence (V1.6 P13): every line kind x normal / related / dimmed / selected, plus the plain and the expanded label, the arrowheads and the gap line.
+const RELATION_KINDS = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
+const RELATION_STATES = [['normal', ''], ['related', ' is-related'], ['dimmed', ' is-dimmed'], ['selected', ' is-selected']];
+const RELATION_FIXTURE = `<defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker><marker id="mb" viewBox="0 0 14 10" markerWidth="14" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/><path class="vam-relation-arrow-bar" d="M 12 0 L 12 10"/></marker></defs>${RELATION_KINDS.map((kind, row) => RELATION_STATES.map(([state, cls], col) => {
+  const y = 200 + row * 20 + col * 130, d = `M0 ${y} L200 ${y}`;
+  return `<path class="vam-relation vam-relation-${kind}${cls}" data-case="${kind}|${state}" d="${d}" marker-end="url(#${kind === 'contradicts' ? 'mb' : 'm'})"/>` + (kind === 'derives_from' ? `<path class="vam-relation-gap" data-gap="${state}" d="${d}"/>` : '');
+}).join('')).join('')}<path class="vam-relation-hit" d="M0 170 L200 170"/><text class="vam-relation-label" x="100" y="190">Supports</text><text class="vam-relation-label is-expanded" x="300" y="190"><tspan x="300">Supports: A → B</tspan><tspan x="300" dy="1.3em">A note</tspan></text>`;
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><style>
 button { background: var(--interactive-normal); color: var(--text-normal); border: 0; font: inherit; }
 button:hover { background: var(--interactive-hover); }
@@ -37,7 +44,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 </div>
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
-    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/><defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><path class="vam-relation vam-relation-prerequisite" d="M0 70 L200 70" marker-end="url(#m)"/><path class="vam-relation vam-relation-evidence" d="M0 50 L200 50" marker-end="url(#m)"/><path class="vam-relation vam-relation-evidence is-dimmed" d="M0 90 L200 90"/><path class="vam-relation vam-relation-prerequisite is-dimmed" d="M0 110 L200 110"/><path class="vam-relation vam-relation-evidence is-related" d="M0 130 L200 130"/><path class="vam-relation vam-relation-evidence is-selected" d="M0 150 L200 150"/><path class="vam-relation-hit" d="M0 170 L200 170"/><text class="vam-relation-label is-visible" x="100" y="190">Evidence</text></svg>
+    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/>${RELATION_FIXTURE}</svg>
     ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
@@ -60,14 +67,11 @@ const CASES = [
   ['edge', '.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)', 'stroke', 3],
   ['edge-skippable', '.vam-edge.vam-edge-side', 'stroke', 3],
   ['edge-convergence', '.vam-edge-convergence', 'stroke', 3],
-  ['edge-evidence', '.vam-relation-evidence', 'stroke', 3],
-  ['edge-prerequisite', '.vam-relation-prerequisite', 'stroke', 3],
-  ['edge-evidence-dimmed', '.vam-relation-evidence.is-dimmed', 'stroke', 3],
-  ['edge-prerequisite-dimmed', '.vam-relation-prerequisite.is-dimmed', 'stroke', 3],
-  ['edge-related', '.vam-relation.is-related', 'stroke', 3],
-  ['edge-selected', '.vam-relation.is-selected', 'stroke', 3],
-  ['relation-label', '.vam-relation-label.is-visible', 'fill', 4.5],
-  ['evidence-arrow', '.vam-relation-arrow', 'fill', 3],
+  ...RELATION_KINDS.flatMap(kind => RELATION_STATES.map(([state, cls]) => [`line-${kind}-${state}`, `.vam-relation-${kind}${cls.replace(/ /g, '.')}:not(${['.is-related', '.is-dimmed', '.is-selected'].filter(c => !cls.includes(c.slice(1))).join('):not(')})`, 'stroke', 3])),
+  ['relation-label', '.vam-relation-label:not(.is-expanded)', 'fill', 4.5],
+  ['relation-label-expanded', '.vam-relation-label.is-expanded', 'fill', 4.5],
+  ['relation-arrow', '.vam-relation-arrow', 'fill', 3],
+  ['relation-arrow-bar', '.vam-relation-arrow-bar', 'stroke', 3],
   ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],
   ['skippable-summary', '.vam-node[data-relevance="side"] .vam-card-summary', 'color', 4.5],
   ['skippable-tag-text', '.vam-node[data-relevance="side"] .vam-relevance-tag span:last-child', 'color', 4.5],
@@ -260,8 +264,11 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         const details = await evaluate(`(() => {
           const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
           const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
-          const evidence = document.querySelector('.vam-relation-evidence'), prerequisite = document.querySelector('.vam-relation-prerequisite'), convergence = document.querySelector('.vam-edge-convergence');
-          return { hitPointer: getComputedStyle(document.querySelector('.vam-relation-hit')).pointerEvents, hitStroke: getComputedStyle(document.querySelector('.vam-relation-hit')).stroke, labelPointer: getComputedStyle(document.querySelector('.vam-relation-label')).pointerEvents, prerequisiteDash: getComputedStyle(prerequisite).strokeDasharray, prerequisiteCap: getComputedStyle(prerequisite).strokeLinecap, prerequisitePointer: getComputedStyle(prerequisite).pointerEvents, evidenceDash: getComputedStyle(evidence).strokeDasharray, convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, evidencePointer: getComputedStyle(evidence).pointerEvents, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
+          const rel = (kind, state = ':not(.is-related):not(.is-dimmed):not(.is-selected)') => getComputedStyle(document.querySelector('.vam-relation-' + kind + state)), convergence = document.querySelector('.vam-edge-convergence');
+          const gap = getComputedStyle(document.querySelector('.vam-relation-gap')), dash = kind => rel(kind).strokeDasharray.replace(/px|,/g, '');
+          return { hitPointer: getComputedStyle(document.querySelector('.vam-relation-hit')).pointerEvents, hitStroke: getComputedStyle(document.querySelector('.vam-relation-hit')).stroke, labelPointer: getComputedStyle(document.querySelector('.vam-relation-label')).pointerEvents, labelDisplay: getComputedStyle(document.querySelector('.vam-relation-label')).display, labelVisibility: getComputedStyle(document.querySelector('.vam-relation-label')).visibility,
+            dashes: { supports: dash('supports'), contradicts: dash('contradicts'), verifies: dash('verifies'), derives_from: dash('derives_from'), related: dash('related'), prerequisite: dash('prerequisite') }, widths: Object.fromEntries(['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map(kind => [kind, rel(kind).strokeWidth])), selectedWidths: { supports: rel('supports', '.is-selected').strokeWidth, derives_from: rel('derives_from', '.is-selected').strokeWidth }, verifiesCap: rel('verifies').strokeLinecap, pointers: ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map(kind => rel(kind).pointerEvents), gapStroke: gap.stroke, gapWidth: gap.strokeWidth, gapPointer: gap.pointerEvents, canvas: getComputedStyle(document.body).backgroundColor,
+            convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
             coreWidth: getComputedStyle(core).borderTopWidth,
             sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
             edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
@@ -291,18 +298,21 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
       }
       // Counterexamples: the cues that replace the fade stay visible and stable.
       // hypothesis-evidence: the new line types stay distinguishable without colour (dash pattern) and leave the old ones alone. The hypothesis frame is now a shape outline, measured with every other type in the kind matrix test below.
-      assert.notEqual(details.evidenceDash, 'none', `${scheme}: an evidence link is dashed`);
-      assert.notEqual(details.evidenceDash, details.convergenceDash, `${scheme}: evidence dashes differ from the AIM 5 5 convergence dashes`);
-      assert.notEqual(details.prerequisiteDash, 'none', `${scheme}: a prerequisite link is dotted`);
-      assert.notEqual(details.prerequisiteDash, details.evidenceDash, `${scheme}: prerequisite dots differ from the evidence dashes`);
-      assert.notEqual(details.prerequisiteDash, details.convergenceDash, `${scheme}: prerequisite dots differ from the AIM 5 5 dashes`);
-      assert.equal(details.prerequisiteCap, 'round', `${scheme}: the dots are round`);
-      assert.equal(details.prerequisitePointer, 'none', `${scheme}: a prerequisite link does not take pointer events`);
+      const d = details.dashes;
+      assert.equal(d.supports, 'none', `${scheme}: supports is solid`); assert.equal(d.contradicts, '8 4', `${scheme}: contradicts is dashed 8 4`); assert.equal(d.verifies, '1 5', `${scheme}: verifies is dotted 1 5`);
+      assert.equal(d.derives_from, 'none', `${scheme}: derives from is a solid double line`); assert.equal(d.related, 'none', `${scheme}: related is solid`); assert.equal(d.prerequisite, '10 4 2 4', `${scheme}: prerequisite is long-short`);
+      assert.equal(details.verifiesCap, 'round', `${scheme}: the dots are round`);
+      assert.equal(new Set(Object.values(d)).size, 4, `${scheme}: the patterns tell contradicts, verifies and prerequisite apart from the solid kinds and each other`);
+      assert.notEqual(d.contradicts, details.convergenceDash.replace(/px|,/g, ''), `${scheme}: contradicts differs from the AIM 5 5 convergence dashes`);
+      assert.deepEqual(details.widths, { supports: '2px', contradicts: '2px', verifies: '2px', derives_from: '5px', related: '1.25px', prerequisite: '2px' }, `${scheme}: line widths`);
+      assert.deepEqual(details.selectedWidths, { supports: '3px', derives_from: '6px' }, `${scheme}: a selected line is 1px heavier`);
+      assert.equal(details.gapWidth, '2px', `${scheme}: the inner line of a double line is 2px`); assert.equal(details.gapStroke, details.canvas, `${scheme}: and in the canvas colour`); assert.equal(details.gapPointer, 'none');
+      assert.deepEqual(details.pointers, Array(6).fill('none'), `${scheme}: no line takes pointer events`);
+      assert.notEqual(details.labelDisplay, 'none', `${scheme}: a label is shown by default`); assert.equal(details.labelVisibility, 'visible');
       assert.equal(details.hitPointer, 'stroke', `${scheme}: the wide hit path takes pointer events on its stroke`);
       assert.equal(details.labelPointer, 'none', `${scheme}: the relation name takes no pointer events`);
       assert.equal(details.edgeDash, 'none', `${scheme}: the parent-child line stays solid`);
       assert.equal(details.edgesPointer, 'none', `${scheme}: the edge layer keeps pointer-events none`);
-      assert.equal(details.evidencePointer, 'none', `${scheme}: an evidence link does not take pointer events`);
       assert.equal(details.coreWidth, '1px', `${scheme}: an ordinary topic keeps the 1px frame`);
       assert.equal(details.sideBorder, 'dashed', `${scheme}: a skippable topic keeps a dashed frame`);
       assert.notEqual(details.coreBorder, 'dashed', `${scheme}: only skippable topics get the dashed frame`);
@@ -424,4 +434,18 @@ test('hypothesis-evidence: six topic types x seven research states keep text >= 
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
+});
+
+// ---- hypothesis-evidence (V1.6 P13): the colour fixture keeps covering every line state ----
+test('hypothesis-evidence: the colour matrix measures six line kinds x normal / related / dimmed / selected at >= 3:1 and both label forms at >= 4.5:1', () => {
+  const lines = CASES.filter(([name]) => name.startsWith('line-'));
+  assert.equal(lines.length, 24);
+  for (const kind of RELATION_KINDS) for (const [state] of RELATION_STATES) {
+    const row = lines.find(([name]) => name === `line-${kind}-${state}`);
+    assert.ok(row, `${kind} ${state} is measured`); assert.equal(row[3], 3);
+    assert.match(PAGE, new RegExp(`data-case="${kind}\\|${state}"`), `${kind} ${state} is in the fixture DOM`);
+  }
+  for (const name of ['relation-label', 'relation-label-expanded']) assert.equal(CASES.find(([n]) => n === name)[3], 4.5, name);
+  assert.ok(CASES.some(([n, , , need]) => n === 'relation-arrow' && need === 3) && CASES.some(([n]) => n === 'relation-arrow-bar'));
+  assert.match(PAGE, /vam-relation-gap/, 'the double line gap is in the fixture');
 });

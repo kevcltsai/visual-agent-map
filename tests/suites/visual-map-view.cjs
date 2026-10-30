@@ -2041,7 +2041,7 @@ function heFixture(options = {}) {
   const Notice = class { constructor(message) { notices.push(message); } };
   const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
   const svgCreated = [];
-  const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
+  const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
   const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
@@ -2249,7 +2249,7 @@ integrationTest('hypothesis-evidence: styles.css gives a hypothesis no 2px card 
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm')); assert.ok(m, `rule ${selector}`); return m[1]; };
   assert.doesNotMatch(css, /^\[data-topic-kind="hypothesis"\]\.vam-node\s*\{[^}]*border-width/m, 'the V1.5 2px hypothesis frame is gone: the shape outline replaces it (decision 23)');
-  const dash = rule('.vam-relation-evidence').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
+  const dash = rule('.vam-relation-contradicts').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
   assert.notEqual(dash, '5 5', 'differs from the AIM convergence line'); assert.ok(!/^none$/.test(dash), 'not the solid parent-child line');
   assert.match(css, /\.vam-edge \{[^}]*\}/); assert.doesNotMatch(rule('.vam-edge'), /dasharray/);
   assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
@@ -2385,21 +2385,21 @@ integrationTest('hypothesis-evidence: the prerequisite target picker lists neith
   none.view.chooseRelationTarget(none.view.map.nodes[0], 'prerequisite');
   assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic this one can be linked to with “Prerequisite”.']);
 });
-integrationTest('hypothesis-evidence: a prerequisite line is dotted, runs from A to B with the arrowhead at B, and shares the view marker with evidence', () => {
+integrationTest('hypothesis-evidence: a prerequisite line runs from A to B along the nearest sides with the arrowhead at B, and shares the view marker with supports', () => {
   const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
   const { view } = heFixture({ relations });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
   const pre = kids.filter(k => k.classes.includes('vam-relation-prerequisite'));
   assert.equal(pre.length, 2); assert.ok(pre.every(k => k.classes.includes('vam-relation')));
-  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'the evidence line for the same pair is separate');
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'the supports line for the same pair is separate');
   const marker = kids.find(k => k.tag === 'defs').children[0].attrs.id;
-  assert.equal(kids.filter(k => k.tag === 'defs').length, 1, 'one marker serves both kinds');
-  const aToB = pre.find(k => / 0 50$/.test(k.attrs.d));
-  assert.ok(aToB, 'other (A) at (0,200) to fact (B): ends at the left edge of B'); assert.match(aToB.attrs.d, /^M 280 250 C /, 'starts at A');
+  assert.equal(kids.filter(k => k.tag === 'defs').length, 1, 'one defs element serves every kind');
+  const aToB = pre.find(k => / 140 100$/.test(k.attrs.d));
+  assert.ok(aToB, 'other (A) is below fact (B): the line ends on the bottom edge of B'); assert.match(aToB.attrs.d, /^M 140 200 C /, 'and starts on the top edge of A');
   assert.equal(aToB.attrs['marker-end'], `url(#${marker})`, 'the arrowhead is at the end, which is B');
   const toHyp = pre.find(k => / 500 90$/.test(k.attrs.d)); assert.ok(toHyp); assert.equal(toHyp.attrs['marker-end'], `url(#${marker})`);
   const drag = view.dragEdges('other', view.cardEls.get('other')); drag.update(0, 400);
-  assert.match(aToB.attrs.d, /^M 280 450 C /, 'dragging A moves the prerequisite line');
+  assert.match(aToB.attrs.d, /^M 140 400 C /, 'dragging A moves the prerequisite line');
 });
 integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is, and an AIM map or the built-in sample draws no prerequisite', () => {
   const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
@@ -2413,11 +2413,11 @@ integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn
   assert.equal(heDrawn(sample.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
   const collapsed = heFixture({ relations }); assert.equal(heDrawn(collapsed.view, { fact: [0, 0], hyp: [500, 40] }).filter(k => k.classes.includes('vam-relation-prerequisite')).length, 0, 'an off-screen end is skipped');
 });
-integrationTest('hypothesis-evidence: styles.css gives the prerequisite line a dotted round-capped pattern unlike evidence, AIM and the solid parent line', () => {
+integrationTest('hypothesis-evidence: styles.css gives the prerequisite line its long-short pattern, unlike contradicts, AIM and the solid parent line', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm')); assert.ok(m, `rule ${selector}`); return m[1]; };
-  const pre = rule('.vam-relation-prerequisite'), dash = pre.match(/stroke-dasharray:\s*([^;]+);/)[1].trim(), evidence = rule('.vam-relation-evidence').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
-  assert.match(pre, /stroke-linecap:\s*round/); assert.notEqual(dash, evidence); assert.notEqual(dash, '5 5'); assert.ok(dash !== 'none');
+  const pre = rule('.vam-relation-prerequisite'), dash = pre.match(/stroke-dasharray:\s*([^;]+);/)[1].trim(), contradicts = rule('.vam-relation-contradicts').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
+  assert.equal(dash, '10 4 2 4', 'long-short pattern'); assert.notEqual(dash, contradicts); assert.notEqual(dash, '5 5'); assert.ok(dash !== 'none');
   assert.match(rule('.vam-relation'), /pointer-events:\s*none/); assert.match(rule('.vam-edges'), /pointer-events:\s*none/);
 });
 integrationTest('hypothesis-evidence: the panel lists relations at both ends, each row is removable through mapChange, and the add button is on topics and hypotheses alike', async () => {
@@ -2448,14 +2448,15 @@ function heLines(options = {}) {
   const labels = kids.filter(k => k.classes.includes('vam-relation-label')), hits = kids.filter(k => k.classes.includes('vam-relation-hit'));
   return { ...fx, kids, ev: find('supports'), pre: find('prerequisite'), labels, hits, evHit: hits[0], preHit: hits[1], evLabel: labels[0], preLabel: labels[1] };
 }
-const heVisible = el => el.classes.includes('is-visible');
-integrationTest('hypothesis-evidence: a relation name is hidden normally, shown while the pointer is on the line or the line is selected, and follows a drag', () => {
+const heExpanded = el => el.classes.includes('is-expanded');
+integrationTest('hypothesis-evidence: a relation name is always shown, expands while the pointer is on the line or the line is selected, and follows a drag', () => {
   const { view, evHit, evLabel, preLabel, preHit } = heLines();
+  const head = l => l.children[0]?.textContent;
   assert.equal(evLabel.textContent, 'Supports'); assert.equal(preLabel.textContent, 'Prerequisite');
-  assert.ok(!heVisible(evLabel) && !heVisible(preLabel), 'no name by default');
-  evHit.fire('pointerenter'); assert.ok(heVisible(evLabel) && !heVisible(preLabel), 'hover shows the name');
-  evHit.fire('pointerleave'); assert.ok(!heVisible(evLabel), 'leaving hides it');
-  preHit.fire('pointerdown', { stopPropagation() {} }); preHit.fire('pointerleave'); assert.ok(heVisible(preLabel), 'a selected line keeps its name');
+  assert.ok(!heExpanded(evLabel) && !heExpanded(preLabel), 'the name only, by default');
+  evHit.fire('pointerenter'); assert.ok(heExpanded(evLabel) && !heExpanded(preLabel), 'hover expands the label'); assert.equal(head(evLabel), 'Supports: FACT → HYP');
+  evHit.fire('pointerleave'); assert.ok(!heExpanded(evLabel), 'leaving collapses it'); assert.equal(evLabel.textContent, 'Supports');
+  preHit.fire('pointerdown', { stopPropagation() {} }); preHit.fire('pointerleave'); assert.ok(heExpanded(preLabel), 'a selected line keeps its full label');
   assert.equal(view.selectedRelation, heKey(heRel[1]));
   const x = Number(evLabel.attrs.x), y = Number(evLabel.attrs.y);
   assert.ok(x > 280 && x < 500, 'the name sits at the midpoint of the curve');
@@ -2799,4 +2800,144 @@ integrationTest('hypothesis-evidence: the V1.5 evidence and prerequisite panel k
     for (const gone of ['ui.evidence_for_heading', 'ui.evidence_from_heading', 'ui.add_evidence', 'ui.add_prerequisite', 'ui.relation_name_evidence', 'ui.remove_evidence_link_0', 'ui.remove_prerequisite_link_0', 'log.evidence_relation_type_ignored_0'])
       assert.equal(read(lang).includes(`"${gone}`), false, `${lang} ${gone}`);
   }
+});
+
+// ---- hypothesis-evidence (V1.6 P13): six line styles, labels, nearest-side routing ----
+const heGeo = () => load('experiences/visual-map/relation-geometry.ts', {}, {});
+const heBox = (x, y, width = 280, height = 100) => ({ x, y, width, height });
+const heNums = d => d.match(/-?\d+(\.\d+)?/g).map(Number);
+const heKinds = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
+const heSixRel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'other' }, { kind: 'verifies', from: 'other', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'other' }, { kind: 'related', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }];
+const heSix = (options = {}) => {
+  const fx = heFixture({ relations: options.relations ?? heSixRel, shared: options.shared });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300] });
+  return { ...fx, kids, line: kind => kids.find(k => k.classes.includes(`vam-relation-${kind}`)), labels: kids.filter(k => k.classes.includes('vam-relation-label')), hits: kids.filter(k => k.classes.includes('vam-relation-hit')) };
+};
+integrationTest('hypothesis-evidence: cards stacked one above the other are joined bottom edge to top edge, and side by side left edge to right edge', () => {
+  const { relationPathData, nearestSides } = heGeo();
+  assert.equal(relationPathData(heBox(0, 0), heBox(0, 200)), 'M 140 100 C 140 150, 140 150, 140 200', 'a above b: from the bottom of a to the top of b');
+  assert.equal(relationPathData(heBox(0, 200), heBox(0, 0)), 'M 140 200 C 140 150, 140 150, 140 100', 'a below b: from the top of a to the bottom of b');
+  assert.equal(relationPathData(heBox(0, 0), heBox(500, 0)), 'M 280 50 C 340 50, 440 50, 500 50');
+  assert.equal(relationPathData(heBox(500, 0), heBox(0, 0)), 'M 500 50 C 440 50, 340 50, 280 50', 'right to left leaves the left edge');
+  const sides = nearestSides(heBox(0, 0), heBox(0, 200));
+  assert.deepEqual([sides.from.ny, sides.to.ny], [1, -1], 'the normals point away from each card');
+});
+integrationTest('hypothesis-evidence: the control arms are clamped to 16..60 and never leave a 60px margin around the two cards (same-side layouts included)', () => {
+  const { relationPathData, relationMidpoint } = heGeo();
+  assert.deepEqual(heNums(relationPathData(heBox(0, 0), heBox(290, 0))).slice(2, 4), [296, 50], 'a 10px gap still gets a 16px arm');
+  assert.deepEqual(heNums(relationPathData(heBox(0, 0), heBox(1000, 0))).slice(2, 4), [340, 50], 'a long gap caps the arm at 60');
+  const pairs = [[heBox(0, 0), heBox(300, 160)], [heBox(0, 0), heBox(200, 300)], [heBox(300, 160), heBox(0, 0)], [heBox(0, 0), heBox(260, 90)], [heBox(0, 0), heBox(0, 20)], [heBox(0, 0), heBox(400, 900)]];
+  for (const [a, b] of pairs) {
+    const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] = heNums(relationPathData(a, b));
+    const left = Math.min(a.x, b.x) - 60, right = Math.max(a.x + a.width, b.x + b.width) + 60, top = Math.min(a.y, b.y) - 60, bottom = Math.max(a.y + a.height, b.y + b.height) + 60;
+    for (const [x, y] of [[x1, y1], [cx1, cy1], [cx2, cy2], [x2, y2]]) assert.ok(x >= left && x <= right && y >= top && y <= bottom, `${JSON.stringify([a, b])}: point ${x},${y} stays within 60px of the cards`);
+  }
+  assert.equal(relationPathData(heBox(0, 0), heBox(100, 40)), 'M 140 50 C 140 50, 240 90, 240 90', 'overlapping cards join centre to centre with no arm');
+  assert.deepEqual(plain(relationMidpoint(heBox(0, 0), heBox(500, 40))), { x: 390, y: 70 }, 'the midpoint is the curve at t = 0.5');
+});
+integrationTest('hypothesis-evidence: each of the six kinds draws its own class; related has no arrow, contradicts the barred arrow, the others the plain arrow', () => {
+  const { kids, line } = heSix();
+  const defs = kids.find(k => k.tag === 'defs'), arrow = defs.children[0], bar = defs.children[1];
+  assert.equal(defs.children.length, 2, 'two markers per view');
+  assert.ok(arrow.children.length === 1 && bar.children.length === 2, 'the barred marker is the arrow plus a bar'); assert.ok(bar.children[1].classes.includes('vam-relation-arrow-bar'));
+  assert.notEqual(arrow.attrs.id, bar.attrs.id);
+  for (const kind of heKinds) { assert.ok(line(kind).classes.includes('vam-relation'), kind); assert.equal(kids.filter(k => k.classes.includes(`vam-relation-${kind}`)).length, 1, `${kind} drawn once`); }
+  for (const kind of ['supports', 'verifies', 'derives_from', 'prerequisite']) assert.equal(line(kind).attrs['marker-end'], `url(#${arrow.attrs.id})`, kind);
+  assert.equal(line('contradicts').attrs['marker-end'], `url(#${bar.attrs.id})`);
+  assert.equal(line('related').attrs['marker-end'], undefined, 'related has no arrowhead');
+});
+integrationTest('hypothesis-evidence: both marker ids are unique per view, so two map tabs open together never share one', () => {
+  const a = heSix(), b = heSix({ shared: { VisualAgentMapView: heFixture().VisualAgentMapView } });
+  const ids = fx => fx.kids.find(k => k.tag === 'defs').children.map(m => m.attrs.id);
+  const all = [...ids(a), ...ids(b)];
+  assert.equal(new Set(all).size, 4, 'four distinct ids');
+  assert.equal(b.line('contradicts').attrs['marker-end'], `url(#${ids(b)[1]})`, 'each view points at its own marker');
+});
+integrationTest('hypothesis-evidence: "derives from" is a double line: the outer line plus a gap line on the same path, with its own arrowhead; no other kind has one', () => {
+  const { kids, line } = heSix();
+  const gaps = kids.filter(k => k.classes.includes('vam-relation-gap'));
+  assert.equal(gaps.length, 1); assert.equal(gaps[0].attrs.d, line('derives_from').attrs.d); assert.equal(gaps[0].attrs['marker-end'], line('derives_from').attrs['marker-end']);
+  assert.ok(kids.indexOf(gaps[0]) > kids.indexOf(line('derives_from')), 'the gap line is painted over the outer line');
+  assert.equal(gaps[0].classes.includes('vam-relation'), false, 'the gap line takes no selection class');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-relation-derives_from \{ --vam-relation-width: 5px; \}/m); assert.match(css, /^\.vam-relation-gap \{[^}]*stroke: var\(--background-primary\);[^}]*stroke-width: 2px;/m);
+});
+integrationTest('hypothesis-evidence: styles.css gives the six kinds their widths and patterns: 2px solid, 8 4, 1 5 round, 5px double, 1.25px, 10 4 2 4', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => css.match(new RegExp(`^${selector.replace(/[.[\]"=_-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))[1];
+  assert.match(rule('.vam-relation'), /stroke-width:\s*var\(--vam-relation-width, 2px\)/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
+  assert.match(rule('.vam-relation-supports'), /stroke-dasharray:\s*none/); assert.match(rule('.vam-relation-contradicts'), /stroke-dasharray:\s*8 4/);
+  assert.match(rule('.vam-relation-verifies'), /stroke-dasharray:\s*1 5/); assert.match(rule('.vam-relation-verifies'), /stroke-linecap:\s*round/);
+  assert.match(rule('.vam-relation-related'), /--vam-relation-width:\s*1\.25px/); assert.match(rule('.vam-relation-prerequisite'), /stroke-dasharray:\s*10 4 2 4/);
+  assert.doesNotMatch(css, /vam-relation-evidence/, 'no V1.5 evidence line rule is left'); assert.doesNotMatch(css, /\.vam-relation-label \{[^}]*visibility: hidden/, 'labels are not hidden by default');
+});
+integrationTest('hypothesis-evidence: the labels show each kind name by default; a selected line reads "Name: A → B" (related uses —) and the note on a second line', () => {
+  const rel = heSixRel.map((r, i) => i === 0 ? { ...r, description: 'because it was measured' } : r);
+  const { kids, labels, hits, view } = heSix({ relations: rel });
+  assert.deepEqual(labels.map(l => l.textContent), ['Supports', 'Contradicts', 'Verifies', 'Derives from', 'Related', 'Prerequisite']);
+  assert.ok(labels.every(l => !heExpanded(l)));
+  hits[0].fire('pointerdown', { stopPropagation() {} });
+  assert.deepEqual(labels[0].children.map(c => [c.tag, c.textContent]), [['tspan', 'Supports: FACT → HYP'], ['tspan', 'because it was measured']]);
+  assert.equal(labels[0].children[1].attrs.dy, '1.3em', 'the note is the second line'); assert.equal(labels[0].children[1].attrs.x, labels[0].attrs.x);
+  hits[4].fire('pointerdown', { stopPropagation() {} });
+  assert.equal(labels[4].children[0].textContent, 'Related: HYP — FACT'); assert.equal(labels[4].children.length, 1, 'no note, no second line');
+  assert.equal(labels[0].textContent, 'Supports', 'the previously selected label folds back'); assert.equal(view.selectedRelation, heKey(rel[4]));
+});
+integrationTest('hypothesis-evidence: a long note is cut to 60 characters with an ellipsis, and markup in a note stays text (tspan textContent only, no element is built from it)', () => {
+  const long = 'x'.repeat(61), exact = 'y'.repeat(60), html = '<img src=x onerror=alert(1)>';
+  const { labels, hits, view } = heSix({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp', description: long }, { kind: 'related', from: 'hyp', to: 'other', description: exact }, { kind: 'verifies', from: 'other', to: 'fact', description: html }] });
+  hits[0].fire('pointerdown', { stopPropagation() {} }); assert.equal(labels[0].children[1].textContent, `${'x'.repeat(60)}…`);
+  hits[1].fire('pointerdown', { stopPropagation() {} }); assert.equal(labels[1].children[1].textContent, exact, '60 characters are kept whole');
+  hits[2].fire('pointerdown', { stopPropagation() {} }); assert.equal(labels[2].children[1].textContent, html); assert.equal(labels[2].children[1].tag, 'tspan');
+  assert.equal(view.edgesEl.kids.some(k => k.tag === 'img'), false);
+  const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.doesNotMatch(src.slice(src.indexOf('private paintRelationLabel'), src.indexOf('private placeRelationLabel')), /innerHTML|insertAdjacentHTML/);
+});
+integrationTest('hypothesis-evidence: relation labels are hidden below 60% zoom (0.59 hidden, 0.6 shown) through an attribute on the stage', () => {
+  const { view } = heFixture();
+  const attrs = {}; view.stageEl = { style: {}, setAttribute(n, v) { attrs[n] = v; }, removeAttribute(n) { delete attrs[n]; } };
+  for (const [zoom, hidden] of [[0.25, true], [0.59, true], [0.6, false], [1, false], [2, false]]) {
+    view.map.viewport.zoom = zoom; view.transform();
+    assert.equal(attrs['data-relation-labels'], hidden ? 'hidden' : undefined, `zoom ${zoom}`);
+  }
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\[data-relation-labels="hidden"\] \.vam-relation-label \{ display: none; \}/m, 'the rule starts with the attribute');
+});
+integrationTest('hypothesis-evidence: dragging a card moves the line, its gap line, its hit path and its label (expanded text included) together', () => {
+  const { view, line, labels, hits, kids } = heSix({ relations: [{ kind: 'derives_from', from: 'fact', to: 'hyp', description: 'why' }] });
+  const gap = kids.find(k => k.classes.includes('vam-relation-gap'));
+  hits[0].fire('pointerdown', { stopPropagation() {} });
+  const before = line('derives_from').attrs.d, x0 = labels[0].attrs.x;
+  view.dragEdges('hyp', view.cardEls.get('hyp')).update(0, 400);
+  const d = line('derives_from').attrs.d;
+  assert.notEqual(d, before); assert.equal(gap.attrs.d, d); assert.equal(hits[0].attrs.d, d);
+  assert.match(d, /^M 140 100 C /, 'now hyp is below fact: bottom edge to top edge'); assert.notEqual(labels[0].attrs.x, x0);
+  assert.ok(labels[0].children.every(c => c.attrs.x === labels[0].attrs.x), 'both tspans follow the label');
+});
+integrationTest('hypothesis-evidence: a press on any of the six lines stops here (no pan, no marquee); the parent-child edge keeps its DOM, class and no handlers', () => {
+  const fx = heFixture({ relations: heSixRel, topics: [node('fact'), node('hyp', 'fact'), node('other')] });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300] });
+  const hits = kids.filter(k => k.classes.includes('vam-relation-hit')); assert.equal(hits.length, 6);
+  for (const hit of hits) { let stopped = 0; hit.fire('pointerdown', { stopPropagation() { stopped++; } }); assert.equal(stopped, 1); }
+  const edge = fx.view.edgeEls.get('fact\u0000hyp'); assert.ok(edge, 'the parent-child edge is drawn');
+  assert.deepEqual(edge.classes, ['vam-edge']); assert.deepEqual(Object.keys(edge.listeners), []); assert.equal(edge.attrs['marker-end'], undefined);
+  assert.match(edge.attrs.d, /^M 280 50 C /, 'it still leaves the parent right edge as before');
+});
+integrationTest('hypothesis-evidence: selecting a topic adds no fade class to any card; the lines get is-related and is-dimmed in all six kinds', () => {
+  const { view, kids } = heSix();
+  view.selected = 'fact'; view.paintCards(['fact']);
+  for (const [id, card] of view.cardEls) assert.ok(!card.classes.some(c => /dim|fade|muted/.test(c)), `${id} is not faded`);
+  const lines = kids.filter(k => k.classes.includes('vam-relation'));
+  assert.equal(lines.length, 6);
+  const related = lines.filter(l => l.classes.includes('is-related')).length, dimmed = lines.filter(l => l.classes.includes('is-dimmed')).length;
+  assert.equal(related, 4, 'four of the six touch fact'); assert.equal(dimmed, 2);
+});
+integrationTest('hypothesis-evidence: the end cards of a selected line outline themselves on the shape for the four shaped types, and the rectangle outline stays for the rest', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const line = css.split('\n').find(l => l.includes('.is-relation-end:not([data-aim-kind])'));
+  assert.ok(line && line.startsWith('[data-topic-kind="atomic"]'), 'starts with the attribute');
+  for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(line.includes(`[data-topic-kind="${kind}"].vam-node.is-relation-end`), kind);
+  assert.ok(!line.includes('"action"'), 'action keeps the rectangular outline');
+  assert.match(line, /outline: 0;[^}]*--vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px/);
+  assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
 });

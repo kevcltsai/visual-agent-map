@@ -17,6 +17,7 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
+import { relationMidpoint, relationPathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -440,46 +441,13 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
-/** Unique ids for the evidence arrowhead `<marker>`: two map tabs share one document, so an id must belong to one view. */
+/** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
 let relationMarkerSequence = 0;
-interface CardBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-/** Curve for an evidence link from `a` (the fact) to `b` (the hypothesis); it leaves and enters on the sides that face each other. */
-function relationPathData(a: CardBox, b: CardBox): string {
-  const y1 = a.y + a.height / 2,
-    y2 = b.y + b.height / 2;
-  if (b.x + b.width < a.x) {
-    const x1 = a.x,
-      x2 = b.x + b.width,
-      bend = Math.max(60, (x1 - x2) / 2);
-    return `M ${x1} ${y1} C ${x1 - bend} ${y1}, ${x2 + bend} ${y2}, ${x2} ${y2}`;
-  }
-  return edgePathData(a.x + a.width, y1, b.x, y2);
-}
-/** Midpoint of the same curve (a cubic Bezier at t = 0.5), where the relation name is written. */
-function relationMidpoint(a: CardBox, b: CardBox): { x: number; y: number } {
-  const y1 = a.y + a.height / 2,
-    y2 = b.y + b.height / 2;
-  let x1: number, x2: number, c1: number, c2: number;
-  if (b.x + b.width < a.x) {
-    x1 = a.x;
-    x2 = b.x + b.width;
-    const bend = Math.max(60, (x1 - x2) / 2);
-    c1 = x1 - bend;
-    c2 = x2 + bend;
-  } else {
-    x1 = a.x + a.width;
-    x2 = b.x;
-    const bend = Math.max(60, Math.abs(x2 - x1) / 2);
-    c1 = x1 + bend;
-    c2 = x2 - bend;
-  }
-  return { x: (x1 + 3 * c1 + 3 * c2 + x2) / 8, y: (y1 + y1 * 3 + y2 * 3 + y2) / 8 };
-}
+type CardBox = RelationBox;
+/** Below this zoom the relation names are hidden; at it they show. */
+const RELATION_LABEL_MIN_ZOOM = 0.6;
+/** A note shown under an expanded label is cut to this many characters. */
+const RELATION_LABEL_NOTE_MAX = 60;
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -783,6 +751,14 @@ export class VisualAgentMapView extends ItemView {
   /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
   private relationHitEls = new Map<string, SVGPathElement>();
   private relationLabelEls = new Map<string, SVGTextElement>();
+  /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
+  private relationGapEls = new Map<string, SVGPathElement>();
+  private relationData = new Map<string, TopicRelation>();
+  /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
+  private relationPainted = new Set<string>();
+  private relationExpanded = new Set<string>();
+  /** Where each label sits, so expanding or collapsing its text keeps it in place. */
+  private relationLabelAt = new Map<string, { x: number; y: number }>();
   /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
   private selectedRelation: string | null = null;
   /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
@@ -790,8 +766,9 @@ export class VisualAgentMapView extends ItemView {
   private previewRelation: string | null = null;
   /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
   private relationEndIds = new Set<string>();
-  /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
+  /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
   private readonly relationMarkerId = `vam-relation-arrow-${++relationMarkerSequence}`;
+  private readonly relationBarMarkerId = `${this.relationMarkerId}-bar`;
   /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
   private suppressClickUntil = 0;
   /** Node whose card should hold keyboard focus once the next render finishes. */
@@ -10225,6 +10202,9 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    // Small enough that a name would only crowd the lines: the stylesheet hides every relation label on this attribute.
+    if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
+    else this.stageEl.removeAttribute("data-relation-labels");
     this.zoomLabel?.setText(`${Math.round(zoom * 100)}%`);
     this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
@@ -12533,6 +12513,7 @@ export class VisualAgentMapView extends ItemView {
             d = relationPathData(from, to);
           path.setAttribute("d", d);
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
+          this.relationGapEls.get(link.key)?.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationMidpoint(from, to));
         }
         for (const edge of touching) {
@@ -12585,15 +12566,22 @@ export class VisualAgentMapView extends ItemView {
     this.syncRelationClasses();
   }
   /**
-   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, with an
-   * arrowhead at the target (one marker serves all kinds). A link is not drawn when an end is off screen (collapsed);
-   * the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map draws none,
-   * and its file keeps the key.
+   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving
+   * the nearest edge of A and entering the nearest edge of B. The kind sets the line pattern in styles.css; the
+   * arrowhead is the plain one (all but "related", which has none) or the barred one ("contradicts"); "derives from"
+   * is a double line (the outer line, then a canvas-coloured inner line). A link is not drawn when an end is off screen
+   * (collapsed); the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map
+   * draws none, and its file keeps the key.
    */
   private drawRelations(): void {
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
+    this.relationGapEls.clear();
+    this.relationData.clear();
+    this.relationLabelAt.clear();
+    this.relationPainted.clear();
+    this.relationExpanded.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
     const links: {
       from: HTMLElement;
@@ -12609,33 +12597,36 @@ export class VisualAgentMapView extends ItemView {
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
-    const defs = createSvg("defs"),
-      marker = createSvg("marker"),
-      arrow = createSvg("path");
-    marker.setAttribute("id", this.relationMarkerId);
-    marker.setAttribute("viewBox", "0 0 10 10");
-    marker.setAttribute("refX", "9");
-    marker.setAttribute("refY", "5");
-    marker.setAttribute("markerWidth", "10");
-    marker.setAttribute("markerHeight", "10");
-    marker.setAttribute("markerUnits", "userSpaceOnUse");
-    marker.setAttribute("orient", "auto");
-    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-    arrow.addClass("vam-relation-arrow");
-    marker.appendChild(arrow);
-    defs.appendChild(marker);
+    const defs = createSvg("defs");
+    defs.appendChild(this.relationMarker(this.relationMarkerId, false));
+    defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
     for (const link of links) {
+      const d = relationPathData(boxOf(link.from), boxOf(link.to)),
+        marker =
+          link.kind === "related"
+            ? null
+            : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
       const path = createSvg("path");
-      path.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
-      path.setAttribute("marker-end", `url(#${this.relationMarkerId})`);
+      path.setAttribute("d", d);
+      if (marker) path.setAttribute("marker-end", marker);
       path.addClass("vam-relation");
       path.addClass(`vam-relation-${link.kind}`);
       this.edgesEl.appendChild(path);
       this.relationEls.set(link.key, path);
+      this.relationData.set(link.key, link.relation);
+      if (link.kind === "derives_from") {
+        // The inner line in the canvas colour leaves the outer one as two rails; its own arrowhead keeps the tip whole.
+        const gap = createSvg("path");
+        gap.setAttribute("d", d);
+        if (marker) gap.setAttribute("marker-end", marker);
+        gap.addClass("vam-relation-gap");
+        this.edgesEl.appendChild(gap);
+        this.relationGapEls.set(link.key, gap);
+      }
       // The wide invisible path is what the pointer meets; the visible line and the parent-child edges ignore it.
       const hit = createSvg("path");
-      hit.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
+      hit.setAttribute("d", d);
       hit.addClass("vam-relation-hit");
       const key = link.key;
       hit.addEventListener("pointerdown", event => {
@@ -12665,7 +12656,6 @@ export class VisualAgentMapView extends ItemView {
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
-      label.textContent = t(RELATION_NAME_KEY[link.kind]);
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
@@ -12675,10 +12665,70 @@ export class VisualAgentMapView extends ItemView {
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
+  /** An arrowhead whose tip sits on the end of the line; the barred one adds a bar across the line just past the tip. */
+  private relationMarker(id: string, barred: boolean): SVGMarkerElement {
+    const marker = createSvg("marker"),
+      arrow = createSvg("path");
+    marker.setAttribute("id", id);
+    marker.setAttribute("viewBox", barred ? "0 0 14 10" : "0 0 10 10");
+    marker.setAttribute("refX", "9");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", barred ? "14" : "10");
+    marker.setAttribute("markerHeight", "10");
+    marker.setAttribute("markerUnits", "userSpaceOnUse");
+    marker.setAttribute("orient", "auto");
+    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.addClass("vam-relation-arrow");
+    marker.appendChild(arrow);
+    if (barred) {
+      const bar = createSvg("path");
+      bar.setAttribute("d", "M 12 0 L 12 10");
+      bar.addClass("vam-relation-arrow-bar");
+      marker.appendChild(bar);
+    }
+    return marker;
+  }
+  /**
+   * The text of a relation label: just the name normally; while the line is selected (or hovered) "Name: A → B"
+   * ("—" for related) and, on a second line, the note cut to 60 characters with an ellipsis. Text only, never markup.
+   */
+  private paintRelationLabel(key: string, expanded: boolean): void {
+    const label = this.relationLabelEls.get(key),
+      link = this.relationData.get(key);
+    if (!label || !link) return;
+    const name = t(RELATION_NAME_KEY[link.kind]);
+    if (!expanded) {
+      label.textContent = name;
+      return;
+    }
+    label.textContent = "";
+    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id,
+      joint = link.kind === "related" ? "—" : "→",
+      at = this.relationLabelAt.get(key),
+      head = createSvg("tspan");
+    head.textContent = `${name}: ${titleOf(link.from)} ${joint} ${titleOf(link.to)}`;
+    if (at) head.setAttribute("x", String(at.x));
+    label.appendChild(head);
+    if (link.description) {
+      const note = createSvg("tspan"),
+        chars = Array.from(link.description);
+      note.textContent =
+        chars.length > RELATION_LABEL_NOTE_MAX
+          ? `${chars.slice(0, RELATION_LABEL_NOTE_MAX).join("")}…`
+          : link.description;
+      if (at) note.setAttribute("x", String(at.x));
+      note.setAttribute("dy", "1.3em");
+      label.appendChild(note);
+    }
+  }
   private placeRelationLabel(key: string, point: { x: number; y: number }): void {
+    this.relationLabelAt.set(key, point);
     const label = this.relationLabelEls.get(key);
-    label?.setAttribute("x", String(point.x));
-    label?.setAttribute("y", String(point.y));
+    if (!label) return;
+    label.setAttribute("x", String(point.x));
+    label.setAttribute("y", String(point.y));
+    // The tspans of an expanded label carry their own x; they follow the line.
+    for (const part of Array.from(label.children)) part.setAttribute("x", String(point.x));
   }
   /**
    * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
@@ -12697,7 +12747,14 @@ export class VisualAgentMapView extends ItemView {
       path.toggleClass("is-related", related);
       path.toggleClass("is-dimmed", chosen.size > 0 && !related);
       path.toggleClass("is-selected", active);
-      this.relationLabelEls.get(key)?.toggleClass("is-visible", active || key === this.hoverRelation);
+      const expanded = active || key === this.hoverRelation;
+      this.relationLabelEls.get(key)?.toggleClass("is-expanded", expanded);
+      if (this.relationExpanded.has(key) !== expanded || !this.relationPainted.has(key)) {
+        this.paintRelationLabel(key, expanded);
+        this.relationPainted.add(key);
+        if (expanded) this.relationExpanded.add(key);
+        else this.relationExpanded.delete(key);
+      }
       if (active) {
         ends.add(fromId);
         ends.add(toId);

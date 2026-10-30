@@ -78,16 +78,25 @@
 .vam-node[data-aim-kind="research"] { border-radius: 4px; }
 .vam-node[data-aim-kind="synthesis"] { border-style: dashed; border-color: var(--interactive-accent); }
 .vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
-.vam-relation { fill: none; stroke-width: 2; pointer-events: none; }
-.vam-relation-evidence { stroke: var(--text-muted); stroke-dasharray: 12 5; }
-.vam-relation-prerequisite { stroke: var(--text-muted); stroke-dasharray: 1 6; stroke-linecap: round; }
-.vam-relation-arrow { fill: var(--text-muted); stroke: none; }
+/* Semantic lines (V1.6): six patterns in the text colour, told apart by pattern and end, not by hue. Every rule starts with .vam-relation, so the share viewer, which draws none, does not pick them up. */
+.vam-relation { fill: none; stroke: var(--text-normal); stroke-width: var(--vam-relation-width, 2px); pointer-events: none; }
+.vam-relation-supports { stroke-dasharray: none; }
+.vam-relation-contradicts { stroke-dasharray: 8 4; }
+.vam-relation-verifies { stroke-dasharray: 1 5; stroke-linecap: round; }
+.vam-relation-derives_from { --vam-relation-width: 5px; }
+.vam-relation-related { --vam-relation-width: 1.25px; }
+.vam-relation-prerequisite { stroke-dasharray: 10 4 2 4; }
+.vam-relation-gap { fill: none; stroke: var(--background-primary); stroke-width: 2px; pointer-events: none; }
+.vam-relation-arrow { fill: var(--text-normal); stroke: none; }
+.vam-relation-arrow-bar { fill: none; stroke: var(--text-normal); stroke-width: 2px; }
 .vam-relation-hit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
-.vam-relation.is-related { stroke-width: 3; }
+.vam-relation.is-related { stroke-width: calc(var(--vam-relation-width, 2px) + 1px); }
 .vam-relation.is-dimmed { opacity: 0.75; }
-.vam-relation.is-selected { stroke: var(--interactive-accent); stroke-width: 3; opacity: 1; }
-.vam-relation-label { visibility: hidden; fill: var(--text-normal); stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
-.vam-relation-label.is-visible { visibility: visible; }
+.vam-relation.is-selected { stroke: var(--interactive-accent); stroke-width: calc(var(--vam-relation-width, 2px) + 1px); opacity: 1; }
+/* The name sits on the line's midpoint with a canvas-coloured halo; a selected or hovered line also gives the ends and the note. */
+.vam-relation-label { fill: var(--text-normal); stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+/* Zoomed out far enough that names would only crowd the lines (view.ts sets the attribute below 60%). */
+[data-relation-labels="hidden"] .vam-relation-label { display: none; }
 /* Written with the class first so the share viewer, which draws no relations, does not pick the rule up (scripts/viewer-css.mjs). */
 .is-relation-end.vam-node { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .vam-relation-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
@@ -177,6 +186,8 @@
 [data-topic-kind="atomic"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node:not([data-aim-kind]) { isolation: isolate; padding: 28px 40px; border-color: transparent; background: transparent; box-shadow: none; }
 [data-topic-kind="atomic"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="hypothesis"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="evidence"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="conclusion"][data-status="running"].vam-node:not([data-aim-kind])::after { display: none; }
 [data-topic-kind="atomic"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-selected:not([data-aim-kind]) { outline: 0; border-color: transparent; }
+/* The end cards of a selected line: the shapes mark it on their own outline (a rectangular outline would show a box around a diamond). */
+[data-topic-kind="atomic"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-relation-end:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-relation-end:not([data-aim-kind]) { outline: 0; --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
 .vam-kind-shape { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; overflow: visible; pointer-events: none; }
 .vam-kind-shape .vam-kind-outline { fill: var(--vam-kind-fill); stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-dasharray: var(--vam-kind-dash); stroke-linejoin: round; }
 .vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-linejoin: round; }

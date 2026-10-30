@@ -17169,6 +17169,56 @@ function withThinkingOrigin(context, note) {
   };
 }
 
+// experiences/visual-map/relation-geometry.ts
+var MIN_CONTROL = 16;
+var MAX_CONTROL = 60;
+function axisGap(aStart, aSize, bStart, bSize) {
+  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
+}
+var centreOf = (box) => ({
+  x: box.x + box.width / 2,
+  y: box.y + box.height / 2
+});
+function nearestSides(a, b) {
+  const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
+  if (horizontal < 0 && vertical < 0) {
+    const from = centreOf(a), to = centreOf(b);
+    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
+  }
+  if (horizontal >= vertical) {
+    const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
+    return {
+      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
+      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign2, ny: 0 },
+      gap: horizontal
+    };
+  }
+  const downward = centreOf(b).y >= centreOf(a).y, sign = downward ? 1 : -1;
+  return {
+    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
+    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
+    gap: vertical
+  };
+}
+var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
+function curveOf(a, b) {
+  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
+  return {
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
+  };
+}
+function relationPathData(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+function relationMidpoint(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+
 // experiences/visual-map/topic-kind-shape.ts
 var TOPIC_KIND_SHAPES = {
   topic: { shape: "rounded", labelKey: "ui.topic_kind_topic" },
@@ -36726,32 +36776,8 @@ function edgePathData(x1, y1, x2, y2) {
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 var relationMarkerSequence = 0;
-function relationPathData(a, b) {
-  const y1 = a.y + a.height / 2, y2 = b.y + b.height / 2;
-  if (b.x + b.width < a.x) {
-    const x1 = a.x, x2 = b.x + b.width, bend = Math.max(60, (x1 - x2) / 2);
-    return `M ${x1} ${y1} C ${x1 - bend} ${y1}, ${x2 + bend} ${y2}, ${x2} ${y2}`;
-  }
-  return edgePathData(a.x + a.width, y1, b.x, y2);
-}
-function relationMidpoint(a, b) {
-  const y1 = a.y + a.height / 2, y2 = b.y + b.height / 2;
-  let x1, x2, c1, c2;
-  if (b.x + b.width < a.x) {
-    x1 = a.x;
-    x2 = b.x + b.width;
-    const bend = Math.max(60, (x1 - x2) / 2);
-    c1 = x1 - bend;
-    c2 = x2 + bend;
-  } else {
-    x1 = a.x + a.width;
-    x2 = b.x;
-    const bend = Math.max(60, Math.abs(x2 - x1) / 2);
-    c1 = x1 + bend;
-    c2 = x2 - bend;
-  }
-  return { x: (x1 + 3 * c1 + 3 * c2 + x2) / 8, y: (y1 + y1 * 3 + y2 * 3 + y2) / 8 };
-}
+var RELATION_LABEL_MIN_ZOOM = 0.6;
+var RELATION_LABEL_NOTE_MAX = 60;
 var boxOf = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -36956,6 +36982,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
     __publicField(this, "relationHitEls", /* @__PURE__ */ new Map());
     __publicField(this, "relationLabelEls", /* @__PURE__ */ new Map());
+    /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
+    __publicField(this, "relationGapEls", /* @__PURE__ */ new Map());
+    __publicField(this, "relationData", /* @__PURE__ */ new Map());
+    /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
+    __publicField(this, "relationPainted", /* @__PURE__ */ new Set());
+    __publicField(this, "relationExpanded", /* @__PURE__ */ new Set());
+    /** Where each label sits, so expanding or collapsing its text keeps it in place. */
+    __publicField(this, "relationLabelAt", /* @__PURE__ */ new Map());
     /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
     __publicField(this, "selectedRelation", null);
     /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
@@ -36963,8 +36997,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "previewRelation", null);
     /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
     __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
-    /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
+    /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
     __publicField(this, "relationMarkerId", `vam-relation-arrow-${++relationMarkerSequence}`);
+    __publicField(this, "relationBarMarkerId", `${this.relationMarkerId}-bar`);
     /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
     __publicField(this, "suppressClickUntil", 0);
     /** Node whose card should hold keyboard focus once the next render finishes. */
@@ -45659,6 +45694,8 @@ ${note.detail.trim()}` : "",
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
+    else this.stageEl.removeAttribute("data-relation-labels");
     (_a2 = this.zoomLabel) == null ? void 0 : _a2.setText(`${Math.round(zoom * 100)}%`);
     (_b2 = this.zoomLabel) == null ? void 0 : _b2.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
@@ -47797,13 +47834,14 @@ ${addition}` : addition });
     }
     return {
       update: (x, y) => {
-        var _a2;
+        var _a2, _b2;
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
           const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, d = relationPathData(from, to);
           path.setAttribute("d", d);
           (_a2 = this.relationHitEls.get(link.key)) == null ? void 0 : _a2.setAttribute("d", d);
+          (_b2 = this.relationGapEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
           this.placeRelationLabel(link.key, relationMidpoint(from, to));
         }
         for (const edge of touching) {
@@ -47855,16 +47893,23 @@ ${addition}` : addition });
     this.syncRelationClasses();
   }
   /**
-   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, with an
-   * arrowhead at the target (one marker serves all kinds). A link is not drawn when an end is off screen (collapsed);
-   * the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map draws none,
-   * and its file keeps the key.
+   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving
+   * the nearest edge of A and entering the nearest edge of B. The kind sets the line pattern in styles.css; the
+   * arrowhead is the plain one (all but "related", which has none) or the barred one ("contradicts"); "derives from"
+   * is a double line (the outer line, then a canvas-coloured inner line). A link is not drawn when an end is off screen
+   * (collapsed); the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map
+   * draws none, and its file keeps the key.
    */
   drawRelations() {
     var _a2;
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
+    this.relationGapEls.clear();
+    this.relationData.clear();
+    this.relationLabelAt.clear();
+    this.relationPainted.clear();
+    this.relationExpanded.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
     const links = [];
     for (const relation of (_a2 = this.map.topicRelations) != null ? _a2 : []) {
@@ -47873,30 +47918,30 @@ ${addition}` : addition });
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
-    const defs = createSvg("defs"), marker5 = createSvg("marker"), arrow = createSvg("path");
-    marker5.setAttribute("id", this.relationMarkerId);
-    marker5.setAttribute("viewBox", "0 0 10 10");
-    marker5.setAttribute("refX", "9");
-    marker5.setAttribute("refY", "5");
-    marker5.setAttribute("markerWidth", "10");
-    marker5.setAttribute("markerHeight", "10");
-    marker5.setAttribute("markerUnits", "userSpaceOnUse");
-    marker5.setAttribute("orient", "auto");
-    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-    arrow.addClass("vam-relation-arrow");
-    marker5.appendChild(arrow);
-    defs.appendChild(marker5);
+    const defs = createSvg("defs");
+    defs.appendChild(this.relationMarker(this.relationMarkerId, false));
+    defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
     for (const link of links) {
+      const d = relationPathData(boxOf(link.from), boxOf(link.to)), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
       const path = createSvg("path");
-      path.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
-      path.setAttribute("marker-end", `url(#${this.relationMarkerId})`);
+      path.setAttribute("d", d);
+      if (marker5) path.setAttribute("marker-end", marker5);
       path.addClass("vam-relation");
       path.addClass(`vam-relation-${link.kind}`);
       this.edgesEl.appendChild(path);
       this.relationEls.set(link.key, path);
+      this.relationData.set(link.key, link.relation);
+      if (link.kind === "derives_from") {
+        const gap = createSvg("path");
+        gap.setAttribute("d", d);
+        if (marker5) gap.setAttribute("marker-end", marker5);
+        gap.addClass("vam-relation-gap");
+        this.edgesEl.appendChild(gap);
+        this.relationGapEls.set(link.key, gap);
+      }
       const hit = createSvg("path");
-      hit.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
+      hit.setAttribute("d", d);
       hit.addClass("vam-relation-hit");
       const key2 = link.key;
       hit.addEventListener("pointerdown", (event) => {
@@ -47924,7 +47969,6 @@ ${addition}` : addition });
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
-      label.textContent = t(RELATION_NAME_KEY[link.kind]);
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
@@ -47933,10 +47977,63 @@ ${addition}` : addition });
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
+  /** An arrowhead whose tip sits on the end of the line; the barred one adds a bar across the line just past the tip. */
+  relationMarker(id, barred) {
+    const marker5 = createSvg("marker"), arrow = createSvg("path");
+    marker5.setAttribute("id", id);
+    marker5.setAttribute("viewBox", barred ? "0 0 14 10" : "0 0 10 10");
+    marker5.setAttribute("refX", "9");
+    marker5.setAttribute("refY", "5");
+    marker5.setAttribute("markerWidth", barred ? "14" : "10");
+    marker5.setAttribute("markerHeight", "10");
+    marker5.setAttribute("markerUnits", "userSpaceOnUse");
+    marker5.setAttribute("orient", "auto");
+    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.addClass("vam-relation-arrow");
+    marker5.appendChild(arrow);
+    if (barred) {
+      const bar = createSvg("path");
+      bar.setAttribute("d", "M 12 0 L 12 10");
+      bar.addClass("vam-relation-arrow-bar");
+      marker5.appendChild(bar);
+    }
+    return marker5;
+  }
+  /**
+   * The text of a relation label: just the name normally; while the line is selected (or hovered) "Name: A → B"
+   * ("—" for related) and, on a second line, the note cut to 60 characters with an ellipsis. Text only, never markup.
+   */
+  paintRelationLabel(key2, expanded) {
+    const label = this.relationLabelEls.get(key2), link = this.relationData.get(key2);
+    if (!label || !link) return;
+    const name = t(RELATION_NAME_KEY[link.kind]);
+    if (!expanded) {
+      label.textContent = name;
+      return;
+    }
+    label.textContent = "";
+    const titleOf = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    }, joint = link.kind === "related" ? "\u2014" : "\u2192", at = this.relationLabelAt.get(key2), head = createSvg("tspan");
+    head.textContent = `${name}: ${titleOf(link.from)} ${joint} ${titleOf(link.to)}`;
+    if (at) head.setAttribute("x", String(at.x));
+    label.appendChild(head);
+    if (link.description) {
+      const note = createSvg("tspan"), chars = Array.from(link.description);
+      note.textContent = chars.length > RELATION_LABEL_NOTE_MAX ? `${chars.slice(0, RELATION_LABEL_NOTE_MAX).join("")}\u2026` : link.description;
+      if (at) note.setAttribute("x", String(at.x));
+      note.setAttribute("dy", "1.3em");
+      label.appendChild(note);
+    }
+  }
   placeRelationLabel(key2, point) {
+    this.relationLabelAt.set(key2, point);
     const label = this.relationLabelEls.get(key2);
-    label == null ? void 0 : label.setAttribute("x", String(point.x));
-    label == null ? void 0 : label.setAttribute("y", String(point.y));
+    if (!label) return;
+    label.setAttribute("x", String(point.x));
+    label.setAttribute("y", String(point.y));
+    for (const part of Array.from(label.children)) part.setAttribute("x", String(point.x));
   }
   /**
    * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
@@ -47955,7 +48052,14 @@ ${addition}` : addition });
       path.toggleClass("is-related", related);
       path.toggleClass("is-dimmed", chosen.size > 0 && !related);
       path.toggleClass("is-selected", active);
-      (_a2 = this.relationLabelEls.get(key2)) == null ? void 0 : _a2.toggleClass("is-visible", active || key2 === this.hoverRelation);
+      const expanded = active || key2 === this.hoverRelation;
+      (_a2 = this.relationLabelEls.get(key2)) == null ? void 0 : _a2.toggleClass("is-expanded", expanded);
+      if (this.relationExpanded.has(key2) !== expanded || !this.relationPainted.has(key2)) {
+        this.paintRelationLabel(key2, expanded);
+        this.relationPainted.add(key2);
+        if (expanded) this.relationExpanded.add(key2);
+        else this.relationExpanded.delete(key2);
+      }
       if (active) {
         ends.add(fromId);
         ends.add(toId);

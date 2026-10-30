@@ -59,14 +59,16 @@ const NODE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 // C0, DEL, C1, and the Unicode line and paragraph separators: nothing that can break a title across lines.
 // eslint-disable-next-line no-control-regex -- the control characters are exactly what is being refused
 const TITLE_FORBIDDEN = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
-const RELATION_KINDS: readonly string[] = [
-  "supports",
-  "contradicts",
-  "verifies",
-  "derives_from",
-  "related",
-  "prerequisite"
-];
+// A Record keyed by TopicRelationKind makes tsc fail when map-model adds or removes a kind.
+const RELATION_KIND_RECORD: Record<TopicRelationKind, true> = {
+  supports: true,
+  contradicts: true,
+  verifies: true,
+  derives_from: true,
+  related: true,
+  prerequisite: true
+};
+const RELATION_KINDS: readonly string[] = Object.keys(RELATION_KIND_RECORD);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

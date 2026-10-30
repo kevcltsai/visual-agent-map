@@ -105,11 +105,21 @@ test('strength is kept only for a hypothesis with a known value', () => {
 });
 test('prototype pollution at the top level and node level does not touch Object.prototype', () => {
   const hostile = '{"__proto__":{"polluted":1},"constructor":{"prototype":{"polluted2":1}},"format":"vam-branch","version":1,"clipId":"clip-0001","nodes":[{"__proto__":{"polluted3":1},"constructor":"x","id":"a","parent":null,"title":"t","kind":"topic","body":""}],"relations":[{"__proto__":{"polluted4":1},"kind":"related","from":"a","to":"a"}]}';
-  const r = ok(hostile);
-  for (const key of ['polluted', 'polluted2', 'polluted3', 'polluted4']) { assert.equal({}[key], undefined); assert.equal(Object.prototype[key], undefined); }
-  assert.deepEqual(Object.keys(r.payload).sort(), ['clipId', 'format', 'nodes', 'relations', 'version']);
-  assert.deepEqual(Object.keys(r.payload.nodes[0]).sort(), ['body', 'id', 'kind', 'parent', 'title']);
-  assert.equal(r.droppedRelations, 1);
+  // Inspect the raw result from the module's own realm: its Object.prototype is not this realm's, and plain() would hide own keys.
+  const raw = clip.parseClipboard(hostile);
+  assert.equal(raw.ok, true);
+  const vmProtos = [raw, raw.payload, raw.payload.nodes[0], ...raw.payload.relations].map(o => Object.getPrototypeOf(o));
+  for (const key of ['polluted', 'polluted2', 'polluted3', 'polluted4']) {
+    assert.equal({}[key], undefined); assert.equal(Object.prototype[key], undefined);
+    for (const proto of vmProtos) assert.equal(proto[key], undefined, `${key} leaked onto a module-realm prototype`);
+    for (const o of [raw.payload, raw.payload.nodes[0]]) assert.equal(key in o, false);
+  }
+  assert.deepEqual(Object.keys(raw.payload).sort(), ['clipId', 'format', 'nodes', 'relations', 'version']);
+  assert.deepEqual(Object.keys(raw.payload.nodes[0]).sort(), ['body', 'id', 'kind', 'parent', 'title']);
+  assert.equal(Object.hasOwn(raw.payload, 'constructor'), false);
+  assert.equal(Object.hasOwn(raw.payload.nodes[0], 'constructor'), false);
+  assert.equal(raw.payload.relations.length, 0);
+  assert.equal(raw.droppedRelations, 1);
 });
 test('a __proto__ or constructor value cannot stand in for a required field', () => {
   assert.equal(reason('{"__proto__":{"format":"vam-branch","version":1},"nodes":[]}'), 'not-vam');

@@ -602,6 +602,9 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-msg.is-error .vam-map-chat-text { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-map-chat-role { color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-map-chat-text { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.vam-map-chat-progress { color: var(--text-muted); font-size: var(--font-ui-small); }
+.vam-map-chat-progress.is-compact { margin-top: 2px; font-size: var(--font-ui-smaller); }
+.vam-map-chat-progress-elapsed { font-variant-numeric: tabular-nums; }
 .vam-map-chat-text.is-markdown { white-space: normal; }
 .vam-map-chat-text.is-markdown > :first-child { margin-top: 0; }
 .vam-map-chat-text.is-markdown > :last-child { margin-bottom: 0; }

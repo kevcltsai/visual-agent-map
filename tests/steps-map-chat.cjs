@@ -810,3 +810,27 @@ test('B3 loadableImages: timers and listeners are cleared when a probe finishes 
   probes[0].onload(); for (const fn of [...listeners]) fn();
   const kept = await aborted; assert.deepEqual(plain(kept.map(c => c.title)), ['T1'], 'a probe that finished before the abort keeps its result; the rest are dropped'); assert.equal(timers.size, 0); assert.equal(listeners.size, 0);
 });
+
+// Ticket 15: the chat hands the runtime's model events down to a progress display, and drops them after a stop.
+test('B3 progress hooks: Claude onFirstEvent and Codex onActivity reach the chat caller; nothing arrives after a stop; no hooks without a listener', async () => {
+  const controlsSeen = [];
+  const runtime = {
+    runTask: async (...args) => {
+      const controls = args[4]; controlsSeen.push(controls);
+      controls.onFirstEvent?.(); for (const activity of ['started', 'reading', 'writing']) controls.onActivity?.(activity);
+      return JSON.stringify({ reply: 'ok', actions: [] });
+    }
+  };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
+  const events = [];
+  await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, undefined, event => events.push(event));
+  assert.deepEqual(JSON.parse(JSON.stringify(events)), [{ kind: 'first-event' }, { kind: 'activity', activity: 'started' }, { kind: 'activity', activity: 'reading' }, { kind: 'activity', activity: 'writing' }]);
+  await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal);
+  assert.equal(controlsSeen[1].onFirstEvent, undefined); assert.equal(controlsSeen[1].onActivity, undefined, 'no listener, no hook');
+  const stopper = new AbortController(); const late = [];
+  const slow = { runTask: async (...args) => { const controls = args[4]; stopper.abort(); controls.onFirstEvent?.(); controls.onActivity?.('writing'); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const stopped = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, { ...options, codexRuntime: () => slow }, new Map())));
+  await assert.rejects(stopped.chat(request({ model: 'gpt-6-luna' }), stopper.signal, undefined, event => late.push(event)));
+  assert.deepEqual(late, [], 'an event that arrives after Stop changes nothing');
+});

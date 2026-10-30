@@ -201,7 +201,7 @@ test('map chat: while the AI works Stop is shown with a visible status, the repl
   f.parts.input().value = 'ask';
   f.panel.begin('ask');
   assert.equal(f.parts.input().value, '', 'the draft is cleared once the question is sent');
-  assert.equal(f.parts.status().text, 'The AI is replying…'); assert.equal(f.parts.send().hidden, true); assert.equal(f.parts.stop().hidden, false);
+  assert.equal(f.parts.status().text, '', 'ticket 15: the far-away "AI is replying" line is gone; the progress stage lives in the bubble'); assert.equal(f.parts.send().hidden, true); assert.equal(f.parts.stop().hidden, false);
   assert.equal(f.parts.stop().attrs['aria-label'], 'Stop'); assert.equal(f.parts.status().attrs.role, 'status'); assert.equal(f.parts.log().attrs.role, 'group', 'B1-ui: the log is a plain group, not role=log (which is live by itself)'); assert.equal(f.parts.log().attrs['aria-live'], undefined, 'B1-ui: no aria-live on the log while a reply streams');
   f.panel.streamReply('partial'); f.panel.streamReply('partial answer'); await tick();
   assert.equal(visibleText(replyBody(f)), 'partial answer');
@@ -221,6 +221,93 @@ test('map chat: a failed or stopped turn shows its own text and does not become 
   eq(texts, ['one', 'It broke', 'two', 'some words', 'three', 'Stopped.']);
   eq(f.panel.turns().map(t => t.text), ['two', 'some words'], 'failed turns are left out; a stopped one keeps its partial text');
   assert.equal(f.panel.isBusy, false);
+});
+
+// ---- ticket 15: progress stage and seconds inside the bubble ---------------------------------------------------------
+
+/** A window with a controllable one-second interval and frames, and a host clock the panel reads the seconds from. */
+function stageFixture() {
+  const clock = frames(); const intervals = new Map(); let nextId = 1; let now = 1_000_000;
+  const win = { ...clock.window, setInterval: (fn, ms) => { const id = nextId++; intervals.set(id, { fn, ms }); return id; }, clearInterval: id => { intervals.delete(id); } };
+  const f = panelFixture({ now: () => now }, win); f.panel.setOpen(true);
+  const progress = () => find(f.parts.log(), i => hasClass(i, 'vam-map-chat-progress'));
+  const tickSeconds = seconds => { now += seconds * 1000; for (const { fn } of [...intervals.values()]) fn(); };
+  return { f, clock, intervals, progress, tickSeconds, label: () => find(progress(), i => hasClass(i, 'vam-map-chat-progress-stage'))?.text, elapsed: () => find(progress(), i => hasClass(i, 'vam-map-chat-progress-elapsed')) };
+}
+
+test('map chat 15: begin shows "Waiting for the model" with seconds inside the AI bubble; the first text shrinks it to a small line below', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('ask');
+  const bubble = find(f.parts.log(), i => hasClass(i, 'is-assistant'));
+  assert.ok(s.progress() && bubble.children.includes(s.progress()), 'the stage is a child of the AI message, not a line far away');
+  assert.equal(s.label(), 'Waiting for the model'); assert.equal(s.elapsed().text, ' · 0:00'); assert.equal(s.elapsed().attrs['aria-hidden'], 'true', 'the ticking seconds are hidden from screen readers');
+  assert.ok(!hasClass(s.progress(), 'is-compact'), 'no text yet: the stage fills the empty bubble');
+  assert.equal(s.intervals.size, 1, 'one one-second timer');
+  f.panel.streamReply('Hello'); s.clock.run();
+  assert.equal(s.label(), 'Writing'); assert.ok(hasClass(s.progress(), 'is-compact'), 'after the first character it becomes a small line under the text');
+  f.panel.setStage('waiting'); assert.equal(s.label(), 'Writing', 'a stage never goes back');
+  f.panel.finish('Hello world', []);
+  assert.equal(s.progress(), undefined, 'finished: no stage left'); assert.equal(s.intervals.size, 0, 'finished: the timer is cleared');
+});
+
+test('map chat 15: a Codex "writing" activity moves the stage to Writing before any text, and other stages are only named once', () => {
+  const s = stageFixture(); const { f } = s;
+  const live = () => f.panel.liveEl.text;
+  f.panel.begin('ask'); assert.equal(live(), 'Waiting for the model'); f.panel.setStage('writing'); assert.equal(live(), 'Writing');
+  assert.equal(s.label(), 'Writing'); assert.ok(!hasClass(s.progress(), 'is-compact'), 'no text yet, so still the big form');
+  f.panel.setStage('writing'); f.panel.setStage('waiting'); assert.equal(live(), 'Writing', 'the same or an earlier stage says nothing new');
+  f.panel.finish('x', []);
+});
+
+test('map chat 15: the seconds change by text only; the log and the other rows are not rebuilt', () => {
+  const s = stageFixture(); const { f } = s; const log = f.parts.log();
+  f.panel.begin('q1'); f.panel.finish('one', []); f.panel.begin('q2');
+  const rows = [...log.children]; const made = spyRows(log); const el = s.elapsed(); const bar = s.progress();
+  s.tickSeconds(1); assert.equal(s.elapsed().text, ' · 0:01'); s.tickSeconds(70); assert.equal(s.elapsed().text, ' · 1:11');
+  assert.equal(made.rows, 0, 'no row was built'); assert.ok(rows.every((row, i) => log.children[i] === row), 'every row is the same object'); assert.equal(s.elapsed(), el); assert.equal(s.progress(), bar, 'the very same elements');
+  f.panel.finish('two', []);
+});
+
+test('map chat 15: applying a plan shows "Applying" in the bubble, and the stage clears when it is done', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('q'); f.panel.finish('Here is a plan', []);
+  const plan = { reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {} };
+  f.panel.showPlan(plan); assert.equal(s.progress(), undefined);
+  f.panel.setApplying(true); assert.equal(s.label(), 'Applying'); assert.equal(s.intervals.size, 1);
+  assert.equal(f.parts.status().text, 'Applying the plan…', 'the existing status line for applying stays');
+  f.panel.setApplying(false); assert.equal(s.progress(), undefined); assert.equal(s.intervals.size, 0);
+});
+
+test('map chat 15: after the reply, applying its actions says "Applying"', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('q'); f.panel.streamReply('Done soon'); s.clock.run(); f.panel.setStage('applying');
+  assert.equal(s.label(), 'Applying'); assert.ok(hasClass(s.progress(), 'is-compact'));
+  f.panel.finish('Done soon', []);
+  assert.equal(s.progress(), undefined);
+});
+
+test('map chat 15 counter-example: Stop, a failure, a reset and a new turn never leave the seconds or the stage behind', () => {
+  for (const [name, end] of [['stop', p => p.markStopped()], ['fail', p => p.fail('It broke')], ['finish', p => p.finish('ok', [])], ['reset', p => p.reset()]]) {
+    const s = stageFixture(); const { f } = s;
+    f.panel.begin('q'); s.tickSeconds(5); f.panel.streamReply('some'); s.clock.run();
+    end(f.panel);
+    assert.equal(s.progress(), undefined, `${name}: the stage is gone from the log`); assert.equal(s.intervals.size, 0, `${name}: the one-second timer is cleared`);
+    s.tickSeconds(30); assert.equal(s.progress(), undefined, `${name}: a late tick draws nothing`);
+    f.panel.setStage('writing'); assert.equal(s.progress(), undefined, `${name}: a late model event after the end draws nothing`);
+  }
+  const s = stageFixture(); s.f.panel.begin('a'); s.tickSeconds(9); s.f.panel.markStopped(); s.f.panel.begin('b');
+  assert.equal(s.elapsed().text, ' · 0:00', 'the next turn starts from zero'); assert.equal(s.intervals.size, 1);
+  s.f.panel.finish('b', []);
+});
+
+test('map chat 15: the reader hears each stage name once through the live region, and the stream is never read word by word', () => {
+  const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text;
+  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model');
+  f.panel.streamReply('a'); s.clock.run(); assert.equal(live(), 'Writing');
+  f.panel.streamReply('ab'); f.panel.streamReply('abc'); s.clock.run(); s.tickSeconds(3); assert.equal(live(), 'Writing', 'more text and ticking seconds say nothing new');
+  f.panel.setStage('writing'); assert.equal(live(), 'Writing');
+  assert.equal(s.progress().attrs['aria-live'], undefined, 'the stage element itself is not a live region'); assert.equal(f.parts.log().attrs['aria-live'], undefined);
+  f.panel.finish('abc', []);
 });
 
 // ---- the view -------------------------------------------------------------------------------------------------
@@ -271,7 +358,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
     subscribeModelDiscovery: listener => { control.listeners.push(listener); return () => { control.listeners.splice(control.listeners.indexOf(listener), 1); }; },
     refreshModelDiscovery: async provider => { control.refreshes.push(provider); return { provider, status: 'ready', models: [] }; },
     confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (control.decline) return false; await run(); return true; },
-    mapChat: { chat: async (request, signal, onReply) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply); } },
+    mapChat: { chat: async (request, signal, onReply, onProgress) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress); } },
     // B3: the web image search of the Markdown quick action; the thumbnail check is stubbed on the view below.
     searchImages: async (query, model, signal) => { control.calls.push('search'); control.searches.push({ query, model, signal }); return control.search(query, model, signal); }
   });
@@ -279,8 +366,8 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
-  ctx.timers = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {}, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  ctx.timers = []; ctx.intervals = new Map(); ctx.intervalSeq = 0;
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
@@ -305,7 +392,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -757,6 +844,50 @@ integrationTest('map chat: an empty draft, a second send while busy and a send o
   h.view.builtIn = true; h.type('three'); await h.view.sendMapChat();
   // B1-ui: the read-only sample is the opening screen now; a message from it is sent, and tells the model there is no map to edit.
   assert.equal(h.control.requests.length, 2); assert.equal(h.control.requests[1].context.noEditableMap, true);
+});
+
+integrationTest('map chat 15: a pure answer is never told "Applying"; a reply with actions is', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
+  h.control.reply = async (_request, _signal, onReply) => { onReply('Plain answer'); return { reply: 'Plain answer', actions: [], rejected: [] }; };
+  h.type('question'); await h.view.sendMapChat();
+  assert.ok(!writes.some(text => text === 'Applying'), 'no actions: the reader hears waiting, writing and the answer only'); assert.deepEqual(plain(writes.slice(0, 2)), ['Waiting for the model', 'Writing']); assert.match(writes.at(-1), /AI replied: Plain answer/);
+  writes.length = 0;
+  h.control.reply = async () => ({ reply: 'Renaming', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'New' }], rejected: [] });
+  h.type('rename'); await h.view.sendMapChat();
+  assert.ok(writes.includes('Applying'), 'with an action the stage says Applying');
+});
+
+integrationTest('map chat 15: closing the view and switching maps clear the stage and leave no one-second timer', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+  const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('go'); const first = h.view.sendMapChat(); await until(() => chat.isBusy);
+  assert.equal(h.intervals.size, base + 1, 'one timer while the turn runs');
+  h.view.map.id = 'another-map'; h.repaint();
+  assert.equal(chat.stage, null, 'switching maps clears the stage'); assert.equal(h.intervals.size, base, 'and the timer');
+  gate.resolve(); await first; assert.equal(h.intervals.size, base);
+  const gate2 = deferred(); h.control.reply = async () => { await gate2.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('again'); const second = h.view.sendMapChat(); await until(() => chat.isBusy); assert.equal(h.intervals.size, base + 1);
+  await h.view.onClose(); assert.equal(h.intervals.size, base, 'closing the view disposes the panel and its timer'); assert.equal(chat.stage, null);
+  gate2.resolve(); await second; assert.equal(h.intervals.size, base);
+});
+
+test('map chat 15: dispose() of the panel clears the stage and its timer', () => {
+  const s = stageFixture(); s.f.panel.begin('q'); assert.equal(s.intervals.size, 1);
+  s.f.panel.dispose(); assert.equal(s.intervals.size, 0); assert.equal(s.f.panel.stage, null); s.tickSeconds(5);
+});
+
+integrationTest('map chat 15: the view turns a Codex writing event into the Writing stage, and a late event after Stop or an unrelated event changes nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const gate = deferred(); let progress;
+  h.control.reply = async (_request, _signal, _onReply, onProgress) => { progress = onProgress; await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await until(() => chat.isBusy);
+  assert.equal(chat.stage.kind, 'waiting');
+  progress({ kind: 'first-event' }); progress({ kind: 'activity', activity: 'started' }); progress({ kind: 'activity', activity: 'reading' });
+  assert.equal(chat.stage.kind, 'waiting', 'only the writing activity moves the stage');
+  progress({ kind: 'activity', activity: 'writing' }); assert.equal(chat.stage.kind, 'writing');
+  chat.stopEl.click(); assert.equal(chat.stage, null, 'Stop clears the stage');
+  progress({ kind: 'activity', activity: 'writing' }); assert.equal(chat.stage, null, 'a late event after Stop changes nothing');
+  gate.resolve(); await sending; assert.equal(chat.stage, null);
 });
 
 integrationTest('map chat: Stop aborts the request, releases the task, and a reply that still arrives applies nothing', async () => {
@@ -2705,15 +2836,15 @@ integrationTest('B1 ui: the window is a labelled region; the log has no aria-liv
   assert.equal(chat.logEl.attrs['aria-live'], undefined); assert.notEqual(chat.logEl.attrs.role, 'log'); assert.equal(findAll(chat.bodyEl, i => i.attrs['aria-live'] !== undefined).length, 0, 'nothing in the body is live');
   const writes = []; const live = chat.liveEl; const setText = live.setText.bind(live); live.setText = value => { writes.push(value); setText(value); };
   assert.equal(live.attrs['aria-live'], 'polite'); assert.equal(live.attrs['aria-atomic'], 'true');
-  chat.begin('ask'); for (const part of ['He', 'Hello', 'Hello wor', 'Hello world']) { chat.streamReply(part); await tick(); } eq(writes, [], 'silence while it streams');
+  chat.begin('ask'); for (const part of ['He', 'Hello', 'Hello wor', 'Hello world']) { chat.streamReply(part); await tick(); } eq(writes, ['Waiting for the model', 'Writing'], 'ticket 15: only each stage name is said, once; never the streaming text');
   chat.finish('Hello world', [{ status: 'done', text: 'Done: A' }, { status: 'done', text: 'Done: B' }, { status: 'skipped', text: 'Skipped: C (x)' }]);
-  eq(writes, ['AI replied: Hello world Results: 2 done, 1 skipped'], 'once, with the counts'); assert.equal(live.text, writes[0]);
-  chat.begin('again'); chat.fail('boom'); eq(writes.length, 2); assert.match(writes[1], /AI chat failed: boom/);
+  eq(writes.slice(2), ['AI replied: Hello world Results: 2 done, 1 skipped'], 'once, with the counts'); assert.equal(live.text, writes[2]);
+  chat.begin('again'); chat.fail('boom'); eq(writes.length, 5); assert.equal(writes[3], 'Waiting for the model'); assert.match(writes[4], /AI chat failed: boom/);
 });
 
 integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; the long reply in the summary is clipped', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
-  chat.begin('q'); chat.streamReply('partial'); chat.markStopped(); eq(writes, ['Stopped.']);
+  chat.begin('q'); chat.streamReply('partial'); chat.markStopped(); eq(writes, ['Waiting for the model', 'Writing', 'Stopped.'], 'ticket 15: the stage names, then the one stop sentence');
   chat.begin('q2'); chat.finish('x'.repeat(500), []); assert.ok(writes.at(-1).length < 200, 'clipped');
 });
 
@@ -3502,9 +3633,9 @@ integrationTest('B3 find_images: nothing is inserted unless a candidate is click
 integrationTest('B3 find_images: the reader hears the candidates once, not while a reply streams', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred();
   h.control.search = async () => { await gate.promise; return imageItems(2); };
-  await apply(h, [findAct(h, 'a')]); assert.equal(chat.liveEl.text, '', 'silent while searching');
+  await apply(h, [findAct(h, 'a')]); assert.equal(chat.liveEl.text, 'Waiting for the model', 'ticket 15: only the stage name is said while searching');
   gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
-  assert.equal(chat.liveEl.text, '', 'the turn is still streaming: held back');
+  assert.equal(chat.liveEl.text, 'Waiting for the model', 'the turn is still streaming: the candidates are held back');
   chat.finish('Reply done', []);
   assert.match(chat.liveEl.text, /AI replied: Reply done/); assert.match(chat.liveEl.text, /Found 2 usable pictures\. Pick one to insert into “Body”\./);
   assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1);

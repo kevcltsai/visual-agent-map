@@ -134,6 +134,13 @@ export interface MapChatSavedTurn {
   answer: MapChatMessage;
 }
 
+/**
+ * The progress stage shown inside the AI bubble while a turn runs. "Preparing" (before the request is built) is ticket 16's;
+ * there is no "thinking": the model's thinking cannot be seen.
+ */
+export type MapChatStage = "waiting" | "writing" | "applying";
+const STAGE_ORDER: Record<MapChatStage, number> = { waiting: 0, writing: 1, applying: 2 };
+
 export interface MapChatMessage {
   role: "user" | "assistant";
   /** On a user message: the question and references it was sent with. */
@@ -161,6 +168,8 @@ export interface MapChatHost {
   send(): void;
   /** The panel asks to stop the running request. */
   stop(): void;
+  /** The clock the stage seconds are counted on (tests); the real time when absent. */
+  now?(): number;
   /** Resolves a `[[link]]` target to the vault path of the note it names, or null. */
   resolveLink(link: string): string | null;
   /** The note the user most recently had open (best guess for where dropped text came from), or null. */
@@ -310,6 +319,12 @@ export class MapChatPanel {
   >();
   /** The animation frame that will lay out the streaming message, if one is waiting. */
   private frame: { cancel: () => void } | null = null;
+  /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
+  private stage: { kind: MapChatStage; since: number } | null = null;
+  /** The stage line inside the AI bubble, with the two texts that change. */
+  private stageEls: { box: HTMLElement; label: HTMLElement; elapsed: HTMLElement } | null = null;
+  /** The one-second timer that rewrites the seconds (only their text). */
+  private stageTimer: { cancel: () => void } | null = null;
   /** Whether the body was showing at the last applyOpen, to tell the moment it opens. */
   private wasShown = false;
   /** The scroll to the end that waits for the overlay's height to be final. */
@@ -451,6 +466,7 @@ export class MapChatPanel {
     this.stopWatching = null;
     this.stopResizing?.();
     this.cancelFrame();
+    this.clearStage();
     this.rows = new WeakMap();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
@@ -590,9 +606,68 @@ export class MapChatPanel {
     this.messages.push({ role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) });
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
+    this.stage = { kind: "waiting", since: this.clockNow() };
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
     this.renderBusy();
+    this.startStageTimer();
+    this.speakStage();
+  }
+  private clockNow(): number {
+    return this.host.now?.() ?? Date.now();
+  }
+  /**
+   * The turn moved on to a later stage (a model event, or its actions are being applied). A stage never goes back, an event
+   * that arrives with no turn running changes nothing, and the new name is said once through the live region.
+   */
+  setStage(kind: MapChatStage): void {
+    const current = this.stage;
+    if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
+    // The seconds of waiting and writing run together from the question; applying counts its own.
+    this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
+    this.paintStage();
+    this.speakStage();
+  }
+  private stageLabel(kind: MapChatStage): string {
+    return t(`ui.map_chat_stage_${kind}`);
+  }
+  private elapsedText(): string {
+    const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1000)) : 0;
+    return t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`);
+  }
+  /** The stage line lives in the last AI message while a turn runs, or while its plan is being applied. */
+  private stageMessage(): MapChatMessage | null {
+    if (!this.stage) return null;
+    const last = this.messages.at(-1);
+    return last?.role === "assistant" ? last : null;
+  }
+  /** Rewrites the texts of the stage line that is on screen (never the row), and shrinks it once the reply has text. */
+  private paintStage(): void {
+    const els = this.stageEls;
+    const stage = this.stage;
+    if (!els || !stage) return;
+    els.label.setText(this.stageLabel(stage.kind));
+    els.elapsed.setText(this.elapsedText());
+    els.box.toggleClass("is-compact", !!this.stageMessage()?.text);
+  }
+  private speakStage(): void {
+    // Straight to the live region: `announce` would also read out what a picture search held back.
+    if (this.built && this.stage) this.liveEl.setText(this.stageLabel(this.stage.kind));
+  }
+  private startStageTimer(): void {
+    if (!this.built || this.stageTimer) return;
+    const win =
+      this.logEl.win ?? this.logEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : undefined);
+    if (typeof win?.setInterval !== "function") return;
+    const id = win.setInterval(() => this.stageEls?.elapsed.setText(this.elapsedText()), 1000);
+    this.stageTimer = { cancel: () => win.clearInterval?.(id) };
+  }
+  /** The turn ended (an answer, a failure, Stop, a reset): no stage, no seconds, no timer. */
+  private clearStage(): void {
+    this.stage = null;
+    this.stageEls = null;
+    this.stageTimer?.cancel();
+    this.stageTimer = null;
   }
   /** Every list of choices already shown stops working (a pick was made, or a newer message came). */
   private retireChoices(except?: MapChatChoices): void {
@@ -603,14 +678,24 @@ export class MapChatPanel {
   setApplying(on: boolean): void {
     if (this.applying === on) return;
     this.applying = on;
+    if (on) {
+      // The plan's reply is finished already, so its message has no stage of its own: this one belongs to the apply.
+      this.stage = { kind: "applying", since: this.clockNow() };
+    } else this.clearStage();
     this.renderLog();
     this.renderBusy();
+    if (on) {
+      this.startStageTimer();
+      this.speakStage();
+    }
   }
   /** The answer so far (the whole text, not a delta). */
   streamReply(text: string): void {
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text;
+    // The first characters are the proof that the model is writing.
+    if (text && this.stage?.kind === "waiting") this.setStage("writing");
     if (!this.built || this.frame) return;
     // Chunks that arrive within one frame are laid out once, with the newest text.
     // The window the log is shown in (a popped-out view has its own), because only that one paints its frames.
@@ -633,6 +718,8 @@ export class MapChatPanel {
     if (!last || !last.streaming || !entry) return;
     const stick = this.atEnd();
     renderChatMarkdown(entry.body, last.text, t("ui.map_chat_overflow_note"));
+    // The stage line shrinks to a small line below the text once there is text.
+    this.stageEls?.box.toggleClass("is-compact", !!last.text);
     entry.key = this.rowKey(last);
     if (stick) this.scrollToEnd();
   }
@@ -649,6 +736,7 @@ export class MapChatPanel {
       last.streaming = false;
     }
     this.busy = false;
+    this.clearStage();
     this.renderLog();
     this.renderBusy();
     // The one thing a screen reader hears of the turn: the log itself is silent while the reply streams.
@@ -664,6 +752,7 @@ export class MapChatPanel {
       last.streaming = false;
     }
     this.busy = false;
+    this.clearStage();
     this.renderLog();
     this.renderBusy();
     // `announce` is the whole sentence when `text` already says that the chat failed; it is never prefixed twice.
@@ -682,6 +771,7 @@ export class MapChatPanel {
       last.streaming = false;
     }
     this.busy = false;
+    this.clearStage();
     this.renderLog();
     this.renderBusy();
     this.announce(t("ui.map_chat_stopped"));
@@ -770,6 +860,7 @@ export class MapChatPanel {
     this.noteChip = null;
     this.busy = false;
     this.applying = false;
+    this.clearStage();
     this.unread = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
@@ -830,7 +921,7 @@ export class MapChatPanel {
     });
     // A map that has content opens the window onto an empty log: one line says what it is for.
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
-    // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says it once, when it ends.
+    // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says each progress stage name once as it changes, then the whole turn once when it ends.
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
       attr: { role: "group", "aria-label": t("ui.map_chat_log_label"), tabindex: "0" }
@@ -1343,6 +1434,8 @@ export class MapChatPanel {
       message.role,
       message.error ? "e" : "",
       message.streaming ? "s" : "",
+      // Only whether the stage line is there (its words and seconds change in place, never the row).
+      this.stageMessage() === message ? "p" : "",
       more ? "m" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
@@ -1440,6 +1533,7 @@ export class MapChatPanel {
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
@@ -1472,6 +1566,16 @@ export class MapChatPanel {
       });
     }
     return { row, body, more };
+  }
+
+  /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */
+  private buildStage(row: HTMLElement, message: MapChatMessage): void {
+    const box = row.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
+    const label = box.createSpan({ cls: "vam-map-chat-progress-stage" });
+    const elapsed = box.createSpan({ cls: "vam-map-chat-progress-elapsed" });
+    elapsed.setAttr("aria-hidden", "true");
+    this.stageEls = { box, label, elapsed };
+    this.paintStage();
   }
 
   /**
@@ -1743,7 +1847,8 @@ export class MapChatPanel {
 
   private renderBusy(): void {
     if (!this.built) return;
-    this.statusEl.setText(this.busy ? t("ui.map_chat_replying") : this.applying ? t("ui.map_chat_applying") : "");
+    // The turn's own progress is in the AI bubble; this line only says that a plan is being applied.
+    this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);

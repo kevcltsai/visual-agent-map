@@ -1,5 +1,6 @@
+import type { CodexActivity } from "../ai/runtime/codex-app-server";
 import type { AiCalls } from "./ai-calls";
-import { providerStepRunner, type ProviderStepRunner } from "./provider-step-runner";
+import { providerStepRunner, type ProviderStepHooks, type ProviderStepRunner } from "./provider-step-runner";
 import { prepareStep } from "./step-runner";
 import {
   MapChatError,
@@ -13,6 +14,8 @@ import {
 export { MapChatError, parseMapChat, MAP_CHAT_SCHEMA };
 export type { MapChatRequest, MapChatResult };
 export type MapChatRunner = ProviderStepRunner<MapChatRequest, MapChatResult>;
+/** A model event of one chat turn, for the progress stage: Claude's first stream event, or Codex's activity. */
+export type MapChatProgressEvent = { kind: "first-event" } | { kind: "activity"; activity: CodexActivity };
 
 export function buildMapChatPrompt(request: MapChatRequest): string {
   return mapChatStep.render(request);
@@ -138,8 +141,14 @@ export class MapChatService {
    * from "" when the CLI begins a new StructuredOutput call or rejects the previous one. Throws {@link MapChatError} for an
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Only Claude streams; for other providers `onReply` is never called and the reply arrives with the result.
+   * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
    */
-  async chat(request: MapChatRequest, signal: AbortSignal, onReply?: (reply: string) => void): Promise<MapChatResult> {
+  async chat(
+    request: MapChatRequest,
+    signal: AbortSignal,
+    onReply?: (reply: string) => void,
+    onProgress?: (event: MapChatProgressEvent) => void
+  ): Promise<MapChatResult> {
     const stopped = (): MapChatError => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
@@ -153,9 +162,19 @@ export class MapChatService {
           onReply(text);
         }
       : undefined;
+    const hooks: ProviderStepHooks | undefined = onProgress
+      ? {
+          onFirstEvent: () => {
+            if (!signal.aborted) onProgress({ kind: "first-event" });
+          },
+          onActivity: activity => {
+            if (!signal.aborted) onProgress({ kind: "activity", activity });
+          }
+        }
+      : undefined;
     let raw: string;
     try {
-      raw = await this.run(request, signal, prepared, onStructuredJson);
+      raw = await this.run(request, signal, prepared, onStructuredJson, hooks);
     } catch (error) {
       if (signal.aborted && !(error instanceof MapChatError)) throw stopped();
       if (error instanceof MapChatError && error.code === "stopped") throw stopped();

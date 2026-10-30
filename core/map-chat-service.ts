@@ -148,7 +148,8 @@ export function providerMapChatRunner(aiCalls: AiCalls): MapChatRunner {
     name: "map-chat",
     topic: request => `Map chat · ${request.message.trim().slice(0, 80)}`,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
-    stream: true
+    stream: true,
+    lastMessageOnly: true
   });
 }
 

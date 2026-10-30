@@ -29078,6 +29078,7 @@ function providerStepRunner(aiCalls, config) {
         textOnly: true,
         searchBudget: 0,
         ...config.stream ? { stream: true } : {},
+        ...config.lastMessageOnly ? { resolveLast: true } : {},
         ...config.stream && onStructuredJson ? { onStructuredJson } : {},
         ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
         ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
@@ -53398,6 +53399,7 @@ var CodexAppServerRuntime = class {
         steered: false,
         onRequest: controls == null ? void 0 : controls.onRequest,
         onText: controls == null ? void 0 : controls.onText,
+        resolveLast: controls == null ? void 0 : controls.resolveLast,
         onWebSearchEvent: controls == null ? void 0 : controls.onWebSearchEvent,
         onActivity: controls == null ? void 0 : controls.onActivity,
         generateImage: controls == null ? void 0 : controls.generateImage
@@ -53640,7 +53642,7 @@ var CodexAppServerRuntime = class {
           );
       } else if ((turn == null ? void 0 : turn.status) === "completed")
         state.resolve(
-          state.onText ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
+          state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
         );
       else
         state.reject(
@@ -56640,7 +56642,8 @@ function providerMapChatRunner(aiCalls) {
     name: "map-chat",
     topic: (request) => `Map chat \xB7 ${request.message.trim().slice(0, 80)}`,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
-    stream: true
+    stream: true,
+    lastMessageOnly: true
   });
 }
 var MapChatService = class {

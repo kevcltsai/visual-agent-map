@@ -836,12 +836,14 @@ test('B3 progress hooks: Claude onFirstEvent and Codex onActivity reach the chat
 });
 
 // Ticket 17: Codex streams its message text; the chat shows only the decoded `reply`, never the JSON around it.
+const explanation = 'I will answer now.';
 const codexTurn = async (texts, { model = 'gpt-6-luna', abortAfter = -1, answer = JSON.stringify({ reply: 'final', actions: [] }) } = {}) => {
   const stopper = new AbortController(); const shown = []; const controlsSeen = [];
   const runtime = { runTask: async (...args) => {
     const controls = args[4]; controlsSeen.push(controls);
     texts.forEach((text, i) => { if (i === abortAfter) stopper.abort(); controls.onText?.(text); });
-    return answer;
+    // What the real runtime resolves to: with onText every message joined, unless the caller asked for the last item only.
+    return controls.onText && !controls.resolveLast ? [explanation, answer].join('\n\n') : answer;
   } };
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
   const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
@@ -890,4 +892,11 @@ test('B4 Codex streaming: Claude models are not given onText; no listener means 
   const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
   await new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map()))).chat(request({ model: 'gpt-6-luna' }), new AbortController().signal);
   assert.equal(runtime.controls.onText, undefined);
+});
+
+test('B4 Codex streaming: with an explanation item before the JSON, the final result still parses (the chat asks for the last message item only)', async () => {
+  const { result, error, controlsSeen } = await codexTurn(['I will answer now.', 'I will answer now.\n\n{"reply":"fin']);
+  assert.equal(error, null);
+  assert.equal(result.reply, 'final');
+  assert.equal(controlsSeen[0].resolveLast, true);
 });

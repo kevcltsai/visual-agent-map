@@ -41,6 +41,8 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
     stopped: () => Error;
     /** Claude only: read the CLI's stream-json output (keeps a pre-started process usable and records `prespawned`). */
     stream?: boolean;
+    /** Codex only: the result is the last message item even while `onText` streams, for a reply that is parsed strictly. */
+    lastMessageOnly?: boolean;
   }
 ): ProviderStepRunner<Request, Output> {
   return (request, signal, prepared, onStructuredJson, hooks) =>
@@ -62,6 +64,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
           textOnly: true,
           searchBudget: 0,
           ...(config.stream ? { stream: true } : {}),
+          ...(config.lastMessageOnly ? { resolveLast: true } : {}),
           ...(config.stream && onStructuredJson ? { onStructuredJson } : {}),
           ...(hooks?.onFirstEvent ? { onFirstEvent: hooks.onFirstEvent } : {}),
           ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {}),

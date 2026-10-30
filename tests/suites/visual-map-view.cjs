@@ -2058,6 +2058,8 @@ const heDrawn = (view, boxes) => {
   return view.edgesEl.kids;
 };
 const heKindNames = ['Topic', 'Action', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion'];
+const heDialogKindIds = ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action'];
+const heDialogKindNames = ['Topic', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion', 'Action'];
 const heKindIds = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
 integrationTest('hypothesis-evidence: the toolbar topic menu keeps "paste an outline" first, then lists the six types in order, each creating that type', () => {
   const { view, menus } = heFixture();
@@ -2185,7 +2187,7 @@ integrationTest('hypothesis-evidence: the panel type control is a labelled group
   const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-kinds'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Topic type');
   const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
-  assert.deepEqual(dom.findAll(group(), c => c.tag === 'button').map(c => c.text), heKindNames);
+  assert.deepEqual(dom.findAll(group(), c => c.tag === 'button').map(c => c.text), heDialogKindNames, 'dialog order of spec section 2 (decision 35 C4); the menus keep the TOPIC_KINDS order');
   assert.deepEqual(pressed(), ['Topic']);
   const strengths = () => dom.buttons(panel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label));
   assert.deepEqual(strengths(), [], 'no strength control for an ordinary topic');
@@ -2881,7 +2883,7 @@ integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A
   const rows = dom.findAll(panel, c => c.tag === 'li');
   assert.deepEqual(rows.map(r => r.attrs['aria-label']), ['Supports → HYP. measured twice', 'OTHER → Derives from', 'Related — HYP']);
   assert.ok(rows.every(r => r.tabIndex === 0), 'every row can take focus');
-  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER derives from This topic', 'This topic is related to HYP'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
+  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER is derived from This topic', 'This topic is related to HYP'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
   assert.ok(dom.texts(panel).includes('measured twice'));
   for (const text of ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']) { assert.ok(dom.byLabel(panel, `Edit relation: ${text}`)); assert.ok(dom.byLabel(panel, `Remove relation: ${text}`)); }
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
@@ -3245,9 +3247,9 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
     assert.ok(buttons.filter(b => b.attrs['aria-pressed'] === 'true')[0].cls.includes('is-pressed'));
   }
   const kindButtons = dom.findAll(group, c => c.tag === 'button');
-  assert.deepEqual(kindButtons.map(b => b.text), heKindNames, 'order of spec section 2');
-  assert.deepEqual(kindButtons.map(b => dom.find(b, c => (c.cls ?? '').includes('vam-type-swatch')).dataset.kind), heKindIds);
-  const shapeOf = kind => { const sw = dom.find(kindButtons[heKindIds.indexOf(kind)], c => (c.cls ?? '').includes('vam-type-swatch')); assert.equal(sw.attrs['aria-hidden'], 'true'); return sw.children[0].children[0]; };
+  assert.deepEqual(kindButtons.map(b => b.text), heDialogKindNames, 'order of spec section 2: topic, atomic, hypothesis, evidence, conclusion, action');
+  assert.deepEqual(kindButtons.map(b => dom.find(b, c => (c.cls ?? '').includes('vam-type-swatch')).dataset.kind), heDialogKindIds);
+  const shapeOf = kind => { const sw = dom.find(kindButtons[heDialogKindIds.indexOf(kind)], c => (c.cls ?? '').includes('vam-type-swatch')); assert.equal(sw.attrs['aria-hidden'], 'true'); return sw.children[0].children[0]; };
   assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
@@ -3260,7 +3262,13 @@ integrationTest('hypothesis-evidence: relation rows read "A relation B" with thi
   view.enqueue = work => work();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
   const rows = dom.findAll(panel, c => c.tag === 'li');
-  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER derives from This topic', 'This topic is related to HYP', 'This topic contradicts OTHER']);
+  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER is derived from This topic', 'This topic is related to HYP', 'This topic contradicts OTHER']);
+  const more = heFixture({ relations: [{ kind: 'verifies', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }] });
+  const morePanel = dom.element('panel'); more.view.renderHypothesisSection(morePanel, more.view.map.nodes[0]);
+  assert.deepEqual(dom.findAll(morePanel, c => (c.cls ?? '').includes('vam-relation-sentence')).map(c => c.text), ['HYP verifies This topic', 'This topic is a prerequisite for OTHER', 'OTHER is a prerequisite for This topic', 'This topic is derived from HYP'], 'one sentence per kind, A = from, B = to');
+  const zh = load('i18n.ts').translate;
+  assert.deepEqual([['derives_from', 'A', 'B', 'A 由 B 推導而來'], ['prerequisite', 'A', 'B', 'A 是 B 的前置知識'], ['supports', 'A', 'B', 'A 支持 B'], ['contradicts', 'A', 'B', 'A 反駁 B'], ['verifies', 'A', 'B', 'A 驗證 B']].map(([k, a, b]) => zh('zh-TW', `ui.relation_sentence_${k}_0_1`, a, b)), ['A 由 B 推導而來', 'A 是 B 的前置知識', 'A 支持 B', 'A 反駁 B', 'A 驗證 B']);
+  assert.equal(zh('zh-CN', 'ui.relation_sentence_prerequisite_0_1', 'A', 'B'), 'A 是 B 的前置知识'); assert.equal(zh('zh-CN', 'ui.relation_sentence_derives_from_0_1', 'A', 'B'), 'A 由 B 推导而来');
   assert.equal(dom.find(rows[0], c => (c.cls ?? '').includes('vam-relation-description-text')).text, 'measured twice', 'the note is its own line');
   assert.equal(dom.find(rows[1], c => (c.cls ?? '').includes('vam-relation-description-text')), undefined);
   const swatch = row => row.children.find(c => (c.classes ?? []).includes('vam-relation-swatch'));

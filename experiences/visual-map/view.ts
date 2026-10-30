@@ -444,6 +444,8 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
 let relationMarkerSequence = 0;
 let relationSwatchSequence = 0;
+/** The structure dialog lists the types in the order of spec section 2 (not TOPIC_KINDS order, which the menus keep). */
+const KIND_PICKER_ORDER: readonly TopicKind[] = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 type CardBox = RelationBox;
 /** Below this zoom the relation names are hidden; at it they show. */
 const RELATION_LABEL_MIN_ZOOM = 0.6;
@@ -480,6 +482,14 @@ const RELATION_KINDS: readonly TopicRelationKind[] = [
   "related",
   "prerequisite"
 ];
+/** One sentence per kind, "A ... B" with A the source and B the target, worded for each language rather than by word order. */
+const RELATION_SENTENCE_KEY: Record<Exclude<TopicRelationKind, "related">, Parameters<typeof t>[0]> = {
+  supports: "ui.relation_sentence_supports_0_1",
+  contradicts: "ui.relation_sentence_contradicts_0_1",
+  verifies: "ui.relation_sentence_verifies_0_1",
+  derives_from: "ui.relation_sentence_derives_from_0_1",
+  prerequisite: "ui.relation_sentence_prerequisite_0_1"
+};
 const RELATION_NAME_KEY: Record<TopicRelationKind, Parameters<typeof t>[0]> = {
   supports: "ui.relation_name_supports",
   contradicts: "ui.relation_name_contradicts",
@@ -8059,12 +8069,7 @@ export class VisualAgentMapView extends ItemView {
       titleOf = (id: string): string => (id === selfId ? self : (this.notes.get(id)?.title ?? id));
     if (link.kind === "related")
       return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
-    return t(
-      "ui.relation_sentence_0_1_2",
-      titleOf(link.from),
-      t(RELATION_NAME_KEY[link.kind]).toLocaleLowerCase(),
-      titleOf(link.to)
-    );
+    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   private openRelationEditor(link: TopicRelation, onChanged?: () => void): void {
@@ -8288,7 +8293,7 @@ export class VisualAgentMapView extends ItemView {
       const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
       kinds.setAttr("role", "group");
       kinds.setAttr("aria-label", t("ui.topic_type"));
-      for (const option of TOPIC_KINDS) {
+      for (const option of KIND_PICKER_ORDER) {
         const choice = this.button(kinds, t(TOPIC_KIND_SHAPES[option].labelKey), () => {
           if (option === currentKind) return;
           this.enqueue(async () => {

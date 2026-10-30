@@ -580,7 +580,11 @@ var en = {
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.relation_this_topic": "This topic",
-  "ui.relation_sentence_0_1_2": "{0} {1} {2}",
+  "ui.relation_sentence_supports_0_1": "{0} supports {1}",
+  "ui.relation_sentence_contradicts_0_1": "{0} contradicts {1}",
+  "ui.relation_sentence_verifies_0_1": "{0} verifies {1}",
+  "ui.relation_sentence_derives_from_0_1": "{0} is derived from {1}",
+  "ui.relation_sentence_prerequisite_0_1": "{0} is a prerequisite for {1}",
   "ui.relation_sentence_related_0_1": "{0} is related to {1}",
   "ui.relations_none": "No relations yet",
   "ui.relation_edit": "Edit",
@@ -2601,7 +2605,11 @@ var zhCN = {
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.relation_this_topic": "\u6B64\u8BAE\u9898",
-  "ui.relation_sentence_0_1_2": "{0} {1} {2}",
+  "ui.relation_sentence_supports_0_1": "{0} \u652F\u6301 {1}",
+  "ui.relation_sentence_contradicts_0_1": "{0} \u53CD\u9A73 {1}",
+  "ui.relation_sentence_verifies_0_1": "{0} \u9A8C\u8BC1 {1}",
+  "ui.relation_sentence_derives_from_0_1": "{0} \u7531 {1} \u63A8\u5BFC\u800C\u6765",
+  "ui.relation_sentence_prerequisite_0_1": "{0} \u662F {1} \u7684\u524D\u7F6E\u77E5\u8BC6",
   "ui.relation_sentence_related_0_1": "{0} \u4E0E {1} \u76F8\u5173",
   "ui.relations_none": "\u8FD8\u6CA1\u6709\u5173\u7CFB",
   "ui.relation_edit": "\u7F16\u8F91",
@@ -4622,7 +4630,11 @@ var zhTW = {
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.relation_this_topic": "\u6B64\u8B70\u984C",
-  "ui.relation_sentence_0_1_2": "{0} {1} {2}",
+  "ui.relation_sentence_supports_0_1": "{0} \u652F\u6301 {1}",
+  "ui.relation_sentence_contradicts_0_1": "{0} \u53CD\u99C1 {1}",
+  "ui.relation_sentence_verifies_0_1": "{0} \u9A57\u8B49 {1}",
+  "ui.relation_sentence_derives_from_0_1": "{0} \u7531 {1} \u63A8\u5C0E\u800C\u4F86",
+  "ui.relation_sentence_prerequisite_0_1": "{0} \u662F {1} \u7684\u524D\u7F6E\u77E5\u8B58",
   "ui.relation_sentence_related_0_1": "{0} \u8207 {1} \u76F8\u95DC",
   "ui.relations_none": "\u9084\u6C92\u6709\u95DC\u4FC2",
   "ui.relation_edit": "\u7DE8\u8F2F",
@@ -36810,6 +36822,7 @@ function edgePathData(x1, y1, x2, y2) {
 }
 var relationMarkerSequence = 0;
 var relationSwatchSequence = 0;
+var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
 var boxOf = (card) => ({
@@ -36834,6 +36847,13 @@ var RELATION_KINDS = [
   "related",
   "prerequisite"
 ];
+var RELATION_SENTENCE_KEY = {
+  supports: "ui.relation_sentence_supports_0_1",
+  contradicts: "ui.relation_sentence_contradicts_0_1",
+  verifies: "ui.relation_sentence_verifies_0_1",
+  derives_from: "ui.relation_sentence_derives_from_0_1",
+  prerequisite: "ui.relation_sentence_prerequisite_0_1"
+};
 var RELATION_NAME_KEY = {
   supports: "ui.relation_name_supports",
   contradicts: "ui.relation_name_contradicts",
@@ -43771,12 +43791,7 @@ ${request.requirements}` : preset.text,
     };
     if (link.kind === "related")
       return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
-    return t(
-      "ui.relation_sentence_0_1_2",
-      titleOf(link.from),
-      t(RELATION_NAME_KEY[link.kind]).toLocaleLowerCase(),
-      titleOf(link.to)
-    );
+    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   openRelationEditor(link, onChanged) {
@@ -43988,7 +44003,7 @@ ${request.requirements}` : preset.text,
       const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
       kinds.setAttr("role", "group");
       kinds.setAttr("aria-label", t("ui.topic_type"));
-      for (const option2 of TOPIC_KINDS) {
+      for (const option2 of KIND_PICKER_ORDER) {
         const choice2 = this.button(kinds, t(TOPIC_KIND_SHAPES[option2].labelKey), () => {
           if (option2 === currentKind) return;
           this.enqueue(async () => {

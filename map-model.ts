@@ -39,10 +39,9 @@ export interface MapDocument {
 /**
  * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind
  * (`related` has no direction). `derives_from` and `prerequisite` must not form a cycle among links of their own kind.
- * `evidence` is the V1.5 kind, kept only for the compatibility period (removed in the next packet).
+ * The V1.5 `evidence` kind is no longer known: it is dropped when a map is read (with a warning), not migrated.
  */
-export type TopicRelationKind =
-  "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite" | "evidence";
+export type TopicRelationKind = "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite";
 export interface TopicRelation {
   kind: TopicRelationKind;
   from: string;
@@ -56,8 +55,7 @@ const TOPIC_RELATION_KINDS: readonly string[] = [
   "verifies",
   "derives_from",
   "related",
-  "prerequisite",
-  "evidence"
+  "prerequisite"
 ];
 export const RELATION_DESCRIPTION_MAX_LENGTH = 200;
 /** `related` has no direction, so both orders share one key. */
@@ -243,35 +241,6 @@ export function retargetTopicRelations(
   );
   return result;
 }
-/** Hypotheses a topic can newly be evidence for: not itself, not a non-hypothesis, not already linked; none when the source is a hypothesis. */
-export function legalEvidenceTargets(
-  map: MapDocument,
-  fromId: string,
-  isHypothesis: (id: string) => boolean
-): string[] {
-  if (isHypothesis(fromId)) return [];
-  const linked = new Set(
-    (map.topicRelations ?? []).filter(r => r.kind === "evidence" && r.from === fromId).map(r => r.to)
-  );
-  return map.nodes.filter(n => n.id !== fromId && isHypothesis(n.id) && !linked.has(n.id)).map(n => n.id);
-}
-/** Topics that can newly be a prerequisite of `toId`: not itself, not already one, and not reachable from it along prerequisite links (that would close a cycle). */
-export function legalPrerequisiteSources(map: MapDocument, toId: string): string[] {
-  const relations = map.topicRelations ?? [];
-  const blocked = new Set<string>([toId]);
-  const queue = [toId];
-  while (queue.length) {
-    const current = queue.shift() as string;
-    for (const r of relations)
-      if (r.kind === "prerequisite" && r.from === current && !blocked.has(r.to)) {
-        blocked.add(r.to);
-        queue.push(r.to);
-      }
-  }
-  for (const r of relations) if (r.kind === "prerequisite" && r.to === toId) blocked.add(r.from);
-  return map.nodes.filter(n => !blocked.has(n.id)).map(n => n.id);
-}
-
 export function clearQuestionConvergenceEdges(map: MapDocument): boolean {
   let changed = false;
   for (const node of map.nodes) {

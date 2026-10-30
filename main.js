@@ -15779,8 +15779,7 @@ var TOPIC_RELATION_KINDS = [
   "verifies",
   "derives_from",
   "related",
-  "prerequisite",
-  "evidence"
+  "prerequisite"
 ];
 var relationKey = (r) => r.kind === "related" && r.from > r.to ? `${r.kind}\0${r.to}\0${r.from}` : `${r.kind}\0${r.from}\0${r.to}`;
 var copyRelation = (r, from = r.from, to = r.to) => {
@@ -15857,6 +15856,20 @@ function reachesByKind(relations, kind, start, target) {
   }
   return false;
 }
+function relationAllowed(relations, candidate, replacingIndex) {
+  if (candidate.from === candidate.to) return false;
+  const others = relations.filter((_, i) => i !== replacingIndex);
+  const key2 = relationKey(candidate);
+  if (others.some((r) => relationKey(r) === key2)) return false;
+  if (isAcyclicKind(candidate.kind) && reachesByKind(others, candidate.kind, candidate.to, candidate.from))
+    return false;
+  return true;
+}
+function legalRelationTargets(map, kind, fromId) {
+  var _a2;
+  const relations = (_a2 = map.topicRelations) != null ? _a2 : [];
+  return map.nodes.filter((n) => relationAllowed(relations, { kind, from: fromId, to: n.id })).map((n) => n.id);
+}
 function retargetTopicRelations(map, fromIds, toId) {
   const result = { droppedCycles: 0 };
   if (!map.topicRelations) return result;
@@ -15890,30 +15903,6 @@ function retargetTopicRelations(map, fromIds, toId) {
     kept.map((k) => k.r)
   );
   return result;
-}
-function legalEvidenceTargets(map, fromId, isHypothesis) {
-  var _a2;
-  if (isHypothesis(fromId)) return [];
-  const linked = new Set(
-    ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => r.kind === "evidence" && r.from === fromId).map((r) => r.to)
-  );
-  return map.nodes.filter((n) => n.id !== fromId && isHypothesis(n.id) && !linked.has(n.id)).map((n) => n.id);
-}
-function legalPrerequisiteSources(map, toId) {
-  var _a2;
-  const relations = (_a2 = map.topicRelations) != null ? _a2 : [];
-  const blocked = /* @__PURE__ */ new Set([toId]);
-  const queue = [toId];
-  while (queue.length) {
-    const current = queue.shift();
-    for (const r of relations)
-      if (r.kind === "prerequisite" && r.from === current && !blocked.has(r.to)) {
-        blocked.add(r.to);
-        queue.push(r.to);
-      }
-  }
-  for (const r of relations) if (r.kind === "prerequisite" && r.to === toId) blocked.add(r.from);
-  return map.nodes.filter((n) => !blocked.has(n.id)).map((n) => n.id);
 }
 function clearQuestionConvergenceEdges(map) {
   let changed = false;
@@ -36806,7 +36795,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
     __publicField(this, "relationMarkerId", `vam-relation-arrow-${++relationMarkerSequence}`);
     /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
-    __publicField(this, "reportedRelations", /* @__PURE__ */ new Set());
     __publicField(this, "suppressClickUntil", 0);
     /** Node whose card should hold keyboard focus once the next render finishes. */
     __publicField(this, "focusNodeId", null);
@@ -43403,13 +43391,13 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /** Adds an evidence link fact -> hypothesis in one undoable Map.md change; an illegal target (already linked, not a hypothesis) is refused. */
+  /** Adds a `supports` link from this topic to another in one undoable Map.md change; an illegal target (itself, already linked) is refused. */
   async addEvidence(fromId, toId) {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange((map) => {
       var _a2;
-      if (!legalEvidenceTargets(map, fromId, (id) => this.isHypothesis(id)).includes(toId)) return;
-      setTopicRelations(map, [...(_a2 = map.topicRelations) != null ? _a2 : [], { kind: "evidence", from: fromId, to: toId }]);
+      if (!legalRelationTargets(map, "supports", fromId).includes(toId)) return;
+      setTopicRelations(map, [...(_a2 = map.topicRelations) != null ? _a2 : [], { kind: "supports", from: fromId, to: toId }]);
     }, false);
   }
   async removeEvidence(fromId, toId) {
@@ -43418,7 +43406,7 @@ ${request.requirements}` : preset.text,
       var _a2;
       setTopicRelations(
         map,
-        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => !(r.kind === "evidence" && r.from === fromId && r.to === toId))
+        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => !(r.kind === "supports" && r.from === fromId && r.to === toId))
       );
     }, false);
   }
@@ -43426,9 +43414,9 @@ ${request.requirements}` : preset.text,
   async addPrerequisite(fromId, toId) {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange((map) => {
-      var _a2;
-      if (!legalPrerequisiteSources(map, toId).includes(fromId)) return;
-      setTopicRelations(map, [...(_a2 = map.topicRelations) != null ? _a2 : [], { kind: "prerequisite", from: fromId, to: toId }]);
+      var _a2, _b2;
+      if (!relationAllowed((_a2 = map.topicRelations) != null ? _a2 : [], { kind: "prerequisite", from: fromId, to: toId })) return;
+      setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], { kind: "prerequisite", from: fromId, to: toId }]);
     }, false);
   }
   async removePrerequisite(fromId, toId) {
@@ -43443,8 +43431,12 @@ ${request.requirements}` : preset.text,
   }
   /** Opens the picker for the prerequisite (A) of `node` (B); with no legal source it only says so. */
   choosePrerequisiteSource(node, onAdded) {
+    var _a2;
     if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalPrerequisiteSources(this.map, node.id));
+    const relations = (_a2 = this.map.topicRelations) != null ? _a2 : [];
+    const legal = new Set(
+      this.map.nodes.filter((n) => relationAllowed(relations, { kind: "prerequisite", from: n.id, to: node.id })).map((n) => n.id)
+    );
     if (!legal.size) {
       new import_obsidian30.Notice(t("ui.no_prerequisite_to_link"));
       return;
@@ -43455,8 +43447,8 @@ ${request.requirements}` : preset.text,
       t("ui.add_prerequisite_description"),
       this.map.nodes,
       (target) => {
-        var _a2, _b2;
-        return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
+        var _a3, _b2;
+        return (_b2 = (_a3 = this.notes.get(target.id)) == null ? void 0 : _a3.title) != null ? _b2 : target.path;
       },
       (target) => legal.has(target.id),
       (target) => this.enqueue(async () => {
@@ -43465,10 +43457,10 @@ ${request.requirements}` : preset.text,
       })
     ).open();
   }
-  /** Opens the hypothesis picker for `node`; with no legal hypothesis it only says so. */
+  /** Opens the picker for the topic `node` supports; with no legal target it only says so. */
   chooseEvidenceTarget(node, onAdded) {
     if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalEvidenceTargets(this.map, node.id, (id) => this.isHypothesis(id)));
+    const legal = new Set(legalRelationTargets(this.map, "supports", node.id));
     if (!legal.size) {
       new import_obsidian30.Notice(t("ui.no_hypothesis_to_link"));
       return;
@@ -43489,7 +43481,7 @@ ${request.requirements}` : preset.text,
       })
     ).open();
   }
-  /** "Add sub-hypothesis", and for a hypothesis its strength and the facts that point at it; for another topic the hypotheses it is evidence for. */
+  /** "Add sub-hypothesis", a hypothesis's strength, and the `supports` links that start or end at this topic. */
   renderHypothesisSection(panel, node, close) {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
@@ -43527,18 +43519,16 @@ ${request.requirements}` : preset.text,
           }
         }
       }
-      const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter(
-        (r) => isHypothesis ? r.kind === "evidence" && r.to === node.id : r.kind === "evidence" && r.from === node.id
-      );
-      if (isHypothesis || links.length)
-        body.createEl("strong", {
-          text: t(isHypothesis ? "ui.evidence_from_heading" : "ui.evidence_for_heading"),
-          cls: "vam-topic-tree-heading"
-        });
-      if (links.length) {
+      const supports = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.kind === "supports");
+      for (const [heading, links, otherOf] of [
+        ["ui.evidence_from_heading", supports.filter((r) => r.to === node.id), (r) => r.from],
+        ["ui.evidence_for_heading", supports.filter((r) => r.from === node.id), (r) => r.to]
+      ]) {
+        if (!links.length) continue;
+        body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
-          const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = isHypothesis ? link.from : link.to;
+          const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = otherOf(link);
           this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
           const remove = this.button(
@@ -43552,16 +43542,16 @@ ${request.requirements}` : preset.text,
           remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
         }
       }
-      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
+      this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
       const prerequisites = ((_f = (_e = this.map) == null ? void 0 : _e.topicRelations) != null ? _f : []).filter((r) => r.kind === "prerequisite");
-      for (const [heading, links2, otherOf] of [
+      for (const [heading, links, otherOf] of [
         ["ui.prerequisite_heading", prerequisites.filter((r) => r.to === node.id), (r) => r.from],
         ["ui.prerequisite_of_heading", prerequisites.filter((r) => r.from === node.id), (r) => r.to]
       ]) {
-        if (!links2.length) continue;
+        if (!links.length) continue;
         body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
         const list = body.createEl("ul", { cls: "vam-relation-list" });
-        for (const link of links2) {
+        for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = otherOf(link);
           this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
@@ -47534,10 +47524,10 @@ ${addition}` : addition });
     this.syncRelationClasses();
   }
   /**
-   * Evidence links (fact -> hypothesis) and prerequisite links (A -> B) in the same layer as the parent-child edges,
-   * with an arrowhead at the target (one marker serves both kinds). A link is not drawn when an end is off screen
-   * (collapsed) or when an evidence link runs the wrong way (the file keeps it; one warning per view); a prerequisite
-   * has no type limit and a hand-written cycle is drawn as it is. An AIM map draws none, and its file keeps the key.
+   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, with an
+   * arrowhead at the target (one marker serves all kinds). A link is not drawn when an end is off screen (collapsed);
+   * the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map draws none,
+   * and its file keeps the key.
    */
   drawRelations() {
     var _a2;
@@ -47550,16 +47540,6 @@ ${addition}` : addition });
       const from = this.cardEls.get(relation.from), to = this.cardEls.get(relation.to);
       if (!from || !to) continue;
       const key2 = `${relation.from}\0${relation.to}\0${relation.kind}`;
-      if (relation.kind === "evidence" && (this.isHypothesis(relation.from) || !this.isHypothesis(relation.to))) {
-        if (!this.reportedRelations.has(key2)) {
-          this.reportedRelations.add(key2);
-          this.plugin.logs.appendLog(
-            "warn",
-            t("log.evidence_relation_type_ignored_0", `${relation.from} -> ${relation.to}`)
-          );
-        }
-        continue;
-      }
       links.push({ from, to, key: key2, kind: relation.kind });
     }
     if (!links.length) return;
@@ -47608,7 +47588,9 @@ ${addition}` : addition });
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
-      label.textContent = t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite");
+      label.textContent = t(
+        link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence"
+      );
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
@@ -47656,7 +47638,7 @@ ${addition}` : addition });
     row.setAttr("role", "group");
     row.setAttr(
       "aria-label",
-      `${t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite")}: ${otherTitle}`
+      `${t(link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence")}: ${otherTitle}`
     );
     row.addEventListener("focus", () => {
       this.selectedRelation = key2;

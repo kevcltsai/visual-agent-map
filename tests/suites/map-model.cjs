@@ -416,24 +416,24 @@ test('hypothesis-evidence: setTopicRelations removes the key for an empty list; 
   core.setTopicRelations(m, [ev('a', 'h')]); assert.equal(m.topicRelations.length, 1);
   core.setTopicRelations(m, []); assert.equal('topicRelations' in m, false);
 });
-test('hypothesis-evidence: legalEvidenceTargets excludes itself, ordinary topics and linked hypotheses; a hypothesis source gets none', () => {
-  const m = relMap([legacyEv('a', 'h')]); const isHyp = id => id === 'h' || id === 'h2';
-  assert.deepEqual(core.legalEvidenceTargets(m, 'a', isHyp), ['h2'], 'h is already linked');
-  assert.deepEqual(core.legalEvidenceTargets(m, 'b', isHyp), ['h', 'h2']);
-  assert.deepEqual(plain(core.legalEvidenceTargets(m, 'h', isHyp)), [], 'a hypothesis cannot be evidence');
-  assert.deepEqual(plain(core.legalEvidenceTargets(relMap(undefined), 'a', () => false)), []);
+const preSources = (m, to) => m.nodes.filter(n => core.relationAllowed(m.topicRelations ?? [], { kind: 'prerequisite', from: n.id, to })).map(n => n.id);
+test('hypothesis-evidence: legalRelationTargets for supports excludes itself and linked targets and allows any topic type at both ends', () => {
+  const m = relMap([ev('a', 'h')]);
+  assert.deepEqual(core.legalRelationTargets(m, 'supports', 'a'), ['b', 'c', 'h2'], 'h is already linked; the ends need not be a fact or a hypothesis');
+  assert.deepEqual(core.legalRelationTargets(m, 'supports', 'h'), ['a', 'b', 'c', 'h2'], 'a hypothesis can be a source; the reverse direction is a different link');
+  assert.deepEqual(plain(core.legalRelationTargets(relMap(undefined, ['a']), 'supports', 'a')), []);
 });
-test('hypothesis-evidence: legalPrerequisiteSources excludes itself, existing sources and anything that would close a cycle, directly or indirectly', () => {
+test('hypothesis-evidence: prerequisite sources (relationAllowed) exclude itself, existing sources and anything that would close a cycle, directly or indirectly', () => {
   const m = relMap([pre('a', 'b')], ['a', 'b', 'c', 'd', 'e']);
-  assert.deepEqual(core.legalPrerequisiteSources(m, 'b'), ['c', 'd', 'e'], 'self and existing source a are out');
+  assert.deepEqual(preSources(m, 'b'), ['c', 'd', 'e'], 'self and existing source a are out');
   core.setTopicRelations(m, [pre('b', 'x'), pre('x', 'c')]); m.nodes.push(node('x'));
-  assert.deepEqual(core.legalPrerequisiteSources(m, 'b'), ['a', 'd', 'e'], 'x and c are reachable from b, so they would close a cycle');
-  assert.deepEqual(core.legalPrerequisiteSources(relMap([legacyEv('a', 'b')]), 'b'), ['a', 'c', 'h', 'h2'], 'evidence links do not count');
+  assert.deepEqual(preSources(m, 'b'), ['a', 'd', 'e'], 'x and c are reachable from b, so they would close a cycle');
+  assert.deepEqual(preSources(relMap([ev('a', 'b')]), 'b'), ['a', 'c', 'h', 'h2'], 'supports links do not count');
 });
-test('hypothesis-evidence: legalPrerequisiteSources terminates on a hand-written cycle', () => {
+test('hypothesis-evidence: prerequisite sources terminate on a hand-written cycle', () => {
   const m = relMap([pre('a', 'b'), pre('b', 'a'), pre('b', 'c'), pre('c', 'b')]);
-  assert.deepEqual(core.legalPrerequisiteSources(m, 'a'), ['h', 'h2']);
-  assert.deepEqual(core.legalPrerequisiteSources(m, 'h'), ['a', 'b', 'c', 'h2']);
+  assert.deepEqual(preSources(m, 'a'), ['h', 'h2']);
+  assert.deepEqual(preSources(m, 'h'), ['a', 'b', 'c', 'h2']);
 });
 test('hypothesis-evidence: retargetTopicRelations merges ends, dedupes, drops self links and reports new cycles', () => {
   const m = relMap([ev('a', 'h'), ev('b', 'h'), pre('a', 'b'), pre('c', 'a'), pre('b', 'h2')]);
@@ -461,9 +461,13 @@ test('hypothesis-evidence: all six kinds with and without a description round-tr
   const text = core.serializeMap(source);
   assert.equal(core.serializeMap(core.parseMap(text)), text);
 });
-test('hypothesis-evidence: parse keeps a V1.5 evidence relation during the compatibility period', () => {
-  const { parsed, logs } = parseWith(relMap([legacyEv('a', 'h')]));
-  assert.deepEqual(plain(parsed.topicRelations), [legacyEv('a', 'h')]); assert.deepEqual(logs, []);
+test('hypothesis-evidence: parse drops a V1.5 evidence relation as an unknown kind, warns with a count only, keeps the rest and does not migrate it', () => {
+  const { parsed, logs } = parseWith(relMap([legacyEv('a', 'h'), ev('b', 'c'), legacyEv('b', 'h2')]));
+  assert.deepEqual(plain(parsed.topicRelations), [ev('b', 'c')], 'evidence is gone and is not turned into supports');
+  assert.equal(logs.length, 1); assert.equal(logs[0].level, 'warn'); assert.match(logs[0].message, /\b2\b/); assert.doesNotMatch(logs[0].message, /evidence|"a"|h2/);
+  const only = parseWith(relMap([legacyEv('a', 'h')]));
+  assert.equal('topicRelations' in only.parsed, false, 'the key goes when nothing valid remains'); assert.equal(only.logs.length, 1);
+  assert.equal(core.legalEvidenceTargets, undefined); assert.equal(core.legalPrerequisiteSources, undefined, 'the V1.5 helpers are removed');
 });
 test('hypothesis-evidence: parse drops a related duplicate in the other direction and keeps the first', () => {
   const { parsed, logs } = parseWith(relMap([rel('related', 'b', 'a', 'first'), rel('related', 'a', 'b'), rel('supports', 'a', 'b'), rel('supports', 'b', 'a')]));

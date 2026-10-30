@@ -55,13 +55,13 @@ import {
   descendants,
   History,
   inheritModel,
-  legalEvidenceTargets,
-  legalPrerequisiteSources,
+  legalRelationTargets,
   type MapDocument,
   type MapNode,
   parentIdsForNode,
   removeNodes,
   removeTopicRelationsFor,
+  relationAllowed,
   retargetTopicRelations,
   setTopicRelations,
   supersededAimNodeIds,
@@ -761,7 +761,6 @@ export class VisualAgentMapView extends ItemView {
   /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
   private readonly relationMarkerId = `vam-relation-arrow-${++relationMarkerSequence}`;
   /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
-  private reportedRelations = new Set<string>();
   private suppressClickUntil = 0;
   /** Node whose card should hold keyboard focus once the next render finishes. */
   private focusNodeId: string | null = null;
@@ -7902,12 +7901,12 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /** Adds an evidence link fact -> hypothesis in one undoable Map.md change; an illegal target (already linked, not a hypothesis) is refused. */
+  /** Adds a `supports` link from this topic to another in one undoable Map.md change; an illegal target (itself, already linked) is refused. */
   private async addEvidence(fromId: string, toId: string): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange(map => {
-      if (!legalEvidenceTargets(map, fromId, id => this.isHypothesis(id)).includes(toId)) return;
-      setTopicRelations(map, [...(map.topicRelations ?? []), { kind: "evidence", from: fromId, to: toId }]);
+      if (!legalRelationTargets(map, "supports", fromId).includes(toId)) return;
+      setTopicRelations(map, [...(map.topicRelations ?? []), { kind: "supports", from: fromId, to: toId }]);
     }, false);
   }
   private async removeEvidence(fromId: string, toId: string): Promise<void> {
@@ -7915,7 +7914,7 @@ export class VisualAgentMapView extends ItemView {
     await this.mapChange(map => {
       setTopicRelations(
         map,
-        (map.topicRelations ?? []).filter(r => !(r.kind === "evidence" && r.from === fromId && r.to === toId))
+        (map.topicRelations ?? []).filter(r => !(r.kind === "supports" && r.from === fromId && r.to === toId))
       );
     }, false);
   }
@@ -7923,7 +7922,7 @@ export class VisualAgentMapView extends ItemView {
   private async addPrerequisite(fromId: string, toId: string): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange(map => {
-      if (!legalPrerequisiteSources(map, toId).includes(fromId)) return;
+      if (!relationAllowed(map.topicRelations ?? [], { kind: "prerequisite", from: fromId, to: toId })) return;
       setTopicRelations(map, [...(map.topicRelations ?? []), { kind: "prerequisite", from: fromId, to: toId }]);
     }, false);
   }
@@ -7939,7 +7938,12 @@ export class VisualAgentMapView extends ItemView {
   /** Opens the picker for the prerequisite (A) of `node` (B); with no legal source it only says so. */
   private choosePrerequisiteSource(node: MapNode, onAdded?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalPrerequisiteSources(this.map, node.id));
+    const relations = this.map.topicRelations ?? [];
+    const legal = new Set(
+      this.map.nodes
+        .filter(n => relationAllowed(relations, { kind: "prerequisite", from: n.id, to: node.id }))
+        .map(n => n.id)
+    );
     if (!legal.size) {
       new Notice(t("ui.no_prerequisite_to_link"));
       return;
@@ -7958,10 +7962,10 @@ export class VisualAgentMapView extends ItemView {
         })
     ).open();
   }
-  /** Opens the hypothesis picker for `node`; with no legal hypothesis it only says so. */
+  /** Opens the picker for the topic `node` supports; with no legal target it only says so. */
   private chooseEvidenceTarget(node: MapNode, onAdded?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalEvidenceTargets(this.map, node.id, id => this.isHypothesis(id)));
+    const legal = new Set(legalRelationTargets(this.map, "supports", node.id));
     if (!legal.size) {
       new Notice(t("ui.no_hypothesis_to_link"));
       return;
@@ -7980,7 +7984,7 @@ export class VisualAgentMapView extends ItemView {
         })
     ).open();
   }
-  /** "Add sub-hypothesis", and for a hypothesis its strength and the facts that point at it; for another topic the hypotheses it is evidence for. */
+  /** "Add sub-hypothesis", a hypothesis's strength, and the `supports` links that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
@@ -8015,19 +8019,17 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      const links = (this.map?.topicRelations ?? []).filter(r =>
-        isHypothesis ? r.kind === "evidence" && r.to === node.id : r.kind === "evidence" && r.from === node.id
-      );
-      if (isHypothesis || links.length)
-        body.createEl("strong", {
-          text: t(isHypothesis ? "ui.evidence_from_heading" : "ui.evidence_for_heading"),
-          cls: "vam-topic-tree-heading"
-        });
-      if (links.length) {
+      const supports = (this.map?.topicRelations ?? []).filter(r => r.kind === "supports");
+      for (const [heading, links, otherOf] of [
+        ["ui.evidence_from_heading", supports.filter(r => r.to === node.id), (r: TopicRelation) => r.from],
+        ["ui.evidence_for_heading", supports.filter(r => r.from === node.id), (r: TopicRelation) => r.to]
+      ] as const) {
+        if (!links.length) continue;
+        body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }),
-            otherId = isHypothesis ? link.from : link.to;
+            otherId = otherOf(link);
           this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
           const remove = this.button(row, t("ui.remove"), () =>
@@ -8039,7 +8041,7 @@ export class VisualAgentMapView extends ItemView {
           remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
         }
       }
-      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
+      this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
       // Prerequisites: any topic or hypothesis can be either end; each row can be removed from both ends.
       const prerequisites = (this.map?.topicRelations ?? []).filter(r => r.kind === "prerequisite");
       for (const [heading, links, otherOf] of [
@@ -12366,10 +12368,10 @@ export class VisualAgentMapView extends ItemView {
     this.syncRelationClasses();
   }
   /**
-   * Evidence links (fact -> hypothesis) and prerequisite links (A -> B) in the same layer as the parent-child edges,
-   * with an arrowhead at the target (one marker serves both kinds). A link is not drawn when an end is off screen
-   * (collapsed) or when an evidence link runs the wrong way (the file keeps it; one warning per view); a prerequisite
-   * has no type limit and a hand-written cycle is drawn as it is. An AIM map draws none, and its file keeps the key.
+   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, with an
+   * arrowhead at the target (one marker serves all kinds). A link is not drawn when an end is off screen (collapsed);
+   * the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map draws none,
+   * and its file keeps the key.
    */
   private drawRelations(): void {
     this.relationEls.clear();
@@ -12382,16 +12384,6 @@ export class VisualAgentMapView extends ItemView {
         to = this.cardEls.get(relation.to);
       if (!from || !to) continue;
       const key = `${relation.from}\u0000${relation.to}\u0000${relation.kind}`;
-      if (relation.kind === "evidence" && (this.isHypothesis(relation.from) || !this.isHypothesis(relation.to))) {
-        if (!this.reportedRelations.has(key)) {
-          this.reportedRelations.add(key);
-          this.plugin.logs.appendLog(
-            "warn",
-            t("log.evidence_relation_type_ignored_0", `${relation.from} -> ${relation.to}`)
-          );
-        }
-        continue;
-      }
       links.push({ from, to, key, kind: relation.kind });
     }
     if (!links.length) return;
@@ -12444,7 +12436,9 @@ export class VisualAgentMapView extends ItemView {
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
-      label.textContent = t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite");
+      label.textContent = t(
+        link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence"
+      );
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
@@ -12493,7 +12487,7 @@ export class VisualAgentMapView extends ItemView {
     row.setAttr("role", "group");
     row.setAttr(
       "aria-label",
-      `${t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite")}: ${otherTitle}`
+      `${t(link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence")}: ${otherTitle}`
     );
     row.addEventListener("focus", () => {
       this.selectedRelation = key;

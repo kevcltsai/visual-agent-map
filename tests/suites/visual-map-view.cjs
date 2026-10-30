@@ -2075,27 +2075,28 @@ integrationTest('hypothesis-evidence: the entry points exist only on an ordinary
   dom.button(panel, 'Add sub-hypothesis').click();
   assert.deepEqual(calls, [['other', undefined, true, true, 'hypothesis']], 'the panel passes the hypothesis kind to addNode');
 });
-integrationTest('hypothesis-evidence: a hypothesis has no evidence entry; an ordinary topic has no strength control', () => {
+integrationTest('hypothesis-evidence: every topic type has the add-evidence entry (it creates supports); only a hypothesis has the strength control', () => {
   const { view } = heFixture();
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
-  assert.equal(dom.buttons(hypPanel).includes('Add evidence…'), false);
+  assert.equal(dom.buttons(hypPanel).includes('Add evidence…'), true, 'a hypothesis can now be the source of supports');
   assert.deepEqual(dom.buttons(hypPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), ['Weak', 'Medium', 'Strong']);
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
   assert.deepEqual(dom.buttons(factPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), []);
 });
-integrationTest('hypothesis-evidence: the evidence picker offers only legal hypotheses, and with none it shows a Notice and no dialog', () => {
+integrationTest('hypothesis-evidence: the add-evidence picker offers every topic that can newly be supported (any type), and with none it shows a Notice and no dialog', () => {
   const topics = [node('fact'), node('hyp'), node('linked'), node('plain'), node('hyp2')];
   const notes = heNotes([['fact', {}], ['hyp', heHyp('weak')], ['linked', heHyp('strong')], ['plain', {}], ['hyp2', heHyp()]]);
-  const { view, modals, notices } = heFixture({ topics, notes, relations: [{ kind: 'evidence', from: 'fact', to: 'linked' }] });
+  const { view, modals, notices } = heFixture({ topics, notes, relations: [{ kind: 'supports', from: 'fact', to: 'linked' }] });
   view.chooseEvidenceTarget(view.map.nodes[0]);
   assert.equal(modals.length, 1); assert.deepEqual(notices, []);
   const selectable = modals[0].selectable;
-  assert.deepEqual(view.map.nodes.filter(n => selectable(n)).map(n => n.id), ['hyp', 'hyp2'], 'not itself, not an ordinary topic, not an already linked hypothesis');
-  const none = heFixture({ notes: heNotes([['fact', {}], ['hyp', {}], ['other', {}]]) });
+  assert.deepEqual(view.map.nodes.filter(n => selectable(n)).map(n => n.id), ['hyp', 'plain', 'hyp2'], 'not itself, not an already linked topic; ordinary topics are allowed');
+  const fromHyp = heFixture({ topics, notes }); fromHyp.view.chooseEvidenceTarget(fromHyp.view.map.nodes[1]);
+  assert.equal(fromHyp.modals.length, 1, 'a hypothesis can be the source of supports');
+  const two = [node('a'), node('b')];
+  const none = heFixture({ topics: two, notes: heNotes([['a', {}], ['b', {}]]), relations: [{ kind: 'supports', from: 'a', to: 'b' }] });
   none.view.chooseEvidenceTarget(none.view.map.nodes[0]);
   assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no hypothesis this topic can be evidence for.']);
-  const fromHyp = heFixture(); fromHyp.view.chooseEvidenceTarget(fromHyp.view.map.nodes[1]);
-  assert.equal(fromHyp.modals.length, 0, 'a hypothesis cannot be the source of evidence');
 });
 integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · strength" and carries it in its accessible name; an ordinary topic and an AIM map do not', () => {
   const render = (options, id) => {
@@ -2123,44 +2124,55 @@ integrationTest('hypothesis-evidence: styles.css gives a hypothesis a 2px frame 
   assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
 });
 integrationTest('hypothesis-evidence: an evidence line is drawn from the fact to the hypothesis with an arrowhead whose marker id is unique per view', () => {
-  const relations = [{ kind: 'evidence', from: 'fact', to: 'hyp' }];
+  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp' }];
   const a = heFixture({ relations }), b = heFixture({ relations, shared: { VisualAgentMapView: a.VisualAgentMapView } });
   const kidsA = heDrawn(a.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
   const kidsB = heDrawn(b.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
-  const lineA = kidsA.find(k => k.classes.includes('vam-relation-evidence'));
+  const lineA = kidsA.find(k => k.classes.includes('vam-relation-supports'));
   assert.ok(lineA.classes.includes('vam-relation')); assert.match(lineA.attrs.d, /^M 280 50 C /, 'starts at the fact (right edge) and ends at the hypothesis (left edge)'); assert.match(lineA.attrs.d, / 500 90$/);
   const defs = kidsA.find(k => k.tag === 'defs'), marker = defs.children[0];
   assert.equal(lineA.attrs['marker-end'], `url(#${marker.attrs.id})`);
-  const lineB = kidsB.find(k => k.classes.includes('vam-relation-evidence')), markerB = kidsB.find(k => k.tag === 'defs').children[0];
+  const lineB = kidsB.find(k => k.classes.includes('vam-relation-supports')), markerB = kidsB.find(k => k.tag === 'defs').children[0];
   assert.notEqual(marker.attrs.id, markerB.attrs.id, 'two views never share a marker id'); assert.equal(lineB.attrs['marker-end'], `url(#${markerB.attrs.id})`);
   assert.equal(kidsA.filter(k => k.classes.includes('vam-edge')).length, 0, 'the parent-child edges are not touched');
   a.view.map.aim = { mode: 'x' };
   assert.equal(heDrawn(a.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0, 'an AIM map draws no evidence');
   assert.equal(a.view.map.topicRelations.length, 1, 'and the file keeps the key');
 });
-integrationTest('hypothesis-evidence: a wrong-way evidence link (from a hypothesis, or to an ordinary topic) is not drawn, stays in the file and is logged once; an off-screen end is skipped quietly', () => {
-  const relations = [{ kind: 'evidence', from: 'hyp', to: 'fact' }, { kind: 'evidence', from: 'fact', to: 'other' }, { kind: 'evidence', from: 'fact', to: 'hyp' }];
+integrationTest('hypothesis-evidence: a supports link is drawn whatever the type of either end (no type rule, nothing logged); an off-screen end is skipped quietly', () => {
+  const relations = [{ kind: 'supports', from: 'hyp', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'other' }, { kind: 'supports', from: 'fact', to: 'hyp' }];
   const { view, logs } = heFixture({ relations });
   let kids = heDrawn(view, { fact: [0, 0], hyp: [500, 0], other: [0, 200] });
-  assert.equal(kids.filter(k => k.classes.includes('vam-relation-evidence')).length, 1, 'only the legal link is drawn');
-  assert.equal(logs.length, 2); assert.ok(logs.every(([level]) => level === 'warn'));
-  heDrawn(view, { fact: [0, 0], hyp: [500, 0], other: [0, 200] });
-  assert.equal(logs.length, 2, 'a redraw does not log again');
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 3, 'hypothesis -> topic, topic -> topic and topic -> hypothesis are all drawn');
+  assert.deepEqual(logs, [], 'no type-violation warning');
   assert.equal(view.map.topicRelations.length, 3, 'nothing is deleted from the file');
   kids = heDrawn(view, { fact: [0, 0], other: [0, 200] });
-  assert.equal(kids.filter(k => k.classes.includes('vam-relation-evidence')).length, 0, 'a collapsed (missing) end is not drawn'); assert.equal(logs.length, 2, 'and not logged');
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'a collapsed (missing) end is not drawn'); assert.deepEqual(logs, [], 'and not logged');
+});
+integrationTest('hypothesis-evidence: the add-evidence entry in the panel creates a supports link from the topic, for an ordinary topic and a hypothesis alike', async () => {
+  const { view, doc, modals } = heFixture();
+  view.enqueue = work => work(); view.mapChange = async (change) => { change(view.map); };
+  for (const idx of [0, 1]) {
+    const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[idx]);
+    dom.button(panel, 'Add evidence…').click();
+  }
+  assert.equal(modals.length, 2);
+  modals[0].choose(view.map.nodes[2]); await dom.tick();
+  modals[1].choose(view.map.nodes[0]); await dom.tick();
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'fact', to: 'other' }, { kind: 'supports', from: 'hyp', to: 'fact' }], 'the panel writes supports, never evidence');
+  assert.equal(doc.topicRelations.some(r => r.kind === 'evidence'), false);
 });
 integrationTest('hypothesis-evidence: dragging a card moves the evidence line with it', () => {
-  const { view } = heFixture({ relations: [{ kind: 'evidence', from: 'fact', to: 'hyp' }] });
+  const { view } = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
-  const line = kids.find(k => k.classes.includes('vam-relation-evidence')), before = line.attrs.d;
+  const line = kids.find(k => k.classes.includes('vam-relation-supports')), before = line.attrs.d;
   const drag = view.dragEdges('fact', view.cardEls.get('fact')); drag.update(0, 300);
   assert.notEqual(line.attrs.d, before); assert.match(line.attrs.d, /^M 280 350 C /);
   const dragHyp = view.dragEdges('hyp', view.cardEls.get('hyp')); dragHyp.update(900, 0);
   assert.match(line.attrs.d, / 900 50$/);
 });
 integrationTest('hypothesis-evidence: adding and removing evidence in the panel go through mapChange (undoable); an illegal target is refused', async () => {
-  const { view, doc } = heFixture({ relations: [{ kind: 'evidence', from: 'fact', to: 'hyp' }] });
+  const { view, doc } = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] });
   const changes = []; view.enqueue = work => work();
   view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
@@ -2172,7 +2184,7 @@ integrationTest('hypothesis-evidence: adding and removing evidence in the panel 
   assert.equal('topicRelations' in doc, false, 'the empty list is dropped from Map.md');
   assert.equal(dom.byLabel(factPanel, 'Remove evidence link: HYP'), undefined, 'the row is gone after the change');
   await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'other'); await view.addEvidence('hyp', 'hyp');
-  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'evidence', from: 'fact', to: 'hyp' }], 'added once; duplicate, ordinary-topic and hypothesis-source links refused');
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'other' }], 'added once each; the duplicate and the self link are refused, an ordinary-topic target is allowed');
   assert.equal(changes.length, 5);
 });
 integrationTest('hypothesis-evidence: choosing a hypothesis or a prerequisite in the picker repaints the open panel at once', async () => {
@@ -2240,12 +2252,12 @@ integrationTest('hypothesis-evidence: the prerequisite picker lists neither itse
   assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic that can be a prerequisite for this one.']);
 });
 integrationTest('hypothesis-evidence: a prerequisite line is dotted, runs from A to B with the arrowhead at B, and shares the view marker with evidence', () => {
-  const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'evidence', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
+  const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
   const { view } = heFixture({ relations });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
   const pre = kids.filter(k => k.classes.includes('vam-relation-prerequisite'));
   assert.equal(pre.length, 2); assert.ok(pre.every(k => k.classes.includes('vam-relation')));
-  assert.equal(kids.filter(k => k.classes.includes('vam-relation-evidence')).length, 1, 'the evidence line for the same pair is separate');
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'the evidence line for the same pair is separate');
   const marker = kids.find(k => k.tag === 'defs').children[0].attrs.id;
   assert.equal(kids.filter(k => k.tag === 'defs').length, 1, 'one marker serves both kinds');
   const aToB = pre.find(k => / 0 50$/.test(k.attrs.d));
@@ -2275,7 +2287,7 @@ integrationTest('hypothesis-evidence: styles.css gives the prerequisite line a d
   assert.match(rule('.vam-relation'), /pointer-events:\s*none/); assert.match(rule('.vam-edges'), /pointer-events:\s*none/);
 });
 integrationTest('hypothesis-evidence: the panel lists prerequisites at both ends, each row is removable through mapChange, and the add button is on topics and hypotheses alike', async () => {
-  const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'evidence', from: 'fact', to: 'hyp' }];
+  const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'hyp' }];
   const { view, doc } = heFixture({ relations });
   const changes = []; view.enqueue = work => work();
   view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
@@ -2285,7 +2297,7 @@ integrationTest('hypothesis-evidence: the panel lists prerequisites at both ends
   for (const id of ['hyp', 'fact']) { const p = dom.element('panel'); view.renderHypothesisSection(p, view.map.nodes.find(n => n.id === id)); assert.ok(dom.buttons(p).includes('Add prerequisite…'), `add button for ${id}`); }
   await dom.byLabel(bPanel, 'Remove prerequisite link: FACT').fire('click'); await dom.tick();
   assert.equal(changes.length, 1); assert.equal(changes[0], false);
-  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'evidence', from: 'fact', to: 'hyp' }], 'only that link is removed');
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'hyp' }], 'only that link is removed');
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
   await dom.byLabel(hypPanel, 'Remove prerequisite link: OTHER').fire('click'); await dom.tick();
   assert.equal(changes.length, 2); assert.equal(doc.topicRelations.some(r => r.kind === 'prerequisite'), false, 'removable from the other end too');
@@ -2294,14 +2306,14 @@ integrationTest('hypothesis-evidence: the panel lists prerequisites at both ends
 });
 
 // ---- hypothesis-evidence (P5): selectable relation lines, names on hover/selection, selection highlight ----
-const heRel = [{ kind: 'evidence', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
+const heRel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
 const heKey = r => `${r.from}\u0000${r.to}\u0000${r.kind}`;
 function heLines(options = {}) {
   const fx = heFixture({ relations: options.relations ?? heRel, topics: options.topics });
   const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
   const find = kind => kids.find(k => k.classes.includes(`vam-relation-${kind}`));
   const labels = kids.filter(k => k.classes.includes('vam-relation-label')), hits = kids.filter(k => k.classes.includes('vam-relation-hit'));
-  return { ...fx, kids, ev: find('evidence'), pre: find('prerequisite'), labels, hits, evHit: hits[0], preHit: hits[1], evLabel: labels[0], preLabel: labels[1] };
+  return { ...fx, kids, ev: find('supports'), pre: find('prerequisite'), labels, hits, evHit: hits[0], preHit: hits[1], evLabel: labels[0], preLabel: labels[1] };
 }
 const heVisible = el => el.classes.includes('is-visible');
 integrationTest('hypothesis-evidence: a relation name is hidden normally, shown while the pointer is on the line or the line is selected, and follows a drag', () => {

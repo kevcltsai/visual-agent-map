@@ -50,7 +50,6 @@ import {
   moveNotePath,
   normalizeReasoningLevel,
   normalizeMapChatStyle,
-  normalizeMapChatModel,
   normalizeMapChatWidth,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
@@ -119,6 +118,18 @@ export { VisualAgentMapSettingTab } from "./ui/settings-tab";
 export { firstMarkdownImage, firstMarkdownTable, markdownImages } from "./ui/preview-utils";
 export type { AiRunMetrics, PreparedTaskContext } from "./ai/types";
 
+/**
+ * The old per-chat model (`mapChatModel`, removed when the chat and the settings page became one current model): a saved
+ * non-empty string (trimmed) becomes the current model once; anything else (empty, blank, non-string, null) counts as unset.
+ */
+function migratedChatModel(saved: Partial<Settings> | null): string {
+  const old = (saved as { mapChatModel?: unknown } | null)?.mapChatModel;
+  return typeof old === "string" ? old.trim() : "";
+}
+/** True when the saved data still has the removed `mapChatModel` key and must be rewritten without it. */
+export function hasLegacyChatModel(saved: unknown): boolean {
+  return !!saved && typeof saved === "object" && "mapChatModel" in saved;
+}
 /** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
 export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
@@ -149,9 +160,8 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     mapId: saved?.mapId || "default",
     codexPath: saved?.codexPath || legacy?.cliPath || DEFAULT_SETTINGS.codexPath,
     claudePath: saved?.claudePath || DEFAULT_SETTINGS.claudePath,
-    cliModel: saved?.cliModel || DEFAULT_SETTINGS.cliModel,
+    cliModel: migratedChatModel(saved) || saved?.cliModel || DEFAULT_SETTINGS.cliModel,
     mapChatStyle: normalizeMapChatStyle(saved?.mapChatStyle),
-    mapChatModel: normalizeMapChatModel(saved?.mapChatModel),
     mapChatWidth: normalizeMapChatWidth(saved?.mapChatWidth),
     mapChatOpen: normalizeMapChatOpen(saved?.mapChatOpen),
     cliReasoning: normalizeReasoningLevel(saved?.cliReasoning),
@@ -257,6 +267,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
   readonly relevanceGrades = new Map<string, RelevanceGradeRun>();
   exchanges: AiExchangeLog | null = null;
+  private readonly currentModelListeners = new Set<(model: string) => void>();
   readonly modelDiscovery = new ModelDiscovery(
     () => this.codexDiagnostic().installed,
     () => this.loadCodexModels(),
@@ -446,6 +457,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     announceTestOverrides(message => new Notice(message, 0));
     const saved = (await this.loadData()) as Partial<Settings> | null;
     this.settings = settingsFromSaved(saved);
+    // The removed chat-model key is migrated into cliModel above; write the data back at once so it runs only once.
+    if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
@@ -986,6 +999,19 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   subscribeModelDiscovery(listener: (state: ModelDiscoveryState) => void): () => void {
     return this.modelDiscovery.subscribe(listener);
+  }
+  /** The current model (settings page and chat menu share it): save it and tell every listener. */
+  async setCurrentModel(model: string): Promise<void> {
+    if (typeof model !== "string" || !model.trim()) return;
+    this.settings.cliModel = model.trim();
+    await this.saveSettings();
+    for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
+  }
+  subscribeCurrentModel(listener: (model: string) => void): () => void {
+    this.currentModelListeners.add(listener);
+    return () => {
+      this.currentModelListeners.delete(listener);
+    };
   }
   async refreshModelDiscovery(provider: "codex" | "claude"): Promise<ModelDiscoveryState> {
     const state = await this.modelDiscovery.refresh(provider);

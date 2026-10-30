@@ -185,6 +185,7 @@ export class ClaudeSetupModal extends Modal {
 export class VisualAgentMapSettingTab extends PluginSettingTab {
   private readonly modelSelects = new Set<HTMLSelectElement>();
   private readonly modelStatusEls = new Set<HTMLElement>();
+  private unsubscribeCurrentModel: (() => void) | null = null;
   constructor(
     app: App,
     private plugin: VisualAgentMapPlugin
@@ -211,6 +212,33 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         else element.setText(status);
       }
     });
+  }
+  /** Shows the current model in one dropdown, keeping an unavailable id as a disabled entry. */
+  private showCurrentModel(select: HTMLSelectElement, model: string): void {
+    if (!Array.from(select.options).some(option => option.value === model)) select.add(new Option(model, model));
+    select.value = model;
+    syncModelSelect(
+      select,
+      this.plugin.availableModels(),
+      id => this.plugin.modelLabel(id),
+      t("ui.current_model_is_unavailable")
+    );
+    select.value = model;
+  }
+  /** The chat menu and this page edit one value: follow it while the page is open, drop it when the page closes. */
+  private followCurrentModel(): void {
+    this.unsubscribeCurrentModel?.();
+    this.unsubscribeCurrentModel = this.plugin.subscribeCurrentModel(model => {
+      for (const select of [...this.modelSelects]) {
+        if (!select.isConnected) this.modelSelects.delete(select);
+        else this.showCurrentModel(select, model);
+      }
+    });
+  }
+  hide(): void {
+    this.unsubscribeCurrentModel?.();
+    this.unsubscribeCurrentModel = null;
+    super.hide();
   }
   refreshAfterLanguageChange(): void {
     const focused =
@@ -271,27 +299,18 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       text(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
       text(t("ui.claude_cli_path"), "claudePath", t("ui.vam_uses_the_claude_code_cli_installed_on_this_computer")),
       {
-        name: t("ui.workspace_default_model"),
-        desc: t("ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics"),
+        name: t("ui.current_model"),
+        desc: t("ui.current_model_description"),
         render: setting => {
+          this.followCurrentModel();
           setting
-            .setName(t("ui.workspace_default_model"))
-            .setDesc("")
+            .setName(t("ui.current_model"))
+            .setDesc(t("ui.current_model_description"))
             .addDropdown(dropdown => {
               const select = (dropdown as unknown as { selectEl: HTMLSelectElement }).selectEl;
               this.modelSelects.add(select);
               const selected = this.plugin.settings.cliModel;
-              syncModelSelect(
-                select,
-                this.plugin.availableModels(),
-                id => this.plugin.modelLabel(id),
-                t("ui.current_model_is_unavailable")
-              );
-              if (!Array.from(select.options).some(option => option.value === selected)) {
-                const unavailable = new Option(`${selected} (${t("ui.current_model_is_unavailable")})`, selected);
-                unavailable.disabled = true;
-                select.add(unavailable);
-              }
+              this.showCurrentModel(select, selected);
               dropdown.setValue(selected);
               dropdown.onChange(value => {
                 void this.setControlValue("cliModel", value);
@@ -303,8 +322,9 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
                 void this.plugin.refreshModelDiscovery("claude");
               })
             );
-          this.modelStatusEls.add(setting.descEl);
-          setting.descEl.setText(
+          const statusEl = setting.descEl.createDiv({ cls: "vam-model-discovery-status" });
+          this.modelStatusEls.add(statusEl);
+          statusEl.setText(
             modelDiscoverySummary(this.plugin.modelDiscoveryState("codex"), this.plugin.modelDiscoveryState("claude"))
           );
           if (this.plugin.modelDiscoveryState("codex").status === "idle")
@@ -494,7 +514,10 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     if (key === "language") {
       await this.plugin.changeLanguage(value);
       return;
-    } else if (typeof value === "string" && (key === "codexPath" || key === "claudePath" || key === "cliModel"))
+    } else if (key === "cliModel") {
+      if (typeof value === "string") await this.plugin.setCurrentModel(value);
+      return;
+    } else if (typeof value === "string" && (key === "codexPath" || key === "claudePath"))
       this.plugin.settings[key] = value.trim();
     else if (key === "cliReasoning") this.plugin.settings.cliReasoning = normalizeReasoningLevel(value);
     else return;

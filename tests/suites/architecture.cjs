@@ -15,7 +15,7 @@ test('product architecture keeps shell, core, and experiences separated', () => 
     assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `core/${name} must not depend on repository settings that include experience state`);
   }
 
-  for (const sharedAi of ['types.ts', 'task-policy.ts', 'visual-guidance.ts']) {
+  for (const sharedAi of ['types.ts', 'task-policy.ts', 'visual-guidance.ts', 'model-resolution.ts']) {
     const source = fs.readFileSync(path.join(root, 'ai', sharedAi), 'utf8');
     assert.doesNotMatch(source, /from ["'][^"']*repository["']/, `ai/${sharedAi} must stay experience-independent`);
     assert.doesNotMatch(source, /experiences\//, `ai/${sharedAi} must not import an experience`);

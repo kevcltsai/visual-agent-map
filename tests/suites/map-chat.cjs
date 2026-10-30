@@ -20,6 +20,7 @@ const { contentHash, buildMapChatContext } = load('core/map-chat-context.ts');
 const outlineApi = load('experiences/visual-map/outline-import.ts', { obsidian });
 const { aiModeOptions } = load('experiences/visual-map/ai-mode.ts');
 const { chatResearchRequest } = load('core/map-chat-plan.ts');
+const realPlugin = load('main.ts', { obsidian: { ...obsidian, MarkdownView: class MarkdownView {} } }).default;
 
 // ---- panel on its own -------------------------------------------------------------------------------------------
 
@@ -44,10 +45,10 @@ function panelFixture(overrides = {}, windowValues = {}) {
   const topics = { a: 'Topic A', b: 'Topic B' };
   let selected = [];
   let visibleNote = null;
-  const prefs = { style: 'concise', model: '', saved: [], watchers: [] };
+  const prefs = { style: 'concise', model: 'claude:haiku', saved: [], watchers: [] };
   const host = {
     style: () => prefs.style, setStyle: style => { prefs.style = style; prefs.saved.push(['style', style]); },
-    modelChoices: () => [{ value: '', label: 'Follow default (now: X)' }, { value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }],
+    modelChoices: () => [{ value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }],
     watchModels: changed => { prefs.watchers.push(changed); return () => { prefs.watchers.splice(prefs.watchers.indexOf(changed), 1); }; },
     model: () => prefs.model, setModel: model => { prefs.model = model; prefs.saved.push(['model', model]); }, moreDetail: origin => { calls.more.push(origin); },
     topicTitle: id => topics[id] ?? null, selectedIds: () => selected, send: () => { calls.send++; }, stop: () => { calls.stop++; },
@@ -356,6 +357,10 @@ async function harness({ aim = false, document = false, empty = false, realRende
       return result;
     },
     saveSettings: async () => { control.saves = (control.saves ?? 0) + 1; },
+    // The real plugin's methods (main.ts) on this stand-in, so the view is tested against the shipped current-model logic.
+    currentModelListeners: new Set(),
+    setCurrentModel: model => realPlugin.prototype.setCurrentModel.call(plugin, model),
+    subscribeCurrentModel: listener => realPlugin.prototype.subscribeCurrentModel.call(plugin, listener),
     availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
     subscribeModelDiscovery: listener => { control.listeners.push(listener); return () => { control.listeners.splice(control.listeners.indexOf(listener), 1); }; },
     refreshModelDiscovery: async provider => { control.refreshes.push(provider); return { provider, status: 'ready', models: [] }; },
@@ -1229,15 +1234,13 @@ integrationTest('map chat R2 N3: edit_topic_note on a card whose Detail was over
 
 // ---- Packet C1: answer length, "say it in more detail", answer-length switch, chat model ----------------------------------------
 
-const { normalizeMapChatStyle, normalizeMapChatModel } = load('repository.ts', { obsidian });
+const { normalizeMapChatStyle } = load('repository.ts', { obsidian });
 const styleBtn = (f, label) => byLabel(f.panel.el, label);
 
-test('map chat C1: settings default to concise and follow-default model; an invalid saved style or model is sanitised', () => {
-  assert.equal(DEFAULT_SETTINGS.mapChatStyle, 'concise'); assert.equal(DEFAULT_SETTINGS.mapChatModel, '');
+test('map chat C1: settings default to concise and have no separate chat model (MS-02); an invalid saved style is sanitised', () => {
+  assert.equal(DEFAULT_SETTINGS.mapChatStyle, 'concise'); assert.equal('mapChatModel' in DEFAULT_SETTINGS, false);
   for (const bad of [undefined, null, 'long', 'DETAILED', 7, {}, '']) assert.equal(normalizeMapChatStyle(bad), 'concise', String(bad));
   assert.equal(normalizeMapChatStyle('detailed'), 'detailed'); assert.equal(normalizeMapChatStyle('concise'), 'concise');
-  for (const bad of [undefined, null, 7, {}, [], '   ']) assert.equal(normalizeMapChatModel(bad), '', String(bad));
-  assert.equal(normalizeMapChatModel(' claude:haiku '), 'claude:haiku');
 });
 
 test('map chat C1: the answer-length switch is a labelled group of toggle buttons that follows the remembered style', () => {
@@ -1262,15 +1265,15 @@ test('map chat C1: the answer-length choice survives a repaint and a brand new p
   assert.equal(option(again.panel, 'Concise').attrs['aria-pressed'], 'false');
 });
 
-test('map chat C1: the model list starts with the follow-default entry, shows the remembered pick, and a change is handed to the view', () => {
+test('map chat C1: the model list has no follow-default entry, shows the current model, and a change is handed to the view', () => {
   const f = panelFixture(); f.prefs.model = 'claude:haiku'; f.panel.detach(); f.panel.mount(f.overlay);
   const select = f.panel.modelEl;
-  assert.equal(select.attrs['aria-label'], 'Model for this chat');
-  eq(select.children.map(o => o.text), ['Follow default (now: X)', 'Haiku', 'GPT 6']); assert.equal(select.children[0].optionValue, '');
-  assert.equal(select.value, 'claude:haiku', 'the remembered model is selected');
-  select.value = ''; select.change();
-  eq(f.prefs.saved, [['model', '']], 'following the default is saved as an empty string');
+  assert.equal(select.attrs['aria-label'], 'Current model: chat and new AI tasks use this one');
+  assert.equal(select.attrs.title, 'Current model: chat and new AI tasks use this one\nHaiku', 'the tooltip is the new label followed by the full model label');
+  eq(select.children.map(o => o.text), ['Haiku', 'GPT 6']); assert.ok(select.children.every(o => o.optionValue !== ''), 'no empty follow-default value');
+  assert.equal(select.value, 'claude:haiku', 'the current model is selected');
   select.value = 'gpt-6'; select.change();
+  eq(f.prefs.saved, [['model', 'gpt-6']], 'a pick is handed to the view as that model id');
   assert.equal(f.prefs.model, 'gpt-6');
   f.panel.detach(); f.panel.mount(f.overlay); assert.equal(f.panel.modelEl.value, 'gpt-6', 'kept across a repaint');
 });
@@ -1298,7 +1301,7 @@ test('map chat C1: the more-detail button hands the original question and refere
   f.panel.finish('Again.', []); assert.equal(moreButtons(f).every(b => !b.disabled), true, 'enabled again when the reply is done');
 });
 
-integrationTest('map chat C1: a normal send is concise on the workspace model, and the usage notice is asked for that model', async () => {
+integrationTest('map chat C1: a normal send is concise on the current model, and the usage notice is asked for that model', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
   h.type('hello'); await h.view.sendMapChat();
   const request = h.control.requests[0];
@@ -1306,15 +1309,15 @@ integrationTest('map chat C1: a normal send is concise on the workspace model, a
   eq(h.control.models, ['claude:sonnet']);
 });
 
-integrationTest('map chat C1: a chat model of claude:haiku is what is sent and what the usage notice is asked about; empty follows cliModel', async () => {
+integrationTest('map chat C1: the current model (cliModel) is what is sent and what the usage notice is asked about; there is no follow-default entry', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
-  h.plugin.settings.mapChatModel = 'claude:haiku';
+  h.plugin.settings.cliModel = 'claude:haiku';
   h.type('hello'); await h.view.sendMapChat();
   assert.equal(h.control.requests[0].model, 'claude:haiku'); eq(h.control.models, ['claude:haiku']);
-  h.plugin.settings.mapChatModel = '';
+  h.plugin.settings.cliModel = 'claude:sonnet';
   h.type('again'); await h.view.sendMapChat();
   assert.equal(h.control.requests[1].model, 'claude:sonnet'); eq(h.control.models, ['claude:haiku', 'claude:sonnet']);
-  assert.equal(h.view.chatModelChoices()[0].label, 'Follow default (now: label(claude:sonnet))');
+  assert.equal(h.view.chatModelChoices().some(c => c.value === '' || /Follow default/.test(c.label)), false);
 });
 
 integrationTest('map chat C1: choosing detailed in the switch is remembered, saved, and sent on the next message; the model pick is saved too', async () => {
@@ -1326,13 +1329,13 @@ integrationTest('map chat C1: choosing detailed in the switch is remembered, sav
   assert.equal(h.control.requests[0].style, 'detailed');
   h.repaint(); assert.equal(option('Detailed').attrs['aria-pressed'], 'true', 'kept after render()');
   chat.modelEl.value = 'claude:haiku'; chat.modelEl.change();
-  assert.equal(h.plugin.settings.mapChatModel, 'claude:haiku'); assert.equal(h.control.saves, 2);
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku', 'the menu pick is the current model'); assert.equal(h.control.saves, 2);
 });
 
-integrationTest('map chat C1: the chat model list is the settings list plus follow-default, and a saved model that is gone stays selectable', async () => {
+integrationTest('map chat C1: the chat model list is the settings list (no follow-default), and a current model that is gone stays selectable', async () => {
   const h = await harness(); await h.view.hydrate(); h.open();
-  eq(h.view.chatModelChoices().map(c => c.value), ['', 'gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
-  h.plugin.settings.mapChatModel = 'claude:gone';
+  eq(h.view.chatModelChoices().map(c => c.value), ['gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
+  h.plugin.settings.cliModel = 'claude:gone';
   eq(h.view.chatModelChoices().at(-1), { value: 'claude:gone', label: 'label(claude:gone) (Current model is unavailable)' });
 });
 
@@ -1402,34 +1405,87 @@ test('map chat C1 F1: the redo prompt tells the model that actions must be an em
 test('map chat C1 F2: the panel listens for model changes while built, repaints its model list on a change, and stops on dispose', () => {
   const f = panelFixture(); f.panel.setOpen(true);
   assert.equal(f.prefs.watchers.length, 1);
-  let choices = [{ value: '', label: 'Follow default (now: X)' }];
+  let choices = [{ value: 'claude:haiku', label: 'Haiku' }];
   const host = f.panel.host; host.modelChoices = () => choices;
-  f.panel.refreshControls(); eq(f.panel.modelEl.children.map(o => o.text), ['Follow default (now: X)']);
-  choices = [{ value: '', label: 'Follow default (now: Y)' }, { value: 'claude:haiku', label: 'Haiku' }];
+  f.panel.refreshControls(); eq(f.panel.modelEl.children.map(o => o.text), ['Haiku']);
+  choices = [{ value: 'claude:haiku', label: 'Haiku' }, { value: 'gpt-6', label: 'GPT 6' }];
   f.prefs.watchers[0]();
-  eq(f.panel.modelEl.children.map(o => o.text), ['Follow default (now: Y)', 'Haiku'], 'the list and the follow-default label were refreshed');
+  eq(f.panel.modelEl.children.map(o => o.text), ['Haiku', 'GPT 6'], 'the list was refreshed');
   f.panel.dispose(); assert.equal(f.prefs.watchers.length, 0);
 });
 
 integrationTest('map chat C1 F2: model discovery going from idle to ready makes the Claude models appear; closing the view unsubscribes', async () => {
   const h = await harness(); h.control.claudeReady = false; await h.view.hydrate(); const chat = h.open();
-  eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna']);
-  assert.equal(h.control.listeners.length, 1); assert.ok(h.control.refreshes.includes('claude'), 'a refresh was started');
+  eq(chat.modelEl.children.map(o => o.optionValue), ['gpt-6-luna', 'claude:sonnet']);
+  assert.equal(h.control.listeners.length, 1); assert.equal(h.plugin.currentModelListeners.size, 1); assert.ok(h.control.refreshes.includes('claude'), 'a refresh was started');
   h.control.claudeReady = true; for (const listener of [...h.control.listeners]) listener();
-  eq(chat.modelEl.children.map(o => o.optionValue), ['', 'gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
+  eq(chat.modelEl.children.map(o => o.optionValue), ['gpt-6-luna', 'claude:sonnet', 'claude:haiku']);
   h.plugin.settings.cliModel = 'gpt-6-luna'; chat.setOpen(false); chat.setOpen(true);
-  assert.equal(chat.modelEl.children[0].text, 'Default: label(gpt-6-luna)', 'the shown label (shortened so it fits 340px) follows cliModel when the window is opened');
-  assert.equal(chat.modelEl.children[0].attrs.title, 'Follow default (now: label(gpt-6-luna))', 'the full wording is its tooltip'); assert.equal(chat.modelEl.attrs.title, 'Follow default (now: label(gpt-6-luna))', 'and the select names it too');
-  await h.view.onClose(); assert.equal(h.control.listeners.length, 0);
+  assert.equal(chat.modelEl.value, 'gpt-6-luna', 'the selected model follows cliModel when the window is opened');
+  assert.equal(chat.modelEl.attrs.title, 'Current model: chat and new AI tasks use this one\nlabel(gpt-6-luna)', 'the tooltip is the new label followed by the full model label');
+  await h.view.onClose(); assert.equal(h.control.listeners.length, 0); assert.equal(h.plugin.currentModelListeners.size, 0, 'both notifications are unsubscribed');
 });
 
-test('map chat C1 F3: loading saved settings sanitises an invalid chat style and model, and keeps valid ones', () => {
+test('map chat C1 F3: loading saved settings sanitises an invalid chat style, keeps a valid one, and never carries a chat model key (MS-02)', () => {
   const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
   const bad = settingsFromSaved({ mapChatStyle: 'long', mapChatModel: 7 });
-  assert.equal(bad.mapChatStyle, 'concise'); assert.equal(bad.mapChatModel, '');
-  const good = settingsFromSaved({ mapChatStyle: 'detailed', mapChatModel: ' claude:haiku ' });
-  assert.equal(good.mapChatStyle, 'detailed'); assert.equal(good.mapChatModel, 'claude:haiku');
-  const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal(none.mapChatModel, '');
+  assert.equal(bad.mapChatStyle, 'concise'); assert.equal('mapChatModel' in bad, false);
+  const good = settingsFromSaved({ mapChatStyle: 'detailed' });
+  assert.equal(good.mapChatStyle, 'detailed');
+  const none = settingsFromSaved(null); assert.equal(none.mapChatStyle, 'concise'); assert.equal('mapChatModel' in none, false);
+});
+
+// ---- MS-02: one current model; the old chat model is migrated once ---------------------------------------------------------
+test('MS-02 migration: a saved chat model becomes the current model (trimmed) and the key is dropped; unset values leave cliModel alone', () => {
+  const { settingsFromSaved, hasLegacyChatModel } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const moved = settingsFromSaved({ cliModel: 'gpt-6-luna', mapChatModel: ' claude:sonnet ' });
+  assert.equal(moved.cliModel, 'claude:sonnet'); assert.equal('mapChatModel' in moved, false);
+  assert.equal(settingsFromSaved({ mapChatModel: 'claude:haiku' }).cliModel, 'claude:haiku', 'no saved cliModel: the chat model still wins');
+  for (const bad of [7, '', '  ', null, undefined, {}, []]) {
+    assert.equal(settingsFromSaved({ cliModel: 'gpt-6-luna', mapChatModel: bad }).cliModel, 'gpt-6-luna', `cliModel stays for ${JSON.stringify(bad)}`);
+    assert.equal(settingsFromSaved({ mapChatModel: bad }).cliModel, DEFAULT_SETTINGS.cliModel, `the original default stays for ${JSON.stringify(bad)}`);
+    assert.equal('mapChatModel' in settingsFromSaved({ mapChatModel: bad }), false);
+  }
+  assert.equal(settingsFromSaved({ cliModel: 'gpt-6-luna' }).cliModel, 'gpt-6-luna'); assert.equal(settingsFromSaved(null).cliModel, DEFAULT_SETTINGS.cliModel);
+  assert.equal(hasLegacyChatModel({ mapChatModel: '' }), true, 'even an empty old key is dropped by a rewrite'); assert.equal(hasLegacyChatModel({ mapChatModel: null }), true);
+  assert.equal(hasLegacyChatModel({ cliModel: 'x' }), false); assert.equal(hasLegacyChatModel(null), false);
+});
+
+test('MS-02 migration: a second load of the migrated data does not migrate again and gives the same settings (idempotent)', () => {
+  const { settingsFromSaved, hasLegacyChatModel } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const old = { cliModel: 'gpt-6-luna', mapChatModel: 'claude:sonnet', mapChatStyle: 'detailed' };
+  const once = settingsFromSaved(old); const written = JSON.parse(JSON.stringify(once));
+  assert.equal(hasLegacyChatModel(written), false, 'what was saved no longer triggers a rewrite');
+  const twice = settingsFromSaved(written);
+  eq(twice, once); assert.equal(twice.cliModel, 'claude:sonnet');
+  // The user then picks another model: a later load keeps it (nothing from the old key can come back).
+  eq(settingsFromSaved({ ...written, cliModel: 'gpt-6-luna' }).cliModel, 'gpt-6-luna');
+});
+
+integrationTest('MS-02 migration: migrating does not touch any note frontmatter (a manual note reads the same before and after)', async () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian: { ...obsidian, MarkdownView } });
+  const h = await harness(); await h.view.hydrate();
+  const path = h.node('a').path;
+  await h.repo.updateNote(path, { modelSource: 'manual', model: 'gpt-x', reasoning: 'high' });
+  const before = { content: new Map(h.contents), note: plain(await h.repo.readNote(path)) };
+  Object.assign(h.plugin.settings, settingsFromSaved({ cliModel: 'gpt-6-luna', mapChatModel: 'claude:haiku' }));
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku');
+  eq([...h.contents], [...before.content]); eq(await h.repo.readNote(path), before.note);
+});
+
+integrationTest('MS-02: picking a model in the chat menu sets cliModel, saves once, and tells every listener; a closed view no longer hears it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const heard = []; const stop = h.plugin.subscribeCurrentModel(model => heard.push(model));
+  chat.modelEl.value = 'claude:haiku'; chat.modelEl.change(); await tick();
+  assert.equal(h.plugin.settings.cliModel, 'claude:haiku'); assert.equal(h.control.saves, 1); eq(heard, ['claude:haiku']);
+  assert.equal(h.plugin.currentModelListeners.size, 2, 'the open view and this listener');
+  // A change made elsewhere (the settings page) refreshes the open menu.
+  await h.plugin.setCurrentModel('gpt-6-luna'); assert.equal(chat.modelEl.value, 'gpt-6-luna'); eq(heard, ['claude:haiku', 'gpt-6-luna']);
+  await h.view.onClose(); assert.equal(h.plugin.currentModelListeners.size, 1, 'only the other listener is left');
+  const stale = chat.modelEl.value;
+  await h.plugin.setCurrentModel('claude:sonnet'); assert.equal(chat.modelEl.value, stale, 'the closed view got no update'); eq(heard.at(-1), 'claude:sonnet');
+  for (const bad of ['', '  ', 7, null]) { const saves = h.control.saves; await h.plugin.setCurrentModel(bad); assert.equal(h.plugin.settings.cliModel, 'claude:sonnet'); assert.equal(h.control.saves, saves, 'an empty pick saves nothing'); }
+  stop(); assert.equal(h.plugin.currentModelListeners.size, 0);
 });
 
 // ---- Packet D1: only the note on screen is sent; the reply is laid out as Markdown --------------------------------
@@ -3224,16 +3280,15 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 });
 
 // ---- B2-0 F3: the model menu keeps its width at 340px --------------------------------------------------------------------
-integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and the default entry shows the model without its provider prefix, the tooltip keeps the full name', async () => {
+integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
   // B3-fix rule change: with the save button in the header the model asks for 146px (basis) and the title gives way first (flex-shrink 100, min 64px).
   assert.match(rule, /flex: 1 1 146px;/); assert.match(rule, /min-width: 0;/);
   const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 100 auto;/); assert.match(title, /min-width: 64px;/); assert.doesNotMatch(rule, /min-width: 120px/);
   const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
-  const first = h.view.chatModelChoices()[0];
-  assert.equal(first.label, 'Follow default (now: OpenAI Codex · gpt-6-luna)', 'the full name stays in the tooltip'); assert.equal(first.short, 'Default: gpt-6-luna');
-  h.plugin.settings.cliModel = 'claude:sonnet'; assert.equal(h.view.chatModelChoices()[0].short, 'Default: Claude Sonnet', 'a label without a provider prefix is unchanged');
+  const choices = h.view.chatModelChoices(); const current = choices.find(c => c.value === 'gpt-6-luna');
+  assert.equal(current.label, 'OpenAI Codex · gpt-6-luna', 'the full name is the label'); assert.equal(current.short, undefined); assert.equal(choices.some(c => c.value === ''), false);
 });
 
 // ---- B2-0 F5: maps with the same name can be told apart in the list --------------------------------------------------------

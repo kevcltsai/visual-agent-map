@@ -22105,20 +22105,21 @@ function settledLine(line) {
   const block = line.images;
   if (!block) return line;
   const title = clip(block.nodeTitle);
+  const model = block.modelLabel ? t("ui.map_chat_model_suffix_0", block.modelLabel) : "";
   switch (block.state) {
     case "searching":
-      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) };
+      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) + model };
     case "ready": {
       const usable = usableImageCount(block);
-      return usable ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) } : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+      return usable ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) + model } : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
     }
     case "empty":
-      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
     case "failed":
       return {
         ...line,
         status: "failed",
-        text: t("ui.map_chat_line_images_failed_0_1", title, clip((_a2 = block.reason) != null ? _a2 : "", 160))
+        text: t("ui.map_chat_line_images_failed_0_1", title, clip((_a2 = block.reason) != null ? _a2 : "", 160)) + model
       };
     case "stopped":
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
@@ -50479,7 +50480,7 @@ ${note.detail.trim()}` : "",
     if (outcome.status === "done" && outcome.images)
       return {
         status: "done",
-        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle),
+        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle) + (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
         images: outcome.images
       };
     if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
@@ -51122,6 +51123,7 @@ ${note.detail.trim()}` : "",
           query,
           nodeId: node.id,
           nodeTitle: note.title,
+          modelLabel: this.plugin.modelLabel(note.model),
           mapPath: anchor.path,
           mapId: anchor.id,
           state: "searching",

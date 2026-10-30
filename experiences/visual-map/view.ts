@@ -11684,7 +11684,9 @@ export class VisualAgentMapView extends ItemView {
     if (outcome.status === "done" && outcome.images)
       return {
         status: "done",
-        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle),
+        text:
+          t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle) +
+          (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
         images: outcome.images
       };
     if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
@@ -12404,6 +12406,7 @@ export class VisualAgentMapView extends ItemView {
             query,
             nodeId: node.id,
             nodeTitle: note.title,
+            modelLabel: this.plugin.modelLabel(note.model),
             mapPath: anchor.path,
             mapId: anchor.id,
             state: "searching",

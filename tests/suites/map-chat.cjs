@@ -3547,7 +3547,7 @@ integrationTest('B3 find_images: the chat only picks the card and the words; the
   const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(8); };
   const file = noteFile(h, 'a'); const before = h.contents.get(file); const note = await h.note('a');
   const lines = await apply(h, [findAct(h, 'a')]);
-  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Started looking for pictures for “Body”', 'a start is not a "Done"'); assert.doesNotMatch(lines[0].text, /Done/);
+  eq(lines.map(l => l.status), ['done']); assert.equal(lines[0].text, 'Started looking for pictures for “Body” (label(claude:sonnet))', 'a start is not a "Done"'); assert.doesNotMatch(lines[0].text, /Done/);
   assert.equal(h.control.searches.length, 1); assert.equal(h.control.searches[0].query, 'espresso', 'the search words are the direction');
   assert.equal(h.control.searches[0].model, note.model, 'the card\'s model, not the chat model'); assert.equal(h.control.models.at(-1), note.model, 'asked its usage notice first');
   assert.equal(h.control.calls.filter(c => c === 'chat').length, 0, 'the chat itself made no request of its own here');
@@ -3808,9 +3808,9 @@ integrationTest('B3-polish P1-1: an inserted candidate keeps its picture and is 
 const resultTexts = h => findAll(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-line')).map(i => i.text);
 integrationTest('B3-polish P1-2: the result line starts as "Started" and ends as the block ends (ready / empty / failed / stopped), never "Done" for a failure, on screen and in the saved turn', async () => {
   const cases = [
-    ['ready', async h => { h.control.search = async () => imageItems(3); }, /^Done: found 3 pictures for “Body”$/, 'done'],
-    ['empty', async h => { h.control.probe = async () => []; }, /^No loadable picture was found for “Body”$/, 'skipped'],
-    ['failed', async h => { h.control.search = async () => { throw new Error('quota used up'); }; }, /^Failed: picture search for “Body” \(quota used up\)$/, 'failed']
+    ['ready', async h => { h.control.search = async () => imageItems(3); }, /^Done: found 3 pictures for “Body” \(label\(claude:sonnet\)\)$/, 'done'],
+    ['empty', async h => { h.control.probe = async () => []; }, /^No loadable picture was found for “Body” \(label\(claude:sonnet\)\)$/, 'skipped'],
+    ['failed', async h => { h.control.search = async () => { throw new Error('quota used up'); }; }, /^Failed: picture search for “Body” \(quota used up\) \(label\(claude:sonnet\)\)$/, 'failed']
   ];
   for (const [state, arrange, expected, status] of cases) {
     const { h, chat } = await imageHarness(); await arrange(h);
@@ -3827,12 +3827,12 @@ integrationTest('B3-polish P1-2: the result line starts as "Started" and ends as
   // A search that ends before the reply has finished: finish() must not bring the old "Started" text back.
   const { h, chat } = await imageHarness(); h.control.search = async () => { throw new Error('boom'); };
   const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'failed'));
-  chat.finish('Looking.', lines); eq(resultTexts(h), ['Failed: picture search for “Body” (boom)']);
+  chat.finish('Looking.', lines); eq(resultTexts(h), ['Failed: picture search for “Body” (boom) (label(claude:sonnet))']);
 });
 integrationTest('B3-polish P1-2: stopping the search rewrites the line to "Stopped"; the saved turn carries it', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
   const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
-  eq(resultTexts(h), ['Started looking for pictures for “Body”']);
+  eq(resultTexts(h), ['Started looking for pictures for “Body” (label(claude:sonnet))']);
   find(h.view.chat.logEl, i => hasClass(i, 'vam-map-chat-images-stop')).click();
   eq(resultTexts(h), ['Stopped: picture search for “Body”']); assert.equal(chat.transcript().at(-1).lines[0].status, 'skipped'); gate.resolve(); await tick();
 });
@@ -3842,7 +3842,7 @@ integrationTest('B3-polish P1-2: writing the line back moves no focus and the re
   const lines = await apply(h, [findAct(h, 'a')]); chat.finish('Looking.', lines);
   input.focus(); input.fire('compositionstart'); input.value = 'ni hao';
   gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
-  eq(resultTexts(h), ['Done: found 2 pictures for “Body”']);
+  eq(resultTexts(h), ['Done: found 2 pictures for “Body” (label(claude:sonnet))']);
   assert.equal(h.page.doc.activeElement, input); assert.equal(chat.isComposing, true); assert.equal(input.value, 'ni hao');
   assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1); assert.doesNotMatch(chat.liveEl.text, /Done: found/);
 });
@@ -4522,4 +4522,37 @@ integrationTest('MS-03: the result line a chat research shows carries the model 
   const h = await harness(); await h.view.hydrate(); h.view.startMultiResearch = async () => {};
   const lines = await apply(h, [ms03Act('research_standard', [h.ids.a])]);
   assert.equal(lines[0].text, 'Done: Start quick research on the selected topics (label(claude:sonnet))');
+});
+
+integrationTest('MS-03: every picture-search line (started, ready, none, failed) ends with the model label of the card it runs on, also with an override', async () => {
+  const { h } = await imageHarness();
+  await ms03Override(h, 'b', 'gpt-x');
+  const gate = deferred(); h.control.search = async () => { await gate.promise; return imageItems(2); };
+  const lines = await apply(h, [findAct(h, 'b')]);
+  assert.equal(lines[0].text, 'Started looking for pictures for “Mind” (label(gpt-x))', 'started');
+  const block = lastImages(h); assert.equal(block.modelLabel, 'label(gpt-x)');
+  const { settledLine } = load('experiences/visual-map/map-chat.ts', { obsidian });
+  gate.resolve(); await withTimeout(until(() => block.state === 'ready'));
+  assert.match(settledLine({ status: 'done', text: '', images: block }).text, /^Done: found 2 pictures for “Mind” \(label\(gpt-x\)\)$/);
+  for (const [state, pattern] of [['empty', /^No loadable picture was found for “Mind” \(label\(gpt-x\)\)$/], ['failed', /^Failed: picture search for “Mind” \(why\) \(label\(gpt-x\)\)$/]])
+    assert.match(settledLine({ status: 'done', text: '', images: { ...block, state, reason: 'why', items: [] } }).text, pattern, state);
+});
+
+integrationTest('MS-03 counter-example: a picture block saved without a model label (older conversation) keeps its line text unchanged in every state', async () => {
+  const { settledLine } = load('experiences/visual-map/map-chat.ts', { obsidian });
+  const base = { query: 'q', nodeId: 'n', nodeTitle: 'Body', mapPath: MAP, mapId: 'map-a', items: [] };
+  const text = (state, extra = {}) => settledLine({ status: 'done', text: '', images: { ...base, state, ...extra } }).text;
+  assert.equal(text('searching'), 'Started looking for pictures for “Body”');
+  assert.equal(text('empty'), 'No loadable picture was found for “Body”');
+  assert.equal(text('failed', { reason: 'boom' }), 'Failed: picture search for “Body” (boom)');
+  assert.equal(text('ready', { items: [{ candidate: { title: 't', url: 'u', source: 's' } }] }), 'Done: found 1 pictures for “Body”');
+});
+
+integrationTest('MS-03: the saved transcript writes the same picture line text as the chat shows, with the model label', async () => {
+  const { h } = await imageHarness();
+  h.control.search = async () => imageItems(2);
+  const lines = await apply(h, [findAct(h, 'a')]); await withTimeout(until(() => lastImages(h)?.state === 'ready'));
+  h.view.chat.finish('Looking.', lines);
+  assert.equal(h.view.chat.transcript().at(-1).lines[0].text, 'Done: found 2 pictures for “Body” (label(claude:sonnet))');
+  assert.equal(resultTexts(h)[0], h.view.chat.transcript().at(-1).lines[0].text, 'the same text on screen and in the saved turn');
 });

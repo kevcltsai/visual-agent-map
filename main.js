@@ -29078,9 +29078,11 @@ function providerStepRunner(aiCalls, config) {
         textOnly: true,
         searchBudget: 0,
         ...config.stream ? { stream: true } : {},
+        ...config.lastMessageOnly ? { resolveLast: true } : {},
         ...config.stream && onStructuredJson ? { onStructuredJson } : {},
         ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
-        ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {}
+        ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {},
+        ...(hooks == null ? void 0 : hooks.onText) && !CLAUDE_MODEL_CHOICES.some((choice2) => choice2.id === request.model) ? { onText: hooks.onText } : {}
       }
     },
     (raw, exchange) => {
@@ -53397,6 +53399,7 @@ var CodexAppServerRuntime = class {
         steered: false,
         onRequest: controls == null ? void 0 : controls.onRequest,
         onText: controls == null ? void 0 : controls.onText,
+        resolveLast: controls == null ? void 0 : controls.resolveLast,
         onWebSearchEvent: controls == null ? void 0 : controls.onWebSearchEvent,
         onActivity: controls == null ? void 0 : controls.onActivity,
         generateImage: controls == null ? void 0 : controls.generateImage
@@ -53639,7 +53642,7 @@ var CodexAppServerRuntime = class {
           );
       } else if ((turn == null ? void 0 : turn.status) === "completed")
         state.resolve(
-          state.onText ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
+          state.onText && !state.resolveLast ? [...state.visibleMessages.values()].join("\n\n").trim() || ((_f = state.messages.at(-1)) == null ? void 0 : _f.trim()) || "" : ((_g = state.messages.at(-1)) == null ? void 0 : _g.trim()) || ""
         );
       else
         state.reject(
@@ -56623,12 +56626,24 @@ function partialReply(buffer) {
   }
   return none;
 }
+function replyFromAgentText(text11) {
+  if (typeof text11 !== "string") return "";
+  for (let at = text11.lastIndexOf("{"); at >= 0; at = text11.lastIndexOf("{", at - 1)) {
+    if (/^[ \t]*$/.test(text11.slice(text11.lastIndexOf("\n", at - 1) + 1, at))) {
+      const reply = partialReply(text11.slice(at)).text;
+      if (reply) return reply;
+    }
+    if (at === 0) break;
+  }
+  return "";
+}
 function providerMapChatRunner(aiCalls) {
   return providerStepRunner(aiCalls, {
     name: "map-chat",
     topic: (request) => `Map chat \xB7 ${request.message.trim().slice(0, 80)}`,
     stopped: () => new MapChatError("stopped", "Map chat stopped"),
-    stream: true
+    stream: true,
+    lastMessageOnly: true
   });
 }
 var MapChatService = class {
@@ -56639,7 +56654,7 @@ var MapChatService = class {
    * One chat turn. `onReply` receives the whole reply text decoded so far (not a delta) each time it grows; it starts over
    * from "" when the CLI begins a new StructuredOutput call or rejects the previous one. Throws {@link MapChatError} for an
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
-   * `rejected`. Only Claude streams; for other providers `onReply` is never called and the reply arrives with the result.
+   * `rejected`. Claude streams the StructuredOutput JSON; Codex streams its message text (only growing). Other providers never call `onReply`.
    * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
    */
   async chat(request, signal, onReply, onProgress) {
@@ -56654,13 +56669,23 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
-    const hooks = onProgress ? {
-      onFirstEvent: () => {
-        if (!signal.aborted) onProgress({ kind: "first-event" });
-      },
-      onActivity: (activity) => {
-        if (!signal.aborted) onProgress({ kind: "activity", activity });
-      }
+    const onText = onReply ? (full) => {
+      if (signal.aborted) return;
+      const text11 = replyFromAgentText(full);
+      if (!text11 || text11.length < shown.length || text11 === shown) return;
+      shown = text11;
+      onReply(text11);
+    } : void 0;
+    const hooks = onProgress || onText ? {
+      ...onText ? { onText } : {},
+      ...onProgress ? {
+        onFirstEvent: () => {
+          if (!signal.aborted) onProgress({ kind: "first-event" });
+        },
+        onActivity: (activity) => {
+          if (!signal.aborted) onProgress({ kind: "activity", activity });
+        }
+      } : {}
     } : void 0;
     let raw;
     try {

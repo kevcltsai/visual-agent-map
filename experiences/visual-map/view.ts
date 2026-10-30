@@ -45,6 +45,7 @@ import {
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { providerForModel } from "../../ai/providers/provider";
+import { FALLBACK_MODEL } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -105,6 +106,7 @@ import {
   normalizeMapChatStyle,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
+  failureReason,
   type Note,
   type NotePatch,
   type TopicInfo,
@@ -184,6 +186,7 @@ import {
 } from "../../core/map-chat-context";
 import { applyMdEdit, guardMapChatWrite, normalizeVaultPath, type MapChatGuardCode } from "../../core/map-chat-guard";
 import type { MapChatRequest, MapChatResult } from "../../core/map-chat-service";
+import { FIRST_EVENT_WAIT_MS } from "../../core/ai-task-service";
 import { MAP_CHAT_NEW_PREFIX, type MapChatAction } from "../../core/steps/map-chat/step";
 import {
   MAP_CHAT_AUTO_LAYOUT_MIN_NEW,
@@ -1348,7 +1351,7 @@ export class VisualAgentMapView extends ItemView {
     const epoch = this.aimViewEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === epoch;
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
-    const configuredModel = this.plugin.settings.cliModel?.trim() || "gpt-5.6-luna";
+    const configuredModel = this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
     const defaultReasoning =
       configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
@@ -6287,11 +6290,7 @@ export class VisualAgentMapView extends ItemView {
       this.button(actions, t("ui.duplicate_to_my_workspace"), () =>
         this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
-      this.button(actions, t("ui.create_an_empty_mind_map"), () =>
-        new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
-          this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
-        ).open()
-      );
+      this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
       if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
       // The opening screen of the chat: one sentence builds a new map of the user's own, which the sample cannot be.
       start.createDiv("vam-sample-start-chat");
@@ -6634,6 +6633,7 @@ export class VisualAgentMapView extends ItemView {
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
+    if (note?.status === "error" && note.lastError) errorDetails.push(note.lastError);
     if (batch) {
       const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
       const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
@@ -9629,6 +9629,7 @@ export class VisualAgentMapView extends ItemView {
               "previewSection",
               "previewInitialized",
               "status",
+              "lastError",
               "detailFormatIssues"
             ],
             t("ui.synthesize_subtopics")
@@ -9675,7 +9676,7 @@ export class VisualAgentMapView extends ItemView {
         else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
         console.error("Visual Agent Map child integration", error);
-        await this.plugin.repo.updateNote(node.path, { status: "error" });
+        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
         const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
         if (failed) failed(message);
         else new Notice(message);
@@ -10835,8 +10836,19 @@ export class VisualAgentMapView extends ItemView {
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
+  /** Asks for a name, then makes and opens an empty map. No AI. */
+  private promptEmptyMap(): void {
+    new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
+      this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
+    ).open();
+  }
   private chatHost(): MapChatHost {
+    const emptyMap = (): (() => void) | undefined => (this.builtIn ? undefined : () => this.promptEmptyMap());
     return {
+      // The built-in sample's start card already has this button; read each time, the view can switch to the sample.
+      get createEmptyMap() {
+        return emptyMap();
+      },
       topicTitle: id => {
         const node = this.map?.nodes.find(item => item.id === id);
         return node ? (this.notes.get(id)?.title ?? node.path) : null;
@@ -10852,16 +10864,19 @@ export class VisualAgentMapView extends ItemView {
         void this.plugin.saveSettings();
       },
       modelChoices: () => this.chatModelChoices(),
-      model: () => this.plugin.settings.mapChatModel ?? "",
+      model: () => this.plugin.settings.cliModel,
       setModel: model => {
-        this.plugin.settings.mapChatModel = model;
-        void this.plugin.saveSettings();
+        void this.plugin.setCurrentModel(model);
       },
       watchModels: changed => {
-        const unsubscribe = this.plugin.subscribeModelDiscovery(changed);
+        const stopDiscovery = this.plugin.subscribeModelDiscovery(changed);
+        const stopCurrent = this.plugin.subscribeCurrentModel(changed);
         void this.plugin.refreshModelDiscovery("codex");
         void this.plugin.refreshModelDiscovery("claude");
-        return unsubscribe;
+        return () => {
+          stopDiscovery();
+          stopCurrent();
+        };
       },
       moreDetail: origin => {
         void this.sendMapChat(origin);
@@ -10909,26 +10924,14 @@ export class VisualAgentMapView extends ItemView {
       saveTranscript: turns => this.saveChatTranscript(turns)
     };
   }
-  /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
+  /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
   private chatModelChoices(): { value: string; label: string; short?: string }[] {
-    const settings = this.plugin.settings;
-    const choices = [
-      {
-        value: "",
-        label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
-        // The list shows the model's own name; the provider prefix ("Codex · ") is in the tooltip with the full label.
-        short: t(
-          "ui.map_chat_model_follow_short_0",
-          this.plugin.modelLabel(settings.cliModel).split(" · ").at(-1) ?? ""
-        )
-      },
-      ...this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }))
-    ];
-    const saved = settings.mapChatModel;
-    if (saved && !choices.some(choice => choice.value === saved))
+    const current = this.plugin.settings.cliModel;
+    const choices = this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }));
+    if (current && !choices.some(choice => choice.value === current))
       choices.push({
-        value: saved,
-        label: `${this.plugin.modelLabel(saved)} (${t("ui.current_model_is_unavailable")})`
+        value: current,
+        label: `${this.plugin.modelLabel(current)} (${t("ui.current_model_is_unavailable")})`
       });
     return choices;
   }
@@ -11084,12 +11087,17 @@ export class VisualAgentMapView extends ItemView {
       }
       return depth;
     };
+    const failureOf = (id: string): { status?: "error"; error?: string } => {
+      const note = this.notes.get(id);
+      return note?.status === "error" ? { status: "error", ...(note.lastError ? { error: note.lastError } : {}) } : {};
+    };
     const outline: MapChatOutlineNode[] = map.nodes.map(node => ({
       id: node.id,
       title: titleOf(node),
       summary: summaryOf(node.id),
       parentId: node.parentId,
-      depth: depthOf(node)
+      depth: depthOf(node),
+      ...failureOf(node.id)
     }));
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
@@ -11099,7 +11107,8 @@ export class VisualAgentMapView extends ItemView {
             title: titleOf(node),
             summary: summaryOf(id),
             detail: this.notes.get(id)?.detail ?? "",
-            path: node.path
+            path: node.path,
+            ...failureOf(id)
           }
         : null;
     };
@@ -11153,7 +11162,7 @@ export class VisualAgentMapView extends ItemView {
       contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
       ...(redo ? { redo: true } : {}),
-      model: settings.mapChatModel?.trim() || settings.cliModel,
+      model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
   }
@@ -11228,71 +11237,150 @@ export class VisualAgentMapView extends ItemView {
         }
         sent = true;
         if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
-        const controller = new AbortController();
-        const key = `map-chat-view:${++mapChatTaskSequence}`;
-        this.chatController = controller;
-        this.chatTaskKey = key;
-        this.plugin.activeTasks?.set(key, controller);
-        // A reply that arrives after Stop, closing the view or switching maps changes nothing.
-        const alive = (): boolean =>
-          !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
+        // One attempt is one request to the model. "Resend" (the slow notice) replaces it with another attempt of the same
+        // question: a reply that arrives from a replaced attempt changes nothing, like one that arrives after Stop.
+        const openAttempt = (): { controller: AbortController; alive: () => boolean } => {
+          const controller = new AbortController();
+          const key = `map-chat-view:${++mapChatTaskSequence}`;
+          this.chatController = controller;
+          this.chatTaskKey = key;
+          this.plugin.activeTasks?.set(key, controller);
+          // A reply that arrives after Stop, a resend, closing the view or switching maps changes nothing.
+          return {
+            controller,
+            alive: () =>
+              !this.closed &&
+              !controller.signal.aborted &&
+              this.chatController === controller &&
+              this.path === anchor.path
+          };
+        };
+        let attempt = openAttempt();
         // A plan still waiting for its yes belongs to the question before this one.
         this.supersedeChatPlan();
         // The first message of a conversation moves the opening screen's panel into the side window.
         this.relocateMapChat();
         // From here the request goes out: the bubble leaves "Preparing".
         chat.setStage("waiting");
-        try {
-          const result = await this.plugin.mapChat.chat(
-            request,
-            controller.signal,
-            text => {
-              if (alive()) chat.streamReply(text);
-            },
-            event => {
-              // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
-              if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-            }
-          );
+        const modelName = this.plugin.modelLabel(request.model);
+        for (;;) {
+          const { controller, alive } = attempt;
+          // Stop came between a resend and its request: nothing more is sent.
           if (!alive()) return;
-          // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
-          if (redo) {
-            const lines = result.actions.length
-              ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
-              : [];
+          // Set when the user presses "Resend" on this attempt; the loop then runs the next one.
+          let replaced = false;
+          let wake: () => void = () => undefined;
+          const swapped = new Promise<void>(resolve => {
+            wake = resolve;
+          });
+          // The slow notice: no model event for FIRST_EVENT_WAIT_MS from the start of the wait. Any model event ends the watch;
+          // so does a mode where events cannot be seen at all (Claude json), where the notice would be a false alarm.
+          let watching = true;
+          let timer: number | null = null;
+          const stopWatching = (): void => {
+            watching = false;
+            if (timer !== null) window.clearTimeout(timer);
+            timer = null;
+          };
+          const modelEvent = (): void => {
+            stopWatching();
+            if (alive()) chat.clearSlow();
+          };
+          const resend = (): void => {
+            // Stop wins: an attempt that was stopped or replaced already cannot be replaced again.
+            if (!alive() || replaced || !watching) return;
+            replaced = true;
+            stopWatching();
+            this.releaseChatTask();
+            controller.abort();
+            attempt = openAttempt();
+            chat.restartWaiting();
+            wake();
+          };
+          timer = window.setTimeout(() => {
+            timer = null;
+            if (watching && alive() && !replaced) chat.showSlow(t("ui.map_chat_slow_0", modelName), resend);
+          }, FIRST_EVENT_WAIT_MS);
+          try {
+            const outcome = await Promise.race([
+              this.plugin.mapChat.chat(
+                request,
+                controller.signal,
+                text => {
+                  if (!alive()) return;
+                  modelEvent();
+                  chat.streamReply(text);
+                },
+                event => {
+                  if (!alive()) return;
+                  if (event.kind === "stream-mode") {
+                    if (event.mode !== "stream-json") stopWatching();
+                    return;
+                  }
+                  // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
+                  // runtime sends it for any `item/*`, including the echo of our own prompt (`userMessage`, about 3 s in), so it
+                  // proves nothing about the model. Codex text arrives through the reply callback above.
+                  if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
+                  // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
+                  if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+                }
+              ),
+              swapped.then(() => null)
+            ]);
+            stopWatching();
+            if (outcome === null) continue;
+            if (!alive()) return;
+            const result: MapChatResult = outcome;
+            // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
+            if (redo) {
+              const lines = result.actions.length
+                ? [{ status: "skipped" as const, text: t("ui.map_chat_redo_actions_ignored") }]
+                : [];
+              if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+              return;
+            }
+            const plan = result.actions.length
+              ? planFor(result.actions, request.context, {
+                  diagrams: this.plugin.settings.addDiagramsAfterResearch,
+                  mapAiMode: this.map?.aiMode
+                })
+              : null;
+            if (plan) {
+              // Nothing is touched until the user applies the plan.
+              if (chat.isBusy) {
+                chat.finish(result.reply, []);
+                this.offerChatPlan(
+                  result,
+                  plan,
+                  request.context,
+                  { path: anchor.path, id: anchor.id },
+                  request.message
+                );
+              }
+              return;
+            }
+            // A pure answer has nothing to apply: the reader is not told "applying" for it.
+            if (result.actions.length) chat.setStage("applying");
+            const lines = await this.applyMapChatActions(
+              { ...result, message: request.message },
+              request.context,
+              alive,
+              anchor
+            );
             if (alive() && chat.isBusy) chat.finish(result.reply, lines);
             return;
-          }
-          const plan = result.actions.length
-            ? planFor(result.actions, request.context, {
-                diagrams: this.plugin.settings.addDiagramsAfterResearch,
-                mapAiMode: this.map?.aiMode
-              })
-            : null;
-          if (plan) {
-            // Nothing is touched until the user applies the plan.
-            if (chat.isBusy) {
-              chat.finish(result.reply, []);
-              this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, request.message);
+          } catch (error) {
+            stopWatching();
+            // The attempt that was replaced reports nothing; a later one is already running.
+            if (replaced) continue;
+            if (alive()) {
+              const failure = this.chatErrorText(error);
+              chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
             }
             return;
+          } finally {
+            if (!replaced && this.chatController === controller) this.releaseChatTask();
           }
-          // A pure answer has nothing to apply: the reader is not told "applying" for it.
-          if (result.actions.length) chat.setStage("applying");
-          const lines = await this.applyMapChatActions(
-            { ...result, message: request.message },
-            request.context,
-            alive,
-            anchor
-          );
-          if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-        } catch (error) {
-          if (alive()) {
-            const failure = this.chatErrorText(error);
-            chat.fail(failure.text, failure.wrapped ? failure.text : undefined);
-          }
-        } finally {
-          if (this.chatController === controller) this.releaseChatTask();
         }
       });
     } catch (error) {
@@ -13312,6 +13400,7 @@ export class VisualAgentMapView extends ItemView {
               "previewSection",
               "previewInitialized",
               "status",
+              "lastError",
               "researchMode"
             ],
             t("ui.research_task")
@@ -13364,7 +13453,7 @@ export class VisualAgentMapView extends ItemView {
               exchangeId,
               t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
             );
-          await this.plugin.repo.updateNote(node.path, { status: "error" });
+          await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
           const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
           if (failed) failed(message);
           else new Notice(message);

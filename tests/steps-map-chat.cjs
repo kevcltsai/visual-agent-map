@@ -834,3 +834,106 @@ test('B3 progress hooks: Claude onFirstEvent and Codex onActivity reach the chat
   await assert.rejects(stopped.chat(request({ model: 'gpt-6-luna' }), stopper.signal, undefined, event => late.push(event)));
   assert.deepEqual(late, [], 'an event that arrives after Stop changes nothing');
 });
+
+// Ticket 18: whether Claude's events can be watched at all (json mode cannot) reaches the chat caller, so no false slow notice is shown.
+test('B3 progress hooks 18: the stream mode reaches the chat caller as a stream-mode event, and nothing after a stop', async () => {
+  const runtime = { runTask: async (...args) => { const controls = args[4]; controls.onStreamMode?.('json'); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
+  const events = [];
+  await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, undefined, event => events.push(event));
+  assert.deepEqual(JSON.parse(JSON.stringify(events)), [{ kind: 'stream-mode', mode: 'json' }]);
+  const stopper = new AbortController(); const late = [];
+  const slow = { runTask: async (...args) => { stopper.abort(); args[4].onStreamMode?.('json'); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const stopped = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, { ...options, codexRuntime: () => slow }, new Map())));
+  await assert.rejects(stopped.chat(request({ model: 'gpt-6-luna' }), stopper.signal, undefined, event => late.push(event)));
+  assert.deepEqual(late, []);
+});
+
+// Ticket 17: Codex streams its message text; the chat shows only the decoded `reply`, never the JSON around it.
+const explanation = 'I will answer now.';
+const codexTurn = async (texts, { model = 'gpt-6-luna', abortAfter = -1, answer = JSON.stringify({ reply: 'final', actions: [] }) } = {}) => {
+  const stopper = new AbortController(); const shown = []; const controlsSeen = [];
+  const runtime = { runTask: async (...args) => {
+    const controls = args[4]; controlsSeen.push(controls);
+    texts.forEach((text, i) => { if (i === abortAfter) stopper.abort(); controls.onText?.(text); });
+    // What the real runtime resolves to: with onText every message joined, unless the caller asked for the last item only.
+    return controls.onText && !controls.resolveLast ? [explanation, answer].join('\n\n') : answer;
+  } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
+  let result = null, error = null;
+  try { result = await service.chat(request({ model }), stopper.signal, text => shown.push(text)); } catch (e) { error = e; }
+  return { shown, controlsSeen, result: result && plain(result), error };
+};
+
+test('B4 Codex streaming: the reply field of the growing text reaches onReply; the result still comes from the final text', async () => {
+  const { shown, result } = await codexTurn(['{"reply":"He', '{"reply":"Hello wor', '{"reply":"Hello world","actions":[]}']);
+  assert.deepEqual(shown, ['He', 'Hello wor', 'Hello world']);
+  assert.equal(result.reply, 'final', 'the result is parsed from the final text, not from what was shown');
+});
+
+test('B4 Codex streaming counterexample: lead-in, JSON with no reply yet, or a cut JSON never put raw text on screen', async () => {
+  const { shown } = await codexTurn(['Here is', 'Here is the JSON:\n', 'Here is the JSON:\n{', 'Here is the JSON:\n{"rep', 'Here is the JSON:\n{"reply":"', 'Here is the JSON:\n{"reply":"Hi', 'Here is the JSON:\n{"reply":"Hi there","actions":[{"kind":"x"']);
+  assert.deepEqual(shown, ['Hi', 'Hi there']);
+  assert.ok(shown.every(text => !text.includes('{') && !text.includes('JSON')));
+});
+
+test('B4 Codex streaming counterexample: several message items (an explanation, an earlier JSON) are joined by a blank line and still decode the last reply', async () => {
+  const { shown } = await codexTurn([
+    'I will look at the map first.',
+    'I will look at the map first.\n\n{"reply":"Draft","actions":[]}',
+    'I will look at the map first.\n\n{"reply":"Draft","actions":[]}\n\n{',
+    'I will look at the map first.\n\n{"reply":"Draft","actions":[]}\n\n{"reply":"Better answer here',
+    '```json\n{\n  "reply": "Pretty",\n  "actions": [\n    {\n      "kind": "note"\n    }\n  ]\n}\n```'
+  ]);
+  assert.deepEqual(shown, ['Draft', 'Better answer here'], 'a shorter reading ("Pretty") never replaces a longer one on screen');
+});
+
+test('B4 Codex streaming: the shown text never goes backwards, and an unchanged reading is not repeated', async () => {
+  const { shown } = await codexTurn(['{"reply":"Hello there"}', '{"reply":"Hello there"}', '{"reply":"Hel', '{"reply":"Hello there, friend"}']);
+  assert.deepEqual(shown, ['Hello there', 'Hello there, friend']);
+});
+
+test('B4 Codex streaming: text that arrives after Stop changes nothing', async () => {
+  const { shown } = await codexTurn(['{"reply":"One', '{"reply":"One two', '{"reply":"One two three'], { abortAfter: 1 });
+  assert.deepEqual(shown, ['One']);
+});
+
+test('B4 Codex streaming: Claude models are not given onText; no listener means no hook', async () => {
+  assert.equal((await codexTurn(['x'], { model: 'claude:sonnet' })).controlsSeen[0].onText, undefined, 'Claude streams through onStructuredJson');
+  assert.equal(typeof (await codexTurn(['x'])).controlsSeen[0].onText, 'function');
+  const runtime = { runTask: async (...args) => { runtime.controls = args[4]; return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  await new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map()))).chat(request({ model: 'gpt-6-luna' }), new AbortController().signal);
+  assert.equal(runtime.controls.onText, undefined);
+});
+
+test('B4 Codex streaming: with an explanation item before the JSON, the final result still parses (the chat asks for the last message item only)', async () => {
+  const { result, error, controlsSeen } = await codexTurn(['I will answer now.', 'I will answer now.\n\n{"reply":"fin']);
+  assert.equal(error, null);
+  assert.equal(result.reply, 'final');
+  assert.equal(controlsSeen[0].resolveLast, true);
+});
+
+// ---- failure reason on error cards ----
+test('map chat context names the failure of an error card in the outline and in selected and references', () => {
+  const failed = outline.map(node => (node.id === 'a' ? { ...node, status: 'error', error: 'You hit your usage limit' } : node));
+  const ctx = JSON.parse(context({ outline: failed, selected: [topic('a', { status: 'error', error: 'You hit your usage limit' })], references: [topic('a', { status: 'error', error: 'x'.repeat(500) })] }).json);
+  assert.equal(ctx.outline.find(node => node.id === 'a').status, 'error');
+  assert.equal(ctx.outline.find(node => node.id === 'a').error, 'You hit your usage limit');
+  assert.equal(ctx.selected[0].status, 'error');
+  assert.equal(ctx.selected[0].error, 'You hit your usage limit');
+  assert.equal([...ctx.references[0].error].length, 200, 'a long reason is cut to 200 characters');
+});
+test('map chat context adds no status or error field to a card that did not fail', () => {
+  const ctx = JSON.parse(context({ selected: [topic('a')], references: [topic('b')] }).json);
+  for (const node of [...ctx.outline, ...ctx.selected, ...ctx.references]) {
+    assert.equal('status' in node, false);
+    assert.equal('error' in node, false);
+  }
+  const noReason = JSON.parse(context({ outline: outline.map(node => (node.id === 'a' ? { ...node, status: 'error' } : node)) }).json);
+  assert.equal(noReason.outline.find(node => node.id === 'a').status, 'error');
+  assert.equal('error' in noReason.outline.find(node => node.id === 'a'), false, 'no reason stored, none invented');
+  assert.equal(JSON.parse(context({ outline: outline.map(node => (node.id === 'a' ? { ...node, error: 'stray' } : node)) }).json).outline[1].error, undefined, 'error without status error is not sent');
+});

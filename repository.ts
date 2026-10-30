@@ -17,6 +17,7 @@ import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord } fro
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
+import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
 import type { PromptPreset } from "./ai/prompt-presets";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
@@ -46,10 +47,6 @@ export { normalizeReasoningLevel } from "./ai/task-policy";
 /** Saved map-chat answer length: anything but "detailed" is the default "concise". */
 export function normalizeMapChatStyle(value: unknown): "concise" | "detailed" {
   return value === "detailed" ? "detailed" : "concise";
-}
-/** Saved map-chat model: a trimmed string; empty (also for any non-string) follows the workspace default model. */
-export function normalizeMapChatModel(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 /** Saved width of the map chat's side window: a whole number from 280 to 560; anything else is the default. */
@@ -88,6 +85,8 @@ export interface Note {
   /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
   toneId?: string;
   detailFormatIssues: string[];
+  /** Why the last AI task on this note failed (frontmatter `last-error`); empty when none. */
+  lastError: string;
   status: Status;
   mapId: string;
   topicId: string;
@@ -123,8 +122,6 @@ export interface Settings {
   cliModel: string;
   /** Answer length of the map AI chat; remembered between sessions. */
   mapChatStyle: "concise" | "detailed";
-  /** Model of the map AI chat; empty follows cliModel. */
-  mapChatModel: string;
   /** Width in pixels of the map AI chat's side window (280 to 560); remembered between sessions. */
   mapChatWidth: number;
   /** Whether the side window was open when the map was last used; remembered between sessions. */
@@ -226,9 +223,8 @@ export const DEFAULT_SETTINGS: Settings = {
   mapId: "default",
   codexPath: "codex",
   claudePath: "claude",
-  cliModel: "gpt-5.6-luna",
+  cliModel: FALLBACK_MODEL,
   mapChatStyle: "concise",
-  mapChatModel: "",
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
   cliReasoning: "low",
@@ -334,6 +330,15 @@ function writeMapContent(content: string, map: MapDocument): string {
 }
 function marker(value: unknown): boolean {
   return value === true || value === "true";
+}
+/** Longest `last-error` stored in a note. */
+export const LAST_ERROR_LIMIT = 300;
+/** The failure reason kept on a note: the raw error message, whitespace collapsed, cut to {@link LAST_ERROR_LIMIT}. */
+export function failureReason(error: unknown): string {
+  const raw = (error as { message?: unknown } | null | undefined)?.message;
+  const message = (typeof raw === "string" ? raw : String(error)).replace(/\s+/g, " ").trim();
+  const characters = [...message];
+  return characters.length > LAST_ERROR_LIMIT ? `${characters.slice(0, LAST_ERROR_LIMIT - 1).join("")}…` : message;
 }
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -1064,17 +1069,22 @@ export class Repository {
   /**
    * The model a topic actually runs on. The stored `model:` is a creation-time snapshot and is never rewritten:
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
-   * and otherwise the current setting.
+   * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
   private async effectiveModel(
     path: string,
     stored: string | undefined,
     source: ModelSource,
-    map?: MapDocument
-  ): Promise<string> {
-    const current = this.settings.cliModel;
-    if (source === "manual") return stored || current;
-    if (source === "workspace") return current;
+    map?: MapDocument,
+    storedReasoning?: string
+  ): Promise<{ model: string; overridden: boolean; reasoning?: string }> {
+    if (source === "manual")
+      return {
+        model: stored || this.settings.cliModel,
+        overridden: Boolean(stored),
+        reasoning: storedReasoning || undefined
+      };
+    if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
     let owner = map?.nodes.some(node => node.path === path) ? map : undefined;
     if (!owner) {
       for (const file of await this.mapFiles()) {
@@ -1098,13 +1108,38 @@ export class Repository {
       if (!parent) break;
       try {
         const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text(fm.model)) return text(fm.model);
+        if (fm["model-source"] === "manual" && text(fm.model))
+          return { model: text(fm.model), overridden: true, reasoning: text(fm["reasoning-level"]) || undefined };
       } catch {
         /* A missing ancestor note is skipped. */
       }
       node = parent;
     }
-    return current;
+    return { model: this.settings.cliModel, overridden: false };
+  }
+
+  /**
+   * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
+   * model. Reasoning follows the current setting until MS-04 moves it into the same resolution.
+   */
+  async resolveTopicModel(
+    path: string,
+    map?: MapDocument,
+    runOnce?: { model: string; reasoning?: ReasoningLevel } | null
+  ): Promise<ReturnType<typeof resolveTaskModel>> {
+    const note = this.file(path);
+    const fm = frontmatter(await this.app.vault.read(note));
+    const raw = text(fm["model-source"], "workspace");
+    const source: ModelSource = raw === "manual" || raw === "inherited" ? raw : "workspace";
+    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
+    const effective = await this.effectiveModel(path, text(fm.model), source, map, text(fm["reasoning-level"]));
+    // The override brings its own reasoning (the manual topic's, or its manual ancestor's); only a missing value falls back.
+    const overrideReasoning = normalizeReasoningLevel(effective.reasoning ?? this.settings.cliReasoning);
+    return resolveTaskModel({
+      runOnce,
+      override: effective.overridden ? { model: effective.model, reasoning: overrideReasoning } : null,
+      current
+    });
   }
 
   /**
@@ -1117,7 +1152,7 @@ export class Repository {
   ): Promise<{ source: Exclude<ModelSource, "manual">; model: string }> {
     const node = map?.nodes.find(item => item.path === path);
     if (!node?.parentId) return { source: "workspace", model: this.settings.cliModel };
-    return { source: "inherited", model: await this.effectiveModel(path, undefined, "inherited", map) };
+    return { source: "inherited", model: (await this.effectiveModel(path, undefined, "inherited", map)).model };
   }
 
   async readNote(path: string, map?: MapDocument): Promise<Note> {
@@ -1130,7 +1165,7 @@ export class Repository {
     const modelSource: ModelSource = ["workspace", "inherited", "manual"].includes(source)
       ? (source as ModelSource)
       : "workspace";
-    const model = await this.effectiveModel(path, text(fm.model), modelSource, map);
+    const { model } = await this.effectiveModel(path, text(fm.model), modelSource, map);
     const state = text(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -1149,6 +1184,7 @@ export class Repository {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
+      // Reasoning stays as before; MS-04 moves it into the same resolution as the model.
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
@@ -1163,6 +1199,7 @@ export class Repository {
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
+      lastError: text(fm["last-error"]),
       status: ["idea", "running", "completed", "error"].includes(normalized) ? (normalized as Status) : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -1207,6 +1244,10 @@ export class Repository {
         patch.detailFormatIssues.length
           ? (fm["detail-format-issues"] = patch.detailFormatIssues)
           : delete fm["detail-format-issues"];
+      // A completed write ends the failure it follows; running leaves it (a stopped run restores the old status).
+      if (patch.lastError !== undefined)
+        patch.lastError ? (fm["last-error"] = patch.lastError) : delete fm["last-error"];
+      else if (patch.status === "completed") delete fm["last-error"];
       if (patch.mapId !== undefined) patch.mapId ? (fm["agent-map-id"] = patch.mapId) : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? (fm["topic-id"] = patch.topicId) : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;

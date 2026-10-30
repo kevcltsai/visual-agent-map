@@ -1,6 +1,7 @@
 import { titleProblemText } from "./title-check";
 import { App, Modal, Setting } from "obsidian";
 import { randomUUID } from "node:crypto";
+import { FALLBACK_MODEL } from "../../ai/model-resolution";
 import {
   FOLLOW_INPUT_ID,
   getUiLanguage,
@@ -38,7 +39,7 @@ export class AimStartModal extends Modal {
     app: App,
     private submit: (input: AimStartInput) => Promise<void>,
     private models: ModelChoice[] = [],
-    private defaultModel = "gpt-6-luna",
+    private defaultModel = FALLBACK_MODEL,
     private defaultReasoning: "low" | "medium" | "high" = "low",
     private refreshModels?: () => Promise<ModelRefreshResult>
   ) {

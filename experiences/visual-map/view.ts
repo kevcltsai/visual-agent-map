@@ -45,6 +45,7 @@ import {
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { providerForModel } from "../../ai/providers/provider";
+import { FALLBACK_MODEL } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -1350,7 +1351,7 @@ export class VisualAgentMapView extends ItemView {
     const epoch = this.aimViewEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === epoch;
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
-    const configuredModel = this.plugin.settings.cliModel?.trim() || "gpt-5.6-luna";
+    const configuredModel = this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
     const defaultReasoning =
       configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";

@@ -18329,6 +18329,19 @@ ${ordered.join("\n")}
   ].join("\n");
 }
 
+// ai/model-resolution.ts
+var FALLBACK_MODEL = "gpt-5.6-luna";
+function resolveTaskModel(input) {
+  var _a2, _b2, _c, _d, _e, _f;
+  const once = (_b2 = (_a2 = input.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
+  if (once) {
+    return { model: once, reasoning: (_d = (_c = input.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input.current.reasoning, origin: "run-once" };
+  }
+  const own = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
+  if (input.override && own) return { model: own, reasoning: input.override.reasoning, origin: "override" };
+  return { model: input.current.model, reasoning: input.current.reasoning, origin: "current" };
+}
+
 // ui/modals/name-modal.ts
 var import_obsidian11 = require("obsidian");
 
@@ -19250,7 +19263,7 @@ var DEFAULT_SETTINGS = {
   mapId: "default",
   codexPath: "codex",
   claudePath: "claude",
-  cliModel: "gpt-5.6-luna",
+  cliModel: FALLBACK_MODEL,
   mapChatStyle: "concise",
   mapChatModel: "",
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
@@ -19943,12 +19956,11 @@ var Repository = class {
   /**
    * The model a topic actually runs on. The stored `model:` is a creation-time snapshot and is never rewritten:
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
-   * and otherwise the current setting.
+   * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
   async effectiveModel(path, stored, source, map) {
-    const current = this.settings.cliModel;
-    if (source === "manual") return stored || current;
-    if (source === "workspace") return current;
+    if (source === "manual") return { model: stored || this.settings.cliModel, overridden: Boolean(stored) };
+    if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
     let owner = (map == null ? void 0 : map.nodes.some((node2) => node2.path === path)) ? map : void 0;
     if (!owner) {
       for (const file of await this.mapFiles()) {
@@ -19971,12 +19983,29 @@ var Repository = class {
       if (!parent) break;
       try {
         const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model)) return text5(fm.model);
+        if (fm["model-source"] === "manual" && text5(fm.model)) return { model: text5(fm.model), overridden: true };
       } catch (e) {
       }
       node = parent;
     }
-    return current;
+    return { model: this.settings.cliModel, overridden: false };
+  }
+  /**
+   * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
+   * model. Reasoning follows the current setting until MS-04 moves it into the same resolution.
+   */
+  async resolveTopicModel(path, map, runOnce) {
+    const note = this.file(path);
+    const fm = frontmatter(await this.app.vault.read(note));
+    const raw = text5(fm["model-source"], "workspace");
+    const source = raw === "manual" || raw === "inherited" ? raw : "workspace";
+    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
+    const effective = await this.effectiveModel(path, text5(fm.model), source, map);
+    return resolveTaskModel({
+      runOnce,
+      override: effective.overridden ? { model: effective.model, reasoning: current.reasoning } : null,
+      current
+    });
   }
   /**
    * What "follow the default" resolves to for a topic: a root follows the workspace model, a child follows its upper
@@ -19985,7 +20014,7 @@ var Repository = class {
   async followDefaultModel(path, map) {
     const node = map == null ? void 0 : map.nodes.find((item) => item.path === path);
     if (!(node == null ? void 0 : node.parentId)) return { source: "workspace", model: this.settings.cliModel };
-    return { source: "inherited", model: await this.effectiveModel(path, void 0, "inherited", map) };
+    return { source: "inherited", model: (await this.effectiveModel(path, void 0, "inherited", map)).model };
   }
   async readNote(path, map) {
     var _a2;
@@ -19994,7 +20023,7 @@ var Repository = class {
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const model = await this.effectiveModel(path, text5(fm.model), modelSource, map);
+    const { model } = await this.effectiveModel(path, text5(fm.model), modelSource, map);
     const state = text5(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -20013,6 +20042,7 @@ var Repository = class {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
+      // Reasoning stays as before; MS-04 moves it into the same resolution as the model.
       reasoning: normalizeReasoningLevel((_a2 = fm["reasoning-level"]) != null ? _a2 : this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
@@ -33762,7 +33792,7 @@ var TopicTreeModal = class extends import_obsidian24.Modal {
 var import_obsidian25 = require("obsidian");
 var import_node_crypto8 = require("node:crypto");
 var AimStartModal = class extends import_obsidian25.Modal {
-  constructor(app, submit, models = [], defaultModel = "gpt-6-luna", defaultReasoning = "low", refreshModels) {
+  constructor(app, submit, models = [], defaultModel = FALLBACK_MODEL, defaultReasoning = "low", refreshModels) {
     super(app);
     this.submit = submit;
     this.models = models;
@@ -36499,7 +36529,7 @@ ${delivery.evidence}` },
         }
       );
       if (existing) continue;
-      const model = (_h = attempt.model) != null ? _h : "gpt-6-luna", reasoning = (_i = attempt.reasoningLevel) != null ? _i : "low";
+      const model = (_h = attempt.model) != null ? _h : this.repository.settings.cliModel, reasoning = (_i = attempt.reasoningLevel) != null ? _i : "low";
       const answerOptions = normalizePersistedAnswerOptions(review.answerOptions);
       const saved = await this.saveManualQuestion(
         mapPath,
@@ -36555,7 +36585,7 @@ ${delivery.evidence}` },
     const explorationTarget = (_f = (_e = map.aim) == null ? void 0 : _e.minimumAnswersBeforeConclusion) != null ? _f : 2;
     const answeredQuestionCount = this.answerCountInLineage(map, branch.id);
     const floor = this.floorFor(topic.detail, map);
-    const model = priorAttempt.model || diagnostic.model || "gpt-6-luna";
+    const model = priorAttempt.model || diagnostic.model || this.repository.settings.cliModel;
     const taskDefaults = {
       timeoutMs: branch.retryTimeoutMs,
       title: topic.title,
@@ -36916,7 +36946,7 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     const floor = this.floorFor(topicNote.detail, map);
     const explorationTarget = (_d = (_c = map.aim) == null ? void 0 : _c.minimumAnswersBeforeConclusion) != null ? _d : 2;
     const questionsAlreadyAsked = await this.questionHistory(map, branch.id);
-    const modelToUse = (model == null ? void 0 : model.trim()) || priorAttempt.model || "gpt-6-luna";
+    const modelToUse = (model == null ? void 0 : model.trim()) || priorAttempt.model || this.repository.settings.cliModel;
     const taskDefaults = {
       timeoutMs: branch.retryTimeoutMs,
       title: topicNote.title,
@@ -39755,7 +39785,7 @@ var _AimRunStore = class _AimRunStore {
         if (draft.status === "creating") {
           await this.repository.createNoteAt(
             draft.title,
-            (_d = draft.model) != null ? _d : "gpt-6-luna",
+            (_d = draft.model) != null ? _d : this.repository.settings.cliModel,
             map,
             mapPath,
             "inherited",
@@ -40949,7 +40979,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     const epoch = this.aimViewEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === epoch;
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
-    const configuredModel = ((_a2 = this.plugin.settings.cliModel) == null ? void 0 : _a2.trim()) || "gpt-5.6-luna";
+    const configuredModel = ((_a2 = this.plugin.settings.cliModel) == null ? void 0 : _a2.trim()) || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
     const defaultReasoning = configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
     const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];

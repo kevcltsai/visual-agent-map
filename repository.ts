@@ -17,6 +17,7 @@ import { MapDocument, MapNode, serializeMap, parseMap, type AimReuseRecord } fro
 import type { CoffeeStyle } from "./experiences/coffee-tables/types";
 import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
+import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
 import type { PromptPreset } from "./ai/prompt-presets";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
@@ -227,7 +228,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mapId: "default",
   codexPath: "codex",
   claudePath: "claude",
-  cliModel: "gpt-5.6-luna",
+  cliModel: FALLBACK_MODEL,
   mapChatStyle: "concise",
   mapChatModel: "",
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
@@ -1074,17 +1075,16 @@ export class Repository {
   /**
    * The model a topic actually runs on. The stored `model:` is a creation-time snapshot and is never rewritten:
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
-   * and otherwise the current setting.
+   * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
   private async effectiveModel(
     path: string,
     stored: string | undefined,
     source: ModelSource,
     map?: MapDocument
-  ): Promise<string> {
-    const current = this.settings.cliModel;
-    if (source === "manual") return stored || current;
-    if (source === "workspace") return current;
+  ): Promise<{ model: string; overridden: boolean }> {
+    if (source === "manual") return { model: stored || this.settings.cliModel, overridden: Boolean(stored) };
+    if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
     let owner = map?.nodes.some(node => node.path === path) ? map : undefined;
     if (!owner) {
       for (const file of await this.mapFiles()) {
@@ -1108,13 +1108,35 @@ export class Repository {
       if (!parent) break;
       try {
         const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text(fm.model)) return text(fm.model);
+        if (fm["model-source"] === "manual" && text(fm.model)) return { model: text(fm.model), overridden: true };
       } catch {
         /* A missing ancestor note is skipped. */
       }
       node = parent;
     }
-    return current;
+    return { model: this.settings.cliModel, overridden: false };
+  }
+
+  /**
+   * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
+   * model. Reasoning follows the current setting until MS-04 moves it into the same resolution.
+   */
+  async resolveTopicModel(
+    path: string,
+    map?: MapDocument,
+    runOnce?: { model: string; reasoning?: ReasoningLevel } | null
+  ): Promise<ReturnType<typeof resolveTaskModel>> {
+    const note = this.file(path);
+    const fm = frontmatter(await this.app.vault.read(note));
+    const raw = text(fm["model-source"], "workspace");
+    const source: ModelSource = raw === "manual" || raw === "inherited" ? raw : "workspace";
+    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
+    const effective = await this.effectiveModel(path, text(fm.model), source, map);
+    return resolveTaskModel({
+      runOnce,
+      override: effective.overridden ? { model: effective.model, reasoning: current.reasoning } : null,
+      current
+    });
   }
 
   /**
@@ -1127,7 +1149,7 @@ export class Repository {
   ): Promise<{ source: Exclude<ModelSource, "manual">; model: string }> {
     const node = map?.nodes.find(item => item.path === path);
     if (!node?.parentId) return { source: "workspace", model: this.settings.cliModel };
-    return { source: "inherited", model: await this.effectiveModel(path, undefined, "inherited", map) };
+    return { source: "inherited", model: (await this.effectiveModel(path, undefined, "inherited", map)).model };
   }
 
   async readNote(path: string, map?: MapDocument): Promise<Note> {
@@ -1140,7 +1162,7 @@ export class Repository {
     const modelSource: ModelSource = ["workspace", "inherited", "manual"].includes(source)
       ? (source as ModelSource)
       : "workspace";
-    const model = await this.effectiveModel(path, text(fm.model), modelSource, map);
+    const { model } = await this.effectiveModel(path, text(fm.model), modelSource, map);
     const state = text(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -1159,6 +1181,7 @@ export class Repository {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
+      // Reasoning stays as before; MS-04 moves it into the same resolution as the model.
       reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",

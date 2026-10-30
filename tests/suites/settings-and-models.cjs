@@ -164,3 +164,52 @@ test('saved content templates are normalized with the same call onload uses', ()
   assert.deepEqual(plain(templates.normalizeTemplates(undefined)), []);
   assert.deepEqual(plain(DEFAULT_SETTINGS.detailTemplates), []);
 });
+// model resolution (MS-01): run-once, then topic override (inherited upward), then the current model
+const modelResolution = load('ai/model-resolution.ts');
+const resolveInput = (extra = {}) => ({ current: { model: 'cur', reasoning: 'low' }, ...extra });
+test('model resolution: run-once beats override and current, and keeps current reasoning when none is given', () => {
+  const out = modelResolution.resolveTaskModel(resolveInput({ runOnce: { model: 'once' }, override: { model: 'ov', reasoning: 'high' } }));
+  assert.deepEqual(plain(out), { model: 'once', reasoning: 'low', origin: 'run-once' });
+  const withReasoning = modelResolution.resolveTaskModel(resolveInput({ runOnce: { model: 'once', reasoning: 'medium' } }));
+  assert.equal(withReasoning.reasoning, 'medium');
+});
+test('model resolution: override beats current', () => {
+  const out = modelResolution.resolveTaskModel(resolveInput({ override: { model: 'ov', reasoning: 'high' } }));
+  assert.deepEqual(plain(out), { model: 'ov', reasoning: 'high', origin: 'override' });
+});
+test('model resolution: current is used when nothing else is set', () => {
+  assert.deepEqual(plain(modelResolution.resolveTaskModel(resolveInput())), { model: 'cur', reasoning: 'low', origin: 'current' });
+});
+test('model resolution: an empty run-once model does not count and falls to override then current', () => {
+  const withOverride = modelResolution.resolveTaskModel(resolveInput({ runOnce: { model: '' }, override: { model: 'ov', reasoning: 'low' } }));
+  assert.equal(withOverride.origin, 'override');
+  const whitespace = modelResolution.resolveTaskModel(resolveInput({ runOnce: { model: '  ' } }));
+  assert.equal(whitespace.origin, 'current');
+});
+test('model resolution: the single fallback constant is the default current model', () => {
+  assert.equal(modelResolution.FALLBACK_MODEL, DEFAULT_SETTINGS.cliModel);
+});
+test('model resolution: a manual topic without a stored model resolves to current', async () => {
+  const { fixture, topicNote } = require('../support.cjs');
+  const { repo } = fixture('en'); repo.settings.cliModel = 'cur-model';
+  const note = await topicNote(repo, 'T', 'stored');
+  await repo.updateNote(note.path, { modelSource: 'manual', model: '' });
+  const out = await repo.resolveTopicModel(note.path);
+  assert.equal(out.model, 'cur-model'); assert.equal(out.origin, 'current');
+});
+test('model resolution: inherited with no manual ancestor resolves to current; manual ancestor is an override', async () => {
+  const support = require('../support.cjs');
+  const { repo, app } = support.fixture('en'); repo.settings.cliModel = 'cur-model';
+  const root = await support.topicNote(repo, 'Root', 'gpt-5.5');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', map = support.map([root]); map.id = 'map-a';
+  await app.vault.create(mapPath, support.core.serializeMap(map));
+  const child = await repo.createNote('Child', 'gpt-5.5', map, mapPath, 'inherited');
+  child.parentId = root.id; map.nodes.push(child);
+  const none = await repo.resolveTopicModel(child.path, map);
+  assert.equal(none.model, 'cur-model'); assert.equal(none.origin, 'current');
+  await repo.updateNote(root.path, { model: 'anc-model', modelSource: 'manual' });
+  const inherited = await repo.resolveTopicModel(child.path, map);
+  assert.equal(inherited.model, 'anc-model'); assert.equal(inherited.origin, 'override');
+  const once = await repo.resolveTopicModel(child.path, map, { model: 'once-model' });
+  assert.equal(once.origin, 'run-once');
+});

@@ -1043,7 +1043,6 @@ var en = {
   "ui.map_chat_more_detail": "Say it in more detail",
   "ui.map_chat_more_detail_asked": "Say it in more detail.",
   "ui.map_chat_redo_actions_ignored": "Actions are not applied again in a more-detail answer.",
-  "ui.map_chat_replying": "The AI is replying\u2026",
   "ui.map_chat_stopped": "Stopped.",
   "ui.map_chat_overflow_note": "Content too long; the rest is shown as plain text.",
   "ui.map_chat_remove_ref_0": "Remove reference: {0}",
@@ -1183,6 +1182,9 @@ var en = {
   "ui.map_chat_plan_title_applied": "Applied plan",
   "ui.map_chat_plan_title_cancelled": "Cancelled plan",
   "ui.map_chat_applying": "Applying the plan\u2026",
+  "ui.map_chat_stage_waiting": "Waiting for the model",
+  "ui.map_chat_stage_writing": "Writing",
+  "ui.map_chat_stage_applying": "Applying",
   "ui.map_chat_skip_stopped": "you stopped it",
   "ui.map_chat_live_plan_0": "A plan is waiting for you: {0}",
   "ui.map_chat_model_follow_short_0": "Default: {0}",
@@ -3067,7 +3069,6 @@ var zhCN = {
   "ui.map_chat_more_detail": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9",
   "ui.map_chat_more_detail_asked": "\u8BF4\u8BE6\u7EC6\u4E00\u70B9\u3002",
   "ui.map_chat_redo_actions_ignored": "\u8BE6\u7EC6\u7248\u56DE\u7B54\u4E0D\u4F1A\u518D\u6B21\u5E94\u7528\u64CD\u4F5C\u3002",
-  "ui.map_chat_replying": "AI \u6B63\u5728\u56DE\u590D\u2026",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_overflow_note": "\u5185\u5BB9\u8FC7\u957F\uFF0C\u4EE5\u4E0B\u4EE5\u7EAF\u6587\u672C\u663E\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -3207,6 +3208,9 @@ var zhCN = {
   "ui.map_chat_plan_title_applied": "\u5DF2\u5E94\u7528\u7684\u8BA1\u5212",
   "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8BA1\u5212",
   "ui.map_chat_applying": "\u6B63\u5728\u5E94\u7528\u8BA1\u5212\u2026",
+  "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
+  "ui.map_chat_stage_writing": "\u64B0\u5199\u4E2D",
+  "ui.map_chat_stage_applying": "\u5E94\u7528\u4E2D",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8BA1\u5212\u7B49\u4F60\u786E\u8BA4\uFF1A{0}",
   "ui.map_chat_model_follow_short_0": "\u9ED8\u8BA4\uFF1A{0}",
@@ -5091,7 +5095,6 @@ var zhTW = {
   "ui.map_chat_more_detail": "\u8AAA\u8A73\u7D30\u4E00\u9EDE",
   "ui.map_chat_more_detail_asked": "\u8AAA\u8A73\u7D30\u4E00\u9EDE\u3002",
   "ui.map_chat_redo_actions_ignored": "\u8A73\u7D30\u7248\u56DE\u7B54\u4E0D\u6703\u518D\u6B21\u5957\u7528\u52D5\u4F5C\u3002",
-  "ui.map_chat_replying": "AI \u6B63\u5728\u56DE\u8986\u2026",
   "ui.map_chat_stopped": "\u5DF2\u505C\u6B62\u3002",
   "ui.map_chat_overflow_note": "\u5167\u5BB9\u904E\u9577\uFF0C\u4EE5\u4E0B\u4EE5\u7D14\u6587\u5B57\u986F\u793A",
   "ui.map_chat_remove_ref_0": "\u79FB\u9664\u5F15\u7528\uFF1A{0}",
@@ -5231,6 +5234,9 @@ var zhTW = {
   "ui.map_chat_plan_title_applied": "\u5DF2\u5957\u7528\u7684\u8A08\u756B",
   "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8A08\u756B",
   "ui.map_chat_applying": "\u6B63\u5728\u5957\u7528\u8A08\u756B\u2026",
+  "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
+  "ui.map_chat_stage_writing": "\u64B0\u5BEB\u4E2D",
+  "ui.map_chat_stage_applying": "\u5957\u7528\u4E2D",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8A08\u756B\u7B49\u4F60\u78BA\u8A8D\uFF1A{0}",
   "ui.map_chat_model_follow_short_0": "\u9810\u8A2D\uFF1A{0}",
@@ -22053,6 +22059,7 @@ function settledLine(line) {
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
   }
 }
+var STAGE_ORDER = { waiting: 0, writing: 1, applying: 2 };
 var LABEL_LIMIT = 40;
 var clip = (value, limit = LABEL_LIMIT) => {
   const text11 = value.replace(/\s+/g, " ").trim();
@@ -22147,6 +22154,12 @@ var MapChatPanel = class {
     __publicField(this, "rows", /* @__PURE__ */ new WeakMap());
     /** The animation frame that will lay out the streaming message, if one is waiting. */
     __publicField(this, "frame", null);
+    /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
+    __publicField(this, "stage", null);
+    /** The stage line inside the AI bubble, with the two texts that change. */
+    __publicField(this, "stageEls", null);
+    /** The one-second timer that rewrites the seconds (only their text). */
+    __publicField(this, "stageTimer", null);
     /** Whether the body was showing at the last applyOpen, to tell the moment it opens. */
     __publicField(this, "wasShown", false);
     /** The scroll to the end that waits for the overlay's height to be final. */
@@ -22285,6 +22298,7 @@ var MapChatPanel = class {
     this.stopWatching = null;
     (_b2 = this.stopResizing) == null ? void 0 : _b2.call(this);
     this.cancelFrame();
+    this.clearStage();
     this.rows = /* @__PURE__ */ new WeakMap();
   }
   /** Takes the panel out of the page; the next {@link mount} puts it back with all state intact. */
@@ -22414,9 +22428,79 @@ var MapChatPanel = class {
     this.messages.push({ role: "user", text: userText, lines: [], ...origin ? { origin } : {} });
     this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
     this.busy = true;
+    this.stage = { kind: "waiting", since: this.clockNow() };
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
     this.renderBusy();
+    this.startStageTimer();
+    this.speakStage();
+  }
+  clockNow() {
+    var _a2, _b2, _c;
+    return (_c = (_b2 = (_a2 = this.host).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : Date.now();
+  }
+  /**
+   * The turn moved on to a later stage (a model event, or its actions are being applied). A stage never goes back, an event
+   * that arrives with no turn running changes nothing, and the new name is said once through the live region.
+   */
+  setStage(kind) {
+    const current = this.stage;
+    if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
+    this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
+    this.paintStage();
+    this.speakStage();
+  }
+  stageLabel(kind) {
+    return t(`ui.map_chat_stage_${kind}`);
+  }
+  elapsedText() {
+    const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
+    return t(
+      "ui.aim_stage_with_elapsed_0_1",
+      "",
+      `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+    );
+  }
+  /** The stage line lives in the last AI message while a turn runs, or while its plan is being applied. */
+  stageMessage() {
+    if (!this.stage) return null;
+    const last = this.messages.at(-1);
+    return (last == null ? void 0 : last.role) === "assistant" ? last : null;
+  }
+  /** Rewrites the texts of the stage line that is on screen (never the row), and shrinks it once the reply has text. */
+  paintStage() {
+    var _a2;
+    const els = this.stageEls;
+    const stage = this.stage;
+    if (!els || !stage) return;
+    els.label.setText(this.stageLabel(stage.kind));
+    els.elapsed.setText(this.elapsedText());
+    els.box.toggleClass("is-compact", !!((_a2 = this.stageMessage()) == null ? void 0 : _a2.text));
+  }
+  speakStage() {
+    if (this.built && this.stage) this.liveEl.setText(this.stageLabel(this.stage.kind));
+  }
+  startStageTimer() {
+    var _a2, _b2, _c;
+    if (!this.built || this.stageTimer) return;
+    const win = (_c = (_b2 = this.logEl.win) != null ? _b2 : (_a2 = this.logEl.ownerDocument) == null ? void 0 : _a2.defaultView) != null ? _c : typeof window !== "undefined" ? window : void 0;
+    if (typeof (win == null ? void 0 : win.setInterval) !== "function") return;
+    const id = win.setInterval(() => {
+      var _a3;
+      return (_a3 = this.stageEls) == null ? void 0 : _a3.elapsed.setText(this.elapsedText());
+    }, 1e3);
+    this.stageTimer = { cancel: () => {
+      var _a3;
+      return (_a3 = win.clearInterval) == null ? void 0 : _a3.call(win, id);
+    } };
+  }
+  /** The turn ended (an answer, a failure, Stop, a reset): no stage, no seconds, no timer. */
+  clearStage() {
+    var _a2;
+    this.stage = null;
+    this.stageEls = null;
+    (_a2 = this.stageTimer) == null ? void 0 : _a2.cancel();
+    this.stageTimer = null;
   }
   /** Every list of choices already shown stops working (a pick was made, or a newer message came). */
   retireChoices(except) {
@@ -22427,17 +22511,25 @@ var MapChatPanel = class {
   setApplying(on) {
     if (this.applying === on) return;
     this.applying = on;
+    if (on) {
+      this.stage = { kind: "applying", since: this.clockNow() };
+    } else this.clearStage();
     this.renderLog();
     this.renderBusy();
+    if (on) {
+      this.startStageTimer();
+      this.speakStage();
+    }
   }
   /** The answer so far (the whole text, not a delta). */
   streamReply(text11) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const last = this.messages.at(-1);
     if (!last || !last.streaming) return;
     last.text = text11;
+    if (text11 && ((_a2 = this.stage) == null ? void 0 : _a2.kind) === "waiting") this.setStage("writing");
     if (!this.built || this.frame) return;
-    const win = (_c = (_b2 = this.logEl.win) != null ? _b2 : (_a2 = this.logEl.ownerDocument) == null ? void 0 : _a2.defaultView) != null ? _c : typeof window !== "undefined" ? window : void 0;
+    const win = (_d = (_c = this.logEl.win) != null ? _c : (_b2 = this.logEl.ownerDocument) == null ? void 0 : _b2.defaultView) != null ? _d : typeof window !== "undefined" ? window : void 0;
     if (typeof (win == null ? void 0 : win.requestAnimationFrame) !== "function") {
       this.layoutStreaming();
       return;
@@ -22453,11 +22545,13 @@ var MapChatPanel = class {
   }
   /** Lays the streaming message out with the text it has now; no other message is touched. */
   layoutStreaming() {
+    var _a2;
     const last = this.messages.at(-1);
     const entry = last ? this.rows.get(last) : void 0;
     if (!last || !last.streaming || !entry) return;
     const stick = this.atEnd();
     renderChatMarkdown(entry.body, last.text, t("ui.map_chat_overflow_note"));
+    (_a2 = this.stageEls) == null ? void 0 : _a2.box.toggleClass("is-compact", !!last.text);
     entry.key = this.rowKey(last);
     if (stick) this.scrollToEnd();
   }
@@ -22475,6 +22569,7 @@ var MapChatPanel = class {
       last.streaming = false;
     }
     this.busy = false;
+    this.clearStage();
     this.renderLog();
     this.renderBusy();
     this.announce(this.spokenTurn(reply, lines));
@@ -22489,6 +22584,7 @@ var MapChatPanel = class {
       last.streaming = false;
     }
     this.busy = false;
+    this.clearStage();
     this.renderLog();
     this.renderBusy();
     this.announce(announce !== void 0 ? clip(announce, 160) : t("ui.map_chat_live_failed_0", clip(text11, 160)));
@@ -22506,6 +22602,7 @@ var MapChatPanel = class {
       last.streaming = false;
     }
     this.busy = false;
+    this.clearStage();
     this.renderLog();
     this.renderBusy();
     this.announce(t("ui.map_chat_stopped"));
@@ -22604,6 +22701,7 @@ var MapChatPanel = class {
     this.noteChip = null;
     this.busy = false;
     this.applying = false;
+    this.clearStage();
     this.unread = false;
     if (this.built) this.inputEl.value = "";
     this.renderLog();
@@ -23138,6 +23236,8 @@ ${text11}` : text11;
       message.role,
       message.error ? "e" : "",
       message.streaming ? "s" : "",
+      // Only whether the stage line is there (its words and seconds change in place, never the row).
+      this.stageMessage() === message ? "p" : "",
       more ? "m" : "",
       this.canRetry(message, asked) ? "r" : "",
       message.linesOpen ? "o" : "",
@@ -23217,6 +23317,7 @@ ${text11}` : text11;
     const body = row.createDiv({ cls: `vam-map-chat-text${markdown ? " is-markdown" : ""}` });
     if (markdown) renderChatMarkdown(body, message.text, t("ui.map_chat_overflow_note"));
     else body.setText(message.text);
+    if (this.stage && this.stageMessage() === message) this.buildStage(row, message);
     if (message.plan) this.buildPlan(row, message.plan);
     if (message.choices) this.buildChoices(row, message.choices);
     if (message.lines.length) this.buildLines(row, message);
@@ -23249,6 +23350,15 @@ ${text11}` : text11;
       });
     }
     return { row, body, more };
+  }
+  /** The stage line of the running turn: the stage name, then the seconds (hidden from screen readers; they tick). */
+  buildStage(row, message) {
+    const box = row.createDiv({ cls: `vam-map-chat-progress${message.text ? " is-compact" : ""}` });
+    const label = box.createSpan({ cls: "vam-map-chat-progress-stage" });
+    const elapsed = box.createSpan({ cls: "vam-map-chat-progress-elapsed" });
+    elapsed.setAttr("aria-hidden", "true");
+    this.stageEls = { box, label, elapsed };
+    this.paintStage();
   }
   /**
    * One line per action. More than five fold into a count (the closing "cannot be undone" note stays); each line says what
@@ -23511,7 +23621,7 @@ ${text11}` : text11;
   renderBusy() {
     var _a2, _b2;
     if (!this.built) return;
-    this.statusEl.setText(this.busy ? t("ui.map_chat_replying") : this.applying ? t("ui.map_chat_applying") : "");
+    this.statusEl.setText(this.applying ? t("ui.map_chat_applying") : "");
     this.el.toggleClass("is-busy", this.working);
     this.sendEl.hidden = this.working;
     this.sendEl.toggleClass("is-hidden", this.working);
@@ -28905,7 +29015,7 @@ var StructureReviewModal = class extends import_obsidian23.Modal {
 // core/provider-step-runner.ts
 var stepEffort = (reasoning) => reasoning === "auto" ? "low" : reasoning;
 function providerStepRunner(aiCalls, config) {
-  return (request, signal, prepared, onStructuredJson) => aiCalls.run(
+  return (request, signal, prepared, onStructuredJson, hooks) => aiCalls.run(
     prepared,
     {
       model: request.model,
@@ -28923,7 +29033,9 @@ function providerStepRunner(aiCalls, config) {
         textOnly: true,
         searchBudget: 0,
         ...config.stream ? { stream: true } : {},
-        ...config.stream && onStructuredJson ? { onStructuredJson } : {}
+        ...config.stream && onStructuredJson ? { onStructuredJson } : {},
+        ...(hooks == null ? void 0 : hooks.onFirstEvent) ? { onFirstEvent: hooks.onFirstEvent } : {},
+        ...(hooks == null ? void 0 : hooks.onActivity) ? { onActivity: hooks.onActivity } : {}
       }
     },
     (raw, exchange) => {
@@ -46667,9 +46779,16 @@ ${note.detail.trim()}` : "",
       chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
       this.relocateMapChat();
       try {
-        const result = await this.plugin.mapChat.chat(request, controller.signal, (text11) => {
-          if (alive()) chat.streamReply(text11);
-        });
+        const result = await this.plugin.mapChat.chat(
+          request,
+          controller.signal,
+          (text11) => {
+            if (alive()) chat.streamReply(text11);
+          },
+          (event) => {
+            if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+          }
+        );
         if (!alive()) return;
         if (redo) {
           const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
@@ -46687,6 +46806,7 @@ ${note.detail.trim()}` : "",
           }
           return;
         }
+        chat.setStage("applying");
         const lines = await this.applyMapChatActions(
           { ...result, message: request.message },
           request.context,
@@ -56442,8 +56562,9 @@ var MapChatService = class {
    * from "" when the CLI begins a new StructuredOutput call or rejects the previous one. Throws {@link MapChatError} for an
    * empty message, an over-budget context, a stop or a malformed reply. Actions that name nothing valid come back in
    * `rejected`. Only Claude streams; for other providers `onReply` is never called and the reply arrives with the result.
+   * `onProgress` gets the runtime's model events (never after a stop); it only drives a display.
    */
-  async chat(request, signal, onReply) {
+  async chat(request, signal, onReply, onProgress) {
     const stopped = () => new MapChatError("stopped", "Map chat stopped");
     if (signal.aborted) throw stopped();
     const prepared = prepareStep(mapChatStep, request);
@@ -56455,9 +56576,17 @@ var MapChatService = class {
       shown = text11;
       onReply(text11);
     } : void 0;
+    const hooks = onProgress ? {
+      onFirstEvent: () => {
+        if (!signal.aborted) onProgress({ kind: "first-event" });
+      },
+      onActivity: (activity) => {
+        if (!signal.aborted) onProgress({ kind: "activity", activity });
+      }
+    } : void 0;
     let raw;
     try {
-      raw = await this.run(request, signal, prepared, onStructuredJson);
+      raw = await this.run(request, signal, prepared, onStructuredJson, hooks);
     } catch (error) {
       if (signal.aborted && !(error instanceof MapChatError)) throw stopped();
       if (error instanceof MapChatError && error.code === "stopped") throw stopped();

@@ -1,10 +1,20 @@
 import { CLAUDE_MODEL_CHOICES } from "../ai/providers/provider";
+import type { CodexActivity } from "../ai/runtime/codex-app-server";
 import type { ReasoningLevel } from "../ai/types";
 import type { AiCalls } from "./ai-calls";
 import type { PreparedStep } from "./step-runner";
 
 /** The effort a step runs with: the user's `auto` means low. A pre-started process has to be asked for the same value. */
 export const stepEffort = (reasoning: ReasoningLevel): string => (reasoning === "auto" ? "low" : reasoning);
+
+/**
+ * What the model runtime reports while a step runs, passed straight down to its controls. `onFirstEvent` is Claude's first
+ * stream event; `onActivity` is Codex's `started | searching | reading | writing`. (Codex text streaming joins this list.)
+ */
+export interface ProviderStepHooks {
+  onFirstEvent?: () => void;
+  onActivity?: (activity: CodexActivity) => void;
+}
 
 /**
  * A runner for one prepared step: sends it to the Claude or Codex runtime through `AiCalls`, which registers the
@@ -16,7 +26,9 @@ export type ProviderStepRunner<Request, Output> = (
   signal: AbortSignal,
   prepared: PreparedStep<Request, Output>,
   /** Claude stream only: the raw StructuredOutput JSON so far ("" = a new call began, null = the CLI rejected it). */
-  onStructuredJson?: (buffer: string | null) => void
+  onStructuredJson?: (buffer: string | null) => void,
+  /** Model events for a progress display (see {@link ProviderStepHooks}). */
+  hooks?: ProviderStepHooks
 ) => Promise<string>;
 
 export function providerStepRunner<Request extends { model: string; reasoning: ReasoningLevel }, Output>(
@@ -29,7 +41,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
     stream?: boolean;
   }
 ): ProviderStepRunner<Request, Output> {
-  return (request, signal, prepared, onStructuredJson) =>
+  return (request, signal, prepared, onStructuredJson, hooks) =>
     aiCalls.run(
       prepared,
       {
@@ -48,7 +60,9 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
           textOnly: true,
           searchBudget: 0,
           ...(config.stream ? { stream: true } : {}),
-          ...(config.stream && onStructuredJson ? { onStructuredJson } : {})
+          ...(config.stream && onStructuredJson ? { onStructuredJson } : {}),
+          ...(hooks?.onFirstEvent ? { onFirstEvent: hooks.onFirstEvent } : {}),
+          ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {})
         }
       },
       (raw, exchange) => {

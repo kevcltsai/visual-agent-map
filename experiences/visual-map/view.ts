@@ -11202,9 +11202,17 @@ export class VisualAgentMapView extends ItemView {
       // The first message of a conversation moves the opening screen's panel into the side window.
       this.relocateMapChat();
       try {
-        const result = await this.plugin.mapChat.chat(request, controller.signal, text => {
-          if (alive()) chat.streamReply(text);
-        });
+        const result = await this.plugin.mapChat.chat(
+          request,
+          controller.signal,
+          text => {
+            if (alive()) chat.streamReply(text);
+          },
+          event => {
+            // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
+            if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+          }
+        );
         if (!alive()) return;
         // A detail re-send only explains: the actions of the first answer were applied already, so whatever it lists is dropped.
         if (redo) {
@@ -11228,6 +11236,7 @@ export class VisualAgentMapView extends ItemView {
           }
           return;
         }
+        chat.setStage("applying");
         const lines = await this.applyMapChatActions(
           { ...result, message: request.message },
           request.context,

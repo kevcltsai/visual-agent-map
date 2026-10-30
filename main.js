@@ -22154,6 +22154,7 @@ var MapChatPanel = class {
     __publicField(this, "hintEl");
     __publicField(this, "logEl");
     __publicField(this, "suggestEl");
+    __publicField(this, "emptyMapEl");
     __publicField(this, "suggestKey", "");
     __publicField(this, "suggestInHero", false);
     __publicField(this, "resizerEl");
@@ -22912,6 +22913,16 @@ ${typed}` : draft;
       if (event.key === "Enter") openInternal(event, event.target);
     });
     this.suggestEl = this.bodyEl.createDiv({ cls: "vam-map-chat-suggest", attr: { role: "group" } });
+    this.emptyMapEl = this.bodyEl.createEl("button", {
+      cls: "vam-map-chat-empty-map",
+      text: t("ui.create_an_empty_mind_map"),
+      attr: { type: "button" }
+    });
+    this.emptyMapEl.hidden = true;
+    this.emptyMapEl.addEventListener("click", () => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.host).createEmptyMap) == null ? void 0 : _b2.call(_a2);
+    });
     this.chipsEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-chips",
       attr: { role: "group", "aria-label": t("ui.map_chat_references") }
@@ -23258,6 +23269,13 @@ ${text11}` : text11;
     this.inputEl.setAttr("placeholder", t(hero ? "ui.map_chat_hero_placeholder" : "ui.map_chat_input_placeholder"));
     this.applyWidth();
     this.renderSuggestions();
+    const showEmptyMap = hero && !!this.host.createEmptyMap;
+    this.emptyMapEl.hidden = !showEmptyMap;
+    this.emptyMapEl.toggleClass("is-hidden", !showEmptyMap);
+    if (showEmptyMap && this.bodyEl.children[this.bodyEl.children.length - 1] !== this.emptyMapEl) {
+      this.emptyMapEl.remove();
+      this.bodyEl.insertBefore(this.emptyMapEl, null);
+    }
     this.renderGuide();
     this.refreshSave();
     if (shown && hadUnread) this.scrollToEnd();
@@ -45499,16 +45517,7 @@ ${request.requirements}` : preset.text,
         t("ui.duplicate_to_my_workspace"),
         () => this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
-      this.button(
-        actions,
-        t("ui.create_an_empty_mind_map"),
-        () => new NameModal(
-          this.app,
-          t("ui.new_mind_map"),
-          t("ui.new_mind_map_from_sample"),
-          (title2) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title2)))
-        ).open()
-      );
+      this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
       if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
       start.createDiv("vam-sample-start-chat");
     }
@@ -49666,8 +49675,22 @@ ${note.detail.trim()}` : "",
     if (!this.chat) return;
     this.chat.toggleFromCommand();
   }
+  /** Asks for a name, then makes and opens an empty map. No AI. */
+  promptEmptyMap() {
+    new NameModal(
+      this.app,
+      t("ui.new_mind_map"),
+      t("ui.new_mind_map_from_sample"),
+      (title) => this.enqueue(async () => this.openMapInMutation(await this.plugin.repo.createMap(title)))
+    ).open();
+  }
   chatHost() {
+    const emptyMap = () => this.builtIn ? void 0 : () => this.promptEmptyMap();
     return {
+      // The built-in sample's start card already has this button; read each time, the view can switch to the sample.
+      get createEmptyMap() {
+        return emptyMap();
+      },
       topicTitle: (id) => {
         var _a2, _b2, _c;
         const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);

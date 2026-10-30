@@ -2859,14 +2859,32 @@ integrationTest('hypothesis-evidence: "Add relation…" asks for the kind first 
   modals[0].choose(view.map.nodes[1]); await dom.tick();
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'derives_from', from: 'fact', to: 'hyp' }]);
 });
-integrationTest('hypothesis-evidence: the picker offers only legal targets: not itself, not a duplicate, not a derivation cycle, but a cross-kind reverse is fine', () => {
+test('hypothesis-evidence: the picker offers only legal targets: not itself, not a topic that already has any relation with this one, not a derivation cycle (decision #37)', () => {
   const topics = [node('a'), node('b'), node('c'), node('d')];
   const notes = heNotes(topics.map(n => [n.id, {}]));
   const relations = [{ kind: 'derives_from', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'c' }, { kind: 'supports', from: 'c', to: 'a' }];
   const ids = (kind, from) => { const fx = heFixture({ topics, notes, relations }); fx.view.chooseRelationTarget(fx.view.map.nodes.find(n => n.id === from), kind); return fx.view.map.nodes.filter(n => fx.modals[0].selectable(n)).map(n => n.id); };
-  assert.deepEqual(ids('derives_from', 'c'), ['d'], 'c -> a and c -> b would close a derivation cycle; itself is out');
-  assert.deepEqual(ids('supports', 'c'), ['b', 'd'], 'c -> a already exists, a derivation does not count as supports');
-  assert.deepEqual(ids('prerequisite', 'c'), ['a', 'b', 'd'], 'another kind is a different graph');
+  assert.deepEqual(ids('derives_from', 'c'), ['d'], 'a and b already hold a relation with c; itself is out');
+  assert.deepEqual(ids('supports', 'c'), ['d'], 'a (supports) and b (derives from) are linked with c whatever the kind asked for');
+  assert.deepEqual(ids('prerequisite', 'c'), ['d'], 'another kind does not reopen a taken pair');
+  assert.deepEqual(ids('prerequisite', 'd'), ['a', 'b', 'c'], 'a topic with no relation is offered every other topic');
+});
+integrationTest('hypothesis-evidence: the picker lists a parent and a child topic, and a topic linked in the reverse direction is not listed (decision #37)', () => {
+  const topics = [node('a'), node('b', 'a'), node('c')];
+  const notes = heNotes(topics.map(n => [n.id, {}]));
+  const ids = (relations, kind, from) => { const fx = heFixture({ topics, notes, relations }); fx.view.chooseRelationTarget(fx.view.map.nodes.find(n => n.id === from), kind); return fx.view.map.nodes.filter(n => fx.modals[0].selectable(n)).map(n => n.id); };
+  assert.deepEqual(ids([], 'supports', 'a'), ['b', 'c'], 'the child is a legal target');
+  assert.deepEqual(ids([], 'related', 'b'), ['a', 'c'], 'the parent is a legal target');
+  assert.deepEqual(ids([{ kind: 'supports', from: 'c', to: 'a' }], 'contradicts', 'a'), ['b'], 'c -> a is already there: c is out although this link would point the other way');
+});
+integrationTest('hypothesis-evidence: a second relation on the same pair cannot be created, same kind, another kind, reversed or related; a parent and child pair takes one (decision #37)', async () => {
+  const topics = [node('a'), node('b', 'a'), node('c')];
+  const { view, doc } = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])), relations: [{ kind: 'supports', from: 'a', to: 'c' }] });
+  view.enqueue = work => work(); view.mapChange = async (change, rebuild) => { change(view.map); };
+  await view.addRelation('a', 'c', 'supports'); await view.addRelation('a', 'c', 'contradicts'); await view.addRelation('c', 'a', 'supports'); await view.addRelation('c', 'a', 'related'); await view.addRelation('a', 'c', 'related');
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'a', to: 'c' }], 'all five attempts are refused');
+  await view.addRelation('a', 'b', 'derives_from'); await view.addRelation('b', 'a', 'supports');
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'a', to: 'c' }, { kind: 'derives_from', from: 'a', to: 'b' }], 'the parent and child pair takes one relation; the reverse is refused');
 });
 integrationTest('hypothesis-evidence: with no legal target the kind shows a Notice naming it and opens no picker', () => {
   const topics = [node('a'), node('b')];
@@ -2874,7 +2892,8 @@ integrationTest('hypothesis-evidence: with no legal target the kind shows a Noti
   fx.view.chooseRelationTarget(fx.view.map.nodes[0], 'related');
   assert.equal(fx.modals.length, 0); assert.deepEqual(fx.notices, ['There is no topic this one can be linked to with “Related”.']);
   fx.view.chooseRelationTarget(fx.view.map.nodes[0], 'supports');
-  assert.equal(fx.modals.length, 1, 'a different kind on the same pair is still allowed');
+  assert.equal(fx.modals.length, 0, 'a different kind on the same pair is refused too (decision #37)');
+  assert.equal(fx.notices.length, 2);
 });
 integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A → Name" coming in and "Name — X" for related, with the note, a focusable row and Edit/Remove labels', () => {
   const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'hyp', to: 'fact' }];
@@ -2903,9 +2922,9 @@ integrationTest('hypothesis-evidence: the panel "Edit" opens the editor for that
   assert.ok(parentEdge.every(e => !(e.listeners && e.listeners.click)), 'a parent-child edge takes no click');
 });
 integrationTest('hypothesis-evidence: the editor lists only legal kinds, always including the current one', () => {
-  const relations = [{ kind: 'supports', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'a' }, { kind: 'verifies', from: 'a', to: 'b' }];
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'c' }, { kind: 'derives_from', from: 'c', to: 'a' }];
   const { kindOptions, select } = heEditor(relations, relations[0]);
-  assert.deepEqual(kindOptions(), ['Supports', 'Contradicts', 'Related', 'Prerequisite'], 'Verifies would duplicate; Derives from would close a cycle with b -> a');
+  assert.deepEqual(kindOptions(), ['Supports', 'Contradicts', 'Verifies', 'Related', 'Prerequisite'], 'the pair a-b is this relation alone, so every kind is open except Derives from, which would close a cycle a -> b -> c -> a');
   assert.equal(select().value, 'supports'); assert.equal(select().attrs['aria-label'], 'Relation type');
 });
 integrationTest('hypothesis-evidence: changing the kind is one mapChange, keeps the note, follows the line selection, and is refused if the map changed meanwhile', async () => {

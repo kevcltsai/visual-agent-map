@@ -390,8 +390,8 @@ test('hypothesis-evidence: parse removes the key when nothing valid remains and 
   assert.deepEqual(clean.logs, []);
 });
 test('hypothesis-evidence: parse keeps a hand-written prerequisite cycle (A->B->A)', () => {
-  const { parsed, logs } = parseWith(relMap([pre('a', 'b'), pre('b', 'a'), pre('a', 'c'), pre('c', 'a')]));
-  assert.equal(parsed.topicRelations.length, 4); assert.deepEqual(logs, []);
+  const { parsed, logs } = parseWith(relMap([pre('a', 'b'), pre('b', 'c'), pre('c', 'a')]));
+  assert.equal(parsed.topicRelations.length, 3, 'a cycle needs three topics now: one pair holds at most one relation (decision #37)'); assert.deepEqual(logs, []);
 });
 test('hypothesis-evidence: a map without relations serializes byte for byte as before, and the key never appears', () => {
   const source = relMap(undefined);
@@ -420,7 +420,7 @@ const preSources = (m, to) => m.nodes.filter(n => core.relationAllowed(m.topicRe
 test('hypothesis-evidence: legalRelationTargets for supports excludes itself and linked targets and allows any topic type at both ends', () => {
   const m = relMap([ev('a', 'h')]);
   assert.deepEqual(core.legalRelationTargets(m, 'supports', 'a'), ['b', 'c', 'h2'], 'h is already linked; the ends need not be a fact or a hypothesis');
-  assert.deepEqual(core.legalRelationTargets(m, 'supports', 'h'), ['a', 'b', 'c', 'h2'], 'a hypothesis can be a source; the reverse direction is a different link');
+  assert.deepEqual(core.legalRelationTargets(m, 'supports', 'h'), ['b', 'c', 'h2'], 'a hypothesis can be a source; a is out because the reverse direction is the same pair (decision #37)');
   assert.deepEqual(plain(core.legalRelationTargets(relMap(undefined, ['a']), 'supports', 'a')), []);
 });
 test('hypothesis-evidence: prerequisite sources (relationAllowed) exclude itself, existing sources and anything that would close a cycle, directly or indirectly', () => {
@@ -428,34 +428,35 @@ test('hypothesis-evidence: prerequisite sources (relationAllowed) exclude itself
   assert.deepEqual(preSources(m, 'b'), ['c', 'd', 'e'], 'self and existing source a are out');
   core.setTopicRelations(m, [pre('b', 'x'), pre('x', 'c')]); m.nodes.push(node('x'));
   assert.deepEqual(preSources(m, 'b'), ['a', 'd', 'e'], 'x and c are reachable from b, so they would close a cycle');
-  assert.deepEqual(preSources(relMap([ev('a', 'b')]), 'b'), ['a', 'c', 'h', 'h2'], 'supports links do not count');
+  assert.deepEqual(preSources(relMap([ev('a', 'b')]), 'b'), ['c', 'h', 'h2'], 'a supports link does not count as a cycle, but a is out: the pair a-b already holds a relation (decision #37)');
 });
 test('hypothesis-evidence: prerequisite sources terminate on a hand-written cycle', () => {
   const m = relMap([pre('a', 'b'), pre('b', 'a'), pre('b', 'c'), pre('c', 'b')]);
   assert.deepEqual(preSources(m, 'a'), ['h', 'h2']);
   assert.deepEqual(preSources(m, 'h'), ['a', 'b', 'c', 'h2']);
 });
-test('hypothesis-evidence: retargetTopicRelations merges ends, dedupes, drops self links and reports new cycles', () => {
+test('hypothesis-evidence: retargetTopicRelations merges ends, keeps one relation per pair, drops self links and reports new cycles and same-pair drops', () => {
   const m = relMap([ev('a', 'h'), ev('b', 'h'), pre('a', 'b'), pre('c', 'a'), pre('b', 'h2')]);
   const result = core.retargetTopicRelations(m, ['a', 'b'], 'a');
   assert.deepEqual(plain(m.topicRelations), [ev('a', 'h'), pre('c', 'a'), pre('a', 'h2')], 'two evidence links collapse; a->b becomes a self link and goes');
-  assert.deepEqual(plain(result), { droppedCycles: 0 });
-  const cyc = relMap([pre('a', 'c'), pre('c', 'b')]);
+  assert.deepEqual(plain(result), { droppedCycles: 0, droppedSamePair: 1 });
+  const cyc = relMap([pre('a', 'c'), pre('c', 'h'), pre('h', 'b')]);
   const merged = core.retargetTopicRelations(cyc, ['a', 'b'], 'a');
-  assert.deepEqual(plain(cyc.topicRelations), [pre('a', 'c')], 'c->a would close a cycle with a->c');
-  assert.deepEqual(plain(merged), { droppedCycles: 1 });
-  const none = relMap(undefined); assert.deepEqual(plain(core.retargetTopicRelations(none, ['a'], 'b')), { droppedCycles: 0 }); assert.equal('topicRelations' in none, false);
+  assert.deepEqual(plain(cyc.topicRelations), [pre('a', 'c'), pre('c', 'h')], 'h->a would close a cycle through c and h');
+  assert.deepEqual(plain(merged), { droppedCycles: 1, droppedSamePair: 0 });
+  const none = relMap(undefined); assert.deepEqual(plain(core.retargetTopicRelations(none, ['a'], 'b')), { droppedCycles: 0, droppedSamePair: 0 }); assert.equal('topicRelations' in none, false);
 });
 test('hypothesis-evidence: retargetTopicRelations leaves a pre-existing cycle alone', () => {
-  const m = relMap([pre('a', 'b'), pre('b', 'a'), ev('c', 'h')]);
-  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0 });
-  assert.deepEqual(plain(m.topicRelations), [pre('a', 'b'), pre('b', 'a'), ev('c2', 'h')]);
+  const m = relMap([pre('a', 'b'), pre('b', 'h2'), pre('h2', 'a'), ev('c', 'h')]);
+  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0, droppedSamePair: 0 });
+  assert.deepEqual(plain(m.topicRelations), [pre('a', 'b'), pre('b', 'h2'), pre('h2', 'a'), ev('c2', 'h')]);
 });
 // ---- hypothesis-evidence (P7): six relation kinds, description, relationAllowed ----
 const rel = (kind, from, to, description) => (description === undefined ? { kind, from, to } : { kind, from, to, description });
 const KINDS6 = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
 test('hypothesis-evidence: all six kinds with and without a description round-trip byte for byte', () => {
-  const source = relMap(KINDS6.map((k, i) => rel(k, 'a', ['b', 'c', 'h', 'h2', 'b', 'c'][i], i % 2 ? `note ${k}` : undefined)));
+  const ends = [['a', 'b'], ['a', 'c'], ['a', 'h'], ['a', 'h2'], ['b', 'c'], ['b', 'h']];
+  const source = relMap(KINDS6.map((k, i) => rel(k, ends[i][0], ends[i][1], i % 2 ? `note ${k}` : undefined)));
   const { parsed, logs } = parseWith(source);
   assert.deepEqual(plain(parsed), plain(source)); assert.deepEqual(logs, []);
   const text = core.serializeMap(source);
@@ -469,10 +470,14 @@ test('hypothesis-evidence: parse drops a V1.5 evidence relation as an unknown ki
   assert.equal('topicRelations' in only.parsed, false, 'the key goes when nothing valid remains'); assert.equal(only.logs.length, 1);
   assert.equal(core.legalEvidenceTargets, undefined); assert.equal(core.legalPrerequisiteSources, undefined, 'the V1.5 helpers are removed');
 });
-test('hypothesis-evidence: parse drops a related duplicate in the other direction and keeps the first', () => {
-  const { parsed, logs } = parseWith(relMap([rel('related', 'b', 'a', 'first'), rel('related', 'a', 'b'), rel('supports', 'a', 'b'), rel('supports', 'b', 'a')]));
-  assert.deepEqual(plain(parsed.topicRelations), [rel('related', 'b', 'a', 'first'), rel('supports', 'a', 'b'), rel('supports', 'b', 'a')], 'only related ignores direction');
-  assert.equal(logs.length, 1); assert.equal(logs[0].level, 'warn'); assert.match(logs[0].message, /\b1\b/);
+test('hypothesis-evidence: parse keeps only the first relation of a pair of topics, whatever the kind or direction, and warns with a count (decision #37)', () => {
+  const { parsed, logs } = parseWith(relMap([rel('related', 'b', 'a', 'first'), rel('related', 'a', 'b'), rel('supports', 'a', 'b'), rel('supports', 'b', 'a'), rel('contradicts', 'a', 'c')]));
+  assert.deepEqual(plain(parsed.topicRelations), [rel('related', 'b', 'a', 'first'), rel('contradicts', 'a', 'c')], 'one per unordered pair; the first in list order stays');
+  assert.equal(logs.length, 1); assert.equal(logs[0].level, 'warn'); assert.match(logs[0].message, /\b3\b/);
+  const hand = parseWith(relMap([rel('supports', 'a', 'h'), rel('verifies', 'h', 'a', 'later')]));
+  assert.deepEqual(plain(hand.parsed.topicRelations), [rel('supports', 'a', 'h')], 'a hand-written second relation of another kind and the other direction goes');
+  assert.equal(hand.logs.length, 1);
+  assert.doesNotThrow(() => parseWith(relMap([rel('supports', 'a', 'h'), rel('supports', 'a', 'h')])));
 });
 test('hypothesis-evidence: a non-string description is removed with a warn but the relation stays', () => {
   const { parsed, logs } = parseWith(relMap([{ ...rel('supports', 'a', 'h'), description: 42 }, { ...rel('contradicts', 'b', 'c'), description: null }, { ...rel('verifies', 'a', 'c'), description: { x: 1 } }]));
@@ -486,13 +491,13 @@ test('hypothesis-evidence: a string description is read as written, even long, w
   assert.deepEqual(plain(parsed.topicRelations.map(r => r.description)), [long, html, multi, '']); assert.deepEqual(logs, []);
 });
 test('hypothesis-evidence: a hand-written derivation cycle and a prerequisite cycle are kept', () => {
-  const { parsed, logs } = parseWith(relMap([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'a'), rel('prerequisite', 'b', 'c'), rel('prerequisite', 'c', 'b')]));
-  assert.equal(parsed.topicRelations.length, 4); assert.deepEqual(logs, []);
+  const { parsed, logs } = parseWith(relMap([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'c'), rel('derives_from', 'c', 'a'), rel('prerequisite', 'b', 'h'), rel('prerequisite', 'h', 'h2'), rel('prerequisite', 'h2', 'b')]));
+  assert.equal(parsed.topicRelations.length, 6, 'three-topic loops: a loop through two topics would be one pair twice (decision #37)'); assert.deepEqual(logs, []);
 });
-test('hypothesis-evidence: unknown kind, dangling end, self link and same-kind duplicate are dropped with one count-only warn', () => {
+test('hypothesis-evidence: unknown kind, dangling end, self link and a second relation on the same pair are dropped with one count-only warn', () => {
   const { parsed, logs } = parseWith(relMap([rel('related', 'a', 'a'), rel('supports', 'a', 'zzz'), { kind: 'likes', from: 'a', to: 'b' }, rel('verifies', 'a', 'b'), rel('verifies', 'a', 'b', 'dup'), rel('contradicts', 'a', 'b')]));
-  assert.deepEqual(plain(parsed.topicRelations), [rel('verifies', 'a', 'b'), rel('contradicts', 'a', 'b')]);
-  assert.equal(logs.length, 1); assert.match(logs[0].message, /\b4\b/); assert.doesNotMatch(logs[0].message, /zzz|likes|dup/);
+  assert.deepEqual(plain(parsed.topicRelations), [rel('verifies', 'a', 'b')], 'the contradicts on the same pair is dropped too (decision #37)');
+  assert.equal(logs.length, 1); assert.match(logs[0].message, /\b5\b/); assert.doesNotMatch(logs[0].message, /zzz|likes|dup/);
 });
 test('hypothesis-evidence: isAcyclicKind is true only for derives_from and prerequisite', () => {
   assert.deepEqual(KINDS6.filter(k => core.isAcyclicKind(k)), ['derives_from', 'prerequisite']);
@@ -513,13 +518,16 @@ test('hypothesis-evidence: setTopicRelations keeps a description and never write
   assert.equal('description' in m.topicRelations[1], false);
   assert.equal(core.serializeMap(m).includes('undefined'), false);
 });
-test('hypothesis-evidence: relationAllowed refuses a self link and a same-kind duplicate; related ignores direction', () => {
+test('hypothesis-evidence: relationAllowed refuses a self link and any second relation on a pair, whatever the kind or direction (decision #37)', () => {
   const rs = [rel('supports', 'a', 'b'), rel('related', 'a', 'c')];
   assert.equal(core.relationAllowed(rs, rel('supports', 'a', 'a')), false);
   assert.equal(core.relationAllowed(rs, rel('supports', 'a', 'b')), false);
-  assert.equal(core.relationAllowed(rs, rel('supports', 'b', 'a')), true, 'supports has a direction');
-  assert.equal(core.relationAllowed(rs, rel('contradicts', 'a', 'b')), true, 'another kind on the same pair is fine');
-  assert.equal(core.relationAllowed(rs, rel('related', 'c', 'a')), false, 'related reversed is a duplicate');
+  assert.equal(core.relationAllowed(rs, rel('supports', 'b', 'a')), false, 'the reverse direction is the same pair');
+  for (const kind of KINDS6) assert.equal(core.relationAllowed(rs, rel(kind, 'a', 'b')), false, `${kind} on a-b`);
+  assert.equal(core.relationAllowed(rs, rel('contradicts', 'a', 'b')), false, 'another kind on the same pair is refused');
+  assert.equal(core.relationAllowed(rs, rel('contradicts', 'b', 'a')), false, 'another kind in the other direction is refused');
+  assert.equal(core.relationAllowed(rs, rel('related', 'c', 'a')), false, 'related reversed is the same pair');
+  assert.equal(core.relationAllowed(rs, rel('supports', 'b', 'c')), true, 'a topic may link to many topics');
   assert.equal(core.relationAllowed(rs, rel('related', 'a', 'c')), false);
   assert.equal(core.relationAllowed([], rel('related', 'a', 'b')), true);
 });
@@ -532,10 +540,11 @@ test('hypothesis-evidence: relationAllowed refuses direct and indirect derivatio
     assert.equal(core.relationAllowed(rs, rel(kind, 'c', 'h')), true);
   }
   const sup = [rel('supports', 'a', 'b')];
-  assert.equal(core.relationAllowed(sup, rel('supports', 'b', 'a')), true, 'supports may point both ways');
+  assert.equal(core.relationAllowed(sup, rel('supports', 'b', 'a')), false, 'supports no longer points both ways on one pair (decision #37)');
 });
-test('hypothesis-evidence: relationAllowed lets a derivation and a prerequisite point opposite ways (cycles are per kind)', () => {
-  assert.equal(core.relationAllowed([rel('derives_from', 'a', 'b')], rel('prerequisite', 'b', 'a')), true);
+test('hypothesis-evidence: relationAllowed counts cycles per kind, and the pair rule still applies across kinds', () => {
+  assert.equal(core.relationAllowed([rel('derives_from', 'a', 'b'), rel('prerequisite', 'b', 'c')], rel('prerequisite', 'c', 'a')), true, 'a derivation does not close a prerequisite cycle');
+  assert.equal(core.relationAllowed([rel('derives_from', 'a', 'b')], rel('prerequisite', 'b', 'a')), false, 'but the pair a-b is taken (decision #37)');
   assert.equal(core.relationAllowed([rel('prerequisite', 'a', 'b'), rel('supports', 'b', 'c')], rel('derives_from', 'c', 'a')), true);
 });
 test('hypothesis-evidence: relationAllowed with replacingIndex excludes the replaced relation (reverse, change kind)', () => {
@@ -545,47 +554,54 @@ test('hypothesis-evidence: relationAllowed with replacingIndex excludes the repl
   assert.equal(core.relationAllowed([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'c'), rel('derives_from', 'c', 'd')], rel('derives_from', 'd', 'a'), 0), true, 'chain without the replaced link');
   assert.equal(core.relationAllowed([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'c'), rel('derives_from', 'c', 'a')], rel('derives_from', 'a', 'c'), 2), true, 'reversing the closing link of a loop');
   assert.equal(core.relationAllowed([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'c')], rel('derives_from', 'c', 'a'), 5), false, 'an index that matches nothing excludes nothing');
-  const dup = [rel('supports', 'a', 'b'), rel('contradicts', 'a', 'b')];
-  assert.equal(core.relationAllowed(dup, rel('supports', 'a', 'b'), 1), false, 'changing contradicts to supports duplicates supports');
-  assert.equal(core.relationAllowed(dup, rel('verifies', 'a', 'b'), 1), true);
-  assert.equal(core.relationAllowed(dup, rel('supports', 'a', 'b'), 0), true, 'replacing itself with the same value');
+  const two = [rel('supports', 'a', 'b'), rel('related', 'a', 'c')];
+  assert.equal(core.relationAllowed(two, rel('contradicts', 'a', 'b'), 0), true, 'changing the kind of the only relation on a pair is fine');
+  assert.equal(core.relationAllowed(two, rel('supports', 'b', 'a'), 0), true, 'reversing it is fine');
+  assert.equal(core.relationAllowed(two, rel('supports', 'a', 'b'), 1), false, 'moving the other relation onto a-b is refused: a-b is still held');
+  assert.equal(core.relationAllowed(two, rel('supports', 'a', 'b'), 0), true, 'replacing itself with the same value');
   const cyc = [rel('prerequisite', 'a', 'b'), rel('supports', 'b', 'a')];
   assert.equal(core.relationAllowed(cyc, rel('prerequisite', 'b', 'a'), 1), false, 'changing supports b->a to prerequisite closes a cycle');
 });
 test('hypothesis-evidence: relationAllowed terminates on a hand-written cycle', () => {
-  const rs = [rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'a'), rel('prerequisite', 'b', 'c'), rel('prerequisite', 'c', 'b')];
-  assert.equal(core.relationAllowed(rs, rel('derives_from', 'b', 'c')), true, 'c does not reach b by derivation');
-  assert.equal(core.relationAllowed(rs, rel('derives_from', 'c', 'a')), true, 'a reaches nothing that leads back to c');
-  assert.equal(core.relationAllowed(rs, rel('derives_from', 'a', 'c')), true);
+  const rs = [rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'c'), rel('derives_from', 'c', 'a'), rel('prerequisite', 'h', 'h2'), rel('prerequisite', 'h2', 'b')];
+  assert.equal(core.relationAllowed(rs, rel('derives_from', 'h', 'a')), true, 'the search from a walks the a->b->c->a loop and ends without reaching h');
+  assert.equal(core.relationAllowed(rs, rel('derives_from', 'a', 'h')), true);
+  assert.equal(core.relationAllowed(rs, rel('derives_from', 'a', 'c')), false, 'a-c is taken by c->a (decision #37)');
+  assert.equal(core.relationAllowed(rs, rel('prerequisite', 'b', 'h')), false, 'h reaches b by prerequisite, so b->h would close a loop');
+  assert.equal(core.relationAllowed(rs, rel('prerequisite', 'h', 'b')), true, 'a shortcut, not a cycle');
   assert.equal(core.relationAllowed(rs, rel('prerequisite', 'c', 'h')), true);
-  assert.equal(core.relationAllowed(rs, rel('prerequisite', 'h', 'b')), true);
-  assert.equal(core.relationAllowed([...rs, rel('derives_from', 'c', 'a')], rel('derives_from', 'a', 'c'), undefined), false, 'c->a is now a derivation, so a->c would close a loop');
-  assert.equal(core.relationAllowed(rs, rel('derives_from', 'h', 'a')), true, 'the search from a walks the a<->b loop and ends without reaching h');
 });
 test('hypothesis-evidence: legalRelationTargets lists every topic relationAllowed accepts', () => {
   const m = relMap([rel('supports', 'a', 'b'), rel('derives_from', 'b', 'c'), rel('related', 'h', 'a')]);
-  assert.deepEqual(core.legalRelationTargets(m, 'supports', 'a'), ['c', 'h', 'h2']);
-  assert.deepEqual(core.legalRelationTargets(m, 'derives_from', 'c'), ['a', 'h', 'h2'], 'b is out: it would close b->c->b');
-  assert.deepEqual(core.legalRelationTargets(m, 'related', 'a'), ['b', 'c', 'h2'], 'h already has related with a');
+  assert.deepEqual(core.legalRelationTargets(m, 'supports', 'a'), ['c', 'h2'], 'b and h already hold a relation with a');
+  assert.deepEqual(core.legalRelationTargets(m, 'derives_from', 'c'), ['a', 'h', 'h2'], 'b is out: the pair b-c is taken');
+  assert.deepEqual(core.legalRelationTargets(m, 'related', 'a'), ['c', 'h2'], 'b and h already hold a relation with a, of another kind');
+  assert.deepEqual(core.legalRelationTargets(relMap([rel('supports', 'a', 'b')]), 'contradicts', 'b'), ['c', 'h', 'h2'], 'a is out in the reverse direction too');
   assert.deepEqual(core.legalRelationTargets(relMap(undefined), 'verifies', 'a'), ['b', 'c', 'h', 'h2']);
 });
 test('hypothesis-evidence: retargetTopicRelations drops a newly closed derivation cycle and counts both acyclic kinds together', () => {
-  const m = relMap([rel('derives_from', 'a', 'c'), rel('derives_from', 'c', 'b'), rel('prerequisite', 'a', 'h'), rel('prerequisite', 'h', 'b'), rel('supports', 'c', 'b', 'kept')]);
+  const m = relMap([rel('derives_from', 'a', 'c'), rel('derives_from', 'c', 'x'), rel('derives_from', 'x', 'b'), rel('prerequisite', 'a', 'h'), rel('prerequisite', 'h', 'y'), rel('prerequisite', 'y', 'b'), rel('supports', 'h2', 'b', 'kept')], ['a', 'b', 'c', 'h', 'h2', 'x', 'y']);
   const result = core.retargetTopicRelations(m, ['a', 'b'], 'a');
-  assert.deepEqual(plain(m.topicRelations), [rel('derives_from', 'a', 'c'), rel('prerequisite', 'a', 'h'), rel('supports', 'c', 'a', 'kept')]);
-  assert.deepEqual(plain(result), { droppedCycles: 2 });
+  assert.deepEqual(plain(m.topicRelations), [rel('derives_from', 'a', 'c'), rel('derives_from', 'c', 'x'), rel('prerequisite', 'a', 'h'), rel('prerequisite', 'h', 'y'), rel('supports', 'h2', 'a', 'kept')]);
+  assert.deepEqual(plain(result), { droppedCycles: 2, droppedSamePair: 0 });
 });
 test('hypothesis-evidence: retargetTopicRelations leaves an existing derivation cycle alone and keeps descriptions', () => {
-  const m = relMap([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'a'), rel('verifies', 'c', 'h', 'note')]);
-  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0 });
-  assert.deepEqual(plain(m.topicRelations), [rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'a'), rel('verifies', 'c2', 'h', 'note')]);
+  const m = relMap([rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'h'), rel('derives_from', 'h', 'a'), rel('verifies', 'c', 'h2', 'note')]);
+  assert.deepEqual(plain(core.retargetTopicRelations(m, ['c'], 'c2')), { droppedCycles: 0, droppedSamePair: 0 });
+  assert.deepEqual(plain(m.topicRelations), [rel('derives_from', 'a', 'b'), rel('derives_from', 'b', 'h'), rel('derives_from', 'h', 'a'), rel('verifies', 'c2', 'h2', 'note')]);
 });
-test('hypothesis-evidence: retargetTopicRelations keeps one related link when two merged topics were both related to the same topic', () => {
-  const m = relMap([rel('related', 'a', 'b', 'first'), rel('related', 'b', 'c'), rel('related', 'h', 'c'), rel('supports', 'a', 'b')]);
-  core.retargetTopicRelations(m, ['a', 'c'], 'a');
-  assert.deepEqual(plain(m.topicRelations), [rel('related', 'a', 'b', 'first'), rel('related', 'h', 'a'), rel('supports', 'a', 'b')], 'b-a and b-c collapse; a-b supports is a different kind');
-  const self = relMap([rel('related', 'a', 'c')]); core.retargetTopicRelations(self, ['a', 'c'], 'a');
+test('hypothesis-evidence: retargetTopicRelations keeps the first relation when merged topics land on one pair, of any kind or direction, and reports the count (decision #37)', () => {
+  const m = relMap([rel('related', 'a', 'b', 'first'), rel('related', 'b', 'c'), rel('related', 'h', 'c')]);
+  const result = core.retargetTopicRelations(m, ['a', 'c'], 'a');
+  assert.deepEqual(plain(m.topicRelations), [rel('related', 'a', 'b', 'first'), rel('related', 'h', 'a')], 'b-a and b-c collapse onto one pair');
+  assert.deepEqual(plain(result), { droppedCycles: 0, droppedSamePair: 1 });
+  const mixed = relMap([rel('contradicts', 'a', 'b', 'kept'), rel('supports', 'c', 'b'), rel('verifies', 'b', 'c')]);
+  const second = core.retargetTopicRelations(mixed, ['a', 'c'], 'a');
+  assert.deepEqual(plain(mixed.topicRelations), [rel('contradicts', 'a', 'b', 'kept')], 'a different kind and the reverse direction on the same pair go too');
+  assert.deepEqual(plain(second), { droppedCycles: 0, droppedSamePair: 2 });
+  const self = relMap([rel('related', 'a', 'c')]); const selfResult = core.retargetTopicRelations(self, ['a', 'c'], 'a');
   assert.equal('topicRelations' in self, false, 'a link between the merged topics becomes a self link and goes');
+  assert.deepEqual(plain(selfResult), { droppedCycles: 0, droppedSamePair: 0 }, 'a self link is not a same-pair drop');
 });
 test('hypothesis-evidence: dangling AIM convergence still throws', () => {
   const m = map([{ ...node('a'), aimKind: 'question' }]); m.aim = { branches: [], runs: [] };

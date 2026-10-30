@@ -297,6 +297,25 @@ integrationTest('hypothesis-evidence: merging two facts that are evidence for th
   await h.view.travel(true);
   assert.deepEqual(await h.relations(), [heRel('supports', merged, h.ids.hyp), heRel('supports', merged, h.ids.hyp2)], 'redo merges again');
 });
+integrationTest('hypothesis-evidence: merging two topics that each hold a relation to the same topic keeps the first whatever the kind or direction; undo restores both (decision #37)', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('contradicts', h.ids.hyp, h.ids.f2), heRel('related', h.ids.f1, h.ids.x), heRel('verifies', h.ids.x, h.ids.f2)]);
+  const original = await h.relations();
+  await h.mergeKeys(['f1', 'f2']);
+  const merged = await h.mergedId();
+  assert.deepEqual(await h.relations(), [heRel('supports', merged, h.ids.hyp), heRel('related', merged, h.ids.x)], 'the first of each pair stays, with its own kind and direction');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original, 'one undo restores both dropped relations');
+});
+integrationTest('hypothesis-evidence: a structure-review merge that lands two relations on one pair keeps the first; undo restores both (decision #37)', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  const original = await h.relations();
+  await h.view.removeToUnassigned(h.notes.hyp, false, h.ids.x);
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f1, h.ids.x)]);
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
 integrationTest('hypothesis-evidence: a prerequisite that becomes a self link after a merge is deleted; the key goes when nothing is left', async () => {
   const h = await heHarness();
   await h.relate([heRel('prerequisite', h.ids.f1, h.ids.f2)]);
@@ -308,18 +327,18 @@ integrationTest('hypothesis-evidence: a prerequisite that becomes a self link af
 });
 integrationTest('hypothesis-evidence: a merge that would close a prerequisite cycle drops that link and keeps the count for the notice; undo restores all', async () => {
   const h = await heHarness();
-  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.f2)]);
+  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.hyp, h.ids.f2)]);
   const original = await h.relations();
   await h.mergeKeys(['f1', 'f2']);
   const merged = await h.mergedId();
-  assert.deepEqual(await h.relations(), [heRel('prerequisite', merged, h.ids.x)]);
+  assert.deepEqual(await h.relations(), [heRel('prerequisite', merged, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.hyp)], 'hyp -> merged would close a loop; a loop through two topics would be one pair twice, so the cycle needs three');
   assert.equal(h.view.droppedCyclesOfLastMerge(), 1);
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
 integrationTest('hypothesis-evidence: a merge that drops a cycle-closing prerequisite shows the count in a Notice, and undo brings the link back; a merge that drops none shows nothing', async () => {
   const h = await heHarness();
-  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.f2)]);
+  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.hyp, h.ids.f2)]);
   const original = await h.relations();
   await h.mergeKeys(['f1', 'f2']);
   assert.deepEqual(h.notices, ['Removed 1 derives-from or prerequisite link(s) that would form a cycle']);
@@ -361,7 +380,7 @@ integrationTest('hypothesis-evidence: mergeSelected with two hypotheses merges t
 integrationTest('hypothesis-evidence: removing a fact or a hypothesis leaves no dangling link (both kinds) and undo restores the links', async () => {
   for (const [removeKey, branch, expected] of [['f1', false, 2], ['hyp', false, 2]]) {
     const h = await heHarness();
-    await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.hyp2), heRel('supports', h.ids.f2, h.ids.hyp2)]);
+    await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.hyp2), heRel('prerequisite', h.ids.f2, h.ids.hyp2), heRel('supports', h.ids.f2, h.ids.hyp)]);
     const original = await h.relations();
     await h.view.removeToUnassigned(h.notes[removeKey], branch);
     const left = await h.relations();
@@ -384,16 +403,16 @@ integrationTest('hypothesis-evidence: removing the selection (removeSelected) dr
 });
 integrationTest('hypothesis-evidence: a structure-review merge allows a hypothesis on either side; links move to the adopter, the adopter keeps its type, undo restores', async () => {
   const h = await heHarness();
-  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x), heRel('prerequisite', h.ids.f1, h.ids.hyp2)]);
   const original = await h.relations();
   await h.view.removeToUnassigned(h.notes.hyp, false, h.ids.x);
   assert.deepEqual(h.notices, [], 'a hypothesis can be merged into another topic');
-  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.f2, h.ids.x), heRel('prerequisite', h.ids.f1, h.ids.hyp2)]);
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
   await h.view.removeToUnassigned(h.notes.f1, false, h.ids.hyp);
   assert.deepEqual(h.notices, [], 'a hypothesis can take over another topic');
-  assert.deepEqual(await h.relations(), [heRel('prerequisite', h.ids.hyp, h.ids.x)]);
+  assert.deepEqual(await h.relations(), [heRel('prerequisite', h.ids.f2, h.ids.x), heRel('prerequisite', h.ids.hyp, h.ids.hyp2)]);
   assert.equal((await h.repo.readNote(h.notes.hyp.path, await h.saved())).topicKind, 'hypothesis', 'the adopter keeps its own type');
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
@@ -444,11 +463,11 @@ integrationTest('hypothesis-evidence: a derives-from merge that closes a cycle d
   const h = await heHarness();
   await h.repo.writeTopicKind(h.notes.f1.path, 'atomic'); await h.view.hydrate();
   h.notes.f1.y = 1;
-  await h.relate([heRel('derives_from', h.ids.f1, h.ids.x), heRel('derives_from', h.ids.x, h.ids.f2), heRel('prerequisite', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.hyp, h.ids.f2)]);
+  await h.relate([heRel('derives_from', h.ids.f1, h.ids.x), heRel('derives_from', h.ids.x, h.ids.hyp), heRel('derives_from', h.ids.hyp, h.ids.f2), heRel('prerequisite', h.ids.f1, h.ids.hyp2), heRel('prerequisite', h.ids.hyp2, h.ids.root), heRel('prerequisite', h.ids.root, h.ids.f2)]);
   const original = await h.relations();
   await h.mergeKeys(['f1', 'f2']);
   const merged = await h.mergedId();
-  assert.deepEqual(await h.relations(), [heRel('derives_from', merged, h.ids.x), heRel('prerequisite', merged, h.ids.hyp)]);
+  assert.deepEqual(await h.relations(), [heRel('derives_from', merged, h.ids.x), heRel('derives_from', h.ids.x, h.ids.hyp), heRel('prerequisite', merged, h.ids.hyp2), heRel('prerequisite', h.ids.hyp2, h.ids.root)]);
   assert.equal(h.view.droppedCyclesOfLastMerge(), 2);
   assert.deepEqual(h.notices, ['Removed 2 derives-from or prerequisite link(s) that would form a cycle']);
   await h.view.travel(false);
@@ -470,12 +489,17 @@ integrationTest('hypothesis-evidence: merging A and C that both relate to B leav
 });
 integrationTest('hypothesis-evidence: removing an endpoint of each of the six relation kinds deletes the relation; undo restores all six', async () => {
   const h = await heHarness();
-  await h.relate(['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map((kind, i) => heRel(kind, h.ids.f1, [h.ids.f2, h.ids.x, h.ids.hyp, h.ids.hyp2, h.ids.root, h.ids.f2][i])));
+  const ends = [[h.ids.f1, h.ids.f2], [h.ids.f1, h.ids.x], [h.ids.f1, h.ids.hyp], [h.ids.f1, h.ids.hyp2], [h.ids.f1, h.ids.root], [h.ids.f2, h.ids.x]];
+  await h.relate(['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map((kind, i) => heRel(kind, ends[i][0], ends[i][1])));
   const original = await h.relations();
-  assert.equal(original.length, 6);
+  assert.equal(original.length, 6, 'six pairs, one relation each (decision #37)');
   assert.equal(new Set(original.map(r => r.kind)).size, 6);
   await h.view.removeToUnassigned(h.notes.f1, false);
-  assert.equal((await h.saved()).topicRelations, undefined, 'every relation touching the removed topic is gone');
+  assert.deepEqual(await h.relations(), [heRel('prerequisite', h.ids.f2, h.ids.x)], 'the five relations touching the removed topic are gone');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+  await h.view.removeToUnassigned(h.notes.f2, false);
+  assert.deepEqual((await h.relations()).map(r => r.kind), ['contradicts', 'verifies', 'derives_from', 'related'], 'removing the other end drops the prerequisite and the supports');
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });

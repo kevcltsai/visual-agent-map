@@ -15860,7 +15860,7 @@ var TOPIC_RELATION_KINDS = [
   "prerequisite"
 ];
 var RELATION_DESCRIPTION_MAX_LENGTH = 200;
-var relationKey = (r) => r.kind === "related" && r.from > r.to ? `${r.kind}\0${r.to}\0${r.from}` : `${r.kind}\0${r.from}\0${r.to}`;
+var relationKey = (r) => r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
 var copyRelation = (r, from = r.from, to = r.to) => {
   const out = { kind: r.kind, from, to };
   if (r.description !== void 0) out.description = r.description;
@@ -15955,7 +15955,7 @@ function legalRelationTargets(map, kind, fromId) {
   return map.nodes.filter((n) => relationAllowed(relations, { kind, from: fromId, to: n.id })).map((n) => n.id);
 }
 function retargetTopicRelations(map, fromIds, toId) {
-  const result = { droppedCycles: 0 };
+  const result = { droppedCycles: 0, droppedSamePair: 0 };
   if (!map.topicRelations) return result;
   const merged = new Set(fromIds);
   const move = (id) => merged.has(id) ? toId : id;
@@ -15966,7 +15966,10 @@ function retargetTopicRelations(map, fromIds, toId) {
     const next = copyRelation(r, move(r.from), move(r.to));
     if (next.from === next.to) return;
     const key2 = relationKey(next);
-    if (seen.has(key2)) return;
+    if (seen.has(key2)) {
+      result.droppedSamePair++;
+      return;
+    }
     seen.add(key2);
     if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
     else kept.push({ r: next, i });

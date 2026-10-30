@@ -58,9 +58,9 @@ const TOPIC_RELATION_KINDS: readonly string[] = [
   "prerequisite"
 ];
 export const RELATION_DESCRIPTION_MAX_LENGTH = 200;
-/** `related` has no direction, so both orders share one key. */
+/** A pair of topics, in either order and of any kind, holds at most one relation (decision #37), so this is the key. */
 const relationKey = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
-  r.kind === "related" && r.from > r.to ? `${r.kind}\0${r.to}\0${r.from}` : `${r.kind}\0${r.from}\0${r.to}`;
+  r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
 const copyRelation = (r: TopicRelation, from = r.from, to = r.to): TopicRelation => {
   const out: TopicRelation = { kind: r.kind, from, to };
   if (r.description !== undefined) out.description = r.description;
@@ -82,7 +82,8 @@ export function normalizeRelationDescription(text: string): string | undefined {
 
 /**
  * Drops what cannot be a relation: a non-list value (the whole key), malformed entries, unknown kinds, endpoints that
- * are not topics, self links and duplicates (`related` in either direction). A description that is not a string is
+ * are not topics, self links and a second relation on a pair of topics already linked (any kind, either direction;
+ * the first in list order stays, decision #37). A description that is not a string is
  * removed but its relation is kept; a string description is kept as written. Derivation and prerequisite cycles are
  * kept (a hand-written loop still opens). Logs warns with counts only; removes the key when nothing is left. Never throws.
  */
@@ -174,8 +175,8 @@ function reachesByKind(
   return false;
 }
 /**
- * Whether `candidate` may be added. Refuses a self link, a duplicate of the same kind (`related` in either direction)
- * and, for the two acyclic kinds, a link that would close a cycle among links of that kind (other kinds do not count).
+ * Whether `candidate` may be added. Refuses a self link, any pair of topics that already holds a relation (any kind,
+ * either direction; decision #37) and, for the two acyclic kinds, a link that would close a cycle among links of that kind (other kinds do not count).
  * `replacingIndex` leaves that existing relation out first (changing its kind or reversing it).
  */
 export function relationAllowed(
@@ -197,16 +198,17 @@ export function legalRelationTargets(map: MapDocument, kind: TopicRelationKind, 
   return map.nodes.filter(n => relationAllowed(relations, { kind, from: fromId, to: n.id })).map(n => n.id);
 }
 /**
- * Points every relation end at `fromIds` to `toId` (a merge). Self links and duplicates (`related` in either direction)
- * are dropped; a derivation or prerequisite that would newly close a cycle is dropped and counted (both kinds together).
+ * Points every relation end at `fromIds` to `toId` (a merge). Self links are dropped; when several relations land on
+ * the same pair of topics (any kind, either direction) only the first in list order stays and the rest are counted in
+ * `droppedSamePair` (decision #37); a derivation or prerequisite that would newly close a cycle is dropped and counted (both kinds together).
  * Cycles already present are not touched.
  */
 export function retargetTopicRelations(
   map: MapDocument,
   fromIds: Iterable<string>,
   toId: string
-): { droppedCycles: number } {
-  const result = { droppedCycles: 0 };
+): { droppedCycles: number; droppedSamePair: number } {
+  const result = { droppedCycles: 0, droppedSamePair: 0 };
   if (!map.topicRelations) return result;
   const merged = new Set(fromIds);
   const move = (id: string): string => (merged.has(id) ? toId : id);
@@ -217,7 +219,10 @@ export function retargetTopicRelations(
     const next = copyRelation(r, move(r.from), move(r.to));
     if (next.from === next.to) return;
     const key = relationKey(next);
-    if (seen.has(key)) return;
+    if (seen.has(key)) {
+      result.droppedSamePair++;
+      return;
+    }
     seen.add(key);
     if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
     else kept.push({ r: next, i });

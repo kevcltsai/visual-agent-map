@@ -1721,10 +1721,5 @@
       "language": "zh-CN",
       "schema": true
     }
-  },
-  "i18nPromptKeys": {
-    "total": 0,
-    "coveredBySnapshotCount": {},
-    "uncovered": []
   }
 }

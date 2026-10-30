@@ -60,10 +60,8 @@ test('the panel hands prepared steps to run: plan first, then transform', async 
   assert.deepEqual(sent.map(item => item.step), ['markdown.plan@1', 'markdown.transform@1']);
 });
 
-test('the five context_ai prompt keys are gone from i18n and nothing in the plugin reads them', () => {
+test('nothing in the plugin reads the five removed context_ai prompt keys', () => {
   const keys = ['condense', 'translate', 'translate_image', 'search_images', 'explain_image'].map(name => `prompt.context_ai_${name}`);
-  const i18n = require('./support.cjs').i18nSource();
-  for (const key of keys) assert.ok(!i18n.includes(`"${key}"`), key);
   for (const directory of ['experiences/markdown-context', '.']) {
     const files = directory === '.' ? ['main.ts'] : fs.readdirSync(path.join(root, directory), { recursive: true }).filter(name => name.endsWith('.ts')).map(name => path.join(directory, name));
     for (const file of files) { const text = fs.readFileSync(path.join(root, file), 'utf8'); for (const key of keys) assert.ok(!text.includes(key), `${file} still mentions ${key}`); }

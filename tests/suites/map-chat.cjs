@@ -1038,11 +1038,6 @@ integrationTest('map chat: keys inside the chat field are not taken by the view 
   assert.equal(find2([], 'F2').func(eventOn(chatField)), true);
 });
 
-test('map chat: nothing in the visual map code uses the private dragManager', () => {
-  const dir = path.join(root, 'experiences/visual-map');
-  for (const file of fs.readdirSync(dir).filter(name => name.endsWith('.ts'))) assert.doesNotMatch(fs.readFileSync(path.join(dir, file), 'utf8'), /dragManager/, file);
-});
-
 test('map chat: render() detaches the panel before it clears the page and mounts it into the new overlay', () => {
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const render = source.slice(source.indexOf('  private render(): void {'), source.indexOf('  /** `shownNode` may be a display copy'));

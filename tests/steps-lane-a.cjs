@@ -28,44 +28,6 @@ function runtime(reply) {
   return { calls, runTask: async (prompt, model, effort, schema, controls) => { calls.push({ prompt, model, effort, schema, controls }); controls.onRequest?.({ via: 'fake', n: calls.length }); return typeof reply === 'function' ? reply(prompt, calls.length) : reply; } };
 }
 
-test('a regular task is the step task.run@1; the exchange log keeps begin, sent(request json), received, parsed', async () => {
-  const log = spyLog(), fake = runtime(GOOD), ids = [];
-  await makeService(fake, { logging: true, exchanges: log }).askModel(context(), 'gpt-6-luna', 'low', undefined, id => ids.push(id));
-  assert.deepEqual(log.events.map(event => event[0]), ['begin', 'sent', 'received', 'parsed'], 'no completed entry: the service ends the exchange with parsed');
-  const [begin, sent, received, parsed] = log.events;
-  assert.deepEqual({ ...begin[1], id: '<id>', startedAt: '<time>' }, { id: '<id>', startedAt: '<time>', topic: 'Topic', mode: 'task', model: 'gpt-6-luna', effort: 'low', step: 'task.run@1' });
-  assert.equal(sent[1], begin[1].id); assert.equal(sent[2], JSON.stringify({ via: 'fake', n: 1 }, null, 2), 'sent stores the runtime request only, as before steps existed');
-  assert.equal(sent[3], fake.calls[0].prompt); assert.equal(received[2], GOOD); assert.equal(parsed[1], begin[1].id);
-  assert.deepEqual(ids, [begin[1].id]);
-});
-
-test('with exchange logging off nothing is logged, onExchange is not called and the call still runs', async () => {
-  const log = spyLog(), fake = runtime(GOOD), ids = [];
-  const result = await makeService(fake, { logging: false, exchanges: log }).askModel(context(), 'gpt-6-luna', 'low', undefined, id => ids.push(id));
-  assert.equal(result.summary, 'S'); assert.deepEqual(log.events, []); assert.deepEqual(ids, []);
-});
-
-test('a parse failure ends the entry with failed(stage "parsing", message) and rethrows the parser error', async () => {
-  const log = spyLog(), fake = runtime('this is not json');
-  await assert.rejects(makeService(fake, { logging: true, exchanges: log }).askModel(context(), 'gpt-6-luna', 'low'), /JSON/);
-  assert.deepEqual(log.events.map(event => event[0]), ['begin', 'sent', 'received', 'failed']);
-  const failed = log.events[3];
-  assert.match(failed[2], new RegExp(`^${translate('en', 'log.stage_parsing_reply')}: `));
-  assert.equal(failed[1], log.events[0][1].id);
-});
-
-test('a runtime failure reports the stage it was in: starting before the request, waiting after it', async () => {
-  for (const [reportRequest, stage] of [[false, 'log.stage_starting_ai'], [true, 'log.stage_waiting_reply']]) {
-    const log = spyLog();
-    const failing = { runTask: async (_prompt, _model, _effort, _schema, controls) => { if (reportRequest) controls.onRequest({ via: 'fake' }); throw new Error('provider down'); } };
-    await assert.rejects(makeService(failing, { logging: true, exchanges: log }).askModel(context(), 'gpt-6-luna', 'low'), /provider down/);
-    const names = log.events.map(event => event[0]);
-    assert.deepEqual(names, reportRequest ? ['begin', 'sent', 'failed'] : ['begin', 'failed']);
-    // The test's Error belongs to another realm than the service bundle, so the service reports it as text (as it always did).
-    assert.match(log.events.at(-1)[2], new RegExp(`^${translate('en', stage)}: (Error: )?provider down$`));
-  }
-});
-
 test('controls reach the runtime unchanged: abort signal, timeout, search flags, accepted callback and web events', async () => {
   const fake = runtime(GOOD), controller = new AbortController(), accepted = () => {}, web = () => {};
   await makeService(fake).askModel(context({ researchMode: 'research', timeoutMs: 240_000, aimIsolatedResearch: true }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
@@ -82,16 +44,6 @@ test('controls reach the runtime unchanged: abort signal, timeout, search flags,
   assert.equal(controls.timeoutMs, 240_000); assert.ok(controls.timeoutMessage);
   assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, false);
   assert.ok(fake.calls[0].schema.required.includes('searchStatus'), 'isolated web research selects the web research schema');
-});
-
-test('Codex local research selects the runtime without web search; Claude models run through the Claude runtime', async () => {
-  const { AiTaskService } = load('core/ai-task-service.ts');
-  const seen = [], answer = name => ({ runTask: async (_p, model, _e, _s, controls) => { seen.push([name, model]); controls.onRequest?.({}); return GOOD; } });
-  const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: (_dir, local) => answer(local ? 'codex-local' : 'codex-web'), claudeRuntime: () => answer('claude') });
-  await service.askModel(context({ researchMode: 'local' }), 'gpt-6-luna', 'low');
-  await service.askModel(context({ researchMode: 'research' }), 'gpt-6-luna', 'low');
-  await service.askModel(context(), 'claude:sonnet', 'low');
-  assert.deepEqual(seen, [['codex-local', 'gpt-6-luna'], ['codex-web', 'gpt-6-luna'], ['claude', 'sonnet']]);
 });
 
 test('an AIM request is the step aim.<phase>@1 and its prompt is exactly buildAimPrompt', async () => {

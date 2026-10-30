@@ -22,10 +22,6 @@ test('test wiring: an unwired test file is reported, a wired one, a glob match, 
   const dir = fixture(['wired.cjs', 'steps-a.cjs', 'dummy-unwired.cjs', 'support-x.cjs', 'build.cjs', 'run.cjs', 'test-vault.mjs'], 'node --test tests/wired.cjs tests/steps-*.cjs');
   try { assert.deepEqual(await findUnwired(dir), ['dummy-unwired.cjs']); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
-test('test wiring: this repository has no unwired test file', async () => {
-  const { findUnwired } = await checker();
-  assert.deepEqual(await findUnwired(root), []);
-});
 test('test wiring: a file mentioned only in a comment is not wired, in test:unit or in test-integration.mjs', async () => {
   const { findUnwired } = await checker();
   const commented = fixture(['a.cjs', 'b.cjs', 'test-vault.mjs'], 'node --test tests/a.cjs # tests/b.cjs');

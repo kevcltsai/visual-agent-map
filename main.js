@@ -16550,6 +16550,7 @@ function begin(deps) {
     }
     const trashed = /* @__PURE__ */ new Set();
     for (const item of [...(_a2 = journal.attachments) != null ? _a2 : []].reverse()) {
+      if (problems.length > 0) break;
       if (!item.created || trashed.has(item.path)) continue;
       trashed.add(item.path);
       try {

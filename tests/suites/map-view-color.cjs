@@ -44,6 +44,9 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="completed"', 660, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="strong">Hypothesis · Strong</span></div><h3 class="vam-card-title">Skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-topic-kind="hypothesis" data-status="idea"', 980, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">New hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="idea"', 980, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">New skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
+    ${card('data-topic-kind="hypothesis" data-status="running"', 20, 440, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="medium">Hypothesis · Medium</span></div><h3 class="vam-card-title">Running hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
+    ${card('data-topic-kind="hypothesis" data-status="error"', 340, 440, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="medium">Hypothesis · Medium</span></div><h3 class="vam-card-title">Failed hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
+    <div class="vam-node is-selected" data-topic-kind="hypothesis" data-status="completed" style="left:660px;top:440px"><div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="strong">Hypothesis · Strong</span></div><h3 class="vam-card-title">Selected hypothesis</h3><p class="vam-card-summary">Summary</p></div>
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
@@ -76,6 +79,9 @@ const CASES = [
   ['hypothesis-border-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]', 'border', 3],
   ['hypothesis-border-idea', '.vam-node[data-topic-kind="hypothesis"][data-status="idea"]:not([data-relevance])', 'border', 3],
   ['hypothesis-border-idea-skippable', '.vam-node[data-topic-kind="hypothesis"][data-status="idea"][data-relevance="side"]', 'border', 3],
+  ['hypothesis-border-running', '.vam-node[data-topic-kind="hypothesis"][data-status="running"]', 'border', 3],
+  ['hypothesis-border-error', '.vam-node[data-topic-kind="hypothesis"][data-status="error"]', 'border', 3],
+  ['hypothesis-border-selected', '.vam-node.is-selected[data-topic-kind="hypothesis"]', 'border', 3],
   ['hypothesis-tag', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance]) .vam-hypothesis-tag', 'color', 4.5],
   ['hypothesis-tag-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"] .vam-hypothesis-tag', 'color', 4.5],
   ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],

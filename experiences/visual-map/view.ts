@@ -7696,7 +7696,6 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    // Optional call: a test double for the view may not carry the hypothesis section.
     if (note) this.renderHypothesisSection(panel, node, close);
     // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");

@@ -19,12 +19,17 @@ const run = part => new Promise(resolve => {
   child.on("error", error => resolve({ ...part, code: 1, output: String(error) }));
 });
 
-async function main() {
-  let failed = false;
-  await Promise.all(parts.map(part => run(part).then(result => {
+// Runs every part at once, prints each part's whole output when it ends, and returns the names of the parts that exited non-zero.
+export async function runParts(list) {
+  const failed = [];
+  await Promise.all(list.map(part => run(part).then(result => {
     process.stdout.write(`\n=== ${result.name} (exit ${result.code}) ===\n${result.output}`);
-    if (result.code !== 0) failed = true;
+    if (result.code !== 0) failed.push(result.name);
   })));
-  process.exit(failed ? 1 : 0);
+  return failed;
+}
+
+async function main() {
+  process.exit((await runParts(parts)).length ? 1 : 0);
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

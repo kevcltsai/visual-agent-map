@@ -550,6 +550,61 @@ var en = {
   "ui.rename_topic": "Rename",
   "ui.paste_outline_add_many": "Paste an outline to add several topics at once",
   "ui.topic_more_options": "More ways to add topics",
+  "ui.topic_kind_topic": "Topic",
+  "ui.topic_kind_atomic": "Atomic knowledge",
+  "ui.topic_kind_hypothesis": "Hypothesis",
+  "ui.topic_kind_evidence": "Evidence",
+  "ui.topic_kind_conclusion": "Conclusion",
+  "ui.topic_kind_action": "Action",
+  "ui.topic_type": "Topic type",
+  "ui.add_subtopic_menu": "Add subtopic\u2026",
+  "ui.add_kind_0": "Add {0}",
+  "ui.new_kind_0": "New {0}",
+  "ui.hypothesis_tag_0": "Hypothesis \xB7 {0}",
+  "ui.hypothesis_weak": "Weak",
+  "ui.hypothesis_medium": "Medium",
+  "ui.hypothesis_strong": "Strong",
+  "ui.hypothesis_strength": "Strength",
+  "ui.relations_heading": "Relations",
+  "ui.relation_name_supports": "Supports",
+  "ui.relation_name_contradicts": "Contradicts",
+  "ui.relation_name_verifies": "Verifies",
+  "ui.relation_name_derives_from": "Derives from",
+  "ui.relation_name_related": "Related",
+  "ui.relation_name_prerequisite": "Prerequisite",
+  "ui.add_relation": "Add relation\u2026",
+  "ui.add_relation_title_0": "Add relation: {0}",
+  "ui.add_relation_description": "Choose the topic at the other end (B). This topic is A.",
+  "ui.no_relation_target_0": "There is no topic this one can be linked to with \u201C{0}\u201D.",
+  "ui.relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_in_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_this_topic": "This topic",
+  "ui.relation_this_topic_object": "this topic",
+  "ui.relation_sentence_supports_0_1": "{0} supports {1}",
+  "ui.relation_sentence_contradicts_0_1": "{0} contradicts {1}",
+  "ui.relation_sentence_verifies_0_1": "{0} verifies {1}",
+  "ui.relation_sentence_derives_from_0_1": "{0} is derived from {1}",
+  "ui.relation_sentence_prerequisite_0_1": "{0} is a prerequisite for {1}",
+  "ui.relation_sentence_related_0_1": "{0} is related to {1}",
+  "ui.relations_none": "No relations yet",
+  "ui.edit_relation_0": "Edit relation: {0}",
+  "ui.remove_relation_0": "Remove relation: {0}",
+  "ui.relation_editor_title": "Edit relation",
+  "ui.relation_kind_label": "Relation type",
+  "ui.relation_reverse": "Reverse direction",
+  "ui.relation_reverse_blocked_cycle": "Cannot reverse: it would form a cycle.",
+  "ui.relation_description_label": "Note (optional)",
+  "ui.relation_description_placeholder": "Up to 200 characters; line breaks are saved as spaces",
+  "ui.relation_direction_label": "Direction",
+  "ui.relation_description_remaining_0": "{0} characters left",
+  "ui.relation_kind_blocked_cycle_0": "Unavailable because they would form a cycle: {0}",
+  "ui.relation_delete": "Delete relation",
+  "ui.relation_gone": "This relation no longer exists.",
+  "ui.merge_dropped_cycles_0": "Removed {0} derives-from or prerequisite link(s) that would form a cycle",
+  "ui.merge_dropped_same_pair_0": "Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)",
+  "ui.relation_label_full_0_1_2": "{0}: {1} \u2192 {2}",
+  "ui.relation_label_full_related_0_1_2": "{0}: {1} \u2014 {2}",
   "ui.collapse_levels": "Collapse or expand the whole map",
   "ui.collapse_all": "Collapse all",
   "ui.expand_all": "Expand all",
@@ -933,9 +988,8 @@ var en = {
   "ui.title_problem_brackets": "A title cannot contain [[ or ]]; they would break the note's links.",
   "ui.multi_research_start_0": "Start research ({0})",
   "ui.topic_0": "Topic: {0}",
-  "ui.apply_parent": "Apply",
-  "ui.will_move_under_0": "Will move under \u201C{0}\u201D.",
-  "ui.will_become_root_topic": "Will become a root topic.",
+  "ui.moved_under_0": "Moved under \u201C{0}\u201D.",
+  "ui.became_root_topic": "Now a root topic.",
   "ui.list_separator": ", ",
   "ui.synthesis_of_0": "Synthesis: {0}",
   "ui.synthesis_of_0_and_1_more": "Synthesis: {0} and others ({1} topics)",
@@ -1012,6 +1066,7 @@ var en = {
   "ui.map_chat_guard_not_markdown": "only .md files are allowed",
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "the edit would change a topic's type or hypothesis fields (topic-kind or hypothesis-strength)",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
   "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",
@@ -2519,6 +2574,61 @@ var zhCN = {
   "ui.rename_topic": "\u91CD\u547D\u540D",
   "ui.paste_outline_add_many": "\u7C98\u8D34\u5927\u7EB2\uFF0C\u4E00\u6B21\u6DFB\u52A0\u591A\u4E2A",
   "ui.topic_more_options": "\u66F4\u591A\u6DFB\u52A0\u8BAE\u9898\u7684\u65B9\u5F0F",
+  "ui.topic_kind_topic": "\u4E00\u822C\u8BAE\u9898",
+  "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8BC6",
+  "ui.topic_kind_hypothesis": "\u5047\u8BBE",
+  "ui.topic_kind_evidence": "\u8BC1\u636E",
+  "ui.topic_kind_conclusion": "\u7ED3\u8BBA",
+  "ui.topic_kind_action": "\u884C\u52A8",
+  "ui.topic_type": "\u8BAE\u9898\u7C7B\u578B",
+  "ui.add_subtopic_menu": "\u6DFB\u52A0\u5B50\u8BAE\u9898\u2026",
+  "ui.add_kind_0": "\u6DFB\u52A0{0}",
+  "ui.new_kind_0": "\u65B0{0}",
+  "ui.hypothesis_tag_0": "\u5047\u8BBE\u30FB{0}",
+  "ui.hypothesis_weak": "\u5F31",
+  "ui.hypothesis_medium": "\u4E2D",
+  "ui.hypothesis_strong": "\u5F3A",
+  "ui.hypothesis_strength": "\u5F3A\u5EA6",
+  "ui.relations_heading": "\u5173\u7CFB",
+  "ui.relation_name_supports": "\u652F\u6301",
+  "ui.relation_name_contradicts": "\u53CD\u9A73",
+  "ui.relation_name_verifies": "\u9A8C\u8BC1",
+  "ui.relation_name_derives_from": "\u63A8\u5BFC",
+  "ui.relation_name_related": "\u76F8\u5173",
+  "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8BC6",
+  "ui.add_relation": "\u6DFB\u52A0\u5173\u7CFB\u2026",
+  "ui.add_relation_title_0": "\u6DFB\u52A0\u5173\u7CFB\uFF1A{0}",
+  "ui.add_relation_description": "\u9009\u62E9\u53E6\u4E00\u7AEF\u7684\u8BAE\u9898\uFF08B\uFF09\u3002\u672C\u8BAE\u9898\u662F A\u3002",
+  "ui.no_relation_target_0": "\u6CA1\u6709\u53EF\u4EE5\u7528\u201C{0}\u201D\u94FE\u63A5\u7684\u8BAE\u9898\u3002",
+  "ui.relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_in_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_this_topic": "\u6B64\u8BAE\u9898",
+  "ui.relation_this_topic_object": "\u6B64\u8BAE\u9898",
+  "ui.relation_sentence_supports_0_1": "{0} \u652F\u6301 {1}",
+  "ui.relation_sentence_contradicts_0_1": "{0} \u53CD\u9A73 {1}",
+  "ui.relation_sentence_verifies_0_1": "{0} \u9A8C\u8BC1 {1}",
+  "ui.relation_sentence_derives_from_0_1": "{0} \u7531 {1} \u63A8\u5BFC\u800C\u6765",
+  "ui.relation_sentence_prerequisite_0_1": "{0} \u662F {1} \u7684\u524D\u7F6E\u77E5\u8BC6",
+  "ui.relation_sentence_related_0_1": "{0} \u4E0E {1} \u76F8\u5173",
+  "ui.relations_none": "\u8FD8\u6CA1\u6709\u5173\u7CFB",
+  "ui.edit_relation_0": "\u7F16\u8F91\u5173\u7CFB\uFF1A{0}",
+  "ui.remove_relation_0": "\u79FB\u9664\u5173\u7CFB\uFF1A{0}",
+  "ui.relation_editor_title": "\u7F16\u8F91\u5173\u7CFB",
+  "ui.relation_kind_label": "\u5173\u7CFB\u79CD\u7C7B",
+  "ui.relation_reverse": "\u53CD\u8F6C\u65B9\u5411",
+  "ui.relation_reverse_blocked_cycle": "\u65E0\u6CD5\u53CD\u8F6C\uFF1A\u4F1A\u5F62\u6210\u73AF\u3002",
+  "ui.relation_description_label": "\u8BF4\u660E\uFF08\u9009\u586B\uFF09",
+  "ui.relation_description_placeholder": "\u6700\u591A 200 \u5B57\uFF1B\u6362\u884C\u4F1A\u5B58\u6210\u7A7A\u683C",
+  "ui.relation_direction_label": "\u65B9\u5411",
+  "ui.relation_description_remaining_0": "\u8FD8\u53EF\u8F93\u5165 {0} \u5B57",
+  "ui.relation_kind_blocked_cycle_0": "\u65E0\u6CD5\u9009\u7528\uFF0C\u4F1A\u5F62\u6210\u73AF\uFF1A{0}",
+  "ui.relation_delete": "\u5220\u9664\u5173\u7CFB",
+  "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
+  "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u63A8\u5BFC\u6216\u524D\u7F6E\u77E5\u8BC6",
+  "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u6761\u91CD\u590D\u7684\u5173\u7CFB\uFF08\u540C\u4E00\u5BF9\u8BAE\u9898\u53EA\u4FDD\u7559\u4E00\u6761\uFF09",
+  "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
+  "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u5F00",
@@ -2902,9 +3012,8 @@ var zhCN = {
   "ui.title_problem_brackets": "\u6807\u9898\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5219\u4F1A\u5F04\u574F\u7B14\u8BB0\u7684\u94FE\u63A5\u3002",
   "ui.multi_research_start_0": "\u5F00\u59CB\u7814\u7A76 {0} \u4E2A\u8BAE\u9898",
   "ui.topic_0": "\u8BAE\u9898\uFF1A{0}",
-  "ui.apply_parent": "\u5E94\u7528",
-  "ui.will_move_under_0": "\u5C06\u79FB\u5230\u201C{0}\u201D\u5E95\u4E0B\u3002",
-  "ui.will_become_root_topic": "\u5C06\u6210\u4E3A\u6839\u8BAE\u9898\u3002",
+  "ui.moved_under_0": "\u5DF2\u79FB\u5230\u201C{0}\u201D\u5E95\u4E0B\u3002",
+  "ui.became_root_topic": "\u5DF2\u6210\u4E3A\u6839\u8BAE\u9898\u3002",
   "ui.list_separator": "\u3001",
   "ui.synthesis_of_0": "\u6574\u5408\uFF1A{0}",
   "ui.synthesis_of_0_and_1_more": "\u6574\u5408\uFF1A{0} \u7B49 {1} \u4E2A\u8BAE\u9898",
@@ -2981,6 +3090,7 @@ var zhCN = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8BB8 .md \u6587\u4EF6",
   "ui.map_chat_guard_map_unparseable": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u5F04\u574F\u5FC3\u667A\u56FE\u6587\u4EF6",
   "ui.map_chat_guard_topic_identity_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u8BC6\u522B\u5B57\u6BB5",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u7C7B\u578B\u6216\u5F3A\u5EA6\u5B57\u6BB5\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6587\u4EF6\u4F1A\u7528\u5230\u63D2\u4EF6\u4FDD\u7559\u7684\u5B57\u6BB5",
   "ui.map_chat_guard_identity_added": "\u8FD9\u6B21\u4FEE\u6539\u4F1A\u7ED9\u666E\u901A\u7B14\u8BB0\u52A0\u4E0A\u63D2\u4EF6\u4FDD\u7559\u7684\u8BAE\u9898\u5B57\u6BB5",
   "ui.map_chat_guard_map_file": "\u8FD9\u662F\u5FC3\u667A\u56FE\u6587\u4EF6\uFF0C\u8BF7\u6539\u7528\u8BAE\u9898\u52A8\u4F5C",
@@ -4488,6 +4598,61 @@ var zhTW = {
   "ui.rename_topic": "\u91CD\u65B0\u547D\u540D",
   "ui.paste_outline_add_many": "\u8CBC\u4E0A\u5927\u7DB1\uFF0C\u4E00\u6B21\u65B0\u589E\u591A\u500B",
   "ui.topic_more_options": "\u66F4\u591A\u65B0\u589E\u8B70\u984C\u7684\u65B9\u5F0F",
+  "ui.topic_kind_topic": "\u4E00\u822C\u8B70\u984C",
+  "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8B58",
+  "ui.topic_kind_hypothesis": "\u5047\u8A2D",
+  "ui.topic_kind_evidence": "\u8B49\u64DA",
+  "ui.topic_kind_conclusion": "\u7D50\u8AD6",
+  "ui.topic_kind_action": "\u884C\u52D5",
+  "ui.topic_type": "\u8B70\u984C\u985E\u578B",
+  "ui.add_subtopic_menu": "\u65B0\u589E\u5B50\u8B70\u984C\u2026",
+  "ui.add_kind_0": "\u65B0\u589E{0}",
+  "ui.new_kind_0": "\u65B0{0}",
+  "ui.hypothesis_tag_0": "\u5047\u8A2D\u30FB{0}",
+  "ui.hypothesis_weak": "\u5F31",
+  "ui.hypothesis_medium": "\u4E2D",
+  "ui.hypothesis_strong": "\u5F37",
+  "ui.hypothesis_strength": "\u5F37\u5EA6",
+  "ui.relations_heading": "\u95DC\u4FC2",
+  "ui.relation_name_supports": "\u652F\u6301",
+  "ui.relation_name_contradicts": "\u53CD\u99C1",
+  "ui.relation_name_verifies": "\u9A57\u8B49",
+  "ui.relation_name_derives_from": "\u63A8\u5C0E",
+  "ui.relation_name_related": "\u76F8\u95DC",
+  "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8B58",
+  "ui.add_relation": "\u65B0\u589E\u95DC\u4FC2\u2026",
+  "ui.add_relation_title_0": "\u65B0\u589E\u95DC\u4FC2\uFF1A{0}",
+  "ui.add_relation_description": "\u9078\u64C7\u53E6\u4E00\u7AEF\u7684\u8B70\u984C\uFF08B\uFF09\u3002\u672C\u8B70\u984C\u662F A\u3002",
+  "ui.no_relation_target_0": "\u6C92\u6709\u53EF\u4EE5\u7528\u300C{0}\u300D\u9023\u7D50\u7684\u8B70\u984C\u3002",
+  "ui.relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_in_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_this_topic": "\u6B64\u8B70\u984C",
+  "ui.relation_this_topic_object": "\u6B64\u8B70\u984C",
+  "ui.relation_sentence_supports_0_1": "{0} \u652F\u6301 {1}",
+  "ui.relation_sentence_contradicts_0_1": "{0} \u53CD\u99C1 {1}",
+  "ui.relation_sentence_verifies_0_1": "{0} \u9A57\u8B49 {1}",
+  "ui.relation_sentence_derives_from_0_1": "{0} \u7531 {1} \u63A8\u5C0E\u800C\u4F86",
+  "ui.relation_sentence_prerequisite_0_1": "{0} \u662F {1} \u7684\u524D\u7F6E\u77E5\u8B58",
+  "ui.relation_sentence_related_0_1": "{0} \u8207 {1} \u76F8\u95DC",
+  "ui.relations_none": "\u9084\u6C92\u6709\u95DC\u4FC2",
+  "ui.edit_relation_0": "\u7DE8\u8F2F\u95DC\u4FC2\uFF1A{0}",
+  "ui.remove_relation_0": "\u79FB\u9664\u95DC\u4FC2\uFF1A{0}",
+  "ui.relation_editor_title": "\u7DE8\u8F2F\u95DC\u4FC2",
+  "ui.relation_kind_label": "\u95DC\u4FC2\u7A2E\u985E",
+  "ui.relation_reverse": "\u53CD\u8F49\u65B9\u5411",
+  "ui.relation_reverse_blocked_cycle": "\u7121\u6CD5\u53CD\u8F49\uFF1A\u6703\u5F62\u6210\u74B0\u3002",
+  "ui.relation_description_label": "\u8AAA\u660E\uFF08\u9078\u586B\uFF09",
+  "ui.relation_description_placeholder": "\u6700\u591A 200 \u5B57\uFF1B\u63DB\u884C\u6703\u5B58\u6210\u7A7A\u767D",
+  "ui.relation_direction_label": "\u65B9\u5411",
+  "ui.relation_description_remaining_0": "\u9084\u53EF\u8F38\u5165 {0} \u5B57",
+  "ui.relation_kind_blocked_cycle_0": "\u7121\u6CD5\u9078\u7528\uFF0C\u6703\u5F62\u6210\u74B0\uFF1A{0}",
+  "ui.relation_delete": "\u522A\u9664\u95DC\u4FC2",
+  "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
+  "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u63A8\u5C0E\u6216\u524D\u7F6E\u77E5\u8B58",
+  "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u689D\u91CD\u8907\u7684\u95DC\u4FC2\uFF08\u540C\u4E00\u5C0D\u8B70\u984C\u53EA\u4FDD\u7559\u4E00\u689D\uFF09",
+  "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
+  "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u958B",
@@ -4871,9 +5036,8 @@ var zhTW = {
   "ui.title_problem_brackets": "\u6A19\u984C\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5247\u6703\u5F04\u58DE\u7B46\u8A18\u7684\u9023\u7D50\u3002",
   "ui.multi_research_start_0": "\u958B\u59CB\u7814\u7A76 {0} \u500B\u8B70\u984C",
   "ui.topic_0": "\u8B70\u984C\uFF1A{0}",
-  "ui.apply_parent": "\u5957\u7528",
-  "ui.will_move_under_0": "\u5C07\u79FB\u5230\u300C{0}\u300D\u5E95\u4E0B\u3002",
-  "ui.will_become_root_topic": "\u5C07\u6210\u70BA\u6839\u8B70\u984C\u3002",
+  "ui.moved_under_0": "\u5DF2\u79FB\u5230\u300C{0}\u300D\u5E95\u4E0B\u3002",
+  "ui.became_root_topic": "\u5DF2\u6210\u70BA\u6839\u8B70\u984C\u3002",
   "ui.list_separator": "\u3001",
   "ui.synthesis_of_0": "\u6574\u5408\uFF1A{0}",
   "ui.synthesis_of_0_and_1_more": "\u6574\u5408\uFF1A{0} \u7B49 {1} \u500B\u8B70\u984C",
@@ -4950,6 +5114,7 @@ var zhTW = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8A31 .md \u6A94",
   "ui.map_chat_guard_map_unparseable": "\u9019\u500B\u4FEE\u6539\u6703\u5F04\u58DE\u5FC3\u667A\u5716\u6A94",
   "ui.map_chat_guard_topic_identity_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u8B58\u5225\u6B04\u4F4D",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u985E\u578B\u6216\u5F37\u5EA6\u6B04\u4F4D\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6A94\u6848\u6703\u7528\u5230\u5916\u639B\u4FDD\u7559\u7684\u6B04\u4F4D",
   "ui.map_chat_guard_identity_added": "\u9019\u6B21\u4FEE\u6539\u6703\u66FF\u4E00\u822C\u7B46\u8A18\u52A0\u4E0A\u5916\u639B\u4FDD\u7559\u7684\u8B70\u984C\u6B04\u4F4D",
   "ui.map_chat_guard_map_file": "\u9019\u662F\u5FC3\u667A\u5716\u6A94\uFF0C\u8ACB\u6539\u7528\u8B70\u984C\u52D5\u4F5C",
@@ -15583,6 +15748,37 @@ function upgradeLegacyAimData(value) {
   return upgraded;
 }
 
+// log-manager.ts
+var LogManager = class {
+  constructor(limit = 500) {
+    this.limit = limit;
+    __publicField(this, "entries", []);
+    __publicField(this, "listeners", /* @__PURE__ */ new Set());
+  }
+  appendLog(level, message) {
+    const normalized = message.trim();
+    if (!normalized) return;
+    this.entries.push({ timestamp: (/* @__PURE__ */ new Date()).toISOString(), level, message: normalized });
+    if (this.entries.length > this.limit) this.entries.splice(0, this.entries.length - this.limit);
+    for (const listener of this.listeners) listener();
+  }
+  getLogs() {
+    return this.entries.map((entry) => ({ ...entry }));
+  }
+  clear() {
+    this.entries = [];
+    for (const listener of this.listeners) listener();
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+};
+function formatDebugLogs(entries) {
+  return entries.map((entry) => `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`).join("\n");
+}
+var debugLog = new LogManager();
+
 // experiences/visual-map/ai-mode.ts
 var DEFAULT_MAP_AI_MODE = "quick";
 function isMapAiMode(value) {
@@ -15652,6 +15848,146 @@ function applyCollapseLevel(nodes, shownLevels) {
 }
 
 // map-model.ts
+var TOPIC_RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+var RELATION_DESCRIPTION_MAX_LENGTH = 200;
+var relationKey = (r) => r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
+var copyRelation = (r, from = r.from, to = r.to) => {
+  const out = { kind: r.kind, from, to };
+  if (r.description !== void 0) out.description = r.description;
+  return out;
+};
+function isAcyclicKind(kind) {
+  return kind === "derives_from" || kind === "prerequisite";
+}
+function normalizeRelationDescription(text11) {
+  const flat = String(text11).replace(/\s+/g, " ").trim();
+  if (!flat) return void 0;
+  return Array.from(flat).slice(0, RELATION_DESCRIPTION_MAX_LENGTH).join("").trim() || void 0;
+}
+function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
+  const raw = map.topicRelations;
+  if (raw === void 0) return;
+  if (!Array.isArray(raw)) {
+    delete map.topicRelations;
+    log("warn", "Ignored topicRelations: not a list.");
+    return;
+  }
+  const ids = new Set(map.nodes.map((n) => n == null ? void 0 : n.id));
+  const seen = /* @__PURE__ */ new Set();
+  const kept = [];
+  let dropped = 0;
+  let droppedDescriptions = 0;
+  for (const item of raw) {
+    const r = item;
+    if (!r || typeof r !== "object" || typeof r.kind !== "string" || !TOPIC_RELATION_KINDS.includes(r.kind) || typeof r.from !== "string" || typeof r.to !== "string" || !ids.has(r.from) || !ids.has(r.to) || r.from === r.to) {
+      dropped++;
+      continue;
+    }
+    const clean4 = { kind: r.kind, from: r.from, to: r.to };
+    const key2 = relationKey(clean4);
+    if (seen.has(key2)) {
+      dropped++;
+      continue;
+    }
+    seen.add(key2);
+    if (typeof r.description === "string") clean4.description = r.description;
+    else if ("description" in r) droppedDescriptions++;
+    kept.push(clean4);
+  }
+  if (dropped)
+    log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (droppedDescriptions)
+    log(
+      "warn",
+      `Dropped ${droppedDescriptions} invalid topic relation description${droppedDescriptions === 1 ? "" : "s"} while reading the map.`
+    );
+  if (kept.length) map.topicRelations = kept;
+  else delete map.topicRelations;
+}
+function setTopicRelations(map, list) {
+  if (list.length) map.topicRelations = list.map((r) => copyRelation(r));
+  else delete map.topicRelations;
+}
+function removeTopicRelationsFor(map, ids) {
+  if (!map.topicRelations) return;
+  const gone = new Set(ids);
+  setTopicRelations(
+    map,
+    map.topicRelations.filter((r) => !gone.has(r.from) && !gone.has(r.to))
+  );
+}
+function reachesByKind(relations, kind, start, target) {
+  const seen = /* @__PURE__ */ new Set([start]);
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift();
+    if (current === target) return true;
+    for (const r of relations)
+      if (r.kind === kind && r.from === current && !seen.has(r.to)) {
+        seen.add(r.to);
+        queue.push(r.to);
+      }
+  }
+  return false;
+}
+function relationAllowed(relations, candidate, replacingIndex) {
+  if (candidate.from === candidate.to) return false;
+  const others = relations.filter((_, i) => i !== replacingIndex);
+  const key2 = relationKey(candidate);
+  if (others.some((r) => relationKey(r) === key2)) return false;
+  if (isAcyclicKind(candidate.kind) && reachesByKind(others, candidate.kind, candidate.to, candidate.from))
+    return false;
+  return true;
+}
+function legalRelationTargets(map, kind, fromId) {
+  var _a2;
+  const relations = (_a2 = map.topicRelations) != null ? _a2 : [];
+  return map.nodes.filter((n) => relationAllowed(relations, { kind, from: fromId, to: n.id })).map((n) => n.id);
+}
+function retargetTopicRelations(map, fromIds, toId) {
+  const result = { droppedCycles: 0, droppedSamePair: 0 };
+  if (!map.topicRelations) return result;
+  const merged = new Set(fromIds);
+  const move = (id) => merged.has(id) ? toId : id;
+  const kept = [];
+  const seen = /* @__PURE__ */ new Set();
+  const touched = [];
+  map.topicRelations.forEach((r, i) => {
+    const next = copyRelation(r, move(r.from), move(r.to));
+    if (next.from === next.to) return;
+    const key2 = relationKey(next);
+    if (seen.has(key2)) {
+      result.droppedSamePair++;
+      return;
+    }
+    seen.add(key2);
+    if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
+    else kept.push({ r: next, i });
+  });
+  for (const item of touched) {
+    if (reachesByKind(
+      kept.map((k) => k.r),
+      item.r.kind,
+      item.r.to,
+      item.r.from
+    ))
+      result.droppedCycles++;
+    else kept.push(item);
+  }
+  kept.sort((a, b) => a.i - b.i);
+  setTopicRelations(
+    map,
+    kept.map((k) => k.r)
+  );
+  return result;
+}
 function clearQuestionConvergenceEdges(map) {
   let changed = false;
   for (const node of map.nodes) {
@@ -15737,7 +16073,7 @@ function validRetainedReports(reports) {
     return typeof summary === "string" && summary.trim() !== "" && typeof detail === "string" && detail.trim() !== "";
   });
 }
-function parseMap(content) {
+function parseMap(content, log) {
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
   const map = upgradeLegacyAimData(JSON.parse(block[1]));
@@ -15778,6 +16114,7 @@ function parseMap(content) {
   if (!map.viewport || !Number.isFinite(map.viewport.x) || !Number.isFinite(map.viewport.y) || !Number.isFinite(map.viewport.zoom))
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
+  sanitizeTopicRelations(map, log);
   return map;
 }
 function validateAimMap(map) {
@@ -16854,6 +17191,127 @@ function withThinkingOrigin(context, note) {
     ...context,
     sourceContext: [context.sourceContext, thinkingOriginBlock(note.thinkingOrigin)].filter(Boolean).join("\n\n")
   };
+}
+
+// experiences/visual-map/relation-geometry.ts
+var MIN_CONTROL = 16;
+var MAX_CONTROL = 60;
+function axisGap(aStart, aSize, bStart, bSize) {
+  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
+}
+var centreOf = (box) => ({
+  x: box.x + box.width / 2,
+  y: box.y + box.height / 2
+});
+function nearestSides(a, b) {
+  const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
+  if (horizontal < 0 && vertical < 0) {
+    const from = centreOf(a), to = centreOf(b);
+    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
+  }
+  if (horizontal >= vertical) {
+    const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
+    return {
+      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
+      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign2, ny: 0 },
+      gap: horizontal
+    };
+  }
+  const downward = centreOf(b).y >= centreOf(a).y, sign = downward ? 1 : -1;
+  return {
+    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
+    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
+    gap: vertical
+  };
+}
+var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
+function curveOf(a, b) {
+  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
+  return {
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
+  };
+}
+function relationPathData(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+function relationLabelPoint(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+
+// experiences/visual-map/topic-kind-shape.ts
+var TOPIC_KIND_SHAPES = {
+  topic: { shape: "rounded", labelKey: "ui.topic_kind_topic" },
+  action: { shape: "rect", labelKey: "ui.topic_kind_action" },
+  atomic: { shape: "ellipse", labelKey: "ui.topic_kind_atomic" },
+  hypothesis: { shape: "diamond", labelKey: "ui.topic_kind_hypothesis" },
+  evidence: { shape: "folded", labelKey: "ui.topic_kind_evidence" },
+  conclusion: { shape: "hexagon", labelKey: "ui.topic_kind_conclusion" }
+};
+var EDGE = 0;
+var FAR = 100;
+var HEXAGON = `25,${EDGE} 75,${EDGE} ${FAR},50 75,${FAR} 25,${FAR} ${EDGE},50`;
+var FOLD_X = 88;
+var FOLD_Y = 24;
+var FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR} ${EDGE},${FAR}`;
+var FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
+var DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
+function hasSvgShape(kind) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  return shape !== "rounded" && shape !== "rect";
+}
+function renderShapeBackground(card, kind) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  if (!hasSvgShape(kind)) return void 0;
+  const svg = createSvg("svg");
+  svg.addClass("vam-kind-shape");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const outline = createSvg(shape === "ellipse" ? "ellipse" : "polygon");
+  outline.addClass("vam-kind-outline");
+  if (shape === "ellipse") {
+    outline.setAttribute("cx", "50");
+    outline.setAttribute("cy", "50");
+    outline.setAttribute("rx", "50");
+    outline.setAttribute("ry", "50");
+  } else outline.setAttribute("points", shape === "diamond" ? DIAMOND : shape === "hexagon" ? HEXAGON : FOLDED);
+  outline.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(outline);
+  if (shape === "folded") {
+    const fold2 = createSvg("polyline");
+    fold2.addClass("vam-kind-fold");
+    fold2.setAttribute("points", FOLD_LINE);
+    fold2.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(fold2);
+  }
+  card.appendChild(svg);
+  return svg;
+}
+var FIT = {
+  // Corner on the ellipse needs w^2 + h^2 <= 1.
+  ellipse: { width: 0.7, height: 0.7 },
+  // Corner on the diamond needs w + h <= 1: half the card's width, so the top and bottom padding is half the text each.
+  diamond: { width: 0.5, height: 0.5 },
+  // The hexagon's slanted side needs w + h / 2 <= 1.
+  hexagon: { width: 0.7, height: 0.58 },
+  // The cut corner needs h <= 1 - 4 * (0.94 - 0.88): the top right of the block clears the fold.
+  folded: { width: 0.88, height: 0.74 }
+};
+var SAFETY = 4;
+var BASE_PADDING = { top: 12, right: 14, bottom: 14, left: 14 };
+function shapeInsets(kind, content) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  if (shape === "rounded" || shape === "rect") return { ...BASE_PADDING };
+  const fit = FIT[shape];
+  const side = content.width * (1 - fit.width) / 2;
+  const vertical = content.height * (1 / fit.height - 1) / 2 + SAFETY;
+  return { top: vertical, right: side, bottom: vertical, left: side };
 }
 
 // experiences/visual-map/view.ts
@@ -18713,6 +19171,17 @@ function readRelevanceContext(fm) {
   const context = fm["relevance-context"];
   return typeof context === "string" ? normalizeRelevanceContext(context) : void 0;
 }
+var TOPIC_KINDS = ["topic", "action", "atomic", "hypothesis", "evidence", "conclusion"];
+var HYPOTHESIS_STRENGTHS = ["weak", "medium", "strong"];
+function readTopicKind(fm) {
+  const value = fm["topic-kind"];
+  return typeof value === "string" && TOPIC_KINDS.includes(value) ? value : "topic";
+}
+function readHypothesisStrength(fm) {
+  if (readTopicKind(fm) !== "hypothesis") return void 0;
+  const value = fm["hypothesis-strength"];
+  return typeof value === "string" && HYPOTHESIS_STRENGTHS.includes(value) ? value : "weak";
+}
 
 // repository.ts
 function normalizeMapChatStyle(value) {
@@ -19520,6 +19989,8 @@ var Repository = class {
       ...typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
+      ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
+      ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
       mapId: text5(fm["agent-map-id"]),
@@ -19623,10 +20094,11 @@ ${withReferenceLinks(body, fm, language2)}`;
     });
   }
   async createNote(title, model, map, mapPath, modelSource, initial = {}, onCreate) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID();
+    const kind = (_a2 = initial.topicKind) != null ? _a2 : initial.hypothesis ? "hypothesis" : "topic";
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -19638,8 +20110,10 @@ ${withReferenceLinks(body, fm, language2)}`;
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": (_a2 = initial.reasoning) != null ? _a2 : this.settings.cliReasoning,
+      "reasoning-level": (_b2 = initial.reasoning) != null ? _b2 : this.settings.cliReasoning,
       ...initial.researchMode ? { "research-mode": initial.researchMode } : {},
+      ...kind !== "topic" ? { "topic-kind": kind } : {},
+      ...kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {},
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -19651,7 +20125,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
       title,
       `---
 ${(0, import_obsidian13.stringifyYaml)(metadata)}---
-${noteBody(title, (_b2 = initial.summary) != null ? _b2 : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_c = initial.detail) != null ? _c : "", "", "", origin)}`,
+${noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_d = initial.detail) != null ? _d : "", "", "", origin)}`,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -19749,6 +20223,23 @@ ${body}`);
   async readRelevanceSetup(path) {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+  }
+  /**
+   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-strength` stays, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeTopicKind(path, kind) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
+  }
+  /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
+  async writeHypothesisStrength(path, strength) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => setFrontmatterKeys(content, { "hypothesis-strength": strength })
+    );
   }
   /**
    * Sets or removes only the relevance keys of a note's frontmatter (`relevance-tier`, `relevance-manual`, and the
@@ -20881,6 +21372,18 @@ function renderRelevanceTagButton(parent, tier, label, ariaLabel, open, disabled
     event.stopPropagation();
     if (!tag.disabled) open(tag);
   });
+  return tag;
+}
+
+// experiences/visual-map/hypothesis-label.ts
+var STRENGTH_LABEL = {
+  weak: "ui.hypothesis_weak",
+  medium: "ui.hypothesis_medium",
+  strong: "ui.hypothesis_strong"
+};
+function renderHypothesisTag(parent, strength, text11) {
+  const tag = parent.createSpan({ cls: "vam-hypothesis-tag", text: text11 });
+  tag.dataset.strength = strength;
   return tag;
 }
 
@@ -23315,6 +23818,19 @@ function topLevelValues(block, keys) {
   }
   return found;
 }
+var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-strength"];
+function hypothesisLines(block) {
+  var _a2, _b2;
+  if (block === null) return [];
+  const found = [];
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+    const key2 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
+    if (match && key2 !== void 0 && HYPOTHESIS_KEYS.includes(key2))
+      found.push(`${key2}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
+  }
+  return found;
+}
 function hasDuplicateIdentityKey(block) {
   if (block === null) return false;
   const seen = /* @__PURE__ */ new Set();
@@ -23361,6 +23877,8 @@ function guardMapChatWrite(check) {
     if (was.get(key2) === now.get(key2)) continue;
     return { ok: false, code: was.has(key2) ? "topic_identity_changed" : "reserved_frontmatter" };
   }
+  if (hypothesisLines(frontmatterBlock(before)).join("\n") !== hypothesisLines(frontmatterBlock(check.newContent)).join("\n"))
+    return { ok: false, code: "hypothesis_frontmatter_changed" };
   return { ok: true };
 }
 function applyMdEdit(content, find, replace) {
@@ -25758,37 +26276,6 @@ var ReferencePicker = class {
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian20 = require("obsidian");
-
-// log-manager.ts
-var LogManager = class {
-  constructor(limit = 500) {
-    this.limit = limit;
-    __publicField(this, "entries", []);
-    __publicField(this, "listeners", /* @__PURE__ */ new Set());
-  }
-  appendLog(level, message) {
-    const normalized = message.trim();
-    if (!normalized) return;
-    this.entries.push({ timestamp: (/* @__PURE__ */ new Date()).toISOString(), level, message: normalized });
-    if (this.entries.length > this.limit) this.entries.splice(0, this.entries.length - this.limit);
-    for (const listener of this.listeners) listener();
-  }
-  getLogs() {
-    return this.entries.map((entry) => ({ ...entry }));
-  }
-  clear() {
-    this.entries = [];
-    for (const listener of this.listeners) listener();
-  }
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-};
-function formatDebugLogs(entries) {
-  return entries.map((entry) => `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`).join("\n");
-}
-var debugLog = new LogManager();
 
 // ai-exchange-log.ts
 function isRecord(value) {
@@ -36309,6 +36796,49 @@ function edgePathData(x1, y1, x2, y2) {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
+var relationMarkerSequence = 0;
+var relationSwatchSequence = 0;
+var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
+var RELATION_LABEL_MIN_ZOOM = 0.6;
+var RELATION_LABEL_NOTE_MAX = 60;
+var boxOf = (card) => ({
+  x: card.offsetLeft,
+  y: card.offsetTop,
+  width: card.offsetWidth,
+  height: card.offsetHeight
+});
+var TOPIC_KIND_ICON = {
+  topic: "circle",
+  action: "square-check",
+  atomic: "atom",
+  hypothesis: "lightbulb",
+  evidence: "file-search",
+  conclusion: "flag"
+};
+var RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+var RELATION_SENTENCE_KEY = {
+  supports: "ui.relation_sentence_supports_0_1",
+  contradicts: "ui.relation_sentence_contradicts_0_1",
+  verifies: "ui.relation_sentence_verifies_0_1",
+  derives_from: "ui.relation_sentence_derives_from_0_1",
+  prerequisite: "ui.relation_sentence_prerequisite_0_1"
+};
+var RELATION_NAME_KEY = {
+  supports: "ui.relation_name_supports",
+  contradicts: "ui.relation_name_contradicts",
+  verifies: "ui.relation_name_verifies",
+  derives_from: "ui.relation_name_derives_from",
+  related: "ui.relation_name_related",
+  prerequisite: "ui.relation_name_prerequisite"
+};
+var relationIdentity = (r) => `${r.from}\0${r.to}\0${r.kind}`;
 var AIM_STAGE_KEYS = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -36356,16 +36886,24 @@ var GUARD_REASON = {
   duplicate_identity_key: "ui.map_chat_guard_duplicate_identity_key",
   topic_identity_changed: "ui.map_chat_guard_topic_identity_changed",
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
+  hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline"
 };
 var guardSkipped = (code, editing = false) => skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 var mapChatTaskSequence = 0;
+function relationPairKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
     __publicField(this, "map", null);
+    /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
+    __publicField(this, "lastDroppedCycles", 0);
+    /** Relations the last merge dropped because the merged topic already had one with the same other topic (one relation per pair, decision 37). */
+    __publicField(this, "lastDroppedSamePair", 0);
     __publicField(this, "path", "");
     __publicField(this, "notes", /* @__PURE__ */ new Map());
     /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
@@ -36474,6 +37012,30 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
     __publicField(this, "viewportQueued", false);
     __publicField(this, "edgeEls", /* @__PURE__ */ new Map());
+    /** Evidence and prerequisite links on screen, keyed `from\0to\0kind`; a drag moves them with their cards. */
+    __publicField(this, "relationEls", /* @__PURE__ */ new Map());
+    /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
+    __publicField(this, "relationHitEls", /* @__PURE__ */ new Map());
+    __publicField(this, "relationLabelEls", /* @__PURE__ */ new Map());
+    /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
+    __publicField(this, "relationGapEls", /* @__PURE__ */ new Map());
+    __publicField(this, "relationData", /* @__PURE__ */ new Map());
+    /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
+    __publicField(this, "relationPainted", /* @__PURE__ */ new Set());
+    __publicField(this, "relationExpanded", /* @__PURE__ */ new Set());
+    /** Where each label sits, so expanding or collapsing its text keeps it in place. */
+    __publicField(this, "relationLabelAt", /* @__PURE__ */ new Map());
+    /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
+    __publicField(this, "selectedRelation", null);
+    /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
+    __publicField(this, "hoverRelation", null);
+    __publicField(this, "previewRelation", null);
+    /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
+    __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
+    /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
+    __publicField(this, "relationMarkerId", `vam-relation-arrow-${++relationMarkerSequence}`);
+    __publicField(this, "relationBarMarkerId", `${this.relationMarkerId}-bar`);
+    /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
     __publicField(this, "suppressClickUntil", 0);
     /** Node whose card should hold keyboard focus once the next render finishes. */
     __publicField(this, "focusNodeId", null);
@@ -36542,6 +37104,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, void 0, void 0, onWebSearchEvent)
     );
     this.aimRecovery.addDiagrams = (request) => plugin.addAimDiagrams(request);
+  }
+  /** How many same-pair relations the latest merge dropped (0 when none). */
+  droppedSamePairOfLastMerge() {
+    return this.lastDroppedSamePair;
+  }
+  /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
+  droppedCyclesOfLastMerge() {
+    return this.lastDroppedCycles;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -36615,6 +37185,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
         const wasSelecting = this.integrationMode;
         this.selected = null;
         this.multiSelected.clear();
+        this.selectedRelation = null;
         this.integrationMode = false;
         if (wasSelecting) this.render();
         else this.commitSelection(previous, null, touched);
@@ -38349,6 +38920,20 @@ ${request.requirements}` : preset.text,
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
     );
+    if (this.relationsEnabled())
+      for (const kind of TOPIC_KINDS)
+        menu.addItem(
+          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
+        );
+    menu.showAtMouseEvent(event);
+  }
+  /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
+  openKindMenu(event, pick) {
+    const menu = new import_obsidian30.Menu();
+    for (const kind of TOPIC_KINDS)
+      menu.addItem(
+        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
+      );
     menu.showAtMouseEvent(event);
   }
   /** Collapse or expand every branch in one undoable change, then fit the map. `shownLevels` as in applyCollapseLevel. */
@@ -39608,6 +40193,7 @@ ${request.requirements}` : preset.text,
     summary.empty();
     summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text: text11 });
+    summary.title = text11;
   }
   /**
    * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
@@ -39628,7 +40214,11 @@ ${request.requirements}` : preset.text,
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text11);
-      else (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
+      else {
+        (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
+        summary.title = text11;
+      }
+      this.fitKindShape(card, this.topicKindOf(node.id));
       return;
     }
     if (!(summary == null ? void 0 : summary.hasClass("is-preview"))) return;
@@ -39637,7 +40227,9 @@ ${request.requirements}` : preset.text,
     else {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
+      summary.title = note.summary;
     }
+    this.fitKindShape(card, this.topicKindOf(node.id));
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   paintHoverResearch() {
@@ -39759,6 +40351,13 @@ ${request.requirements}` : preset.text,
           }
       }
       map.nodes = removeNodes(map.nodes, node.id, branch);
+      if (adopterId) {
+        removeTopicRelationsFor(
+          map,
+          [...ids].filter((id) => id !== node.id)
+        );
+        this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
+      } else removeTopicRelationsFor(map, ids);
       if (adopterId && adopted.size) {
         const adopter = map.nodes.find((item) => item.id === adopterId);
         if (adopter) adopter.collapsed = false;
@@ -39769,6 +40368,7 @@ ${request.requirements}` : preset.text,
     this.selected = null;
     this.multiSelected.clear();
     this.history.push(entry);
+    if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
   }
   mergeBusy(node, except) {
@@ -40136,17 +40736,19 @@ ${request.requirements}` : preset.text,
       );
     }
     const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : await this.mergeModel(check.parentId);
+    const firstNote = this.notes.get(sources2[0].id), firstKind = firstNote == null ? void 0 : firstNote.topicKind, firstStrength = (firstNote == null ? void 0 : firstNote.topicKind) === "hypothesis" ? firstNote.hypothesisStrength : void 0;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
       check.parentId ? "inherited" : "workspace",
-      content ? void 0 : { detail }
+      { ...content ? {} : { detail }, ...firstKind ? { topicKind: firstKind } : {} }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"), viewport = clone((_d = (_c = this.map) == null ? void 0 : _c.viewport) != null ? _d : before.viewport);
     let entry;
     try {
+      if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (content) {
         const detailTemplate = this.mapDetailTemplate(language2);
         await repo.updateNote(
@@ -40182,6 +40784,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
+        this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
         if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -40255,6 +40858,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
+        this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
         if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -40268,9 +40872,20 @@ ${request.requirements}` : preset.text,
     this.multiSelected.clear();
     await this.finishMerge(target.id);
   }
+  /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
+  takeRetargetDrops(result) {
+    this.lastDroppedCycles = result.droppedCycles;
+    this.lastDroppedSamePair = result.droppedSamePair;
+  }
+  /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
+  noticeDroppedCycles() {
+    if (this.lastDroppedSamePair > 0) new import_obsidian30.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
+    if (this.lastDroppedCycles > 0) new import_obsidian30.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
+  }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
   async finishMerge(id) {
     var _a2;
+    this.noticeDroppedCycles();
     try {
       await this.hydrate();
       this.render();
@@ -40408,6 +41023,7 @@ ${request.requirements}` : preset.text,
         map.viewport = clone(viewport);
         const prior = clone(map);
         map.nodes = map.nodes.filter((node) => !ids.has(node.id));
+        removeTopicRelationsFor(map, ids);
         this.removeAimReferences(map, ids, prior.nodes);
       }).commit();
     } catch (error) {
@@ -41689,7 +42305,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -41714,6 +42330,8 @@ ${request.requirements}` : preset.text,
       background.appendChild(shape);
       card.appendChild(background);
     }
+    const kind = this.topicKindOf(node.id);
+    renderShapeBackground(card, kind);
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
@@ -41800,15 +42418,24 @@ ${request.requirements}` : preset.text,
       const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
+    if (kind !== "topic") {
+      card.dataset.topicKind = kind;
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
+      if (strength) renderHypothesisTag(header, strength, kindText);
+      else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
+      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
+    }
     const errorDetails = [];
-    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
+    if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
       const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
+      const currentNode = batch.currentPath ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_r = this.notes.get(currentNode.id)) == null ? void 0 : _r.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -41831,9 +42458,9 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || ((_u = this.plugin.running) == null ? void 0 : _u.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || ((_v = this.plugin.running) == null ? void 0 : _v.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
@@ -41851,27 +42478,27 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_w = (_v = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
-    if (pendingCount && !this.builtIn && !this.integrationMode && !((_x = this.map) == null ? void 0 : _x.aim))
+    const pendingCount = (_x = (_w = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
+    if (pendingCount && !this.builtIn && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim))
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
-    if (note && note.researchMode === "local" && !this.builtIn && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
+    if (note && note.researchMode === "local" && !this.builtIn && !this.integrationMode && !((_z = this.map) == null ? void 0 : _z.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
       this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_z = this.map) == null ? void 0 : _z.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_A = this.map) == null ? void 0 : _A.aim))
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_A = this.map) == null ? void 0 : _A.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_B = this.map) == null ? void 0 : _B.aim)) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -41907,7 +42534,7 @@ ${request.requirements}` : preset.text,
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.builtIn && !this.integrationMode) {
-      if (!((_B = this.map) == null ? void 0 : _B.aim)) {
+      if (!((_C = this.map) == null ? void 0 : _C.aim)) {
         const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure2.addClass("vam-node-tool", "vam-structure-tool");
         structure2.setAttr("aria-label", t("ui.structure_and_links"));
@@ -41933,7 +42560,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_C = this.map) == null ? void 0 : _C.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (((_D = this.map) == null ? void 0 : _D.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -41945,7 +42572,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (((_D = this.map) == null ? void 0 : _D.aim) && assumptions.length) {
+      if (((_E = this.map) == null ? void 0 : _E.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -41957,7 +42584,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (((_E = this.map) == null ? void 0 : _E.aim) && node.aimKind === "conclusion") {
+      if (((_F = this.map) == null ? void 0 : _F.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -41976,17 +42603,17 @@ ${request.requirements}` : preset.text,
     details.addClass("vam-node-tool", "vam-detail-button");
     if (this.builtIn) details.setAttr("title", t("ui.view_sample_content"));
     else details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.builtIn && !this.integrationMode && !((_F = this.map) == null ? void 0 : _F.aim))
+    if (!this.builtIn && !this.integrationMode && !((_G = this.map) == null ? void 0 : _G.aim))
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.builtIn && !this.integrationMode && !((_G = this.map) == null ? void 0 : _G.aim)) {
+    if (!this.builtIn && !this.integrationMode && !((_H = this.map) == null ? void 0 : _H.aim)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
-    const title = card.createEl("h3", { text: (_H = note == null ? void 0 : note.title) != null ? _H : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_I = note == null ? void 0 : note.title) != null ? _I : node.path);
+    const title = card.createEl("h3", { text: (_I = note == null ? void 0 : note.title) != null ? _I : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_J = note == null ? void 0 : note.title) != null ? _J : node.path);
     title.setAttr("dir", "auto");
-    if (note && !this.builtIn && !this.integrationMode && !((_J = this.map) == null ? void 0 : _J.aim))
+    if (note && !this.builtIn && !this.integrationMode && !((_K = this.map) == null ? void 0 : _K.aim))
       card.addEventListener("dblclick", (event) => {
         var _a3;
         const target = event.target;
@@ -41997,18 +42624,19 @@ ${request.requirements}` : preset.text,
         event.preventDefault();
         this.renameNode(node, note.title);
       });
-    if ((_K = research == null ? void 0 : research.preview) == null ? void 0 : _K.summary)
+    if ((_L = research == null ? void 0 : research.preview) == null ? void 0 : _L.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_L = note == null ? void 0 : note.summary) != null ? _L : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: (_M = note == null ? void 0 : note.summary) != null ? _M : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_N = note == null ? void 0 : note.summary) != null ? _N : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_M = this.map) == null ? void 0 : _M.aim) && !this.builtIn) {
+    if (node.aimKind === "conclusion" && ((_O = this.map) == null ? void 0 : _O.aim) && !this.builtIn) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -42021,7 +42649,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_N = this.map) == null ? void 0 : _N.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_P = this.map) == null ? void 0 : _P.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -42057,11 +42685,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_O = this.map) == null ? void 0 : _O.aim)) {
+    if (node.aimKind === "question" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_Q = (_P = node.aimQuestion) == null ? void 0 : _P.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _Q : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = node.aimQuestion) == null ? void 0 : _R.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -42104,11 +42732,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_R = this.map) == null ? void 0 : _R.aim)) {
+    if (node.aimKind === "answer" && ((_T = this.map) == null ? void 0 : _T.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_T = (_S = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _S.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _T : branch.answerSnapshot.selections;
+        const labels = (_V = (_U = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _U.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _V : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -42207,6 +42835,31 @@ ${request.requirements}` : preset.text,
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    this.fitKindShape(card, kind);
+  }
+  /**
+   * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
+   * text block is measured and the top and bottom padding follow its height. The card then grows with its text, and
+   * dragging, arranging and the relation lines read its real height. A card that is not laid out yet (a hidden pane) is
+   * left with the stylesheet's fallback padding and fitted by the next resize.
+   */
+  fitKindShape(card, kind) {
+    if (!hasSvgShape(kind)) return;
+    const width = card.offsetWidth;
+    if (!width) return;
+    const sides = shapeInsets(kind, { width, height: 0 });
+    card.style.padding = `0 ${sides.right}px 0 ${sides.left}px`;
+    const height = card.clientHeight;
+    const insets = shapeInsets(kind, { width, height });
+    card.style.padding = `${insets.top}px ${insets.right}px ${insets.bottom}px ${insets.left}px`;
+  }
+  fitKindShapes() {
+    var _a2, _b2;
+    if (!this.stageEl) return;
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
+      const card = this.cardEls.get(node.id);
+      if (card) this.fitKindShape(card, this.topicKindOf(node.id));
+    }
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
   canvasNodes() {
@@ -42295,6 +42948,7 @@ ${request.requirements}` : preset.text,
       if (check) check.checked = this.multiSelected.has(id);
     }
     (_a2 = this.chat) == null ? void 0 : _a2.refreshSelection();
+    this.syncRelationClasses();
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
@@ -42302,6 +42956,7 @@ ${request.requirements}` : preset.text,
    */
   applySelectionState(prevId, nextId, touched = []) {
     var _a2;
+    this.selectedRelation = null;
     const previousStop = this.tabStopId;
     this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
     this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
@@ -42339,6 +42994,31 @@ ${request.requirements}` : preset.text,
   isResearchQueued(node) {
     var _a2, _b2;
     return !((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) && !!((_b2 = this.plugin.expansionCoordinator) == null ? void 0 : _b2.isQueued(node.path));
+  }
+  /** Hypothesis and evidence features exist on ordinary maps only: not the built-in sample, not AIM. */
+  relationsEnabled() {
+    return !this.builtIn && !!this.map && !this.map.aim;
+  }
+  isHypothesis(id) {
+    var _a2;
+    return ((_a2 = this.notes.get(id)) == null ? void 0 : _a2.topicKind) === "hypothesis";
+  }
+  /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM and the built-in sample show none). */
+  topicKindOf(id) {
+    var _a2, _b2, _c;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind) return "topic";
+    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.topicKind) != null ? _c : "topic";
+  }
+  /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
+  hypothesisStrengthOf(id) {
+    var _a2, _b2, _c;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind || !this.isHypothesis(id)) return void 0;
+    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisStrength) != null ? _c : "weak";
+  }
+  hypothesisTagText(strength) {
+    return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
   }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   labelCard(card, text11) {
@@ -42474,7 +43154,7 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${Math.max(12, Math.min(rect.top - host.top, maxTop))}px`;
   }
   refreshCard(node, redrawEdges = true) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
@@ -42488,6 +43168,7 @@ ${request.requirements}` : preset.text,
         title.after(summary);
       }
       summary == null ? void 0 : summary.setText(note.summary);
+      summary == null ? void 0 : summary.setAttr("title", note.summary);
       summary == null ? void 0 : summary.removeClass("is-preview");
     }
     const header = card.querySelector(".vam-node-header");
@@ -42513,6 +43194,13 @@ ${request.requirements}` : preset.text,
         status.setText(label);
       } else header == null ? void 0 : header.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
     }
+    const kind = this.topicKindOf(node.id);
+    if (kind !== "topic") {
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
+      if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
+    }
+    this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
   taskSourceSettings(currentLabel, currentTopicId = ((_b2) => (_b2 = ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)()) != null ? _b2 : "")(), synthesisLabel) {
@@ -42791,10 +43479,14 @@ ${request.requirements}` : preset.text,
       );
     }
     if (mode !== "structure") return;
+    if (note) this.renderHypothesisSection(panel, node, close);
     const relationship = panel.createDiv("vam-inspector-section");
-    relationship.createEl("strong", { text: t("ui.parent_topic"), cls: "vam-topic-tree-heading" });
-    let chosenParent = (_g = node.parentId) != null ? _g : "";
-    let describe = () => {
+    relationship.createEl("strong", {
+      text: t("ui.parent_topic"),
+      cls: "vam-topic-tree-heading vam-section-heading"
+    });
+    let currentParent = (_g = node.parentId) != null ? _g : null;
+    let moveTo = (_parentId) => {
     };
     const parentTree = renderTopicTree(relationship, {
       nodes: this.map.nodes,
@@ -42805,18 +43497,15 @@ ${request.requirements}` : preset.text,
       label: t("ui.parent_topic_link"),
       selectable: (candidate) => canParent(this.map.nodes, node.id, candidate.id),
       rootChoice: t("ui.no_parent_root_topic"),
-      value: chosenParent,
-      onChoose: (id) => {
-        chosenParent = id;
-        parentTree.select(id);
-        describe();
-      }
+      value: currentParent != null ? currentParent : "",
+      onChoose: (id) => moveTo(id || null)
     });
     relationship.createEl("p", {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
     const actions = (host != null ? host : panel).createDiv("vam-next-actions");
+    if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {
       close == null ? void 0 : close();
@@ -42827,21 +43516,18 @@ ${request.requirements}` : preset.text,
       attr: { "aria-live": "polite" }
     });
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
-    const apply = actions.createEl("button", { text: t("ui.apply_parent"), cls: "mod-cta" });
-    describe = () => {
-      var _a3, _b3, _c2;
-      const parentId = chosenParent || null;
-      const changed = parentId !== ((_a3 = node.parentId) != null ? _a3 : null);
-      apply.disabled = !changed;
+    moveTo = (parentId) => {
+      var _a3, _b3;
+      if (parentId === currentParent) return;
+      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) {
+        parentTree.select(currentParent != null ? currentParent : "");
+        return;
+      }
+      currentParent = parentId;
+      parentTree.select(parentId != null ? parentId : "");
       status.setText(
-        !changed ? "" : parentId ? t("ui.will_move_under_0", (_c2 = (_b3 = this.notes.get(parentId)) == null ? void 0 : _b3.title) != null ? _c2 : "") : t("ui.will_become_root_topic")
+        parentId ? t("ui.moved_under_0", (_b3 = (_a3 = this.notes.get(parentId)) == null ? void 0 : _a3.title) != null ? _b3 : "") : t("ui.became_root_topic")
       );
-    };
-    describe();
-    apply.addEventListener("click", () => {
-      const parentId = chosenParent || null;
-      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
-      close == null ? void 0 : close();
       this.enqueue(async () => {
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange((map) => {
@@ -42855,7 +43541,7 @@ ${request.requirements}` : preset.text,
           } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
         });
       });
-    });
+    };
   }
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
@@ -42996,17 +43682,493 @@ ${request.requirements}` : preset.text,
       }))
     ).open();
   }
+  /** Sets a hypothesis's strength: the note's frontmatter and Map.md in one undoable step (undo writes the old note text back). */
+  async changeHypothesisStrength(node, strength) {
+    if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisStrength(path, strength)).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.hypothesis_strength") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
+  async changeTopicKind(node, kind) {
+    if (!this.map || !this.relationsEnabled() || node.aimKind || this.topicKindOf(node.id) === kind) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeTopicKind(path, kind)).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.topic_type") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Adds one relation A -> B in one undoable Map.md change; an illegal one (itself, a duplicate, a cycle for derivation or prerequisite) is refused. */
+  async addRelation(fromId, toId, kind) {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange((map) => {
+      var _a2, _b2;
+      if (!relationAllowed((_a2 = map.topicRelations) != null ? _a2 : [], { kind, from: fromId, to: toId })) return;
+      setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], { kind, from: fromId, to: toId }]);
+    }, false);
+  }
+  /** Removes one relation in one undoable Map.md change. */
+  async removeRelation(link) {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange((map) => {
+      var _a2;
+      setTopicRelations(
+        map,
+        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => relationIdentity(r) !== relationIdentity(link))
+      );
+    }, false);
+  }
+  /** The six relation kinds as a menu; `pick` gets the chosen one. */
+  openRelationKindMenu(event, pick) {
+    const menu = new import_obsidian30.Menu();
+    for (const kind of RELATION_KINDS)
+      menu.addItem(
+        (item) => item.setTitle(t(RELATION_NAME_KEY[kind])).setIcon("link").onClick(() => pick(kind))
+      );
+    menu.showAtMouseEvent(event);
+  }
+  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
+  chooseRelationTarget(node, kind, onAdded) {
+    if (!this.map || !this.relationsEnabled()) return;
+    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
+    if (!legal.size) {
+      new import_obsidian30.Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
+      return;
+    }
+    new TopicTreeModal(
+      this.app,
+      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
+      t("ui.add_relation_description"),
+      this.map.nodes,
+      (target) => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
+      },
+      (target) => legal.has(target.id),
+      (target) => this.enqueue(async () => {
+        await this.addRelation(node.id, target.id, kind);
+        onAdded == null ? void 0 : onAdded();
+      })
+    ).open();
+  }
+  /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
+  relationRowText(link, selfId) {
+    const name = t(RELATION_NAME_KEY[link.kind]), titleOf = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    };
+    if (link.kind === "related")
+      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
+    return link.from === selfId ? t("ui.relation_row_out_0_1", name, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name);
+  }
+  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
+  relationSentence(link, selfId) {
+    const self = t("ui.relation_this_topic"), titleOf = (id, object2 = false) => {
+      var _a2, _b2;
+      return id === selfId ? object2 ? t("ui.relation_this_topic_object") : self : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    };
+    if (link.kind === "related")
+      return selfId === null ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to)) : t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
+    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
+  }
+  /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
+  openRelationEditor(link, onChanged, onClosed) {
+    if (!this.map || !this.relationsEnabled()) return;
+    let saveNote = () => Promise.resolve();
+    const render = (content, close) => {
+      saveNote = this.renderRelationEditor(content, link, close, onChanged);
+    };
+    new class extends import_obsidian30.Modal {
+      onOpen() {
+        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+        render(this.contentEl, () => this.close());
+      }
+      onClose() {
+        void saveNote().then(() => {
+          if (onClosed) window.setTimeout(onClosed, 0);
+        });
+      }
+    }(this.app).open();
+  }
+  /**
+   * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
+   * illegal), a one-line note, and delete. Each change is one undoable Map.md step and is written at once; the note is
+   * written when the box loses focus, on Ctrl/Cmd+Enter, or when the dialog closes (decision 40). Everything the user
+   * typed (the note, topic titles) is shown as text only. Returns the close-time save, settled when its write is done.
+   */
+  renderRelationEditor(parent, initial, close, onChanged) {
+    let current = { ...initial };
+    const root = parent.createDiv("vam-relation-editor");
+    const indexOfCurrent = () => {
+      var _a2, _b2;
+      return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : []).findIndex((r) => relationIdentity(r) === relationIdentity(current));
+    };
+    const apply = (next, repaint = true) => new Promise(
+      (done) => this.enqueue(async () => {
+        try {
+          await change(next, repaint);
+        } finally {
+          done();
+        }
+      })
+    );
+    const change = async (next, repaint) => {
+      const outcome = {};
+      if (!this.map) return;
+      await this.mapChange((map) => {
+        var _a2;
+        const list = (_a2 = map.topicRelations) != null ? _a2 : [], index = list.findIndex((r) => relationIdentity(r) === relationIdentity(current));
+        if (index < 0) return;
+        outcome.value = next(list[index]);
+        const old = list[index];
+        if (outcome.value && (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) && !relationAllowed(list, outcome.value, index))
+          outcome.value = void 0;
+        if (outcome.value === void 0) return;
+        const updated = [...list];
+        if (outcome.value) updated[index] = outcome.value;
+        else updated.splice(index, 1);
+        setTopicRelations(map, updated);
+      }, false);
+      const result = outcome.value;
+      if (result === null) {
+        if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
+        this.syncRelationClasses();
+        onChanged == null ? void 0 : onChanged();
+        close == null ? void 0 : close();
+        return;
+      }
+      if (result) {
+        current = result;
+        this.selectedRelation = relationIdentity(current);
+        this.syncRelationClasses();
+      }
+      if (repaint) paint();
+      onChanged == null ? void 0 : onChanged();
+    };
+    let savedNote = initial.description;
+    let noteWrite = Promise.resolve();
+    let saveNote = () => {
+    };
+    let refocus = null;
+    const paint = () => {
+      var _a2, _b2, _c;
+      root.empty();
+      saveNote = () => {
+      };
+      const index = indexOfCurrent();
+      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
+      if (index < 0) {
+        root.createEl("p", { text: t("ui.relation_gone") });
+        return;
+      }
+      const relations = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : [];
+      const summary = root.createDiv("vam-relation-editor-summary");
+      this.relationSwatch(summary, current.kind);
+      summary.createSpan({
+        text: this.relationSentence(current, null),
+        cls: "vam-relation-sentence",
+        attr: { dir: "auto" }
+      });
+      const field = (label, id) => {
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
+      };
+      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
+      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("id", "vam-relation-kind");
+      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+      const blocked = [];
+      for (const kind of RELATION_KINDS) {
+        const open = kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
+        if (!open) blocked.push(kind);
+        const option2 = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+        if (!open) option2.disabled = true;
+      }
+      kindSelect.value = current.kind;
+      if (blocked.length) {
+        const reason = kindRow.createEl("p", {
+          text: t("ui.relation_kind_blocked_cycle_0", blocked.map((kind) => t(RELATION_NAME_KEY[kind])).join(", ")),
+          cls: "vam-relation-reason"
+        });
+        reason.setAttr("id", "vam-relation-kind-reason");
+        kindSelect.setAttr("aria-describedby", "vam-relation-kind-reason");
+      }
+      kindSelect.addEventListener("change", () => {
+        const kind = kindSelect.value;
+        if (kind === current.kind) return;
+        refocus = "kind";
+        void apply((rel) => ({ ...rel, kind }));
+      });
+      let reverseButton = null;
+      if (current.kind !== "related") {
+        const directionRow = root.createDiv("vam-relation-field");
+        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
+        const reversed = { kind: current.kind, from: current.to, to: current.from };
+        const allowed = relationAllowed(relations, reversed, index);
+        const reverse = this.button(
+          directionRow,
+          t("ui.relation_reverse"),
+          () => {
+            refocus = "reverse";
+            void apply((rel) => ({ ...rel, from: reversed.from, to: reversed.to }));
+          },
+          !allowed
+        );
+        reverse.addClass("vam-relation-reverse");
+        reverseButton = reverse;
+        if (!allowed) {
+          const reason = directionRow.createEl("p", {
+            text: t("ui.relation_reverse_blocked_cycle"),
+            cls: "vam-relation-reason"
+          });
+          reason.setAttr("id", "vam-relation-reverse-reason");
+          reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
+        }
+      }
+      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
+      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
+      description.setAttr("id", "vam-relation-description");
+      description.setAttr("rows", "4");
+      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
+      savedNote = relations[index].description;
+      description.value = savedNote != null ? savedNote : "";
+      description.setAttr("aria-label", t("ui.relation_description_label"));
+      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
+      const draft = () => normalizeRelationDescription(description.value);
+      saveNote = () => {
+        const text11 = draft();
+        if (text11 === savedNote) return;
+        savedNote = text11;
+        noteWrite = apply((rel) => {
+          const next = { kind: rel.kind, from: rel.from, to: rel.to };
+          if (text11 !== void 0) next.description = text11;
+          return next;
+        }, false);
+      };
+      const footer = root.createDiv("vam-next-actions vam-relation-footer");
+      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
+      remove.addEventListener("click", () => void apply(() => null));
+      footer.createSpan({ cls: "vam-next-status" });
+      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
+      const refresh = () => {
+        remaining.setText(
+          t(
+            "ui.relation_description_remaining_0",
+            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
+          )
+        );
+      };
+      description.addEventListener("input", refresh);
+      description.addEventListener("change", () => saveNote());
+      description.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+        event.preventDefault();
+        saveNote();
+      });
+      refresh();
+      if (refocus) (_c = { kind: kindSelect, reverse: reverseButton, description }[refocus]) == null ? void 0 : _c.focus();
+      refocus = null;
+    };
+    paint();
+    return () => {
+      saveNote();
+      return noteWrite;
+    };
+  }
+  /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
+  renderAddSubtopic(actions, node, close) {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
+    addChild.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.openKindMenu(event, (kind) => {
+        close == null ? void 0 : close();
+        this.enqueue(() => this.addNode(node, void 0, true, true, kind));
+      });
+    });
+  }
+  /** One 18px swatch for a type: the card's own outline (TOPIC_KIND_SHAPES), stroked in the type's colour. */
+  kindSwatch(parent, kind) {
+    var _a2;
+    const swatch = parent.createSpan({ cls: "vam-type-swatch" });
+    swatch.setAttr("aria-hidden", "true");
+    swatch.dataset.kind = kind;
+    let drawn;
+    const collector = {
+      appendChild: (child) => {
+        drawn = child;
+        return child;
+      }
+    };
+    let svg = (_a2 = renderShapeBackground(collector, kind)) != null ? _a2 : drawn;
+    if (!svg) {
+      svg = createSvg("svg");
+      svg.addClass("vam-kind-shape");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("aria-hidden", "true");
+      const frame = createSvg("rect");
+      frame.addClass("vam-kind-outline");
+      for (const [name, value] of [
+        ["x", "0"],
+        ["y", "0"],
+        ["width", "100"],
+        ["height", "100"],
+        ["rx", TOPIC_KIND_SHAPES[kind].shape === "rect" ? "10" : "30"],
+        ["vector-effect", "non-scaling-stroke"]
+      ])
+        frame.setAttribute(name, value);
+      svg.appendChild(frame);
+    }
+    swatch.insertBefore(svg, null);
+  }
+  /** A 32x10 sample of a relation's line (the canvas classes and arrowheads), so a row shows which line to look for. */
+  relationSwatch(parent, kind) {
+    const svg = createSvg("svg"), defs = createSvg("defs"), id = `${this.relationMarkerId}-row${++relationSwatchSequence}`;
+    svg.addClass("vam-relation-swatch");
+    svg.setAttribute("viewBox", "0 0 32 10");
+    svg.setAttribute("aria-hidden", "true");
+    const arrow = kind === "related" ? null : `url(#${id})`;
+    if (arrow) {
+      defs.appendChild(this.relationMarker(id, kind === "contradicts"));
+      svg.appendChild(defs);
+    }
+    for (const gap of kind === "derives_from" ? [false, true] : [false]) {
+      const line = createSvg("path");
+      line.setAttribute("d", "M 0 5 L 32 5");
+      if (arrow) line.setAttribute("marker-end", arrow);
+      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
+      if (!gap) line.addClass(`vam-relation-${kind}`);
+      svg.appendChild(line);
+    }
+    parent.insertBefore(svg, null);
+  }
+  /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
+  renderHypothesisSection(panel, node, close) {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
+    const body = section3.createDiv("vam-hypothesis-body");
+    const editByPair = /* @__PURE__ */ new Map();
+    let addRelationButton = null;
+    const paint = (focusStrength = false, focusKind = false, focusAdd = false) => {
+      var _a2, _b2, _c, _d;
+      body.empty();
+      const currentKind = this.topicKindOf(node.id);
+      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
+      const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
+      kinds.setAttr("role", "group");
+      kinds.setAttr("aria-label", t("ui.topic_type"));
+      for (const option2 of KIND_PICKER_ORDER) {
+        const choice2 = this.button(kinds, t(TOPIC_KIND_SHAPES[option2].labelKey), () => {
+          if (option2 === currentKind) return;
+          this.enqueue(async () => {
+            await this.changeTopicKind(node, option2);
+            paint(false, true);
+          });
+        });
+        this.kindSwatch(choice2, option2);
+        choice2.setAttr("aria-pressed", String(option2 === currentKind));
+        if (option2 === currentKind) {
+          choice2.addClass("is-pressed");
+          if (focusKind) choice2.focus();
+        }
+      }
+      if (currentKind === "hypothesis") {
+        const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "weak";
+        body.createEl("strong", {
+          text: t("ui.hypothesis_strength"),
+          cls: "vam-topic-tree-heading vam-section-heading"
+        });
+        const group = body.createDiv("vam-hypothesis-strengths vam-choice-group");
+        group.setAttr("role", "group");
+        group.setAttr("aria-label", t("ui.hypothesis_strength"));
+        for (const option2 of HYPOTHESIS_STRENGTHS) {
+          const choice2 = this.button(group, t(STRENGTH_LABEL[option2]), () => {
+            if (option2 === current) return;
+            this.enqueue(async () => {
+              await this.changeHypothesisStrength(node, option2);
+              paint(true);
+            });
+          });
+          choice2.setAttr("aria-pressed", String(option2 === current));
+          if (option2 === current) {
+            choice2.addClass("is-pressed");
+            if (focusStrength) choice2.focus();
+          }
+        }
+      }
+      editByPair.clear();
+      const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.from === node.id || r.to === node.id);
+      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
+      if (links.length) {
+        const list = body.createEl("ul", { cls: "vam-relation-list" });
+        for (const link of links) {
+          const row = list.createEl("li", { cls: "vam-relation-row" }), text11 = this.relationRowText(link, node.id), described = link.description ? `${text11}. ${link.description}` : text11;
+          this.bindRelationRow(row, link, described);
+          this.relationSwatch(row, link.kind);
+          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+          label.createSpan({
+            text: this.relationSentence(link, node.id),
+            cls: "vam-relation-sentence",
+            attr: { dir: "auto" }
+          });
+          if (link.description)
+            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+          const tools = row.createSpan({ cls: "vam-relation-tools" });
+          const pair6 = relationPairKey(link.from, link.to);
+          const edit = this.iconButton(
+            tools,
+            "pencil",
+            t("ui.edit_relation_0", text11),
+            () => this.openRelationEditor(link, paint, () => {
+              var _a3, _b3;
+              return (_b3 = (_a3 = editByPair.get(pair6)) != null ? _a3 : addRelationButton) == null ? void 0 : _b3.focus();
+            })
+          );
+          editByPair.set(pair6, edit);
+          this.iconButton(
+            tools,
+            "trash-2",
+            t("ui.remove_relation_0", text11),
+            () => this.enqueue(async () => {
+              await this.removeRelation(link);
+              paint();
+            })
+          );
+        }
+      } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
+      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
+      addRelationButton = addRelation;
+      addRelation.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.openRelationKindMenu(
+          event,
+          (kind) => this.chooseRelationTarget(node, kind, () => paint(false, false, true))
+        );
+      });
+      if (focusAdd) addRelation.focus();
+    };
+    paint();
+  }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
-  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
+  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic") {
     var _a2, _b2, _c, _d, _e, _f, _g;
     if (!this.map) return;
+    const typed = kind !== "topic" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
+      const dialogTitle = typed ? t("ui.add_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey)) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic");
       new NameModal(
         this.app,
-        parent ? t("ui.new_subtopic") : t("ui.my_core_topic"),
+        dialogTitle,
         "",
-        (title) => this.enqueue(() => this.addNode(parent, title))
+        (title) => this.enqueue(() => this.addNode(parent, title, true, true, kind))
       ).open();
       return;
     }
@@ -43019,13 +44181,13 @@ ${request.requirements}` : preset.text,
       return;
     }
     const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (typed ? t("ui.new_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey)) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local" }
+      { researchMode: "local", ...typed ? { topicKind: kind } : {} }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0);
@@ -44753,6 +45915,8 @@ ${note.detail.trim()}` : "",
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
+    else this.stageEl.removeAttribute("data-relation-labels");
     (_a2 = this.zoomLabel) == null ? void 0 : _a2.setText(`${Math.round(zoom * 100)}%`);
     (_b2 = this.zoomLabel) == null ? void 0 : _b2.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
@@ -44977,6 +46141,10 @@ ${note.detail.trim()}` : "",
         viewport.removeClass("is-panning");
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
+        if (!moved && event.button === 0 && this.selectedRelation) {
+          this.selectedRelation = null;
+          this.syncRelationClasses();
+        }
         if (!moved && !this.integrationMode && event.button === 0) {
           const previous = this.selected, touched = [...this.multiSelected];
           this.selected = null;
@@ -45125,6 +46293,7 @@ ${note.detail.trim()}` : "",
   /** Obsidian calls this when the pane's size changes. */
   onResize() {
     this.syncChatNarrow();
+    this.fitKindShapes();
   }
   chatWidth() {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);
@@ -46877,8 +48046,25 @@ ${addition}` : addition });
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
     }
+    const linked = [];
+    for (const key2 of this.relationEls.keys()) {
+      const [fromId, toId] = key2.split("\0");
+      if (fromId !== id && toId !== id) continue;
+      const other = this.cardEls.get(fromId === id ? toId : fromId);
+      if (other) linked.push({ key: key2, dragIsFrom: fromId === id, far: boxOf(other) });
+    }
     return {
       update: (x, y) => {
+        var _a2, _b2;
+        for (const link of linked) {
+          const path = this.relationEls.get(link.key);
+          if (!path) continue;
+          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, d = relationPathData(from, to);
+          path.setAttribute("d", d);
+          (_a2 = this.relationHitEls.get(link.key)) == null ? void 0 : _a2.setAttribute("d", d);
+          (_b2 = this.relationGapEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+        }
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
@@ -46897,15 +48083,19 @@ ${addition}` : addition });
     };
   }
   drawEdges() {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
+    const related = new Set(
+      this.relationsEnabled() ? ((_a2 = this.map.topicRelations) != null ? _a2 : []).map((r) => relationPairKey(r.from, r.to)) : []
+    );
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
         const parent = this.cardEls.get(parentId), child = this.cardEls.get(node.id);
         if (!parent || !child) continue;
+        if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         path.setAttribute(
           "d",
@@ -46918,12 +48108,225 @@ ${addition}` : addition });
         );
         path.addClass("vam-edge");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
-        if (!this.map.aim && !this.builtIn && ((_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier) === "side")
+        if (!this.map.aim && !this.builtIn && ((_c = (_b2 = this.notes.get(node.id)) == null ? void 0 : _b2.relevance) == null ? void 0 : _c.tier) === "side")
           path.addClass("vam-edge-side");
+        else if (!this.map.aim && !this.builtIn && parentId === node.parentId)
+          path.setAttribute("data-parent-line", "");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
       }
     }
+    this.drawRelations();
+    this.syncRelationClasses();
+  }
+  /**
+   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving
+   * the nearest edge of A and entering the nearest edge of B. The kind sets the line pattern in styles.css; the
+   * arrowhead is the plain one (all but "related", which has none) or the barred one ("contradicts"); "derives from"
+   * is a double line (the outer line, then a canvas-coloured inner line). A link is not drawn when an end is off screen
+   * (collapsed); the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map
+   * draws none, and its file keeps the key.
+   */
+  drawRelations() {
+    var _a2;
+    this.relationEls.clear();
+    this.relationHitEls.clear();
+    this.relationLabelEls.clear();
+    this.relationGapEls.clear();
+    this.relationData.clear();
+    this.relationLabelAt.clear();
+    this.relationPainted.clear();
+    this.relationExpanded.clear();
+    if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
+    const links = [];
+    for (const relation of (_a2 = this.map.topicRelations) != null ? _a2 : []) {
+      const from = this.cardEls.get(relation.from), to = this.cardEls.get(relation.to);
+      if (!from || !to) continue;
+      links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
+    }
+    if (!links.length) return;
+    const defs = createSvg("defs");
+    defs.appendChild(this.relationMarker(this.relationMarkerId, false));
+    defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
+    this.edgesEl.appendChild(defs);
+    for (const link of links) {
+      const d = relationPathData(boxOf(link.from), boxOf(link.to)), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
+      const path = createSvg("path");
+      path.setAttribute("d", d);
+      if (marker5) path.setAttribute("marker-end", marker5);
+      path.addClass("vam-relation");
+      path.addClass(`vam-relation-${link.kind}`);
+      this.edgesEl.appendChild(path);
+      this.relationEls.set(link.key, path);
+      this.relationData.set(link.key, link.relation);
+      if (link.kind === "derives_from") {
+        const gap = createSvg("path");
+        gap.setAttribute("d", d);
+        if (marker5) gap.setAttribute("marker-end", marker5);
+        gap.addClass("vam-relation-gap");
+        this.edgesEl.appendChild(gap);
+        this.relationGapEls.set(link.key, gap);
+      }
+      const hit = createSvg("path");
+      hit.setAttribute("d", d);
+      hit.addClass("vam-relation-hit");
+      const key2 = link.key;
+      hit.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        this.selectedRelation = key2;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.selectedRelation = key2;
+        this.syncRelationClasses();
+        this.openRelationEditor(link.relation);
+      });
+      hit.addEventListener("pointerenter", () => {
+        this.hoverRelation = key2;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("pointerleave", () => {
+        if (this.hoverRelation === key2) this.hoverRelation = null;
+        this.syncRelationClasses();
+      });
+      this.edgesEl.appendChild(hit);
+      this.relationHitEls.set(key2, hit);
+    }
+    for (const link of links) {
+      const label = createSvg("text");
+      label.addClass("vam-relation-label");
+      this.edgesEl.appendChild(label);
+      this.relationLabelEls.set(link.key, label);
+      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
+    }
+    if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
+    if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
+    if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
+  }
+  /**
+   * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The
+   * barred one puts the bar on the line before the arrowhead's base: past the tip it would sit under the opaque card.
+   * Plain: viewBox 10 wide, base x 0, tip x 10. Barred: 14 wide, bar x 1, base x 4, tip x 14.
+   */
+  relationMarker(id, barred) {
+    const marker5 = createSvg("marker"), arrow = createSvg("path"), width = barred ? 14 : 10, base = barred ? 4 : 0;
+    marker5.setAttribute("id", id);
+    marker5.setAttribute("viewBox", `0 0 ${width} 10`);
+    marker5.setAttribute("refX", String(width));
+    marker5.setAttribute("refY", "5");
+    marker5.setAttribute("markerWidth", String(width));
+    marker5.setAttribute("markerHeight", "10");
+    marker5.setAttribute("markerUnits", "userSpaceOnUse");
+    marker5.setAttribute("orient", "auto");
+    arrow.setAttribute("d", `M ${base} 0 L ${width} 5 L ${base} 10 z`);
+    arrow.addClass("vam-relation-arrow");
+    if (barred) {
+      const bar = createSvg("path");
+      bar.setAttribute("d", "M 1 0 L 1 10");
+      bar.addClass("vam-relation-arrow-bar");
+      marker5.appendChild(arrow);
+      marker5.appendChild(bar);
+    } else marker5.appendChild(arrow);
+    return marker5;
+  }
+  /**
+   * The text of a relation label: just the name normally; while the line is selected (or hovered) "Name: A → B"
+   * ("—" for related) and, on a second line, the note cut to 60 characters with an ellipsis. Text only, never markup.
+   */
+  paintRelationLabel(key2, expanded) {
+    const label = this.relationLabelEls.get(key2), link = this.relationData.get(key2);
+    if (!label || !link) return;
+    const name = t(RELATION_NAME_KEY[link.kind]);
+    if (!expanded) {
+      label.textContent = name;
+      return;
+    }
+    label.textContent = "";
+    const titleOf = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    }, at = this.relationLabelAt.get(key2), head = createSvg("tspan");
+    head.textContent = t(
+      link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
+      name,
+      titleOf(link.from),
+      titleOf(link.to)
+    );
+    if (at) head.setAttribute("x", String(at.x));
+    label.appendChild(head);
+    if (link.description) {
+      const note = createSvg("tspan"), chars = Array.from(link.description);
+      note.textContent = chars.length > RELATION_LABEL_NOTE_MAX ? `${chars.slice(0, RELATION_LABEL_NOTE_MAX).join("")}\u2026` : link.description;
+      if (at) note.setAttribute("x", String(at.x));
+      note.setAttribute("dy", "1.3em");
+      label.appendChild(note);
+    }
+  }
+  placeRelationLabel(key2, point) {
+    this.relationLabelAt.set(key2, point);
+    const label = this.relationLabelEls.get(key2);
+    if (!label) return;
+    label.setAttribute("x", String(point.x));
+    label.setAttribute("y", String(point.y));
+    for (const part of Array.from(label.children)) part.setAttribute("x", String(point.x));
+  }
+  /**
+   * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
+   * (single or multiple), the semantic lines touching them are `is-related` and the rest `is-dimmed` (parent-child
+   * edges stay as they are); the selected (or panel-previewed) line is `is-selected` and shows its name, as does a
+   * hovered line; both end cards get `is-relation-end`.
+   */
+  syncRelationClasses() {
+    var _a2, _b2;
+    const chosen = new Set(this.multiSelected);
+    if (this.selected) chosen.add(this.selected);
+    const ends = /* @__PURE__ */ new Set();
+    for (const [key2, path] of this.relationEls) {
+      const [fromId, toId] = key2.split("\0");
+      const related = chosen.has(fromId) || chosen.has(toId), active = key2 === this.selectedRelation || key2 === this.previewRelation;
+      path.toggleClass("is-related", related);
+      path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      path.toggleClass("is-selected", active);
+      const expanded = active || key2 === this.hoverRelation;
+      (_a2 = this.relationLabelEls.get(key2)) == null ? void 0 : _a2.toggleClass("is-expanded", expanded);
+      if (this.relationExpanded.has(key2) !== expanded || !this.relationPainted.has(key2)) {
+        this.paintRelationLabel(key2, expanded);
+        this.relationPainted.add(key2);
+        if (expanded) this.relationExpanded.add(key2);
+        else this.relationExpanded.delete(key2);
+      }
+      if (active) {
+        ends.add(fromId);
+        ends.add(toId);
+      }
+    }
+    for (const id of /* @__PURE__ */ new Set([...this.relationEndIds, ...ends]))
+      (_b2 = this.cardEls.get(id)) == null ? void 0 : _b2.toggleClass("is-relation-end", ends.has(id));
+    this.relationEndIds = ends;
+  }
+  /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
+  bindRelationRow(row, link, ariaLabel) {
+    const key2 = relationIdentity(link);
+    row.tabIndex = 0;
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", ariaLabel);
+    row.addEventListener("focus", () => {
+      this.selectedRelation = key2;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("blur", () => {
+      if (this.selectedRelation === key2) this.selectedRelation = null;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseenter", () => {
+      this.previewRelation = key2;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseleave", () => {
+      if (this.previewRelation === key2) this.previewRelation = null;
+      this.syncRelationClasses();
+    });
   }
   /**
    * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.

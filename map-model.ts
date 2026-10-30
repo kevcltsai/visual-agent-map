@@ -1,6 +1,7 @@
 import { validateAimResearchPlan } from "./experiences/aim/research-plan";
 import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
+import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
@@ -32,8 +33,219 @@ export interface MapDocument {
   detailTemplateId?: string;
   /** Default tone preset id for the map; absent = academic. */
   toneId?: string;
+  /** Semantic links between topics (evidence for a hypothesis, prerequisite knowledge). Absent when there are none. */
+  topicRelations?: TopicRelation[];
+}
+/**
+ * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind
+ * (`related` has no direction). `derives_from` and `prerequisite` must not form a cycle among links of their own kind.
+ * The V1.5 `evidence` kind is no longer known: it is dropped when a map is read (with a warning), not migrated.
+ */
+export type TopicRelationKind = "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite";
+export interface TopicRelation {
+  kind: TopicRelationKind;
+  from: string;
+  to: string;
+  /** Optional single-line note, written through `normalizeRelationDescription`; read back as stored. */
+  description?: string;
+}
+const TOPIC_RELATION_KINDS: readonly string[] = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+export const RELATION_DESCRIPTION_MAX_LENGTH = 200;
+/** A pair of topics, in either order and of any kind, holds at most one relation (decision #37), so this is the key. */
+const relationKey = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
+  r.from > r.to ? `${r.to}\0${r.from}` : `${r.from}\0${r.to}`;
+const copyRelation = (r: TopicRelation, from = r.from, to = r.to): TopicRelation => {
+  const out: TopicRelation = { kind: r.kind, from, to };
+  if (r.description !== undefined) out.description = r.description;
+  return out;
+};
+type RelationLogger = (level: LogLevel, message: string) => void;
+
+/** True for the kinds that must not form a cycle among links of their own kind. */
+export function isAcyclicKind(kind: TopicRelationKind): boolean {
+  return kind === "derives_from" || kind === "prerequisite";
 }
 
+/** Single line, collapsed whitespace, at most 200 characters; undefined when nothing is left. */
+export function normalizeRelationDescription(text: string): string | undefined {
+  const flat = String(text).replace(/\s+/g, " ").trim();
+  if (!flat) return undefined;
+  return Array.from(flat).slice(0, RELATION_DESCRIPTION_MAX_LENGTH).join("").trim() || undefined;
+}
+
+/**
+ * Drops what cannot be a relation: a non-list value (the whole key), malformed entries, unknown kinds, endpoints that
+ * are not topics, self links and a second relation on a pair of topics already linked (any kind, either direction;
+ * the first in list order stays, decision #37). A description that is not a string is
+ * removed but its relation is kept; a string description is kept as written. Derivation and prerequisite cycles are
+ * kept (a hand-written loop still opens). Logs warns with counts only; removes the key when nothing is left. Never throws.
+ */
+export function sanitizeTopicRelations(
+  map: MapDocument,
+  log: RelationLogger = (l, m) => debugLog.appendLog(l, m)
+): void {
+  const raw: unknown = (map as { topicRelations?: unknown }).topicRelations;
+  if (raw === undefined) return;
+  if (!Array.isArray(raw)) {
+    delete map.topicRelations;
+    log("warn", "Ignored topicRelations: not a list.");
+    return;
+  }
+  const ids = new Set(map.nodes.map(n => n?.id));
+  const seen = new Set<string>();
+  const kept: TopicRelation[] = [];
+  let dropped = 0;
+  let droppedDescriptions = 0;
+  for (const item of raw as unknown[]) {
+    const r = item as Partial<TopicRelation> | null;
+    if (
+      !r ||
+      typeof r !== "object" ||
+      typeof r.kind !== "string" ||
+      !TOPIC_RELATION_KINDS.includes(r.kind) ||
+      typeof r.from !== "string" ||
+      typeof r.to !== "string" ||
+      !ids.has(r.from) ||
+      !ids.has(r.to) ||
+      r.from === r.to
+    ) {
+      dropped++;
+      continue;
+    }
+    const clean: TopicRelation = { kind: r.kind, from: r.from, to: r.to };
+    const key = relationKey(clean);
+    if (seen.has(key)) {
+      dropped++;
+      continue;
+    }
+    seen.add(key);
+    if (typeof r.description === "string") clean.description = r.description;
+    else if ("description" in r) droppedDescriptions++;
+    kept.push(clean);
+  }
+  if (dropped)
+    log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (droppedDescriptions)
+    log(
+      "warn",
+      `Dropped ${droppedDescriptions} invalid topic relation description${droppedDescriptions === 1 ? "" : "s"} while reading the map.`
+    );
+  if (kept.length) map.topicRelations = kept;
+  else delete map.topicRelations;
+}
+/** Replaces the relations; an empty list removes the key. Every write goes through here. */
+export function setTopicRelations(map: MapDocument, list: TopicRelation[]): void {
+  if (list.length) map.topicRelations = list.map(r => copyRelation(r));
+  else delete map.topicRelations;
+}
+/** Removes every relation (of any kind) that touches one of `ids`. */
+export function removeTopicRelationsFor(map: MapDocument, ids: Iterable<string>): void {
+  if (!map.topicRelations) return;
+  const gone = new Set(ids);
+  setTopicRelations(
+    map,
+    map.topicRelations.filter(r => !gone.has(r.from) && !gone.has(r.to))
+  );
+}
+/** True when `target` can be reached from `start` along links of `kind` (from -> to). Visited-set BFS, so loops end. */
+function reachesByKind(
+  relations: readonly TopicRelation[],
+  kind: TopicRelationKind,
+  start: string,
+  target: string
+): boolean {
+  const seen = new Set<string>([start]);
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift() as string;
+    if (current === target) return true;
+    for (const r of relations)
+      if (r.kind === kind && r.from === current && !seen.has(r.to)) {
+        seen.add(r.to);
+        queue.push(r.to);
+      }
+  }
+  return false;
+}
+/**
+ * Whether `candidate` may be added. Refuses a self link, any pair of topics that already holds a relation (any kind,
+ * either direction; decision #37) and, for the two acyclic kinds, a link that would close a cycle among links of that kind (other kinds do not count).
+ * `replacingIndex` leaves that existing relation out first (changing its kind or reversing it).
+ */
+export function relationAllowed(
+  relations: readonly TopicRelation[],
+  candidate: Pick<TopicRelation, "kind" | "from" | "to">,
+  replacingIndex?: number
+): boolean {
+  if (candidate.from === candidate.to) return false;
+  const others = relations.filter((_, i) => i !== replacingIndex);
+  const key = relationKey(candidate);
+  if (others.some(r => relationKey(r) === key)) return false;
+  if (isAcyclicKind(candidate.kind) && reachesByKind(others, candidate.kind, candidate.to, candidate.from))
+    return false;
+  return true;
+}
+/** Every topic that `relationAllowed` accepts as the `to` end of a new `kind` link starting at `fromId`. */
+export function legalRelationTargets(map: MapDocument, kind: TopicRelationKind, fromId: string): string[] {
+  const relations = map.topicRelations ?? [];
+  return map.nodes.filter(n => relationAllowed(relations, { kind, from: fromId, to: n.id })).map(n => n.id);
+}
+/**
+ * Points every relation end at `fromIds` to `toId` (a merge). Self links are dropped; when several relations land on
+ * the same pair of topics (any kind, either direction) only the first in list order stays and the rest are counted in
+ * `droppedSamePair` (decision #37); a derivation or prerequisite that would newly close a cycle is dropped and counted (both kinds together).
+ * Cycles already present are not touched.
+ */
+export function retargetTopicRelations(
+  map: MapDocument,
+  fromIds: Iterable<string>,
+  toId: string
+): { droppedCycles: number; droppedSamePair: number } {
+  const result = { droppedCycles: 0, droppedSamePair: 0 };
+  if (!map.topicRelations) return result;
+  const merged = new Set(fromIds);
+  const move = (id: string): string => (merged.has(id) ? toId : id);
+  const kept: { r: TopicRelation; i: number }[] = [];
+  const seen = new Set<string>();
+  const touched: { r: TopicRelation; i: number }[] = [];
+  map.topicRelations.forEach((r, i) => {
+    const next = copyRelation(r, move(r.from), move(r.to));
+    if (next.from === next.to) return;
+    const key = relationKey(next);
+    if (seen.has(key)) {
+      result.droppedSamePair++;
+      return;
+    }
+    seen.add(key);
+    if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
+    else kept.push({ r: next, i });
+  });
+  for (const item of touched) {
+    if (
+      reachesByKind(
+        kept.map(k => k.r),
+        item.r.kind,
+        item.r.to,
+        item.r.from
+      )
+    )
+      result.droppedCycles++;
+    else kept.push(item);
+  }
+  kept.sort((a, b) => a.i - b.i);
+  setTopicRelations(
+    map,
+    kept.map(k => k.r)
+  );
+  return result;
+}
 export function clearQuestionConvergenceEdges(map: MapDocument): boolean {
   let changed = false;
   for (const node of map.nodes) {
@@ -363,7 +575,7 @@ function validRetainedReports(reports: unknown): reports is AimRetainedReport[] 
   });
 }
 
-export function parseMap(content: string): MapDocument {
+export function parseMap(content: string, log?: RelationLogger): MapDocument {
   const block = content.match(/```agent-map\s*\n([\s\S]*?)\n```/);
   if (!block) throw new Error(t("ui.mind_map_data_was_not_found_keep_the_agent_map_block"));
   const map = upgradeLegacyAimData(JSON.parse(block[1]) as MapDocument);
@@ -453,6 +665,7 @@ export function parseMap(content: string): MapDocument {
   )
     map.viewport = { x: 40, y: 40, zoom: 1 };
   map.viewport.zoom = Math.min(2, Math.max(0.25, map.viewport.zoom));
+  sanitizeTopicRelations(map, log);
   return map;
 }
 function validateAimMap(map: MapDocument): void {

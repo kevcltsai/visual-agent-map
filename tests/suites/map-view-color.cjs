@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { test, root } = require('../support.cjs');
+const { test, root, load } = require('../support.cjs');
 
 const tokens = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/color/obsidian-default-tokens.json'), 'utf8'));
 const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -23,6 +23,13 @@ const BUTTON_SURFACE = {
 const svg = '<svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14"><path d="M4 12h16" stroke="currentColor"/></svg>';
 const tag = (tier, label) => `<button class="vam-relevance-tag vam-relevance-tag-button" data-tier="${tier}"><span class="vam-relevance-icon">${svg}</span><span>${label}</span></button>`;
 const card = (attrs, left, top, inner) => `<div class="vam-node" ${attrs} style="left:${left}px;top:${top}px">${inner}</div>`;
+// hypothesis-evidence (V1.6 P13): every line kind x normal / related / dimmed / selected, plus the plain and the expanded label, the arrowheads and the gap line.
+const RELATION_KINDS = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
+const RELATION_STATES = [['normal', ''], ['related', ' is-related'], ['dimmed', ' is-dimmed'], ['selected', ' is-selected']];
+const RELATION_FIXTURE = `<defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker><marker id="mb" viewBox="0 0 14 10" markerWidth="14" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/><path class="vam-relation-arrow-bar" d="M 12 0 L 12 10"/></marker></defs>${RELATION_KINDS.map((kind, row) => RELATION_STATES.map(([state, cls], col) => {
+  const y = 200 + row * 20 + col * 130, d = `M0 ${y} L200 ${y}`;
+  return `<path class="vam-relation vam-relation-${kind}${cls}" data-case="${kind}|${state}" d="${d}" marker-end="url(#${kind === 'contradicts' ? 'mb' : 'm'})"/>` + (kind === 'derives_from' ? `<path class="vam-relation-gap" data-gap="${state}" d="${d}"/>` : '');
+}).join('')).join('')}<path class="vam-relation-hit" d="M0 170 L200 170"/><text class="vam-relation-label" x="100" y="190">Supports</text><text class="vam-relation-label is-expanded" x="300" y="190"><tspan x="300">Supports: A → B</tspan><tspan x="300" dy="1.3em">A note</tspan></text>`;
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><style>
 button { background: var(--interactive-normal); color: var(--text-normal); border: 0; font: inherit; }
 button:hover { background: var(--interactive-hover); }
@@ -37,7 +44,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 </div>
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
-    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/></svg>
+    <svg class="vam-edges"><path class="vam-edge" data-parent-line d="M0 0 L200 0"/><path class="vam-edge vam-edge-aim" d="M0 -20 L200 -20"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/>${RELATION_FIXTURE}</svg>
     ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
@@ -55,11 +62,17 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div class="vam-node" style="position:static;width:200px"><button class="vam-add-child" style="opacity:1">+</button></div>
 </body></html>`;
 
-// [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), dot (::before fill), ring (::before border).
+// [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), fill (SVG fill), border (card frame), dot (::before fill), ring (::before border).
 const CASES = [
-  ['edge', '.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)', 'stroke', 3],
+  ['edge', '.vam-edge[data-parent-line]', 'stroke', 3],
+  ['edge-aim', '.vam-edge-aim', 'stroke', 3],
   ['edge-skippable', '.vam-edge.vam-edge-side', 'stroke', 3],
   ['edge-convergence', '.vam-edge-convergence', 'stroke', 3],
+  ...RELATION_KINDS.flatMap(kind => RELATION_STATES.map(([state, cls]) => [`line-${kind}-${state}`, `.vam-relation-${kind}${cls.replace(/ /g, '.')}:not(${['.is-related', '.is-dimmed', '.is-selected'].filter(c => !cls.includes(c.slice(1))).join('):not(')})`, 'stroke', ['normal', 'related'].includes(state) ? 4.5 : 3])),
+  ['relation-label', '.vam-relation-label:not(.is-expanded)', 'fill', 4.5],
+  ['relation-label-expanded', '.vam-relation-label.is-expanded', 'fill', 4.5],
+  ['relation-arrow', '.vam-relation-arrow', 'fill', 3],
+  ['relation-arrow-bar', '.vam-relation-arrow-bar', 'stroke', 3],
   ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],
   ['skippable-summary', '.vam-node[data-relevance="side"] .vam-card-summary', 'color', 4.5],
   ['skippable-tag-text', '.vam-node[data-relevance="side"] .vam-relevance-tag span:last-child', 'color', 4.5],
@@ -140,6 +153,8 @@ const PROBE = `(() => {
     const foreground = () => {
       if (kind === 'color') return rgba(style(target).color);
       if (kind === 'stroke') return rgba(style(target).stroke);
+      if (kind === 'fill') return rgba(style(target).fill);
+      if (kind === 'border') return rgba(style(target).borderTopColor);
       if (kind === 'dot') return rgba(getComputedStyle(target, '::before').backgroundColor);
       return rgba(getComputedStyle(target, '::before').borderTopColor);
     };
@@ -250,9 +265,19 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         const details = await evaluate(`(() => {
           const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
           const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
-          return { sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
+          const rel = (kind, state = ':not(.is-related):not(.is-dimmed):not(.is-selected)') => getComputedStyle(document.querySelector('.vam-relation-' + kind + state)), convergence = document.querySelector('.vam-edge-convergence');
+          const gap = getComputedStyle(document.querySelector('.vam-relation-gap')), dash = kind => rel(kind).strokeDasharray.replace(/px|,/g, '');
+          return { hitPointer: getComputedStyle(document.querySelector('.vam-relation-hit')).pointerEvents, hitStroke: getComputedStyle(document.querySelector('.vam-relation-hit')).stroke, labelPointer: getComputedStyle(document.querySelector('.vam-relation-label')).pointerEvents, labelDisplay: getComputedStyle(document.querySelector('.vam-relation-label')).display, labelVisibility: getComputedStyle(document.querySelector('.vam-relation-label')).visibility,
+            dashes: { supports: dash('supports'), contradicts: dash('contradicts'), verifies: dash('verifies'), derives_from: dash('derives_from'), related: dash('related'), prerequisite: dash('prerequisite') }, widths: Object.fromEntries(['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map(kind => [kind, rel(kind).strokeWidth])), selectedWidths: { supports: rel('supports', '.is-selected').strokeWidth, derives_from: rel('derives_from', '.is-selected').strokeWidth }, verifiesCap: rel('verifies').strokeLinecap, pointers: ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].map(kind => rel(kind).pointerEvents), gapStroke: gap.stroke, gapWidth: gap.strokeWidth, gapPointer: gap.pointerEvents, canvas: getComputedStyle(document.body).backgroundColor,
+            convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
+            coreWidth: getComputedStyle(core).borderTopWidth,
+            sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
             edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
         })()`);
+        details.parentWidth = await evaluate(`getComputedStyle(document.querySelector('.vam-edge[data-parent-line]')).strokeWidth`);
+        details.aimEdgeWidth = await evaluate(`getComputedStyle(document.querySelector('.vam-edge-aim')).strokeWidth`);
+        details.aimEdgeStroke = await evaluate(`getComputedStyle(document.querySelector('.vam-edge-aim')).stroke`);
+        details.accent = await evaluate(`(() => { const p = document.createElement('i'); p.style.color = 'var(--interactive-accent)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })()`);
         // Hover / selection of a skippable topic must not change its look beyond the border colour (no opacity jump).
         await hoverOn('.vam-node[data-relevance="side"]', true);
         details.sideHoverOpacity = await evaluate(`getComputedStyle(document.querySelector('.vam-node[data-relevance="side"]')).opacity`);
@@ -276,7 +301,30 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         assert.notEqual(row.ratio, null, `${scheme}: ${name} exists in the fixture DOM`);
         if (row.need) assert.ok(row.ratio >= row.need, `${scheme}: ${name} contrast ${row.ratio.toFixed(2)} must be >= ${row.need}`);
       }
+      // hypothesis-evidence (decision 35 A1/A2): the mind map's parent line is thin, at least 3:1, and clearly lighter than every semantic line.
+      const parent = rows['edge'].ratio, lightestSemantic = Math.min(...Object.entries(rows).filter(([name]) => /^line-.*-(normal|related)$/.test(name)).map(([, row]) => row.ratio));
+      assert.ok(parent >= 3, `${scheme}: parent line ${parent.toFixed(2)} must be >= 3`);
+      assert.ok(parent < lightestSemantic - 1, `${scheme}: parent line ${parent.toFixed(2)} must be lighter than the lightest semantic line ${lightestSemantic.toFixed(2)}`);
+      assert.equal(details.parentWidth, '1.5px', `${scheme}: the parent line is 1.5px`); assert.equal(details.aimEdgeWidth, '2px', `${scheme}: an edge without data-parent-line (AIM, sample, viewer) keeps the 2px accent line`); assert.equal(details.aimEdgeStroke, details.accent, `${scheme}: and its accent colour`);
+      console.log(`parent line ${scheme}: ${parent.toFixed(2)}:1, lightest semantic line ${lightestSemantic.toFixed(2)}:1`);
       // Counterexamples: the cues that replace the fade stay visible and stable.
+      // hypothesis-evidence: the new line types stay distinguishable without colour (dash pattern) and leave the old ones alone. The hypothesis frame is now a shape outline, measured with every other type in the kind matrix test below.
+      const d = details.dashes;
+      assert.equal(d.supports, 'none', `${scheme}: supports is solid`); assert.equal(d.contradicts, '8 4', `${scheme}: contradicts is dashed 8 4`); assert.equal(d.verifies, '1 5', `${scheme}: verifies is dotted 1 5`);
+      assert.equal(d.derives_from, 'none', `${scheme}: derives from is a solid double line`); assert.equal(d.related, 'none', `${scheme}: related is solid`); assert.equal(d.prerequisite, '10 4 2 4', `${scheme}: prerequisite is long-short`);
+      assert.equal(details.verifiesCap, 'round', `${scheme}: the dots are round`);
+      assert.equal(new Set(Object.values(d)).size, 4, `${scheme}: the patterns tell contradicts, verifies and prerequisite apart from the solid kinds and each other`);
+      assert.notEqual(d.contradicts, details.convergenceDash.replace(/px|,/g, ''), `${scheme}: contradicts differs from the AIM 5 5 convergence dashes`);
+      assert.deepEqual(details.widths, { supports: '1.75px', contradicts: '1.75px', verifies: '1.75px', derives_from: '4.5px', related: '1.25px', prerequisite: '1.75px' }, `${scheme}: line widths`); // decision 35 A2: 2px / 5px became 1.75px / 4.5px
+      assert.deepEqual(details.selectedWidths, { supports: '2.75px', derives_from: '5.5px' }, `${scheme}: a selected line is 1px heavier`); // decision 35 A2
+      assert.equal(details.gapWidth, '1.5px', `${scheme}: the inner line of a double line is 1.5px`); assert.equal(details.gapStroke, details.canvas, `${scheme}: and in the canvas colour`); assert.equal(details.gapPointer, 'none');
+      assert.deepEqual(details.pointers, Array(6).fill('none'), `${scheme}: no line takes pointer events`);
+      assert.notEqual(details.labelDisplay, 'none', `${scheme}: a label is shown by default`); assert.equal(details.labelVisibility, 'visible');
+      assert.equal(details.hitPointer, 'stroke', `${scheme}: the wide hit path takes pointer events on its stroke`);
+      assert.equal(details.labelPointer, 'none', `${scheme}: the relation name takes no pointer events`);
+      assert.equal(details.edgeDash, 'none', `${scheme}: the parent-child line stays solid`);
+      assert.equal(details.edgesPointer, 'none', `${scheme}: the edge layer keeps pointer-events none`);
+      assert.equal(details.coreWidth, '1px', `${scheme}: an ordinary topic keeps the 1px frame`);
       assert.equal(details.sideBorder, 'dashed', `${scheme}: a skippable topic keeps a dashed frame`);
       assert.notEqual(details.coreBorder, 'dashed', `${scheme}: only skippable topics get the dashed frame`);
       assert.equal(details.sideTag, true, `${scheme}: a skippable topic keeps its tag`);
@@ -291,4 +339,126 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
+});
+
+// ---- hypothesis-evidence (V1.6 P11): six topic types x seven research states x both themes ----
+// The shape cards are built from the real topic-kind-shape.ts (so the outline, fold and classes are the ones view.ts draws), then measured in headless Chrome.
+const KIND_STATES = [
+  ['completed', 'data-status="completed"', ''],
+  ['idea', 'data-status="idea"', ''],
+  ['idea+side', 'data-status="idea" data-relevance="side"', ''],
+  ['running', 'data-status="running"', ''],
+  ['queued', 'data-status="queued"', ''],
+  ['error', 'data-status="error"', ''],
+  ['selected', 'data-status="completed"', ' is-selected']
+];
+const KIND_IDS = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+function shapeMarkup(kind) {
+  const { renderShapeBackground } = load('experiences/visual-map/topic-kind-shape.ts', {}, {
+    createSvg: tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } })
+  });
+  let drawn = '';
+  const html = el => `<${el.tag}${el.classes.length ? ` class="${el.classes.join(' ')}"` : ''}${Object.entries(el.attrs).map(([k, v]) => ` ${k}="${v}"`).join('')}>${el.children.map(html).join('')}</${el.tag}>`;
+  renderShapeBackground({ appendChild(el) { drawn = html(el); } }, kind);
+  return drawn;
+}
+const KIND_PAGE = () => `<!doctype html><html><head><meta charset="utf-8"><style>${styles}
+body { margin: 0; width: 2400px; height: 1400px; background: var(--background-primary); color: var(--text-normal); }
+.vam-node { width: 280px; }
+</style></head><body><div class="vam-viewport" style="width:2400px;height:1400px"><div class="vam-stage">${KIND_IDS.map((kind, row) => KIND_STATES.map(([state, attrs, extra], col) => {
+  const kindAttr = kind === 'topic' ? '' : ` data-topic-kind="${kind}"`;
+  // decision 35 B1: every typed card carries the tag (a hypothesis with its strength, the others with the type name).
+  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span>' : kind === 'topic' ? '' : `<span class="vam-hypothesis-tag vam-kind-tag">${kind}</span>`;
+  return `<div class="vam-node${extra}"${kindAttr} ${attrs} data-case="${kind}|${state}" style="left:${20 + col * 330}px;top:${20 + row * 220}px;padding:28px 40px">${shapeMarkup(kind)}<div class="vam-node-header">${tagHtml}</div><h3 class="vam-card-title" title="Title">Title of the topic</h3><p class="vam-card-summary">A short summary of the topic.</p></div>`;
+}).join('')).join('')}</div></div></body></html>`;
+const KIND_PROBE = `(() => {
+  const cx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const rgba = text => { const read = base => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = base; cx.fillStyle = text; cx.fillRect(0, 0, 1, 1); return [...cx.getImageData(0, 0, 1, 1).data]; }; const a = read('#000000'), b = read('#ffffff'); if (a.join() !== b.join()) throw new Error('unparsed colour: ' + text); return [a[0], a[1], a[2], a[3] / 255]; };
+  const over = (top, under) => { const a = top[3]; return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)).concat([1]); };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (x, y) => { const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+  const canvas = over(rgba(getComputedStyle(document.querySelector('.vam-viewport')).backgroundColor), [255, 255, 255, 1]);
+  const rows = {};
+  for (const card of document.querySelectorAll('[data-case]')) {
+    const [kind, state] = card.dataset.case.split('|');
+    const outline = card.querySelector('.vam-kind-outline'), style = getComputedStyle(card);
+    const cardBg = rgba(style.backgroundColor);
+    const fill = outline ? over(rgba(getComputedStyle(outline).fill), canvas) : over(cardBg, canvas);
+    const row = { text: Math.min(ratio(over(rgba(getComputedStyle(card.querySelector('.vam-card-title')).color), fill), fill), ratio(over(rgba(getComputedStyle(card.querySelector('.vam-card-summary')).color), fill), fill)) };
+    const tag = card.querySelector('.vam-hypothesis-tag');
+    if (tag) row.tag = ratio(over(rgba(getComputedStyle(tag).color), fill), fill);
+    if (kind !== 'topic') {
+      const line = over(rgba(outline ? getComputedStyle(outline).stroke : style.borderTopColor), fill);
+      row.outline = Math.min(ratio(line, fill), ratio(line, canvas));
+      row.cardFrame = outline ? { border: style.borderTopColor, bg: style.backgroundColor, shadow: style.boxShadow, outline: style.outlineStyle, width: getComputedStyle(outline).strokeWidth, dash: getComputedStyle(outline).strokeDasharray } : null;
+    }
+    rows[card.dataset.case] = row;
+  }
+  return rows;
+})()`;
+
+test('hypothesis-evidence: six topic types x seven research states keep text >= 4.5:1 and the shape outline >= 3:1 in the light and dark themes', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-kind-colour-'));
+  try {
+    const file = path.join(directory, 'kinds.html');
+    fs.writeFileSync(file, KIND_PAGE());
+    const report = await withChrome(chrome, directory, pathToFileURL(file).href, async send => {
+      const evaluate = async expression => {
+        const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? 'page error');
+        return result.result.value;
+      };
+      const out = {};
+      for (const scheme of ['light', 'dark']) {
+        await evaluate(`(() => { document.body.className = ${JSON.stringify(`theme-${scheme}`)}; document.body.removeAttribute('style'); document.body.style.cssText = 'margin:0;width:2400px;height:1400px;background:var(--background-primary);color:var(--text-normal)'; for (const [k, v] of Object.entries(${JSON.stringify(tokens[scheme])})) document.body.style.setProperty(k, v); })()`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        out[scheme] = await evaluate(KIND_PROBE);
+      }
+      return out;
+    });
+    let lowestText = Infinity, lowestOutline = Infinity, lowestTag = Infinity, lowestAt = {};
+    for (const scheme of ['light', 'dark']) {
+      const rows = report[scheme];
+      assert.equal(Object.keys(rows).length, KIND_IDS.length * KIND_STATES.length, `${scheme}: every type x state case is in the fixture`);
+      for (const [name, row] of Object.entries(rows)) {
+        assert.ok(row.text >= 4.5, `${scheme} ${name}: title / summary ${row.text.toFixed(2)} must be >= 4.5`);
+        if (row.text < lowestText) { lowestText = row.text; lowestAt.text = `${scheme} ${name}`; }
+        if (row.tag !== undefined) { assert.ok(row.tag >= 4.5, `${scheme} ${name}: hypothesis tag ${row.tag.toFixed(2)} must be >= 4.5`); if (row.tag < lowestTag) { lowestTag = row.tag; lowestAt.tag = `${scheme} ${name}`; } }
+        if (row.outline !== undefined) {
+          assert.ok(row.outline >= 3, `${scheme} ${name}: outline ${row.outline.toFixed(2)} must be >= 3 (against the fill and the canvas)`);
+          if (row.outline < lowestOutline) { lowestOutline = row.outline; lowestAt.outline = `${scheme} ${name}`; }
+        }
+        const [kind, state] = name.split('|');
+        assert.equal(row.tag !== undefined, kind !== 'topic', `${scheme} ${name}: every typed card has a kind tag, an ordinary topic has none`);
+        if (row.cardFrame) {
+          // The four SVG types hide the card's own frame and shadow; selected is heavier, a skippable one is dashed, the others are solid.
+          assert.equal(row.cardFrame.shadow, 'none', `${scheme} ${name}: no card shadow behind a shape`);
+          assert.match(row.cardFrame.bg, /rgba\(0, 0, 0, 0\)|transparent/, `${scheme} ${name}: no card fill behind a shape`);
+          assert.equal(row.cardFrame.width, state === 'selected' ? '3px' : '2px', `${scheme} ${name}: outline weight`);
+          assert.equal(row.cardFrame.dash !== 'none', state === 'idea+side', `${scheme} ${name}: only a skippable topic is dashed`);
+          if (state === 'selected') assert.equal(row.cardFrame.outline, 'none', `${scheme} ${name}: no rectangular selection outline around a shape`);
+        }
+        assert.ok(KIND_IDS.includes(kind));
+      }
+    }
+    console.log(`kind matrix (6 types x 7 states x 2 themes): lowest text ${lowestText.toFixed(2)} (${lowestAt.text}), lowest hypothesis tag ${lowestTag.toFixed(2)} (${lowestAt.tag}), lowest outline ${lowestOutline.toFixed(2)} (${lowestAt.outline})`);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+// ---- hypothesis-evidence (V1.6 P13): the colour fixture keeps covering every line state ----
+test('hypothesis-evidence: the colour matrix measures six line kinds x normal / related / dimmed / selected at >= 3:1 and both label forms at >= 4.5:1', () => {
+  const lines = CASES.filter(([name]) => name.startsWith('line-'));
+  assert.equal(lines.length, 24);
+  for (const kind of RELATION_KINDS) for (const [state] of RELATION_STATES) {
+    const row = lines.find(([name]) => name === `line-${kind}-${state}`);
+    assert.ok(row, `${kind} ${state} is measured`); assert.equal(row[3], ['normal', 'related'].includes(state) ? 4.5 : 3); // decision 35 A2: the resting and related states of a semantic line need 4.5, up from 3
+    assert.match(PAGE, new RegExp(`data-case="${kind}\\|${state}"`), `${kind} ${state} is in the fixture DOM`);
+  }
+  for (const name of ['relation-label', 'relation-label-expanded']) assert.equal(CASES.find(([n]) => n === name)[3], 4.5, name);
+  assert.ok(CASES.some(([n, , , need]) => n === 'relation-arrow' && need === 3) && CASES.some(([n]) => n === 'relation-arrow-bar'));
+  assert.match(PAGE, /vam-relation-gap/, 'the double line gap is in the fixture');
 });

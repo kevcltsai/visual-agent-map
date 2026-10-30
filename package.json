@@ -16,7 +16,7 @@
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
     "lint": "eslint . --max-warnings=0 && node scripts/check-css.mjs && node scripts/check-test-timing.mjs && node scripts/check-test-wiring.mjs",
     "test": "node scripts/test-harness.mjs",
-    "test:unit": "npm run compile:sample && node tests/run.cjs --layer=unit && node --test tests/compliance-gates.mjs tests/css-support.mjs tests/prompt-snapshots.cjs tests/replay.cjs tests/markdown-selection-auto-open.cjs tests/step-runner.cjs tests/relevance-offline.cjs tests/steps-*.cjs tests/aim-*.cjs tests/codex-parallel-runtime.cjs tests/prompt-monitor-timing.cjs tests/coffee-customization-storage.cjs",
+    "test:unit": "npm run compile:sample && node scripts/test-unit.mjs",
     "test:aim": "VAM_SUITES=aim node --test tests/run.cjs tests/aim-*.cjs tests/steps-aim-*.cjs tests/codex-parallel-runtime.cjs && VAM_SUITES=other node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs",
     "test:aim:node": "node tests/tools/aim-node.cjs",
     "test:integration": "node scripts/test-integration.mjs",

@@ -502,3 +502,65 @@ integrationTest('map transaction: R1-F3 a coordinate-only write that landed befo
   assert.equal(error.message, 'injected onApplied');
   assert.deepEqual((await h.repo.readMap(MAP)).nodes.map(n => [n.id, n.x, n.y]), before, 'coordinates are back as before');
 });
+
+// ---- hypothesis-evidence (P3): relations ride along in undo and redo; map-transaction.ts is not changed ----
+const heRel = (kind, from, to) => ({ kind, from, to });
+const heIds = async h => (await h.repo.readMap(MAP)).nodes.map(n => n.id);
+integrationTest('hypothesis-evidence: undo and redo of adding then removing a relation restore Map.md exactly, and an outside relation change makes undo stale', async () => {
+  const h = await harness();
+  const [one, two, three] = await heIds(h);
+  const original = h.contents.get(MAP);
+  const added = await begin(h.deps).editMap(MAP, map => { map.topicRelations = [heRel('supports', one, two), heRel('prerequisite', three, one)]; }).commit();
+  const withRelations = h.contents.get(MAP);
+  assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('supports', one, two), heRel('prerequisite', three, one)]);
+  const removed = await begin(h.deps).editMap(MAP, map => { map.topicRelations = [heRel('prerequisite', three, one)]; }).commit();
+  await removed.undo();
+  assert.equal(h.contents.get(MAP), withRelations, 'undo of a removal brings the relation back, byte for byte');
+  await removed.redo();
+  assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('prerequisite', three, one)]);
+  await removed.undo();
+  await added.undo();
+  assert.equal(h.contents.get(MAP), original, 'undo of an addition leaves no topicRelations key');
+  assert.equal('topicRelations' in (await h.repo.readMap(MAP)), false);
+  await added.redo();
+  assert.equal(h.contents.get(MAP), withRelations);
+  const outside = await h.repo.readMap(MAP);
+  outside.topicRelations = [heRel('supports', one, three)];
+  await h.repo.saveMap(MAP, outside);
+  const before = h.snapshot(), calls = h.calls.length;
+  assert.equal((await rejected(added.undo())).kind, 'stale', 'a relation edited outside makes the stored step stale (structure() already covers topicRelations)');
+  assert.deepEqual(h.snapshot(), before);
+  assert.equal(h.calls.length, calls, 'nothing written');
+});
+integrationTest('hypothesis-evidence: deleting an endpoint (park plus relation removal) undoes and redoes together', async () => {
+  const h = await harness();
+  const [one, two, three] = await heIds(h);
+  await begin(h.deps).editMap(MAP, map => { map.topicRelations = [heRel('supports', one, two), heRel('prerequisite', two, three), heRel('prerequisite', one, three)]; }).commit();
+  const withRelations = h.contents.get(MAP);
+  const entry = await park(h, [h.notes[1]]).editMap(MAP, map => {
+    map.nodes = map.nodes.filter(n => n.id !== two);
+    map.topicRelations = map.topicRelations.filter(r => r.from !== two && r.to !== two);
+  }).commit();
+  assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('prerequisite', one, three)]);
+  await entry.undo();
+  assert.equal(h.contents.get(MAP), withRelations, 'both relations to the deleted topic are back');
+  assert.equal(h.exists(h.notes[1]), true);
+  await entry.redo();
+  assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('prerequisite', one, three)]);
+});
+integrationTest('hypothesis-evidence: a merge that re-points relations (dedupe, drop self link) undoes and redoes together', async () => {
+  const h = await harness();
+  const [one, two, three] = await heIds(h);
+  const model = load('map-model.ts');
+  await begin(h.deps).editMap(MAP, map => { map.topicRelations = [heRel('supports', one, three), heRel('supports', two, three), heRel('prerequisite', one, two)]; }).commit();
+  const withRelations = h.contents.get(MAP);
+  const entry = await park(h, [h.notes[1]]).editMap(MAP, map => {
+    map.nodes = map.nodes.filter(n => n.id !== two);
+    model.retargetTopicRelations(map, [two], one);
+  }).commit();
+  assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('supports', one, three)], 'deduped, and the one->two link became a self link and went');
+  await entry.undo();
+  assert.equal(h.contents.get(MAP), withRelations);
+  await entry.redo();
+  assert.deepEqual(plain((await h.repo.readMap(MAP)).topicRelations), [heRel('supports', one, three)]);
+});

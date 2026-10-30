@@ -17,6 +17,8 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
+import { relationLabelPoint, relationPathData, type RelationBox } from "./relation-geometry";
+import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import {
@@ -55,11 +57,20 @@ import {
   descendants,
   History,
   inheritModel,
+  legalRelationTargets,
   type MapDocument,
   type MapNode,
+  normalizeRelationDescription,
+  RELATION_DESCRIPTION_MAX_LENGTH,
   parentIdsForNode,
   removeNodes,
+  removeTopicRelationsFor,
+  relationAllowed,
+  retargetTopicRelations,
+  setTopicRelations,
   supersededAimNodeIds,
+  type TopicRelation,
+  type TopicRelationKind,
   visibleNodes
 } from "../../map-model";
 import {
@@ -127,12 +138,17 @@ import {
   normalizeRelevanceLevel,
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
+  HYPOTHESIS_STRENGTHS,
+  TOPIC_KINDS,
   RELEVANCE_LEVELS,
+  type HypothesisStrength,
   type NoteRelevance,
   type RelevanceLevel,
-  type RelevanceTier
+  type RelevanceTier,
+  type TopicKind
 } from "../../note-values";
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
+import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
 import { fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
@@ -426,6 +442,22 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
+/** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
+let relationMarkerSequence = 0;
+let relationSwatchSequence = 0;
+/** The structure dialog lists the types in the order of spec section 2 (not TOPIC_KINDS order, which the menus keep). */
+const KIND_PICKER_ORDER: readonly TopicKind[] = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
+type CardBox = RelationBox;
+/** Below this zoom the relation names are hidden; at it they show. */
+const RELATION_LABEL_MIN_ZOOM = 0.6;
+/** A note shown under an expanded label is cut to this many characters. */
+const RELATION_LABEL_NOTE_MAX = 60;
+const boxOf = (card: HTMLElement): CardBox => ({
+  x: card.offsetLeft,
+  y: card.offsetTop,
+  width: card.offsetWidth,
+  height: card.offsetHeight
+});
 
 /** One planned subtopic of the running AIM branch, as the map shows it before its research note exists. */
 type AimTargetProgress = {
@@ -435,6 +467,41 @@ type AimTargetProgress = {
   startedAt?: number;
 };
 
+const TOPIC_KIND_ICON: Record<TopicKind, string> = {
+  topic: "circle",
+  action: "square-check",
+  atomic: "atom",
+  hypothesis: "lightbulb",
+  evidence: "file-search",
+  conclusion: "flag"
+};
+const RELATION_KINDS: readonly TopicRelationKind[] = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+/** One sentence per kind, "A ... B" with A the source and B the target, worded for each language rather than by word order. */
+const RELATION_SENTENCE_KEY: Record<Exclude<TopicRelationKind, "related">, Parameters<typeof t>[0]> = {
+  supports: "ui.relation_sentence_supports_0_1",
+  contradicts: "ui.relation_sentence_contradicts_0_1",
+  verifies: "ui.relation_sentence_verifies_0_1",
+  derives_from: "ui.relation_sentence_derives_from_0_1",
+  prerequisite: "ui.relation_sentence_prerequisite_0_1"
+};
+const RELATION_NAME_KEY: Record<TopicRelationKind, Parameters<typeof t>[0]> = {
+  supports: "ui.relation_name_supports",
+  contradicts: "ui.relation_name_contradicts",
+  verifies: "ui.relation_name_verifies",
+  derives_from: "ui.relation_name_derives_from",
+  related: "ui.relation_name_related",
+  prerequisite: "ui.relation_name_prerequisite"
+};
+/** The key a relation line is known by (view state only): `from`, `to` and kind. */
+const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
+  `${r.from}\u0000${r.to}\u0000${r.kind}`;
 const AIM_STAGE_KEYS: Record<string, Parameters<typeof t>[0]> = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -512,6 +579,7 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   duplicate_identity_key: "ui.map_chat_guard_duplicate_identity_key",
   topic_identity_changed: "ui.map_chat_guard_topic_identity_changed",
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
+  hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline"
 };
@@ -519,8 +587,25 @@ const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
   skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 let mapChatTaskSequence = 0;
 
+/** The same key for both directions: a pair of topics holds one relation (spec V1.7). */
+function relationPairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
+  /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
+  private lastDroppedCycles = 0;
+  /** Relations the last merge dropped because the merged topic already had one with the same other topic (one relation per pair, decision 37). */
+  private lastDroppedSamePair = 0;
+  /** How many same-pair relations the latest merge dropped (0 when none). */
+  droppedSamePairOfLastMerge(): number {
+    return this.lastDroppedSamePair;
+  }
+  /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
+  droppedCyclesOfLastMerge(): number {
+    return this.lastDroppedCycles;
+  }
   private path = "";
   private notes = new Map<string, Note>();
   /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
@@ -684,6 +769,30 @@ export class VisualAgentMapView extends ItemView {
   /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
   private viewportQueued = false;
   private edgeEls = new Map<string, SVGPathElement>();
+  /** Evidence and prerequisite links on screen, keyed `from\0to\0kind`; a drag moves them with their cards. */
+  private relationEls = new Map<string, SVGPathElement>();
+  /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
+  private relationHitEls = new Map<string, SVGPathElement>();
+  private relationLabelEls = new Map<string, SVGTextElement>();
+  /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
+  private relationGapEls = new Map<string, SVGPathElement>();
+  private relationData = new Map<string, TopicRelation>();
+  /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
+  private relationPainted = new Set<string>();
+  private relationExpanded = new Set<string>();
+  /** Where each label sits, so expanding or collapsing its text keeps it in place. */
+  private relationLabelAt = new Map<string, { x: number; y: number }>();
+  /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
+  private selectedRelation: string | null = null;
+  /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
+  private hoverRelation: string | null = null;
+  private previewRelation: string | null = null;
+  /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
+  private relationEndIds = new Set<string>();
+  /** Ids of this view's two arrowheads (plain, and with a bar for "contradicts"); unique per view so two open maps never share (or lose) one. */
+  private readonly relationMarkerId = `vam-relation-arrow-${++relationMarkerSequence}`;
+  private readonly relationBarMarkerId = `${this.relationMarkerId}-bar`;
+  /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
   private suppressClickUntil = 0;
   /** Node whose card should hold keyboard focus once the next render finishes. */
   private focusNodeId: string | null = null;
@@ -841,6 +950,7 @@ export class VisualAgentMapView extends ItemView {
         const wasSelecting = this.integrationMode;
         this.selected = null;
         this.multiSelected.clear();
+        this.selectedRelation = null;
         this.integrationMode = false;
         if (wasSelecting) this.render();
         else this.commitSelection(previous, null, touched);
@@ -2673,6 +2783,26 @@ export class VisualAgentMapView extends ItemView {
         .setIcon("list-tree")
         .onClick(() => this.openOutlineImport())
     );
+    if (this.relationsEnabled())
+      for (const kind of TOPIC_KINDS)
+        menu.addItem(item =>
+          item
+            .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
+            .setIcon(TOPIC_KIND_ICON[kind])
+            .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind)))
+        );
+    menu.showAtMouseEvent(event);
+  }
+  /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
+  private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
+    const menu = new Menu();
+    for (const kind of TOPIC_KINDS)
+      menu.addItem(item =>
+        item
+          .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
+          .setIcon(TOPIC_KIND_ICON[kind])
+          .onClick(() => pick(kind))
+      );
     menu.showAtMouseEvent(event);
   }
   /** Collapse or expand every branch in one undoable change, then fit the map. `shownLevels` as in applyCollapseLevel. */
@@ -4021,6 +4151,7 @@ export class VisualAgentMapView extends ItemView {
     summary.empty();
     summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text });
+    summary.title = text;
   }
   /**
    * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
@@ -4040,7 +4171,11 @@ export class VisualAgentMapView extends ItemView {
       }
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
-      else summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+      else {
+        summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+        summary.title = text;
+      }
+      this.fitKindShape(card, this.topicKindOf(node.id));
       return;
     }
     if (!summary?.hasClass("is-preview")) return;
@@ -4049,7 +4184,9 @@ export class VisualAgentMapView extends ItemView {
     else {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
+      summary.title = note.summary;
     }
+    this.fitKindShape(card, this.topicKindOf(node.id));
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -4178,6 +4315,13 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
         map.nodes = removeNodes(map.nodes, node.id, branch);
+        if (adopterId) {
+          removeTopicRelationsFor(
+            map,
+            [...ids].filter(id => id !== node.id)
+          );
+          this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
+        } else removeTopicRelationsFor(map, ids);
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
           if (adopter) adopter.collapsed = false;
@@ -4189,6 +4333,7 @@ export class VisualAgentMapView extends ItemView {
     this.selected = null;
     this.multiSelected.clear();
     this.history.push(entry);
+    if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
   }
   private mergeBusy(node: MapNode, except?: MergeTask): boolean {
@@ -4605,18 +4750,23 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     const model = content?.task.model ?? (await this.mergeModel(check.parentId));
+    // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
+    const firstNote = this.notes.get(sources[0].id),
+      firstKind = firstNote?.topicKind,
+      firstStrength = firstNote?.topicKind === "hypothesis" ? firstNote.hypothesisStrength : undefined;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),
       model,
       before,
       mapPath,
       check.parentId ? "inherited" : "workspace",
-      content ? undefined : { detail }
+      { ...(content ? {} : { detail }), ...(firstKind ? { topicKind: firstKind } : {}) }
     );
     const parkFolder = repo.topicFolder(mapPath, "Unassigned"),
       viewport = clone(this.map?.viewport ?? before.viewport);
     let entry: TransactionEntry;
     try {
+      if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (content) {
         const detailTemplate = this.mapDetailTemplate(language);
         await repo.updateNote(
@@ -4656,6 +4806,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
+          this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
           if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -4756,6 +4907,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
+          this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
           if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -4770,8 +4922,19 @@ export class VisualAgentMapView extends ItemView {
     this.multiSelected.clear();
     await this.finishMerge(target.id);
   }
+  /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
+  private takeRetargetDrops(result: { droppedCycles: number; droppedSamePair: number }): void {
+    this.lastDroppedCycles = result.droppedCycles;
+    this.lastDroppedSamePair = result.droppedSamePair;
+  }
+  /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
+  private noticeDroppedCycles(): void {
+    if (this.lastDroppedSamePair > 0) new Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
+    if (this.lastDroppedCycles > 0) new Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
+  }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
   private async finishMerge(id: string): Promise<void> {
+    this.noticeDroppedCycles();
     try {
       await this.hydrate();
       this.render();
@@ -4914,6 +5077,7 @@ export class VisualAgentMapView extends ItemView {
           map.viewport = clone(viewport);
           const prior = clone(map);
           map.nodes = map.nodes.filter(node => !ids.has(node.id));
+          removeTopicRelationsFor(map, ids);
           this.removeAimReferences(map, ids, prior.nodes);
         })
         .commit();
@@ -6317,6 +6481,9 @@ export class VisualAgentMapView extends ItemView {
       background.appendChild(shape);
       card.appendChild(background);
     }
+    // The type's SVG shape goes behind the text (an AIM card has none: its kind is always an ordinary topic).
+    const kind = this.topicKindOf(node.id);
+    renderShapeBackground(card, kind);
     card.dataset.nodeId = node.id;
     // Research state drives the card's frame: frontier (idea), running, concluded, or failed.
     const queued = this.isResearchQueued(node);
@@ -6442,6 +6609,17 @@ export class VisualAgentMapView extends ItemView {
       }
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
+    }
+    // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
+    if (kind !== "topic") {
+      card.dataset.topicKind = kind;
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
+      if (strength) renderHypothesisTag(header, strength, kindText);
+      // The other typed cards name their type in the same quiet tag, coloured by the type's hue (decision 35); an ordinary topic shows none.
+      else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
+      const named = cardLabels.get(card)?.textContent;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
@@ -6675,7 +6853,8 @@ export class VisualAgentMapView extends ItemView {
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: note?.summary ?? t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
@@ -6907,6 +7086,30 @@ export class VisualAgentMapView extends ItemView {
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    this.fitKindShape(card, kind);
+  }
+  /**
+   * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
+   * text block is measured and the top and bottom padding follow its height. The card then grows with its text, and
+   * dragging, arranging and the relation lines read its real height. A card that is not laid out yet (a hidden pane) is
+   * left with the stylesheet's fallback padding and fitted by the next resize.
+   */
+  private fitKindShape(card: HTMLElement, kind: TopicKind): void {
+    if (!hasSvgShape(kind)) return;
+    const width = card.offsetWidth;
+    if (!width) return;
+    const sides = shapeInsets(kind, { width, height: 0 });
+    card.style.padding = `0 ${sides.right}px 0 ${sides.left}px`;
+    const height = card.clientHeight;
+    const insets = shapeInsets(kind, { width, height });
+    card.style.padding = `${insets.top}px ${insets.right}px ${insets.bottom}px ${insets.left}px`;
+  }
+  private fitKindShapes(): void {
+    if (!this.stageEl) return;
+    for (const node of this.map?.nodes ?? []) {
+      const card = this.cardEls.get(node.id);
+      if (card) this.fitKindShape(card, this.topicKindOf(node.id));
+    }
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
   private canvasNodes(): MapNode[] {
@@ -7002,12 +7205,15 @@ export class VisualAgentMapView extends ItemView {
       if (check) check.checked = this.multiSelected.has(id);
     }
     this.chat?.refreshSelection();
+    this.syncRelationClasses();
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
    * cards and the two tab stops are repainted, and the selection bar is refreshed in selection mode.
    */
   applySelectionState(prevId: string | null, nextId: string | null, touched: Iterable<string> = []): void {
+    // Picking, clearing or extending the topic selection ends a line selection.
+    this.selectedRelation = null;
     const previousStop = this.tabStopId;
     this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
     this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
@@ -7042,6 +7248,28 @@ export class VisualAgentMapView extends ItemView {
   /** A topic waiting in a batch (multi-topic or shallow research) for a free slot; it is not running yet. */
   private isResearchQueued(node: MapNode): boolean {
     return !this.plugin.running?.has(node.path) && !!this.plugin.expansionCoordinator?.isQueued(node.path);
+  }
+  /** Hypothesis and evidence features exist on ordinary maps only: not the built-in sample, not AIM. */
+  private relationsEnabled(): boolean {
+    return !this.builtIn && !!this.map && !this.map.aim;
+  }
+  private isHypothesis(id: string): boolean {
+    return this.notes.get(id)?.topicKind === "hypothesis";
+  }
+  /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM and the built-in sample show none). */
+  private topicKindOf(id: string): TopicKind {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind) return "topic";
+    return this.notes.get(id)?.topicKind ?? "topic";
+  }
+  /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
+  private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind || !this.isHypothesis(id)) return undefined;
+    return this.notes.get(id)?.hypothesisStrength ?? "weak";
+  }
+  private hypothesisTagText(strength: HypothesisStrength): string {
+    return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
   }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   private labelCard(card: HTMLElement, text: string): void {
@@ -7199,6 +7427,7 @@ export class VisualAgentMapView extends ItemView {
         title.after(summary);
       }
       summary?.setText(note.summary);
+      summary?.setAttr("title", note.summary);
       summary?.removeClass("is-preview");
     }
     const header = card.querySelector<HTMLElement>(".vam-node-header");
@@ -7231,6 +7460,16 @@ export class VisualAgentMapView extends ItemView {
         status.setText(label);
       } else header?.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
     }
+    // The label above was rewritten from the title and status; a typed topic keeps its type (a hypothesis its strength) in the accessible name.
+    const kind = this.topicKindOf(node.id);
+    if (kind !== "topic") {
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey),
+        named = cardLabels.get(card)?.textContent;
+      if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
+    }
+    // A new title or summary changes the text's height, and the shape's padding follows it.
+    this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
   private taskSourceSettings(
@@ -7533,29 +7772,31 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
+    // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
+    if (note) this.renderHypothesisSection(panel, node, close);
     const relationship = panel.createDiv("vam-inspector-section");
-    relationship.createEl("strong", { text: t("ui.parent_topic"), cls: "vam-topic-tree-heading" });
-    let chosenParent = node.parentId ?? "";
-    let describe = (): void => {};
+    relationship.createEl("strong", {
+      text: t("ui.parent_topic"),
+      cls: "vam-topic-tree-heading vam-section-heading"
+    });
+    // Choosing a parent moves the topic at once, one undo step (decision 40); the line under the footer says where it went.
+    let currentParent = node.parentId ?? null;
+    let moveTo = (_parentId: string | null): void => {};
     const parentTree = renderTopicTree(relationship, {
       nodes: this.map!.nodes,
       title: candidate => this.notes.get(candidate.id)?.title ?? candidate.path,
       label: t("ui.parent_topic_link"),
       selectable: candidate => canParent(this.map!.nodes, node.id, candidate.id),
       rootChoice: t("ui.no_parent_root_topic"),
-      value: chosenParent,
-      onChoose: id => {
-        chosenParent = id;
-        parentTree.select(id);
-        describe();
-      }
+      value: currentParent ?? "",
+      onChoose: id => moveTo(id || null)
     });
     relationship.createEl("p", {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");
+    if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {
       close?.();
@@ -7566,24 +7807,18 @@ export class VisualAgentMapView extends ItemView {
       attr: { "aria-live": "polite" }
     });
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-    const apply = actions.createEl("button", { text: t("ui.apply_parent"), cls: "mod-cta" });
-    describe = (): void => {
-      const parentId = chosenParent || null;
-      const changed = parentId !== (node.parentId ?? null);
-      apply.disabled = !changed;
+    moveTo = parentId => {
+      if (parentId === currentParent) return;
+      // A merging card keeps its parent: the tree goes back to the one it has.
+      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) {
+        parentTree.select(currentParent ?? "");
+        return;
+      }
+      currentParent = parentId;
+      parentTree.select(parentId ?? "");
       status.setText(
-        !changed
-          ? ""
-          : parentId
-            ? t("ui.will_move_under_0", this.notes.get(parentId)?.title ?? "")
-            : t("ui.will_become_root_topic")
+        parentId ? t("ui.moved_under_0", this.notes.get(parentId)?.title ?? "") : t("ui.became_root_topic")
       );
-    };
-    describe();
-    apply.addEventListener("click", () => {
-      const parentId = chosenParent || null;
-      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
-      close?.();
       this.enqueue(async () => {
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange(map => {
@@ -7597,7 +7832,7 @@ export class VisualAgentMapView extends ItemView {
           } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
         });
       });
-    });
+    };
   }
   private renderPendingProposals(
     panel: HTMLElement,
@@ -7746,19 +7981,531 @@ export class VisualAgentMapView extends ItemView {
       }))
     ).open();
   }
+  /** Sets a hypothesis's strength: the note's frontmatter and Map.md in one undoable step (undo writes the old note text back). */
+  private async changeHypothesisStrength(node: MapNode, strength: HypothesisStrength): Promise<void> {
+    if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisStrength(path, strength))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.hypothesis_strength") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
+  private async changeTopicKind(node: MapNode, kind: TopicKind): Promise<void> {
+    if (!this.map || !this.relationsEnabled() || node.aimKind || this.topicKindOf(node.id) === kind) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeTopicKind(path, kind))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_type") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Adds one relation A -> B in one undoable Map.md change; an illegal one (itself, a duplicate, a cycle for derivation or prerequisite) is refused. */
+  private async addRelation(fromId: string, toId: string, kind: TopicRelationKind): Promise<void> {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange(map => {
+      if (!relationAllowed(map.topicRelations ?? [], { kind, from: fromId, to: toId })) return;
+      setTopicRelations(map, [...(map.topicRelations ?? []), { kind, from: fromId, to: toId }]);
+    }, false);
+  }
+  /** Removes one relation in one undoable Map.md change. */
+  private async removeRelation(link: TopicRelation): Promise<void> {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange(map => {
+      setTopicRelations(
+        map,
+        (map.topicRelations ?? []).filter(r => relationIdentity(r) !== relationIdentity(link))
+      );
+    }, false);
+  }
+  /** The six relation kinds as a menu; `pick` gets the chosen one. */
+  private openRelationKindMenu(event: MouseEvent, pick: (kind: TopicRelationKind) => void): void {
+    const menu = new Menu();
+    for (const kind of RELATION_KINDS)
+      menu.addItem(item =>
+        item
+          .setTitle(t(RELATION_NAME_KEY[kind]))
+          .setIcon("link")
+          .onClick(() => pick(kind))
+      );
+    menu.showAtMouseEvent(event);
+  }
+  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
+  private chooseRelationTarget(node: MapNode, kind: TopicRelationKind, onAdded?: () => void): void {
+    if (!this.map || !this.relationsEnabled()) return;
+    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
+    if (!legal.size) {
+      new Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
+      return;
+    }
+    new TopicTreeModal(
+      this.app,
+      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
+      t("ui.add_relation_description"),
+      this.map.nodes,
+      target => this.notes.get(target.id)?.title ?? target.path,
+      target => legal.has(target.id),
+      target =>
+        this.enqueue(async () => {
+          await this.addRelation(node.id, target.id, kind);
+          onAdded?.();
+        })
+    ).open();
+  }
+  /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
+  private relationRowText(link: TopicRelation, selfId: string): string {
+    const name = t(RELATION_NAME_KEY[link.kind]),
+      titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
+    if (link.kind === "related")
+      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
+    return link.from === selfId
+      ? t("ui.relation_row_out_0_1", name, titleOf(link.to))
+      : t("ui.relation_row_in_0_1", titleOf(link.from), name);
+  }
+  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
+  private relationSentence(link: TopicRelation, selfId: string | null): string {
+    const self = t("ui.relation_this_topic"),
+      // English needs the lower-case form after the verb ("OTHER is derived from this topic"); Chinese has one form.
+      titleOf = (id: string, object = false): string =>
+        id === selfId ? (object ? t("ui.relation_this_topic_object") : self) : (this.notes.get(id)?.title ?? id);
+    if (link.kind === "related")
+      return selfId === null
+        ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to))
+        : t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
+    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
+  }
+  /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
+  private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
+    if (!this.map || !this.relationsEnabled()) return;
+    let saveNote = (): Promise<void> => Promise.resolve();
+    const render = (content: HTMLElement, close: () => void): void => {
+      saveNote = this.renderRelationEditor(content, link, close, onChanged);
+    };
+    new (class extends Modal {
+      onOpen(): void {
+        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+        render(this.contentEl, () => this.close());
+      }
+      onClose(): void {
+        // Closing saves a changed note. Obsidian puts focus back on the button that opened the dialog, but a change
+        // repainted the panel and that button is gone; once the save is done, the caller moves focus to the row's replacement.
+        void saveNote().then(() => {
+          if (onClosed) window.setTimeout(onClosed, 0);
+        });
+      }
+    })(this.app).open();
+  }
+
+  /**
+   * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
+   * illegal), a one-line note, and delete. Each change is one undoable Map.md step and is written at once; the note is
+   * written when the box loses focus, on Ctrl/Cmd+Enter, or when the dialog closes (decision 40). Everything the user
+   * typed (the note, topic titles) is shown as text only. Returns the close-time save, settled when its write is done.
+   */
+  private renderRelationEditor(
+    parent: HTMLElement,
+    initial: TopicRelation,
+    close?: () => void,
+    onChanged?: () => void
+  ): () => Promise<void> {
+    let current: TopicRelation = { ...initial };
+    const root = parent.createDiv("vam-relation-editor");
+    const indexOfCurrent = (): number =>
+      (this.map?.topicRelations ?? []).findIndex(r => relationIdentity(r) === relationIdentity(current));
+    // Runs one change on the relation held in the map being edited; `next` returns its new form, or null to delete it.
+    // A note save does not repaint the dialog, so a control the user is reaching for stays where it is.
+    const apply = (next: (rel: TopicRelation) => TopicRelation | null | undefined, repaint = true): Promise<void> =>
+      new Promise(done =>
+        this.enqueue(async () => {
+          try {
+            await change(next, repaint);
+          } finally {
+            done();
+          }
+        })
+      );
+    const change = async (
+      next: (rel: TopicRelation) => TopicRelation | null | undefined,
+      repaint: boolean
+    ): Promise<void> => {
+      const outcome: { value?: TopicRelation | null } = {};
+      if (!this.map) return;
+      // The line stays selected under its new identity; a deleted one is dropped by the next draw.
+      await this.mapChange(map => {
+        const list = map.topicRelations ?? [],
+          index = list.findIndex(r => relationIdentity(r) === relationIdentity(current));
+        if (index < 0) return;
+        outcome.value = next(list[index]);
+        // A type or direction change is checked again on the map being edited (the same rule as the choices offered).
+        const old = list[index];
+        if (
+          outcome.value &&
+          (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) &&
+          !relationAllowed(list, outcome.value, index)
+        )
+          outcome.value = undefined;
+        if (outcome.value === undefined) return;
+        const updated = [...list];
+        if (outcome.value) updated[index] = outcome.value;
+        else updated.splice(index, 1);
+        setTopicRelations(map, updated);
+      }, false);
+      const result = outcome.value;
+      if (result === null) {
+        if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
+        this.syncRelationClasses();
+        onChanged?.();
+        close?.();
+        return;
+      }
+      if (result) {
+        current = result;
+        this.selectedRelation = relationIdentity(current);
+        this.syncRelationClasses();
+      }
+      if (repaint) paint();
+      onChanged?.();
+    };
+    // The note as last written or requested; a save is asked for only when the box differs from it.
+    let savedNote = initial.description;
+    let noteWrite: Promise<void> = Promise.resolve();
+    let saveNote = (): void => {};
+    // Which control takes the keyboard focus after the next repaint (a change repaints the whole dialog).
+    let refocus: "kind" | "reverse" | null = null;
+    const paint = (): void => {
+      root.empty();
+      saveNote = () => {};
+      const index = indexOfCurrent();
+      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
+      if (index < 0) {
+        root.createEl("p", { text: t("ui.relation_gone") });
+        return;
+      }
+      const relations = this.map?.topicRelations ?? [];
+      // E1: the sentence "A relation B" and the line sample follow the kind and direction at once.
+      const summary = root.createDiv("vam-relation-editor-summary");
+      this.relationSwatch(summary, current.kind);
+      summary.createSpan({
+        text: this.relationSentence(current, null),
+        cls: "vam-relation-sentence",
+        attr: { dir: "auto" }
+      });
+      // E2: one field per row, label above the control.
+      const field = (label: string, id: string): HTMLElement => {
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
+      };
+      // Type: every kind is listed; one that would close a derives/prerequisite cycle is disabled, with the reason beside it (Q7).
+      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
+      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("id", "vam-relation-kind");
+      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+      const blocked: TopicRelationKind[] = [];
+      for (const kind of RELATION_KINDS) {
+        const open =
+          kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
+        if (!open) blocked.push(kind);
+        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+        if (!open) option.disabled = true;
+      }
+      kindSelect.value = current.kind;
+      if (blocked.length) {
+        const reason = kindRow.createEl("p", {
+          text: t("ui.relation_kind_blocked_cycle_0", blocked.map(kind => t(RELATION_NAME_KEY[kind])).join(", ")),
+          cls: "vam-relation-reason"
+        });
+        reason.setAttr("id", "vam-relation-kind-reason");
+        kindSelect.setAttr("aria-describedby", "vam-relation-kind-reason");
+      }
+      kindSelect.addEventListener("change", () => {
+        const kind = kindSelect.value as TopicRelationKind;
+        if (kind === current.kind) return;
+        refocus = "kind";
+        void apply(rel => ({ ...rel, kind }));
+      });
+      let reverseButton: HTMLElement | null = null;
+      // E3 direction: one Reverse button; "related" has no direction and no button. A reverse that would close a cycle stays visible, disabled, with the reason beside it.
+      if (current.kind !== "related") {
+        const directionRow = root.createDiv("vam-relation-field");
+        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
+        const reversed = { kind: current.kind, from: current.to, to: current.from };
+        const allowed = relationAllowed(relations, reversed, index);
+        const reverse = this.button(
+          directionRow,
+          t("ui.relation_reverse"),
+          () => {
+            refocus = "reverse";
+            void apply(rel => ({ ...rel, from: reversed.from, to: reversed.to }));
+          },
+          !allowed
+        );
+        reverse.addClass("vam-relation-reverse");
+        reverseButton = reverse;
+        if (!allowed) {
+          const reason = directionRow.createEl("p", {
+            text: t("ui.relation_reverse_blocked_cycle"),
+            cls: "vam-relation-reason"
+          });
+          reason.setAttr("id", "vam-relation-reverse-reason");
+          reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
+        }
+      }
+      // Note: a multi-line box of up to 200 characters, saved as one line (line breaks become spaces); an empty one removes the key.
+      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
+      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
+      description.setAttr("id", "vam-relation-description");
+      description.setAttr("rows", "4");
+      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
+      savedNote = relations[index].description;
+      description.value = savedNote ?? "";
+      description.setAttr("aria-label", t("ui.relation_description_label"));
+      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
+      const draft = (): string | undefined => normalizeRelationDescription(description.value);
+      saveNote = (): void => {
+        const text = draft();
+        if (text === savedNote) return;
+        savedNote = text;
+        noteWrite = apply(rel => {
+          const next: TopicRelation = { kind: rel.kind, from: rel.from, to: rel.to };
+          if (text !== undefined) next.description = text;
+          return next;
+        }, false);
+      };
+      // E5 footer (decision 40): Delete on the left, Close on the right; nothing waits for an Apply.
+      const footer = root.createDiv("vam-next-actions vam-relation-footer");
+      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
+      remove.addEventListener("click", () => void apply(() => null));
+      footer.createSpan({ cls: "vam-next-status" });
+      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
+      const refresh = (): void => {
+        remaining.setText(
+          t(
+            "ui.relation_description_remaining_0",
+            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
+          )
+        );
+      };
+      description.addEventListener("input", refresh);
+      description.addEventListener("change", () => saveNote());
+      // Enter adds a line break; Ctrl/Cmd+Enter saves at once.
+      description.addEventListener("keydown", event => {
+        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+        event.preventDefault();
+        saveNote();
+      });
+      refresh();
+      if (refocus) ({ kind: kindSelect, reverse: reverseButton, description })[refocus]?.focus();
+      refocus = null;
+    };
+    paint();
+    return () => {
+      saveNote();
+      return noteWrite;
+    };
+  }
+  /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
+  private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
+    addChild.addEventListener("click", event => {
+      event.stopPropagation();
+      this.openKindMenu(event, kind => {
+        close?.();
+        this.enqueue(() => this.addNode(node, undefined, true, true, kind));
+      });
+    });
+  }
+  /** One 18px swatch for a type: the card's own outline (TOPIC_KIND_SHAPES), stroked in the type's colour. */
+  private kindSwatch(parent: HTMLElement, kind: TopicKind): void {
+    const swatch = parent.createSpan({ cls: "vam-type-swatch" });
+    swatch.setAttr("aria-hidden", "true");
+    swatch.dataset.kind = kind;
+    let drawn: SVGElement | undefined;
+    const collector = {
+      appendChild: (child: SVGElement) => {
+        drawn = child;
+        return child;
+      }
+    } as unknown as HTMLElement;
+    let svg = renderShapeBackground(collector, kind) ?? drawn;
+    if (!svg) {
+      // A rounded or rectangular type draws no SVG on the card (its CSS frame is the shape); the swatch draws that frame.
+      svg = createSvg("svg");
+      svg.addClass("vam-kind-shape");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("aria-hidden", "true");
+      const frame = createSvg("rect");
+      frame.addClass("vam-kind-outline");
+      for (const [name, value] of [
+        ["x", "0"],
+        ["y", "0"],
+        ["width", "100"],
+        ["height", "100"],
+        ["rx", TOPIC_KIND_SHAPES[kind].shape === "rect" ? "10" : "30"],
+        ["vector-effect", "non-scaling-stroke"]
+      ])
+        frame.setAttribute(name, value);
+      svg.appendChild(frame);
+    }
+    swatch.insertBefore(svg, null);
+  }
+  /** A 32x10 sample of a relation's line (the canvas classes and arrowheads), so a row shows which line to look for. */
+  private relationSwatch(parent: HTMLElement, kind: TopicRelationKind): void {
+    const svg = createSvg("svg"),
+      defs = createSvg("defs"),
+      id = `${this.relationMarkerId}-row${++relationSwatchSequence}`;
+    svg.addClass("vam-relation-swatch");
+    svg.setAttribute("viewBox", "0 0 32 10");
+    svg.setAttribute("aria-hidden", "true");
+    const arrow = kind === "related" ? null : `url(#${id})`;
+    if (arrow) {
+      defs.appendChild(this.relationMarker(id, kind === "contradicts"));
+      svg.appendChild(defs);
+    }
+    for (const gap of kind === "derives_from" ? [false, true] : [false]) {
+      const line = createSvg("path");
+      line.setAttribute("d", "M 0 5 L 32 5");
+      if (arrow) line.setAttribute("marker-end", arrow);
+      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
+      if (!gap) line.addClass(`vam-relation-${kind}`);
+      svg.appendChild(line);
+    }
+    parent.insertBefore(svg, null);
+  }
+  /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
+  private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
+    const body = section.createDiv("vam-hypothesis-body");
+    const editByPair = new Map<string, HTMLElement>();
+    let addRelationButton: HTMLElement | null = null;
+    const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
+      body.empty();
+      const currentKind = this.topicKindOf(node.id);
+      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
+      const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
+      kinds.setAttr("role", "group");
+      kinds.setAttr("aria-label", t("ui.topic_type"));
+      for (const option of KIND_PICKER_ORDER) {
+        const choice = this.button(kinds, t(TOPIC_KIND_SHAPES[option].labelKey), () => {
+          if (option === currentKind) return;
+          this.enqueue(async () => {
+            await this.changeTopicKind(node, option);
+            paint(false, true);
+          });
+        });
+        this.kindSwatch(choice, option);
+        choice.setAttr("aria-pressed", String(option === currentKind));
+        if (option === currentKind) {
+          choice.addClass("is-pressed");
+          // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
+          if (focusKind) choice.focus();
+        }
+      }
+      if (currentKind === "hypothesis") {
+        const current = this.notes.get(node.id)?.hypothesisStrength ?? "weak";
+        body.createEl("strong", {
+          text: t("ui.hypothesis_strength"),
+          cls: "vam-topic-tree-heading vam-section-heading"
+        });
+        const group = body.createDiv("vam-hypothesis-strengths vam-choice-group");
+        group.setAttr("role", "group");
+        group.setAttr("aria-label", t("ui.hypothesis_strength"));
+        for (const option of HYPOTHESIS_STRENGTHS) {
+          const choice = this.button(group, t(STRENGTH_LABEL[option]), () => {
+            if (option === current) return;
+            this.enqueue(async () => {
+              await this.changeHypothesisStrength(node, option);
+              paint(true);
+            });
+          });
+          choice.setAttr("aria-pressed", String(option === current));
+          if (option === current) {
+            choice.addClass("is-pressed");
+            // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
+            if (focusStrength) choice.focus();
+          }
+        }
+      }
+      // Relations: every link that starts or ends at this topic, whatever its kind.
+      editByPair.clear();
+      const links = (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id);
+      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
+      if (links.length) {
+        const list = body.createEl("ul", { cls: "vam-relation-list" });
+        for (const link of links) {
+          const row = list.createEl("li", { cls: "vam-relation-row" }),
+            text = this.relationRowText(link, node.id),
+            described = link.description ? `${text}. ${link.description}` : text;
+          this.bindRelationRow(row, link, described);
+          this.relationSwatch(row, link.kind);
+          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+          label.createSpan({
+            text: this.relationSentence(link, node.id),
+            cls: "vam-relation-sentence",
+            attr: { dir: "auto" }
+          });
+          if (link.description)
+            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+          const tools = row.createSpan({ cls: "vam-relation-tools" });
+          const pair = relationPairKey(link.from, link.to);
+          // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
+          // or to "Add relation…" when the relation was deleted.
+          const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
+            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationButton)?.focus())
+          );
+          editByPair.set(pair, edit);
+          this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
+            this.enqueue(async () => {
+              await this.removeRelation(link);
+              paint();
+            })
+          );
+        }
+      } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
+      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
+      addRelationButton = addRelation;
+      addRelation.addEventListener("click", event => {
+        event.stopPropagation();
+        this.openRelationKindMenu(event, kind =>
+          this.chooseRelationTarget(node, kind, () => paint(false, false, true))
+        );
+      });
+      // Repainting replaced the button that started the flow; a keyboard user lands back on its replacement.
+      if (focusAdd) addRelation.focus();
+    };
+    paint();
+  }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   private async addNode(
     parentNode: MapNode | null,
     suggestedTitle?: string,
     rebuildDerivedData = true,
-    focus = true
+    focus = true,
+    kind: TopicKind = "topic"
   ): Promise<void> {
     if (!this.map) return;
+    const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
     if (!suggestedTitle?.trim()) {
-      new NameModal(this.app, parent ? t("ui.new_subtopic") : t("ui.my_core_topic"), "", title =>
-        this.enqueue(() => this.addNode(parent, title))
+      const dialogTitle = typed
+        ? t("ui.add_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
+        : parent
+          ? t("ui.new_subtopic")
+          : t("ui.my_core_topic");
+      new NameModal(this.app, dialogTitle, "", title =>
+        this.enqueue(() => this.addNode(parent, title, true, true, kind))
       ).open();
       return;
     }
@@ -7772,13 +8519,17 @@ export class VisualAgentMapView extends ItemView {
     }
     const node = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
-        (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+        (typed
+          ? t("ui.new_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
+          : parent
+            ? t("ui.new_subtopic")
+            : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local" }
+      { researchMode: "local", ...(typed ? { topicKind: kind } : {}) }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
@@ -9671,6 +10422,9 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    // Small enough that a name would only crowd the lines: the stylesheet hides every relation label on this attribute.
+    if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
+    else this.stageEl.removeAttribute("data-relation-labels");
     this.zoomLabel?.setText(`${Math.round(zoom * 100)}%`);
     this.zoomLabel?.setAttr("aria-label", t("ui.zoom_level_0_reset", `${Math.round(zoom * 100)}%`));
   }
@@ -9914,6 +10668,10 @@ export class VisualAgentMapView extends ItemView {
         viewport.removeClass("is-panning");
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
+        if (!moved && event.button === 0 && this.selectedRelation) {
+          this.selectedRelation = null;
+          this.syncRelationClasses();
+        }
         if (!moved && !this.integrationMode && event.button === 0) {
           const previous = this.selected,
             touched = [...this.multiSelected];
@@ -10061,6 +10819,7 @@ export class VisualAgentMapView extends ItemView {
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
     this.syncChatNarrow();
+    this.fitKindShapes();
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);
@@ -11956,8 +12715,27 @@ export class VisualAgentMapView extends ItemView {
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
     }
+    const linked: { key: string; dragIsFrom: boolean; far: CardBox }[] = [];
+    for (const key of this.relationEls.keys()) {
+      const [fromId, toId] = key.split("\u0000");
+      if (fromId !== id && toId !== id) continue;
+      const other = this.cardEls.get(fromId === id ? toId : fromId);
+      if (other) linked.push({ key, dragIsFrom: fromId === id, far: boxOf(other) });
+    }
     return {
       update: (x, y) => {
+        for (const link of linked) {
+          const path = this.relationEls.get(link.key);
+          if (!path) continue;
+          const mine = { x, y, ...size },
+            from = link.dragIsFrom ? mine : link.far,
+            to = link.dragIsFrom ? link.far : mine,
+            d = relationPathData(from, to);
+          path.setAttribute("d", d);
+          this.relationHitEls.get(link.key)?.setAttribute("d", d);
+          this.relationGapEls.get(link.key)?.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+        }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
           const path = this.edgeEls.get(edge.key);
@@ -11980,12 +12758,17 @@ export class VisualAgentMapView extends ItemView {
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
+    // A parent and child that also hold a relation show only the relation line, so one pair draws one line (decision 39).
+    const related = new Set(
+      this.relationsEnabled() ? (this.map.topicRelations ?? []).map(r => relationPairKey(r.from, r.to)) : []
+    );
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
         const parent = this.cardEls.get(parentId),
           child = this.cardEls.get(node.id);
         if (!parent || !child) continue;
+        if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         path.setAttribute(
           "d",
@@ -12000,10 +12783,247 @@ export class VisualAgentMapView extends ItemView {
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
         if (!this.map.aim && !this.builtIn && this.notes.get(node.id)?.relevance?.tier === "side")
           path.addClass("vam-edge-side");
+        // A mind map's own parent line is drawn lighter than the semantic lines (decision 35); AIM, the sample and the share viewer keep the accent line.
+        else if (!this.map.aim && !this.builtIn && parentId === node.parentId)
+          path.setAttribute("data-parent-line", "");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
       }
     }
+    this.drawRelations();
+    this.syncRelationClasses();
+  }
+  /**
+   * Semantic links (`supports` and the other kinds, A -> B) in the same layer as the parent-child edges, each leaving
+   * the nearest edge of A and entering the nearest edge of B. The kind sets the line pattern in styles.css; the
+   * arrowhead is the plain one (all but "related", which has none) or the barred one ("contradicts"); "derives from"
+   * is a double line (the outer line, then a canvas-coloured inner line). A link is not drawn when an end is off screen
+   * (collapsed); the type of either end never hides a link, and a hand-written cycle is drawn as it is. An AIM map
+   * draws none, and its file keeps the key.
+   */
+  private drawRelations(): void {
+    this.relationEls.clear();
+    this.relationHitEls.clear();
+    this.relationLabelEls.clear();
+    this.relationGapEls.clear();
+    this.relationData.clear();
+    this.relationLabelAt.clear();
+    this.relationPainted.clear();
+    this.relationExpanded.clear();
+    if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
+    const links: {
+      from: HTMLElement;
+      to: HTMLElement;
+      key: string;
+      kind: TopicRelation["kind"];
+      relation: TopicRelation;
+    }[] = [];
+    for (const relation of this.map.topicRelations ?? []) {
+      const from = this.cardEls.get(relation.from),
+        to = this.cardEls.get(relation.to);
+      if (!from || !to) continue;
+      links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
+    }
+    if (!links.length) return;
+    const defs = createSvg("defs");
+    defs.appendChild(this.relationMarker(this.relationMarkerId, false));
+    defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
+    this.edgesEl.appendChild(defs);
+    for (const link of links) {
+      const d = relationPathData(boxOf(link.from), boxOf(link.to)),
+        marker =
+          link.kind === "related"
+            ? null
+            : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
+      const path = createSvg("path");
+      path.setAttribute("d", d);
+      if (marker) path.setAttribute("marker-end", marker);
+      path.addClass("vam-relation");
+      path.addClass(`vam-relation-${link.kind}`);
+      this.edgesEl.appendChild(path);
+      this.relationEls.set(link.key, path);
+      this.relationData.set(link.key, link.relation);
+      if (link.kind === "derives_from") {
+        // The inner line in the canvas colour leaves the outer one as two rails; its own arrowhead keeps the tip whole.
+        const gap = createSvg("path");
+        gap.setAttribute("d", d);
+        if (marker) gap.setAttribute("marker-end", marker);
+        gap.addClass("vam-relation-gap");
+        this.edgesEl.appendChild(gap);
+        this.relationGapEls.set(link.key, gap);
+      }
+      // The wide invisible path is what the pointer meets; the visible line and the parent-child edges ignore it.
+      const hit = createSvg("path");
+      hit.setAttribute("d", d);
+      hit.addClass("vam-relation-hit");
+      const key = link.key;
+      hit.addEventListener("pointerdown", event => {
+        // A press on a line is not a press on the empty canvas: no pan, no marquee, no clearing of the selection.
+        event.stopPropagation();
+        this.selectedRelation = key;
+        this.syncRelationClasses();
+      });
+      // The click (not the press) opens the editor, so the dialog never opens under a pointer that is still down.
+      hit.addEventListener("click", event => {
+        event.stopPropagation();
+        this.selectedRelation = key;
+        this.syncRelationClasses();
+        this.openRelationEditor(link.relation);
+      });
+      hit.addEventListener("pointerenter", () => {
+        this.hoverRelation = key;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("pointerleave", () => {
+        if (this.hoverRelation === key) this.hoverRelation = null;
+        this.syncRelationClasses();
+      });
+      this.edgesEl.appendChild(hit);
+      this.relationHitEls.set(key, hit);
+    }
+    for (const link of links) {
+      const label = createSvg("text");
+      label.addClass("vam-relation-label");
+      this.edgesEl.appendChild(label);
+      this.relationLabelEls.set(link.key, label);
+      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
+    }
+    // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
+    if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
+    if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
+    if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
+  }
+  /**
+   * An arrowhead whose tip sits exactly on the end of the line (`refX` is the tip), so it stops at the card edge. The
+   * barred one puts the bar on the line before the arrowhead's base: past the tip it would sit under the opaque card.
+   * Plain: viewBox 10 wide, base x 0, tip x 10. Barred: 14 wide, bar x 1, base x 4, tip x 14.
+   */
+  private relationMarker(id: string, barred: boolean): SVGMarkerElement {
+    const marker = createSvg("marker"),
+      arrow = createSvg("path"),
+      width = barred ? 14 : 10,
+      base = barred ? 4 : 0;
+    marker.setAttribute("id", id);
+    marker.setAttribute("viewBox", `0 0 ${width} 10`);
+    marker.setAttribute("refX", String(width));
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", String(width));
+    marker.setAttribute("markerHeight", "10");
+    marker.setAttribute("markerUnits", "userSpaceOnUse");
+    marker.setAttribute("orient", "auto");
+    arrow.setAttribute("d", `M ${base} 0 L ${width} 5 L ${base} 10 z`);
+    arrow.addClass("vam-relation-arrow");
+    if (barred) {
+      const bar = createSvg("path");
+      bar.setAttribute("d", "M 1 0 L 1 10");
+      bar.addClass("vam-relation-arrow-bar");
+      marker.appendChild(arrow);
+      marker.appendChild(bar);
+    } else marker.appendChild(arrow);
+    return marker;
+  }
+  /**
+   * The text of a relation label: just the name normally; while the line is selected (or hovered) "Name: A → B"
+   * ("—" for related) and, on a second line, the note cut to 60 characters with an ellipsis. Text only, never markup.
+   */
+  private paintRelationLabel(key: string, expanded: boolean): void {
+    const label = this.relationLabelEls.get(key),
+      link = this.relationData.get(key);
+    if (!label || !link) return;
+    const name = t(RELATION_NAME_KEY[link.kind]);
+    if (!expanded) {
+      label.textContent = name;
+      return;
+    }
+    label.textContent = "";
+    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id,
+      at = this.relationLabelAt.get(key),
+      head = createSvg("tspan");
+    head.textContent = t(
+      link.kind === "related" ? "ui.relation_label_full_related_0_1_2" : "ui.relation_label_full_0_1_2",
+      name,
+      titleOf(link.from),
+      titleOf(link.to)
+    );
+    if (at) head.setAttribute("x", String(at.x));
+    label.appendChild(head);
+    if (link.description) {
+      const note = createSvg("tspan"),
+        chars = Array.from(link.description);
+      note.textContent =
+        chars.length > RELATION_LABEL_NOTE_MAX
+          ? `${chars.slice(0, RELATION_LABEL_NOTE_MAX).join("")}…`
+          : link.description;
+      if (at) note.setAttribute("x", String(at.x));
+      note.setAttribute("dy", "1.3em");
+      label.appendChild(note);
+    }
+  }
+  private placeRelationLabel(key: string, point: { x: number; y: number }): void {
+    this.relationLabelAt.set(key, point);
+    const label = this.relationLabelEls.get(key);
+    if (!label) return;
+    label.setAttribute("x", String(point.x));
+    label.setAttribute("y", String(point.y));
+    // The tspans of an expanded label carry their own x; they follow the line.
+    for (const part of Array.from(label.children)) part.setAttribute("x", String(point.x));
+  }
+  /**
+   * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
+   * (single or multiple), the semantic lines touching them are `is-related` and the rest `is-dimmed` (parent-child
+   * edges stay as they are); the selected (or panel-previewed) line is `is-selected` and shows its name, as does a
+   * hovered line; both end cards get `is-relation-end`.
+   */
+  private syncRelationClasses(): void {
+    const chosen = new Set(this.multiSelected);
+    if (this.selected) chosen.add(this.selected);
+    const ends = new Set<string>();
+    for (const [key, path] of this.relationEls) {
+      const [fromId, toId] = key.split("\u0000");
+      const related = chosen.has(fromId) || chosen.has(toId),
+        active = key === this.selectedRelation || key === this.previewRelation;
+      path.toggleClass("is-related", related);
+      path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      path.toggleClass("is-selected", active);
+      const expanded = active || key === this.hoverRelation;
+      this.relationLabelEls.get(key)?.toggleClass("is-expanded", expanded);
+      if (this.relationExpanded.has(key) !== expanded || !this.relationPainted.has(key)) {
+        this.paintRelationLabel(key, expanded);
+        this.relationPainted.add(key);
+        if (expanded) this.relationExpanded.add(key);
+        else this.relationExpanded.delete(key);
+      }
+      if (active) {
+        ends.add(fromId);
+        ends.add(toId);
+      }
+    }
+    for (const id of new Set([...this.relationEndIds, ...ends]))
+      this.cardEls.get(id)?.toggleClass("is-relation-end", ends.has(id));
+    this.relationEndIds = ends;
+  }
+  /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
+  private bindRelationRow(row: HTMLElement, link: TopicRelation, ariaLabel: string): void {
+    const key = relationIdentity(link);
+    row.tabIndex = 0;
+    row.setAttr("role", "group");
+    row.setAttr("aria-label", ariaLabel);
+    row.addEventListener("focus", () => {
+      this.selectedRelation = key;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("blur", () => {
+      if (this.selectedRelation === key) this.selectedRelation = null;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseenter", () => {
+      this.previewRelation = key;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseleave", () => {
+      if (this.previewRelation === key) this.previewRelation = null;
+      this.syncRelationClasses();
+    });
   }
   /**
    * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.

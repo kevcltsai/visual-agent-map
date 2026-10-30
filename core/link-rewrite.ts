@@ -33,7 +33,7 @@ export function splitFrontmatter(text: string): { head: string; body: string } {
 }
 
 /** Offsets of fenced code blocks and inline code spans, where Obsidian does not read links. */
-function codeRanges(text: string): Array<[number, number]> {
+export function codeRanges(text: string): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
   let offset = 0,
     fence: { marker: string; start: number } | null = null;

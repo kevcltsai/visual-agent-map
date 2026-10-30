@@ -5232,6 +5232,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([target.id, ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])]))
       return;
     const copies: MapNode[] = [],
+      pairs: Array<{ from: string; to: string }> = [],
       replacement = new Map<string, string>(),
       repo = this.plugin.repo,
       parkFolder = repo.topicFolder(this.path, "Unassigned");
@@ -5251,8 +5252,11 @@ export class VisualAgentMapView extends ItemView {
           copy.x = target.x + 340 + (original.x - root.x);
           copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
         }
       }
+      // Only the new copies are written, before the transaction; a failure parks them like any other.
+      await repo.rewriteCopiedNoteLinks(pairs);
       const tx = this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       entry = await tx

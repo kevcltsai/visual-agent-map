@@ -23,6 +23,7 @@ import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/
 import { fencedLines } from "./ai/markdown-blocks";
 import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
 import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
+import { rewriteCopiedLinks } from "./core/copy-links";
 import {
   managedHeadingValue,
   managedSectionValue,
@@ -1461,6 +1462,35 @@ export class Repository {
     const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
     const created = await this.createUniqueNote(folder, title, `---\n${stringifyYaml(metadata)}---\n${body}`);
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+
+  /**
+   * Rewrites the body links of notes just copied for "Copy to…": each link is read from the source note's place and
+   * written for the copy's place, following the copies of this run. Only the copies (`to`) are written, and only when
+   * their body changes; the sources and the frontmatter are never touched.
+   */
+  async rewriteCopiedNoteLinks(
+    pairs: Array<{ from: string; to: string }>
+  ): Promise<{ rewritten: number; unverified: string[] }> {
+    const copies = new Map(pairs.map(pair => [pair.from, pair.to])),
+      resolve = (linkPath: string, fromPath: string): string | undefined =>
+        linkPath ? this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath)?.path : undefined,
+      unverified: string[] = [];
+    let rewritten = 0;
+    for (const { from, to } of pairs) {
+      const file = this.file(to),
+        { body } = splitFrontmatter(await this.app.vault.read(file)),
+        result = rewriteCopiedLinks(body, { sourcePath: from, newPath: to, copies, resolve });
+      rewritten += result.rewritten;
+      unverified.push(...result.unverified);
+      if (result.text === body) continue;
+      // The copy was created a moment ago by this run; rewrite it only if its body is still the one read above.
+      await this.app.vault.process(file, content => {
+        const current = splitFrontmatter(content);
+        return current.body === body ? current.head + result.text : content;
+      });
+    }
+    return { rewritten, unverified };
   }
 
   async readMap(path: string): Promise<MapDocument> {

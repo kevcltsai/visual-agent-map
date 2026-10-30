@@ -9,11 +9,13 @@ export const stepEffort = (reasoning: ReasoningLevel): string => (reasoning === 
 
 /**
  * What the model runtime reports while a step runs, passed straight down to its controls. `onFirstEvent` is Claude's first
- * stream event; `onActivity` is Codex's `started | searching | reading | writing`. (Codex text streaming joins this list.)
+ * stream event; `onActivity` is Codex's `started | searching | reading | writing`; `onText` is Codex's visible message text so
+ * far (the whole text, not a delta). `onText` is handed to Codex only: Claude streams through `onStructuredJson`.
  */
 export interface ProviderStepHooks {
   onFirstEvent?: () => void;
   onActivity?: (activity: CodexActivity) => void;
+  onText?: (text: string) => void;
 }
 
 /**
@@ -62,7 +64,10 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
           ...(config.stream ? { stream: true } : {}),
           ...(config.stream && onStructuredJson ? { onStructuredJson } : {}),
           ...(hooks?.onFirstEvent ? { onFirstEvent: hooks.onFirstEvent } : {}),
-          ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {})
+          ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {}),
+          ...(hooks?.onText && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model)
+            ? { onText: hooks.onText }
+            : {})
         }
       },
       (raw, exchange) => {

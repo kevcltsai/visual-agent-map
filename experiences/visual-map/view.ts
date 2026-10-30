@@ -8036,7 +8036,7 @@ export class VisualAgentMapView extends ItemView {
         })
     ).open();
   }
-  /** "Add sub-hypothesis", a hypothesis's strength, and the `supports` links that start or end at this topic. */
+  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the `supports` links that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");

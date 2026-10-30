@@ -43559,7 +43559,7 @@ ${request.requirements}` : preset.text,
       })
     ).open();
   }
-  /** "Add sub-hypothesis", a hypothesis's strength, and the `supports` links that start or end at this topic. */
+  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the `supports` links that start or end at this topic. */
   renderHypothesisSection(panel, node, close) {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");

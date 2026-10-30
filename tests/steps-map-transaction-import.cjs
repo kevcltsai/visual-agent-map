@@ -13,6 +13,10 @@ const TRASH = '.trash/';
 
 async function harness() {
   const { repo, app, contents } = fixture('en', { linkIndex: true });
+  // renameFile is what opens the Update links dialog; undo and redo must never go through it.
+  const calls = { file: [] };
+  const fileRename = app.fileManager.renameFile;
+  app.fileManager.renameFile = async (item, target) => { calls.file.push([item.path, target]); return fileRename(item, target); };
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
   const mapDoc = { id: 'map-u', title: 'Undo', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -48,7 +52,7 @@ async function harness() {
   // The whole fake vault except the trash: path -> content (Map.md byte for byte, notes without the `updated:` line).
   const snapshot = () => new Map([...contents].filter(([p]) => !p.startsWith(TRASH)).map(([p, text]) => [p, p === MAP ? text : stable(text)]));
   const rejected = async promise => { try { await promise; } catch (error) { return error; } return assert.fail('expected a rejection'); };
-  return { repo, spy, app, contents, view, plugin, notices, researched, trashFailures, root: view.map.nodes[0], notesIn, trashed, orphans, snapshot, rejected };
+  return { repo, spy, app, contents, view, plugin, calls, notices, researched, trashFailures, root: view.map.nodes[0], notesIn, trashed, orphans, snapshot, rejected };
 }
 
 const outline = (...titles) => titles.map((title, index) => ({ index, title, level: 1, parent: null, line: index }));
@@ -82,6 +86,7 @@ test('I1: an outline import into a new tree is one undo step; undo parks all fiv
   assert.deepEqual(h.orphans(), []);
   const parked = h.notesIn('Unassigned').sort();
   assert.equal(parked.length, 5, 'all five incl. the two with the same title');
+  assert.equal(h.calls.file.length, 0, 'no Update links dialog');
   for (const p of parked) assert.match(h.contents.get(p), /topic-state: unassigned/);
   const structure = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.parentId]));
   assert.equal(structure, JSON.stringify([[h.root.id, null]]), 'Map.md structure equals the one before the import');
@@ -91,6 +96,8 @@ test('I1: an outline import into a new tree is one undo step; undo parks all fiv
   assert.equal(h.notesIn('Unassigned').length, 0);
   await h.view.travel(false);
   assert.deepEqual(h.notesIn('Unassigned').sort(), parked, 'the second undo parks at the same paths');
+  assert.deepEqual(h.orphans(), [], 'the second undo leaves no note in Notes');
+  assert.equal(h.calls.file.length, 0, 'no Update links dialog after redo and the second undo');
 });
 
 for (const kind of ['tree', 'under']) {

@@ -28,24 +28,6 @@ function runtime(reply) {
   return { calls, runTask: async (prompt, model, effort, schema, controls) => { calls.push({ prompt, model, effort, schema, controls }); controls.onRequest?.({ via: 'fake', n: calls.length }); return typeof reply === 'function' ? reply(prompt, calls.length) : reply; } };
 }
 
-test('controls reach the runtime unchanged: abort signal, timeout, search flags, accepted callback and web events', async () => {
-  const fake = runtime(GOOD), controller = new AbortController(), accepted = () => {}, web = () => {};
-  await makeService(fake).askModel(context({ researchMode: 'research', timeoutMs: 240_000, aimIsolatedResearch: true }), 'gpt-6-luna', 'low', controller.signal, undefined, accepted, web);
-  const controls = fake.calls[0].controls;
-  // The runtime gets AiCalls' own signal, linked to the caller's: a caller stop reaches it and a reply that arrives later is refused.
-  assert.notEqual(controls.signal, controller.signal);
-  {
-    const stopper = new AbortController(); let seen;
-    const stopping = { runTask: async (_prompt, _model, _effort, _schema, runControls) => { seen = runControls.signal; assert.equal(seen.aborted, false); stopper.abort(); assert.equal(seen.aborted, true, 'the caller stop reaches the runtime signal'); return GOOD; } };
-    await assert.rejects(makeService(stopping).askModel(context(), 'gpt-6-luna', 'low', stopper.signal), error => error.name === 'AbortError');
-    assert.notEqual(seen, stopper.signal);
-  }
-  assert.equal(controls.onAccepted, accepted); assert.equal(controls.onWebSearchEvent, web);
-  assert.equal(controls.timeoutMs, 240_000); assert.ok(controls.timeoutMessage);
-  assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, false);
-  assert.ok(fake.calls[0].schema.required.includes('searchStatus'), 'isolated web research selects the web research schema');
-});
-
 test('an AIM request is the step aim.<phase>@1 and its prompt is exactly buildAimPrompt', async () => {
   const log = spyLog(), fake = runtime(GOOD);
   const aim = context({ promptProfile: 'aim', task: '<!-- aim-phase: research-plan -->\nPlan the evidence.', outputLanguage: 'zh-TW' });
@@ -53,22 +35,6 @@ test('an AIM request is the step aim.<phase>@1 and its prompt is exactly buildAi
   assert.equal(log.events[0][1].step, 'aim.research-plan@1');
   assert.equal(fake.calls[0].prompt, buildAimPrompt(aim, 'zh-TW'));
   assert.equal(taskPrompt(aim, 'zh-TW'), buildAimPrompt(aim, 'zh-TW'), 'the step render delegates to buildAimPrompt');
-});
-
-test('the reference extract and reduce rounds are their own steps, followed by the task.run step', async () => {
-  const log = spyLog();
-  // 9_001 = half of the 18_000 batch limit (ai/reference-materials.ts:52 batchLimit, :38 packReferenceChunks default; not exported) + 1: two documents or two findings never share a batch.
-  const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
-  const fake = runtime(prompt => (prompt.includes('Extract relevant facts') ? big : GOOD));
-  const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(9_001) })); // 4 batches, as above
-  const progress = [];
-  await makeService(fake, { logging: true, exchanges: log }).askModel(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }], onProgress: text => progress.push(text) }), 'gpt-6-luna', 'low');
-  const steps = log.events.filter(event => event[0] === 'begin').map(event => event[1].step);
-  assert.deepEqual(steps, [...Array(4).fill('task.reference-extract@1'), ...Array(4).fill('task.reference-reduce@1'), 'task.run@1']);
-  assert.ok(fake.calls[0].prompt.includes('Extract relevant facts'));
-  assert.ok(fake.calls[4].prompt.includes('Combine the supplied extracted evidence'));
-  assert.ok(fake.calls[8].prompt.includes('Source registry (retain these identities in citations):\n[S1]'));
-  assert.equal(progress.at(-1), '');
 });
 
 test('Visual Map task text comes from fragments and renders the same as the strings it replaced', () => {

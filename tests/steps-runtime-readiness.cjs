@@ -218,6 +218,8 @@ test('A3 Codex: prewarmClaude and prewarmClaudeStep only release the waiting pro
   assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [1, 0, 0, 0]);
   plugin.prewarmClaudeStep(CODEX, 'low', { type: 'object' });
   assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [2, 0, 0, 0]);
+  plugin.releaseWarmClaude();
+  assert.deepEqual([out.released, out.claude, out.directory, out.prewarm.length], [3, 0, 0, 0], 'releaseWarmClaude called directly drops the waiting process');
 });
 
 test('A3 a plugin folder that throws never fails the caller, starts nothing and releases nothing', () => {

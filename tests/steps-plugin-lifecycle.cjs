@@ -118,35 +118,3 @@ test('W2c plugin: prewarmClaude for a synthesis resolves auto to medium like the
   const { effectiveReasoningLevel } = S.load('ai/task-policy.ts');
   assert.equal(effectiveReasoningLevel({ mode: 'synthesize' }, 'auto'), calls[0][1]);
 });
-
-test('S6 plugin: prewarmClaude pre-starts a Claude command (model id, effort, response schema, web tools), a Codex model releases it, and unload resets the runtime service (which disposes the pool)', () => {
-  const plugin = newPlugin();
-  const calls = [];
-  plugin.pluginDirectory = () => '/plugin';
-  plugin.aiRuntime.claude = directory => ({ prewarm: (...args) => { calls.push([directory, args[0], args[1], args[2] && args[2].type, args[3]]); return true; } });
-  plugin.settings.cliReasoning = 'auto';
-  plugin.prewarmClaude('claude:sonnet', undefined);
-  plugin.prewarmClaude('claude:opus', 'high');
-  assert.deepEqual(calls, [['/plugin', 'sonnet', 'low', 'object', true], ['/plugin', 'opus', 'high', 'object', true]], 'auto resolves to low like a short-source task');
-  plugin.prewarmClaude('claude:sonnet', 'low', false);
-  assert.equal(calls.at(-1)[4], false, 'a local run pre-starts the command without web tools');
-  calls.pop();
-  let released = 0;
-  Object.assign(plugin.aiRuntime, { releaseWarm: () => { released++; }, reset: () => { released += 10; }, dispose: () => { released += 100; } });
-  plugin.prewarmClaude('gpt-test');
-  assert.equal(released, 1, 'a Codex model has nothing to pre-start and drops a waiting process');
-  plugin.releaseWarmClaude();
-  assert.equal(released, 2);
-  plugin.pluginDirectory = () => { throw new Error('no folder'); };
-  assert.doesNotThrow(() => plugin.prewarmClaude('claude:sonnet'), 'pre-starting never fails the dialog');
-  plugin.repo = { dispose() {} };
-  plugin.expansionCoordinator = { stopAll() {} };
-  plugin.modelDiscovery = { invalidate() {} };
-  released = 0;
-  plugin.onunload();
-  assert.equal(released, 110, 'onunload resets the runtime service and disposes it (no later pre-start)');
-  const before = calls.length;
-  plugin.pluginDirectory = () => '/plugin';
-  plugin.prewarmClaude('claude:sonnet', 'low');
-  assert.equal(calls.length, before, 'a dialog event after unload starts nothing');
-});

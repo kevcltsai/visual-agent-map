@@ -78,7 +78,13 @@ test('Claude success: the plugin directory and the model without the claude: pre
   assert.deepEqual(h.routes, [['claude', '/vault/plugin']]);
   assert.equal(h.calls[0].route, 'claude'); assert.equal(h.calls[0].model, 'sonnet'); assert.equal(h.calls[0].effort, 'low'); assert.equal(h.calls[0].schema, undefined);
   assert.deepEqual(Object.keys(h.calls[0].controls).sort(), CONTROL_FIELDS);
+  assert.equal(h.calls[0].controls.searchBudget, 0);
   assert.equal(h.plugin.activeTasks.size, 0);
+  // Claude with the high reasoning level: effort is high, still plain text and no search budget.
+  const high = harness();
+  assert.equal(await high.plugin.runCoffeeRequest(request({ session: { ...request().session, model: 'claude:sonnet', reasoning: 'high' } })), 'reply');
+  assert.equal(high.calls[0].model, 'sonnet'); assert.equal(high.calls[0].effort, 'high'); assert.equal(high.calls[0].schema, undefined);
+  assert.equal(high.calls[0].controls.searchBudget, 0); assert.equal(high.calls[0].controls.textOnly, true);
 });
 
 test('without a step the begin entry has no step property', async () => {

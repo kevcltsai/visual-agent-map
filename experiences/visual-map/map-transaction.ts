@@ -1,6 +1,7 @@
 import { t } from "../../i18n";
 import { clone, type MapDocument } from "../../map-model";
 import type { Note, Repository, TopicState } from "../../repository";
+import { claim, findSame, fingerprintOf, isLinked, release, unchangedFile, type Fingerprint } from "./attachment-store";
 
 /**
  * One undoable step that moves note files and edits Map.md files together.
@@ -33,6 +34,15 @@ export interface CommitOptions {
   deferRebuild?: boolean;
   label?: string;
 }
+/** The vault path commit chose for the attachment registered under `key`; throws for an unknown key. */
+export type AttachmentPath = (key: string) => string;
+export interface AttachmentSource {
+  /** File name handed to Obsidian (which dedupes it), e.g. `image.png`. */
+  name: string;
+  data: ArrayBuffer;
+  /** The note the attachment belongs to; Obsidian's attachment settings place it relative to this note. */
+  sourcePath: string;
+}
 export type TransactionErrorKind = "stale" | "rollback-failed" | "guard";
 export type TransactionError = Error & { kind: TransactionErrorKind };
 export interface Transaction {
@@ -48,13 +58,23 @@ export interface Transaction {
   unpark(path: string, folder: string, topicId: string, mapId: string): Transaction;
   transfer(path: string, topic: { id: string; root: string }, mode: "unassigned" | "add"): Transaction;
   /** `resolve(originalPath)` gives the path a moved note will have; moves run before map edits. */
-  editMap(mapPath: string, edit: (map: MapDocument, resolve: (originalPath: string) => string) => void): Transaction;
+  editMap(
+    mapPath: string,
+    edit: (map: MapDocument, resolve: (originalPath: string) => string, attachment: AttachmentPath) => void
+  ): Transaction;
   /**
    * Rewrites the note at `path` through `write(path)` (which must write that file and nothing else). Commit runs it
    * before any move; undo writes the original text back after the moves; redo runs `write` again before the moves.
    * Undo and redo refuse (`guard`) when title, summary, detail or status differ from what this step left or found.
    */
-  rewriteNote(path: string, write: (path: string) => Promise<void>): Transaction;
+  rewriteNote(path: string, write: (path: string, attachment: AttachmentPath) => Promise<void>): Transaction;
+  /**
+   * Stores `data` as an attachment of `sourcePath` before any note or map write; the callbacks of `editMap` and
+   * `rewriteNote` get its path through `attachment(key)`. A file with the same content already in the chosen folder is
+   * reused. A failed commit trashes only a file this step created (unchanged and not linked); undo and redo never touch
+   * the file, and redo refuses (`stale`) when it is gone.
+   */
+  createAttachment(key: string, source: AttachmentSource): Transaction;
   commit(options?: CommitOptions): Promise<TransactionEntry>;
 }
 
@@ -93,6 +113,15 @@ interface Journal {
   maps: Array<{ mapPath: string; restore: MapDocument; written: boolean }>;
   /** `restore`: the whole note text read before the write in that direction. */
   notes: Array<{ path: string; restore: string; written: boolean }>;
+  /** Files this step stored (created or reused); the created ones are trashed last when the step fails. */
+  attachments?: AttachmentRecord[];
+}
+/** Where an attachment of this step is; `created`: this step wrote the file (a reused one is never trashed). */
+interface AttachmentRecord {
+  key: string;
+  path: string;
+  created: boolean;
+  print: Fingerprint;
 }
 
 // Viewport and node positions are layout, not content: undo writes the stored positions back and does not treat a change as stale.
@@ -109,7 +138,7 @@ const GUARD_FIELDS = ["title", "summary", "detail", "status"] as const;
 type NoteGuard = Pick<Note, (typeof GUARD_FIELDS)[number]>;
 interface NoteOp {
   path: string;
-  write: (path: string) => Promise<void>;
+  write: (path: string, attachment: AttachmentPath) => Promise<void>;
 }
 interface NoteRecord extends NoteOp {
   guardBefore: NoteGuard;
@@ -139,9 +168,18 @@ const writeText = async (repo: Pick<Repository, "app" | "file">, path: string, t
 export function begin(deps: TransactionDeps): Transaction {
   const { repo } = deps;
   const moves: Array<{ kind: "move" | "create"; path: string; folder: string; lifecycle: Lifecycle }> = [];
-  const edits: Array<{ mapPath: string; edit: (map: MapDocument, resolve: (originalPath: string) => string) => void }> =
-    [];
+  const edits: Array<{
+    mapPath: string;
+    edit: (map: MapDocument, resolve: (originalPath: string) => string, attachment: AttachmentPath) => void;
+  }> = [];
   const noteOps: NoteOp[] = [];
+  const sources: Array<{ key: string } & AttachmentSource> = [];
+  const placed: AttachmentRecord[] = [];
+  const attachment: AttachmentPath = key => {
+    const found = placed.find(item => item.key === key);
+    if (!found) throw new Error(`Not an attachment of this step: ${key}`);
+    return found.path;
+  };
   let committed = false;
   const exists = (path: string): boolean => !!repo.app.vault.getAbstractFileByPath(path);
 
@@ -240,6 +278,18 @@ export function begin(deps: TransactionDeps): Transaction {
         problems.push(problem);
       }
     }
+    // Last, once nothing of this step links to them: a file changed since it was written or linked from any note stays.
+    const trashed = new Set<string>();
+    for (const item of [...(journal.attachments ?? [])].reverse()) {
+      if (!item.created || trashed.has(item.path)) continue;
+      trashed.add(item.path);
+      try {
+        const file = await unchangedFile(repo.app, item.path, item.print);
+        if (file && !isLinked(repo.app, item.path)) await repo.app.fileManager.trashFile(file);
+      } catch (problem) {
+        problems.push(problem);
+      }
+    }
     if (problems.length === 0) throw error;
     const rollbackError =
       problems.length === 1 ? problems[0] : new AggregateError(problems, t("error.topic_state_change_rollback_failed"));
@@ -254,7 +304,8 @@ export function begin(deps: TransactionDeps): Transaction {
     records: MapRecord[],
     rebuild: boolean,
     label?: string,
-    noteRecords: NoteRecord[] = []
+    noteRecords: NoteRecord[] = [],
+    attachments: AttachmentRecord[] = []
   ): TransactionEntry {
     // `toward`: the step moves the note from its original path to its target path.
     const toward = (op: FileOp, direction: "undo" | "redo"): boolean =>
@@ -296,6 +347,8 @@ export function begin(deps: TransactionDeps): Transaction {
         const expected = direction === "undo" ? record.after : record.before;
         if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
       }
+      // Redo links the same files again; it never recreates one.
+      if (direction === "redo") for (const item of attachments) if (!exists(item.path)) fail();
     };
     const apply = async (direction: "undo" | "redo"): Promise<void> => {
       if (direction === "undo") choosePark();
@@ -319,11 +372,31 @@ export function begin(deps: TransactionDeps): Transaction {
         // Undo writes the original text after the moves (a move rewrites links in other notes); redo writes before them.
         if (undoing)
           notes.after.push({ path: note.path, restore, apply: () => writeText(repo, note.path, note.beforeText) });
-        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path) });
+        else notes.before.push({ path: note.path, restore, apply: () => note.write(note.path, attachment) });
       }
       await run(files, maps, rebuild, notes);
     };
     return { undo: () => apply("undo"), redo: () => apply("redo"), ...(label === undefined ? {} : { label }) };
+  }
+
+  /**
+   * Stores every registered attachment where Obsidian's settings put it, reusing a file with the same content in that
+   * folder (also one this step already wrote). Each record is pushed as soon as its file exists, so a later failure
+   * trashes it.
+   */
+  async function place(owner: object): Promise<void> {
+    for (const source of sources) {
+      const print = fingerprintOf(source.data);
+      const path = await repo.app.fileManager.getAvailablePathForAttachment(source.name, source.sourcePath);
+      const same = await findSame(repo.app, path, print, owner);
+      if (same) {
+        placed.push({ key: source.key, path: same, created: false, print });
+        continue;
+      }
+      claim(path, owner);
+      await repo.app.vault.createBinary(path, source.data);
+      placed.push({ key: source.key, path, created: true, print });
+    }
   }
 
   const transaction: Transaction = {
@@ -352,6 +425,11 @@ export function begin(deps: TransactionDeps): Transaction {
     },
     rewriteNote(path, write) {
       noteOps.push({ path, write });
+      return transaction;
+    },
+    createAttachment(key, source) {
+      if (sources.some(item => item.key === key)) throw new Error(`Attachment key used twice: ${key}`);
+      sources.push({ key, ...source });
       return transaction;
     },
     async commit(options = {}) {
@@ -387,13 +465,16 @@ export function begin(deps: TransactionDeps): Transaction {
           beforeText: await readText(repo, note.path)
         });
       }
-      const journal: Journal = { files: [], maps: [], notes: [] };
+      const journal: Journal = { files: [], maps: [], notes: [], attachments: placed };
       let rebuildNeeded = ops.length > 0;
       const records: MapRecord[] = [];
+      // Marks the files this step creates until commit settles, so a parallel step does not reuse one it may trash.
+      const owner = {};
       try {
+        await place(owner);
         for (const note of noteRecords) {
           journal.notes.push({ path: note.path, restore: note.beforeText, written: true });
-          await note.write(note.path);
+          await note.write(note.path, attachment);
         }
         for (const op of ops) {
           if (op.kind === "create") continue;
@@ -428,7 +509,7 @@ export function begin(deps: TransactionDeps): Transaction {
         for (const mapPath of mapPaths) {
           const before = befores.get(mapPath)!;
           const after = clone(before);
-          for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve);
+          for (const item of edits) if (item.mapPath === mapPath) item.edit(after, resolve, attachment);
           records.push({ mapPath, before, after });
           if (ownership(before) !== ownership(after)) rebuildNeeded = true;
           journal.maps.push({ mapPath, restore: before, written: true });
@@ -437,9 +518,10 @@ export function begin(deps: TransactionDeps): Transaction {
         if (rebuildRequested && rebuildNeeded) await deps.rebuildDerivedData();
         for (const record of records) await deps.onApplied(record.mapPath, clone(record.after));
       } catch (error) {
-        return revert(journal, rebuildRequested && rebuildNeeded, error);
+        return revert(journal, rebuildRequested && rebuildNeeded, error).finally(() => release(owner));
       }
-      return entryFor(ops, records, rebuildNeeded, options.label, noteRecords);
+      release(owner);
+      return entryFor(ops, records, rebuildNeeded, options.label, noteRecords, placed);
     }
   };
   return transaction;

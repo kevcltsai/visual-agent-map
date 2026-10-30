@@ -580,6 +580,7 @@ var en = {
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.relation_this_topic": "This topic",
+  "ui.relation_this_topic_object": "this topic",
   "ui.relation_sentence_supports_0_1": "{0} supports {1}",
   "ui.relation_sentence_contradicts_0_1": "{0} contradicts {1}",
   "ui.relation_sentence_verifies_0_1": "{0} verifies {1}",
@@ -587,7 +588,6 @@ var en = {
   "ui.relation_sentence_prerequisite_0_1": "{0} is a prerequisite for {1}",
   "ui.relation_sentence_related_0_1": "{0} is related to {1}",
   "ui.relations_none": "No relations yet",
-  "ui.relation_edit": "Edit",
   "ui.edit_relation_0": "Edit relation: {0}",
   "ui.remove_relation_0": "Remove relation: {0}",
   "ui.relation_editor_title": "Edit relation",
@@ -2605,6 +2605,7 @@ var zhCN = {
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.relation_this_topic": "\u6B64\u8BAE\u9898",
+  "ui.relation_this_topic_object": "\u6B64\u8BAE\u9898",
   "ui.relation_sentence_supports_0_1": "{0} \u652F\u6301 {1}",
   "ui.relation_sentence_contradicts_0_1": "{0} \u53CD\u9A73 {1}",
   "ui.relation_sentence_verifies_0_1": "{0} \u9A8C\u8BC1 {1}",
@@ -2612,7 +2613,6 @@ var zhCN = {
   "ui.relation_sentence_prerequisite_0_1": "{0} \u662F {1} \u7684\u524D\u7F6E\u77E5\u8BC6",
   "ui.relation_sentence_related_0_1": "{0} \u4E0E {1} \u76F8\u5173",
   "ui.relations_none": "\u8FD8\u6CA1\u6709\u5173\u7CFB",
-  "ui.relation_edit": "\u7F16\u8F91",
   "ui.edit_relation_0": "\u7F16\u8F91\u5173\u7CFB\uFF1A{0}",
   "ui.remove_relation_0": "\u79FB\u9664\u5173\u7CFB\uFF1A{0}",
   "ui.relation_editor_title": "\u7F16\u8F91\u5173\u7CFB",
@@ -4630,6 +4630,7 @@ var zhTW = {
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
   "ui.relation_this_topic": "\u6B64\u8B70\u984C",
+  "ui.relation_this_topic_object": "\u6B64\u8B70\u984C",
   "ui.relation_sentence_supports_0_1": "{0} \u652F\u6301 {1}",
   "ui.relation_sentence_contradicts_0_1": "{0} \u53CD\u99C1 {1}",
   "ui.relation_sentence_verifies_0_1": "{0} \u9A57\u8B49 {1}",
@@ -4637,7 +4638,6 @@ var zhTW = {
   "ui.relation_sentence_prerequisite_0_1": "{0} \u662F {1} \u7684\u524D\u7F6E\u77E5\u8B58",
   "ui.relation_sentence_related_0_1": "{0} \u8207 {1} \u76F8\u95DC",
   "ui.relations_none": "\u9084\u6C92\u6709\u95DC\u4FC2",
-  "ui.relation_edit": "\u7DE8\u8F2F",
   "ui.edit_relation_0": "\u7DE8\u8F2F\u95DC\u4FC2\uFF1A{0}",
   "ui.remove_relation_0": "\u79FB\u9664\u95DC\u4FC2\uFF1A{0}",
   "ui.relation_editor_title": "\u7DE8\u8F2F\u95DC\u4FC2",
@@ -43785,13 +43785,13 @@ ${request.requirements}` : preset.text,
   }
   /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". */
   relationSentence(link, selfId) {
-    const self = t("ui.relation_this_topic"), titleOf = (id) => {
+    const self = t("ui.relation_this_topic"), titleOf = (id, object2 = false) => {
       var _a2, _b2;
-      return id === selfId ? self : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+      return id === selfId ? object2 ? t("ui.relation_this_topic_object") : self : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
     };
     if (link.kind === "related")
       return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
-    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to));
+    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   openRelationEditor(link, onChanged) {

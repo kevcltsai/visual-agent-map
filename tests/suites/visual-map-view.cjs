@@ -2883,7 +2883,7 @@ integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A
   const rows = dom.findAll(panel, c => c.tag === 'li');
   assert.deepEqual(rows.map(r => r.attrs['aria-label']), ['Supports → HYP. measured twice', 'OTHER → Derives from', 'Related — HYP']);
   assert.ok(rows.every(r => r.tabIndex === 0), 'every row can take focus');
-  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER is derived from This topic', 'This topic is related to HYP'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
+  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER is derived from this topic', 'This topic is related to HYP'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
   assert.ok(dom.texts(panel).includes('measured twice'));
   for (const text of ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']) { assert.ok(dom.byLabel(panel, `Edit relation: ${text}`)); assert.ok(dom.byLabel(panel, `Remove relation: ${text}`)); }
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
@@ -3197,7 +3197,7 @@ integrationTest('hypothesis-evidence: relation labels are muted and medium weigh
   assert.match(rule('.vam-relation.is-selected'), /stroke: var\(--interactive-accent\)/, 'a selected line stays accent');
   const base = css.indexOf(':where([data-node-id]).vam-node:where(:not([data-aim-kind])) {'), running = css.indexOf('.vam-node:not([data-aim-kind])[data-status="running"] {'), selected = css.indexOf('.vam-node.is-selected {');
   assert.ok(base > 0 && base < running && base < selected, 'the frame rule comes before the status and selection rules, which are at least as specific');
-  assert.match(css.slice(base, base + 200), /border-color: var\(--background-modifier-border-hover\)/);
+  assert.match(css.slice(base, base + 200), /border-color: color-mix\(in srgb, var\(--text-muted\) 45%, var\(--background-modifier-border-hover\)\)/, 'B3 border darkened after tester F1 (decision 36)');
 });
 
 // ---- hypothesis-evidence (P20, decision 35): the "Structure and links" dialog ----
@@ -3262,10 +3262,10 @@ integrationTest('hypothesis-evidence: relation rows read "A relation B" with thi
   view.enqueue = work => work();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
   const rows = dom.findAll(panel, c => c.tag === 'li');
-  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER is derived from This topic', 'This topic is related to HYP', 'This topic contradicts OTHER']);
+  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER is derived from this topic', 'This topic is related to HYP', 'This topic contradicts OTHER']);
   const more = heFixture({ relations: [{ kind: 'verifies', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }] });
   const morePanel = dom.element('panel'); more.view.renderHypothesisSection(morePanel, more.view.map.nodes[0]);
-  assert.deepEqual(dom.findAll(morePanel, c => (c.cls ?? '').includes('vam-relation-sentence')).map(c => c.text), ['HYP verifies This topic', 'This topic is a prerequisite for OTHER', 'OTHER is a prerequisite for This topic', 'This topic is derived from HYP'], 'one sentence per kind, A = from, B = to');
+  assert.deepEqual(dom.findAll(morePanel, c => (c.cls ?? '').includes('vam-relation-sentence')).map(c => c.text), ['HYP verifies this topic', 'This topic is a prerequisite for OTHER', 'OTHER is a prerequisite for this topic', 'This topic is derived from HYP'], 'one sentence per kind, A = from, B = to');
   const zh = load('i18n.ts').translate;
   assert.deepEqual([['derives_from', 'A', 'B', 'A 由 B 推導而來'], ['prerequisite', 'A', 'B', 'A 是 B 的前置知識'], ['supports', 'A', 'B', 'A 支持 B'], ['contradicts', 'A', 'B', 'A 反駁 B'], ['verifies', 'A', 'B', 'A 驗證 B']].map(([k, a, b]) => zh('zh-TW', `ui.relation_sentence_${k}_0_1`, a, b)), ['A 由 B 推導而來', 'A 是 B 的前置知識', 'A 支持 B', 'A 反駁 B', 'A 驗證 B']);
   assert.equal(zh('zh-CN', 'ui.relation_sentence_prerequisite_0_1', 'A', 'B'), 'A 是 B 的前置知识'); assert.equal(zh('zh-CN', 'ui.relation_sentence_derives_from_0_1', 'A', 'B'), 'A 由 B 推导而来');

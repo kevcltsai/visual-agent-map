@@ -8066,10 +8066,12 @@ export class VisualAgentMapView extends ItemView {
   /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". */
   private relationSentence(link: TopicRelation, selfId: string): string {
     const self = t("ui.relation_this_topic"),
-      titleOf = (id: string): string => (id === selfId ? self : (this.notes.get(id)?.title ?? id));
+      // English needs the lower-case form after the verb ("OTHER is derived from this topic"); Chinese has one form.
+      titleOf = (id: string, object = false): string =>
+        id === selfId ? (object ? t("ui.relation_this_topic_object") : self) : (this.notes.get(id)?.title ?? id);
     if (link.kind === "related")
       return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
-    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to));
+    return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   private openRelationEditor(link: TopicRelation, onChanged?: () => void): void {

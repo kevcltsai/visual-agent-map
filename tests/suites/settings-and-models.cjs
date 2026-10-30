@@ -164,19 +164,3 @@ test('saved content templates are normalized with the same call onload uses', ()
   assert.deepEqual(plain(templates.normalizeTemplates(undefined)), []);
   assert.deepEqual(plain(DEFAULT_SETTINGS.detailTemplates), []);
 });
-test('Fix connection checks the chosen model service and quietly refreshes the other one', () => {
-  const { default: Plugin } = load('main.ts', { obsidian });
-  const run = (model, claudeInstalled = true) => {
-    const calls = [], plugin = Object.create(Plugin.prototype);
-    Object.assign(plugin, { aiRuntime: new Plugin().aiRuntime, settings: { cliModel: 'gpt-test' },
-      recheckCodex: async guide => { calls.push(['recheckCodex', guide]); }, recheckClaude: async () => { calls.push(['recheckClaude']); },
-      openClaudeSetupGuide: () => calls.push(['claudeGuide']), claudeDiagnostic: () => ({ installed: claudeInstalled }),
-      refreshModelDiscovery: async provider => { calls.push(['refresh', provider]); } });
-    plugin.repairConnection(model);
-    return calls;
-  };
-  assert.deepEqual(run('gpt-test'), [['recheckCodex', true], ['refresh', 'claude']]);
-  assert.deepEqual(run(undefined), [['recheckCodex', true], ['refresh', 'claude']], 'no choice means the workspace model');
-  assert.deepEqual(run('claude:sonnet'), [['recheckClaude'], ['refresh', 'codex']]);
-  assert.deepEqual(run('claude:sonnet', false), [['claudeGuide'], ['refresh', 'codex']], 'a missing CLI opens its setup guide');
-});

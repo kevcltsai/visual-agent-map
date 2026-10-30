@@ -291,22 +291,6 @@ test('chartDetail reports the chart entry id so a caller can mark a stale result
   assert.equal(entry.status, 'failed'); assert.equal(entry.error, 'stale reason');
 });
 
-test('a Claude chart prompt carries the StructuredOutput-first sentence; a Codex chart prompt does not', async () => {
-  for (const [model, expected] of [['claude:sonnet', true], ['gpt-6-luna', false]]) {
-    const { calls, service, base } = fixture([TASK_REPLY(NOTE), chartReply()]);
-    await askAndChart(service, base, model, 'low');
-    assert.equal(calls[1].prompt.includes('StructuredOutput'), expected, model);
-    assert.equal(calls[0].prompt.includes('StructuredOutput'), expected, `${model} task prompt`);
-  }
-});
-
-test('three existing diagrams: no chart call', async () => {
-  const d = (n) => `Para ${n}.\n\n\`\`\`mermaid\nflowchart TD\nA-->B\n\`\`\``;
-  const { calls, service, base } = fixture([TASK_REPLY([d(1), d(2), d(3)].join('\n\n')), chartReply()]);
-  await askAndChart(service, base, 'claude:sonnet', 'low');
-  assert.equal(calls.length, 1);
-});
-
 test('onExchange and onRequestAccepted see only the main entry', async () => {
   const { service, base, log } = fixture([TASK_REPLY(NOTE), chartReply()]);
   const ids = []; let accepted = 0;

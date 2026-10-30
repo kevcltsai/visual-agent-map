@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { literalsOf, markdownFiles, root } = require('./aim-literal-scan.cjs');
+const { literalsOf, markdownFiles, root } = require('./support-aim-literal-scan.cjs');
 const inventory = JSON.parse(fs.readFileSync(path.join(__dirname, 'literal-inventory', 'aim.json'), 'utf8'));
 const CLASSES = new Set(['content', 'ui', 'machine-marker', 'attempt-record', 'prompt-only']);
 

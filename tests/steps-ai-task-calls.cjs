@@ -96,6 +96,7 @@ test('main task controls: signal reaches the runtime and aborts with the caller,
   assert.equal(controls.onAccepted, accepted); assert.equal(controls.onWebSearchEvent, web);
   assert.equal(controls.timeoutMs, 240_000); assert.equal(controls.timeoutMessage, translate('en', 'ui.aim_task_timeout', 4));
   assert.equal(controls.webSearch, true); assert.equal(controls.searchBudget, 0); assert.equal(controls.webSearchOnly, true); assert.equal(controls.textOnly, false);
+  assert.ok(h.state.calls[0].schema.required.includes('searchStatus'), 'isolated web research selects the web research schema');
   assert.ok(controls.signal instanceof AbortSignal);
   assert.equal(controls.signal.aborted, false);
   // D-2026-10-318: the runtime signal belongs to AiCalls and follows the caller's only while the call runs.
@@ -278,7 +279,12 @@ test('reference rounds: four extract, four reduce and the main task each end par
   const big = JSON.stringify({ summary: 'S', detail: 'e'.repeat(9_001), suggestions: [], visualReferences: [] });
   const h = rig({ handler: call => answer(call, call.prompt.includes('Extract relevant facts') ? big : GOOD) });
   const documents = [1, 2, 3, 4].map(n => ({ path: `n${n}.md`, content: 'x'.repeat(9_001) }));
-  await h.service.askModel(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }] }), 'gpt-6-luna', 'low', undefined, h.mark);
+  const progress = [];
+  await h.service.askModel(context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents }], onProgress: text => progress.push(text) }), 'gpt-6-luna', 'low', undefined, h.mark);
+  assert.ok(h.state.calls[0].prompt.includes('Extract relevant facts'));
+  assert.ok(h.state.calls[4].prompt.includes('Combine the supplied extracted evidence'));
+  assert.ok(h.state.calls[8].prompt.includes('Source registry (retain these identities in citations):\n[S1]'));
+  assert.equal(progress.at(-1), '');
   const begins = h.order.filter(event => event[0] === 'begin');
   assert.deepEqual(begins.map(event => event[2].step), [...Array(4).fill('task.reference-extract@1'), ...Array(4).fill('task.reference-reduce@1'), 'task.run@1']);
   assert.equal(h.state.calls.length, 9);
@@ -444,4 +450,135 @@ test('addDiagramsToDetail: diagrams off means no call, no event and no onStart; 
   assert.deepEqual(on.names(), ['begin', 'sent', 'received', 'milestones', 'parsed', 'completed'], 'no onExchange on this path');
   assert.deepEqual({ ...on.order[0][2], id: '<id>', startedAt: '<time>' }, { id: '<id>', startedAt: '<time>', topic: 'Goal', mode: 'task', model: 'gpt-6-luna', effort: 'low', step: 'chart.add@1' });
   assert.equal(on.state.calls[0].controls.timeoutMs, 180_000);
+});
+
+// Stop semantics after AiTaskService moved onto AiCalls:
+//  main task / reference: a reply that arrives after the caller's stop is refused before `received`;
+//  chart: the same, with only failed("Aborted") written;
+//  log switched off after attempt 1: the re-asked attempt writes no begin and calls no onExchange.
+function stopRig(handler, extra = {}) {
+  const state = { logging: true, calls: 0 };
+  const order = [];
+  const log = {
+    begin: entry => order.push(['begin', entry.id, entry]), sent: (id, body) => order.push(['sent', id, body]),
+    received: (id, body) => order.push(['received', id, body]), milestones: id => order.push(['milestones', id]),
+    parsed: id => order.push(['parsed', id]), completed: id => order.push(['completed', id]), failed: (id, error) => order.push(['failed', id, error])
+  };
+  const runtime = { runTask: async (prompt, model, effort, schema, controls) => { state.calls++; controls.onRequest?.({ via: 'fake' }); return handler(state.calls, controls); } };
+  const service = new AiTaskService({
+    pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low',
+    exchangeLoggingEnabled: () => state.logging, exchanges: () => log,
+    codexRuntime: () => runtime, claudeRuntime: () => runtime, ...extra
+  });
+  return { service, state, order, names: () => order.map(event => event[0]) };
+}
+
+test('main task: a reply that resolves after the caller stopped is refused before received; failed starts with the waiting stage', async () => {
+  const stop = new AbortController();
+  const h = stopRig(() => { stop.abort(); return GOOD; });
+  await assert.rejects(h.service.askModel(context(), 'gpt-6-luna', 'low', stop.signal), error => error.name === 'AbortError');
+  assert.equal(h.names().filter(name => name === 'received').length, 0);
+  const failed = h.order.filter(event => event[0] === 'failed');
+  assert.equal(failed.length, 1);
+  assert.ok(failed[0][2].startsWith(`${translate('en', 'log.stage_waiting_reply')}`), failed[0][2]);
+});
+
+test('reference: the same stop on a reference round (no observer) is refused before received', async () => {
+  const stop = new AbortController();
+  const h = stopRig(() => { stop.abort(); return GOOD; });
+  const request = context({ referenceGroups: [{ id: 'g', name: 'g', location: 'l', documents: [{ path: 'n1.md', content: 'x'.repeat(9_001) }] }] });
+  await assert.rejects(h.service.askModel(request, 'gpt-6-luna', 'low', stop.signal), error => error.name === 'AbortError');
+  assert.equal(h.names().filter(name => name === 'received').length, 0);
+  const failed = h.order.filter(event => event[0] === 'failed');
+  assert.equal(failed.length, 1);
+  assert.ok(failed[0][2].startsWith(translate('en', 'log.stage_waiting_reply')), failed[0][2]);
+});
+
+test('chart: a reply after the stop writes no received, exactly one failed(Aborted) and no completed', async () => {
+  const stop = new AbortController();
+  const h = stopRig(() => { stop.abort(); return JSON.stringify({ charts: [] }); }, { mermaidParses: async () => true });
+  const note = 'The larva stage lasts 3 days at 25°C and reaches 160–180 mm.\n\nThe pupa stage lasts 5 days.';
+  await assert.rejects(
+    h.service.chartDetail({ input: context({ outputLanguage: 'en', addCharts: true, visualMode: 'auto' }), detail: note, model: 'gpt-6-luna', signal: stop.signal }),
+    error => error.name === 'AbortError'
+  );
+  assert.equal(h.names().filter(name => name === 'received').length, 0);
+  assert.equal(h.names().filter(name => name === 'completed').length, 0);
+  const failed = h.order.filter(event => event[0] === 'failed');
+  assert.equal(failed.length, 1);
+  assert.match(failed[0][2], /^(AbortError: )?Aborted$/);
+});
+
+test('logging switched off after attempt 1: the re-asked attempt writes no begin and calls no onExchange', async () => {
+  const ids = [];
+  const h = stopRig(count => { if (count === 1) { h.state.logging = false; throw searchNotPerformedError(); } return GOOD; });
+  const result = await h.service.askModel(context({ researchMode: 'research' }), 'gpt-6-luna', 'low', undefined, id => ids.push(id));
+  assert.equal(result.summary, 'S');
+  assert.equal(h.state.calls, 2);
+  assert.equal(h.names().filter(name => name === 'begin').length, 1);
+  assert.equal(ids.length, 1);
+});
+
+// How AiTaskService picks the runtime id (Claude or Codex) for a model: the model check, the task prompt branch and the chart prompt
+// branch. Pins what a refactor onto the runtime capabilities must keep, and that the check starts no runtime and reads no plugin directory.
+const CHART_REPLY = JSON.stringify({ charts: [] });
+const chartContext = (extra = {}) => context({ outputLanguage: 'en', addCharts: true, visualMode: 'auto', ...extra });
+
+/** A service over a scripted runtime that records every runtime request, runtime construction and pluginDirectory read. */
+function runtimeRig({ reply = () => GOOD } = {}) {
+  const state = { directoryReads: 0, claudeRuntime: 0, codexRuntime: 0, calls: [], exchanges: 0 };
+  const runtime = {
+    runTask: async (prompt, model, effort, schema, controls) => {
+      state.calls.push({ prompt, model, effort, schema, controls });
+      controls.onRequest?.({ via: 'fake' });
+      return reply(prompt);
+    }
+  };
+  const log = new Proxy({}, { get: () => () => { state.exchanges++; } });
+  const service = new AiTaskService({
+    pluginDirectory: () => { state.directoryReads++; return '/plugin'; }, language: () => 'en', defaultReasoning: () => 'low',
+    exchangeLoggingEnabled: () => true, exchanges: () => log, mermaidParses: async () => true,
+    codexRuntime: () => { state.codexRuntime++; return runtime; },
+    claudeRuntime: () => { state.claudeRuntime++; return runtime; }
+  });
+  return { service, state };
+}
+const usesStructuredOutput = call => call.prompt.includes('StructuredOutput');
+
+test('an unsupported Claude model is refused before any runtime, plugin directory or exchange is touched', async () => {
+  const h = runtimeRig();
+  await assert.rejects(h.service.askModel(context(), 'claude:not-a-model', 'low'), error => error.message === translate('en', 'ui.claude_model_is_not_supported_0', 'claude:not-a-model'));
+  assert.equal(h.state.directoryReads, 0); assert.equal(h.state.claudeRuntime, 0); assert.equal(h.state.codexRuntime, 0);
+  assert.equal(h.state.calls.length, 0); assert.equal(h.state.exchanges, 0);
+});
+
+test('the timeout check runs before the model check', async () => {
+  const h = runtimeRig();
+  await assert.rejects(h.service.askModel(context({ timeoutMs: 1 }), 'claude:not-a-model', 'low'), error => error.message === 'Invalid AI task timeout.');
+  assert.equal(h.state.directoryReads, 0); assert.equal(h.state.calls.length, 0);
+});
+
+test('the task prompt asks for StructuredOutput only on Claude, and the runtime gets the provider model id', async () => {
+  const claude = runtimeRig(), codex = runtimeRig();
+  await claude.service.askModel(context(), 'claude:sonnet', 'low');
+  await codex.service.askModel(context(), 'gpt-6-luna', 'low');
+  assert.equal(claude.state.calls.length, 1); assert.equal(codex.state.calls.length, 1);
+  assert.equal(usesStructuredOutput(claude.state.calls[0]), true); assert.equal(usesStructuredOutput(codex.state.calls[0]), false);
+  assert.equal(claude.state.calls[0].model, 'sonnet'); assert.equal(codex.state.calls[0].model, 'gpt-6-luna');
+  assert.equal(claude.state.claudeRuntime, 1); assert.equal(claude.state.codexRuntime, 0);
+  assert.equal(codex.state.codexRuntime, 1); assert.equal(codex.state.claudeRuntime, 0);
+  // Measured on 32971ab: one askModel call reads the plugin directory exactly once (the runtime choice reads none).
+  assert.equal(claude.state.directoryReads, 1); assert.equal(codex.state.directoryReads, 1);
+});
+
+test('the chart prompt asks for StructuredOutput only on Claude, for chartDetail and addDiagramsToDetail', async () => {
+  for (const model of ['claude:sonnet', 'gpt-6-luna']) {
+    const expected = model.startsWith('claude:');
+    const viaChart = runtimeRig({ reply: () => CHART_REPLY });
+    await viaChart.service.chartDetail({ input: chartContext(), detail: NOTE, model });
+    assert.equal(viaChart.state.calls.length, 1, model); assert.equal(usesStructuredOutput(viaChart.state.calls[0]), expected, `chartDetail ${model}`);
+    const viaDiagrams = runtimeRig({ reply: () => CHART_REPLY });
+    await viaDiagrams.service.addDiagramsToDetail({ title: 'Goal', detail: NOTE, language: 'en', model });
+    assert.equal(viaDiagrams.state.calls.length, 1, model); assert.equal(usesStructuredOutput(viaDiagrams.state.calls[0]), expected, `addDiagramsToDetail ${model}`);
+  }
 });

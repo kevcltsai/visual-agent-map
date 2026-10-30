@@ -1,12 +1,20 @@
 // 0.25 FG20-06/07/08/10: moved or copied branches, a re-parented branch and a new card are laid out against the
 // measured card heights in the same history entry as the change; one AI "Create subtopics" is one undo step.
+// Also a child batch (camera framing) and the re-space of quick-research cards against measured heights.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, core } = require('./support.cjs');
+const { load, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, core, topicNote } = require('./support.cjs');
+const replay = require('./support-replay.cjs');
 const dom = require('./support-dom.cjs');
 const { element } = dom;
 const WIDTH = 300, GAP = 24;
 const MAP = 'Agent Workspace/Topics/map-l/Map.md';
+
+/** A view without a real vault: only the fields the method under test reads. */
+function bareView(plugin, extra = {}) {
+  const { VisualAgentMapView } = replay.load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+  return Object.assign(Object.create(VisualAgentMapView.prototype), { plugin, renderingCard: false, ...extra });
+}
 
 /** A view over a fake vault; `spec` is [title, parentTitle|null, x, y] per node, `heights` maps title -> card height. */
 async function harness(spec = [['Root', null, 80, 80]], heights = {}) {
@@ -264,4 +272,65 @@ test('FG20-08: a new child goes after its siblings and clears a cousin tree belo
   await h.view.addNode(h.node('A'), 'New');
   assert.deepEqual(h.overlaps(), []);
   assert.ok(h.node('New').y >= 400 + 180 + GAP, 'after its sibling, not in the gap above it');
+});
+
+test('a child batch frames the parent and every new child without Show all, and addNode(focus=false) leaves the camera alone', async () => {
+  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 40, y: 40, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = replay.load('main.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } });
+  const view = new VisualAgentMapView({ app }, withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {}, mutate: async fn => fn() }));
+  let focused = 0;
+  Object.assign(view, { path: mapPath, map: mapDoc, render: () => {}, hydrate: async () => {}, focusNode: () => { focused++; }, saveViewport: () => {}, canvasInset: () => 58,
+    viewportEl: { clientWidth: 1000, clientHeight: 700 } });
+  const items = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'].map(title => ({ title, task: title, contribution: '' }));
+  await view.createChildBatch(parent, items);
+  assert.equal(focused, 0, 'no per-child focus on the pre-layout position');
+  const { x, y, zoom } = view.map.viewport;
+  for (const node of view.map.nodes) {
+    const h = view.cardHeightOf(node.id) ?? 180;
+    assert.ok(node.x * zoom + x >= 0 && (node.x + 280) * zoom + x <= 1000, `${node.id} horizontally visible`);
+    assert.ok(node.y * zoom + y >= 58 && (node.y + h) * zoom + y <= 700, `${node.id} vertically visible below the toolbar`);
+  }
+  assert.ok(zoom <= 1);
+});
+
+
+test('after quick research the untouched batch cards are re-spaced against measured heights; a dragged card and siblings stay', async () => {
+  const mk = (id, parentId, x, y) => ({ id, path: `${id}.md`, parentId, x, y, collapsed: false });
+  const nodes = [mk('p', null, 0, 0), mk('s', 'p', 340, 0), mk('c1', 'p', 340, 220), mk('c2', 'p', 340, 440), mk('c3', 'p', 340, 660)];
+  const heights = { p: 180, s: 180, c1: 180, c2: 180, c3: 180 };
+  const writes = [];
+  const view = bareView({ mutate: async fn => fn(), repo: { updateMap: async (p, fn) => { const doc = { nodes: JSON.parse(JSON.stringify(view.map.nodes)) }; fn(doc); writes.push(doc.nodes); } } },
+    { map: { nodes }, closed: false, builtIn: false, path: 'Map.md', cardHeightOf: id => heights[id] });
+  const placed = new Map(['c1', 'c2', 'c3'].map(id => [id, { x: 340, y: nodes.find(n => n.id === id).y }]));
+  Object.assign(heights, { c1: 500, c2: 500, c3: 500 }); // research filled the cards
+  nodes.find(n => n.id === 'c3').y = 1234; // the user dragged c3
+  await view.respaceBatch(nodes[0], placed);
+  assert.equal(writes.length, 1, 'one Map.md write');
+  const by = Object.fromEntries(view.map.nodes.map(n => [n.id, n]));
+  assert.equal(by.c3.y, 1234, 'dragged card stays');
+  assert.equal(by.s.y, 0, 'sibling stays');
+  const flow = ['s', 'c1', 'c2'].map(id => by[id]).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < flow.length; i++) assert.ok(flow[i].y >= flow[i - 1].y + heights[flow[i - 1].id], `no overlap ${flow[i - 1].id}/${flow[i].id}`);
+  await view.respaceBatch(nodes[0], placed);
+  assert.equal(writes.length, 1, 'a second pass with nothing left to move writes nothing');
+});
+
+
+test('re-space race: a drag queued before the re-space wins, and memory and disk stay identical (so the next mapChange sees no conflict)', async () => {
+  const mk = (id, parentId, x, y) => ({ id, path: `${id}.md`, parentId, x, y, collapsed: false });
+  const nodes = [mk('p', null, 0, 0), mk('c1', 'p', 340, 0), mk('c2', 'p', 340, 220)];
+  const disk = { nodes: JSON.parse(JSON.stringify(nodes)) };
+  let chain = Promise.resolve();
+  const plugin = { mutate: fn => { const run = chain.then(fn); chain = run.catch(() => {}); return run; }, repo: { updateMap: async (_p, fn) => { fn(disk); } } };
+  const view = bareView(plugin, { map: { nodes }, closed: false, builtIn: false, path: 'Map.md', cardHeightOf: () => 500 });
+  const placed = new Map([['c1', { x: 340, y: 0 }], ['c2', { x: 340, y: 220 }]]);
+  // The user drags c2: the drag is queued first and lands in memory and on disk before the re-space runs.
+  const drag = plugin.mutate(async () => { nodes[2].y = 900; disk.nodes[2].y = 900; });
+  await Promise.all([drag, view.respaceBatch(nodes[0], placed)]);
+  assert.equal(view.map.nodes[2].y, 900, 'the dragged card keeps its position');
+  assert.equal(disk.nodes[2].y, 900);
+  assert.deepEqual(JSON.parse(JSON.stringify(view.map.nodes)), disk.nodes, 'memory equals disk: mapChange raises no conflict dialog and keeps history');
 });

@@ -17,7 +17,7 @@
     "lint": "eslint . --max-warnings=0 && node scripts/check-css.mjs && node scripts/check-test-timing.mjs && node scripts/check-test-wiring.mjs",
     "test": "node scripts/test-harness.mjs",
     "test:unit": "npm run compile:sample && node scripts/test-unit.mjs",
-    "test:aim": "node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs tests/aim-final-delivery.cjs && node --test tests/aim-review-repair.cjs tests/aim-prompt-contract.cjs tests/aim-evidence-context.cjs tests/aim-delivery-resume.cjs tests/aim-delivery-lineage.cjs tests/aim-lineage-delivery-flow.cjs tests/aim-section-delivery.cjs tests/aim-parallel-store.cjs tests/codex-parallel-runtime.cjs tests/aim-research-pipeline.cjs tests/aim-contracts.cjs tests/prompt-monitor-timing.cjs tests/aim-fingerprints.cjs tests/aim-checkpoint-resume.cjs tests/steps-aim-prompt-language.cjs tests/steps-aim-literal-inventory.cjs tests/steps-aim-node-replay.cjs",
+    "test:aim": "VAM_SUITES=aim node --test tests/run.cjs tests/aim-*.cjs tests/steps-aim-*.cjs tests/codex-parallel-runtime.cjs && VAM_SUITES=other node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs",
     "test:aim:node": "node tests/tools/aim-node.cjs",
     "test:integration": "node scripts/test-integration.mjs",
     "test:runtime": "node scripts/test-runtime.mjs",

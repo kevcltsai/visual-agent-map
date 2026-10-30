@@ -74,4 +74,10 @@ if (shard) {
   assert.ok(Number.isInteger(index) && Number.isInteger(count) && count >= 1 && index >= 1 && index <= count, `bad --shard=${shard}`);
   selected = shardOf(index, count);
 }
+// `VAM_SUITES=aim` registers only the AIM suites (tests/suites/aim-*.cjs, every test in them); `VAM_SUITES=other` registers the rest. test:aim runs both, the second with a name pattern.
+const group = process.env.VAM_SUITES;
+if (group) {
+  assert.ok(group === 'aim' || group === 'other', `bad VAM_SUITES=${group}`);
+  selected = selected.filter(suite => suite.startsWith('aim-') === (group === 'aim'));
+}
 for (const suite of selected) require(path.join(directory, suite));

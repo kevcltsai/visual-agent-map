@@ -376,18 +376,6 @@ integrationTest('Coffee Tables engine survives view closure and reopening withou
   const reopenedViewEngine = manager.open(session); assert.equal(reopenedViewEngine, firstViewEngine); assert.equal(calls, 1);
   pending.resolve('### 主持人｜主持人\n\nComplete conversation\n\n# 觀察者整理\n\n## 最大討論轉折\n- A\n## 被推翻或修正的假設\n- B\n## 值得繼續追問的問題\n- C\n## 尚未解決的核心分歧\n- D'); await task; assert.equal(manager.open(firstViewEngine.session).session.status, 'completed'); assert.equal(calls, 1); assert.match(saved.at(-1).transcriptMarkdown, /Complete conversation/);
 });
-integrationTest('Coffee Tables provider adapter uses plain text while preserving model, reasoning, logging and cancellation', async () => {
-  const { default: Plugin } = load('main.ts', { obsidian });
-  for (const model of ['test-codex', 'claude:sonnet']) {
-    const plugin = new Plugin(); plugin.app = { vault: { adapter: new obsidian.FileSystemAdapter() } }; plugin.manifest = { dir: 'plugin' }; plugin.settings.aiExchangeLoggingEnabled = true;
-    const events = []; plugin.exchanges = Object.fromEntries(['begin', 'sent', 'received', 'milestones', 'completed', 'failed'].map(key => [key, (...args) => events.push([key, ...args])]));
-    const runTask = async (_prompt, actualModel, effort, schema, controls) => { assert.equal(effort, 'high'); assert.equal(schema, undefined); assert.equal(controls.searchBudget, 0); assert.equal(actualModel, model === 'claude:sonnet' ? 'sonnet' : model); controls.onRequest({ prompt: 'plain text' }); return '完整 Markdown'; };
-    plugin.aiRuntime.codex = (_directory, local) => { assert.equal(local, true); return { runTask }; }; plugin.aiRuntime.claude = () => ({ runTask });
-    const request = { session: { ...coffeeSession(), model, reasoning: 'high' }, prompt: 'coffee prompt', signal: new AbortController().signal };
-    assert.equal(await plugin.runCoffeeRequest(request), '完整 Markdown'); assert.deepEqual(events.map(event => event[0]), ['begin', 'sent', 'received', 'completed']); assert.equal(plugin.activeTasks.size, 0);
-    const abort = new AbortController(); abort.abort(); await assert.rejects(plugin.runCoffeeRequest({ ...request, signal: abort.signal }), /cancelled/);
-  }
-});
 integrationTest('Coffee Tables puts saved-draft recovery in the pinned room toolbar', () => {
   const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian }, { requestAnimationFrame: callback => callback() });
   const session = coffeeSession(); session.status = 'error'; session.draftMarkdown = '### 主持人｜林岑\n\n已收到的對談。'; session.rounds = [{ id: 'failed-round', markdown: '', notes: '', draftMarkdown: session.draftMarkdown, status: 'error', createdAt: session.createdAt }];

@@ -1,4 +1,4 @@
-import { arrangeMap } from "../../map-layout";
+import { arrangeMap, type LayoutDirection } from "../../map-layout";
 import type { MapNode } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 
@@ -31,7 +31,8 @@ export function orderSiblingsByRelevance(
 export function relevanceDisplayNodes(
   nodes: MapNode[],
   tierOf: (id: string) => RelevanceTier | undefined,
-  hidden?: Set<string>
+  hidden?: Set<string>,
+  direction: LayoutDirection = "right"
 ): MapNode[] {
   const groups = new Map<string | null, MapNode[]>();
   for (const node of nodes) {
@@ -45,7 +46,7 @@ export function relevanceDisplayNodes(
     .map((node, index) => ({ node, index }))
     .sort((a, b) => slot.get(a.node.id)! - slot.get(b.node.id)! || a.index - b.index)
     .map(item => item.node);
-  const laidOut = arrangeMap(sequenced, hidden);
+  const laidOut = arrangeMap(sequenced, hidden, undefined, direction);
   const placed = new Map(laidOut.map(node => [node.id, node]));
   return nodes.map(node => ({ ...node, x: placed.get(node.id)!.x, y: placed.get(node.id)!.y }));
 }

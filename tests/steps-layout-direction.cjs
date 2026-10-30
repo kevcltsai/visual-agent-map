@@ -75,4 +75,148 @@ test('G0: passing "right" gives the same coordinates as passing no direction', (
   assert.deepEqual(cases('right'), cases());
 });
 
+const L = 'left';
+const at = (list, id) => list.find(item => item.id === id);
+const depthOf = (list, id) => { let depth = 0; for (let item = at(list, id); item.parentId; item = at(list, item.parentId)) depth++; return depth; };
+const rootOf = (list, id) => { let item = at(list, id); while (item.parentId) item = at(list, item.parentId); return item; };
+
+test('L1: the left layout keeps each root column and puts every depth one column further left, with the right layout\'s y', () => {
+  for (const [nodes, heightOf] of [[sample(), undefined], [sample(), sampleHeight], [sized(), sizedHeight]]) {
+    const right = layout.arrangeMap(nodes, undefined, heightOf);
+    const left = layout.arrangeMap(nodes, undefined, heightOf, L);
+    for (const item of left) {
+      const root = rootOf(right, item.id);
+      assert.equal(item.x, root.x - depthOf(nodes, item.id) * 360, `${item.id} x`);
+      assert.equal(item.y, at(right, item.id).y, `${item.id} y`);
+    }
+  }
+});
+
+test('L1: a convergence node sits one column left of its sources in the left layout', () => {
+  const left = layout.arrangeMap(converging(), undefined, undefined, L);
+  const right = layout.arrangeMap(converging());
+  for (const item of left) {
+    assert.equal(item.y, at(right, item.id).y, `${item.id} y`);
+    assert.equal(item.x, 2 * 80 - at(right, item.id).x, `${item.id} mirrors around the root column`);
+  }
+  assert.equal(at(left, 'C').x, at(left, 'R1').x - 360);
+});
+
+const overlaps = (list, heightOf = () => undefined) => {
+  const h = id => heightOf(id) ?? layout.DEFAULT_CARD_HEIGHT;
+  const found = [];
+  for (const a of list) for (const b of list)
+    if (a.id < b.id && Math.abs(a.x - b.x) < 300 && a.y < b.y + h(b.id) && b.y < a.y + h(a.id)) found.push(`${a.id}/${b.id}`);
+  return found;
+};
+
+test('L2: no two cards overlap in the left layout', () => {
+  const placed = layout.arrangeMap(sample(), undefined, undefined, L);
+  assert.ok(at(placed, 'budget').x < at(placed, 'constraints').x && at(placed, 'constraints').x < at(placed, 'explore').x, 'laid out to the left');
+  assert.deepEqual(overlaps(layout.arrangeMap(sample(), undefined, undefined, L)), []);
+  assert.deepEqual(overlaps(layout.arrangeMap(sample(), undefined, sampleHeight, L), sampleHeight), []);
+  assert.deepEqual(overlaps(layout.arrangeMap(converging(), undefined, undefined, L)), []);
+  assert.deepEqual(overlaps(layout.arrangeMap(sized(), undefined, sizedHeight, L), sizedHeight), []);
+});
+
+test('L3: a hidden or folded branch keeps its coordinates in the left layout', () => {
+  const left = layout.arrangeMap(folded(), undefined, undefined, L);
+  for (let index = 0; index < 6; index++) assert.deepEqual([at(left, `hidden-${index}`).x, at(left, `hidden-${index}`).y], [999, index]);
+  assert.equal(at(left, 'big').x, at(left, 'root').x - 360);
+  const hidden = layout.arrangeMap(sample().map(item => (item.id === 'food' ? { ...item, x: 777, y: 999 } : item)), new Set(['food']), undefined, L);
+  assert.deepEqual([at(hidden, 'food').x, at(hidden, 'food').y], [777, 999]);
+});
+
+test('L4: a new branch in the left layout starts one column left of its parent and moves down past a collision', () => {
+  const base = [
+    node('root', null, { x: 800, y: 80 }),
+    node('old', 'root', { x: 440, y: 0 }),
+    node('old2', 'root', { x: 440, y: 260 }),
+    node('fresh', 'root'), node('fresh2', 'root'), node('fresh-kid', 'fresh')
+  ];
+  const placed = layout.arrangeNewBranch(base, 'root', new Set(['fresh', 'fresh2', 'fresh-kid']), undefined, undefined, L);
+  assert.equal(at(placed, 'fresh').x, 800 - 360);
+  assert.equal(at(placed, 'fresh2').x, 800 - 360);
+  assert.equal(at(placed, 'fresh-kid').x, 800 - 720);
+  assert.deepEqual(snap(placed.slice(0, 3)), snap(base.slice(0, 3)), 'existing cards never move');
+  assert.ok(at(placed, 'fresh').y >= 260 + layout.DEFAULT_CARD_HEIGHT + layout.LAYOUT_GAP, 'the new branch clears the old cards');
+  assert.deepEqual(overlaps(placed), []);
+});
+
+test('L5: a new tree in the left layout goes below every card, its children to the left', () => {
+  const existing = [node('root', null, { x: 900, y: 80 }), node('a', 'root', { x: 540, y: -100 }), node('b', 'root', { x: 540, y: 520 })];
+  const fresh = [node('n'), node('n1', 'n'), node('n2', 'n'), node('n11', 'n1')];
+  const placed = layout.arrangeNewTree([...existing, ...fresh], 'n', new Set(fresh.map(item => item.id)), undefined, L);
+  assert.deepEqual(snap(placed.slice(0, 3)), snap(existing));
+  for (const item of placed.slice(3)) assert.ok(item.y >= 520 + layout.DEFAULT_CARD_HEIGHT + layout.LAYOUT_GAP, `${item.id} below`);
+  assert.equal(at(placed, 'n').x, 900, 'the root column stays the leftmost root column');
+  assert.equal(at(placed, 'n1').x, 900 - 360);
+  assert.equal(at(placed, 'n11').x, 900 - 720);
+});
+
+const core = load('map-model.ts');
+const doc = extra => ({ version: 1, id: 'm', title: 'M', nodes: [node('a')], viewport: { x: 0, y: 0, zoom: 1 }, ...extra });
+
+test('L6: parseMap keeps a valid layout through a round trip and drops an invalid one', () => {
+  const kept = core.parseMap(core.serializeMap(doc({ layout: { direction: 'left' } })));
+  assert.deepEqual(JSON.parse(JSON.stringify(kept.layout)), { direction: 'left' });
+  for (const value of ['left', { direction: 'down' }, {}, 3, null, [], { direction: 5 }]) {
+    const parsed = core.parseMap(core.serializeMap(doc({ layout: value })));
+    assert.equal('layout' in parsed, false, JSON.stringify(value));
+  }
+  const plainDoc = doc();
+  const text = core.serializeMap(plainDoc);
+  assert.equal(core.serializeMap(core.parseMap(text)), text, 'a map without layout serializes to the same text');
+  assert.equal('layout' in core.parseMap(text), false);
+});
+
+test('L7: layoutDirectionOf reads the map, and AIM maps or missing fields are always right', () => {
+  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left' } }), 'left');
+  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'right' } }), 'right');
+  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left' }, aim: { version: 1 } }), 'right');
+  assert.equal(layout.layoutDirectionOf({}), 'right');
+  assert.equal(layout.layoutDirectionOf(null), 'right');
+  assert.equal(layout.layoutDirectionOf(undefined), 'right');
+  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'down' } }), 'right');
+  assert.equal(layout.isLayoutDirection('left'), true);
+  assert.equal(layout.isLayoutDirection('right'), true);
+  for (const value of ['down', '', null, undefined, 1, {}]) assert.equal(layout.isLayoutDirection(value), false);
+});
+
+const geometry = load('experiences/visual-map/relation-geometry.ts');
+const viewerEdge = load('experiences/sharing/viewer/edge-path.ts');
+const boxes = [
+  [{ x: 80, y: 80, width: 300, height: 180 }, { x: 440, y: 0, width: 300, height: 180 }],
+  [{ x: 0, y: 500, width: 300, height: 92 }, { x: 360, y: 20, width: 300, height: 260 }],
+  [{ x: 100, y: 100, width: 280, height: 60 }, { x: 140, y: 400, width: 300, height: 100 }],
+  [{ x: -720, y: 33.5, width: 300, height: 121 }, { x: -1080, y: 57.25, width: 300, height: 77 }]
+];
+
+test('L8: treeEdgePathData right is exactly the plugin edge curve; left goes from the parent\'s left edge to the child\'s right edge', () => {
+  for (const [parent, child] of boxes)
+    assert.equal(
+      geometry.treeEdgePathData(parent, child, 'right'),
+      viewerEdge.edgePathData(parent.x + parent.width, parent.y + parent.height / 2, child.x, child.y + child.height / 2)
+    );
+  const parent = { x: 800, y: 100, width: 300, height: 180 }, child = { x: 440, y: 0, width: 300, height: 100 };
+  assert.equal(geometry.treeEdgePathData(parent, child, 'left'), 'M 800 190 C 740 190, 800 50, 740 50');
+  const far = { x: 0, y: 0, width: 300, height: 100 };
+  assert.equal(geometry.treeEdgePathData(parent, far, 'left'), 'M 800 190 C 550 190, 550 50, 300 50', 'arms are half the distance when it is wide');
+});
+
+const relevance = load('experiences/visual-map/relevance-order.ts');
+
+test('L9: the relevance display layout follows the left direction', () => {
+  const nodes = [node('r'), node('a', 'r', { y: 100 }), node('b', 'r', { y: 0 }), node('b1', 'b')];
+  const tiers = { a: 'core', b: 'side' };
+  const right = relevance.relevanceDisplayNodes(nodes, id => tiers[id]);
+  const left = relevance.relevanceDisplayNodes(nodes, id => tiers[id], undefined, L);
+  assert.deepEqual(snap(relevance.relevanceDisplayNodes(nodes, id => tiers[id], undefined, 'right')), snap(right));
+  for (const item of left) {
+    assert.equal(item.y, at(right, item.id).y);
+    assert.equal(item.x, at(left, 'r').x - depthOf(nodes, item.id) * 360);
+  }
+  assert.ok(at(left, 'a').y < at(left, 'b').y, 'still sorted by relevance');
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

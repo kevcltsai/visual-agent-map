@@ -1,3 +1,5 @@
+import type { LayoutDirection } from "../../map-layout";
+
 /** A card's rectangle on the stage. */
 export interface RelationBox {
   x: number;
@@ -91,4 +93,24 @@ export function relationPathData(a: RelationBox, b: RelationBox): string {
 export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number; y: number } {
   const { p1, c1, c2, p2 } = curveOf(a, b);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+
+/**
+ * The curve from a parent card to its child in a tree laid out in `direction`. "right" runs from the parent's right edge
+ * to the child's left edge, exactly as `edgePathData` in view.ts; "left" mirrors it, from the parent's left edge to the
+ * child's right edge, with both arms bending outward.
+ */
+export function treeEdgePathData(parent: RelationBox, child: RelationBox, direction: LayoutDirection): string {
+  const y1 = parent.y + parent.height / 2,
+    y2 = child.y + child.height / 2;
+  if (direction === "left") {
+    const x1 = parent.x,
+      x2 = child.x + child.width,
+      bend = Math.max(60, Math.abs(x2 - x1) / 2);
+    return `M ${x1} ${y1} C ${x1 - bend} ${y1}, ${x2 + bend} ${y2}, ${x2} ${y2}`;
+  }
+  const x1 = parent.x + parent.width,
+    x2 = child.x,
+    bend = Math.max(60, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }

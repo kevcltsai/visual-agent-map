@@ -109,25 +109,26 @@ export function relationPathData(a: RelationBox, b: RelationBox, offset = 0): st
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
 
-/** Assumed label footprint (px) used to space the labels of parallel relations: the widest names plus padding. */
-export const RELATION_LABEL_SPACING_W = 90;
-export const RELATION_LABEL_SPACING_H = 16;
+/** Vertical step (px) between the labels of parallel relations: one label height (14) plus 2px of air. */
+export const RELATION_LABEL_LANE = 16;
 
 /**
- * Where the label sits: the midpoint of the same curve (t = 0.5). `slot` is the relation's signed place among the
- * relations of the same pair (see `relationLabelSlots`); slot 0 (a lone relation, or the first of a pair) stays on
- * the midpoint, and slot n slides n steps along the line (the direction it leaves the card, in the pair's frame) so
- * labels that share a pair do not stack. A step is the label's width when the line is horizontal and its height when
- * vertical.
+ * Where the label sits. A lone relation (offset 0) keeps the midpoint of its line (t = 0.5). Parallel relations stack
+ * their labels in screen-y lanes of `RELATION_LABEL_LANE` px around the midpoint of the unshifted curve, in the order
+ * of the lines' own sideways shift: the lane is `offset / RELATION_OFFSET_STEP`, signed by the screen component of that
+ * shift (y for a horizontal line, x for a vertical one; for a slanted chord the larger component decides). The labels
+ * of a left-right pair keep the x of the gap's middle, so they stay between the cards whatever their count; those of a
+ * top-bottom pair follow the line's sideways shift in x.
  */
-export function relationMidpoint(a: RelationBox, b: RelationBox, offset = 0, slot = 0): { x: number; y: number } {
-  const { p1, c1, c2, p2, along } = curveOf(a, b, offset),
+export function relationLabelPoint(a: RelationBox, b: RelationBox, offset = 0): { x: number; y: number } {
+  const { p1, c1, c2, p2, along } = curveOf(a, b, 0),
     mid = { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
-  if (!slot) return mid;
-  // Slide along the direction the offset is perpendicular to, so the steps never cancel against the sideways offsets:
-  // two labels that are `step` apart along it are clear of each other's box, whatever their sideways offsets.
-  const step = Math.abs(along.x) * RELATION_LABEL_SPACING_W + Math.abs(along.y) * RELATION_LABEL_SPACING_H;
-  return { x: mid.x + along.x * step * slot, y: mid.y + along.y * step * slot };
+  if (!offset) return mid;
+  const horizontal = Math.abs(along.x) >= Math.abs(along.y),
+    sx = -along.y * offset,
+    sy = along.x * offset,
+    lane = (Math.sign(horizontal ? sy : sx) * Math.abs(offset)) / RELATION_OFFSET_STEP;
+  return { x: horizontal ? mid.x : mid.x + sx, y: mid.y + lane * RELATION_LABEL_LANE };
 }
 
 /**
@@ -145,21 +146,5 @@ export function relationOffsets(relations: readonly { from: string; to: string }
     const step = Math.ceil(index / 2) * RELATION_OFFSET_STEP,
       signed = index % 2 === 1 ? step : -step;
     return signed * (forward ? 1 : -1) || 0;
-  });
-}
-
-/**
- * One label slot per relation, in list order: the relation's place among those on the same pair of topics (0, 1, 2 ...),
- * negated when the relation runs against the pair's frame (smaller id to larger id) so that, like the offsets, a
- * reversed relation's label slides the same way on the screen as the others'.
- */
-export function relationLabelSlots(relations: readonly { from: string; to: string }[]): number[] {
-  const seen = new Map<string, number>();
-  return relations.map(({ from, to }) => {
-    const forward = from <= to,
-      key = forward ? `${from}\u0000${to}` : `${to}\u0000${from}`,
-      index = seen.get(key) ?? 0;
-    seen.set(key, index + 1);
-    return (forward ? index : -index) || 0;
   });
 }

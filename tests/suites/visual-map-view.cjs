@@ -2345,12 +2345,14 @@ integrationTest('hypothesis-evidence: several relations on one pair of topics ar
   assert.equal(gap.attrs.d, derives.attrs.d, 'the inner gap line follows its line');
   const hits = ys('vam-relation-hit').map(h => h.attrs.d);
   for (const line of [supports[0], derives, contradicts]) assert.ok(hits.includes(line.attrs.d), 'every line has a hit path on the same curve');
-  assert.deepEqual(ys('vam-relation-label').map(l => l.attrs.y).slice(0, 3), ['50', '62', '38'], 'labels sit on their own line');
+  // F6 oracle swap: the label no longer sits on its own line (y 50/62/38) but in a 16px screen-y lane of the pair's gap (50 / 66 / 34).
+  assert.deepEqual(ys('vam-relation-label').map(l => l.attrs.y).slice(0, 3), ['50', '66', '34'], 'labels sit in their own y lane, the first on the midpoint');
+  assert.deepEqual(ys('vam-relation-label').map(l => l.attrs.x).slice(0, 3), ['390', '390', '390'], 'and keep the x of the gap middle (390), between the two cards (280..500)');
   const drag = fx.view.dragEdges('fact', fx.view.cardEls.get('fact')); drag.update(0, 100);
   assert.match(derives.attrs.d, /^M 280 162 C .* 500 62$/, 'dragging keeps the 12px shift'); assert.match(supports[0].attrs.d, /^M 280 150 /); assert.match(contradicts.attrs.d, / 280 138$/);
   assert.equal(gap.attrs.d, derives.attrs.d); assert.ok(ys('vam-relation-hit').map(h => h.attrs.d).includes(derives.attrs.d), 'the hit path follows too');
-  const moved = ys('vam-relation-label')[1].attrs, expected = heGeo().relationMidpoint(heBox(0, 100), heBox(500, 0), 12, 1);
-  assert.deepEqual([Number(moved.x), Number(moved.y)], [expected.x, expected.y], 'and so does the label (same offset and label slot; the drag tilts the line, so the slot slides along the tilt)');
+  const moved = ys('vam-relation-label')[1].attrs, expected = heGeo().relationLabelPoint(heBox(0, 100), heBox(500, 0), 12);
+  assert.deepEqual([Number(moved.x), Number(moved.y)], [expected.x, expected.y], 'and so does the label (relationLabelPoint with the same offset)');
 });
 // Label boxes as drawn: centred on the label's x/y, 14px high, 7px per character plus 8px (the estimate of the review).
 const heLabelBoxes = labels => labels.map(l => { const w = Array.from(l.text ?? '').length * 7 + 8, x = Number(l.attrs.x), y = Number(l.attrs.y); return { x: x - w / 2, y: y - 7, w, h: 14 }; });
@@ -2376,15 +2378,17 @@ integrationTest('hypothesis-evidence: the labels of 2, 3 and 4 relations on one 
   }
   const { labels } = heStagger(1, layouts.vertical);
   assert.deepEqual([labels[0].attrs.x, labels[0].attrs.y], ['140', '200'], 'a single relation sits on the midpoint of its line');
-  const { relationMidpoint, relationOffsets, relationLabelSlots } = heGeo();
+  const { relationLabelPoint, relationOffsets } = heGeo();
   for (let degrees = 0; degrees < 360; degrees += 7) for (const reach of [250, 400, 700]) for (const count of [2, 3, 4, 5]) {
     const a = heBox(0, 0), b = heBox(Math.round(Math.cos(degrees * Math.PI / 180) * reach), Math.round(Math.sin(degrees * Math.PI / 180) * reach));
-    const rel = Array.from({ length: count }, () => ({ from: 'a', to: 'b' })), offsets = relationOffsets(rel), slots = relationLabelSlots(rel);
-    const boxes = rel.map((_, i) => { const p = relationMidpoint(a, b, offsets[i], slots[i]); return { x: p.x - 45, y: p.y - 7, w: 90, h: 14 }; });
+    const rel = Array.from({ length: count }, () => ({ from: 'a', to: 'b' })), offsets = relationOffsets(rel);
+    const boxes = rel.map((_, i) => { const p = relationLabelPoint(a, b, offsets[i]); return { x: p.x - 45, y: p.y - 7, w: 90, h: 14 }; });
     for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${degrees} deg, reach ${reach}, ${count} lines: ${i} and ${j} overlap (widest 11-letter name box)`);
   }
-  assert.deepEqual(plain(relationLabelSlots([{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }, { from: 'a', to: 'c' }, { from: 'a', to: 'b' }, { from: 'b', to: 'a' }])), [0, -1, 0, 2, -3], 'slots count per pair, negated against the pair frame');
-  assert.deepEqual(plain(relationMidpoint(heBox(0, 0), heBox(500, 0), 12)), plain(relationMidpoint(heBox(0, 0), heBox(500, 0), 12, 0)), 'slot 0 is the plain midpoint');
+  // F6 oracle swap: relationLabelSlots is gone; the lane (offset / 12, signed by the line's screen shift) replaces the slot.
+  assert.deepEqual(plain(relationLabelPoint(heBox(0, 0), heBox(500, 0), 12)), { x: 390, y: 66 }, 'offset +12 on a left-to-right pair is one lane (16px) below the midpoint (390, 50)');
+  assert.deepEqual(plain(relationLabelPoint(heBox(500, 0), heBox(0, 0), -12)), { x: 390, y: 66 }, 'the reversed relation (own frame -12) lands in the same lane as the line it follows');
+  assert.deepEqual(plain(relationLabelPoint(heBox(0, 0), heBox(500, 0))), plain(relationLabelPoint(heBox(0, 0), heBox(500, 0), 0)), 'offset 0 is the plain midpoint');
 });
 integrationTest('hypothesis-evidence: after a drag the labels of parallel relations are still apart, and the lines and hit paths are unchanged by the label slot (F5)', () => {
   for (const [name, boxes, to] of [['vertical', { fact: [0, 0], hyp: [0, 300] }, [40, 420]], ['horizontal', { fact: [0, 0], hyp: [500, 0] }, [700, 20]], ['vertical to horizontal', { fact: [0, 0], hyp: [0, 300] }, [600, 0]]]) {
@@ -2400,6 +2404,83 @@ integrationTest('hypothesis-evidence: after a drag the labels of parallel relati
   assert.deepEqual(kids.filter(k => k.classes.includes('vam-relation-hit')).map(k => k.attrs.d), lines, 'hit paths equal the lines');
   const sorted = kids.filter(k => k.classes.includes('vam-relation-label')).map(k => Number(k.attrs.y)).sort((a, b) => a - b);
   assert.ok(sorted[3] - sorted[0] >= 3 * 14, 'on a vertical pair the labels are spread along the line');
+});
+// F6 (decision #34): label boxes against BOTH cards of the pair. Label box = w x 14 centred on the label point.
+const heLabelAt = (p, w) => ({ x: p.x - w / 2, y: p.y - 7, w, h: 14 });
+const heCardBox = box => ({ x: box.x, y: box.y, w: box.width, h: box.height });
+const heGapOf = (a, b) => ({ h: Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width)), v: Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height)) });
+const heLanes = (A, B, pattern) => {
+  // pattern: array of booleans, true = the relation runs B -> A (against the pair frame 'a' < 'b').
+  const { relationLabelPoint, relationOffsets, relationPathData } = heGeo(), rel = pattern.map(rev => rev ? { from: 'b', to: 'a' } : { from: 'a', to: 'b' }), offsets = relationOffsets(rel);
+  return rel.map((r, i) => { const from = r.from === 'a' ? A : B, to = r.from === 'a' ? B : A, p = relationLabelPoint(from, to, offsets[i]), line = heNums(relationPathData(from, to, offsets[i])), plainLine = heNums(relationPathData(from, to, 0)); return { p, shiftX: line[0] - plainLine[0], shiftY: line[1] - plainLine[1], offset: offsets[i] }; });
+};
+const hePatterns = { 1: [[false], [true]], 2: [[false, false], [false, true]], 3: [[false, false, false], [false, true, false]], 4: [[false, false, false, false], [false, true, true, false], [true, false, true, true]] };
+const heSweep = (A, B, label) => {
+  const gap = heGapOf(A, B), horizontal = gap.h >= gap.v;
+  for (const [count, patterns] of Object.entries(hePatterns)) for (const pattern of patterns) {
+    const lanes = heLanes(A, B, pattern), tag = `${label} x${count} ${JSON.stringify(pattern)}`;
+    for (const w of [24, 46, 90]) {
+      const boxes = lanes.map(l => heLabelAt(l.p, w));
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${tag} w${w}: labels ${i} and ${j} overlap`);
+      const ys = lanes.map(l => l.p.y), range = Math.max(...ys) - Math.min(...ys);
+      // Gate: horizontal pair needs gap >= label width + 4; vertical pair needs gap >= lane range * 16 + 18 (range = span of the lanes in y).
+      const clear = horizontal ? gap.h >= w + 4 : gap.v >= range + 18;
+      if (clear) for (const [i, box] of boxes.entries()) for (const card of [A, B]) assert.ok(!heOverlaps(box, heCardBox(card)), `${tag} w${w}: label ${i} ${JSON.stringify(box)} meets card ${JSON.stringify(card)}`);
+    }
+    // (d) the y order of the labels is the order of the lines' sideways shift (y of a horizontal line, x of a vertical one).
+    for (let i = 0; i < lanes.length; i++) for (let j = i + 1; j < lanes.length; j++) {
+      const shift = horizontal ? lanes[i].shiftY - lanes[j].shiftY : lanes[i].shiftX - lanes[j].shiftX;
+      assert.equal(Math.sign(lanes[i].p.y - lanes[j].p.y), Math.sign(shift), `${tag}: label ${i}/${j} y order follows the line shift`);
+    }
+  }
+};
+integrationTest('hypothesis-evidence: label points of 1-4 parallel relations never overlap, stay clear of both cards when the gap allows (horizontal gap >= label width + 4; vertical gap >= lane range x 16 + 18), follow the line order, and a lone label is the t = 0.5 midpoint (F6, decision #34)', () => {
+  const A = heBox(0, 0);
+  for (const gap of [60, 140, 440]) heSweep(A, heBox(280 + gap, 0), `horizontal gap ${gap}`);
+  for (const gap of [60, 140, 440]) heSweep(heBox(280 + gap, 0), A, `horizontal reversed gap ${gap}`);
+  for (const gap of [80, 175]) heSweep(A, heBox(0, 100 + gap), `vertical gap ${gap}`);
+  for (const gap of [80, 175]) heSweep(A, heBox(120, 100 + gap), `vertical shifted gap ${gap}`);
+  for (const gap of [80, 175]) heSweep(heBox(0, 100 + gap), A, `vertical reversed gap ${gap}`);
+  // either side of the horizontal / vertical decision (hgap 140 vs vgap 139, and 139 vs 140)
+  heSweep(A, heBox(420, 239), 'diagonal h140 v139 (horizontal)'); heSweep(A, heBox(419, 240), 'diagonal h139 v140 (vertical)');
+  heSweep(A, heBox(420, 240), 'diagonal h140 v140 (tie: horizontal)'); heSweep(A, heBox(500, 400), 'diagonal h220 v300 (vertical)');
+  const { relationLabelPoint, relationPathData } = heGeo();
+  for (const [a, b] of [[A, heBox(420, 0)], [A, heBox(0, 175 + 100)], [A, heBox(419, 240)], [heBox(420, 0), A]]) {
+    const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] = heNums(relationPathData(a, b, 0));
+    assert.deepEqual(plain(relationLabelPoint(a, b)), { x: (x1 + 3 * cx1 + 3 * cx2 + x2) / 8, y: (y1 + 3 * cy1 + 3 * cy2 + y2) / 8 }, 'a lone label is the curve at t = 0.5');
+  }
+});
+integrationTest('hypothesis-evidence: F6 sample coordinates - four labels A<->B and two labels A->C across a 140px gap sit between the cards, none on a card (decision #34)', () => {
+  // From ui-evidence F5 re-check: Rel B dragged to (0,0) left of Rel A (420, y), gap 140; Rel C at x 840 right of A (right edge 700), gap 140. Widest label 90 x 14.
+  const { relationLabelPoint, relationOffsets } = heGeo(), A = heBox(420, 0), B = heBox(0, 0), C = heBox(840, 0);
+  const rel = [{ from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'b', to: 'a' }, { from: 'a', to: 'b' }], off = relationOffsets(rel);
+  const ab = rel.map((r, i) => relationLabelPoint(r.from === 'a' ? A : B, r.from === 'a' ? B : A, off[i]));
+  const abBoxes = ab.map(p => heLabelAt(p, 90));
+  assert.deepEqual(plain(ab), [{ x: 350, y: 50 }, { x: 350, y: 34 }, { x: 350, y: 66 }, { x: 350, y: 18 }], 'x stays at the gap middle (350); y lanes 0, -1, +1, -2 follow the lines at y 50, 38, 62, 26');
+  assert.deepEqual(abBoxes.map(b => [b.x, b.x + b.w]), Array(4).fill([305, 395]), 'every A<->B label spans x 305..395, inside the 280..420 gap');
+  for (const [i, box] of abBoxes.entries()) for (const [name, card] of [['A', A], ['B', B]]) assert.ok(!heOverlaps(box, heCardBox(card)), `A<->B label ${i} meets card ${name}`);
+  const c = [0, 12].map(offset => relationLabelPoint(A, C, offset)), cBoxes = c.map(p => heLabelAt(p, 90));
+  assert.deepEqual(plain(c), [{ x: 770, y: 50 }, { x: 770, y: 66 }], 'A->C: the second label is one lane down, x stays at the gap middle 770');
+  for (const [i, box] of cBoxes.entries()) for (const [name, card] of [['A', A], ['C', C]]) assert.ok(!heOverlaps(box, heCardBox(card)), `A->C label ${i} meets card ${name}`);
+  assert.ok(!heOverlaps(cBoxes[0], cBoxes[1]));
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) assert.ok(!heOverlaps(abBoxes[i], abBoxes[j]), `A<->B labels ${i} and ${j} overlap`);
+});
+integrationTest('hypothesis-evidence: the labels drawn by the view equal relationLabelPoint after the draw and after a drag, in horizontal and vertical layouts, and stay clear of both cards (F6, decision #34)', () => {
+  const { relationLabelPoint, relationOffsets } = heGeo(), rel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
+  const offsets = relationOffsets(rel);
+  for (const [name, start, to] of [['horizontal gap 140', { fact: [0, 0], hyp: [420, 0] }, [700, 30]], ['horizontal gap 440', { fact: [0, 0], hyp: [720, 0] }, [420, 10]], ['vertical gap 175', { fact: [0, 0], hyp: [0, 275] }, [40, 380]], ['vertical to horizontal', { fact: [0, 0], hyp: [0, 275] }, [600, 0]]]) {
+    const fx = heFixture({ relations: rel }), kids = heDrawn(fx.view, start), labels = () => kids.filter(k => k.classes.includes('vam-relation-label'));
+    const expected = hypPos => rel.map((r, i) => { const f = heBox(...start.fact), h = heBox(...hypPos); return relationLabelPoint(r.from === 'fact' ? f : h, r.from === 'fact' ? h : f, offsets[i]); });
+    const check = (hypPos, when) => {
+      const exp = expected(hypPos);
+      labels().forEach((l, i) => assert.deepEqual([Number(l.attrs.x), Number(l.attrs.y)], [exp[i].x, exp[i].y], `${name} ${when}: label ${i} is at relationLabelPoint`));
+    };
+    check(start.hyp, 'after draw');
+    fx.view.dragEdges('hyp', fx.view.cardEls.get('hyp')).update(...to);
+    check(to, 'after drag');
+    const gap = heGapOf(heBox(...start.fact), heBox(...to)), horizontal = gap.h >= gap.v;
+    if (horizontal && gap.h >= 90 + 4 || !horizontal && gap.v >= 3 * 16 + 18) for (const l of labels()) for (const card of [heBox(...start.fact), heBox(...to)]) assert.ok(!heOverlaps(heLabelAt({ x: Number(l.attrs.x), y: Number(l.attrs.y) }, 90), heCardBox(card)), `${name} after drag: a label meets a card`);
+  }
 });
 const heDrawnPaths = view => view.edgesEl.kids.filter(k => k.classes.includes('vam-relation') || k.classes.includes('vam-relation-hit'));
 integrationTest('hypothesis-evidence: after a relation is added from the panel the focus is on the new "Add relation…" button (R3-3)', async () => {
@@ -2931,7 +3012,7 @@ integrationTest('hypothesis-evidence: cards stacked one above the other are join
   assert.deepEqual([sides.from.ny, sides.to.ny], [1, -1], 'the normals point away from each card');
 });
 integrationTest('hypothesis-evidence: the control arms are clamped to 16..60 and never leave a 60px margin around the two cards (same-side layouts included)', () => {
-  const { relationPathData, relationMidpoint } = heGeo();
+  const { relationPathData, relationLabelPoint } = heGeo();
   assert.deepEqual(heNums(relationPathData(heBox(0, 0), heBox(290, 0))).slice(2, 4), [296, 50], 'a 10px gap still gets a 16px arm');
   assert.deepEqual(heNums(relationPathData(heBox(0, 0), heBox(1000, 0))).slice(2, 4), [340, 50], 'a long gap caps the arm at 60');
   const pairs = [[heBox(0, 0), heBox(300, 160)], [heBox(0, 0), heBox(200, 300)], [heBox(300, 160), heBox(0, 0)], [heBox(0, 0), heBox(260, 90)], [heBox(0, 0), heBox(0, 20)], [heBox(0, 0), heBox(400, 900)]];
@@ -2941,7 +3022,7 @@ integrationTest('hypothesis-evidence: the control arms are clamped to 16..60 and
     for (const [x, y] of [[x1, y1], [cx1, cy1], [cx2, cy2], [x2, y2]]) assert.ok(x >= left && x <= right && y >= top && y <= bottom, `${JSON.stringify([a, b])}: point ${x},${y} stays within 60px of the cards`);
   }
   assert.equal(relationPathData(heBox(0, 0), heBox(100, 40)), 'M 140 50 C 140 50, 240 90, 240 90', 'overlapping cards join centre to centre with no arm');
-  assert.deepEqual(plain(relationMidpoint(heBox(0, 0), heBox(500, 40))), { x: 390, y: 70 }, 'the midpoint is the curve at t = 0.5');
+  assert.deepEqual(plain(relationLabelPoint(heBox(0, 0), heBox(500, 40))), { x: 390, y: 70 }, 'the lone label is the curve at t = 0.5');
 });
 integrationTest('hypothesis-evidence: each of the six kinds draws its own class; related has no arrow, contradicts the barred arrow, the others the plain arrow', () => {
   const { kids, line } = heSix();

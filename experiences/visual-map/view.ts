@@ -17,13 +17,7 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import {
-  relationLabelSlots,
-  relationMidpoint,
-  relationOffsets,
-  relationPathData,
-  type RelationBox
-} from "./relation-geometry";
+import { relationLabelPoint, relationOffsets, relationPathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -761,8 +755,6 @@ export class VisualAgentMapView extends ItemView {
   private relationGapEls = new Map<string, SVGPathElement>();
   /** Sideways shift of each line from the others on the same pair of topics (see `relationOffsets`). */
   private relationOffsetBy = new Map<string, number>();
-  /** Place of each label along its line among the relations of the same pair (see `relationLabelSlots`). */
-  private relationSlotBy = new Map<string, number>();
   private relationData = new Map<string, TopicRelation>();
   /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
   private relationPainted = new Set<string>();
@@ -12529,7 +12521,7 @@ export class VisualAgentMapView extends ItemView {
           path.setAttribute("d", d);
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationMidpoint(from, to, offset, this.relationSlotBy.get(link.key) ?? 0));
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to, offset));
         }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
@@ -12594,7 +12586,6 @@ export class VisualAgentMapView extends ItemView {
     this.relationLabelEls.clear();
     this.relationGapEls.clear();
     this.relationOffsetBy.clear();
-    this.relationSlotBy.clear();
     this.relationData.clear();
     this.relationLabelAt.clear();
     this.relationPainted.clear();
@@ -12615,11 +12606,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!links.length) return;
     const offsets = relationOffsets(links.map(link => link.relation));
-    const slots = relationLabelSlots(links.map(link => link.relation));
-    links.forEach((link, index) => {
-      this.relationOffsetBy.set(link.key, offsets[index]);
-      this.relationSlotBy.set(link.key, slots[index]);
-    });
+    links.forEach((link, index) => this.relationOffsetBy.set(link.key, offsets[index]));
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
@@ -12683,12 +12670,7 @@ export class VisualAgentMapView extends ItemView {
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(
         link.key,
-        relationMidpoint(
-          boxOf(link.from),
-          boxOf(link.to),
-          this.relationOffsetBy.get(link.key) ?? 0,
-          this.relationSlotBy.get(link.key) ?? 0
-        )
+        relationLabelPoint(boxOf(link.from), boxOf(link.to), this.relationOffsetBy.get(link.key) ?? 0)
       );
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.

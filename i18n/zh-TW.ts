@@ -490,6 +490,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.add_prerequisite_description": "選擇必須先具備的議題。",
   "ui.no_prerequisite_to_link": "沒有可以作為本議題前置知識的議題。",
   "ui.remove_prerequisite_link_0": "移除前置知識連結：{0}",
+  "ui.relation_name_evidence": "證據",
+  "ui.relation_name_prerequisite": "前置知識",
   "ui.merge_dropped_cycles_0": "已移除 {0} 條會形成環的前置知識",
   "log.evidence_relation_type_ignored_0": "證據連結未繪製（必須由議題指向假設）：{0}",
   "ui.collapse_levels": "收合或展開整張心智圖",

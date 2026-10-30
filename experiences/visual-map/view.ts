@@ -455,6 +455,26 @@ function relationPathData(a: CardBox, b: CardBox): string {
   }
   return edgePathData(a.x + a.width, y1, b.x, y2);
 }
+/** Midpoint of the same curve (a cubic Bezier at t = 0.5), where the relation name is written. */
+function relationMidpoint(a: CardBox, b: CardBox): { x: number; y: number } {
+  const y1 = a.y + a.height / 2,
+    y2 = b.y + b.height / 2;
+  let x1: number, x2: number, c1: number, c2: number;
+  if (b.x + b.width < a.x) {
+    x1 = a.x;
+    x2 = b.x + b.width;
+    const bend = Math.max(60, (x1 - x2) / 2);
+    c1 = x1 - bend;
+    c2 = x2 + bend;
+  } else {
+    x1 = a.x + a.width;
+    x2 = b.x;
+    const bend = Math.max(60, Math.abs(x2 - x1) / 2);
+    c1 = x1 + bend;
+    c2 = x2 - bend;
+  }
+  return { x: (x1 + 3 * c1 + 3 * c2 + x2) / 8, y: (y1 + y1 * 3 + y2 * 3 + y2) / 8 };
+}
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -728,6 +748,16 @@ export class VisualAgentMapView extends ItemView {
   private edgeEls = new Map<string, SVGPathElement>();
   /** Evidence and prerequisite links on screen, keyed `from\0to\0kind`; a drag moves them with their cards. */
   private relationEls = new Map<string, SVGPathElement>();
+  /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
+  private relationHitEls = new Map<string, SVGPathElement>();
+  private relationLabelEls = new Map<string, SVGTextElement>();
+  /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
+  private selectedRelation: string | null = null;
+  /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
+  private hoverRelation: string | null = null;
+  private previewRelation: string | null = null;
+  /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
+  private relationEndIds = new Set<string>();
   /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
   private readonly relationMarkerId = `vam-relation-arrow-${++relationMarkerSequence}`;
   /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
@@ -889,6 +919,7 @@ export class VisualAgentMapView extends ItemView {
         const wasSelecting = this.integrationMode;
         this.selected = null;
         this.multiSelected.clear();
+        this.selectedRelation = null;
         this.integrationMode = false;
         if (wasSelecting) this.render();
         else this.commitSelection(previous, null, touched);
@@ -7087,12 +7118,15 @@ export class VisualAgentMapView extends ItemView {
       if (check) check.checked = this.multiSelected.has(id);
     }
     this.chat?.refreshSelection();
+    this.syncRelationClasses();
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
    * cards and the two tab stops are repainted, and the selection bar is refreshed in selection mode.
    */
   applySelectionState(prevId: string | null, nextId: string | null, touched: Iterable<string> = []): void {
+    // Picking, clearing or extending the topic selection ends a line selection.
+    this.selectedRelation = null;
     const previousStop = this.tabStopId;
     this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
     this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
@@ -7983,6 +8017,7 @@ export class VisualAgentMapView extends ItemView {
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }),
             otherId = isHypothesis ? link.from : link.to;
+          this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
           const remove = this.button(row, t("ui.remove"), () =>
             this.enqueue(async () => {
@@ -8006,6 +8041,7 @@ export class VisualAgentMapView extends ItemView {
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }),
             otherId = otherOf(link);
+          this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
           const remove = this.button(row, t("ui.remove"), () =>
             this.enqueue(async () => {
@@ -10203,6 +10239,10 @@ export class VisualAgentMapView extends ItemView {
         viewport.removeClass("is-panning");
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
+        if (!moved && event.button === 0 && this.selectedRelation) {
+          this.selectedRelation = null;
+          this.syncRelationClasses();
+        }
         if (!moved && !this.integrationMode && event.button === 0) {
           const previous = this.selected,
             touched = [...this.multiSelected];
@@ -12257,8 +12297,13 @@ export class VisualAgentMapView extends ItemView {
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
-          const mine = { x, y, ...size };
-          path.setAttribute("d", link.dragIsFrom ? relationPathData(mine, link.far) : relationPathData(link.far, mine));
+          const mine = { x, y, ...size },
+            from = link.dragIsFrom ? mine : link.far,
+            to = link.dragIsFrom ? link.far : mine,
+            d = relationPathData(from, to);
+          path.setAttribute("d", d);
+          this.relationHitEls.get(link.key)?.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationMidpoint(from, to));
         }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
@@ -12307,6 +12352,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     this.drawRelations();
+    this.syncRelationClasses();
   }
   /**
    * Evidence links (fact -> hypothesis) and prerequisite links (A -> B) in the same layer as the parent-child edges,
@@ -12316,6 +12362,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private drawRelations(): void {
     this.relationEls.clear();
+    this.relationHitEls.clear();
+    this.relationLabelEls.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
     const links: { from: HTMLElement; to: HTMLElement; key: string; kind: TopicRelation["kind"] }[] = [];
     for (const relation of this.map.topicRelations ?? []) {
@@ -12360,7 +12408,98 @@ export class VisualAgentMapView extends ItemView {
       path.addClass(`vam-relation-${link.kind}`);
       this.edgesEl.appendChild(path);
       this.relationEls.set(link.key, path);
+      // The wide invisible path is what the pointer meets; the visible line and the parent-child edges ignore it.
+      const hit = createSvg("path");
+      hit.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
+      hit.addClass("vam-relation-hit");
+      const key = link.key;
+      hit.addEventListener("pointerdown", event => {
+        // A press on a line is not a press on the empty canvas: no pan, no marquee, no clearing of the selection.
+        event.stopPropagation();
+        this.selectedRelation = key;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("pointerenter", () => {
+        this.hoverRelation = key;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("pointerleave", () => {
+        if (this.hoverRelation === key) this.hoverRelation = null;
+        this.syncRelationClasses();
+      });
+      this.edgesEl.appendChild(hit);
+      this.relationHitEls.set(key, hit);
     }
+    for (const link of links) {
+      const label = createSvg("text");
+      label.addClass("vam-relation-label");
+      label.textContent = t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite");
+      this.edgesEl.appendChild(label);
+      this.relationLabelEls.set(link.key, label);
+      this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
+    }
+    // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
+    if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
+    if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
+    if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
+  }
+  private placeRelationLabel(key: string, point: { x: number; y: number }): void {
+    const label = this.relationLabelEls.get(key);
+    label?.setAttribute("x", String(point.x));
+    label?.setAttribute("y", String(point.y));
+  }
+  /**
+   * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
+   * (single or multiple), the semantic lines touching them are `is-related` and the rest `is-dimmed` (parent-child
+   * edges stay as they are); the selected (or panel-previewed) line is `is-selected` and shows its name, as does a
+   * hovered line; both end cards get `is-relation-end`.
+   */
+  private syncRelationClasses(): void {
+    const chosen = new Set(this.multiSelected);
+    if (this.selected) chosen.add(this.selected);
+    const ends = new Set<string>();
+    for (const [key, path] of this.relationEls) {
+      const [fromId, toId] = key.split("\u0000");
+      const related = chosen.has(fromId) || chosen.has(toId),
+        active = key === this.selectedRelation || key === this.previewRelation;
+      path.toggleClass("is-related", related);
+      path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      path.toggleClass("is-selected", active);
+      this.relationLabelEls.get(key)?.toggleClass("is-visible", active || key === this.hoverRelation);
+      if (active) {
+        ends.add(fromId);
+        ends.add(toId);
+      }
+    }
+    for (const id of new Set([...this.relationEndIds, ...ends]))
+      this.cardEls.get(id)?.toggleClass("is-relation-end", ends.has(id));
+    this.relationEndIds = ends;
+  }
+  /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
+  private bindRelationRow(row: HTMLElement, link: TopicRelation, otherTitle: string): void {
+    const key = `${link.from}\u0000${link.to}\u0000${link.kind}`;
+    row.tabIndex = 0;
+    row.setAttr("role", "group");
+    row.setAttr(
+      "aria-label",
+      `${t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite")}: ${otherTitle}`
+    );
+    row.addEventListener("focus", () => {
+      this.selectedRelation = key;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("blur", () => {
+      if (this.selectedRelation === key) this.selectedRelation = null;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseenter", () => {
+      this.previewRelation = key;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseleave", () => {
+      if (this.previewRelation === key) this.previewRelation = null;
+      this.syncRelationClasses();
+    });
   }
   /**
    * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.

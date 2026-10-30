@@ -573,6 +573,8 @@ var en = {
   "ui.add_prerequisite_description": "Choose the topic that must come first.",
   "ui.no_prerequisite_to_link": "There is no topic that can be a prerequisite for this one.",
   "ui.remove_prerequisite_link_0": "Remove prerequisite link: {0}",
+  "ui.relation_name_evidence": "Evidence",
+  "ui.relation_name_prerequisite": "Prerequisite",
   "ui.merge_dropped_cycles_0": "Removed {0} prerequisite link(s) that would form a cycle",
   "log.evidence_relation_type_ignored_0": "Evidence link not drawn (it must run from a topic to a hypothesis): {0}",
   "ui.collapse_levels": "Collapse or expand the whole map",
@@ -2570,6 +2572,8 @@ var zhCN = {
   "ui.add_prerequisite_description": "\u9009\u62E9\u5FC5\u987B\u5148\u5177\u5907\u7684\u8BAE\u9898\u3002",
   "ui.no_prerequisite_to_link": "\u6CA1\u6709\u53EF\u4EE5\u4F5C\u4E3A\u672C\u8BAE\u9898\u524D\u7F6E\u77E5\u8BC6\u7684\u8BAE\u9898\u3002",
   "ui.remove_prerequisite_link_0": "\u79FB\u9664\u524D\u7F6E\u77E5\u8BC6\u94FE\u63A5\uFF1A{0}",
+  "ui.relation_name_evidence": "\u8BC1\u636E",
+  "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8BC6",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u524D\u7F6E\u77E5\u8BC6",
   "log.evidence_relation_type_ignored_0": "\u8BC1\u636E\u94FE\u63A5\u672A\u7ED8\u5236\uFF08\u5FC5\u987B\u7531\u8BAE\u9898\u6307\u5411\u5047\u8BBE\uFF09\uFF1A{0}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
@@ -4567,6 +4571,8 @@ var zhTW = {
   "ui.add_prerequisite_description": "\u9078\u64C7\u5FC5\u9808\u5148\u5177\u5099\u7684\u8B70\u984C\u3002",
   "ui.no_prerequisite_to_link": "\u6C92\u6709\u53EF\u4EE5\u4F5C\u70BA\u672C\u8B70\u984C\u524D\u7F6E\u77E5\u8B58\u7684\u8B70\u984C\u3002",
   "ui.remove_prerequisite_link_0": "\u79FB\u9664\u524D\u7F6E\u77E5\u8B58\u9023\u7D50\uFF1A{0}",
+  "ui.relation_name_evidence": "\u8B49\u64DA",
+  "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8B58",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u524D\u7F6E\u77E5\u8B58",
   "log.evidence_relation_type_ignored_0": "\u8B49\u64DA\u9023\u7D50\u672A\u7E6A\u88FD\uFF08\u5FC5\u9808\u7531\u8B70\u984C\u6307\u5411\u5047\u8A2D\uFF09\uFF1A{0}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
@@ -36562,6 +36568,24 @@ function relationPathData(a, b) {
   }
   return edgePathData(a.x + a.width, y1, b.x, y2);
 }
+function relationMidpoint(a, b) {
+  const y1 = a.y + a.height / 2, y2 = b.y + b.height / 2;
+  let x1, x2, c1, c2;
+  if (b.x + b.width < a.x) {
+    x1 = a.x;
+    x2 = b.x + b.width;
+    const bend = Math.max(60, (x1 - x2) / 2);
+    c1 = x1 - bend;
+    c2 = x2 + bend;
+  } else {
+    x1 = a.x + a.width;
+    x2 = b.x;
+    const bend = Math.max(60, Math.abs(x2 - x1) / 2);
+    c1 = x1 + bend;
+    c2 = x2 - bend;
+  }
+  return { x: (x1 + 3 * c1 + 3 * c2 + x2) / 8, y: (y1 + y1 * 3 + y2 * 3 + y2) / 8 };
+}
 var boxOf = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -36738,6 +36762,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "edgeEls", /* @__PURE__ */ new Map());
     /** Evidence and prerequisite links on screen, keyed `from\0to\0kind`; a drag moves them with their cards. */
     __publicField(this, "relationEls", /* @__PURE__ */ new Map());
+    /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
+    __publicField(this, "relationHitEls", /* @__PURE__ */ new Map());
+    __publicField(this, "relationLabelEls", /* @__PURE__ */ new Map());
+    /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
+    __publicField(this, "selectedRelation", null);
+    /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
+    __publicField(this, "hoverRelation", null);
+    __publicField(this, "previewRelation", null);
+    /** Cards currently carrying `is-relation-end`, so a repaint only touches the cards that change. */
+    __publicField(this, "relationEndIds", /* @__PURE__ */ new Set());
     /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
     __publicField(this, "relationMarkerId", `vam-relation-arrow-${++relationMarkerSequence}`);
     /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
@@ -36887,6 +36921,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
         const wasSelecting = this.integrationMode;
         this.selected = null;
         this.multiSelected.clear();
+        this.selectedRelation = null;
         this.integrationMode = false;
         if (wasSelecting) this.render();
         else this.commitSelection(previous, null, touched);
@@ -42600,6 +42635,7 @@ ${request.requirements}` : preset.text,
       if (check) check.checked = this.multiSelected.has(id);
     }
     (_a2 = this.chat) == null ? void 0 : _a2.refreshSelection();
+    this.syncRelationClasses();
   }
   /**
    * Moves the selection without rebuilding the map: only the previous and next cards, the changed multi-select
@@ -42607,6 +42643,7 @@ ${request.requirements}` : preset.text,
    */
   applySelectionState(prevId, nextId, touched = []) {
     var _a2;
+    this.selectedRelation = null;
     const previousStop = this.tabStopId;
     this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
     this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
@@ -43462,6 +43499,7 @@ ${request.requirements}` : preset.text,
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = isHypothesis ? link.from : link.to;
+          this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
           const remove = this.button(
             row,
@@ -43485,6 +43523,7 @@ ${request.requirements}` : preset.text,
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links2) {
           const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = otherOf(link);
+          this.bindRelationRow(row, link, titleOf(otherId));
           row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
           const remove = this.button(
             row,
@@ -45484,6 +45523,10 @@ ${note.detail.trim()}` : "",
         viewport.removeClass("is-panning");
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
+        if (!moved && event.button === 0 && this.selectedRelation) {
+          this.selectedRelation = null;
+          this.syncRelationClasses();
+        }
         if (!moved && !this.integrationMode && event.button === 0) {
           const previous = this.selected, touched = [...this.multiSelected];
           this.selected = null;
@@ -47393,11 +47436,14 @@ ${addition}` : addition });
     }
     return {
       update: (x, y) => {
+        var _a2;
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
-          const mine = { x, y, ...size };
-          path.setAttribute("d", link.dragIsFrom ? relationPathData(mine, link.far) : relationPathData(link.far, mine));
+          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, d = relationPathData(from, to);
+          path.setAttribute("d", d);
+          (_a2 = this.relationHitEls.get(link.key)) == null ? void 0 : _a2.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationMidpoint(from, to));
         }
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
@@ -47445,6 +47491,7 @@ ${addition}` : addition });
       }
     }
     this.drawRelations();
+    this.syncRelationClasses();
   }
   /**
    * Evidence links (fact -> hypothesis) and prerequisite links (A -> B) in the same layer as the parent-child edges,
@@ -47455,6 +47502,8 @@ ${addition}` : addition });
   drawRelations() {
     var _a2;
     this.relationEls.clear();
+    this.relationHitEls.clear();
+    this.relationLabelEls.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
     const links = [];
     for (const relation of (_a2 = this.map.topicRelations) != null ? _a2 : []) {
@@ -47496,7 +47545,95 @@ ${addition}` : addition });
       path.addClass(`vam-relation-${link.kind}`);
       this.edgesEl.appendChild(path);
       this.relationEls.set(link.key, path);
+      const hit = createSvg("path");
+      hit.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
+      hit.addClass("vam-relation-hit");
+      const key2 = link.key;
+      hit.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        this.selectedRelation = key2;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("pointerenter", () => {
+        this.hoverRelation = key2;
+        this.syncRelationClasses();
+      });
+      hit.addEventListener("pointerleave", () => {
+        if (this.hoverRelation === key2) this.hoverRelation = null;
+        this.syncRelationClasses();
+      });
+      this.edgesEl.appendChild(hit);
+      this.relationHitEls.set(key2, hit);
     }
+    for (const link of links) {
+      const label = createSvg("text");
+      label.addClass("vam-relation-label");
+      label.textContent = t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite");
+      this.edgesEl.appendChild(label);
+      this.relationLabelEls.set(link.key, label);
+      this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
+    }
+    if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
+    if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
+    if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
+  }
+  placeRelationLabel(key2, point) {
+    const label = this.relationLabelEls.get(key2);
+    label == null ? void 0 : label.setAttribute("x", String(point.x));
+    label == null ? void 0 : label.setAttribute("y", String(point.y));
+  }
+  /**
+   * Repaints the relation highlights from the current state, without touching the DOM structure: with topics selected
+   * (single or multiple), the semantic lines touching them are `is-related` and the rest `is-dimmed` (parent-child
+   * edges stay as they are); the selected (or panel-previewed) line is `is-selected` and shows its name, as does a
+   * hovered line; both end cards get `is-relation-end`.
+   */
+  syncRelationClasses() {
+    var _a2, _b2;
+    const chosen = new Set(this.multiSelected);
+    if (this.selected) chosen.add(this.selected);
+    const ends = /* @__PURE__ */ new Set();
+    for (const [key2, path] of this.relationEls) {
+      const [fromId, toId] = key2.split("\0");
+      const related = chosen.has(fromId) || chosen.has(toId), active = key2 === this.selectedRelation || key2 === this.previewRelation;
+      path.toggleClass("is-related", related);
+      path.toggleClass("is-dimmed", chosen.size > 0 && !related);
+      path.toggleClass("is-selected", active);
+      (_a2 = this.relationLabelEls.get(key2)) == null ? void 0 : _a2.toggleClass("is-visible", active || key2 === this.hoverRelation);
+      if (active) {
+        ends.add(fromId);
+        ends.add(toId);
+      }
+    }
+    for (const id of /* @__PURE__ */ new Set([...this.relationEndIds, ...ends]))
+      (_b2 = this.cardEls.get(id)) == null ? void 0 : _b2.toggleClass("is-relation-end", ends.has(id));
+    this.relationEndIds = ends;
+  }
+  /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
+  bindRelationRow(row, link, otherTitle) {
+    const key2 = `${link.from}\0${link.to}\0${link.kind}`;
+    row.tabIndex = 0;
+    row.setAttr("role", "group");
+    row.setAttr(
+      "aria-label",
+      `${t(link.kind === "evidence" ? "ui.relation_name_evidence" : "ui.relation_name_prerequisite")}: ${otherTitle}`
+    );
+    row.addEventListener("focus", () => {
+      this.selectedRelation = key2;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("blur", () => {
+      if (this.selectedRelation === key2) this.selectedRelation = null;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseenter", () => {
+      this.previewRelation = key2;
+      this.syncRelationClasses();
+    });
+    row.addEventListener("mouseleave", () => {
+      if (this.previewRelation === key2) this.previewRelation = null;
+      this.syncRelationClasses();
+    });
   }
   /**
    * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.

@@ -82,6 +82,15 @@
 .vam-relation-evidence { stroke: var(--text-muted); stroke-dasharray: 12 5; }
 .vam-relation-prerequisite { stroke: var(--text-muted); stroke-dasharray: 1 6; stroke-linecap: round; }
 .vam-relation-arrow { fill: var(--text-muted); stroke: none; }
+.vam-relation-hit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; cursor: pointer; }
+.vam-relation.is-related { stroke-width: 3; }
+.vam-relation.is-dimmed { opacity: 0.75; }
+.vam-relation.is-selected { stroke: var(--interactive-accent); stroke-width: 3; opacity: 1; }
+.vam-relation-label { visibility: hidden; fill: var(--text-normal); stroke: var(--background-primary); stroke-width: 4px; paint-order: stroke; font-size: var(--font-ui-smaller); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.vam-relation-label.is-visible { visibility: visible; }
+/* Written with the class first so the share viewer, which draws no relations, does not pick the rule up (scripts/viewer-css.mjs). */
+.is-relation-end.vam-node { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-relation-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 /* Written with the attribute first so the share viewer, which does not show hypotheses, does not pick the rule up (scripts/viewer-css.mjs). */
 [data-topic-kind="hypothesis"].vam-node { border-width: 2px; border-color: var(--text-muted); }
 .vam-hypothesis-tag { display: inline-flex; align-items: center; max-width: 100%; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; white-space: nowrap; color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }

@@ -2040,7 +2040,7 @@ function heFixture(options = {}) {
   const Notice = class { constructor(message) { notices.push(message); } };
   const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: () => entry }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
   const svgCreated = [];
-  const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
+  const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
   const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
@@ -2051,7 +2051,7 @@ function heFixture(options = {}) {
   return { VisualAgentMapView, view, doc, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
 }
 const heDrawn = (view, boxes) => {
-  view.cardEls = new Map(Object.entries(boxes).map(([id, [x, y]]) => [id, { offsetLeft: x, offsetTop: y, offsetWidth: 280, offsetHeight: 100 }]));
+  view.cardEls = new Map(Object.entries(boxes).map(([id, [x, y]]) => [id, { offsetLeft: x, offsetTop: y, offsetWidth: 280, offsetHeight: 100, classes: [], setAttr() {}, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); } }]));
   view.edgesEl = { kids: [], replaceChildren() { this.kids = []; }, appendChild(p) { this.kids.push(p); } };
   view.stageEl = view.stageEl ?? {}; view.edgeEls = new Map(); view.canvasNodes = () => view.map.nodes; view.drawEdges();
   return view.edgesEl.kids;
@@ -2263,4 +2263,96 @@ integrationTest('hypothesis-evidence: the panel lists prerequisites at both ends
   assert.equal(changes.length, 2); assert.equal(doc.topicRelations.some(r => r.kind === 'prerequisite'), false, 'removable from the other end too');
   await view.addPrerequisite('fact', 'other'); await view.addPrerequisite('fact', 'other'); await view.addPrerequisite('other', 'fact'); await view.addPrerequisite('hyp', 'hyp');
   assert.deepEqual(plain(doc.topicRelations.filter(r => r.kind === 'prerequisite')), [{ kind: 'prerequisite', from: 'fact', to: 'other' }], 'added once; duplicate, cycle-closing and self links refused');
+});
+
+// ---- hypothesis-evidence (P5): selectable relation lines, names on hover/selection, selection highlight ----
+const heRel = [{ kind: 'evidence', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
+const heKey = r => `${r.from}\u0000${r.to}\u0000${r.kind}`;
+function heLines(options = {}) {
+  const fx = heFixture({ relations: options.relations ?? heRel, topics: options.topics });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
+  const find = kind => kids.find(k => k.classes.includes(`vam-relation-${kind}`));
+  const labels = kids.filter(k => k.classes.includes('vam-relation-label')), hits = kids.filter(k => k.classes.includes('vam-relation-hit'));
+  return { ...fx, kids, ev: find('evidence'), pre: find('prerequisite'), labels, hits, evHit: hits[0], preHit: hits[1], evLabel: labels[0], preLabel: labels[1] };
+}
+const heVisible = el => el.classes.includes('is-visible');
+integrationTest('hypothesis-evidence: a relation name is hidden normally, shown while the pointer is on the line or the line is selected, and follows a drag', () => {
+  const { view, evHit, evLabel, preLabel, preHit } = heLines();
+  assert.equal(evLabel.textContent, 'Evidence'); assert.equal(preLabel.textContent, 'Prerequisite');
+  assert.ok(!heVisible(evLabel) && !heVisible(preLabel), 'no name by default');
+  evHit.fire('pointerenter'); assert.ok(heVisible(evLabel) && !heVisible(preLabel), 'hover shows the name');
+  evHit.fire('pointerleave'); assert.ok(!heVisible(evLabel), 'leaving hides it');
+  preHit.fire('pointerdown', { stopPropagation() {} }); preHit.fire('pointerleave'); assert.ok(heVisible(preLabel), 'a selected line keeps its name');
+  assert.equal(view.selectedRelation, heKey(heRel[1]));
+  const x = Number(evLabel.attrs.x), y = Number(evLabel.attrs.y);
+  assert.ok(x > 280 && x < 500, 'the name sits at the midpoint of the curve');
+  view.dragEdges('fact', view.cardEls.get('fact')).update(0, 300);
+  assert.notEqual(evLabel.attrs.y, String(y), 'the name follows the dragged card'); assert.equal(evLabel.attrs.x, String((280 + 3 * 340 + 3 * 440 + 500) / 8));
+});
+integrationTest('hypothesis-evidence: selecting a topic marks the lines touching it is-related and the other relation lines is-dimmed; parent-child edges are untouched; multi-select is a union', () => {
+  const { view, ev, pre, kids } = heLines({ relations: [...heRel, { kind: 'prerequisite', from: 'hyp', to: 'other' }] });
+  const third = kids.filter(k => k.classes.includes('vam-relation-prerequisite'))[1];
+  assert.ok(![ev, pre, third].some(l => l.classes.includes('is-related') || l.classes.includes('is-dimmed')), 'nothing selected: no highlight');
+  view.selected = 'hyp'; view.paintCards(['hyp']);
+  assert.ok(ev.classes.includes('is-related') && third.classes.includes('is-related')); assert.ok(pre.classes.includes('is-dimmed') && !pre.classes.includes('is-related'));
+  view.multiSelected.add('other'); view.paintCards(['other']);
+  assert.ok([ev, pre, third].every(l => l.classes.includes('is-related') && !l.classes.includes('is-dimmed')), 'union of selected and multi-selected topics');
+  view.selected = null; view.multiSelected.clear(); view.paintCards(['hyp', 'other']);
+  assert.ok(![ev, pre, third].some(l => l.classes.includes('is-related') || l.classes.includes('is-dimmed')), 'cleared selection removes the classes in place');
+  assert.equal(kids.filter(k => k.classes.includes('vam-edge')).length, 0, 'no parent-child edge exists here and none was given a highlight class');
+});
+integrationTest('hypothesis-evidence: parent-child edges get no highlight class from a topic selection', () => {
+  const { view } = heLines();
+  const edge = { classes: ['vam-edge'], toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); } };
+  view.edgeEls.set('fact\u0000hyp', edge); view.selected = 'fact'; view.paintCards(['fact']);
+  assert.deepEqual(edge.classes, ['vam-edge']);
+});
+integrationTest('hypothesis-evidence: a selected line is is-selected and both end cards are is-relation-end; Escape, a blank-canvas press and picking a topic clear it', () => {
+  const { view, ev, evHit, preHit, pre } = heLines();
+  const marks = () => [...view.cardEls].filter(([, c]) => c.classes.includes('is-relation-end')).map(([id]) => id).sort();
+  evHit.fire('pointerdown', { stopPropagation() {} });
+  assert.ok(ev.classes.includes('is-selected') && !pre.classes.includes('is-selected')); assert.deepEqual(marks(), ['fact', 'hyp']);
+  preHit.fire('pointerdown', { stopPropagation() {} }); assert.deepEqual(marks(), ['fact', 'other'], 'ends move to the newly selected line'); assert.ok(!ev.classes.includes('is-selected'));
+  // Escape
+  view.commitSelection = (...args) => view.applySelectionState(...args);
+  view.selectedRelation = heKey(heRel[0]); view.syncRelationClasses();
+  view.selectedRelation = null; view.commitSelection(null, null, []);
+  assert.deepEqual(marks(), []); assert.ok(!ev.classes.includes('is-selected'), 'clearing through the selection path repaints in place');
+  // picking a topic
+  evHit.fire('pointerdown', { stopPropagation() {} }); view.cardEls.get('fact').focus = () => {}; view.selected = 'other'; view.applySelectionState(null, 'other', []);
+  assert.equal(view.selectedRelation, null, 'selecting a topic clears the line'); assert.deepEqual(marks(), []);
+  // blank canvas / vanished relation
+  evHit.fire('pointerdown', { stopPropagation() {} }); view.map.topicRelations = [heRel[1]]; view.drawEdges();
+  assert.equal(view.selectedRelation, null, 'a relation that no longer exists cannot stay selected');
+});
+integrationTest('hypothesis-evidence: the Escape key handler and the blank-canvas release clear the line selection (source wiring)', () => {
+  const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(src, /if \(event\.key === "Escape"\) \{[\s\S]{0,260}this\.selectedRelation = null;/, 'Escape');
+  assert.match(src, /if \(!moved && event\.button === 0 && this\.selectedRelation\) \{\s*this\.selectedRelation = null;/, 'blank canvas release');
+});
+integrationTest('hypothesis-evidence: a panel row is focusable, named by relation and other topic, and focus selects its line while hover previews it', () => {
+  const { view, ev, pre } = heLines();
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
+  const rows = []; const walk = el => { if (el.cls && String(el.cls).includes('vam-relation-row')) rows.push(el); (el.children ?? []).forEach(walk); };
+  walk(panel);
+  assert.ok(rows.length >= 1, 'the evidence row is rendered');
+  const row = rows[0];
+  assert.equal(row.tabIndex, 0, 'focusable'); assert.equal(row.attrs['aria-label'] ?? row.getAttribute?.('aria-label'), 'Evidence: FACT');
+  row.fire('mouseenter'); assert.ok(ev.classes.includes('is-selected'), 'hover previews like a selection'); row.fire('mouseleave'); assert.ok(!ev.classes.includes('is-selected'));
+  row.fire('focus'); assert.ok(ev.classes.includes('is-selected') && !pre.classes.includes('is-selected')); assert.equal(view.selectedRelation, heKey(heRel[0]));
+  row.fire('blur'); assert.equal(view.selectedRelation, null);
+});
+integrationTest('hypothesis-evidence: pressing a relation line starts neither a pan nor a marquee, and a parent-child edge takes no press', () => {
+  const { evHit, preHit, view } = heLines();
+  for (const hit of [evHit, preHit]) {
+    let stopped = 0; hit.fire('pointerdown', { stopPropagation() { stopped++; } });
+    assert.equal(stopped, 1, 'the press stops here, so the viewport pan/marquee handler never sees it');
+  }
+  const edgeSvg = view.edgesEl.kids.filter(k => k.classes.includes('vam-edge'));
+  assert.ok(edgeSvg.every(e => Object.keys(e.listeners ?? {}).length === 0), 'parent-child edges have no handlers');
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))[1];
+  assert.match(rule('.vam-relation-hit'), /pointer-events:\s*stroke/); assert.match(rule('.vam-relation-hit'), /stroke:\s*transparent/);
+  assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
+  assert.ok(!/\.vam-edge\s*\{[^}]*pointer-events:\s*(stroke|auto|all)/.test(css), 'a parent-child edge takes no pointer events');
 });

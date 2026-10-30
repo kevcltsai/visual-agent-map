@@ -540,6 +540,8 @@ export const en = {
   "ui.add_prerequisite_description": "Choose the topic that must come first.",
   "ui.no_prerequisite_to_link": "There is no topic that can be a prerequisite for this one.",
   "ui.remove_prerequisite_link_0": "Remove prerequisite link: {0}",
+  "ui.relation_name_evidence": "Evidence",
+  "ui.relation_name_prerequisite": "Prerequisite",
   "ui.merge_dropped_cycles_0": "Removed {0} prerequisite link(s) that would form a cycle",
   "log.evidence_relation_type_ignored_0": "Evidence link not drawn (it must run from a topic to a hypothesis): {0}",
   "ui.collapse_levels": "Collapse or expand the whole map",

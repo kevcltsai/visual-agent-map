@@ -490,6 +490,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.add_prerequisite_description": "选择必须先具备的议题。",
   "ui.no_prerequisite_to_link": "没有可以作为本议题前置知识的议题。",
   "ui.remove_prerequisite_link_0": "移除前置知识链接：{0}",
+  "ui.relation_name_evidence": "证据",
+  "ui.relation_name_prerequisite": "前置知识",
   "ui.merge_dropped_cycles_0": "已移除 {0} 条会形成环的前置知识",
   "log.evidence_relation_type_ignored_0": "证据链接未绘制（必须由议题指向假设）：{0}",
   "ui.collapse_levels": "收合或展开整张心智图",

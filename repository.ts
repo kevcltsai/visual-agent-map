@@ -1078,7 +1078,11 @@ export class Repository {
     storedReasoning?: string
   ): Promise<{ model: string; overridden: boolean; reasoning?: string }> {
     if (source === "manual")
-      return { model: stored || this.settings.cliModel, overridden: Boolean(stored), reasoning: storedReasoning || undefined };
+      return {
+        model: stored || this.settings.cliModel,
+        overridden: Boolean(stored),
+        reasoning: storedReasoning || undefined
+      };
     if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
     let owner = map?.nodes.some(node => node.path === path) ? map : undefined;
     if (!owner) {
@@ -1103,7 +1107,8 @@ export class Repository {
       if (!parent) break;
       try {
         const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text(fm.model)) return { model: text(fm.model), overridden: true, reasoning: text(fm["reasoning-level"]) || undefined };
+        if (fm["model-source"] === "manual" && text(fm.model))
+          return { model: text(fm.model), overridden: true, reasoning: text(fm["reasoning-level"]) || undefined };
       } catch {
         /* A missing ancestor note is skipped. */
       }

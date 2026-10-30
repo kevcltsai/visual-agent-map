@@ -19957,7 +19957,11 @@ var Repository = class {
    */
   async effectiveModel(path, stored, source, map, storedReasoning) {
     if (source === "manual")
-      return { model: stored || this.settings.cliModel, overridden: Boolean(stored), reasoning: storedReasoning || void 0 };
+      return {
+        model: stored || this.settings.cliModel,
+        overridden: Boolean(stored),
+        reasoning: storedReasoning || void 0
+      };
     if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
     let owner = (map == null ? void 0 : map.nodes.some((node2) => node2.path === path)) ? map : void 0;
     if (!owner) {
@@ -19981,7 +19985,8 @@ var Repository = class {
       if (!parent) break;
       try {
         const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model)) return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
+        if (fm["model-source"] === "manual" && text5(fm.model))
+          return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
       } catch (e) {
       }
       node = parent;

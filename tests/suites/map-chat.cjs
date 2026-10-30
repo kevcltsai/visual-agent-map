@@ -2267,13 +2267,18 @@ test('map chat E2: the cut is found while parsing: a reply is parsed once, whate
 test('map chat E2: laying a dense single-line reply out costs about one parse of it, not a search that parses many prefixes', () => {
   const spy = spyRender();
   for (const text of [DENSE.repeat(1850), SPARSE.repeat(900)]) {
-    // KF-013: one parse takes a few ms, below what a wall-clock ratio can tell apart on a CI runner. Each sample repeats both
-    // sides until the parse baseline is at least 25 ms; the ratio itself is unchanged.
-    const reps = Math.max(1, Math.ceil(25 / Math.max(bestOf(3, () => spy.parseInline(text.slice(0, 50000))), 0.05)));
+    // KF-013: one parse takes a few ms, below what a wall-clock ratio can tell apart on a CI runner, and best-of-N on each side
+    // separately lets one side land in a quiet moment and the other in a busy one. So each sample repeats both sides until the
+    // parse is at least 25 ms, runs the parse and then the layout back to back, and takes the ratio of that pair; the test uses
+    // the median of 9 pairs, which load shifts for both sides at once. Measured median ratios: a correct layout is at most 1.94
+    // times one parse on a quiet machine (typically 1.3-1.7); under a local load average of 30+ it can pass 2 (see KF-013), so
+    // the limit stays 2. A layout that parses the reply ten times or searches prefixes is about 7-11 times one parse.
+    const one = () => spy.parseInline(text.slice(0, 50000));
+    const timed = run => { const start = process.hrtime.bigint(); run(); return Number(process.hrtime.bigint() - start) / 1e6; };
+    const reps = Math.max(1, Math.ceil(25 / Math.max(bestOf(3, one), 0.05)));
     const repeated = run => () => { for (let i = 0; i < reps; i++) run(); };
-    const one = bestOf(9, repeated(() => spy.parseInline(text.slice(0, 50000))));
-    const cut = bestOf(9, repeated(() => spy.__layoutReply(text)));
-    assert.ok(cut <= one * 2, `layout ${cut.toFixed(1)} ms against ${one.toFixed(1)} ms for one parse`);
+    const ratios = Array.from({ length: 9 }, () => { const parse = timed(repeated(one)); return timed(repeated(() => spy.__layoutReply(text))) / parse; }).sort((a, b) => a - b);
+    assert.ok(ratios[4] <= 2, `layout takes ${ratios[4].toFixed(2)} times one parse (median of 9 pairs; ${ratios.map(r => r.toFixed(2)).join(' ')})`);
   }
 });
 

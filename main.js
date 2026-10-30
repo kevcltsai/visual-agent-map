@@ -3221,7 +3221,7 @@ var zhCN = {
   "ui.map_chat_stage_writing": "\u64B0\u5199\u4E2D",
   "ui.map_chat_stage_applying": "\u5E94\u7528\u4E2D",
   "ui.map_chat_stage_elapsed_0": "\u30FB{0}",
-  "ui.map_chat_slow_0": "{0}\u54CD\u5E94\u8F83\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
+  "ui.map_chat_slow_0": "{0} \u54CD\u5E94\u8F83\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
   "ui.map_chat_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8BA1\u5212\u7B49\u4F60\u786E\u8BA4\uFF1A{0}",
@@ -5253,7 +5253,7 @@ var zhTW = {
   "ui.map_chat_stage_writing": "\u64B0\u5BEB\u4E2D",
   "ui.map_chat_stage_applying": "\u5957\u7528\u4E2D",
   "ui.map_chat_stage_elapsed_0": "\u30FB{0}",
-  "ui.map_chat_slow_0": "{0}\u56DE\u61C9\u8F03\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
+  "ui.map_chat_slow_0": "{0} \u56DE\u61C9\u8F03\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
   "ui.map_chat_resend": "\u91CD\u65B0\u9001\u51FA",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8A08\u756B\u7B49\u4F60\u78BA\u8A8D\uFF1A{0}",
@@ -22555,7 +22555,8 @@ ${typed}` : draft;
     });
     button.addEventListener("click", () => {
       var _a3;
-      return (_a3 = this.slow) == null ? void 0 : _a3.resend();
+      (_a3 = this.slow) == null ? void 0 : _a3.resend();
+      if (this.built && this.stage) this.stopEl.focus();
     });
     els.slow = notice;
   }
@@ -50086,7 +50087,7 @@ ${note.detail.trim()}` : "",
                     if (event.mode !== "stream-json") stopWatching();
                     return;
                   }
-                  modelEvent();
+                  if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                   if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
                 }
               ),

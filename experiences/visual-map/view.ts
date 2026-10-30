@@ -11305,8 +11305,10 @@ export class VisualAgentMapView extends ItemView {
                     if (event.mode !== "stream-json") stopWatching();
                     return;
                   }
-                  // Every activity of Codex (`started` is its first model item or delta) and Claude's first event is a model event.
-                  modelEvent();
+                  // Claude's first event, and Codex's searching / reading / writing, are model events. Codex's `started` is not: the
+                  // runtime sends it for any `item/*`, including the echo of our own prompt (`userMessage`, about 3 s in), so it
+                  // proves nothing about the model. Codex text arrives through the reply callback above.
+                  if (!(event.kind === "activity" && event.activity === "started")) modelEvent();
                   // Codex says it is writing before its text can be shown; Claude's first event proves nothing about the stage.
                   if (event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
                 }

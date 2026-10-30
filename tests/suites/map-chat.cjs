@@ -4158,8 +4158,8 @@ integrationTest('map chat 18: 19.9 s without a model event shows nothing, the 20
   gate.resolve(); await sending; assert.equal(chat.transcript().at(-1).text, 'done');
 });
 
-integrationTest('map chat 18: a model event before 20 s means the notice never shows (Claude first event, Codex any activity, any text)', async () => {
-  for (const event of [{ kind: 'first-event' }, { kind: 'activity', activity: 'started' }, { kind: 'activity', activity: 'reading' }, { kind: 'text' }]) {
+integrationTest('map chat 18: a model event before 20 s means the notice never shows (Claude first event, Codex searching / reading / writing, any text)', async () => {
+  for (const event of [{ kind: 'first-event' }, { kind: 'activity', activity: 'searching' }, { kind: 'activity', activity: 'reading' }, { kind: 'activity', activity: 'writing' }, { kind: 'text' }]) {
     const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress; let onText;
     h.control.reply = async (_request, _signal, onReply, onProgress) => { progress = onProgress; onText = onReply; await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
     h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
@@ -4240,4 +4240,29 @@ integrationTest('map chat 18: a Claude stream-mode event alone (before any model
   h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
   progress({ kind: 'stream-mode', mode: 'stream-json' }); h.clock.advance(20_000); assert.ok(slowNotice(chat), 'only a real model event stops the watch');
   await h.view.onClose(); gate.resolve(); await sending; assert.equal(chat.stage, null);
+});
+
+integrationTest('map chat 18 counter-example: Codex "started" (any item, even the echo of our own prompt, ~3 s in) is not a model event; the notice still shows at 20 s, and writing or text removes it', async () => {
+  for (const later of [{ kind: 'activity', activity: 'writing' }, { kind: 'text' }]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress; let onText;
+    h.control.reply = async (_request, _signal, onReply, onProgress) => { progress = onProgress; onText = onReply; await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(3_000); progress({ kind: 'activity', activity: 'started' });
+    assert.equal(chat.stage.kind, 'waiting', 'started does not move the stage');
+    h.clock.advance(16_900); assert.equal(slowNotice(chat), undefined, '19.9 s: not yet');
+    h.clock.advance(100); assert.ok(slowNotice(chat), 'started 17 s ago did not stop the watch: the notice shows at 20 s');
+    if (later.kind === 'text') onText('Hel'); else progress(later);
+    assert.equal(slowNotice(chat), undefined, `${later.kind}: removes the notice`);
+    gate.resolve(); await sending;
+  }
+});
+
+integrationTest('map chat 18: pressing Resend moves the focus to Stop instead of letting it fall to the page', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal, onReply, onProgress) => new Promise(resolve => { attempts.push({ resolve }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+  const button = resendButton(chat); button.focus(); assert.equal(h.page.doc.activeElement, button);
+  button.click(); await until(() => attempts.length === 2);
+  assert.equal(h.page.doc.activeElement, chat.stopEl, 'the focus is on Stop');
+  attempts[1].resolve({ reply: 'ok', actions: [], rejected: [] }); await sending;
 });

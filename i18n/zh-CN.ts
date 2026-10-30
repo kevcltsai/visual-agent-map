@@ -1140,7 +1140,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.map_chat_stage_writing": "撰写中",
   "ui.map_chat_stage_applying": "应用中",
   "ui.map_chat_stage_elapsed_0": "・{0}",
-  "ui.map_chat_slow_0": "{0}响应较慢，仍在等待",
+  "ui.map_chat_slow_0": "{0} 响应较慢，仍在等待",
   "ui.map_chat_resend": "重新送出",
   "ui.map_chat_skip_stopped": "你已停止",
   "ui.map_chat_live_plan_0": "有一份计划等你确认：{0}",

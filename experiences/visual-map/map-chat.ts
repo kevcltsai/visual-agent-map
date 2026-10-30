@@ -726,7 +726,11 @@ export class MapChatPanel {
       text: t("ui.map_chat_resend"),
       attr: { type: "button" }
     });
-    button.addEventListener("click", () => this.slow?.resend());
+    button.addEventListener("click", () => {
+      this.slow?.resend();
+      // The button leaves with the notice, and the focus would fall to the page: it goes to Stop, the one control of a waiting turn.
+      if (this.built && this.stage) this.stopEl.focus();
+    });
     els.slow = notice;
   }
   /** Whether the slow notice is showing. */

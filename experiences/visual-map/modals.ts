@@ -581,6 +581,7 @@ export class NextStepModal extends Modal {
         save({ modelSource: settings.modelSource });
         // Follow-default pins nothing: a specific model picked earlier in this dialog is not written.
         delete this.pendingSettings.model;
+        delete this.pendingSettings.reasoning;
         describeModel();
         return;
       }
@@ -608,8 +609,21 @@ export class NextStepModal extends Modal {
       advancedValue.setText(`${this.plugin.modelLabel(settings.model)} · ${reasoningLabel(settings.reasoning)}`);
     describeModel();
     reasoning.addEventListener("change", () => {
-      settings.reasoning = normalizeReasoningLevel(reasoning.value);
-      save({ reasoning: normalizeReasoningLevel(reasoning.value) });
+      const level = normalizeReasoningLevel(reasoning.value);
+      settings.reasoning = level;
+      if (settings.modelSource !== "manual") {
+        // A non-override topic follows the current model's reasoning, so a chosen level would be ignored: store the
+        // whole set as an override instead (the resolved model shown here, manual, and this level).
+        settings.modelSource = "manual";
+        modelSummary.setText(
+          t(
+            "ui.0_1_reasoning_can_be_adjusted_per_topic",
+            this.plugin.modelLabel(settings.model),
+            sourceLabels[settings.modelSource]
+          )
+        );
+        save({ model: settings.model, modelSource: "manual", reasoning: level });
+      } else save({ reasoning: level });
       describeModel();
     });
     return advanced;

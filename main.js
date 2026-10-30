@@ -20076,16 +20076,26 @@ var Repository = class {
   }
   /**
    * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
-   * model. Reasoning follows the current setting until MS-04 moves it into the same resolution.
+   * model. Reasoning is resolved together with the model.
    */
   async resolveTopicModel(path, map, runOnce) {
-    var _a2;
-    const note = this.file(path);
-    const fm = frontmatter(await this.app.vault.read(note));
-    const raw = text5(fm["model-source"], "workspace");
-    const source = raw === "manual" || raw === "inherited" ? raw : "workspace";
-    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
+    const fm = frontmatter(await this.app.vault.read(this.file(path)));
+    const source = this.modelSourceOf(fm);
     const effective = await this.effectiveModel(path, text5(fm.model), source, map, text5(fm["reasoning-level"]));
+    return this.chooseModel(effective, runOnce);
+  }
+  modelSourceOf(fm) {
+    const raw = text5(fm["model-source"], "workspace");
+    return raw === "manual" || raw === "inherited" ? raw : "workspace";
+  }
+  /**
+   * One resolveTaskModel over an effective lookup, shared by readNote and resolveTopicModel. Only an override brings
+   * its own reasoning (the manual topic's, or its manual ancestor's); a stored value on a workspace or inherited topic
+   * is ignored and never rewritten.
+   */
+  chooseModel(effective, runOnce) {
+    var _a2;
+    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
     const overrideReasoning = normalizeReasoningLevel((_a2 = effective.reasoning) != null ? _a2 : this.settings.cliReasoning);
     return resolveTaskModel({
       runOnce,
@@ -20103,13 +20113,14 @@ var Repository = class {
     return { source: "inherited", model: (await this.effectiveModel(path, void 0, "inherited", map)).model };
   }
   async readNote(path, map) {
-    var _a2;
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
     const status = text5(fm.status, "idea");
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const { model } = await this.effectiveModel(path, text5(fm.model), modelSource, map);
+    const { model, reasoning } = this.chooseModel(
+      await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]))
+    );
     const state = text5(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -20128,8 +20139,7 @@ var Repository = class {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
-      // Reasoning stays as before; MS-04 moves it into the same resolution as the model.
-      reasoning: normalizeReasoningLevel((_a2 = fm["reasoning-level"]) != null ? _a2 : this.settings.cliReasoning),
+      reasoning,
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       ...typeof fm["detail-template"] === "string" && fm["detail-template"] ? { detailTemplateId: fm["detail-template"] } : {},
@@ -20261,7 +20271,7 @@ ${withReferenceLinks(body, fm, language2)}`;
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": (_b2 = initial.reasoning) != null ? _b2 : this.settings.cliReasoning,
+      ...modelSource === "manual" ? { "reasoning-level": (_b2 = initial.reasoning) != null ? _b2 : this.settings.cliReasoning } : {},
       ...initial.researchMode ? { "research-mode": initial.researchMode } : {},
       ...kind !== "topic" ? { "topic-kind": kind } : {},
       ...kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {},
@@ -20327,7 +20337,7 @@ ${noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLan
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": (_c = initial.reasoning) != null ? _c : this.settings.cliReasoning,
+      ...modelSource === "manual" ? { "reasoning-level": (_c = initial.reasoning) != null ? _c : this.settings.cliReasoning } : {},
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS],
       ...initial.contentLanguage ? { "content-language": initial.contentLanguage } : {}
@@ -31128,6 +31138,7 @@ var NextStepModal = class extends import_obsidian22.Modal {
         );
         save({ modelSource: settings.modelSource });
         delete this.pendingSettings.model;
+        delete this.pendingSettings.reasoning;
         describeModel();
         return;
       }
@@ -31154,8 +31165,19 @@ var NextStepModal = class extends import_obsidian22.Modal {
     const describeModel = () => advancedValue.setText(`${this.plugin.modelLabel(settings.model)} \xB7 ${reasoningLabel(settings.reasoning)}`);
     describeModel();
     reasoning.addEventListener("change", () => {
-      settings.reasoning = normalizeReasoningLevel(reasoning.value);
-      save({ reasoning: normalizeReasoningLevel(reasoning.value) });
+      const level = normalizeReasoningLevel(reasoning.value);
+      settings.reasoning = level;
+      if (settings.modelSource !== "manual") {
+        settings.modelSource = "manual";
+        modelSummary.setText(
+          t(
+            "ui.0_1_reasoning_can_be_adjusted_per_topic",
+            this.plugin.modelLabel(settings.model),
+            sourceLabels[settings.modelSource]
+          )
+        );
+        save({ model: settings.model, modelSource: "manual", reasoning: level });
+      } else save({ reasoning: level });
       describeModel();
     });
     return advanced;
@@ -43973,10 +43995,16 @@ ${request.requirements}` : preset.text,
   async mergeModel(parentId) {
     var _a2, _b2;
     const parent = parentId ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === parentId) : void 0;
-    return resolveMergeModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, (_b2 = this.map) != null ? _b2 : void 0)).model : void 0,
-      this.plugin.settings.cliModel
-    );
+    const current = {
+      model: this.plugin.settings.cliModel,
+      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
+    };
+    if (!parent) return current;
+    const resolved = await this.plugin.repo.resolveTopicModel(parent.path, (_b2 = this.map) != null ? _b2 : void 0);
+    return {
+      model: resolveMergeModel(resolved.model, current.model),
+      reasoning: resolved.reasoning
+    };
   }
   /**
    * Starts the AI merge from the dialog. The usage notice comes first (declining leaves the dialog open and starts
@@ -43997,7 +44025,7 @@ ${request.requirements}` : preset.text,
       new import_obsidian30.Notice(t("ui.merge_draft_stale"));
       return false;
     }
-    const model = await this.mergeModel((_a2 = snapshot.targetId) != null ? _a2 : snapshot.parentId);
+    const { model, reasoning } = await this.mergeModel((_a2 = snapshot.targetId) != null ? _a2 : snapshot.parentId);
     let began = false;
     const accepted = await this.plugin.confirmAiUsage(model, async () => {
       var _a3, _b2, _c;
@@ -44012,6 +44040,7 @@ ${request.requirements}` : preset.text,
         parentId: snapshot.parentId,
         targetId: (_c = snapshot.targetId) != null ? _c : null,
         model,
+        reasoning,
         sourceContent: "",
         controller: new AbortController(),
         state: "running",
@@ -44064,7 +44093,7 @@ ${request.requirements}` : preset.text,
         this.plugin.askModel(
           context,
           task.model,
-          this.plugin.settings.cliReasoning,
+          task.reasoning,
           task.controller.signal,
           void 0,
           void 0,
@@ -44256,7 +44285,7 @@ ${request.requirements}` : preset.text,
         sources2.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
     }
-    const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : await this.mergeModel(check.parentId);
+    const model = (_b2 = content == null ? void 0 : content.task.model) != null ? _b2 : (await this.mergeModel(check.parentId)).model;
     const firstNote = this.notes.get(sources2[0].id), firstKind = firstNote == null ? void 0 : firstNote.topicKind, firstStrength = (firstNote == null ? void 0 : firstNote.topicKind) === "hypothesis" ? firstNote.hypothesisStrength : void 0;
     const created = await repo.createNote(
       sanitizeGeneratedTitle(title),

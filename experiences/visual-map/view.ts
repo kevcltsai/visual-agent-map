@@ -406,6 +406,7 @@ interface MergeTask {
   /** Parent mode: the parent topic that keeps its card (first of `sources`); null when a new topic replaces siblings. */
   targetId: string | null;
   model: string;
+  reasoning: ModelChoice["reasoning"];
   /** The sources as sent to the model (JSON of the reference documents); compared again before the draft is saved. */
   sourceContent: string;
   controller: AbortController;
@@ -4431,12 +4432,18 @@ export class VisualAgentMapView extends ItemView {
    * The model of a merged topic: the common parent's model like a new subtopic, else the workspace model. In parent mode
    * the parent topic itself is the one whose model counts.
    */
-  private async mergeModel(parentId: string | null): Promise<string> {
+  private async mergeModel(parentId: string | null): Promise<ModelChoice> {
     const parent = parentId ? this.map?.nodes.find(node => node.id === parentId) : undefined;
-    return resolveMergeModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).model : undefined,
-      this.plugin.settings.cliModel
-    );
+    const current: ModelChoice = {
+      model: this.plugin.settings.cliModel,
+      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
+    };
+    if (!parent) return current;
+    const resolved = await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined);
+    return {
+      model: resolveMergeModel(resolved.model, current.model),
+      reasoning: resolved.reasoning
+    };
   }
   /**
    * Starts the AI merge from the dialog. The usage notice comes first (declining leaves the dialog open and starts
@@ -4471,7 +4478,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.merge_draft_stale"));
       return false;
     }
-    const model = await this.mergeModel(snapshot.targetId ?? snapshot.parentId);
+    const { model, reasoning } = await this.mergeModel(snapshot.targetId ?? snapshot.parentId);
     let began = false;
     const accepted = await this.plugin.confirmAiUsage(model, async () => {
       if (signal.aborted || !stillValid()) return;
@@ -4485,6 +4492,7 @@ export class VisualAgentMapView extends ItemView {
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
         model,
+        reasoning,
         sourceContent: "",
         controller: new AbortController(),
         state: "running",
@@ -4537,7 +4545,7 @@ export class VisualAgentMapView extends ItemView {
         this.plugin.askModel(
           context,
           task.model,
-          this.plugin.settings.cliReasoning,
+          task.reasoning,
           task.controller.signal,
           undefined,
           undefined,
@@ -4757,7 +4765,7 @@ export class VisualAgentMapView extends ItemView {
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
     }
-    const model = content?.task.model ?? (await this.mergeModel(check.parentId));
+    const model = content?.task.model ?? (await this.mergeModel(check.parentId)).model;
     // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
     const firstNote = this.notes.get(sources[0].id),
       firstKind = firstNote?.topicKind,

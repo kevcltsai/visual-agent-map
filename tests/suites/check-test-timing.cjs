@@ -34,3 +34,13 @@ test('timing scanner: only the fake-timer delay line in expansion-and-synthesis 
   assert.equal(findAbsoluteTiming('  ' + slow, file).length, 1);
   assert.deepEqual(findAbsoluteTiming('x\n' + slow + '\n', 'a.cjs'), [{ line: 2, text: slow }]);
 });
+
+// The per-test timeout (tests/support.cjs): a test that never settles must fail its run, not hang it.
+test('test timeout: a registered test that never settles makes its run fail instead of hanging', () => {
+  const { spawnSync } = require('node:child_process');
+  const script = "const { test } = require('./tests/support.cjs'); test('never settles', () => new Promise(() => {}));";
+  const result = spawnSync(process.execPath, ['-e', script], { cwd: root, env: { ...process.env, VAM_TEST_TIMEOUT_MS: '200' }, encoding: 'utf8', timeout: 50000 });
+  assert.equal(result.signal, null, 'the child must end by itself, not be killed after hanging');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout + result.stderr, /timed out after 200ms/);
+});

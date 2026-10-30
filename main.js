@@ -50674,7 +50674,7 @@ ${note.detail.trim()}` : "",
             if (!same2() || !this.map) return;
             this.flushChatRender();
             await this.mapChange((map) => {
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
             }, false);
             const nodes = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b3 : [];
             const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
@@ -50760,14 +50760,14 @@ ${note.detail.trim()}` : "",
       if (done.has(top.id)) continue;
       if (!top.parentId) {
         const ids2 = subtree(top.id);
-        placed = arrangeNewTree(placed, top.id, ids2, this.cardHeightOf);
+        placed = arrangeNewTree(placed, top.id, ids2, this.cardHeightOf, layoutDirectionOf(this.map));
         for (const id of ids2) done.add(id);
         continue;
       }
       const siblings = tops.filter((other) => other.parentId === top.parentId);
       const ids = /* @__PURE__ */ new Set();
       for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
-      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf);
+      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf, void 0, layoutDirectionOf(this.map));
       for (const id of ids) done.add(id);
     }
     return placed;
@@ -50914,14 +50914,14 @@ ${note.detail.trim()}` : "",
         await this.mapChange((map) => {
           const target = map.nodes.find((item) => item.id === node.id);
           if (target) target.collapsed = collapsed;
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         });
         return done;
       }
       case "auto_layout":
         this.flushChatRender();
         await this.mapChange((map) => {
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         }, false);
         return done;
       case "focus_topic": {

@@ -382,4 +382,26 @@ test('V5: an AIM map and the built-in sample offer no direction in the Layout me
   assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Auto layout']);
 });
 
+// ---- P3: the map chat's new cards follow the map's direction. ----
+const chatApply = (h, actions) => {
+  h.view.plugin.views ??= () => [h.view];
+  return h.view.applyMapChatActions({ actions, rejected: [] }, { mdHashes: {}, topicHashes: {} }, () => true);
+};
+const chatChildren = (h, parentId) => h.view.map.nodes.filter(n => n.parentId === parentId);
+
+test('V6: in a left map the cards a map chat reply adds (and its auto_layout) go to the left of their parent; right maps are unchanged', async () => {
+  for (const [extra, side] of [[LEFT_MAP, -1], [{}, 1]]) {
+    const h = await harness(tree4.slice(0, 1), extra);
+    const root = h.named('Root');
+    // Five new cards at once get one layout for the lot.
+    await chatApply(h, ['C1', 'C2', 'C3', 'C4', 'C5'].map(title => ({ kind: 'add_child', parentId: root.id, title })));
+    const added = chatChildren(h, root.id);
+    assert.equal(added.length, 5);
+    for (const child of added) assert.equal(Math.sign(child.x - h.named('Root').x), side, `${child.id} after the batch layout`);
+    // An auto_layout action of a reply lays the map out in its direction too.
+    await chatApply(h, [{ kind: 'auto_layout' }]);
+    for (const child of chatChildren(h, root.id)) assert.equal(child.x, h.named('Root').x + side * 360, `${child.id} after auto_layout`);
+  }
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

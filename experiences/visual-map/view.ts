@@ -11874,7 +11874,7 @@ export class VisualAgentMapView extends ItemView {
             // The layout measures the cards, so the held repaint comes first.
             this.flushChatRender();
             await this.mapChange(map => {
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
             }, false);
             const nodes = this.map?.nodes ?? [];
             const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
@@ -11971,7 +11971,7 @@ export class VisualAgentMapView extends ItemView {
       if (done.has(top.id)) continue;
       if (!top.parentId) {
         const ids = subtree(top.id);
-        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf);
+        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf, layoutDirectionOf(this.map));
         for (const id of ids) done.add(id);
         continue;
       }
@@ -11979,7 +11979,7 @@ export class VisualAgentMapView extends ItemView {
       const siblings = tops.filter(other => other.parentId === top.parentId);
       const ids = new Set<string>();
       for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
-      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf);
+      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf, undefined, layoutDirectionOf(this.map));
       for (const id of ids) done.add(id);
     }
     return placed;
@@ -12148,7 +12148,7 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChange(map => {
           const target = map.nodes.find(item => item.id === node.id);
           if (target) target.collapsed = collapsed;
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         });
         return done;
       }
@@ -12156,7 +12156,7 @@ export class VisualAgentMapView extends ItemView {
         // The layout measures the cards, so a held repaint comes first.
         this.flushChatRender();
         await this.mapChange(map => {
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         }, false);
         return done;
       case "focus_topic": {

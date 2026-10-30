@@ -710,13 +710,15 @@ integrationTest('map chat: the result rows name the mode the research really run
   const h = await harness(); await h.view.hydrate();
   const research = mode => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [h.ids.a], title: '', goal: '', direction: '', mode });
   delete h.view.map.aiMode;
-  assert.equal(h.view.chatActionLabel(research('')), 'Start quick research on the selected topics', 'no mode named, none remembered: Quick');
-  assert.equal(h.view.chatActionLabel(research('standard')), 'Start standard research on the selected topics');
+  // MS-03: the result rows end with the model the task runs on (the harness labels a model as label(<id>)).
+  const sfx = ' (label(claude:sonnet))';
+  assert.equal(h.view.chatActionLabel(research('')), 'Start quick research on the selected topics' + sfx, 'no mode named, none remembered: Quick');
+  assert.equal(h.view.chatActionLabel(research('standard')), 'Start standard research on the selected topics' + sfx);
   h.view.map.aiMode = 'standard';
-  assert.equal(h.view.chatActionLabel(research('')), 'Start standard research on the selected topics', 'the remembered mode');
-  assert.equal(h.view.chatActionLabel(research('quick')), 'Start quick research on the selected topics', 'the named mode wins');
+  assert.equal(h.view.chatActionLabel(research('')), 'Start standard research on the selected topics' + sfx, 'the remembered mode');
+  assert.equal(h.view.chatActionLabel(research('quick')), 'Start quick research on the selected topics' + sfx, 'the named mode wins');
   const expand = h.view.chatActionLabel({ kind: 'run_map_action', action: 'expand', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' });
-  assert.equal(expand, 'Expand subtopics for 2 topics'); assert.equal(/suggest/i.test(expand), false);
+  assert.equal(expand, 'Expand subtopics for 2 topics' + sfx); assert.equal(/suggest/i.test(expand), false);
 });
 
 integrationTest('map chat: research on named topics selects exactly those first', async () => {
@@ -4361,4 +4363,161 @@ integrationTest('map chat 18: pressing Resend moves the focus to Stop instead of
   button.click(); await until(() => attempts.length === 2);
   assert.equal(h.page.doc.activeElement, chat.stopEl, 'the focus is on Stop');
   attempts[1].resolve({ reply: 'ok', actions: [], rejected: [] }); await sending;
+});
+
+// ---- MS-03: the chat's tasks run on the current model (or the topic's own override), and the result rows say which -------------
+
+const ms03Act = (action, nodeIds, extra = {}) => ({ kind: 'run_map_action', action, nodeIds, title: '', goal: '', direction: '', ...extra });
+const ms03Override = async (h, key, model, reasoning) => { await h.repo.updateNote(h.node(key).path, { model, modelSource: 'manual', ...(reasoning ? { reasoning } : {}) }); await h.view.hydrate(); };
+/** Records what the provider call of a real run receives; the call itself ends in an error, which the run reports its own way. */
+const ms03Provider = h => { const calls = []; h.plugin.askModel = async (context, model, reasoning) => { calls.push({ mode: context.mode, model, reasoning }); throw new Error('stop here'); }; return calls; };
+const ms03Options = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] };
+
+integrationTest('MS-03: with Claude as the current model and no override, a chat research asks the notice for Claude and the provider call gets Claude', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.plugin.researchProgress = { begin() {}, end() {}, update() {} };
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  await apply(h, [ms03Act('research_standard', [h.ids.a])]);
+  await withTimeout(until(() => calls.length >= 1), 3000);
+  assert.equal(calls[0].model, 'claude:sonnet'); eq(h.control.models, ['claude:sonnet'], 'the usage notice is for the same model');
+});
+
+integrationTest('MS-03 counter-example: a topic whose manual model is gpt-x runs on gpt-x although the current model is Claude (research, notice and provider call)', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.plugin.researchProgress = { begin() {}, end() {}, update() {} };
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  await ms03Override(h, 'a', 'gpt-x');
+  await apply(h, [ms03Act('research_standard', [h.ids.a])]);
+  await withTimeout(until(() => calls.length >= 1), 3000);
+  assert.equal(calls[0].model, 'gpt-x', 'the override, not the chat model'); eq(h.control.models, ['gpt-x']);
+});
+
+integrationTest('MS-03: a research over topics with two models asks each notice once, in order, and a declined one starts no AI call', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.plugin.researchProgress = { begin() {}, end() {}, update() {} };
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  await ms03Override(h, 'a', 'gpt-x');
+  const asked = []; h.plugin.confirmAiUsage = async (model, run) => { asked.push(model); if (model === 'claude:sonnet') return false; await run(); return true; };
+  await apply(h, [ms03Act('research_standard', [h.ids.a, h.ids.b, h.ids.c])]);
+  for (let i = 0; i < 20; i++) await tick();
+  eq(asked, ['gpt-x', 'claude:sonnet'], 'one notice per model, deduplicated'); assert.equal(calls.length, 0, 'the second notice was declined: nothing was sent to a provider');
+});
+
+integrationTest('MS-03: when every notice is accepted a two-model research asks each once and then starts', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.plugin.researchProgress = { begin() {}, end() {}, update() {} };
+  h.plugin.abortChartJobs = () => {}; h.plugin.addChartsAfterWrite = () => {};
+  await ms03Override(h, 'a', 'gpt-x');
+  await apply(h, [ms03Act('research_standard', [h.ids.a, h.ids.b])]);
+  await withTimeout(until(() => calls.length >= 1), 3000);
+  eq(h.control.models, ['gpt-x', 'claude:sonnet']);
+});
+
+integrationTest('MS-03: the expand notice and the picture search use the card\'s model; Claude when it has none', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.chatExpand = async () => {};
+  await apply(h, [ms03Act('expand', [h.ids.a])]); for (let i = 0; i < 10; i++) await tick();
+  eq(h.control.models, ['claude:sonnet']);
+  await ms03Override(h, 'b', 'gpt-x'); h.control.models.length = 0;
+  await apply(h, [ms03Act('expand', [h.ids.b])]); for (let i = 0; i < 10; i++) await tick();
+  eq(h.control.models, ['gpt-x']);
+});
+
+integrationTest('MS-03: the picture search runs through the card\'s own override (not the chat model) and asks its notice for it', async () => {
+  const { h } = await imageHarness();
+  await ms03Override(h, 'b', 'gpt-x'); h.control.search = async () => [];
+  await apply(h, [findAct(h, 'b')]); await withTimeout(until(() => h.control.searches.length === 1));
+  assert.equal(h.control.searches[0].model, 'gpt-x'); eq(h.control.models, ['gpt-x']);
+});
+
+integrationTest('MS-03: a single-card synthesis from the chat asks its notice for the card\'s model', async () => {
+  const h = await harness(); await h.view.hydrate();
+  await ms03Override(h, 'a', 'gpt-x'); // Body has the child REM
+  h.view.startSynthesis = async (_node, _options, _direction, _failed, accepted) => { accepted(); };
+  await apply(h, [ms03Act('synthesize', [h.ids.a])]); await tick();
+  eq(h.control.models, ['gpt-x']);
+});
+
+integrationTest('MS-03: selectionModel - the same override on every card is used (model and the cards\' common reasoning); a single override among others is not', async () => {
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliReasoning = 'low';
+  const nodes = keys => keys.map(k => h.node(k));
+  eq(await h.view.selectionModel(nodes(['a', 'b'])), { model: 'claude:sonnet', reasoning: 'low' }, 'no override: the current model');
+  await ms03Override(h, 'a', 'gpt-x', 'high');
+  eq(await h.view.selectionModel(nodes(['a', 'b'])), { model: 'claude:sonnet', reasoning: 'low' }, 'counter-example: only one card overrides, so the current model');
+  await ms03Override(h, 'b', 'gpt-x', 'high');
+  eq(await h.view.selectionModel(nodes(['a', 'b'])), { model: 'gpt-x', reasoning: 'high' }, 'every card has gpt-x and the same reasoning');
+  await ms03Override(h, 'b', 'gpt-y', 'high');
+  eq(await h.view.selectionModel(nodes(['a', 'b'])), { model: 'claude:sonnet', reasoning: 'low' }, 'two different overrides: the current model');
+});
+
+integrationTest('MS-03 counter-example: the same override with different reasoning keeps the override model and uses the current reasoning', async () => {
+  const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliReasoning = 'low';
+  await ms03Override(h, 'a', 'gpt-x', 'high'); await ms03Override(h, 'b', 'gpt-x', 'medium');
+  eq(await h.view.selectionModel([h.node('a'), h.node('b')]), { model: 'gpt-x', reasoning: 'low' });
+});
+
+integrationTest('MS-03: the selection integration run (directions step) sends the resolved model, stores it on the task, and the retry asks its notice for the same one', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.plugin.startTaskProgress = undefined; h.view.startTaskProgress = () => ({ end() {}, observer: undefined });
+  await ms03Override(h, 'a', 'gpt-x', 'high'); await ms03Override(h, 'b', 'gpt-x', 'high');
+  const failures = [];
+  await h.view.startSelectionSynthesis([h.node('a'), h.node('b')], { ...ms03Options }, null, message => failures.push(message), () => {});
+  assert.equal(calls.length, 1); assert.equal(calls[0].model, 'gpt-x'); assert.equal(calls[0].reasoning, 'high');
+  assert.equal(h.view.integrationTask.model, 'gpt-x'); assert.equal(h.view.integrationTask.reasoning, 'high'); assert.equal(h.view.integrationTask.state, 'failed');
+  const task = h.view.integrationTask; h.control.models.length = 0;
+  h.view.startSelectionSynthesis = async () => {};
+  h.view.retrySelectionSynthesis(task); await withTimeout(until(() => h.control.models.length === 1));
+  eq(h.control.models, ['gpt-x'], 'the retry notice is for the task\'s model, not the current one');
+});
+
+integrationTest('MS-03 counter-example: a selection integration with only one overriding card runs on the current model', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.view.startTaskProgress = () => ({ end() {}, observer: undefined });
+  await ms03Override(h, 'a', 'gpt-x');
+  await h.view.startSelectionSynthesis([h.node('a'), h.node('b')], { ...ms03Options }, null, () => {}, () => {});
+  assert.equal(calls[0].model, 'claude:sonnet'); assert.equal(h.view.integrationTask.model, 'claude:sonnet');
+});
+
+integrationTest('MS-03: a chat synthesis of several cards asks its usage notice for the resolved model (shared override, else current)', async () => {
+  const h = await harness(); await h.view.hydrate();
+  h.view.startSelectionSynthesis = async (_nodes, _options, _direction, _failed, accepted) => { accepted(); };
+  await apply(h, [ms03Act('synthesize', [h.ids.a, h.ids.b])]); await tick();
+  eq(h.control.models, ['claude:sonnet']);
+  await ms03Override(h, 'a', 'gpt-x'); await ms03Override(h, 'b', 'gpt-x'); h.control.models.length = 0;
+  await apply(h, [ms03Act('synthesize', [h.ids.a, h.ids.b])]); await tick();
+  eq(h.control.models, ['gpt-x']);
+  await ms03Override(h, 'b', ''); await h.view.hydrate(); h.control.models.length = 0;
+  await h.repo.updateNote(h.node('b').path, { modelSource: 'workspace' }); await h.view.hydrate();
+  await apply(h, [ms03Act('synthesize', [h.ids.a, h.ids.b])]); await tick();
+  eq(h.control.models, ['claude:sonnet'], 'counter-example: only one card overrides');
+});
+
+integrationTest('MS-03 counter-example: a declined usage notice of a chat synthesis sends no AI request', async () => {
+  const h = await harness(); await h.view.hydrate(); const calls = ms03Provider(h);
+  h.view.startTaskProgress = () => ({ end() {}, observer: undefined });
+  h.control.decline = true;
+  const lines = await apply(h, [ms03Act('synthesize', [h.ids.a, h.ids.b])]);
+  eq(lines.map(l => l.status), ['skipped']); assert.equal(calls.length, 0);
+});
+
+integrationTest('MS-03: result rows end with the model label(s) of the task; several models are joined once each; merge, select and create_map rows are unchanged', async () => {
+  const h = await harness(); await h.view.hydrate();
+  const label = (action, extra) => h.view.chatActionLabel(ms03Act(action, extra.ids ?? [], extra.fields));
+  await ms03Override(h, 'a', 'gpt-x');
+  assert.equal(label('expand', { ids: [h.ids.a, h.ids.b] }), 'Expand subtopics for 2 topics (label(gpt-x), label(claude:sonnet))');
+  assert.equal(label('expand', { ids: [h.ids.root, h.ids.b] }), 'Expand subtopics for 2 topics (label(claude:sonnet))', 'the same model is named once');
+  assert.match(label('research_standard', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/);
+  assert.equal(label('rate_by_goal', { fields: { goal: 'Sleep' } }), 'Prioritize topics by the goal “Sleep” (label(claude:sonnet))', 'grading uses the current model');
+  assert.match(label('find_images', { ids: [h.ids.a], fields: { direction: 'x' } }), /^Start looking for pictures for “Body” \(label\(gpt-x\)\)$/);
+  assert.match(label('synthesize', { ids: [h.ids.a, h.ids.b] }), / \(label\(claude:sonnet\)\)$/, 'several cards, only one override: the current model');
+  assert.match(label('synthesize', { ids: [h.ids.a] }), / \(label\(gpt-x\)\)$/, 'a single card: its own model');
+  await ms03Override(h, 'b', 'gpt-x');
+  assert.match(label('synthesize', { ids: [h.ids.a, h.ids.b] }), / \(label\(gpt-x\)\)$/, 'several cards that share one override');
+  assert.equal(label('merge', { ids: [h.ids.a, h.ids.b], fields: { title: 'Both' } }), 'Merge the selected topics into “Both”', 'merge is MS-05');
+});
+
+integrationTest('MS-03: the result line a chat research shows carries the model label', async () => {
+  const h = await harness(); await h.view.hydrate(); h.view.startMultiResearch = async () => {};
+  const lines = await apply(h, [ms03Act('research_standard', [h.ids.a])]);
+  assert.equal(lines[0].text, 'Done: Start quick research on the selected topics (label(claude:sonnet))');
 });

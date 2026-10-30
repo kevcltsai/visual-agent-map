@@ -1121,6 +1121,8 @@ export const en = {
   "ui.map_chat_do_research_standard": "Start standard research on the selected topics",
   "ui.map_chat_do_expand_0": "Expand subtopics for {0} topics",
   "ui.map_chat_do_synthesize": "Integrate the selected topics (your message is the direction; no dialog opens)",
+  "ui.map_chat_model_suffix_0": " ({0})",
+  "ui.map_chat_model_separator": ", ",
   "ui.map_chat_do_rate_0": "Prioritize topics by the goal “{0}”",
   "ui.map_chat_do_merge_0": "Merge the selected topics into “{0}”",
   "ui.map_chat_do_create_map_0": "Create the map “{0}”",

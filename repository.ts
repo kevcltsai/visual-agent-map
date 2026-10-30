@@ -87,6 +87,8 @@ export interface Note {
   /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
   toneId?: string;
   detailFormatIssues: string[];
+  /** Why the last AI task on this note failed (frontmatter `last-error`); empty when none. */
+  lastError: string;
   status: Status;
   mapId: string;
   topicId: string;
@@ -333,6 +335,15 @@ function writeMapContent(content: string, map: MapDocument): string {
 }
 function marker(value: unknown): boolean {
   return value === true || value === "true";
+}
+/** Longest `last-error` stored in a note. */
+export const LAST_ERROR_LIMIT = 300;
+/** The failure reason kept on a note: the raw error message, whitespace collapsed, cut to {@link LAST_ERROR_LIMIT}. */
+export function failureReason(error: unknown): string {
+  const raw = (error as { message?: unknown } | null | undefined)?.message;
+  const message = (typeof raw === "string" ? raw : String(error)).replace(/\s+/g, " ").trim();
+  const characters = [...message];
+  return characters.length > LAST_ERROR_LIMIT ? `${characters.slice(0, LAST_ERROR_LIMIT - 1).join("")}…` : message;
 }
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -1162,6 +1173,7 @@ export class Repository {
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
+      lastError: text(fm["last-error"]),
       status: ["idea", "running", "completed", "error"].includes(normalized) ? (normalized as Status) : "idea",
       mapId: text(fm["agent-map-id"]),
       topicId: text(fm["topic-id"], text(fm["agent-map-id"])),
@@ -1206,6 +1218,10 @@ export class Repository {
         patch.detailFormatIssues.length
           ? (fm["detail-format-issues"] = patch.detailFormatIssues)
           : delete fm["detail-format-issues"];
+      // A completed write ends the failure it follows; running leaves it (a stopped run restores the old status).
+      if (patch.lastError !== undefined)
+        patch.lastError ? (fm["last-error"] = patch.lastError) : delete fm["last-error"];
+      else if (patch.status === "completed") delete fm["last-error"];
       if (patch.mapId !== undefined) patch.mapId ? (fm["agent-map-id"] = patch.mapId) : delete fm["agent-map-id"];
       if (patch.topicId !== undefined) patch.topicId ? (fm["topic-id"] = patch.topicId) : delete fm["topic-id"];
       if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;

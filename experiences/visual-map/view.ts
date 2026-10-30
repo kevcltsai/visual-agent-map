@@ -105,6 +105,7 @@ import {
   normalizeMapChatStyle,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
+  failureReason,
   type Note,
   type NotePatch,
   type TopicInfo,
@@ -6631,6 +6632,7 @@ export class VisualAgentMapView extends ItemView {
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
+    if (note?.status === "error" && note.lastError) errorDetails.push(note.lastError);
     if (batch) {
       const currentNode = batch.currentPath ? this.map?.nodes.find(item => item.path === batch.currentPath) : undefined;
       const currentTitle = currentNode ? this.notes.get(currentNode.id)?.title : undefined;
@@ -9626,6 +9628,7 @@ export class VisualAgentMapView extends ItemView {
               "previewSection",
               "previewInitialized",
               "status",
+              "lastError",
               "detailFormatIssues"
             ],
             t("ui.synthesize_subtopics")
@@ -9672,7 +9675,7 @@ export class VisualAgentMapView extends ItemView {
         else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
         console.error("Visual Agent Map child integration", error);
-        await this.plugin.repo.updateNote(node.path, { status: "error" });
+        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
         const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
         if (failed) failed(message);
         else new Notice(message);
@@ -11081,12 +11084,17 @@ export class VisualAgentMapView extends ItemView {
       }
       return depth;
     };
+    const failureOf = (id: string): { status?: "error"; error?: string } => {
+      const note = this.notes.get(id);
+      return note?.status === "error" ? { status: "error", ...(note.lastError ? { error: note.lastError } : {}) } : {};
+    };
     const outline: MapChatOutlineNode[] = map.nodes.map(node => ({
       id: node.id,
       title: titleOf(node),
       summary: summaryOf(node.id),
       parentId: node.parentId,
-      depth: depthOf(node)
+      depth: depthOf(node),
+      ...failureOf(node.id)
     }));
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
@@ -11096,7 +11104,8 @@ export class VisualAgentMapView extends ItemView {
             title: titleOf(node),
             summary: summaryOf(id),
             detail: this.notes.get(id)?.detail ?? "",
-            path: node.path
+            path: node.path,
+            ...failureOf(id)
           }
         : null;
     };
@@ -13388,6 +13397,7 @@ export class VisualAgentMapView extends ItemView {
               "previewSection",
               "previewInitialized",
               "status",
+              "lastError",
               "researchMode"
             ],
             t("ui.research_task")
@@ -13440,7 +13450,7 @@ export class VisualAgentMapView extends ItemView {
               exchangeId,
               t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
             );
-          await this.plugin.repo.updateNote(node.path, { status: "error" });
+          await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
           const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
           if (failed) failed(message);
           else new Notice(message);

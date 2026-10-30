@@ -1,11 +1,12 @@
 import { Component, MarkdownView, Notice, setIcon, type App, type TFile } from "obsidian";
 import { getUiLanguage, OUTPUT_LANGUAGE_CHOICES, SUPPORTED_LANGUAGES, t, type ContentLanguage } from "../../i18n";
 import { prepareStep, type PreparedStep } from "../../core/step-runner";
-import { providerForModel } from "../../ai/providers/provider";
 import { imageTranslateStep } from "./steps/image-translate/step";
 
 export interface ImageTranslateOptions {
   model: () => string;
+  /** True while the current model cannot draw images (a Claude model): the translate popover then says so beforehand. */
+  imageNeedsCodex?: () => boolean;
   run: <Input, Output>(
     prepared: PreparedStep<Input, Output>,
     model: string,
@@ -217,7 +218,7 @@ export class ImageTranslateAction extends Component {
     const hint = popover.createDiv({ cls: "vam-image-action-hint" });
     hint.setAttribute("role", "note");
     const refreshHint = (): void => {
-      hint.setText(providerForModel(this.options.model()) === "claude" ? t("ui.image_translate_needs_codex") : "");
+      hint.setText(this.options.imageNeedsCodex?.() ? t("ui.image_translate_needs_codex") : "");
       hint.hidden = !hint.textContent;
     };
     refreshHint();

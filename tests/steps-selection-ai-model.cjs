@@ -59,7 +59,7 @@ function setup(modelRef) {
     metadataCache: { getFirstLinkpathDest: () => null }
   };
   const sentModels = [];
-  const ai = new MarkdownSelectionAi(app, { model: () => modelRef.value, autoOpen: () => true, language: () => 'English', run: async (_prepared, model) => { sentModels.push(model); return ''; } });
+  const ai = new MarkdownSelectionAi(app, { model: () => modelRef.value, imageNeedsCodex: () => modelRef.value.startsWith('claude:'), autoOpen: () => true, language: () => 'English', run: async (_prepared, model) => { sentModels.push(model); return ''; } });
   ai.load();
   const fire = (type, event = {}) => { for (const listener of listeners[type] ?? []) listener(event); };
   return { ai, app, fire, sentModels, image: new HTMLImageElement() };
@@ -135,8 +135,9 @@ test('pressing a translate button re-reads the model, so a switch to Claude show
 test('the sample copy and the selection AI take the model from plugin.currentModelChoice()', () => {
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.match(main, /currentModelChoice\(\): ModelChoice \{\s*const \{ model, reasoning \} = resolveTaskModel\(\{\s*current:/);
-  assert.match(main, /model: \(\) => this\.currentModelChoice\(\)\.model,\s*autoOpen/);
+  assert.match(main, /model: \(\) => this\.currentModelChoice\(\)\.model,\s*imageNeedsCodex/);
   assert.match(main, /this\.currentModelChoice\(\)\.model,\s*map,\s*path,\s*source\.parentId/);
+  assert.match(main, /imageNeedsCodex: \(\) => this\.runtimeIdFor\(this\.currentModelChoice\(\)\.model\) === "claude"/);
   const panel = fs.readFileSync(path.join(root, 'experiences/markdown-context/selection-ai.ts'), 'utf8');
   assert.doesNotMatch(panel, /this\.model\b/, 'the panel keeps no model copy');
 });

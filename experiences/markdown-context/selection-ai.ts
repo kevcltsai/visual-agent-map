@@ -23,6 +23,8 @@ interface SelectionSnapshot {
 
 interface SelectionAiOptions {
   model: () => string;
+  /** True while the current model cannot draw images (a Claude model): the translate popover then says so beforehand. */
+  imageNeedsCodex?: () => boolean;
   /** Show the selection button and open the panel on image clicks; the command opens the panel either way. */
   autoOpen: () => boolean;
   /**

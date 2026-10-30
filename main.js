@@ -57365,7 +57365,8 @@ var ImageTranslateAction = class extends import_obsidian36.Component {
     const hint = popover.createDiv({ cls: "vam-image-action-hint" });
     hint.setAttribute("role", "note");
     const refreshHint = () => {
-      hint.setText(providerForModel(this.options.model()) === "claude" ? t("ui.image_translate_needs_codex") : "");
+      var _a3, _b2;
+      hint.setText(((_b2 = (_a3 = this.options).imageNeedsCodex) == null ? void 0 : _b2.call(_a3)) ? t("ui.image_translate_needs_codex") : "");
       hint.hidden = !hint.textContent;
     };
     refreshHint();
@@ -58622,6 +58623,7 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
+      imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
         kind: "selection",

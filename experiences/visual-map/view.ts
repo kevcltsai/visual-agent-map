@@ -59,6 +59,7 @@ import {
   legalRelationTargets,
   type MapDocument,
   type MapNode,
+  normalizeRelationDescription,
   parentIdsForNode,
   removeNodes,
   removeTopicRelationsFor,
@@ -67,6 +68,7 @@ import {
   setTopicRelations,
   supersededAimNodeIds,
   type TopicRelation,
+  type TopicRelationKind,
   visibleNodes
 } from "../../map-model";
 import {
@@ -501,6 +503,25 @@ const TOPIC_KIND_ICON: Record<TopicKind, string> = {
   evidence: "file-search",
   conclusion: "flag"
 };
+const RELATION_KINDS: readonly TopicRelationKind[] = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+const RELATION_NAME_KEY: Record<TopicRelationKind, Parameters<typeof t>[0]> = {
+  supports: "ui.relation_name_supports",
+  contradicts: "ui.relation_name_contradicts",
+  verifies: "ui.relation_name_verifies",
+  derives_from: "ui.relation_name_derives_from",
+  related: "ui.relation_name_related",
+  prerequisite: "ui.relation_name_prerequisite"
+};
+/** The key a relation line is known by (view state only): `from`, `to` and kind. */
+const relationIdentity = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
+  `${r.from}\u0000${r.to}\u0000${r.kind}`;
 const AIM_STAGE_KEYS: Record<string, Parameters<typeof t>[0]> = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -7976,90 +7997,209 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /** Adds a `supports` link from this topic to another in one undoable Map.md change; an illegal target (itself, already linked) is refused. */
-  private async addEvidence(fromId: string, toId: string): Promise<void> {
+  /** Adds one relation A -> B in one undoable Map.md change; an illegal one (itself, a duplicate, a cycle for derivation or prerequisite) is refused. */
+  private async addRelation(fromId: string, toId: string, kind: TopicRelationKind): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange(map => {
-      if (!legalRelationTargets(map, "supports", fromId).includes(toId)) return;
-      setTopicRelations(map, [...(map.topicRelations ?? []), { kind: "supports", from: fromId, to: toId }]);
+      if (!relationAllowed(map.topicRelations ?? [], { kind, from: fromId, to: toId })) return;
+      setTopicRelations(map, [...(map.topicRelations ?? []), { kind, from: fromId, to: toId }]);
     }, false);
   }
-  private async removeEvidence(fromId: string, toId: string): Promise<void> {
-    if (!this.map || !this.relationsEnabled()) return;
-    await this.mapChange(map => {
-      setTopicRelations(
-        map,
-        (map.topicRelations ?? []).filter(r => !(r.kind === "supports" && r.from === fromId && r.to === toId))
-      );
-    }, false);
-  }
-  /** Adds a prerequisite link A -> B in one undoable Map.md change; an illegal source (itself, already linked, or closing a cycle) is refused. */
-  private async addPrerequisite(fromId: string, toId: string): Promise<void> {
-    if (!this.map || !this.relationsEnabled()) return;
-    await this.mapChange(map => {
-      if (!relationAllowed(map.topicRelations ?? [], { kind: "prerequisite", from: fromId, to: toId })) return;
-      setTopicRelations(map, [...(map.topicRelations ?? []), { kind: "prerequisite", from: fromId, to: toId }]);
-    }, false);
-  }
-  private async removePrerequisite(fromId: string, toId: string): Promise<void> {
+  /** Removes one relation in one undoable Map.md change. */
+  private async removeRelation(link: TopicRelation): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange(map => {
       setTopicRelations(
         map,
-        (map.topicRelations ?? []).filter(r => !(r.kind === "prerequisite" && r.from === fromId && r.to === toId))
+        (map.topicRelations ?? []).filter(r => relationIdentity(r) !== relationIdentity(link))
       );
     }, false);
   }
-  /** Opens the picker for the prerequisite (A) of `node` (B); with no legal source it only says so. */
-  private choosePrerequisiteSource(node: MapNode, onAdded?: () => void): void {
+  /** The six relation kinds as a menu; `pick` gets the chosen one. */
+  private openRelationKindMenu(event: MouseEvent, pick: (kind: TopicRelationKind) => void): void {
+    const menu = new Menu();
+    for (const kind of RELATION_KINDS)
+      menu.addItem(item =>
+        item
+          .setTitle(t(RELATION_NAME_KEY[kind]))
+          .setIcon("link")
+          .onClick(() => pick(kind))
+      );
+    menu.showAtMouseEvent(event);
+  }
+  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
+  private chooseRelationTarget(node: MapNode, kind: TopicRelationKind, onAdded?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
-    const relations = this.map.topicRelations ?? [];
-    const legal = new Set(
-      this.map.nodes
-        .filter(n => relationAllowed(relations, { kind: "prerequisite", from: n.id, to: node.id }))
-        .map(n => n.id)
-    );
+    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
     if (!legal.size) {
-      new Notice(t("ui.no_prerequisite_to_link"));
+      new Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
       return;
     }
     new TopicTreeModal(
       this.app,
-      t("ui.add_prerequisite_title"),
-      t("ui.add_prerequisite_description"),
+      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
+      t("ui.add_relation_description"),
       this.map.nodes,
       target => this.notes.get(target.id)?.title ?? target.path,
       target => legal.has(target.id),
       target =>
         this.enqueue(async () => {
-          await this.addPrerequisite(target.id, node.id);
+          await this.addRelation(node.id, target.id, kind);
           onAdded?.();
         })
     ).open();
   }
-  /** Opens the picker for the topic `node` supports; with no legal target it only says so. */
-  private chooseEvidenceTarget(node: MapNode, onAdded?: () => void): void {
+  /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
+  private relationRowText(link: TopicRelation, selfId: string): string {
+    const name = t(RELATION_NAME_KEY[link.kind]),
+      titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
+    if (link.kind === "related")
+      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
+    return link.from === selfId
+      ? t("ui.relation_row_out_0_1", name, titleOf(link.to))
+      : t("ui.relation_row_in_0_1", titleOf(link.from), name);
+  }
+  /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
+  private openRelationEditor(link: TopicRelation, onChanged?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalRelationTargets(this.map, "supports", node.id));
-    if (!legal.size) {
-      new Notice(t("ui.no_hypothesis_to_link"));
-      return;
-    }
-    new TopicTreeModal(
-      this.app,
-      t("ui.add_evidence_title"),
-      t("ui.add_evidence_description"),
-      this.map.nodes,
-      target => this.notes.get(target.id)?.title ?? target.path,
-      target => legal.has(target.id),
-      target =>
-        this.enqueue(async () => {
-          await this.addEvidence(node.id, target.id);
-          onAdded?.();
-        })
-    ).open();
+    const render = (content: HTMLElement, close: () => void): void =>
+      this.renderRelationEditor(content, link, close, onChanged);
+    new (class extends Modal {
+      onOpen(): void {
+        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+        render(this.contentEl, () => this.close());
+      }
+    })(this.app).open();
   }
-  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the `supports` links that start or end at this topic. */
+  /**
+   * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
+   * illegal), a one-line note applied on request, and delete. Each change is one undoable Map.md step. Everything the
+   * user typed (the note, topic titles) is shown as text only.
+   */
+  private renderRelationEditor(
+    parent: HTMLElement,
+    initial: TopicRelation,
+    close?: () => void,
+    onChanged?: () => void
+  ): void {
+    let current: TopicRelation = { ...initial };
+    const root = parent.createDiv("vam-relation-editor");
+    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
+    const indexOfCurrent = (): number =>
+      (this.map?.topicRelations ?? []).findIndex(r => relationIdentity(r) === relationIdentity(current));
+    // Runs one change on the relation held in the map being edited; `next` returns its new form, or null to delete it.
+    const apply = (next: (rel: TopicRelation) => TopicRelation | null | undefined): void =>
+      this.enqueue(async () => {
+        const outcome: { value?: TopicRelation | null } = {};
+        if (!this.map) return;
+        // The line stays selected under its new identity; a deleted one is dropped by the next draw.
+        await this.mapChange(map => {
+          const list = map.topicRelations ?? [],
+            index = list.findIndex(r => relationIdentity(r) === relationIdentity(current));
+          if (index < 0) return;
+          outcome.value = next(list[index]);
+          // A type or direction change is checked again on the map being edited (the same rule as the choices offered).
+          const old = list[index];
+          if (
+            outcome.value &&
+            (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) &&
+            !relationAllowed(list, outcome.value, index)
+          )
+            outcome.value = undefined;
+          if (outcome.value === undefined) return;
+          const updated = [...list];
+          if (outcome.value) updated[index] = outcome.value;
+          else updated.splice(index, 1);
+          setTopicRelations(map, updated);
+        }, false);
+        const result = outcome.value;
+        if (result === null) {
+          if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
+          this.syncRelationClasses();
+          onChanged?.();
+          close?.();
+          return;
+        }
+        if (result) {
+          current = result;
+          this.selectedRelation = relationIdentity(current);
+          this.syncRelationClasses();
+        }
+        paint();
+        onChanged?.();
+      });
+    const paint = (): void => {
+      root.empty();
+      const index = indexOfCurrent();
+      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
+      if (index < 0) {
+        root.createEl("p", { text: t("ui.relation_gone") });
+        return;
+      }
+      const relations = this.map?.topicRelations ?? [];
+      root.createEl("p", { text: t("ui.relation_a_0", titleOf(current.from)), attr: { dir: "auto" } });
+      root.createEl("p", { text: t("ui.relation_b_0", titleOf(current.to)), attr: { dir: "auto" } });
+      // Type: only kinds that keep the map legal; the current one is always listed.
+      root.createEl("label", { text: t("ui.relation_kind_label") });
+      const kindSelect = root.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+      for (const kind of RELATION_KINDS)
+        if (kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index))
+          kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+      kindSelect.value = current.kind;
+      kindSelect.addEventListener("change", () => {
+        const kind = kindSelect.value as TopicRelationKind;
+        if (kind === current.kind) return;
+        apply(rel => ({ ...rel, kind }));
+      });
+      // Reverse: "related" has no direction. An illegal reverse stays visible, disabled, with the reason beside it.
+      if (current.kind !== "related") {
+        const reversed = { kind: current.kind, from: current.to, to: current.from };
+        const allowed = relationAllowed(relations, reversed, index);
+        const reverse = this.button(
+          root,
+          t("ui.relation_reverse"),
+          () => apply(rel => ({ ...rel, from: reversed.from, to: reversed.to })),
+          !allowed
+        );
+        if (!allowed) {
+          const duplicate = relations.some(
+            (r, at) => at !== index && relationIdentity(r) === relationIdentity(reversed)
+          );
+          const reason = root.createEl("p", {
+            text: t(duplicate ? "ui.relation_reverse_blocked_duplicate" : "ui.relation_reverse_blocked_cycle"),
+            cls: "vam-relation-reason"
+          });
+          reason.setAttr("id", "vam-relation-reverse-reason");
+          reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
+        }
+      }
+      // Note: one line, normalized on apply; an empty one removes the key.
+      root.createEl("label", { text: t("ui.relation_description_label") });
+      const description = root.createEl("input", { cls: "vam-relation-description", type: "text" });
+      description.value = relations[index].description ?? "";
+      description.setAttr("aria-label", t("ui.relation_description_label"));
+      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const applyDescription = (): void => {
+        const text = normalizeRelationDescription(description.value);
+        if (text === relations[index].description) return;
+        apply(rel => {
+          const next: TopicRelation = { kind: rel.kind, from: rel.from, to: rel.to };
+          if (text !== undefined) next.description = text;
+          return next;
+        });
+      };
+      description.addEventListener("keydown", event => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        applyDescription();
+      });
+      this.button(root, t("ui.relation_apply"), applyDescription);
+      this.button(root, t("ui.relation_delete"), () => apply(() => null));
+    };
+    paint();
+  }
+  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
@@ -8072,7 +8212,6 @@ export class VisualAgentMapView extends ItemView {
       });
     });
     const body = section.createDiv("vam-hypothesis-body");
-    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
     const paint = (focusStrength = false, focusKind = false): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
@@ -8117,53 +8256,36 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       }
-      const supports = (this.map?.topicRelations ?? []).filter(r => r.kind === "supports");
-      for (const [heading, links, otherOf] of [
-        ["ui.evidence_from_heading", supports.filter(r => r.to === node.id), (r: TopicRelation) => r.from],
-        ["ui.evidence_for_heading", supports.filter(r => r.from === node.id), (r: TopicRelation) => r.to]
-      ] as const) {
-        if (!links.length) continue;
-        body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
+      // Relations: every link that starts or ends at this topic, whatever its kind.
+      const links = (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id);
+      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading" });
+      if (links.length) {
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }),
-            otherId = otherOf(link);
-          this.bindRelationRow(row, link, titleOf(otherId));
-          row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
+            text = this.relationRowText(link, node.id),
+            described = link.description ? `${text}. ${link.description}` : text;
+          this.bindRelationRow(row, link, described);
+          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+          label.createSpan({ text, attr: { dir: "auto" } });
+          if (link.description)
+            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+          const edit = this.button(row, t("ui.relation_edit"), () => this.openRelationEditor(link, paint));
+          edit.setAttr("aria-label", t("ui.edit_relation_0", text));
           const remove = this.button(row, t("ui.remove"), () =>
             this.enqueue(async () => {
-              await this.removeEvidence(link.from, link.to);
+              await this.removeRelation(link);
               paint();
             })
           );
-          remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
+          remove.setAttr("aria-label", t("ui.remove_relation_0", text));
         }
       }
-      this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
-      // Prerequisites: any topic or hypothesis can be either end; each row can be removed from both ends.
-      const prerequisites = (this.map?.topicRelations ?? []).filter(r => r.kind === "prerequisite");
-      for (const [heading, links, otherOf] of [
-        ["ui.prerequisite_heading", prerequisites.filter(r => r.to === node.id), (r: TopicRelation) => r.from],
-        ["ui.prerequisite_of_heading", prerequisites.filter(r => r.from === node.id), (r: TopicRelation) => r.to]
-      ] as const) {
-        if (!links.length) continue;
-        body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
-        const list = body.createEl("ul", { cls: "vam-relation-list" });
-        for (const link of links) {
-          const row = list.createEl("li", { cls: "vam-relation-row" }),
-            otherId = otherOf(link);
-          this.bindRelationRow(row, link, titleOf(otherId));
-          row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
-          const remove = this.button(row, t("ui.remove"), () =>
-            this.enqueue(async () => {
-              await this.removePrerequisite(link.from, link.to);
-              paint();
-            })
-          );
-          remove.setAttr("aria-label", t("ui.remove_prerequisite_link_0", titleOf(otherId)));
-        }
-      }
-      this.button(body, t("ui.add_prerequisite"), () => this.choosePrerequisiteSource(node, paint));
+      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
+      addRelation.addEventListener("click", event => {
+        event.stopPropagation();
+        this.openRelationKindMenu(event, kind => this.chooseRelationTarget(node, kind, paint));
+      });
     };
     paint();
   }
@@ -12473,13 +12595,18 @@ export class VisualAgentMapView extends ItemView {
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
     if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
-    const links: { from: HTMLElement; to: HTMLElement; key: string; kind: TopicRelation["kind"] }[] = [];
+    const links: {
+      from: HTMLElement;
+      to: HTMLElement;
+      key: string;
+      kind: TopicRelation["kind"];
+      relation: TopicRelation;
+    }[] = [];
     for (const relation of this.map.topicRelations ?? []) {
       const from = this.cardEls.get(relation.from),
         to = this.cardEls.get(relation.to);
       if (!from || !to) continue;
-      const key = `${relation.from}\u0000${relation.to}\u0000${relation.kind}`;
-      links.push({ from, to, key, kind: relation.kind });
+      links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
     const defs = createSvg("defs"),
@@ -12517,6 +12644,13 @@ export class VisualAgentMapView extends ItemView {
         this.selectedRelation = key;
         this.syncRelationClasses();
       });
+      // The click (not the press) opens the editor, so the dialog never opens under a pointer that is still down.
+      hit.addEventListener("click", event => {
+        event.stopPropagation();
+        this.selectedRelation = key;
+        this.syncRelationClasses();
+        this.openRelationEditor(link.relation);
+      });
       hit.addEventListener("pointerenter", () => {
         this.hoverRelation = key;
         this.syncRelationClasses();
@@ -12531,9 +12665,7 @@ export class VisualAgentMapView extends ItemView {
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
-      label.textContent = t(
-        link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence"
-      );
+      label.textContent = t(RELATION_NAME_KEY[link.kind]);
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
@@ -12576,14 +12708,11 @@ export class VisualAgentMapView extends ItemView {
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
-  private bindRelationRow(row: HTMLElement, link: TopicRelation, otherTitle: string): void {
-    const key = `${link.from}\u0000${link.to}\u0000${link.kind}`;
+  private bindRelationRow(row: HTMLElement, link: TopicRelation, ariaLabel: string): void {
+    const key = relationIdentity(link);
     row.tabIndex = 0;
     row.setAttr("role", "group");
-    row.setAttr(
-      "aria-label",
-      `${t(link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence")}: ${otherTitle}`
-    );
+    row.setAttr("aria-label", ariaLabel);
     row.addEventListener("focus", () => {
       this.selectedRelation = key;
       this.syncRelationClasses();

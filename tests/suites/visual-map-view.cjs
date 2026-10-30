@@ -2205,28 +2205,29 @@ integrationTest('hypothesis-evidence: the chat-guard message names the type and 
   }
   assert.match(read('zh-TW'), /類型或強度欄位/); assert.match(read('zh-CN'), /类型或强度字段/); assert.match(read('en'), /type or hypothesis fields/);
 });
-integrationTest('hypothesis-evidence: every topic type has the add-evidence entry (it creates supports); only a hypothesis has the strength control', () => {
+integrationTest('hypothesis-evidence: every topic type has the add-relation entry; only a hypothesis has the strength control', () => {
   const { view } = heFixture();
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
-  assert.equal(dom.buttons(hypPanel).includes('Add evidence…'), true, 'a hypothesis can now be the source of supports');
+  assert.equal(dom.buttons(hypPanel).includes('Add relation…'), true, 'a hypothesis can start a relation of any kind');
   assert.deepEqual(dom.buttons(hypPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), ['Weak', 'Medium', 'Strong']);
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
+  assert.equal(dom.buttons(factPanel).includes('Add relation…'), true);
   assert.deepEqual(dom.buttons(factPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), []);
 });
-integrationTest('hypothesis-evidence: the add-evidence picker offers every topic that can newly be supported (any type), and with none it shows a Notice and no dialog', () => {
+integrationTest('hypothesis-evidence: the supports picker offers every topic that can newly be supported (any type), and with none it shows a Notice and no dialog', () => {
   const topics = [node('fact'), node('hyp'), node('linked'), node('plain'), node('hyp2')];
   const notes = heNotes([['fact', {}], ['hyp', heHyp('weak')], ['linked', heHyp('strong')], ['plain', {}], ['hyp2', heHyp()]]);
   const { view, modals, notices } = heFixture({ topics, notes, relations: [{ kind: 'supports', from: 'fact', to: 'linked' }] });
-  view.chooseEvidenceTarget(view.map.nodes[0]);
+  view.chooseRelationTarget(view.map.nodes[0], 'supports');
   assert.equal(modals.length, 1); assert.deepEqual(notices, []);
   const selectable = modals[0].selectable;
   assert.deepEqual(view.map.nodes.filter(n => selectable(n)).map(n => n.id), ['hyp', 'plain', 'hyp2'], 'not itself, not an already linked topic; ordinary topics are allowed');
-  const fromHyp = heFixture({ topics, notes }); fromHyp.view.chooseEvidenceTarget(fromHyp.view.map.nodes[1]);
+  const fromHyp = heFixture({ topics, notes }); fromHyp.view.chooseRelationTarget(fromHyp.view.map.nodes[1], 'supports');
   assert.equal(fromHyp.modals.length, 1, 'a hypothesis can be the source of supports');
   const two = [node('a'), node('b')];
   const none = heFixture({ topics: two, notes: heNotes([['a', {}], ['b', {}]]), relations: [{ kind: 'supports', from: 'a', to: 'b' }] });
-  none.view.chooseEvidenceTarget(none.view.map.nodes[0]);
-  assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no hypothesis this topic can be evidence for.']);
+  none.view.chooseRelationTarget(none.view.map.nodes[0], 'supports');
+  assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic this one can be linked to with “Supports”.']);
 });
 integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · strength" and carries it in its accessible name; an ordinary topic and an AIM map do not', () => {
   const render = (options, id) => {
@@ -2279,17 +2280,20 @@ integrationTest('hypothesis-evidence: a supports link is drawn whatever the type
   kids = heDrawn(view, { fact: [0, 0], other: [0, 200] });
   assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'a collapsed (missing) end is not drawn'); assert.deepEqual(logs, [], 'and not logged');
 });
-integrationTest('hypothesis-evidence: the add-evidence entry in the panel creates a supports link from the topic, for an ordinary topic and a hypothesis alike', async () => {
-  const { view, doc, modals } = heFixture();
+integrationTest('hypothesis-evidence: the add-relation entry in the panel opens the kind menu, then the picker, and creates the chosen kind from the topic, for an ordinary topic and a hypothesis alike', async () => {
+  const { view, doc, modals, menus } = heFixture();
   view.enqueue = work => work(); view.mapChange = async (change) => { change(view.map); };
   for (const idx of [0, 1]) {
     const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[idx]);
-    dom.button(panel, 'Add evidence…').click();
+    dom.button(panel, 'Add relation…').click();
   }
+  assert.equal(modals.length, 0, 'the kind is chosen before any topic picker opens');
+  assert.deepEqual(menus.at(-1).titles, ['Supports', 'Contradicts', 'Verifies', 'Derives from', 'Related', 'Prerequisite']);
+  menus[0].clicks[0](); menus[1].clicks[1]();
   assert.equal(modals.length, 2);
   modals[0].choose(view.map.nodes[2]); await dom.tick();
   modals[1].choose(view.map.nodes[0]); await dom.tick();
-  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'fact', to: 'other' }, { kind: 'supports', from: 'hyp', to: 'fact' }], 'the panel writes supports, never evidence');
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'fact', to: 'other' }, { kind: 'contradicts', from: 'hyp', to: 'fact' }], 'the panel topic is A; the kind is the one picked');
   assert.equal(doc.topicRelations.some(r => r.kind === 'evidence'), false);
 });
 integrationTest('hypothesis-evidence: dragging a card moves the evidence line with it', () => {
@@ -2301,36 +2305,36 @@ integrationTest('hypothesis-evidence: dragging a card moves the evidence line wi
   const dragHyp = view.dragEdges('hyp', view.cardEls.get('hyp')); dragHyp.update(900, 0);
   assert.match(line.attrs.d, / 900 50$/);
 });
-integrationTest('hypothesis-evidence: adding and removing evidence in the panel go through mapChange (undoable); an illegal target is refused', async () => {
+integrationTest('hypothesis-evidence: adding and removing a relation in the panel go through mapChange (undoable); an illegal target is refused', async () => {
   const { view, doc } = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] });
   const changes = []; view.enqueue = work => work();
   view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
-  assert.ok(dom.texts(factPanel).includes('HYP'), 'the linked hypothesis is listed');
-  const remove = dom.byLabel(factPanel, 'Remove evidence link: HYP'); assert.ok(remove);
+  assert.ok(dom.texts(factPanel).includes('Supports → HYP'), 'the linked topic is listed');
+  const remove = dom.byLabel(factPanel, 'Remove relation: Supports → HYP'); assert.ok(remove);
   await remove.fire('click');
   await dom.tick();
   assert.equal(changes.length, 1); assert.equal(changes[0], false, 'no derived-data rebuild for a relation change');
   assert.equal('topicRelations' in doc, false, 'the empty list is dropped from Map.md');
-  assert.equal(dom.byLabel(factPanel, 'Remove evidence link: HYP'), undefined, 'the row is gone after the change');
-  await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'other'); await view.addEvidence('hyp', 'hyp');
+  assert.equal(dom.byLabel(factPanel, 'Remove relation: Supports → HYP'), undefined, 'the row is gone after the change');
+  await view.addRelation('fact', 'hyp', 'supports'); await view.addRelation('fact', 'hyp', 'supports'); await view.addRelation('fact', 'other', 'supports'); await view.addRelation('hyp', 'hyp', 'supports');
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'other' }], 'added once each; the duplicate and the self link are refused, an ordinary-topic target is allowed');
   assert.equal(changes.length, 5);
 });
-integrationTest('hypothesis-evidence: choosing a hypothesis or a prerequisite in the picker repaints the open panel at once', async () => {
-  const { view, modals } = heFixture({ topics: [node('fact'), node('hyp'), node('pre')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['pre', {}]]) });
+integrationTest('hypothesis-evidence: choosing a target in the picker repaints the open panel at once', async () => {
+  const { view, modals, menus } = heFixture({ topics: [node('fact'), node('hyp'), node('pre')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['pre', {}]]) });
   view.enqueue = work => work();
   view.mapChange = async (change, rebuild) => { change(view.map); };
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
-  assert.equal(dom.byLabel(factPanel, 'Remove evidence link: HYP'), undefined);
-  dom.button(factPanel, 'Add evidence…').click();
+  assert.equal(dom.byLabel(factPanel, 'Remove relation: Supports → HYP'), undefined);
+  dom.button(factPanel, 'Add relation…').click(); menus[0].clicks[0]();
   assert.equal(modals.length, 1);
   modals[0].choose(view.map.nodes[1]); await dom.tick();
-  assert.ok(dom.byLabel(factPanel, 'Remove evidence link: HYP'), 'the new evidence row shows without reopening the panel');
-  dom.button(factPanel, 'Add prerequisite…').click();
+  assert.ok(dom.byLabel(factPanel, 'Remove relation: Supports → HYP'), 'the new row shows without reopening the panel');
+  dom.button(factPanel, 'Add relation…').click(); menus[1].clicks[5]();
   assert.equal(modals.length, 2);
   modals[1].choose(view.map.nodes[2]); await dom.tick();
-  assert.ok(dom.byLabel(factPanel, 'Remove prerequisite link: PRE'), 'the new prerequisite row shows without reopening the panel');
+  assert.ok(dom.byLabel(factPanel, 'Remove relation: Prerequisite → PRE'), 'a prerequisite row shows too');
 });
 integrationTest('hypothesis-evidence: after a strength change the focus returns to the pressed strength button', async () => {
   const { view } = heFixture();
@@ -2362,24 +2366,24 @@ integrationTest('hypothesis-evidence: a strength change rewrites the note and Ma
 });
 
 // ---- hypothesis-evidence (P4): prerequisite picker, dotted line, panel rows ----
-integrationTest('hypothesis-evidence: the prerequisite picker lists neither itself, an existing source nor a source that would close a cycle (direct or indirect), and ends on a hand-written cycle', () => {
+integrationTest('hypothesis-evidence: the prerequisite target picker lists neither itself, an existing target nor a target that would close a cycle (direct or indirect), and ends on a hand-written cycle', () => {
   const topics = [node('a'), node('b'), node('c'), node('d'), node('e')];
   const notes = heNotes(topics.map(n => [n.id, {}]));
   const relations = [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'c' }, { kind: 'prerequisite', from: 'd', to: 'c' }];
   const { view, modals, notices } = heFixture({ topics, notes, relations });
-  view.choosePrerequisiteSource(view.map.nodes[0]);
+  view.chooseRelationTarget(view.map.nodes[0], 'prerequisite');
   assert.equal(modals.length, 1); assert.deepEqual(notices, []);
   const pickable = id => modals[0].selectable(view.map.nodes.find(n => n.id === id));
-  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(pickable), ['d', 'e'], 'for A: not itself, and not b or c, which A already leads to (b->a or c->a would close a cycle, directly or through b)');
-  const forC = heFixture({ topics, notes, relations }); forC.view.choosePrerequisiteSource(forC.view.map.nodes[2]);
-  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(id => forC.modals[0].selectable(forC.view.map.nodes.find(n => n.id === id))), ['a', 'e'], 'for C: not itself, not the existing sources b and d');
+  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(pickable), ['c', 'd', 'e'], 'for A: not itself and not its existing target b; c is a new, acyclic target');
+  const forC = heFixture({ topics, notes, relations }); forC.view.chooseRelationTarget(forC.view.map.nodes[2], 'prerequisite');
+  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(id => forC.modals[0].selectable(forC.view.map.nodes.find(n => n.id === id))), ['e'], 'for C: a, b and d all lead to c (c->b would close a cycle, directly or through b)');
   const loop = heFixture({ topics, notes, relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'a' }] });
-  loop.view.choosePrerequisiteSource(loop.view.map.nodes[0]);
+  loop.view.chooseRelationTarget(loop.view.map.nodes[0], 'prerequisite');
   assert.equal(loop.modals.length, 1, 'a hand-written cycle does not hang or hide the picker');
   const all = [node('a'), node('b')];
   const none = heFixture({ topics: all, notes: heNotes(all.map(n => [n.id, {}])), relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'a' }] });
-  none.view.choosePrerequisiteSource(none.view.map.nodes[0]);
-  assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic that can be a prerequisite for this one.']);
+  none.view.chooseRelationTarget(none.view.map.nodes[0], 'prerequisite');
+  assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic this one can be linked to with “Prerequisite”.']);
 });
 integrationTest('hypothesis-evidence: a prerequisite line is dotted, runs from A to B with the arrowhead at B, and shares the view marker with evidence', () => {
   const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
@@ -2416,25 +2420,24 @@ integrationTest('hypothesis-evidence: styles.css gives the prerequisite line a d
   assert.match(pre, /stroke-linecap:\s*round/); assert.notEqual(dash, evidence); assert.notEqual(dash, '5 5'); assert.ok(dash !== 'none');
   assert.match(rule('.vam-relation'), /pointer-events:\s*none/); assert.match(rule('.vam-edges'), /pointer-events:\s*none/);
 });
-integrationTest('hypothesis-evidence: the panel lists prerequisites at both ends, each row is removable through mapChange, and the add button is on topics and hypotheses alike', async () => {
+integrationTest('hypothesis-evidence: the panel lists relations at both ends, each row is removable through mapChange, and the add button is on topics and hypotheses alike', async () => {
   const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'hyp' }];
   const { view, doc } = heFixture({ relations });
   const changes = []; view.enqueue = work => work();
   view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
   const bPanel = dom.element('panel'); view.renderHypothesisSection(bPanel, view.map.nodes[2]);
-  assert.ok(dom.texts(bPanel).includes('Prerequisites') && dom.texts(bPanel).includes('This topic is a prerequisite for'), 'both headings');
-  assert.ok(dom.byLabel(bPanel, 'Remove prerequisite link: FACT'), 'A is listed on B'); assert.ok(dom.byLabel(bPanel, 'Remove prerequisite link: HYP'), 'B is listed on A');
-  for (const id of ['hyp', 'fact']) { const p = dom.element('panel'); view.renderHypothesisSection(p, view.map.nodes.find(n => n.id === id)); assert.ok(dom.buttons(p).includes('Add prerequisite…'), `add button for ${id}`); }
-  await dom.byLabel(bPanel, 'Remove prerequisite link: FACT').fire('click'); await dom.tick();
+  assert.ok(dom.texts(bPanel).includes('Relations'), 'one Relations section');
+  assert.ok(dom.byLabel(bPanel, 'Remove relation: FACT → Prerequisite'), 'A is listed on B'); assert.ok(dom.byLabel(bPanel, 'Remove relation: Prerequisite → HYP'), 'B is listed on A');
+  for (const id of ['hyp', 'fact']) { const p = dom.element('panel'); view.renderHypothesisSection(p, view.map.nodes.find(n => n.id === id)); assert.ok(dom.buttons(p).includes('Add relation…'), `add button for ${id}`); }
+  await dom.byLabel(bPanel, 'Remove relation: FACT → Prerequisite').fire('click'); await dom.tick();
   assert.equal(changes.length, 1); assert.equal(changes[0], false);
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'supports', from: 'fact', to: 'hyp' }], 'only that link is removed');
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
-  await dom.byLabel(hypPanel, 'Remove prerequisite link: OTHER').fire('click'); await dom.tick();
+  await dom.byLabel(hypPanel, 'Remove relation: OTHER → Prerequisite').fire('click'); await dom.tick();
   assert.equal(changes.length, 2); assert.equal(doc.topicRelations.some(r => r.kind === 'prerequisite'), false, 'removable from the other end too');
-  await view.addPrerequisite('fact', 'other'); await view.addPrerequisite('fact', 'other'); await view.addPrerequisite('other', 'fact'); await view.addPrerequisite('hyp', 'hyp');
+  await view.addRelation('fact', 'other', 'prerequisite'); await view.addRelation('fact', 'other', 'prerequisite'); await view.addRelation('other', 'fact', 'prerequisite'); await view.addRelation('hyp', 'hyp', 'prerequisite');
   assert.deepEqual(plain(doc.topicRelations.filter(r => r.kind === 'prerequisite')), [{ kind: 'prerequisite', from: 'fact', to: 'other' }], 'added once; duplicate, cycle-closing and self links refused');
 });
-
 // ---- hypothesis-evidence (P5): selectable relation lines, names on hover/selection, selection highlight ----
 const heRel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
 const heKey = r => `${r.from}\u0000${r.to}\u0000${r.kind}`;
@@ -2448,7 +2451,7 @@ function heLines(options = {}) {
 const heVisible = el => el.classes.includes('is-visible');
 integrationTest('hypothesis-evidence: a relation name is hidden normally, shown while the pointer is on the line or the line is selected, and follows a drag', () => {
   const { view, evHit, evLabel, preLabel, preHit } = heLines();
-  assert.equal(evLabel.textContent, 'Evidence'); assert.equal(preLabel.textContent, 'Prerequisite');
+  assert.equal(evLabel.textContent, 'Supports'); assert.equal(preLabel.textContent, 'Prerequisite');
   assert.ok(!heVisible(evLabel) && !heVisible(preLabel), 'no name by default');
   evHit.fire('pointerenter'); assert.ok(heVisible(evLabel) && !heVisible(preLabel), 'hover shows the name');
   evHit.fire('pointerleave'); assert.ok(!heVisible(evLabel), 'leaving hides it');
@@ -2500,14 +2503,14 @@ integrationTest('hypothesis-evidence: the Escape key handler and the blank-canva
   assert.match(src, /if \(event\.key === "Escape"\) \{[\s\S]{0,260}this\.selectedRelation = null;/, 'Escape');
   assert.match(src, /if \(!moved && event\.button === 0 && this\.selectedRelation\) \{\s*this\.selectedRelation = null;/, 'blank canvas release');
 });
-integrationTest('hypothesis-evidence: a panel row is focusable, named by relation and other topic, and focus selects its line while hover previews it', () => {
+integrationTest('hypothesis-evidence: a panel row is focusable, named by direction, relation and other topic, and focus selects its line while hover previews it', () => {
   const { view, ev, pre } = heLines();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
   const rows = []; const walk = el => { if (el.cls && String(el.cls).includes('vam-relation-row')) rows.push(el); (el.children ?? []).forEach(walk); };
   walk(panel);
   assert.ok(rows.length >= 1, 'the evidence row is rendered');
   const row = rows[0];
-  assert.equal(row.tabIndex, 0, 'focusable'); assert.equal(row.attrs['aria-label'] ?? row.getAttribute?.('aria-label'), 'Evidence: FACT');
+  assert.equal(row.tabIndex, 0, 'focusable'); assert.equal(row.attrs['aria-label'], 'FACT → Supports');
   row.fire('mouseenter'); assert.ok(ev.classes.includes('is-selected'), 'hover previews like a selection'); row.fire('mouseleave'); assert.ok(!ev.classes.includes('is-selected'));
   row.fire('focus'); assert.ok(ev.classes.includes('is-selected') && !pre.classes.includes('is-selected')); assert.equal(view.selectedRelation, heKey(heRel[0]));
   row.fire('blur'); assert.equal(view.selectedRelation, null);
@@ -2635,4 +2638,165 @@ integrationTest('hypothesis-evidence: the SVG types hide the card frame and shad
   assert.match(css, /\[data-status="error"\][^{]*\{ --vam-kind-line: var\(--color-red\); \}/);
   assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px; \}/);
   assert.match(css, /\.vam-kind-shape \.vam-kind-outline \{[^}]*stroke-dasharray: var\(--vam-kind-dash\)/);
+});
+
+// ---- hypothesis-evidence (V1.6 P12): relation section, create flow, relation editor ----
+const heEditor = (relations, current, options = {}) => {
+  const topics = options.topics ?? [node('a'), node('b'), node('c')];
+  const fx = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])), relations, ...options });
+  const calls = [], closed = [], changed = [];
+  fx.view.enqueue = work => work();
+  fx.view.mapChange = async (change, rebuild) => { calls.push(rebuild); change(fx.view.map); };
+  const host = dom.element('editor');
+  fx.view.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
+  const kindOptions = () => dom.findAll(host, c => c.tag === 'option').map(o => o.text);
+  const select = () => dom.find(host, c => c.tag === 'select');
+  const input = () => dom.find(host, c => c.tag === 'input');
+  return { ...fx, host, calls, closed, changed, kindOptions, select, input };
+};
+integrationTest('hypothesis-evidence: "Add relation…" asks for the kind first (six names in order), then the picker for B titled with that kind; the panel topic is A', async () => {
+  const { view, modals, menus, doc } = heFixture();
+  view.enqueue = work => work(); view.mapChange = async change => { change(view.map); };
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  dom.button(panel, 'Add relation…').click();
+  assert.equal(modals.length, 0, 'no picker before a kind is chosen');
+  assert.deepEqual(menus[0].titles, ['Supports', 'Contradicts', 'Verifies', 'Derives from', 'Related', 'Prerequisite']);
+  menus[0].clicks[3]();
+  assert.equal(modals.length, 1); assert.equal(modals[0].titleText, 'Add relation: Derives from');
+  modals[0].choose(view.map.nodes[1]); await dom.tick();
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'derives_from', from: 'fact', to: 'hyp' }]);
+});
+integrationTest('hypothesis-evidence: the picker offers only legal targets: not itself, not a duplicate, not a derivation cycle, but a cross-kind reverse is fine', () => {
+  const topics = [node('a'), node('b'), node('c'), node('d')];
+  const notes = heNotes(topics.map(n => [n.id, {}]));
+  const relations = [{ kind: 'derives_from', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'c' }, { kind: 'supports', from: 'c', to: 'a' }];
+  const ids = (kind, from) => { const fx = heFixture({ topics, notes, relations }); fx.view.chooseRelationTarget(fx.view.map.nodes.find(n => n.id === from), kind); return fx.view.map.nodes.filter(n => fx.modals[0].selectable(n)).map(n => n.id); };
+  assert.deepEqual(ids('derives_from', 'c'), ['d'], 'c -> a and c -> b would close a derivation cycle; itself is out');
+  assert.deepEqual(ids('supports', 'c'), ['b', 'd'], 'c -> a already exists, a derivation does not count as supports');
+  assert.deepEqual(ids('prerequisite', 'c'), ['a', 'b', 'd'], 'another kind is a different graph');
+});
+integrationTest('hypothesis-evidence: with no legal target the kind shows a Notice naming it and opens no picker', () => {
+  const topics = [node('a'), node('b')];
+  const fx = heFixture({ topics, notes: heNotes(topics.map(n => [n.id, {}])), relations: [{ kind: 'related', from: 'b', to: 'a' }] });
+  fx.view.chooseRelationTarget(fx.view.map.nodes[0], 'related');
+  assert.equal(fx.modals.length, 0); assert.deepEqual(fx.notices, ['There is no topic this one can be linked to with “Related”.']);
+  fx.view.chooseRelationTarget(fx.view.map.nodes[0], 'supports');
+  assert.equal(fx.modals.length, 1, 'a different kind on the same pair is still allowed');
+});
+integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A → Name" coming in and "Name — X" for related, with the note, a focusable row and Edit/Remove labels', () => {
+  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'hyp', to: 'fact' }];
+  const { view } = heFixture({ relations });
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  const rows = dom.findAll(panel, c => c.tag === 'li');
+  assert.deepEqual(rows.map(r => r.attrs['aria-label']), ['Supports → HYP. measured twice', 'OTHER → Derives from', 'Related — HYP']);
+  assert.ok(rows.every(r => r.tabIndex === 0), 'every row can take focus');
+  assert.deepEqual(dom.texts(panel).filter(x => /→|—/.test(x)), ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']);
+  assert.ok(dom.texts(panel).includes('measured twice'));
+  for (const text of ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']) { assert.ok(dom.byLabel(panel, `Edit relation: ${text}`)); assert.ok(dom.byLabel(panel, `Remove relation: ${text}`)); }
+  const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
+  assert.deepEqual(dom.findAll(hypPanel, c => c.tag === 'li').map(r => r.attrs['aria-label']), ['FACT → Supports. measured twice', 'Related — FACT'], 'the same links seen from the other end');
+});
+integrationTest('hypothesis-evidence: the panel "Edit" opens the editor for that row, and clicking a semantic line selects it and opens the editor, while the press alone opens nothing', () => {
+  const { view, modals, evHit } = heLines();
+  let stopped = 0;
+  evHit.fire('pointerdown', { stopPropagation() { stopped++; } });
+  assert.equal(modals.length, 0, 'the press selects only'); assert.equal(view.selectedRelation, heKey(heRel[0]));
+  evHit.fire('click', { stopPropagation() { stopped++; } });
+  assert.equal(stopped, 2); assert.equal(modals.length, 1, 'the click opens the editor dialog');
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  dom.byLabel(panel, 'Edit relation: Supports → HYP').click();
+  assert.equal(modals.length, 2, 'the row Edit opens the same editor');
+  const parentEdge = view.edgesEl.kids.filter(k => k.classes.includes('vam-edge'));
+  assert.ok(parentEdge.every(e => !(e.listeners && e.listeners.click)), 'a parent-child edge takes no click');
+});
+integrationTest('hypothesis-evidence: the editor lists only legal kinds, always including the current one', () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'a' }, { kind: 'verifies', from: 'a', to: 'b' }];
+  const { kindOptions, select } = heEditor(relations, relations[0]);
+  assert.deepEqual(kindOptions(), ['Supports', 'Contradicts', 'Related', 'Prerequisite'], 'Verifies would duplicate; Derives from would close a cycle with b -> a');
+  assert.equal(select().value, 'supports'); assert.equal(select().attrs['aria-label'], 'Relation type');
+});
+integrationTest('hypothesis-evidence: changing the kind is one mapChange, keeps the note, follows the line selection, and is refused if the map changed meanwhile', async () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b', description: 'note' }];
+  const { view, doc, calls, select } = heEditor(relations, relations[0]);
+  select().value = 'contradicts'; select().fire('change'); await dom.tick();
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'contradicts', from: 'a', to: 'b', description: 'note' }]);
+  assert.deepEqual(calls, [false], 'exactly one undoable change, no derived-data rebuild');
+  assert.equal(view.selectedRelation, heKey({ kind: 'contradicts', from: 'a', to: 'b' }), 'the same line stays selected under its new kind');
+  doc.topicRelations.push({ kind: 'prerequisite', from: 'a', to: 'b' });
+  select().value = 'prerequisite'; select().fire('change'); await dom.tick();
+  assert.equal(doc.topicRelations[0].kind, 'contradicts', 'a kind that became a duplicate in the map is refused');
+  assert.equal(calls.length, 2);
+});
+integrationTest('hypothesis-evidence: reverse swaps A and B in one change; "related" has no reverse button', async () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { view, doc, calls, host } = heEditor(relations, relations[0]);
+  dom.button(host, 'Reverse direction').click(); await dom.tick();
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'b', to: 'a' }]); assert.deepEqual(calls, [false]);
+  assert.equal(view.selectedRelation, heKey({ kind: 'supports', from: 'b', to: 'a' }));
+  const related = heEditor([{ kind: 'related', from: 'a', to: 'b' }], { kind: 'related', from: 'a', to: 'b' });
+  assert.equal(dom.buttons(related.host).includes('Reverse direction'), false);
+});
+integrationTest('hypothesis-evidence: an illegal reverse is disabled with its reason (cycle or duplicate) and does nothing', async () => {
+  const cycle = [{ kind: 'derives_from', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'a', to: 'c' }, { kind: 'derives_from', from: 'c', to: 'b' }];
+  const one = heEditor(cycle, cycle[0]);
+  const button = dom.button(one.host, 'Reverse direction');
+  assert.equal(button.disabled, true); button.click(); await dom.tick(); assert.deepEqual(one.calls, []);
+  const reason = dom.find(one.host, c => String(c.cls).includes('vam-relation-reason'));
+  assert.equal(reason.text, 'Cannot reverse: it would form a cycle.'); assert.equal(button.attrs['aria-describedby'], reason.attrs.id);
+  const dup = [{ kind: 'supports', from: 'a', to: 'b' }, { kind: 'supports', from: 'b', to: 'a' }];
+  const two = heEditor(dup, dup[0]);
+  assert.equal(dom.button(two.host, 'Reverse direction').disabled, true);
+  assert.equal(dom.find(two.host, c => String(c.cls).includes('vam-relation-reason')).text, 'Cannot reverse: the reversed relation already exists.');
+});
+integrationTest('hypothesis-evidence: the note is normalized on apply (one line, 200 characters), an empty note removes the key, and an unchanged note writes nothing', async () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { doc, calls, host, input } = heEditor(relations, relations[0]);
+  input().value = '  hello \n   world  '; dom.button(host, 'Apply').click(); await dom.tick();
+  assert.equal(doc.topicRelations[0].description, 'hello world');
+  input().value = 'hello world'; dom.button(host, 'Apply').click(); await dom.tick();
+  assert.equal(calls.length, 1, 'unchanged text is not a change');
+  input().value = 'x'.repeat(201); input().fire('keydown', { key: 'Enter' }); await dom.tick();
+  assert.equal(doc.topicRelations[0].description.length, 200, 'Enter applies too');
+  input().value = '   '; dom.button(host, 'Apply').click(); await dom.tick();
+  assert.equal('description' in doc.topicRelations[0], false, 'clearing deletes the key'); assert.equal(calls.length, 3);
+});
+integrationTest('hypothesis-evidence: Delete removes the relation in one change, closes the editor, repaints the panel, and an undone/vanished relation says so', async () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { view, doc, calls, closed, changed, host } = heEditor(relations, relations[0]);
+  view.selectedRelation = heKey(relations[0]);
+  dom.button(host, 'Delete relation').click(); await dom.tick();
+  assert.equal('topicRelations' in doc, false); assert.deepEqual(calls, [false]); assert.equal(closed.length, 1); assert.equal(changed.length, 1); assert.equal(view.selectedRelation, null);
+  const gone = heEditor([], { kind: 'supports', from: 'a', to: 'b' });
+  assert.ok(dom.texts(gone.host).includes('This relation no longer exists.'));
+  assert.equal(dom.buttons(gone.host).includes('Delete relation'), false);
+});
+integrationTest('hypothesis-evidence: a note like <img src=x onerror=alert(1)> is shown as text in the panel row and the editor, and no img element exists', () => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const relations = [{ kind: 'supports', from: 'a', to: 'b', description: evil }];
+  const { host, input } = heEditor(relations, relations[0]);
+  assert.equal(input().value, evil); assert.equal(dom.findAll(host, c => c.tag === 'img').length, 0);
+  const { view } = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp', description: evil }] });
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  assert.ok(dom.texts(panel).includes(evil), 'shown verbatim'); assert.equal(dom.findAll(panel, c => c.tag === 'img').length, 0);
+  const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const editor = src.slice(src.indexOf('private renderRelationEditor'), src.indexOf('/** `focus` false leaves the camera'));
+  assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(editor), false, 'the editor and the panel rows never parse markup');
+});
+integrationTest('hypothesis-evidence: an AIM map and the built-in sample have no relation section, no add entry and no editor', () => {
+  for (const options of [{ aim: true, relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }, { builtIn: true, relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }]) {
+    const fx = heFixture(options);
+    const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
+    assert.equal(panel.children.length, 0, 'nothing is rendered');
+    fx.view.openRelationEditor(options.relations[0]); fx.view.chooseRelationTarget(fx.view.map.nodes[0], 'supports');
+    assert.equal(fx.modals.length, 0); assert.deepEqual(fx.notices, []);
+  }
+});
+integrationTest('hypothesis-evidence: the V1.5 evidence and prerequisite panel keys are gone and the six relation names exist in all three languages', () => {
+  const read = lang => fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8');
+  const names = { en: ['Supports', 'Contradicts', 'Verifies', 'Derives from', 'Related', 'Prerequisite'], 'zh-TW': ['支持', '反駁', '驗證', '推導', '相關', '前置知識'], 'zh-CN': ['支持', '反驳', '验证', '推导', '相关', '前置知识'] };
+  for (const lang of Object.keys(names)) {
+    ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'].forEach((kind, i) => assert.ok(read(lang).includes(`"ui.relation_name_${kind}": "${names[lang][i]}"`), `${lang} ${kind}`));
+    for (const gone of ['ui.evidence_for_heading', 'ui.evidence_from_heading', 'ui.add_evidence', 'ui.add_prerequisite', 'ui.relation_name_evidence', 'ui.remove_evidence_link_0', 'ui.remove_prerequisite_link_0', 'log.evidence_relation_type_ignored_0'])
+      assert.equal(read(lang).includes(`"${gone}`), false, `${lang} ${gone}`);
+  }
 });

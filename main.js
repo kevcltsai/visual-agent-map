@@ -565,24 +565,36 @@ var en = {
   "ui.hypothesis_medium": "Medium",
   "ui.hypothesis_strong": "Strong",
   "ui.hypothesis_strength": "Strength",
-  "ui.evidence_for_heading": "This topic is evidence for",
-  "ui.evidence_from_heading": "Evidence for this hypothesis",
-  "ui.add_evidence": "Add evidence\u2026",
-  "ui.add_evidence_title": "Add evidence",
-  "ui.add_evidence_description": "Choose the hypothesis this topic is evidence for.",
-  "ui.no_hypothesis_to_link": "There is no hypothesis this topic can be evidence for.",
-  "ui.remove_evidence_link_0": "Remove evidence link: {0}",
-  "ui.prerequisite_heading": "Prerequisites",
-  "ui.prerequisite_of_heading": "This topic is a prerequisite for",
-  "ui.add_prerequisite": "Add prerequisite\u2026",
-  "ui.add_prerequisite_title": "Add prerequisite",
-  "ui.add_prerequisite_description": "Choose the topic that must come first.",
-  "ui.no_prerequisite_to_link": "There is no topic that can be a prerequisite for this one.",
-  "ui.remove_prerequisite_link_0": "Remove prerequisite link: {0}",
-  "ui.relation_name_evidence": "Evidence",
+  "ui.relations_heading": "Relations",
+  "ui.relation_name_supports": "Supports",
+  "ui.relation_name_contradicts": "Contradicts",
+  "ui.relation_name_verifies": "Verifies",
+  "ui.relation_name_derives_from": "Derives from",
+  "ui.relation_name_related": "Related",
   "ui.relation_name_prerequisite": "Prerequisite",
+  "ui.add_relation": "Add relation\u2026",
+  "ui.add_relation_title_0": "Add relation: {0}",
+  "ui.add_relation_description": "Choose the topic at the other end (B). This topic is A.",
+  "ui.no_relation_target_0": "There is no topic this one can be linked to with \u201C{0}\u201D.",
+  "ui.relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_in_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_edit": "Edit",
+  "ui.edit_relation_0": "Edit relation: {0}",
+  "ui.remove_relation_0": "Remove relation: {0}",
+  "ui.relation_editor_title": "Edit relation",
+  "ui.relation_a_0": "A: {0}",
+  "ui.relation_b_0": "B: {0}",
+  "ui.relation_kind_label": "Relation type",
+  "ui.relation_reverse": "Reverse direction",
+  "ui.relation_reverse_blocked_cycle": "Cannot reverse: it would form a cycle.",
+  "ui.relation_reverse_blocked_duplicate": "Cannot reverse: the reversed relation already exists.",
+  "ui.relation_description_label": "Note (optional)",
+  "ui.relation_description_placeholder": "One line, up to 200 characters",
+  "ui.relation_apply": "Apply",
+  "ui.relation_delete": "Delete relation",
+  "ui.relation_gone": "This relation no longer exists.",
   "ui.merge_dropped_cycles_0": "Removed {0} prerequisite link(s) that would form a cycle",
-  "log.evidence_relation_type_ignored_0": "Evidence link not drawn (it must run from a topic to a hypothesis): {0}",
   "ui.collapse_levels": "Collapse or expand the whole map",
   "ui.collapse_all": "Collapse all",
   "ui.expand_all": "Expand all",
@@ -2570,24 +2582,36 @@ var zhCN = {
   "ui.hypothesis_medium": "\u4E2D",
   "ui.hypothesis_strong": "\u5F3A",
   "ui.hypothesis_strength": "\u5F3A\u5EA6",
-  "ui.evidence_for_heading": "\u6B64\u8BAE\u9898\u662F\u4EE5\u4E0B\u5047\u8BBE\u7684\u8BC1\u636E",
-  "ui.evidence_from_heading": "\u6307\u5411\u6B64\u5047\u8BBE\u7684\u8BC1\u636E",
-  "ui.add_evidence": "\u6DFB\u52A0\u8BC1\u636E\u2026",
-  "ui.add_evidence_title": "\u6DFB\u52A0\u8BC1\u636E",
-  "ui.add_evidence_description": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u8981\u4F5C\u4E3A\u8BC1\u636E\u7684\u5047\u8BBE\u3002",
-  "ui.no_hypothesis_to_link": "\u6CA1\u6709\u53EF\u4EE5\u4F5C\u4E3A\u8BC1\u636E\u5BF9\u8C61\u7684\u5047\u8BBE\u3002",
-  "ui.remove_evidence_link_0": "\u79FB\u9664\u8BC1\u636E\u94FE\u63A5\uFF1A{0}",
-  "ui.prerequisite_heading": "\u524D\u7F6E\u77E5\u8BC6",
-  "ui.prerequisite_of_heading": "\u662F\u4EE5\u4E0B\u8BAE\u9898\u7684\u524D\u7F6E\u77E5\u8BC6",
-  "ui.add_prerequisite": "\u6DFB\u52A0\u524D\u7F6E\u77E5\u8BC6\u2026",
-  "ui.add_prerequisite_title": "\u6DFB\u52A0\u524D\u7F6E\u77E5\u8BC6",
-  "ui.add_prerequisite_description": "\u9009\u62E9\u5FC5\u987B\u5148\u5177\u5907\u7684\u8BAE\u9898\u3002",
-  "ui.no_prerequisite_to_link": "\u6CA1\u6709\u53EF\u4EE5\u4F5C\u4E3A\u672C\u8BAE\u9898\u524D\u7F6E\u77E5\u8BC6\u7684\u8BAE\u9898\u3002",
-  "ui.remove_prerequisite_link_0": "\u79FB\u9664\u524D\u7F6E\u77E5\u8BC6\u94FE\u63A5\uFF1A{0}",
-  "ui.relation_name_evidence": "\u8BC1\u636E",
+  "ui.relations_heading": "\u5173\u7CFB",
+  "ui.relation_name_supports": "\u652F\u6301",
+  "ui.relation_name_contradicts": "\u53CD\u9A73",
+  "ui.relation_name_verifies": "\u9A8C\u8BC1",
+  "ui.relation_name_derives_from": "\u63A8\u5BFC",
+  "ui.relation_name_related": "\u76F8\u5173",
   "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8BC6",
+  "ui.add_relation": "\u6DFB\u52A0\u5173\u7CFB\u2026",
+  "ui.add_relation_title_0": "\u6DFB\u52A0\u5173\u7CFB\uFF1A{0}",
+  "ui.add_relation_description": "\u9009\u62E9\u53E6\u4E00\u7AEF\u7684\u8BAE\u9898\uFF08B\uFF09\u3002\u672C\u8BAE\u9898\u662F A\u3002",
+  "ui.no_relation_target_0": "\u6CA1\u6709\u53EF\u4EE5\u7528\u201C{0}\u201D\u94FE\u63A5\u7684\u8BAE\u9898\u3002",
+  "ui.relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_in_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_edit": "\u7F16\u8F91",
+  "ui.edit_relation_0": "\u7F16\u8F91\u5173\u7CFB\uFF1A{0}",
+  "ui.remove_relation_0": "\u79FB\u9664\u5173\u7CFB\uFF1A{0}",
+  "ui.relation_editor_title": "\u7F16\u8F91\u5173\u7CFB",
+  "ui.relation_a_0": "A\uFF1A{0}",
+  "ui.relation_b_0": "B\uFF1A{0}",
+  "ui.relation_kind_label": "\u5173\u7CFB\u79CD\u7C7B",
+  "ui.relation_reverse": "\u53CD\u8F6C\u65B9\u5411",
+  "ui.relation_reverse_blocked_cycle": "\u65E0\u6CD5\u53CD\u8F6C\uFF1A\u4F1A\u5F62\u6210\u73AF\u3002",
+  "ui.relation_reverse_blocked_duplicate": "\u65E0\u6CD5\u53CD\u8F6C\uFF1A\u53CD\u5411\u7684\u5173\u7CFB\u5DF2\u7ECF\u5B58\u5728\u3002",
+  "ui.relation_description_label": "\u8BF4\u660E\uFF08\u9009\u586B\uFF09",
+  "ui.relation_description_placeholder": "\u5355\u884C\uFF0C\u6700\u591A 200 \u5B57",
+  "ui.relation_apply": "\u5E94\u7528",
+  "ui.relation_delete": "\u5220\u9664\u5173\u7CFB",
+  "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u524D\u7F6E\u77E5\u8BC6",
-  "log.evidence_relation_type_ignored_0": "\u8BC1\u636E\u94FE\u63A5\u672A\u7ED8\u5236\uFF08\u5FC5\u987B\u7531\u8BAE\u9898\u6307\u5411\u5047\u8BBE\uFF09\uFF1A{0}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u5F00",
@@ -4575,24 +4599,36 @@ var zhTW = {
   "ui.hypothesis_medium": "\u4E2D",
   "ui.hypothesis_strong": "\u5F37",
   "ui.hypothesis_strength": "\u5F37\u5EA6",
-  "ui.evidence_for_heading": "\u6B64\u8B70\u984C\u662F\u4EE5\u4E0B\u5047\u8A2D\u7684\u8B49\u64DA",
-  "ui.evidence_from_heading": "\u6307\u5411\u6B64\u5047\u8A2D\u7684\u8B49\u64DA",
-  "ui.add_evidence": "\u65B0\u589E\u8B49\u64DA\u2026",
-  "ui.add_evidence_title": "\u65B0\u589E\u8B49\u64DA",
-  "ui.add_evidence_description": "\u9078\u64C7\u9019\u500B\u8B70\u984C\u8981\u4F5C\u70BA\u8B49\u64DA\u7684\u5047\u8A2D\u3002",
-  "ui.no_hypothesis_to_link": "\u6C92\u6709\u53EF\u4EE5\u4F5C\u70BA\u8B49\u64DA\u5C0D\u8C61\u7684\u5047\u8A2D\u3002",
-  "ui.remove_evidence_link_0": "\u79FB\u9664\u8B49\u64DA\u9023\u7D50\uFF1A{0}",
-  "ui.prerequisite_heading": "\u524D\u7F6E\u77E5\u8B58",
-  "ui.prerequisite_of_heading": "\u662F\u4EE5\u4E0B\u8B70\u984C\u7684\u524D\u7F6E\u77E5\u8B58",
-  "ui.add_prerequisite": "\u65B0\u589E\u524D\u7F6E\u77E5\u8B58\u2026",
-  "ui.add_prerequisite_title": "\u65B0\u589E\u524D\u7F6E\u77E5\u8B58",
-  "ui.add_prerequisite_description": "\u9078\u64C7\u5FC5\u9808\u5148\u5177\u5099\u7684\u8B70\u984C\u3002",
-  "ui.no_prerequisite_to_link": "\u6C92\u6709\u53EF\u4EE5\u4F5C\u70BA\u672C\u8B70\u984C\u524D\u7F6E\u77E5\u8B58\u7684\u8B70\u984C\u3002",
-  "ui.remove_prerequisite_link_0": "\u79FB\u9664\u524D\u7F6E\u77E5\u8B58\u9023\u7D50\uFF1A{0}",
-  "ui.relation_name_evidence": "\u8B49\u64DA",
+  "ui.relations_heading": "\u95DC\u4FC2",
+  "ui.relation_name_supports": "\u652F\u6301",
+  "ui.relation_name_contradicts": "\u53CD\u99C1",
+  "ui.relation_name_verifies": "\u9A57\u8B49",
+  "ui.relation_name_derives_from": "\u63A8\u5C0E",
+  "ui.relation_name_related": "\u76F8\u95DC",
   "ui.relation_name_prerequisite": "\u524D\u7F6E\u77E5\u8B58",
+  "ui.add_relation": "\u65B0\u589E\u95DC\u4FC2\u2026",
+  "ui.add_relation_title_0": "\u65B0\u589E\u95DC\u4FC2\uFF1A{0}",
+  "ui.add_relation_description": "\u9078\u64C7\u53E6\u4E00\u7AEF\u7684\u8B70\u984C\uFF08B\uFF09\u3002\u672C\u8B70\u984C\u662F A\u3002",
+  "ui.no_relation_target_0": "\u6C92\u6709\u53EF\u4EE5\u7528\u300C{0}\u300D\u9023\u7D50\u7684\u8B70\u984C\u3002",
+  "ui.relation_row_out_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_in_0_1": "{0} \u2192 {1}",
+  "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_edit": "\u7DE8\u8F2F",
+  "ui.edit_relation_0": "\u7DE8\u8F2F\u95DC\u4FC2\uFF1A{0}",
+  "ui.remove_relation_0": "\u79FB\u9664\u95DC\u4FC2\uFF1A{0}",
+  "ui.relation_editor_title": "\u7DE8\u8F2F\u95DC\u4FC2",
+  "ui.relation_a_0": "A\uFF1A{0}",
+  "ui.relation_b_0": "B\uFF1A{0}",
+  "ui.relation_kind_label": "\u95DC\u4FC2\u7A2E\u985E",
+  "ui.relation_reverse": "\u53CD\u8F49\u65B9\u5411",
+  "ui.relation_reverse_blocked_cycle": "\u7121\u6CD5\u53CD\u8F49\uFF1A\u6703\u5F62\u6210\u74B0\u3002",
+  "ui.relation_reverse_blocked_duplicate": "\u7121\u6CD5\u53CD\u8F49\uFF1A\u53CD\u5411\u7684\u95DC\u4FC2\u5DF2\u7D93\u5B58\u5728\u3002",
+  "ui.relation_description_label": "\u8AAA\u660E\uFF08\u9078\u586B\uFF09",
+  "ui.relation_description_placeholder": "\u55AE\u884C\uFF0C\u6700\u591A 200 \u5B57",
+  "ui.relation_apply": "\u5957\u7528",
+  "ui.relation_delete": "\u522A\u9664\u95DC\u4FC2",
+  "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u524D\u7F6E\u77E5\u8B58",
-  "log.evidence_relation_type_ignored_0": "\u8B49\u64DA\u9023\u7D50\u672A\u7E6A\u88FD\uFF08\u5FC5\u9808\u7531\u8B70\u984C\u6307\u5411\u5047\u8A2D\uFF09\uFF1A{0}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u958B",
@@ -15799,6 +15835,7 @@ var TOPIC_RELATION_KINDS = [
   "related",
   "prerequisite"
 ];
+var RELATION_DESCRIPTION_MAX_LENGTH = 200;
 var relationKey = (r) => r.kind === "related" && r.from > r.to ? `${r.kind}\0${r.to}\0${r.from}` : `${r.kind}\0${r.from}\0${r.to}`;
 var copyRelation = (r, from = r.from, to = r.to) => {
   const out = { kind: r.kind, from, to };
@@ -15807,6 +15844,11 @@ var copyRelation = (r, from = r.from, to = r.to) => {
 };
 function isAcyclicKind(kind) {
   return kind === "derives_from" || kind === "prerequisite";
+}
+function normalizeRelationDescription(text11) {
+  const flat = String(text11).replace(/\s+/g, " ").trim();
+  if (!flat) return void 0;
+  return Array.from(flat).slice(0, RELATION_DESCRIPTION_MAX_LENGTH).join("").trim() || void 0;
 }
 function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
   const raw = map.topicRelations;
@@ -36724,6 +36766,23 @@ var TOPIC_KIND_ICON = {
   evidence: "file-search",
   conclusion: "flag"
 };
+var RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite"
+];
+var RELATION_NAME_KEY = {
+  supports: "ui.relation_name_supports",
+  contradicts: "ui.relation_name_contradicts",
+  verifies: "ui.relation_name_verifies",
+  derives_from: "ui.relation_name_derives_from",
+  related: "ui.relation_name_related",
+  prerequisite: "ui.relation_name_prerequisite"
+};
+var relationIdentity = (r) => `${r.from}\0${r.to}\0${r.kind}`;
 var AIM_STAGE_KEYS = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -43561,84 +43620,47 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
-  /** Adds a `supports` link from this topic to another in one undoable Map.md change; an illegal target (itself, already linked) is refused. */
-  async addEvidence(fromId, toId) {
-    if (!this.map || !this.relationsEnabled()) return;
-    await this.mapChange((map) => {
-      var _a2;
-      if (!legalRelationTargets(map, "supports", fromId).includes(toId)) return;
-      setTopicRelations(map, [...(_a2 = map.topicRelations) != null ? _a2 : [], { kind: "supports", from: fromId, to: toId }]);
-    }, false);
-  }
-  async removeEvidence(fromId, toId) {
-    if (!this.map || !this.relationsEnabled()) return;
-    await this.mapChange((map) => {
-      var _a2;
-      setTopicRelations(
-        map,
-        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => !(r.kind === "supports" && r.from === fromId && r.to === toId))
-      );
-    }, false);
-  }
-  /** Adds a prerequisite link A -> B in one undoable Map.md change; an illegal source (itself, already linked, or closing a cycle) is refused. */
-  async addPrerequisite(fromId, toId) {
+  /** Adds one relation A -> B in one undoable Map.md change; an illegal one (itself, a duplicate, a cycle for derivation or prerequisite) is refused. */
+  async addRelation(fromId, toId, kind) {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange((map) => {
       var _a2, _b2;
-      if (!relationAllowed((_a2 = map.topicRelations) != null ? _a2 : [], { kind: "prerequisite", from: fromId, to: toId })) return;
-      setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], { kind: "prerequisite", from: fromId, to: toId }]);
+      if (!relationAllowed((_a2 = map.topicRelations) != null ? _a2 : [], { kind, from: fromId, to: toId })) return;
+      setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], { kind, from: fromId, to: toId }]);
     }, false);
   }
-  async removePrerequisite(fromId, toId) {
+  /** Removes one relation in one undoable Map.md change. */
+  async removeRelation(link) {
     if (!this.map || !this.relationsEnabled()) return;
     await this.mapChange((map) => {
       var _a2;
       setTopicRelations(
         map,
-        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => !(r.kind === "prerequisite" && r.from === fromId && r.to === toId))
+        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => relationIdentity(r) !== relationIdentity(link))
       );
     }, false);
   }
-  /** Opens the picker for the prerequisite (A) of `node` (B); with no legal source it only says so. */
-  choosePrerequisiteSource(node, onAdded) {
-    var _a2;
-    if (!this.map || !this.relationsEnabled()) return;
-    const relations = (_a2 = this.map.topicRelations) != null ? _a2 : [];
-    const legal = new Set(
-      this.map.nodes.filter((n) => relationAllowed(relations, { kind: "prerequisite", from: n.id, to: node.id })).map((n) => n.id)
-    );
-    if (!legal.size) {
-      new import_obsidian30.Notice(t("ui.no_prerequisite_to_link"));
-      return;
-    }
-    new TopicTreeModal(
-      this.app,
-      t("ui.add_prerequisite_title"),
-      t("ui.add_prerequisite_description"),
-      this.map.nodes,
-      (target) => {
-        var _a3, _b2;
-        return (_b2 = (_a3 = this.notes.get(target.id)) == null ? void 0 : _a3.title) != null ? _b2 : target.path;
-      },
-      (target) => legal.has(target.id),
-      (target) => this.enqueue(async () => {
-        await this.addPrerequisite(target.id, node.id);
-        onAdded == null ? void 0 : onAdded();
-      })
-    ).open();
+  /** The six relation kinds as a menu; `pick` gets the chosen one. */
+  openRelationKindMenu(event, pick) {
+    const menu = new import_obsidian30.Menu();
+    for (const kind of RELATION_KINDS)
+      menu.addItem(
+        (item) => item.setTitle(t(RELATION_NAME_KEY[kind])).setIcon("link").onClick(() => pick(kind))
+      );
+    menu.showAtMouseEvent(event);
   }
-  /** Opens the picker for the topic `node` supports; with no legal target it only says so. */
-  chooseEvidenceTarget(node, onAdded) {
+  /** Opens the picker for the other end (B) of a `kind` relation that starts at `node` (A); with no legal target it only says so. */
+  chooseRelationTarget(node, kind, onAdded) {
     if (!this.map || !this.relationsEnabled()) return;
-    const legal = new Set(legalRelationTargets(this.map, "supports", node.id));
+    const legal = new Set(legalRelationTargets(this.map, kind, node.id));
     if (!legal.size) {
-      new import_obsidian30.Notice(t("ui.no_hypothesis_to_link"));
+      new import_obsidian30.Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
       return;
     }
     new TopicTreeModal(
       this.app,
-      t("ui.add_evidence_title"),
-      t("ui.add_evidence_description"),
+      t("ui.add_relation_title_0", t(RELATION_NAME_KEY[kind])),
+      t("ui.add_relation_description"),
       this.map.nodes,
       (target) => {
         var _a2, _b2;
@@ -43646,12 +43668,151 @@ ${request.requirements}` : preset.text,
       },
       (target) => legal.has(target.id),
       (target) => this.enqueue(async () => {
-        await this.addEvidence(node.id, target.id);
+        await this.addRelation(node.id, target.id, kind);
         onAdded == null ? void 0 : onAdded();
       })
     ).open();
   }
-  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the `supports` links that start or end at this topic. */
+  /** The text of a panel row for `link` seen from `selfId`: "Name → B" going out, "A → Name" coming in, "Name — X" for related. */
+  relationRowText(link, selfId) {
+    const name = t(RELATION_NAME_KEY[link.kind]), titleOf = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    };
+    if (link.kind === "related")
+      return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
+    return link.from === selfId ? t("ui.relation_row_out_0_1", name, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name);
+  }
+  /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
+  openRelationEditor(link, onChanged) {
+    if (!this.map || !this.relationsEnabled()) return;
+    const render = (content, close) => this.renderRelationEditor(content, link, close, onChanged);
+    new class extends import_obsidian30.Modal {
+      onOpen() {
+        this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
+        render(this.contentEl, () => this.close());
+      }
+    }(this.app).open();
+  }
+  /**
+   * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
+   * illegal), a one-line note applied on request, and delete. Each change is one undoable Map.md step. Everything the
+   * user typed (the note, topic titles) is shown as text only.
+   */
+  renderRelationEditor(parent, initial, close, onChanged) {
+    let current = { ...initial };
+    const root = parent.createDiv("vam-relation-editor");
+    const titleOf = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    };
+    const indexOfCurrent = () => {
+      var _a2, _b2;
+      return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : []).findIndex((r) => relationIdentity(r) === relationIdentity(current));
+    };
+    const apply = (next) => this.enqueue(async () => {
+      const outcome = {};
+      if (!this.map) return;
+      await this.mapChange((map) => {
+        var _a2;
+        const list = (_a2 = map.topicRelations) != null ? _a2 : [], index = list.findIndex((r) => relationIdentity(r) === relationIdentity(current));
+        if (index < 0) return;
+        outcome.value = next(list[index]);
+        const old = list[index];
+        if (outcome.value && (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) && !relationAllowed(list, outcome.value, index))
+          outcome.value = void 0;
+        if (outcome.value === void 0) return;
+        const updated = [...list];
+        if (outcome.value) updated[index] = outcome.value;
+        else updated.splice(index, 1);
+        setTopicRelations(map, updated);
+      }, false);
+      const result = outcome.value;
+      if (result === null) {
+        if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
+        this.syncRelationClasses();
+        onChanged == null ? void 0 : onChanged();
+        close == null ? void 0 : close();
+        return;
+      }
+      if (result) {
+        current = result;
+        this.selectedRelation = relationIdentity(current);
+        this.syncRelationClasses();
+      }
+      paint();
+      onChanged == null ? void 0 : onChanged();
+    });
+    const paint = () => {
+      var _a2, _b2, _c;
+      root.empty();
+      const index = indexOfCurrent();
+      root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
+      if (index < 0) {
+        root.createEl("p", { text: t("ui.relation_gone") });
+        return;
+      }
+      const relations = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : [];
+      root.createEl("p", { text: t("ui.relation_a_0", titleOf(current.from)), attr: { dir: "auto" } });
+      root.createEl("p", { text: t("ui.relation_b_0", titleOf(current.to)), attr: { dir: "auto" } });
+      root.createEl("label", { text: t("ui.relation_kind_label") });
+      const kindSelect = root.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
+      for (const kind of RELATION_KINDS)
+        if (kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index))
+          kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+      kindSelect.value = current.kind;
+      kindSelect.addEventListener("change", () => {
+        const kind = kindSelect.value;
+        if (kind === current.kind) return;
+        apply((rel) => ({ ...rel, kind }));
+      });
+      if (current.kind !== "related") {
+        const reversed = { kind: current.kind, from: current.to, to: current.from };
+        const allowed = relationAllowed(relations, reversed, index);
+        const reverse = this.button(
+          root,
+          t("ui.relation_reverse"),
+          () => apply((rel) => ({ ...rel, from: reversed.from, to: reversed.to })),
+          !allowed
+        );
+        if (!allowed) {
+          const duplicate = relations.some(
+            (r, at) => at !== index && relationIdentity(r) === relationIdentity(reversed)
+          );
+          const reason = root.createEl("p", {
+            text: t(duplicate ? "ui.relation_reverse_blocked_duplicate" : "ui.relation_reverse_blocked_cycle"),
+            cls: "vam-relation-reason"
+          });
+          reason.setAttr("id", "vam-relation-reverse-reason");
+          reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
+        }
+      }
+      root.createEl("label", { text: t("ui.relation_description_label") });
+      const description = root.createEl("input", { cls: "vam-relation-description", type: "text" });
+      description.value = (_c = relations[index].description) != null ? _c : "";
+      description.setAttr("aria-label", t("ui.relation_description_label"));
+      description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const applyDescription = () => {
+        const text11 = normalizeRelationDescription(description.value);
+        if (text11 === relations[index].description) return;
+        apply((rel) => {
+          const next = { kind: rel.kind, from: rel.from, to: rel.to };
+          if (text11 !== void 0) next.description = text11;
+          return next;
+        });
+      };
+      description.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        applyDescription();
+      });
+      this.button(root, t("ui.relation_apply"), applyDescription);
+      this.button(root, t("ui.relation_delete"), () => apply(() => null));
+    };
+    paint();
+  }
+  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   renderHypothesisSection(panel, node, close) {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
@@ -43664,12 +43825,8 @@ ${request.requirements}` : preset.text,
       });
     });
     const body = section3.createDiv("vam-hypothesis-body");
-    const titleOf = (id) => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
-    };
     const paint = (focusStrength = false, focusKind = false) => {
-      var _a2, _b2, _c, _d, _e, _f;
+      var _a2, _b2, _c, _d;
       body.empty();
       const currentKind = this.topicKindOf(node.id);
       body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading" });
@@ -43711,54 +43868,35 @@ ${request.requirements}` : preset.text,
           }
         }
       }
-      const supports = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.kind === "supports");
-      for (const [heading, links, otherOf] of [
-        ["ui.evidence_from_heading", supports.filter((r) => r.to === node.id), (r) => r.from],
-        ["ui.evidence_for_heading", supports.filter((r) => r.from === node.id), (r) => r.to]
-      ]) {
-        if (!links.length) continue;
-        body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
+      const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.from === node.id || r.to === node.id);
+      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading" });
+      if (links.length) {
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
-          const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = otherOf(link);
-          this.bindRelationRow(row, link, titleOf(otherId));
-          row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
+          const row = list.createEl("li", { cls: "vam-relation-row" }), text11 = this.relationRowText(link, node.id), described = link.description ? `${text11}. ${link.description}` : text11;
+          this.bindRelationRow(row, link, described);
+          const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
+          label.createSpan({ text: text11, attr: { dir: "auto" } });
+          if (link.description)
+            label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
+          const edit = this.button(row, t("ui.relation_edit"), () => this.openRelationEditor(link, paint));
+          edit.setAttr("aria-label", t("ui.edit_relation_0", text11));
           const remove = this.button(
             row,
             t("ui.remove"),
             () => this.enqueue(async () => {
-              await this.removeEvidence(link.from, link.to);
+              await this.removeRelation(link);
               paint();
             })
           );
-          remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
+          remove.setAttr("aria-label", t("ui.remove_relation_0", text11));
         }
       }
-      this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
-      const prerequisites = ((_f = (_e = this.map) == null ? void 0 : _e.topicRelations) != null ? _f : []).filter((r) => r.kind === "prerequisite");
-      for (const [heading, links, otherOf] of [
-        ["ui.prerequisite_heading", prerequisites.filter((r) => r.to === node.id), (r) => r.from],
-        ["ui.prerequisite_of_heading", prerequisites.filter((r) => r.from === node.id), (r) => r.to]
-      ]) {
-        if (!links.length) continue;
-        body.createEl("strong", { text: t(heading), cls: "vam-topic-tree-heading" });
-        const list = body.createEl("ul", { cls: "vam-relation-list" });
-        for (const link of links) {
-          const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = otherOf(link);
-          this.bindRelationRow(row, link, titleOf(otherId));
-          row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
-          const remove = this.button(
-            row,
-            t("ui.remove"),
-            () => this.enqueue(async () => {
-              await this.removePrerequisite(link.from, link.to);
-              paint();
-            })
-          );
-          remove.setAttr("aria-label", t("ui.remove_prerequisite_link_0", titleOf(otherId)));
-        }
-      }
-      this.button(body, t("ui.add_prerequisite"), () => this.choosePrerequisiteSource(node, paint));
+      const addRelation = body.createEl("button", { text: t("ui.add_relation") });
+      addRelation.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.openRelationKindMenu(event, (kind) => this.chooseRelationTarget(node, kind, paint));
+      });
     };
     paint();
   }
@@ -47732,8 +47870,7 @@ ${addition}` : addition });
     for (const relation of (_a2 = this.map.topicRelations) != null ? _a2 : []) {
       const from = this.cardEls.get(relation.from), to = this.cardEls.get(relation.to);
       if (!from || !to) continue;
-      const key2 = `${relation.from}\0${relation.to}\0${relation.kind}`;
-      links.push({ from, to, key: key2, kind: relation.kind });
+      links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
     const defs = createSvg("defs"), marker5 = createSvg("marker"), arrow = createSvg("path");
@@ -47767,6 +47904,12 @@ ${addition}` : addition });
         this.selectedRelation = key2;
         this.syncRelationClasses();
       });
+      hit.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.selectedRelation = key2;
+        this.syncRelationClasses();
+        this.openRelationEditor(link.relation);
+      });
       hit.addEventListener("pointerenter", () => {
         this.hoverRelation = key2;
         this.syncRelationClasses();
@@ -47781,9 +47924,7 @@ ${addition}` : addition });
     for (const link of links) {
       const label = createSvg("text");
       label.addClass("vam-relation-label");
-      label.textContent = t(
-        link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence"
-      );
+      label.textContent = t(RELATION_NAME_KEY[link.kind]);
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationMidpoint(boxOf(link.from), boxOf(link.to)));
@@ -47825,14 +47966,11 @@ ${addition}` : addition });
     this.relationEndIds = ends;
   }
   /** A panel row stands for its line: focusing it selects the line, hovering previews it with the same highlight and name. */
-  bindRelationRow(row, link, otherTitle) {
-    const key2 = `${link.from}\0${link.to}\0${link.kind}`;
+  bindRelationRow(row, link, ariaLabel) {
+    const key2 = relationIdentity(link);
     row.tabIndex = 0;
     row.setAttr("role", "group");
-    row.setAttr(
-      "aria-label",
-      `${t(link.kind === "prerequisite" ? "ui.relation_name_prerequisite" : "ui.relation_name_evidence")}: ${otherTitle}`
-    );
+    row.setAttr("aria-label", ariaLabel);
     row.addEventListener("focus", () => {
       this.selectedRelation = key2;
       this.syncRelationClasses();

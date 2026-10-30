@@ -2704,6 +2704,12 @@ export class VisualAgentMapView extends ItemView {
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   private openTopicMenu(event: MouseEvent): void {
     const menu = new Menu();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.paste_outline_add_many"))
+        .setIcon("list-tree")
+        .onClick(() => this.openOutlineImport())
+    );
     if (this.relationsEnabled())
       menu.addItem(item =>
         item
@@ -2711,12 +2717,6 @@ export class VisualAgentMapView extends ItemView {
           .setIcon("lightbulb")
           .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, "hypothesis")))
       );
-    menu.addItem(item =>
-      item
-        .setTitle(t("ui.paste_outline_add_many"))
-        .setIcon("list-tree")
-        .onClick(() => this.openOutlineImport())
-    );
     menu.showAtMouseEvent(event);
   }
   /** Collapse or expand every branch in one undoable change, then fit the map. `shownLevels` as in applyCollapseLevel. */
@@ -7630,7 +7630,8 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    if (note) this.renderHypothesisSection(panel, node, close);
+    // Optional call: a test double for the view may not carry the hypothesis section.
+    if (note) this.renderHypothesisSection?.(panel, node, close);
     // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });

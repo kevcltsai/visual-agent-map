@@ -38495,13 +38495,13 @@ ${request.requirements}` : preset.text,
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
     const menu = new import_obsidian30.Menu();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
+    );
     if (this.relationsEnabled())
       menu.addItem(
         (item) => item.setTitle(t("ui.add_hypothesis")).setIcon("lightbulb").onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, "hypothesis")))
       );
-    menu.addItem(
-      (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
-    );
     menu.showAtMouseEvent(event);
   }
   /** Collapse or expand every branch in one undoable change, then fit the map. `shownLevels` as in applyCollapseLevel. */
@@ -42906,7 +42906,7 @@ ${request.requirements}` : preset.text,
     }(this.app).open();
   }
   renderInspector(parent, node, mode = "structure", close, host) {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
     if (this.builtIn) parent.addClass("has-inspector");
     const panel = parent.createDiv(this.builtIn ? "vam-inspector" : "vam-topic-panel"), note = this.notes.get(node.id);
     const heading = panel.createDiv("vam-inspector-heading");
@@ -43000,7 +43000,7 @@ ${request.requirements}` : preset.text,
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    if (note) this.renderHypothesisSection(panel, node, close);
+    if (note) (_h = this.renderHypothesisSection) == null ? void 0 : _h.call(this, panel, node, close);
     const actions = (host != null ? host : panel).createDiv("vam-next-actions");
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {

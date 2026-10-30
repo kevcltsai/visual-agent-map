@@ -134,11 +134,13 @@ import {
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
   HYPOTHESIS_STRENGTHS,
+  TOPIC_KINDS,
   RELEVANCE_LEVELS,
   type HypothesisStrength,
   type NoteRelevance,
   type RelevanceLevel,
-  type RelevanceTier
+  type RelevanceTier,
+  type TopicKind
 } from "../../note-values";
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
@@ -490,6 +492,22 @@ type AimTargetProgress = {
   startedAt?: number;
 };
 
+const TOPIC_KIND_LABEL: Record<TopicKind, Parameters<typeof t>[0]> = {
+  topic: "ui.topic_kind_topic",
+  action: "ui.topic_kind_action",
+  atomic: "ui.topic_kind_atomic",
+  hypothesis: "ui.topic_kind_hypothesis",
+  evidence: "ui.topic_kind_evidence",
+  conclusion: "ui.topic_kind_conclusion"
+};
+const TOPIC_KIND_ICON: Record<TopicKind, string> = {
+  topic: "circle",
+  action: "square-check",
+  atomic: "atom",
+  hypothesis: "lightbulb",
+  evidence: "file-search",
+  conclusion: "flag"
+};
 const AIM_STAGE_KEYS: Record<string, Parameters<typeof t>[0]> = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -2752,11 +2770,24 @@ export class VisualAgentMapView extends ItemView {
         .onClick(() => this.openOutlineImport())
     );
     if (this.relationsEnabled())
+      for (const kind of TOPIC_KINDS)
+        menu.addItem(item =>
+          item
+            .setTitle(t(TOPIC_KIND_LABEL[kind]))
+            .setIcon(TOPIC_KIND_ICON[kind])
+            .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind)))
+        );
+    menu.showAtMouseEvent(event);
+  }
+  /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
+  private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
+    const menu = new Menu();
+    for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
-          .setTitle(t("ui.add_hypothesis"))
-          .setIcon("lightbulb")
-          .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, "hypothesis")))
+          .setTitle(t(TOPIC_KIND_LABEL[kind]))
+          .setIcon(TOPIC_KIND_ICON[kind])
+          .onClick(() => pick(kind))
       );
     menu.showAtMouseEvent(event);
   }
@@ -6549,14 +6580,15 @@ export class VisualAgentMapView extends ItemView {
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
-    // A hypothesis: quiet "Hypothesis · strength" tag, a heavier frame (styles.css) and the same words in the card's accessible name.
-    const strength = this.hypothesisStrengthOf(node.id);
-    if (strength) {
-      const tagText = this.hypothesisTagText(strength);
-      card.dataset.topicKind = "hypothesis";
-      renderHypothesisTag(header, strength, tagText);
+    // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
+    const kind = this.topicKindOf(node.id);
+    if (kind !== "topic") {
+      card.dataset.topicKind = kind;
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]);
+      if (strength) renderHypothesisTag(header, strength, kindText);
       const named = cardLabels.get(card)?.textContent;
-      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
@@ -7168,6 +7200,12 @@ export class VisualAgentMapView extends ItemView {
   private isHypothesis(id: string): boolean {
     return this.notes.get(id)?.topicKind === "hypothesis";
   }
+  /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM and the built-in sample show none). */
+  private topicKindOf(id: string): TopicKind {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind) return "topic";
+    return this.notes.get(id)?.topicKind ?? "topic";
+  }
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
     const node = this.map?.nodes.find(item => item.id === id);
@@ -7365,12 +7403,13 @@ export class VisualAgentMapView extends ItemView {
         status.setText(label);
       } else header?.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
     }
-    // The label above was rewritten from the title and status; a hypothesis keeps its strength in the accessible name.
-    const strength = this.hypothesisStrengthOf(node.id);
-    if (strength && !node.aimKind) {
-      const tagText = this.hypothesisTagText(strength),
+    // The label above was rewritten from the title and status; a typed topic keeps its type (a hypothesis its strength) in the accessible name.
+    const kind = this.topicKindOf(node.id);
+    if (kind !== "topic") {
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]),
         named = cardLabels.get(card)?.textContent;
-      if (named && !named.includes(tagText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
+      if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (redrawEdges) this.drawEdges();
   }
@@ -7901,6 +7940,19 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
+  /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
+  private async changeTopicKind(node: MapNode, kind: TopicKind): Promise<void> {
+    if (!this.map || !this.relationsEnabled() || node.aimKind || this.topicKindOf(node.id) === kind) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeTopicKind(path, kind))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_type") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
   /** Adds a `supports` link from this topic to another in one undoable Map.md change; an illegal target (itself, already linked) is refused. */
   private async addEvidence(fromId: string, toId: string): Promise<void> {
     if (!this.map || !this.relationsEnabled()) return;
@@ -7988,16 +8040,39 @@ export class VisualAgentMapView extends ItemView {
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
-    this.button(section, t("ui.add_subhypothesis"), () => {
-      close?.();
-      this.enqueue(() => this.addNode(node, undefined, true, true, "hypothesis"));
+    const addChild = section.createEl("button", { text: t("ui.add_subtopic_menu") });
+    addChild.addEventListener("click", event => {
+      event.stopPropagation();
+      this.openKindMenu(event, kind => {
+        close?.();
+        this.enqueue(() => this.addNode(node, undefined, true, true, kind));
+      });
     });
-    const isHypothesis = this.isHypothesis(node.id);
     const body = section.createDiv("vam-hypothesis-body");
     const titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
-    const paint = (focusStrength = false): void => {
+    const paint = (focusStrength = false, focusKind = false): void => {
       body.empty();
-      if (isHypothesis) {
+      const currentKind = this.topicKindOf(node.id);
+      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading" });
+      const kinds = body.createDiv("vam-topic-kinds");
+      kinds.setAttr("role", "group");
+      kinds.setAttr("aria-label", t("ui.topic_type"));
+      for (const option of TOPIC_KINDS) {
+        const choice = this.button(kinds, t(TOPIC_KIND_LABEL[option]), () => {
+          if (option === currentKind) return;
+          this.enqueue(async () => {
+            await this.changeTopicKind(node, option);
+            paint(false, true);
+          });
+        });
+        choice.setAttr("aria-pressed", String(option === currentKind));
+        if (option === currentKind) {
+          choice.addClass("mod-cta");
+          // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
+          if (focusKind) choice.focus();
+        }
+      }
+      if (currentKind === "hypothesis") {
         const current = this.notes.get(node.id)?.hypothesisStrength ?? "weak";
         body.createEl("strong", { text: t("ui.hypothesis_strength"), cls: "vam-topic-tree-heading" });
         const group = body.createDiv("vam-hypothesis-strengths");
@@ -8075,17 +8150,15 @@ export class VisualAgentMapView extends ItemView {
     suggestedTitle?: string,
     rebuildDerivedData = true,
     focus = true,
-    kind: "topic" | "hypothesis" = "topic"
+    kind: TopicKind = "topic"
   ): Promise<void> {
     if (!this.map) return;
-    const hypothesis = kind === "hypothesis" && this.relationsEnabled();
+    const typed = kind !== "topic" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
     if (!suggestedTitle?.trim()) {
-      const dialogTitle = hypothesis
-        ? parent
-          ? t("ui.add_subhypothesis")
-          : t("ui.add_hypothesis")
+      const dialogTitle = typed
+        ? t("ui.add_kind_0", t(TOPIC_KIND_LABEL[kind]))
         : parent
           ? t("ui.new_subtopic")
           : t("ui.my_core_topic");
@@ -8104,19 +8177,13 @@ export class VisualAgentMapView extends ItemView {
     }
     const node = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
-        (hypothesis
-          ? parent
-            ? t("ui.new_subhypothesis")
-            : t("ui.new_hypothesis")
-          : parent
-            ? t("ui.new_subtopic")
-            : t("ui.my_core_topic")),
+        (typed ? t("ui.new_kind_0", t(TOPIC_KIND_LABEL[kind])) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local", ...(hypothesis ? { topicKind: "hypothesis" as const } : {}) }
+      { researchMode: "local", ...(typed ? { topicKind: kind } : {}) }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);

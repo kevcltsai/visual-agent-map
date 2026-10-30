@@ -2039,7 +2039,7 @@ function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
   const Notice = class { constructor(message) { notices.push(message); } };
-  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: () => entry }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
+  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
   const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
@@ -2057,23 +2057,153 @@ const heDrawn = (view, boxes) => {
   view.stageEl = view.stageEl ?? {}; view.edgeEls = new Map(); view.canvasNodes = () => view.map.nodes; view.drawEdges();
   return view.edgesEl.kids;
 };
-integrationTest('hypothesis-evidence: the entry points exist only on an ordinary map (not AIM, not the built-in sample)', () => {
-  for (const [options, expected] of [[{}, true], [{ aim: true }, false], [{ builtIn: true }, false]]) {
-    const { view, menus } = heFixture(options);
-    view.openTopicMenu({});
-    const menuTitles = menus.flatMap(m => m.titles);
-    assert.equal(menuTitles.includes('Add hypothesis'), expected, `toolbar menu ${JSON.stringify(options)}`);
-    const panel = dom.element('panel');
-    view.renderHypothesisSection(panel, view.map.nodes[0]);
-    const labels = dom.buttons(panel);
-    assert.equal(labels.includes('Add sub-hypothesis'), expected, `panel sub-hypothesis ${JSON.stringify(options)}`);
-    assert.equal(labels.includes('Add evidence…'), expected, `panel evidence ${JSON.stringify(options)}`);
-  }
-  const { view } = heFixture();
+const heKindNames = ['Topic', 'Action', 'Atomic knowledge', 'Hypothesis', 'Evidence', 'Conclusion'];
+const heKindIds = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+integrationTest('hypothesis-evidence: the toolbar topic menu keeps "paste an outline" first, then lists the six types in order, each creating that type', () => {
+  const { view, menus } = heFixture();
+  const calls = []; view.addNode = (...args) => calls.push(args); view.enqueue = work => work();
+  view.openTopicMenu({});
+  assert.equal(menus.length, 1);
+  assert.match(menus[0].titles[0], /outline/i, 'paste outline stays the first item');
+  assert.deepEqual(menus[0].titles.slice(1), heKindNames);
+  assert.equal(menus[0].titles.some(title => /hypothesis/i.test(title) && title !== 'Hypothesis'), false, 'the old "Add hypothesis" item is gone');
+  menus[0].clicks.slice(1).forEach(click => click());
+  assert.deepEqual(calls, heKindIds.map(kind => [null, undefined, true, true, kind]));
+});
+integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-type menu and creates the chosen type under this topic', () => {
+  const { view, menus } = heFixture();
   const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
-  dom.button(panel, 'Add sub-hypothesis').click();
-  assert.deepEqual(calls, [['other', undefined, true, true, 'hypothesis']], 'the panel passes the hypothesis kind to addNode');
+  assert.equal(dom.buttons(panel).includes('Add sub-hypothesis'), false);
+  dom.button(panel, 'Add subtopic…').click();
+  assert.equal(menus.length, 1); assert.deepEqual(menus[0].titles, heKindNames);
+  menus[0].clicks.forEach(click => click());
+  assert.deepEqual(calls, heKindIds.map(kind => ['other', undefined, true, true, kind]));
+});
+integrationTest('hypothesis-evidence: the card "+" still creates an ordinary topic in one click (no kind argument)', () => {
+  const { view } = heFixture();
+  const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
+  view.stageEl = hePatch(dom.element('stage')); view.renderNode(view.map.nodes[2]);
+  const plus = dom.button(view.stageEl.children[0], '+');
+  plus.click();
+  assert.deepEqual(calls, [['other']]);
+});
+integrationTest('hypothesis-evidence: addNode hands createNote a topicKind only for a typed topic on an ordinary map', async () => {
+  const seen = [];
+  for (const [kind, options] of [['topic', {}], ['hypothesis', {}], ['conclusion', {}], ['action', { aim: true }]]) {
+    const f = heFixture(options);
+    f.view.path = 'Agent Workspace/Topics/map-a/Map.md';
+    f.view.plugin.repo.createNote = async (...args) => { seen.push([kind, args[args.length - 1]]); throw new Error('stop'); };
+    await f.view.addNode(null, 'Title', true, false, kind).catch(error => assert.equal(error.message, 'stop'));
+  }
+  assert.deepEqual(plain(seen), [['topic', { researchMode: 'local' }], ['hypothesis', { researchMode: 'local', topicKind: 'hypothesis' }], ['conclusion', { researchMode: 'local', topicKind: 'conclusion' }], ['action', { researchMode: 'local' }]]);
+});
+integrationTest('hypothesis-evidence: switching the type is one undoable step; undo and redo leave id, parentId and relations as they were, and the strength stays in the file', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-k/Map.md';
+  const doc = { id: 'map-k', title: 'k', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-k');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const parent = await repo.createNote('Parent', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(parent);
+  const child = await repo.createNote('Child', 'gpt-6-luna', doc, MAP, 'workspace', { topicKind: 'hypothesis' });
+  child.parentId = parent.id; doc.nodes.push(child);
+  doc.topicRelations = [{ kind: 'supports', from: child.id, to: parent.id }];
+  await repo.saveMap(MAP, doc);
+  const { view } = heFixture({ topics: [parent, child] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  await view.refreshAfterSavedChange();
+  const frame = async () => plain({ ids: view.map.nodes.map(n => [n.id, n.parentId]), rel: view.map.topicRelations, kind: (await repo.readNote(child.path)).topicKind, strength: (await repo.readNote(child.path)).hypothesisStrength, text: contents.get(child.path).match(/topic-kind:.*|hypothesis-strength:.*/g)?.map(line => line.replace(/"/g, '')) });
+  const before = await frame();
+  assert.equal(before.kind, 'hypothesis'); assert.deepEqual(before.text, ['topic-kind: hypothesis', 'hypothesis-strength: weak']);
+  await view.changeTopicKind(view.map.nodes[1], 'evidence');
+  assert.equal(pushed.length, 1, 'one history entry');
+  const evidence = await frame();
+  assert.equal(evidence.kind, 'evidence'); assert.deepEqual(evidence.text, ['topic-kind: evidence', 'hypothesis-strength: weak'], 'the strength stays in the file');
+  assert.deepEqual([evidence.ids, evidence.rel], [before.ids, before.rel]);
+  await pushed[0].undo(); assert.deepEqual(await frame(), before);
+  await pushed[0].redo(); assert.deepEqual(await frame(), evidence);
+  await pushed[0].undo();
+  await view.refreshAfterSavedChange();
+  await view.changeTopicKind(view.map.nodes[1], 'topic');
+  assert.deepEqual((await frame()).text, ['hypothesis-strength: weak'], 'an ordinary topic drops topic-kind only');
+  assert.equal(pushed.length, 2); assert.equal(pushed[1] !== pushed[0], true);
+  await view.changeTopicKind(view.map.nodes[1], 'topic');
+  assert.equal(pushed.length, 2, 'choosing the current type does nothing');
+});
+integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind and names its type on the card; an ordinary topic sets nothing; AIM shows neither', () => {
+  const render = (options, id) => {
+    const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
+    const card = f.view.stageEl.children[0]; return { card, label: dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label')) };
+  };
+  const notes = heNotes([['fact', { topicKind: 'evidence' }], ['hyp', heHyp('strong')], ['other', {}]]);
+  const evidence = render({ notes }, 'fact');
+  assert.equal(evidence.card.dataset.topicKind, 'evidence'); assert.match(evidence.label.text, /Evidence/);
+  assert.equal(evidence.card.attrs['aria-labelledby'], evidence.label.id);
+  const hyp = render({ notes }, 'hyp');
+  assert.equal(hyp.card.dataset.topicKind, 'hypothesis'); assert.match(hyp.label.text, /Hypothesis · Strong/);
+  for (const kind of ['action', 'atomic', 'conclusion']) {
+    const card = render({ notes: heNotes([['fact', { topicKind: kind }], ['hyp', {}], ['other', {}]]) }, 'fact');
+    assert.equal(card.card.dataset.topicKind, kind); assert.match(card.label.text, new RegExp(heKindNames[heKindIds.indexOf(kind)]));
+  }
+  const plainCard = render({ notes }, 'other');
+  assert.equal('topicKind' in plainCard.card.dataset, false, 'an ordinary topic has no data-topic-kind'); assert.doesNotMatch(plainCard.label.text, /Evidence|Hypothesis|Action|Conclusion|Atomic/);
+  const aim = render({ aim: true, notes }, 'fact');
+  assert.equal('topicKind' in aim.card.dataset, false); assert.doesNotMatch(aim.label.text, /Evidence/);
+  const builtIn = render({ builtIn: true, notes }, 'fact');
+  assert.equal('topicKind' in builtIn.card.dataset, false);
+});
+integrationTest('hypothesis-evidence: an AIM map and the built-in sample have no type menu, no add-subtopic entry, no type control, and refuse a switch', async () => {
+  for (const options of [{ aim: true }, { builtIn: true }]) {
+    const { view, menus, writes } = heFixture(options);
+    view.openTopicMenu({});
+    assert.deepEqual(menus.flatMap(m => m.titles).filter(title => heKindNames.includes(title)), [], `toolbar ${JSON.stringify(options)}`);
+    const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
+    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
+    view.beginMapTransaction = () => assert.fail('no transaction');
+    await view.changeTopicKind(view.map.nodes[2], 'evidence');
+    assert.deepEqual(writes, []);
+  }
+});
+integrationTest('hypothesis-evidence: the panel type control is a labelled group with aria-pressed, shows strength only for a hypothesis, and keeps focus on the pressed type after a switch', async () => {
+  const { view } = heFixture();
+  view.enqueue = work => work();
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.history = { push() {} };
+  view.refreshAfterSavedChange = async () => { for (const [id, kind] of view.pendingKinds) { const note = view.notes.get(id); if (kind === 'topic') delete note.topicKind; else note.topicKind = kind; } };
+  view.pendingKinds = new Map();
+  view.plugin.repo.writeTopicKind = async (path, kind) => view.pendingKinds.set(path.replace('.md', ''), kind);
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  const group = () => dom.find(panel, c => c.cls.includes('vam-topic-kinds'));
+  assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Topic type');
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  assert.deepEqual(dom.findAll(group(), c => c.tag === 'button').map(c => c.text), heKindNames);
+  assert.deepEqual(pressed(), ['Topic']);
+  const strengths = () => dom.buttons(panel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label));
+  assert.deepEqual(strengths(), [], 'no strength control for an ordinary topic');
+  dom.button(group(), 'Hypothesis').click(); await dom.tick();
+  assert.deepEqual(pressed(), ['Hypothesis']); assert.deepEqual(strengths(), ['Weak', 'Medium', 'Strong'], 'the strength control follows the type');
+  const focused = dom.findAll(group(), c => c.focused);
+  assert.deepEqual(focused.map(c => c.text), ['Hypothesis'], 'focus stays on the control that is now pressed');
+  dom.button(group(), 'Evidence').click(); await dom.tick();
+  assert.deepEqual(pressed(), ['Evidence']); assert.deepEqual(strengths(), [], 'the strength control is hidden for any other type');
+  assert.deepEqual(dom.findAll(group(), c => c.focused).map(c => c.text).includes('Evidence'), true);
+});
+integrationTest('hypothesis-evidence: the chat-guard message names the type and strength fields in all three languages, and the old add-hypothesis keys are gone', () => {
+  const read = lang => fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8');
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const text = read(lang);
+    assert.doesNotMatch(text, /"ui\.(add_hypothesis|new_hypothesis|add_subhypothesis|new_subhypothesis)"/, lang);
+    for (const key of [...heKindIds.map(k => `ui.topic_kind_${k}`), 'ui.topic_type', 'ui.add_subtopic_menu']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
+  }
+  assert.match(read('zh-TW'), /類型或強度欄位/); assert.match(read('zh-CN'), /类型或强度字段/); assert.match(read('en'), /type or hypothesis fields/);
 });
 integrationTest('hypothesis-evidence: every topic type has the add-evidence entry (it creates supports); only a hypothesis has the strength control', () => {
   const { view } = heFixture();
@@ -2210,7 +2340,7 @@ integrationTest('hypothesis-evidence: after a strength change the focus returns 
   view.history = { push() {} };
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
   dom.button(panel, 'Strong').click(); await dom.tick();
-  const pressed = dom.findAll(panel, c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true');
+  const pressed = dom.findAll(dom.find(panel, c => c.cls.includes('vam-hypothesis-strengths')), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true');
   assert.deepEqual(pressed.map(c => c.text), ['Strong']);
   assert.equal(pressed[0].focused, true, 'focus is on the strength button that is now pressed');
 });
@@ -2221,7 +2351,7 @@ integrationTest('hypothesis-evidence: a strength change rewrites the note and Ma
   view.beginMapTransaction = () => tx; view.refreshAfterSavedChange = async () => { view.notes.get('hyp').hypothesisStrength = 'strong'; };
   const pushed = []; view.history = { push: entry => pushed.push(entry) };
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
-  const pressed = () => dom.findAll(panel, c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  const pressed = () => dom.findAll(dom.find(panel, c => c.cls.includes('vam-hypothesis-strengths')), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
   assert.deepEqual(pressed(), ['Weak']);
   dom.button(panel, 'Weak').click();
   assert.equal(steps.length, 0, 'choosing the current strength does nothing');

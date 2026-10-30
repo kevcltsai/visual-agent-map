@@ -550,10 +550,16 @@ var en = {
   "ui.rename_topic": "Rename",
   "ui.paste_outline_add_many": "Paste an outline to add several topics at once",
   "ui.topic_more_options": "More ways to add topics",
-  "ui.add_hypothesis": "Add hypothesis",
-  "ui.new_hypothesis": "New hypothesis",
-  "ui.add_subhypothesis": "Add sub-hypothesis",
-  "ui.new_subhypothesis": "New sub-hypothesis",
+  "ui.topic_kind_topic": "Topic",
+  "ui.topic_kind_atomic": "Atomic knowledge",
+  "ui.topic_kind_hypothesis": "Hypothesis",
+  "ui.topic_kind_evidence": "Evidence",
+  "ui.topic_kind_conclusion": "Conclusion",
+  "ui.topic_kind_action": "Action",
+  "ui.topic_type": "Topic type",
+  "ui.add_subtopic_menu": "Add subtopic\u2026",
+  "ui.add_kind_0": "Add {0}",
+  "ui.new_kind_0": "New {0}",
   "ui.hypothesis_tag_0": "Hypothesis \xB7 {0}",
   "ui.hypothesis_weak": "Weak",
   "ui.hypothesis_medium": "Medium",
@@ -1041,7 +1047,7 @@ var en = {
   "ui.map_chat_guard_not_markdown": "only .md files are allowed",
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
-  "ui.map_chat_guard_hypothesis_frontmatter_changed": "the edit would change a topic's hypothesis fields (topic-kind or hypothesis-strength)",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "the edit would change a topic's type or hypothesis fields (topic-kind or hypothesis-strength)",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
   "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",
@@ -2549,10 +2555,16 @@ var zhCN = {
   "ui.rename_topic": "\u91CD\u547D\u540D",
   "ui.paste_outline_add_many": "\u7C98\u8D34\u5927\u7EB2\uFF0C\u4E00\u6B21\u6DFB\u52A0\u591A\u4E2A",
   "ui.topic_more_options": "\u66F4\u591A\u6DFB\u52A0\u8BAE\u9898\u7684\u65B9\u5F0F",
-  "ui.add_hypothesis": "\u6DFB\u52A0\u5047\u8BBE",
-  "ui.new_hypothesis": "\u65B0\u5047\u8BBE",
-  "ui.add_subhypothesis": "\u6DFB\u52A0\u5B50\u5047\u8BBE",
-  "ui.new_subhypothesis": "\u65B0\u5B50\u5047\u8BBE",
+  "ui.topic_kind_topic": "\u4E00\u822C\u8BAE\u9898",
+  "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8BC6",
+  "ui.topic_kind_hypothesis": "\u5047\u8BBE",
+  "ui.topic_kind_evidence": "\u8BC1\u636E",
+  "ui.topic_kind_conclusion": "\u7ED3\u8BBA",
+  "ui.topic_kind_action": "\u884C\u52A8",
+  "ui.topic_type": "\u8BAE\u9898\u7C7B\u578B",
+  "ui.add_subtopic_menu": "\u6DFB\u52A0\u5B50\u8BAE\u9898\u2026",
+  "ui.add_kind_0": "\u6DFB\u52A0{0}",
+  "ui.new_kind_0": "\u65B0{0}",
   "ui.hypothesis_tag_0": "\u5047\u8BBE\u30FB{0}",
   "ui.hypothesis_weak": "\u5F31",
   "ui.hypothesis_medium": "\u4E2D",
@@ -3040,7 +3052,7 @@ var zhCN = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8BB8 .md \u6587\u4EF6",
   "ui.map_chat_guard_map_unparseable": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u5F04\u574F\u5FC3\u667A\u56FE\u6587\u4EF6",
   "ui.map_chat_guard_topic_identity_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u8BC6\u522B\u5B57\u6BB5",
-  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u5047\u8BBE\u5B57\u6BB5\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u7C7B\u578B\u6216\u5F3A\u5EA6\u5B57\u6BB5\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6587\u4EF6\u4F1A\u7528\u5230\u63D2\u4EF6\u4FDD\u7559\u7684\u5B57\u6BB5",
   "ui.map_chat_guard_identity_added": "\u8FD9\u6B21\u4FEE\u6539\u4F1A\u7ED9\u666E\u901A\u7B14\u8BB0\u52A0\u4E0A\u63D2\u4EF6\u4FDD\u7559\u7684\u8BAE\u9898\u5B57\u6BB5",
   "ui.map_chat_guard_map_file": "\u8FD9\u662F\u5FC3\u667A\u56FE\u6587\u4EF6\uFF0C\u8BF7\u6539\u7528\u8BAE\u9898\u52A8\u4F5C",
@@ -4548,10 +4560,16 @@ var zhTW = {
   "ui.rename_topic": "\u91CD\u65B0\u547D\u540D",
   "ui.paste_outline_add_many": "\u8CBC\u4E0A\u5927\u7DB1\uFF0C\u4E00\u6B21\u65B0\u589E\u591A\u500B",
   "ui.topic_more_options": "\u66F4\u591A\u65B0\u589E\u8B70\u984C\u7684\u65B9\u5F0F",
-  "ui.add_hypothesis": "\u65B0\u589E\u5047\u8A2D",
-  "ui.new_hypothesis": "\u65B0\u5047\u8A2D",
-  "ui.add_subhypothesis": "\u65B0\u589E\u5B50\u5047\u8A2D",
-  "ui.new_subhypothesis": "\u65B0\u5B50\u5047\u8A2D",
+  "ui.topic_kind_topic": "\u4E00\u822C\u8B70\u984C",
+  "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8B58",
+  "ui.topic_kind_hypothesis": "\u5047\u8A2D",
+  "ui.topic_kind_evidence": "\u8B49\u64DA",
+  "ui.topic_kind_conclusion": "\u7D50\u8AD6",
+  "ui.topic_kind_action": "\u884C\u52D5",
+  "ui.topic_type": "\u8B70\u984C\u985E\u578B",
+  "ui.add_subtopic_menu": "\u65B0\u589E\u5B50\u8B70\u984C\u2026",
+  "ui.add_kind_0": "\u65B0\u589E{0}",
+  "ui.new_kind_0": "\u65B0{0}",
   "ui.hypothesis_tag_0": "\u5047\u8A2D\u30FB{0}",
   "ui.hypothesis_weak": "\u5F31",
   "ui.hypothesis_medium": "\u4E2D",
@@ -5039,7 +5057,7 @@ var zhTW = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8A31 .md \u6A94",
   "ui.map_chat_guard_map_unparseable": "\u9019\u500B\u4FEE\u6539\u6703\u5F04\u58DE\u5FC3\u667A\u5716\u6A94",
   "ui.map_chat_guard_topic_identity_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u8B58\u5225\u6B04\u4F4D",
-  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u5047\u8A2D\u6B04\u4F4D\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u985E\u578B\u6216\u5F37\u5EA6\u6B04\u4F4D\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6A94\u6848\u6703\u7528\u5230\u5916\u639B\u4FDD\u7559\u7684\u6B04\u4F4D",
   "ui.map_chat_guard_identity_added": "\u9019\u6B21\u4FEE\u6539\u6703\u66FF\u4E00\u822C\u7B46\u8A18\u52A0\u4E0A\u5916\u639B\u4FDD\u7559\u7684\u8B70\u984C\u6B04\u4F4D",
   "ui.map_chat_guard_map_file": "\u9019\u662F\u5FC3\u667A\u5716\u6A94\uFF0C\u8ACB\u6539\u7528\u8B70\u984C\u52D5\u4F5C",
@@ -36627,6 +36645,22 @@ var boxOf = (card) => ({
   width: card.offsetWidth,
   height: card.offsetHeight
 });
+var TOPIC_KIND_LABEL = {
+  topic: "ui.topic_kind_topic",
+  action: "ui.topic_kind_action",
+  atomic: "ui.topic_kind_atomic",
+  hypothesis: "ui.topic_kind_hypothesis",
+  evidence: "ui.topic_kind_evidence",
+  conclusion: "ui.topic_kind_conclusion"
+};
+var TOPIC_KIND_ICON = {
+  topic: "circle",
+  action: "square-check",
+  atomic: "atom",
+  hypothesis: "lightbulb",
+  evidence: "file-search",
+  conclusion: "flag"
+};
 var AIM_STAGE_KEYS = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -38691,8 +38725,18 @@ ${request.requirements}` : preset.text,
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
     );
     if (this.relationsEnabled())
+      for (const kind of TOPIC_KINDS)
+        menu.addItem(
+          (item) => item.setTitle(t(TOPIC_KIND_LABEL[kind])).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
+        );
+    menu.showAtMouseEvent(event);
+  }
+  /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
+  openKindMenu(event, pick) {
+    const menu = new import_obsidian30.Menu();
+    for (const kind of TOPIC_KINDS)
       menu.addItem(
-        (item) => item.setTitle(t("ui.add_hypothesis")).setIcon("lightbulb").onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, "hypothesis")))
+        (item) => item.setTitle(t(TOPIC_KIND_LABEL[kind])).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
       );
     menu.showAtMouseEvent(event);
   }
@@ -42166,13 +42210,14 @@ ${request.requirements}` : preset.text,
       const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
-    const strength = this.hypothesisStrengthOf(node.id);
-    if (strength) {
-      const tagText = this.hypothesisTagText(strength);
-      card.dataset.topicKind = "hypothesis";
-      renderHypothesisTag(header, strength, tagText);
+    const kind = this.topicKindOf(node.id);
+    if (kind !== "topic") {
+      card.dataset.topicKind = kind;
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]);
+      if (strength) renderHypothesisTag(header, strength, kindText);
       const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
-      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     const errorDetails = [];
     if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
@@ -42724,6 +42769,13 @@ ${request.requirements}` : preset.text,
     var _a2;
     return ((_a2 = this.notes.get(id)) == null ? void 0 : _a2.topicKind) === "hypothesis";
   }
+  /** The type to show: only a topic on an ordinary map has one other than "topic" (AIM and the built-in sample show none). */
+  topicKindOf(id) {
+    var _a2, _b2, _c;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind) return "topic";
+    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.topicKind) != null ? _c : "topic";
+  }
   /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
   hypothesisStrengthOf(id) {
     var _a2, _b2, _c;
@@ -42907,10 +42959,11 @@ ${request.requirements}` : preset.text,
         status.setText(label);
       } else header == null ? void 0 : header.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
     }
-    const strength = this.hypothesisStrengthOf(node.id);
-    if (strength && !node.aimKind) {
-      const tagText = this.hypothesisTagText(strength), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
-      if (named && !named.includes(tagText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
+    const kind = this.topicKindOf(node.id);
+    if (kind !== "topic") {
+      const strength = this.hypothesisStrengthOf(node.id);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
+      if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (redrawEdges) this.drawEdges();
   }
@@ -43406,6 +43459,16 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
+  /** Sets a topic's type: the note's `topic-kind` and Map.md (viewport only) in one undoable step. Id, parent and relations are not touched. */
+  async changeTopicKind(node, kind) {
+    if (!this.map || !this.relationsEnabled() || node.aimKind || this.topicKindOf(node.id) === kind) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeTopicKind(path, kind)).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.topic_type") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
   /** Adds a `supports` link from this topic to another in one undoable Map.md change; an illegal target (itself, already linked) is refused. */
   async addEvidence(fromId, toId) {
     if (!this.map || !this.relationsEnabled()) return;
@@ -43500,20 +43563,42 @@ ${request.requirements}` : preset.text,
   renderHypothesisSection(panel, node, close) {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
-    this.button(section3, t("ui.add_subhypothesis"), () => {
-      close == null ? void 0 : close();
-      this.enqueue(() => this.addNode(node, void 0, true, true, "hypothesis"));
+    const addChild = section3.createEl("button", { text: t("ui.add_subtopic_menu") });
+    addChild.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.openKindMenu(event, (kind) => {
+        close == null ? void 0 : close();
+        this.enqueue(() => this.addNode(node, void 0, true, true, kind));
+      });
     });
-    const isHypothesis = this.isHypothesis(node.id);
     const body = section3.createDiv("vam-hypothesis-body");
     const titleOf = (id) => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
     };
-    const paint = (focusStrength = false) => {
+    const paint = (focusStrength = false, focusKind = false) => {
       var _a2, _b2, _c, _d, _e, _f;
       body.empty();
-      if (isHypothesis) {
+      const currentKind = this.topicKindOf(node.id);
+      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading" });
+      const kinds = body.createDiv("vam-topic-kinds");
+      kinds.setAttr("role", "group");
+      kinds.setAttr("aria-label", t("ui.topic_type"));
+      for (const option2 of TOPIC_KINDS) {
+        const choice2 = this.button(kinds, t(TOPIC_KIND_LABEL[option2]), () => {
+          if (option2 === currentKind) return;
+          this.enqueue(async () => {
+            await this.changeTopicKind(node, option2);
+            paint(false, true);
+          });
+        });
+        choice2.setAttr("aria-pressed", String(option2 === currentKind));
+        if (option2 === currentKind) {
+          choice2.addClass("mod-cta");
+          if (focusKind) choice2.focus();
+        }
+      }
+      if (currentKind === "hypothesis") {
         const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "weak";
         body.createEl("strong", { text: t("ui.hypothesis_strength"), cls: "vam-topic-tree-heading" });
         const group = body.createDiv("vam-hypothesis-strengths");
@@ -43589,10 +43674,10 @@ ${request.requirements}` : preset.text,
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic") {
     var _a2, _b2, _c, _d, _e, _f, _g;
     if (!this.map) return;
-    const hypothesis = kind === "hypothesis" && this.relationsEnabled();
+    const typed = kind !== "topic" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
-      const dialogTitle = hypothesis ? parent ? t("ui.add_subhypothesis") : t("ui.add_hypothesis") : parent ? t("ui.new_subtopic") : t("ui.my_core_topic");
+      const dialogTitle = typed ? t("ui.add_kind_0", t(TOPIC_KIND_LABEL[kind])) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic");
       new NameModal(
         this.app,
         dialogTitle,
@@ -43610,13 +43695,13 @@ ${request.requirements}` : preset.text,
       return;
     }
     const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (hypothesis ? parent ? t("ui.new_subhypothesis") : t("ui.new_hypothesis") : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (typed ? t("ui.new_kind_0", t(TOPIC_KIND_LABEL[kind])) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local", ...hypothesis ? { topicKind: "hypothesis" } : {} }
+      { researchMode: "local", ...typed ? { topicKind: kind } : {} }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0);

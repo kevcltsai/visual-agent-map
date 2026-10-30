@@ -40177,7 +40177,7 @@ ${request.requirements}` : preset.text,
     summary.empty();
     summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text: text11 });
-    summary.setAttr("title", text11);
+    summary.title = text11;
   }
   /**
    * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
@@ -40200,7 +40200,7 @@ ${request.requirements}` : preset.text,
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text11);
       else {
         (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
-        summary.setAttr("title", text11);
+        summary.title = text11;
       }
       this.fitKindShape(card, this.topicKindOf(node.id));
       return;
@@ -40211,7 +40211,7 @@ ${request.requirements}` : preset.text,
     else {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
-      summary.setAttr("title", note.summary);
+      summary.title = note.summary;
     }
     this.fitKindShape(card, this.topicKindOf(node.id));
   }

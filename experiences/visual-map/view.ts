@@ -4130,7 +4130,7 @@ export class VisualAgentMapView extends ItemView {
     summary.empty();
     summary.createSpan({ cls: "vam-card-preview-label", text: t("ui.research_preview_label") });
     summary.createSpan({ cls: "vam-card-preview-text", text });
-    summary.setAttr("title", text);
+    summary.title = text;
   }
   /**
    * Streams the summary preview into the card itself. Text only: no render, nothing is saved. Once the preview is gone
@@ -4152,7 +4152,7 @@ export class VisualAgentMapView extends ItemView {
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
       else {
         summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
-        summary.setAttr("title", text);
+        summary.title = text;
       }
       this.fitKindShape(card, this.topicKindOf(node.id));
       return;
@@ -4163,7 +4163,7 @@ export class VisualAgentMapView extends ItemView {
     else {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
-      summary.setAttr("title", note.summary);
+      summary.title = note.summary;
     }
     this.fitKindShape(card, this.topicKindOf(node.id));
   }

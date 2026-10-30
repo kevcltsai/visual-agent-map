@@ -3278,6 +3278,17 @@ integrationTest('hypothesis-evidence: relation rows read "A relation B" with thi
   const tools = dom.findAll(rows[0], c => c.tag === 'button');
   assert.deepEqual(tools.map(b => b.dataset.icon), ['pencil', 'trash-2']); assert.deepEqual(tools.map(b => b.attrs['aria-label']), ['Edit relation: Supports → HYP', 'Remove relation: Supports → HYP']);
   assert.ok(tools.every(b => b.cls.includes('clickable-icon')));
+  // Tester F3 (decision 38): after a change the panel is repainted, so closing the editor focuses the new row's edit button, or "Add relation…" once the relation is gone.
+  {
+    const fx = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }); const opened = []; fx.view.openRelationEditor = (link, onChanged, onClosed) => opened.push({ link, onChanged, onClosed });
+    const p = dom.element('panel'); fx.view.renderHypothesisSection(p, fx.view.map.nodes.find(n => n.id === 'fact'));
+    const focusedOf = root => { const all = dom.findAll(root, c => c.tag === 'button'); return all.filter(b => b.focused || b.focusCount); };
+    dom.find(p, c => c.dataset?.icon === 'pencil').click(); assert.equal(typeof opened[0].onClosed, 'function', 'the row passes a focus-return callback');
+    opened[0].onChanged(); const fresh = dom.find(p, c => c.dataset?.icon === 'pencil'); let focused = null; fresh.focus = () => { focused = 'edit'; };
+    opened[0].onClosed(); assert.equal(focused, 'edit', 'focus lands on the repainted edit button of the same pair');
+    fx.view.map.topicRelations = []; opened[0].onChanged(); const add = dom.find(p, c => c.tag === 'button' && c.text === 'Add relation…'); let addFocused = false; add.focus = () => { addFocused = true; };
+    opened[0].onClosed(); assert.ok(addFocused, 'with the relation deleted, focus lands on Add relation…'); void focusedOf;
+  }
   assert.equal(rows[0].attrs['aria-label'], 'Supports → HYP. measured twice', 'the row name is unchanged');
   const none = heFixture(); const emptyPanel = dom.element('panel'); none.view.renderHypothesisSection(emptyPanel, none.view.map.nodes[0]);
   assert.ok(dom.texts(emptyPanel).includes('No relations yet')); assert.equal(dom.findAll(emptyPanel, c => c.tag === 'li').length, 0);

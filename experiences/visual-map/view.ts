@@ -587,6 +587,11 @@ const guardSkipped = (code: MapChatGuardCode, editing = false): ChatOutcome =>
   skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 let mapChatTaskSequence = 0;
 
+/** The same key for both directions: a pair of topics holds one relation (spec V1.7). */
+function relationPairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
@@ -8087,7 +8092,7 @@ export class VisualAgentMapView extends ItemView {
     return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
-  private openRelationEditor(link: TopicRelation, onChanged?: () => void): void {
+  private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
     const render = (content: HTMLElement, close: () => void): void =>
       this.renderRelationEditor(content, link, close, onChanged);
@@ -8096,8 +8101,14 @@ export class VisualAgentMapView extends ItemView {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
       }
+      onClose(): void {
+        // Obsidian puts focus back on the button that opened the dialog, but a change repainted the panel and that
+        // button is gone; after its restore, the caller moves focus to the row's replacement.
+        if (onClosed) window.setTimeout(onClosed, 0);
+      }
     })(this.app).open();
   }
+
   /**
    * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
    * illegal), a one-line note applied on request, and delete. Each change is one undoable Map.md step. Everything the
@@ -8361,6 +8372,8 @@ export class VisualAgentMapView extends ItemView {
     if (!this.relationsEnabled() || node.aimKind) return;
     const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
+    const editByPair = new Map<string, HTMLElement>();
+    let addRelationButton: HTMLElement | null = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
@@ -8410,6 +8423,7 @@ export class VisualAgentMapView extends ItemView {
         }
       }
       // Relations: every link that starts or ends at this topic, whatever its kind.
+      editByPair.clear();
       const links = (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id);
       body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
       if (links.length) {
@@ -8429,7 +8443,13 @@ export class VisualAgentMapView extends ItemView {
           if (link.description)
             label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
           const tools = row.createSpan({ cls: "vam-relation-tools" });
-          this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () => this.openRelationEditor(link, paint));
+          const pair = relationPairKey(link.from, link.to);
+          // After the editor closes, focus goes to this pair's edit button as last painted (a pair has one relation),
+          // or to "Add relation…" when the relation was deleted.
+          const edit = this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () =>
+            this.openRelationEditor(link, paint, () => (editByPair.get(pair) ?? addRelationButton)?.focus())
+          );
+          editByPair.set(pair, edit);
           this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
             this.enqueue(async () => {
               await this.removeRelation(link);
@@ -8439,6 +8459,7 @@ export class VisualAgentMapView extends ItemView {
         }
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
       const addRelation = body.createEl("button", { text: t("ui.add_relation") });
+      addRelationButton = addRelation;
       addRelation.addEventListener("click", event => {
         event.stopPropagation();
         this.openRelationKindMenu(event, kind =>

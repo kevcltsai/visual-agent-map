@@ -36898,6 +36898,9 @@ var GUARD_REASON = {
 };
 var guardSkipped = (code, editing = false) => skipped(editing && code === "reserved_frontmatter" ? "ui.map_chat_guard_identity_added" : GUARD_REASON[code]);
 var mapChatTaskSequence = 0;
+function relationPairKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
 var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -43786,13 +43789,16 @@ ${request.requirements}` : preset.text,
     return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
-  openRelationEditor(link, onChanged) {
+  openRelationEditor(link, onChanged, onClosed) {
     if (!this.map || !this.relationsEnabled()) return;
     const render = (content, close) => this.renderRelationEditor(content, link, close, onChanged);
     new class extends import_obsidian30.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
+      }
+      onClose() {
+        if (onClosed) window.setTimeout(onClosed, 0);
       }
     }(this.app).open();
   }
@@ -44038,6 +44044,8 @@ ${request.requirements}` : preset.text,
     if (!this.relationsEnabled() || node.aimKind) return;
     const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section3.createDiv("vam-hypothesis-body");
+    const editByPair = /* @__PURE__ */ new Map();
+    let addRelationButton = null;
     const paint = (focusStrength = false, focusKind = false, focusAdd = false) => {
       var _a2, _b2, _c, _d;
       body.empty();
@@ -44085,6 +44093,7 @@ ${request.requirements}` : preset.text,
           }
         }
       }
+      editByPair.clear();
       const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.from === node.id || r.to === node.id);
       body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
       if (links.length) {
@@ -44102,7 +44111,17 @@ ${request.requirements}` : preset.text,
           if (link.description)
             label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
           const tools = row.createSpan({ cls: "vam-relation-tools" });
-          this.iconButton(tools, "pencil", t("ui.edit_relation_0", text11), () => this.openRelationEditor(link, paint));
+          const pair6 = relationPairKey(link.from, link.to);
+          const edit = this.iconButton(
+            tools,
+            "pencil",
+            t("ui.edit_relation_0", text11),
+            () => this.openRelationEditor(link, paint, () => {
+              var _a3, _b3;
+              return (_b3 = (_a3 = editByPair.get(pair6)) != null ? _a3 : addRelationButton) == null ? void 0 : _b3.focus();
+            })
+          );
+          editByPair.set(pair6, edit);
           this.iconButton(
             tools,
             "trash-2",
@@ -44115,6 +44134,7 @@ ${request.requirements}` : preset.text,
         }
       } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
       const addRelation = body.createEl("button", { text: t("ui.add_relation") });
+      addRelationButton = addRelation;
       addRelation.addEventListener("click", (event) => {
         event.stopPropagation();
         this.openRelationKindMenu(

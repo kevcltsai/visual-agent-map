@@ -22747,6 +22747,7 @@ ${typed}` : draft;
     this.applying = false;
     this.clearStage();
     this.unread = false;
+    if (this.built) this.liveEl.setText("");
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();
@@ -37088,6 +37089,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** The map the conversation belongs to; opening another map starts a new conversation. */
     __publicField(this, "chatMapId", "");
     __publicField(this, "chatController", null);
+    /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
+    __publicField(this, "chatPrepAbandon", null);
     __publicField(this, "chatTaskKey", null);
     /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
     __publicField(this, "chatPlanToken", 0);
@@ -46806,15 +46809,22 @@ ${note.detail.trim()}` : "",
     const turn = chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again), "preparing");
     let sent = false;
     const abandon = (reason) => {
+      if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
       if (!chat.retract(turn, again ? void 0 : draft)) return;
       if (reason !== void 0) new import_obsidian30.Notice(reason);
     };
+    const stopPreparing = () => abandon();
+    this.chatPrepAbandon = stopPreparing;
     const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request;
     try {
       request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
-      abandon(errorMessage(error));
+      abandon(this.closed ? void 0 : errorMessage(error));
+      return;
+    }
+    if (this.closed || !chat.hasTurn(turn)) {
+      abandon();
       return;
     }
     let went = false;
@@ -46826,6 +46836,7 @@ ${note.detail.trim()}` : "",
           return;
         }
         sent = true;
+        if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
         const controller = new AbortController();
         const key2 = `map-chat-view:${++mapChatTaskSequence}`;
         this.chatController = controller;
@@ -46882,7 +46893,7 @@ ${note.detail.trim()}` : "",
       });
     } catch (error) {
       if (sent) throw error;
-      abandon(errorMessage(error));
+      abandon(this.closed ? void 0 : errorMessage(error));
       return;
     }
     if (!went && !sent) abandon(this.closed ? void 0 : notSent());
@@ -46973,18 +46984,22 @@ ${note.detail.trim()}` : "",
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   stopMapChat() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
       (_a2 = this.chat) == null ? void 0 : _a2.focusInput();
       return;
     }
     const controller = this.chatController;
-    if (!controller) return;
+    if (!controller) {
+      (_b2 = this.chatPrepAbandon) == null ? void 0 : _b2.call(this);
+      (_c = this.chat) == null ? void 0 : _c.focusInput();
+      return;
+    }
     this.releaseChatTask();
     controller.abort();
-    (_b2 = this.chat) == null ? void 0 : _b2.markStopped();
-    (_c = this.chat) == null ? void 0 : _c.focusInput();
+    (_d = this.chat) == null ? void 0 : _d.markStopped();
+    (_e = this.chat) == null ? void 0 : _e.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   abortMapChat() {

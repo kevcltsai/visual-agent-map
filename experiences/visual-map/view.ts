@@ -634,6 +634,8 @@ export class VisualAgentMapView extends ItemView {
   /** The map the conversation belongs to; opening another map starts a new conversation. */
   private chatMapId = "";
   private chatController: AbortController | null = null;
+  /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
+  private chatPrepAbandon: (() => void) | null = null;
   private chatTaskKey: string | null = null;
   /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
   private chatPlanToken = 0;
@@ -11186,15 +11188,24 @@ export class VisualAgentMapView extends ItemView {
     // Takes the turn back and puts the draft into the field again (a "more detail" or retry has no draft to put back). `reason`
     // is the Notice; closing the view or switching maps needs none, and then the panel has already dropped the turn.
     const abandon = (reason?: string): void => {
+      if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
       if (!chat.retract(turn, again ? undefined : draft)) return;
       if (reason !== undefined) new Notice(reason);
     };
+    // Stop while preparing is the user's own act: the send is taken back like any early end, without a Notice.
+    const stopPreparing = (): void => abandon();
+    this.chatPrepAbandon = stopPreparing;
     const notSent = (): string => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request: MapChatRequest;
     try {
       request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
-      abandon(errorMessage(error));
+      abandon(this.closed ? undefined : errorMessage(error));
+      return;
+    }
+    // Stop, closing the view or a map switch while the request was being built: no usage notice, no setup guide.
+    if (this.closed || !chat.hasTurn(turn)) {
+      abandon();
       return;
     }
     let went = false;
@@ -11212,6 +11223,7 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         sent = true;
+        if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
         const controller = new AbortController();
         const key = `map-chat-view:${++mapChatTaskSequence}`;
         this.chatController = controller;
@@ -11282,7 +11294,7 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       // Only a failure before the request went out is taken back; once sent, the turn reports its own failures.
       if (sent) throw error;
-      abandon(errorMessage(error));
+      abandon(this.closed ? undefined : errorMessage(error));
       return;
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
@@ -11403,7 +11415,11 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const controller = this.chatController;
-    if (!controller) return;
+    if (!controller) {
+      this.chatPrepAbandon?.();
+      this.chat?.focusInput();
+      return;
+    }
     this.releaseChatTask();
     controller.abort();
     this.chat?.markStopped();

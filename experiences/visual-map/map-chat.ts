@@ -910,6 +910,8 @@ export class MapChatPanel {
     this.applying = false;
     this.clearStage();
     this.unread = false;
+    // A stage name said for the turn that is gone must not stay in the live region.
+    if (this.built) this.liveEl.setText("");
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();

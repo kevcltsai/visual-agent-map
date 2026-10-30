@@ -194,13 +194,13 @@ export interface MapChatHost {
   style(): MapChatStyleChoice;
   /** The user picked an answer length; the view remembers it. */
   setStyle(style: MapChatStyleChoice): void;
-  /** Models the chat can use; `value` "" follows the default model and its label names that model. */
+  /** Models the chat can use (the current model is one of them, or an "unavailable" entry). */
   modelChoices(): { value: string; label: string; short?: string }[];
-  /** Remembered chat model ("" follows the default). */
+  /** The current model (shared with the settings page). */
   model(): string;
-  /** The user picked a chat model; the view remembers it. */
+  /** The user picked a model: it becomes the current model everywhere. */
   setModel(model: string): void;
-  /** Calls `changed` whenever the available models change and starts a refresh; the returned function stops listening. */
+  /** Calls `changed` whenever the available models or the current model change, and starts a refresh; the returned function stops listening. */
   watchModels(changed: () => void): () => void;
   /** "Say it in more detail": send `origin` again with the detailed style. */
   moreDetail(origin: MapChatOrigin): void;
@@ -1508,7 +1508,7 @@ export class MapChatPanel {
     }
     const choices = this.host.modelChoices();
     this.modelEl.empty();
-    // A long label (the follow-default entry names the model) is shortened in the list; the full one is its tooltip.
+    // A choice may carry a shorter list label; the full one is its tooltip.
     for (const choice of choices)
       this.modelEl.createEl("option", {
         text: choice.short ?? choice.label,

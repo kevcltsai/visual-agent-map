@@ -34,6 +34,7 @@ __export(main_exports, {
   extractJsonObject: () => extractJsonObject,
   firstMarkdownImage: () => firstMarkdownImage,
   firstMarkdownTable: () => firstMarkdownTable,
+  hasLegacyChatModel: () => hasLegacyChatModel,
   markdownImages: () => markdownImages,
   settingsFromSaved: () => settingsFromSaved,
   visualReferencesMarkdown: () => visualReferencesMarkdown
@@ -19224,9 +19225,6 @@ function readHypothesisStrength(fm) {
 function normalizeMapChatStyle(value) {
   return value === "detailed" ? "detailed" : "concise";
 }
-function normalizeMapChatModel(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
 function normalizeMapChatWidth(value) {
   return clampMapChatWidth(value);
 }
@@ -19265,7 +19263,6 @@ var DEFAULT_SETTINGS = {
   claudePath: "claude",
   cliModel: FALLBACK_MODEL,
   mapChatStyle: "concise",
-  mapChatModel: "",
   mapChatWidth: MAP_CHAT_WIDTH_DEFAULT,
   mapChatOpen: true,
   cliReasoning: "low",
@@ -19958,8 +19955,9 @@ var Repository = class {
    * manual keeps it, workspace follows the current setting, inherited uses the nearest manual ancestor's stored model
    * and otherwise the current setting. `overridden` is true when the model comes from a manual topic or ancestor.
    */
-  async effectiveModel(path, stored, source, map) {
-    if (source === "manual") return { model: stored || this.settings.cliModel, overridden: Boolean(stored) };
+  async effectiveModel(path, stored, source, map, storedReasoning) {
+    if (source === "manual")
+      return { model: stored || this.settings.cliModel, overridden: Boolean(stored), reasoning: storedReasoning || void 0 };
     if (source === "workspace") return { model: this.settings.cliModel, overridden: false };
     let owner = (map == null ? void 0 : map.nodes.some((node2) => node2.path === path)) ? map : void 0;
     if (!owner) {
@@ -19983,7 +19981,7 @@ var Repository = class {
       if (!parent) break;
       try {
         const fm = frontmatter(await this.app.vault.read(this.file(parent.path)));
-        if (fm["model-source"] === "manual" && text5(fm.model)) return { model: text5(fm.model), overridden: true };
+        if (fm["model-source"] === "manual" && text5(fm.model)) return { model: text5(fm.model), overridden: true, reasoning: text5(fm["reasoning-level"]) || void 0 };
       } catch (e) {
       }
       node = parent;
@@ -19995,15 +19993,17 @@ var Repository = class {
    * model. Reasoning follows the current setting until MS-04 moves it into the same resolution.
    */
   async resolveTopicModel(path, map, runOnce) {
+    var _a2;
     const note = this.file(path);
     const fm = frontmatter(await this.app.vault.read(note));
     const raw = text5(fm["model-source"], "workspace");
     const source = raw === "manual" || raw === "inherited" ? raw : "workspace";
     const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
-    const effective = await this.effectiveModel(path, text5(fm.model), source, map);
+    const effective = await this.effectiveModel(path, text5(fm.model), source, map, text5(fm["reasoning-level"]));
+    const overrideReasoning = normalizeReasoningLevel((_a2 = effective.reasoning) != null ? _a2 : this.settings.cliReasoning);
     return resolveTaskModel({
       runOnce,
-      override: effective.overridden ? { model: effective.model, reasoning: current.reasoning } : null,
+      override: effective.overridden ? { model: effective.model, reasoning: overrideReasoning } : null,
       current
     });
   }
@@ -49737,19 +49737,19 @@ ${note.detail.trim()}` : "",
         void this.plugin.saveSettings();
       },
       modelChoices: () => this.chatModelChoices(),
-      model: () => {
-        var _a2;
-        return (_a2 = this.plugin.settings.mapChatModel) != null ? _a2 : "";
-      },
+      model: () => this.plugin.settings.cliModel,
       setModel: (model) => {
-        this.plugin.settings.mapChatModel = model;
-        void this.plugin.saveSettings();
+        void this.plugin.setCurrentModel(model);
       },
       watchModels: (changed) => {
-        const unsubscribe = this.plugin.subscribeModelDiscovery(changed);
+        const stopDiscovery = this.plugin.subscribeModelDiscovery(changed);
+        const stopCurrent = this.plugin.subscribeCurrentModel(changed);
         void this.plugin.refreshModelDiscovery("codex");
         void this.plugin.refreshModelDiscovery("claude");
-        return unsubscribe;
+        return () => {
+          stopDiscovery();
+          stopCurrent();
+        };
       },
       moreDetail: (origin) => {
         void this.sendMapChat(origin);
@@ -49808,27 +49808,14 @@ ${note.detail.trim()}` : "",
       saveTranscript: (turns) => this.saveChatTranscript(turns)
     };
   }
-  /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
+  /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
   chatModelChoices() {
-    var _a2;
-    const settings = this.plugin.settings;
-    const choices = [
-      {
-        value: "",
-        label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
-        // The list shows the model's own name; the provider prefix ("Codex · ") is in the tooltip with the full label.
-        short: t(
-          "ui.map_chat_model_follow_short_0",
-          (_a2 = this.plugin.modelLabel(settings.cliModel).split(" \xB7 ").at(-1)) != null ? _a2 : ""
-        )
-      },
-      ...this.plugin.availableModels().map((id) => ({ value: id, label: this.plugin.modelLabel(id) }))
-    ];
-    const saved = settings.mapChatModel;
-    if (saved && !choices.some((choice2) => choice2.value === saved))
+    const current = this.plugin.settings.cliModel;
+    const choices = this.plugin.availableModels().map((id) => ({ value: id, label: this.plugin.modelLabel(id) }));
+    if (current && !choices.some((choice2) => choice2.value === current))
       choices.push({
-        value: saved,
-        label: `${this.plugin.modelLabel(saved)} (${t("ui.current_model_is_unavailable")})`
+        value: current,
+        label: `${this.plugin.modelLabel(current)} (${t("ui.current_model_is_unavailable")})`
       });
     return choices;
   }
@@ -49956,23 +49943,22 @@ ${note.detail.trim()}` : "",
     };
   }
   async buildChatRequest(message, chat, origin, redo = false) {
-    var _a2;
     const map = this.map;
     const settings = this.plugin.settings;
     const byId = new Map(map.nodes.map((node) => [node.id, node]));
     const summaryOf = (id) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.chatTopicState(id)) == null ? void 0 : _a3.summary) != null ? _b2 : "";
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.chatTopicState(id)) == null ? void 0 : _a2.summary) != null ? _b2 : "";
     };
     const titleOf = (node) => {
-      var _a3, _b2;
-      return (_b2 = (_a3 = this.chatTopicState(node.id)) == null ? void 0 : _a3.title) != null ? _b2 : node.path;
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.chatTopicState(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path;
     };
     const depthOf = (node) => {
-      var _a3, _b2;
+      var _a2, _b2;
       const seen = /* @__PURE__ */ new Set([node.id]);
       let depth = 0;
-      for (let at = node.parentId; at && !seen.has(at); at = (_b2 = (_a3 = byId.get(at)) == null ? void 0 : _a3.parentId) != null ? _b2 : null) {
+      for (let at = node.parentId; at && !seen.has(at); at = (_b2 = (_a2 = byId.get(at)) == null ? void 0 : _a2.parentId) != null ? _b2 : null) {
         seen.add(at);
         depth++;
       }
@@ -49991,13 +49977,13 @@ ${note.detail.trim()}` : "",
       ...failureOf(node.id)
     }));
     const ref = (id) => {
-      var _a3, _b2;
+      var _a2, _b2;
       const node = byId.get(id);
       return node ? {
         id,
         title: titleOf(node),
         summary: summaryOf(id),
-        detail: (_b2 = (_a3 = this.notes.get(id)) == null ? void 0 : _a3.detail) != null ? _b2 : "",
+        detail: (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.detail) != null ? _b2 : "",
         path: node.path,
         ...failureOf(id)
       } : null;
@@ -50043,7 +50029,7 @@ ${note.detail.trim()}` : "",
       contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
       ...redo ? { redo: true } : {},
-      model: ((_a2 = settings.mapChatModel) == null ? void 0 : _a2.trim()) || settings.cliModel,
+      model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
   }
@@ -58079,6 +58065,13 @@ ${value}
 };
 
 // main.ts
+function migratedChatModel(saved) {
+  const old = saved == null ? void 0 : saved.mapChatModel;
+  return typeof old === "string" ? old.trim() : "";
+}
+function hasLegacyChatModel(saved) {
+  return !!saved && typeof saved === "object" && "mapChatModel" in saved;
+}
 function settingsFromSaved(saved) {
   var _a2, _b2;
   const legacy = saved;
@@ -58101,9 +58094,8 @@ function settingsFromSaved(saved) {
     mapId: (saved == null ? void 0 : saved.mapId) || "default",
     codexPath: (saved == null ? void 0 : saved.codexPath) || (legacy == null ? void 0 : legacy.cliPath) || DEFAULT_SETTINGS.codexPath,
     claudePath: (saved == null ? void 0 : saved.claudePath) || DEFAULT_SETTINGS.claudePath,
-    cliModel: (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
+    cliModel: migratedChatModel(saved) || (saved == null ? void 0 : saved.cliModel) || DEFAULT_SETTINGS.cliModel,
     mapChatStyle: normalizeMapChatStyle(saved == null ? void 0 : saved.mapChatStyle),
-    mapChatModel: normalizeMapChatModel(saved == null ? void 0 : saved.mapChatModel),
     mapChatWidth: normalizeMapChatWidth(saved == null ? void 0 : saved.mapChatWidth),
     mapChatOpen: normalizeMapChatOpen(saved == null ? void 0 : saved.mapChatOpen),
     cliReasoning: normalizeReasoningLevel(saved == null ? void 0 : saved.cliReasoning),
@@ -58204,6 +58196,7 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     /** The relevance grading run of each map, by map path. A view shows it; only one run per map. */
     __publicField(this, "relevanceGrades", /* @__PURE__ */ new Map());
     __publicField(this, "exchanges", null);
+    __publicField(this, "currentModelListeners", /* @__PURE__ */ new Set());
     __publicField(this, "modelDiscovery", new ModelDiscovery(
       () => this.codexDiagnostic().installed,
       () => this.loadCodexModels(),
@@ -58396,6 +58389,7 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     announceTestOverrides((message) => new import_obsidian38.Notice(message, 0));
     const saved = await this.loadData();
     this.settings = settingsFromSaved(saved);
+    if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
@@ -58912,6 +58906,19 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   subscribeModelDiscovery(listener) {
     return this.modelDiscovery.subscribe(listener);
+  }
+  /** The current model (settings page and chat menu share it): save it and tell every listener. */
+  async setCurrentModel(model) {
+    if (typeof model !== "string" || !model.trim()) return;
+    this.settings.cliModel = model.trim();
+    await this.saveSettings();
+    for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
+  }
+  subscribeCurrentModel(listener) {
+    this.currentModelListeners.add(listener);
+    return () => {
+      this.currentModelListeners.delete(listener);
+    };
   }
   async refreshModelDiscovery(provider) {
     const state = await this.modelDiscovery.refresh(provider);

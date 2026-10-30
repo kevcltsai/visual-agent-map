@@ -10860,16 +10860,19 @@ export class VisualAgentMapView extends ItemView {
         void this.plugin.saveSettings();
       },
       modelChoices: () => this.chatModelChoices(),
-      model: () => this.plugin.settings.mapChatModel ?? "",
+      model: () => this.plugin.settings.cliModel,
       setModel: model => {
-        this.plugin.settings.mapChatModel = model;
-        void this.plugin.saveSettings();
+        void this.plugin.setCurrentModel(model);
       },
       watchModels: changed => {
-        const unsubscribe = this.plugin.subscribeModelDiscovery(changed);
+        const stopDiscovery = this.plugin.subscribeModelDiscovery(changed);
+        const stopCurrent = this.plugin.subscribeCurrentModel(changed);
         void this.plugin.refreshModelDiscovery("codex");
         void this.plugin.refreshModelDiscovery("claude");
-        return unsubscribe;
+        return () => {
+          stopDiscovery();
+          stopCurrent();
+        };
       },
       moreDetail: origin => {
         void this.sendMapChat(origin);
@@ -10917,26 +10920,14 @@ export class VisualAgentMapView extends ItemView {
       saveTranscript: turns => this.saveChatTranscript(turns)
     };
   }
-  /** The chat's model list: the follow-default entry first, then the settings page's list (and a saved model that has gone). */
+  /** The chat's model list: the settings page's list, plus the current model when it has gone from that list. */
   private chatModelChoices(): { value: string; label: string; short?: string }[] {
-    const settings = this.plugin.settings;
-    const choices = [
-      {
-        value: "",
-        label: t("ui.map_chat_model_follow_0", this.plugin.modelLabel(settings.cliModel)),
-        // The list shows the model's own name; the provider prefix ("Codex · ") is in the tooltip with the full label.
-        short: t(
-          "ui.map_chat_model_follow_short_0",
-          this.plugin.modelLabel(settings.cliModel).split(" · ").at(-1) ?? ""
-        )
-      },
-      ...this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }))
-    ];
-    const saved = settings.mapChatModel;
-    if (saved && !choices.some(choice => choice.value === saved))
+    const current = this.plugin.settings.cliModel;
+    const choices = this.plugin.availableModels().map(id => ({ value: id, label: this.plugin.modelLabel(id) }));
+    if (current && !choices.some(choice => choice.value === current))
       choices.push({
-        value: saved,
-        label: `${this.plugin.modelLabel(saved)} (${t("ui.current_model_is_unavailable")})`
+        value: current,
+        label: `${this.plugin.modelLabel(current)} (${t("ui.current_model_is_unavailable")})`
       });
     return choices;
   }
@@ -11167,7 +11158,7 @@ export class VisualAgentMapView extends ItemView {
       contentLanguage: outputLanguageForMap(map, settings.language, ...mapChatLanguageSources(message)),
       style: redo ? "detailed" : normalizeMapChatStyle(settings.mapChatStyle),
       ...(redo ? { redo: true } : {}),
-      model: settings.mapChatModel?.trim() || settings.cliModel,
+      model: settings.cliModel,
       reasoning: normalizeReasoningLevel(settings.cliReasoning)
     };
   }

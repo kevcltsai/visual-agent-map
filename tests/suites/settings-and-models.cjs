@@ -213,3 +213,23 @@ test('model resolution: inherited with no manual ancestor resolves to current; m
   const once = await repo.resolveTopicModel(child.path, map, { model: 'once-model' });
   assert.equal(once.origin, 'run-once');
 });
+
+test('model resolution (MS-01 review): an override brings its own reasoning-level; a missing one falls back to cliReasoning', async () => {
+  const support = require('../support.cjs');
+  const { repo, app } = support.fixture('en'); repo.settings.cliModel = 'cur-model'; repo.settings.cliReasoning = 'low';
+  const root = await support.topicNote(repo, 'Root', 'gpt-5.5');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', map = support.map([root]); map.id = 'map-a';
+  await app.vault.create(mapPath, support.core.serializeMap(map));
+  const child = await repo.createNote('Child', 'gpt-5.5', map, mapPath, 'inherited');
+  child.parentId = root.id; map.nodes.push(child);
+  await repo.updateNote(root.path, { model: 'anc-model', modelSource: 'manual', reasoning: 'high' });
+  const own = await repo.resolveTopicModel(root.path, map);
+  assert.equal(own.origin, 'override'); assert.equal(own.model, 'anc-model'); assert.equal(own.reasoning, 'high');
+  const inherited = await repo.resolveTopicModel(child.path, map);
+  assert.equal(inherited.origin, 'override'); assert.equal(inherited.reasoning, 'high', 'an inheriting topic uses its manual ancestor\'s reasoning');
+  const once = await repo.resolveTopicModel(child.path, map, { model: 'once-model' });
+  assert.equal(once.reasoning, 'low', 'run-once without reasoning keeps the current reasoning');
+  await repo.updateNote(root.path, { model: 'anc-model', modelSource: 'manual' });
+  await app.vault.process(repo.file(root.path), content => content.replace(/^reasoning-level:.*\n/m, ''));
+  assert.equal((await repo.resolveTopicModel(root.path, map)).reasoning, 'low', 'no reasoning-level in the note: fall back to cliReasoning');
+});

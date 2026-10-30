@@ -60,6 +60,8 @@ import {
   type MapNode,
   parentIdsForNode,
   removeNodes,
+  removeTopicRelationsFor,
+  retargetTopicRelations,
   setTopicRelations,
   supersededAimNodeIds,
   visibleNodes
@@ -543,6 +545,7 @@ const GUARD_REASON: Record<MapChatGuardCode, TranslationKey> = {
   duplicate_identity_key: "ui.map_chat_guard_duplicate_identity_key",
   topic_identity_changed: "ui.map_chat_guard_topic_identity_changed",
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
+  hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline"
 };
@@ -552,6 +555,12 @@ let mapChatTaskSequence = 0;
 
 export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
+  /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
+  private lastDroppedCycles = 0;
+  /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
+  droppedCyclesOfLastMerge(): number {
+    return this.lastDroppedCycles;
+  }
   private path = "";
   private notes = new Map<string, Note>();
   /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
@@ -4200,6 +4209,10 @@ export class VisualAgentMapView extends ItemView {
     const before = clone(this.map),
       ids = branch ? new Set([node.id, ...descendants(before.nodes, node.id)]) : new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
+    if (adopterId && (this.isHypothesis(node.id) || this.isHypothesis(adopterId))) {
+      new Notice(t("ui.merge_adopt_hypothesis"));
+      return;
+    }
     const removableQuestions = new Set(
       node.aimKind === "question"
         ? before.nodes.filter(item => ids.has(item.id) && item.aimKind === "question").map(item => item.id)
@@ -4222,6 +4235,13 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
         map.nodes = removeNodes(map.nodes, node.id, branch);
+        if (adopterId) {
+          removeTopicRelationsFor(
+            map,
+            [...ids].filter(id => id !== node.id)
+          );
+          this.lastDroppedCycles = retargetTopicRelations(map, [node.id], adopterId).droppedCycles;
+        } else removeTopicRelationsFor(map, ids);
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
           if (adopter) adopter.collapsed = false;
@@ -4272,7 +4292,8 @@ export class VisualAgentMapView extends ItemView {
       ids,
       nodes: this.map?.nodes ?? [],
       hasNote: id => this.notes.has(id),
-      busy: node => this.mergeBusy(node, except)
+      busy: node => this.mergeBusy(node, except),
+      isHypothesis: id => this.isHypothesis(id)
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
@@ -4700,6 +4721,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
+          this.lastDroppedCycles = retargetTopicRelations(map, ids, merged.id).droppedCycles;
           if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -4800,6 +4822,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
+          this.lastDroppedCycles = retargetTopicRelations(map, ids, target.id).droppedCycles;
           if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -4958,6 +4981,7 @@ export class VisualAgentMapView extends ItemView {
           map.viewport = clone(viewport);
           const prior = clone(map);
           map.nodes = map.nodes.filter(node => !ids.has(node.id));
+          removeTopicRelationsFor(map, ids);
           this.removeAimReferences(map, ids, prior.nodes);
         })
         .commit();

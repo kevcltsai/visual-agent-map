@@ -732,6 +732,8 @@ var en = {
   "ui.merge_target_changed": "The merged topic was edited after the merge, so Undo or Redo was not applied.",
   "ui.merge_busy": "An AI task is running on a selected topic; merge after it finishes",
   "ui.merge_missing_note": "A selected topic's note is missing, so it cannot be merged",
+  "ui.merge_hypothesis": "A hypothesis cannot be merged; only ordinary topics can be merged",
+  "ui.merge_adopt_hypothesis": "A hypothesis cannot be merged into another topic or take one over",
   "ui.merge_title_label": "Name of the merged topic",
   "ui.merge_ai_untitled": "(AI names the merged topic)",
   "ui.merge_confirm_desc": "{0} cards become 1 new topic that replaces them. The original notes move to this map's Unassigned folder; Undo restores them.",
@@ -1029,6 +1031,7 @@ var en = {
   "ui.map_chat_guard_not_markdown": "only .md files are allowed",
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "the edit would change a topic's hypothesis fields (topic-kind or hypothesis-strength)",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
   "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",
@@ -2718,6 +2721,8 @@ var zhCN = {
   "ui.merge_target_changed": "\u5408\u5E76\u540E\u7684\u8BAE\u9898\u5DF2\u88AB\u4FEE\u6539\uFF0C\u64A4\u9500\u6216\u91CD\u505A\u672A\u8FD0\u884C\u3002",
   "ui.merge_busy": "\u6709\u8BAE\u9898\u6B63\u5728\u8FD0\u884C AI \u4EFB\u52A1\uFF0C\u5B8C\u6210\u540E\u624D\u80FD\u5408\u5E76",
   "ui.merge_missing_note": "\u6709\u8BAE\u9898\u7684\u7B14\u8BB0\u627E\u4E0D\u5230\uFF0C\u65E0\u6CD5\u5408\u5E76",
+  "ui.merge_hypothesis": "\u5047\u8BBE\u4E0D\u80FD\u5408\u5E76\uFF0C\u53EA\u6709\u4E00\u822C\u8BAE\u9898\u53EF\u4EE5\u5408\u5E76",
+  "ui.merge_adopt_hypothesis": "\u5047\u8BBE\u4E0D\u80FD\u88AB\u5408\u5E76\uFF0C\u4E5F\u4E0D\u80FD\u5408\u5E76\u5176\u4ED6\u8BAE\u9898",
   "ui.merge_title_label": "\u5408\u5E76\u540E\u7684\u8BAE\u9898\u540D\u79F0",
   "ui.merge_ai_untitled": "\uFF08\u7531 AI \u66FF\u5408\u5E76\u540E\u7684\u8BAE\u9898\u547D\u540D\uFF09",
   "ui.merge_confirm_desc": "{0} \u5F20\u5361\u4F1A\u5408\u5E76\u6210 1 \u5F20\u65B0\u8BAE\u9898\u5E76\u53D6\u4EE3\u539F\u672C\u7684\u5361\uFF1B\u539F\u7B14\u8BB0\u79FB\u5230\u8FD9\u5F20\u56FE\u7684 Unassigned\uFF0C\u53EF\u4EE5\u7528\u64A4\u9500\u8FD8\u539F\u3002",
@@ -3015,6 +3020,7 @@ var zhCN = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8BB8 .md \u6587\u4EF6",
   "ui.map_chat_guard_map_unparseable": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u5F04\u574F\u5FC3\u667A\u56FE\u6587\u4EF6",
   "ui.map_chat_guard_topic_identity_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u8BC6\u522B\u5B57\u6BB5",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u8FD9\u4E2A\u4FEE\u6539\u4F1A\u6539\u5230\u8BAE\u9898\u7684\u5047\u8BBE\u5B57\u6BB5\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6587\u4EF6\u4F1A\u7528\u5230\u63D2\u4EF6\u4FDD\u7559\u7684\u5B57\u6BB5",
   "ui.map_chat_guard_identity_added": "\u8FD9\u6B21\u4FEE\u6539\u4F1A\u7ED9\u666E\u901A\u7B14\u8BB0\u52A0\u4E0A\u63D2\u4EF6\u4FDD\u7559\u7684\u8BAE\u9898\u5B57\u6BB5",
   "ui.map_chat_guard_map_file": "\u8FD9\u662F\u5FC3\u667A\u56FE\u6587\u4EF6\uFF0C\u8BF7\u6539\u7528\u8BAE\u9898\u52A8\u4F5C",
@@ -4704,6 +4710,8 @@ var zhTW = {
   "ui.merge_target_changed": "\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u5DF2\u88AB\u4FEE\u6539\uFF0C\u5FA9\u539F\u6216\u91CD\u505A\u672A\u57F7\u884C\u3002",
   "ui.merge_busy": "\u6709\u8B70\u984C\u6B63\u5728\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u5B8C\u6210\u5F8C\u624D\u80FD\u5408\u4F75",
   "ui.merge_missing_note": "\u6709\u8B70\u984C\u7684\u7B46\u8A18\u627E\u4E0D\u5230\uFF0C\u7121\u6CD5\u5408\u4F75",
+  "ui.merge_hypothesis": "\u5047\u8A2D\u4E0D\u80FD\u5408\u4F75\uFF0C\u53EA\u6709\u4E00\u822C\u8B70\u984C\u53EF\u4EE5\u5408\u4F75",
+  "ui.merge_adopt_hypothesis": "\u5047\u8A2D\u4E0D\u80FD\u88AB\u5408\u4F75\uFF0C\u4E5F\u4E0D\u80FD\u5408\u4F75\u5176\u4ED6\u8B70\u984C",
   "ui.merge_title_label": "\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u540D\u7A31",
   "ui.merge_ai_untitled": "\uFF08\u7531 AI \u66FF\u5408\u4F75\u5F8C\u7684\u8B70\u984C\u547D\u540D\uFF09",
   "ui.merge_confirm_desc": "{0} \u500B\u8B70\u984C\u6703\u5408\u4F75\u6210 1 \u500B\u65B0\u8B70\u984C\u4E26\u53D6\u4EE3\u539F\u672C\u7684\u8B70\u984C\uFF1B\u539F\u7B46\u8A18\u79FB\u5230\u9019\u5F35\u5716\u7684 Unassigned\uFF0C\u53EF\u4EE5\u7528\u5FA9\u539F\u9084\u539F\u3002",
@@ -5001,6 +5009,7 @@ var zhTW = {
   "ui.map_chat_guard_not_markdown": "\u53EA\u5141\u8A31 .md \u6A94",
   "ui.map_chat_guard_map_unparseable": "\u9019\u500B\u4FEE\u6539\u6703\u5F04\u58DE\u5FC3\u667A\u5716\u6A94",
   "ui.map_chat_guard_topic_identity_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u8B58\u5225\u6B04\u4F4D",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed": "\u9019\u500B\u4FEE\u6539\u6703\u6539\u5230\u8B70\u984C\u7684\u5047\u8A2D\u6B04\u4F4D\uFF08topic-kind \u6216 hypothesis-strength\uFF09",
   "ui.map_chat_guard_reserved_frontmatter": "\u65B0\u6A94\u6848\u6703\u7528\u5230\u5916\u639B\u4FDD\u7559\u7684\u6B04\u4F4D",
   "ui.map_chat_guard_identity_added": "\u9019\u6B21\u4FEE\u6539\u6703\u66FF\u4E00\u822C\u7B46\u8A18\u52A0\u4E0A\u5916\u639B\u4FDD\u7559\u7684\u8B70\u984C\u6B04\u4F4D",
   "ui.map_chat_guard_map_file": "\u9019\u662F\u5FC3\u667A\u5716\u6A94\uFF0C\u8ACB\u6539\u7528\u8B70\u984C\u52D5\u4F5C",
@@ -15772,6 +15781,57 @@ function setTopicRelations(map, list) {
   if (list.length) map.topicRelations = list.map((r) => ({ kind: r.kind, from: r.from, to: r.to }));
   else delete map.topicRelations;
 }
+function removeTopicRelationsFor(map, ids) {
+  if (!map.topicRelations) return;
+  const gone = new Set(ids);
+  setTopicRelations(
+    map,
+    map.topicRelations.filter((r) => !gone.has(r.from) && !gone.has(r.to))
+  );
+}
+function reachesByPrerequisite(relations, start, target) {
+  const seen = /* @__PURE__ */ new Set([start]);
+  const queue = [start];
+  while (queue.length) {
+    const current = queue.shift();
+    if (current === target) return true;
+    for (const r of relations)
+      if (r.kind === "prerequisite" && r.from === current && !seen.has(r.to)) {
+        seen.add(r.to);
+        queue.push(r.to);
+      }
+  }
+  return false;
+}
+function retargetTopicRelations(map, fromIds, toId) {
+  const result = { droppedCycles: 0 };
+  if (!map.topicRelations) return result;
+  const merged = new Set(fromIds);
+  const move = (id) => merged.has(id) ? toId : id;
+  const kept = [];
+  const seen = /* @__PURE__ */ new Set();
+  const touched = [];
+  for (const r of map.topicRelations) {
+    const next = { kind: r.kind, from: move(r.from), to: move(r.to) };
+    if (next.from === next.to) continue;
+    const key2 = relationKey(next);
+    if (seen.has(key2)) continue;
+    seen.add(key2);
+    if (next.kind === "prerequisite" && (next.from !== r.from || next.to !== r.to)) touched.push(next);
+    else kept.push(next);
+  }
+  for (const r of touched) {
+    if (reachesByPrerequisite(kept, r.to, r.from)) result.droppedCycles++;
+    else kept.push(r);
+  }
+  const order = new Map(map.topicRelations.map((r, i) => [relationKey(r), i]));
+  kept.sort((a, b) => {
+    var _a2, _b2;
+    return ((_a2 = order.get(relationKey(a))) != null ? _a2 : 1e9) - ((_b2 = order.get(relationKey(b))) != null ? _b2 : 1e9);
+  });
+  setTopicRelations(map, kept);
+  return result;
+}
 function legalEvidenceTargets(map, fromId, isHypothesis) {
   var _a2;
   if (isHypothesis(fromId)) return [];
@@ -23474,6 +23534,17 @@ function topLevelValues(block, keys) {
   }
   return found;
 }
+var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-strength"];
+function hypothesisLines(block) {
+  if (block === null) return [];
+  const found = [];
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
+    if (match && HYPOTHESIS_KEYS.includes(match[1]))
+      found.push(`${match[1]}=${match[2].replace(/^(["'])(.*)\1$/, "$2")}`);
+  }
+  return found;
+}
 function hasDuplicateIdentityKey(block) {
   if (block === null) return false;
   const seen = /* @__PURE__ */ new Set();
@@ -23520,6 +23591,8 @@ function guardMapChatWrite(check) {
     if (was.get(key2) === now.get(key2)) continue;
     return { ok: false, code: was.has(key2) ? "topic_identity_changed" : "reserved_frontmatter" };
   }
+  if (hypothesisLines(frontmatterBlock(before)).join("\n") !== hypothesisLines(frontmatterBlock(check.newContent)).join("\n"))
+    return { ok: false, code: "hypothesis_frontmatter_changed" };
   return { ok: true };
 }
 function applyMdEdit(content, find, replace) {
@@ -36201,10 +36274,13 @@ function readingOrder(nodes) {
   return [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
 }
 function mergeEligibility(input) {
+  var _a2;
+  const isHypothesis = (_a2 = input.isHypothesis) != null ? _a2 : () => false;
   const wanted = new Set(input.ids);
   const picked = input.nodes.filter((node) => wanted.has(node.id));
   if (wanted.size < 2 || picked.length < 2 || picked.length !== wanted.size)
     return { ok: false, reason: "ui.merge_needs_two" };
+  if (picked.some((node) => isHypothesis(node.id))) return { ok: false, reason: "ui.merge_hypothesis" };
   const related = picked.filter((node) => {
     const below = descendants(input.nodes, node.id);
     return below.size && picked.some((other) => below.has(other.id));
@@ -36499,6 +36575,7 @@ var GUARD_REASON = {
   duplicate_identity_key: "ui.map_chat_guard_duplicate_identity_key",
   topic_identity_changed: "ui.map_chat_guard_topic_identity_changed",
   reserved_frontmatter: "ui.map_chat_guard_reserved_frontmatter",
+  hypothesis_frontmatter_changed: "ui.map_chat_guard_hypothesis_frontmatter_changed",
   exists: "ui.map_chat_guard_exists",
   no_baseline: "ui.map_chat_guard_no_baseline"
 };
@@ -36509,6 +36586,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     super(leaf);
     this.plugin = plugin;
     __publicField(this, "map", null);
+    /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
+    __publicField(this, "lastDroppedCycles", 0);
     __publicField(this, "path", "");
     __publicField(this, "notes", /* @__PURE__ */ new Map());
     /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
@@ -36691,6 +36770,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, void 0, void 0, onWebSearchEvent)
     );
     this.aimRecovery.addDiagrams = (request) => plugin.addAimDiagrams(request);
+  }
+  /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
+  droppedCyclesOfLastMerge() {
+    return this.lastDroppedCycles;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -39893,6 +39976,10 @@ ${request.requirements}` : preset.text,
     if (!this.map) return;
     const before = clone(this.map), ids = branch ? /* @__PURE__ */ new Set([node.id, ...descendants(before.nodes, node.id)]) : /* @__PURE__ */ new Set([node.id]);
     if (!this.mergeUnlocked(adopterId ? [...ids, adopterId] : ids)) return;
+    if (adopterId && (this.isHypothesis(node.id) || this.isHypothesis(adopterId))) {
+      new import_obsidian30.Notice(t("ui.merge_adopt_hypothesis"));
+      return;
+    }
     const removableQuestions = new Set(
       node.aimKind === "question" ? before.nodes.filter((item) => ids.has(item.id) && item.aimKind === "question").map((item) => item.id) : []
     );
@@ -39912,6 +39999,13 @@ ${request.requirements}` : preset.text,
           }
       }
       map.nodes = removeNodes(map.nodes, node.id, branch);
+      if (adopterId) {
+        removeTopicRelationsFor(
+          map,
+          [...ids].filter((id) => id !== node.id)
+        );
+        this.lastDroppedCycles = retargetTopicRelations(map, [node.id], adopterId).droppedCycles;
+      } else removeTopicRelationsFor(map, ids);
       if (adopterId && adopted.size) {
         const adopter = map.nodes.find((item) => item.id === adopterId);
         if (adopter) adopter.collapsed = false;
@@ -39955,7 +40049,8 @@ ${request.requirements}` : preset.text,
       ids,
       nodes: (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [],
       hasNote: (id) => this.notes.has(id),
-      busy: (node) => this.mergeBusy(node, except)
+      busy: (node) => this.mergeBusy(node, except),
+      isHypothesis: (id) => this.isHypothesis(id)
     });
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
@@ -40335,6 +40430,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
+        this.lastDroppedCycles = retargetTopicRelations(map, ids, merged.id).droppedCycles;
         if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -40408,6 +40504,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
+        this.lastDroppedCycles = retargetTopicRelations(map, ids, target.id).droppedCycles;
         if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -40561,6 +40658,7 @@ ${request.requirements}` : preset.text,
         map.viewport = clone(viewport);
         const prior = clone(map);
         map.nodes = map.nodes.filter((node) => !ids.has(node.id));
+        removeTopicRelationsFor(map, ids);
         this.removeAimReferences(map, ids, prior.nodes);
       }).commit();
     } catch (error) {

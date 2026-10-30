@@ -1,6 +1,6 @@
 // Merge topics, Phase 1 selection gestures: the pointer-intent table for the empty canvas.
 const assert = require('node:assert/strict');
-const { test, load } = require('../support.cjs');
+const { test, integrationTest, load, fixture, DEFAULT_SETTINGS } = require('../support.cjs');
 
 const { canvasPointerIntent } = load('experiences/visual-map/canvas-gestures.ts');
 const press = (over = {}) => canvasPointerIntent({ button: 0, integrationMode: false, spaceHeld: false, altKey: false, shiftKey: false, ...over });
@@ -245,4 +245,135 @@ test('draft review (still used by synthesis) has no name field: merging no longe
   assert.equal(dom.find(modal.contentEl, i => i.tag === 'input'), undefined, 'no name field');
   dom.button(modal.modalEl, 'Confirm').click(); await dom.tick();
   assert.deepEqual(got, [['S', 'D']]);
+});
+
+// ---- hypothesis-evidence (P3): merge and removal keep evidence and prerequisite links consistent ----
+const heObsidian = require('../support.cjs').obsidian;
+const heDom = require('../support-dom.cjs');
+const heRel = (kind, from, to) => ({ kind, from, to });
+test('hypothesis-evidence: a selection that includes a hypothesis cannot be merged, in sibling and in parent mode', () => {
+  const isHypothesis = id => id === 'b' || id === 'root';
+  const base = { nodes: family(), hasNote: () => true, busy: () => false, isHypothesis };
+  assert.deepEqual(plain(mergeEligibility({ ...base, ids: ['a', 'b'] })), { ok: false, reason: 'ui.merge_hypothesis' });
+  assert.deepEqual(plain(mergeEligibility({ ...base, ids: ['root', 'a', 'c'] })), { ok: false, reason: 'ui.merge_hypothesis' }, 'a hypothesis parent cannot take its subtopics');
+  assert.equal(mergeEligibility({ ...base, ids: ['a', 'c'] }).ok, true, 'ordinary topics still merge');
+  assert.equal(mergeEligibility({ nodes: family(), hasNote: () => true, busy: () => false, ids: ['a', 'b'] }).ok, true, 'no isHypothesis input: nothing is a hypothesis');
+});
+async function heHarness() {
+  const { repo, app, contents } = fixture(), path = await repo.createMap('Relations', []), mapDoc = await repo.readMap(path);
+  const ids = {}, notes = {};
+  const add = async (key, parentKey, hypothesis) => {
+    const n = await repo.createNote(key, 'a', mapDoc, path, 'workspace', hypothesis ? { hypothesis: true } : {});
+    n.parentId = parentKey ? ids[parentKey] : null; n.x = 400; n.y = 100 * mapDoc.nodes.length; mapDoc.nodes.push(n); ids[key] = n.id; notes[key] = n;
+  };
+  await add('root'); await add('f1', 'root'); await add('f2', 'root'); await add('x', 'root'); await add('hyp', 'root', true); await add('hyp2', 'root', true);
+  let queue = Promise.resolve();
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate(work) { queue = queue.then(work); return queue; }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map() };
+  const notices = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...heObsidian, Notice: heDom.makeNotice(notices) } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const view = new VisualAgentMapView({ app }, plugin);
+  view.path = path; view.map = mapDoc; view.render = () => {}; view.focusNode = () => {}; view.drawEdges = () => {}; view.updateHistoryButtons = () => {};
+  const relate = async list => { mapDoc.topicRelations = list; await repo.saveMap(path, mapDoc); view.map = await repo.readMap(path); await repo.rebuildDerivedData(); await view.hydrate(); };
+  const saved = async () => repo.readMap(path);
+  const relations = async () => plain((await saved()).topicRelations ?? null);
+  const mergeKeys = async keys => {
+    view.multiSelected = new Set(keys.map(k => ids[k]));
+    const check = view.mergeCheck(); assert.equal(check.ok, true, JSON.stringify(check));
+    await view.mergeSelected('Merged', { path, mapId: mapDoc.id, targetId: check.targetId, sources: check.sources.map(n => ({ id: n.id, path: n.path })) });
+    return check;
+  };
+  await view.hydrate();
+  return { repo, app, contents, path, mapDoc, ids, notes, view, notices, relate, saved, relations, mergeKeys, mergedId: async () => (await saved()).nodes.find(n => n.id !== undefined && !Object.values(ids).includes(n.id))?.id };
+}
+integrationTest('hypothesis-evidence: merging two facts that are evidence for the same hypothesis leaves one link; undo brings both back', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('evidence', h.ids.f2, h.ids.hyp), heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+  const original = await h.relations();
+  await h.mergeKeys(['f1', 'f2']);
+  const merged = await h.mergedId();
+  assert.ok(merged);
+  assert.deepEqual(await h.relations(), [heRel('evidence', merged, h.ids.hyp), heRel('evidence', merged, h.ids.hyp2)], 'one link per hypothesis, from the merged topic');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original, 'undo restores both original links');
+  await h.view.travel(true);
+  assert.deepEqual(await h.relations(), [heRel('evidence', merged, h.ids.hyp), heRel('evidence', merged, h.ids.hyp2)], 'redo merges again');
+});
+integrationTest('hypothesis-evidence: a prerequisite that becomes a self link after a merge is deleted; the key goes when nothing is left', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.f2)]);
+  await h.mergeKeys(['f1', 'f2']);
+  assert.equal((await h.saved()).topicRelations, undefined);
+  assert.equal(h.view.droppedCyclesOfLastMerge(), 0, 'a self link is not a dropped cycle');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), [heRel('prerequisite', h.ids.f1, h.ids.f2)]);
+});
+integrationTest('hypothesis-evidence: a merge that would close a prerequisite cycle drops that link and keeps the count for the notice; undo restores all', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('prerequisite', h.ids.f1, h.ids.x), heRel('prerequisite', h.ids.x, h.ids.f2)]);
+  const original = await h.relations();
+  await h.mergeKeys(['f1', 'f2']);
+  const merged = await h.mergedId();
+  assert.deepEqual(await h.relations(), [heRel('prerequisite', merged, h.ids.x)]);
+  assert.equal(h.view.droppedCyclesOfLastMerge(), 1);
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
+integrationTest('hypothesis-evidence: merging subtopics into a parent re-points their links to the parent and dedupes', async () => {
+  const h = await heHarness();
+  // f1 and f2 become children of x; x is the parent that keeps its identity.
+  for (const key of ['f1', 'f2']) h.mapDoc.nodes.find(n => n.id === h.ids[key]).parentId = h.ids.x;
+  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('evidence', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x), heRel('prerequisite', h.ids.f2, h.ids.hyp2)]);
+  const original = await h.relations();
+  const check = await h.mergeKeys(['x', 'f1', 'f2']);
+  assert.equal(check.targetId, h.ids.x);
+  assert.deepEqual(await h.relations(), [heRel('evidence', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.x, h.ids.hyp2)], 'f1 folded into the existing x link; f2 to x became a self link');
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
+integrationTest('hypothesis-evidence: mergeSelected with a hypothesis selected is refused with a Notice and changes nothing', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp)]);
+  const before = JSON.stringify(await h.saved());
+  h.view.multiSelected = new Set([h.ids.hyp, h.ids.hyp2]);
+  assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_hypothesis' });
+  await h.view.mergeSelected('Merged', { path: h.path, mapId: h.mapDoc.id, sources: [h.notes.hyp, h.notes.hyp2].map(n => ({ id: n.id, path: n.path })) });
+  assert.deepEqual(h.notices, ['A hypothesis cannot be merged; only ordinary topics can be merged']);
+  assert.equal(JSON.stringify(await h.saved()), before);
+});
+integrationTest('hypothesis-evidence: removing a fact or a hypothesis leaves no dangling link (both kinds) and undo restores the links', async () => {
+  for (const [removeKey, branch, expected] of [['f1', false, 2], ['hyp', false, 2]]) {
+    const h = await heHarness();
+    await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.hyp2), heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+    const original = await h.relations();
+    await h.view.removeToUnassigned(h.notes[removeKey], branch);
+    const left = await h.relations();
+    assert.equal(left.length, expected, removeKey);
+    const live = new Set((await h.saved()).nodes.map(n => n.id));
+    assert.ok(left.every(r => live.has(r.from) && live.has(r.to)), `${removeKey}: no dangling end`);
+    await h.view.travel(false);
+    assert.deepEqual(await h.relations(), original, `${removeKey}: undo restores`);
+  }
+});
+integrationTest('hypothesis-evidence: removing the selection (removeSelected) drops links of every removed topic; undo restores them', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.hyp2, h.ids.x), heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+  const original = await h.relations();
+  h.view.multiSelected = new Set([h.ids.hyp, h.ids.x]);
+  await h.view.removeSelected();
+  assert.deepEqual(await h.relations(), [heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+  await h.view.travel(false);
+  assert.deepEqual(await h.relations(), original);
+});
+integrationTest('hypothesis-evidence: a structure-review merge with a hypothesis on either side is refused; otherwise links move to the adopter', async () => {
+  const h = await heHarness();
+  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  const before = JSON.stringify(await h.saved());
+  await h.view.removeToUnassigned(h.notes.hyp, false, h.ids.x);
+  await h.view.removeToUnassigned(h.notes.f1, false, h.ids.hyp);
+  assert.deepEqual(h.notices, ['A hypothesis cannot be merged into another topic or take one over', 'A hypothesis cannot be merged into another topic or take one over']);
+  assert.equal(JSON.stringify(await h.saved()), before, 'nothing changed');
+  await h.view.removeToUnassigned(h.notes.f1, false, h.ids.f2);
+  assert.deepEqual(await h.relations(), [heRel('evidence', h.ids.f2, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x)], 'links now start at the adopter');
+  await h.view.travel(false);
+  assert.deepEqual(plain((await h.saved()).topicRelations), [heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
 });

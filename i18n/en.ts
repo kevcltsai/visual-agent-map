@@ -710,6 +710,8 @@ export const en = {
   "ui.merge_target_changed": "The merged topic was edited after the merge, so Undo or Redo was not applied.",
   "ui.merge_busy": "An AI task is running on a selected topic; merge after it finishes",
   "ui.merge_missing_note": "A selected topic's note is missing, so it cannot be merged",
+  "ui.merge_hypothesis": "A hypothesis cannot be merged; only ordinary topics can be merged",
+  "ui.merge_adopt_hypothesis": "A hypothesis cannot be merged into another topic or take one over",
   "ui.merge_title_label": "Name of the merged topic",
   "ui.merge_ai_untitled": "(AI names the merged topic)",
   "ui.merge_confirm_desc":
@@ -1050,6 +1052,8 @@ export const en = {
   "ui.map_chat_guard_not_markdown": "only .md files are allowed",
   "ui.map_chat_guard_map_unparseable": "the edit would break the map file",
   "ui.map_chat_guard_topic_identity_changed": "the edit would change the topic's identity fields",
+  "ui.map_chat_guard_hypothesis_frontmatter_changed":
+    "the edit would change a topic's hypothesis fields (topic-kind or hypothesis-strength)",
   "ui.map_chat_guard_reserved_frontmatter": "the new file would use fields reserved by this plugin",
   "ui.map_chat_guard_identity_added": "this edit would add the topic fields reserved by this plugin to a regular note",
   "ui.map_chat_guard_map_file": "the file is a map file; use the topic actions instead",

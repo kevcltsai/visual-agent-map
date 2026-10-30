@@ -3731,3 +3731,54 @@ integrationTest('B3-fix insert: a candidate title with HTML adds no extra pictur
   const detail = (await h.note('a')).detail;
   assert.equal((detail.match(/<img/gi) ?? []).length, 0); assert.equal((detail.match(/!\[/g) ?? []).length, 1, 'exactly one picture embed');
 });
+
+// ---- hypothesis-evidence (P3): the chat cannot touch the hypothesis keys, and moving a topic leaves relations alone ----
+const heGuard = load('core/map-chat-guard.ts');
+const heNote = extra => `---\nagent-map-node: true\nnode-id: n\ntopic-id: m\n${extra}---\nBody\n`;
+const heEdit = (before, after, path = 'Topics/n.md') => heGuard.guardMapChatWrite({ kind: 'edit', path, oldContent: before, newContent: after, knownHashes: { [path]: 'h' }, configDir: '.obsidian' });
+test('hypothesis-evidence: edit_md_file cannot add topic-kind, change hypothesis-strength or remove either key', () => {
+  const refused = { ok: false, code: 'hypothesis_frontmatter_changed' };
+  const plainNote = heNote(''), hypothesis = heNote('topic-kind: hypothesis\nhypothesis-strength: weak\n');
+  eq(heEdit(plainNote, heNote('topic-kind: hypothesis\n')), refused, 'add topic-kind');
+  eq(heEdit(plainNote, heNote('hypothesis-strength: strong\n')), refused, 'add a strength');
+  eq(heEdit(hypothesis, hypothesis.replace('weak', 'strong')), refused, 'change the strength');
+  eq(heEdit(hypothesis, hypothesis.replace('weak', '"weak"')), { ok: true }, 'quote style alone is not a change');
+  eq(heEdit(hypothesis, hypothesis.replace('topic-kind: hypothesis\n', '')), refused, 'remove topic-kind');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-strength: weak\n', '')), refused, 'remove the strength');
+  eq(heEdit(hypothesis, hypothesis + 'topic-kind: note\n'), { ok: true }, 'text after the front matter is body, not a key');
+  eq(heEdit(hypothesis, hypothesis.replace('topic-kind: hypothesis\n', 'topic-kind: hypothesis\ntopic-kind: hypothesis\n')), refused, 'a duplicated key');
+  eq(heEdit('---\ntitle: P\n---\nText\n', '---\ntitle: P\ntopic-kind: hypothesis\n---\nText\n', 'Notes/p.md'), refused, 'an ordinary note cannot get the key either');
+  eq(heEdit(hypothesis, hypothesis.replace('Body', 'Changed body')), { ok: true }, 'body edits on a hypothesis note are still allowed');
+});
+test('hypothesis-evidence: writing the map file is still refused with map_file', () => {
+  const mapText = '```agent-map\n{"id":"m","title":"T","version":1,"nodes":[],"viewport":{"x":0,"y":0,"zoom":1}}\n```\n';
+  eq(heEdit(mapText, mapText.replace('"T"', '"U"'), 'Map.md'), { ok: false, code: 'map_file' });
+});
+integrationTest('hypothesis-evidence: a chat edit that touches a hypothesis key is skipped with a reason and the note is unchanged; other edits still apply', async () => {
+  const h = await harness();
+  const topicPath = h.node('a').path;
+  h.contents.set(topicPath, h.contents.get(topicPath).replace('---\n', '---\ntopic-kind: hypothesis\nhypothesis-strength: weak\n'));
+  await h.view.hydrate();
+  const snapshot = h.contents.get(topicPath);
+  const lines = await apply(h, [
+    { kind: 'edit_md_file', path: topicPath, find: 'hypothesis-strength: weak', replace: 'hypothesis-strength: strong' },
+    { kind: 'edit_md_file', path: topicPath, find: 'topic-kind: hypothesis\n', replace: '' },
+    { kind: 'edit_md_file', path: 'Notes/Research.md', find: '# Research', replace: '---\ntopic-kind: hypothesis\n---\n# Research' },
+    { kind: 'edit_md_file', path: 'Notes/Research.md', find: 'needs darkness', replace: 'needs total darkness' }
+  ], h.hashes(topicPath, 'Notes/Research.md'));
+  eq(lines.map(l => l.status), ['skipped', 'skipped', 'skipped', 'done'], JSON.stringify(lines));
+  for (const line of lines.slice(0, 3)) assert.match(line.text, /hypothesis fields/);
+  assert.equal(h.contents.get(topicPath), snapshot, 'the hypothesis note is unchanged');
+  assert.match(h.contents.get('Notes/Research.md'), /needs total darkness/);
+  assert.doesNotMatch(h.contents.get('Notes/Research.md'), /topic-kind/);
+});
+integrationTest('hypothesis-evidence: move_topic leaves every relation as it was', async () => {
+  const h = await harness();
+  const relations = [{ kind: 'evidence', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }];
+  h.view.map.topicRelations = relations; await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
+  const lines = await apply(h, [{ kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }]);
+  eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));
+  const saved = await h.repo.readMap(MAP);
+  assert.equal(saved.nodes.find(n => n.id === h.ids.c).parentId, h.ids.b, 'the topic really moved');
+  eq(saved.topicRelations, relations);
+});

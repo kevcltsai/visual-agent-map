@@ -13,6 +13,7 @@ export type MapChatGuardCode =
   | "duplicate_identity_key"
   | "topic_identity_changed"
   | "reserved_frontmatter"
+  | "hypothesis_frontmatter_changed"
   | "exists"
   | "no_baseline";
 export type MapChatGuardResult = { ok: true } | { ok: false; code: MapChatGuardCode };
@@ -67,6 +68,21 @@ function topLevelValues(block: string | null, keys: readonly string[]): Map<stri
     const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
     if (!match || !keys.includes(match[1]) || found.has(match[1])) continue;
     found.set(match[1], match[2].replace(/^(["'])(.*)\1$/, "$2"));
+  }
+  return found;
+}
+
+/** The keys that make a note a hypothesis and set its strength; the chat may not add, remove or change them. */
+export const HYPOTHESIS_KEYS: readonly string[] = ["topic-kind", "hypothesis-strength"];
+
+/** Every top-level occurrence of the hypothesis keys, in file order, so a duplicate or a quote-free value change shows. */
+function hypothesisLines(block: string | null): string[] {
+  if (block === null) return [];
+  const found: string[] = [];
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
+    if (match && HYPOTHESIS_KEYS.includes(match[1]))
+      found.push(`${match[1]}=${match[2].replace(/^(["'])(.*)\1$/, "$2")}`);
   }
   return found;
 }
@@ -127,6 +143,11 @@ export function guardMapChatWrite(check: MapChatWriteCheck): MapChatGuardResult 
     // A note that was not a topic must not become one.
     return { ok: false, code: was.has(key) ? "topic_identity_changed" : "reserved_frontmatter" };
   }
+  if (
+    hypothesisLines(frontmatterBlock(before)).join("\n") !==
+    hypothesisLines(frontmatterBlock(check.newContent)).join("\n")
+  )
+    return { ok: false, code: "hypothesis_frontmatter_changed" };
   return { ok: true };
 }
 

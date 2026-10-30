@@ -4401,6 +4401,8 @@ integrationTest('MS-03: a research over topics with two models asks each notice 
   await apply(h, [ms03Act('research_standard', [h.ids.a, h.ids.b, h.ids.c])]);
   for (let i = 0; i < 20; i++) await tick();
   eq(asked, ['gpt-x', 'claude:sonnet'], 'one notice per model, deduplicated'); assert.equal(calls.length, 0, 'the second notice was declined: nothing was sent to a provider');
+  assert.equal(h.plugin.expansionCoordinator.isRunning(h.view.multiResearchKey()), false, 'the batch never started'); assert.equal(h.plugin.expansionBatches.has(h.view.multiResearchKey()), false, 'and left no batch state');
+  for (let i = 0; i < 20; i++) await tick(); assert.equal(calls.length, 0, 'still nothing after the queue settled');
 });
 
 integrationTest('MS-03: when every notice is accepted a two-model research asks each once and then starts', async () => {

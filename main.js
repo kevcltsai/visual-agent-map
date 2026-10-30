@@ -1099,6 +1099,8 @@ var en = {
   "ui.map_chat_do_research_standard": "Start standard research on the selected topics",
   "ui.map_chat_do_expand_0": "Expand subtopics for {0} topics",
   "ui.map_chat_do_synthesize": "Integrate the selected topics (your message is the direction; no dialog opens)",
+  "ui.map_chat_model_suffix_0": " ({0})",
+  "ui.map_chat_model_separator": ", ",
   "ui.map_chat_do_rate_0": "Prioritize topics by the goal \u201C{0}\u201D",
   "ui.map_chat_do_merge_0": "Merge the selected topics into \u201C{0}\u201D",
   "ui.map_chat_do_create_map_0": "Create the map \u201C{0}\u201D",
@@ -3129,6 +3131,8 @@ var zhCN = {
   "ui.map_chat_do_research_standard": "\u5BF9\u9009\u53D6\u7684\u8BAE\u9898\u5F00\u59CB\u6807\u51C6\u7814\u7A76",
   "ui.map_chat_do_expand_0": "\u4E3A {0} \u4E2A\u8BAE\u9898\u5C55\u5F00\u5B50\u8BAE\u9898",
   "ui.map_chat_do_synthesize": "\u6574\u5408\u9009\u53D6\u7684\u8BAE\u9898\uFF08\u4EE5\u4F60\u7684\u6D88\u606F\u4E3A\u65B9\u5411\uFF0C\u4E0D\u6253\u5F00\u7A97\u53E3\uFF09",
+  "ui.map_chat_model_suffix_0": "\uFF08{0}\uFF09",
+  "ui.map_chat_model_separator": "\u3001",
   "ui.map_chat_do_rate_0": "\u4F9D\u76EE\u6807\u201C{0}\u201D\u5206\u7EA7\u8BAE\u9898",
   "ui.map_chat_do_merge_0": "\u628A\u9009\u53D6\u7684\u8BAE\u9898\u5408\u5E76\u6210\u201C{0}\u201D",
   "ui.map_chat_do_create_map_0": "\u5EFA\u7ACB\u65B0\u5730\u56FE\u201C{0}\u201D",
@@ -5159,6 +5163,8 @@ var zhTW = {
   "ui.map_chat_do_research_standard": "\u5C0D\u9078\u53D6\u7684\u8B70\u984C\u958B\u59CB\u6A19\u6E96\u7814\u7A76",
   "ui.map_chat_do_expand_0": "\u70BA {0} \u500B\u8B70\u984C\u5C55\u958B\u5B50\u8B70\u984C",
   "ui.map_chat_do_synthesize": "\u6574\u5408\u9078\u53D6\u7684\u8B70\u984C\uFF08\u4EE5\u4F60\u7684\u8A0A\u606F\u70BA\u65B9\u5411\uFF0C\u4E0D\u958B\u8996\u7A97\uFF09",
+  "ui.map_chat_model_suffix_0": "\uFF08{0}\uFF09",
+  "ui.map_chat_model_separator": "\u3001",
   "ui.map_chat_do_rate_0": "\u4F9D\u76EE\u6A19\u300C{0}\u300D\u5206\u7D1A\u8B70\u984C",
   "ui.map_chat_do_merge_0": "\u628A\u9078\u53D6\u7684\u8B70\u984C\u5408\u4F75\u6210\u300C{0}\u300D",
   "ui.map_chat_do_create_map_0": "\u5EFA\u7ACB\u65B0\u5FC3\u667A\u5716\u300C{0}\u300D",
@@ -22099,20 +22105,21 @@ function settledLine(line) {
   const block = line.images;
   if (!block) return line;
   const title = clip(block.nodeTitle);
+  const model = block.modelLabel ? t("ui.map_chat_model_suffix_0", block.modelLabel) : "";
   switch (block.state) {
     case "searching":
-      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) };
+      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) + model };
     case "ready": {
       const usable = usableImageCount(block);
-      return usable ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) } : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+      return usable ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) + model } : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
     }
     case "empty":
-      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
     case "failed":
       return {
         ...line,
         status: "failed",
-        text: t("ui.map_chat_line_images_failed_0_1", title, clip((_a2 = block.reason) != null ? _a2 : "", 160))
+        text: t("ui.map_chat_line_images_failed_0_1", title, clip((_a2 = block.reason) != null ? _a2 : "", 160)) + model
       };
     case "stopped":
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
@@ -48066,7 +48073,6 @@ ${request.requirements}` : preset.text,
    * topics that were counted, and how many of those made none.
    */
   async startMultiResearch(request, retryBatchKey, onSettled) {
-    var _a2;
     if (!this.map || this.map.aim || this.builtIn || !this.multiSelected.size) return;
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
@@ -48075,8 +48081,22 @@ ${request.requirements}` : preset.text,
     }
     const selected = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
-      await this.plugin.confirmAiUsage((_a2 = request.model) != null ? _a2 : this.plugin.settings.cliModel, async () => {
-        var _a3;
+      const models = request.model ? [request.model] : [
+        ...new Set(
+          (await Promise.all(
+            selected.map((node) => {
+              var _a2;
+              return this.plugin.repo.resolveTopicModel(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+            })
+          )).map((item) => item.origin === "override" ? item.model : this.currentModelId())
+        )
+      ];
+      if (!models.length) models.push(this.plugin.settings.cliModel);
+      const confirmEach = async (index, run) => index >= models.length ? (await run(), true) : this.plugin.confirmAiUsage(models[index], async () => {
+        await confirmEach(index + 1, run);
+      });
+      await confirmEach(0, async () => {
+        var _a2;
         if (this.plugin.expansionCoordinator.isRunning(key2)) {
           new import_obsidian30.Notice(t("ui.multi_research_already_running"));
           return;
@@ -48101,17 +48121,17 @@ ${request.requirements}` : preset.text,
           ...request.toneId ? { toneId: request.toneId } : {}
         };
         const choicesFor = (note) => {
-          var _a4;
+          var _a3;
           return request.researchMode !== void 0 ? {
             // The mode follows the override (local = Quick), so a Quick run gets the Quick prompt and no charts.
             ...aiModeOptions(noteAiMode(request.researchMode), "research"),
             researchMode: request.researchMode,
-            researchDepth: (_a4 = request.researchDepth) != null ? _a4 : "normal",
+            researchDepth: (_a3 = request.researchDepth) != null ? _a3 : "normal",
             visualMode: request.imageSearch ? "auto" : "off",
             ...shared2
           } : { ...aiModeOptions(noteAiMode(note.researchMode), "research"), ...shared2 };
         };
-        if (retryBatchKey && ((_a3 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a3.status) !== "running")
+        if (retryBatchKey && ((_a2 = this.plugin.expansionBatches.get(retryBatchKey)) == null ? void 0 : _a2.status) !== "running")
           this.plugin.expansionBatches.delete(retryBatchKey);
         let reported = false;
         let skipped2 = 0;
@@ -48121,13 +48141,13 @@ ${request.requirements}` : preset.text,
             key2,
             nodes,
             async (child, batchSignal, accepted) => {
-              var _a4;
+              var _a3;
               if (busy(child)) {
                 skipped2++;
                 accepted();
                 return "skipped";
               }
-              const choices = choicesFor(await this.plugin.repo.readNote(child.path, (_a4 = this.map) != null ? _a4 : void 0));
+              const choices = choicesFor(await this.plugin.repo.readNote(child.path, (_a3 = this.map) != null ? _a3 : void 0));
               await this.researchChild(child, batchSignal, accepted, choices, choices.mapAiMode !== "quick", (result) => {
                 if (choices.researchMode !== "research" || result.retrievals === void 0) return;
                 web.counted++;
@@ -48940,8 +48960,10 @@ ${request.requirements}` : preset.text,
       );
     };
     try {
+      const chosen = await this.selectionModel(sources2);
       if (step === "draft") {
         await this.createIntegratedNode(title, sources2, direction != null ? direction : "", "", runOptions, {
+          model: chosen,
           observer,
           accepted: markAccepted,
           controller,
@@ -48968,7 +48990,9 @@ ${request.requirements}` : preset.text,
         state: "running",
         step: "directions",
         directions: [],
-        progress: ""
+        progress: "",
+        model: chosen.model,
+        reasoning: chosen.reasoning
       };
       this.integrationTask = task;
       own = task;
@@ -48995,8 +49019,8 @@ ${request.requirements}` : preset.text,
           researchDepth: runOptions.researchDepth,
           visualMode: "off"
         },
-        this.plugin.settings.cliModel,
-        this.plugin.settings.cliReasoning,
+        chosen.model,
+        chosen.reasoning,
         controller.signal,
         void 0,
         markAccepted,
@@ -49051,16 +49075,43 @@ ${request.requirements}` : preset.text,
   retrySelectionSynthesis(task) {
     if (task.state !== "failed" && task.state !== "cancelled") return;
     const { signal: _staleSignal, onProgress: _staleProgress, ...retained } = task.options;
-    void this.plugin.confirmAiUsage(this.plugin.settings.cliModel, async () => {
-      await this.startSelectionSynthesis(
-        task.sources,
-        { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
-        task.step === "directions" ? null : task.goal,
-        (message) => new import_obsidian30.Notice(message),
-        () => {
-        }
-      );
-    });
+    void this.selectionModel(task.sources).then(
+      (chosen) => this.plugin.confirmAiUsage(chosen.model, async () => {
+        await this.startSelectionSynthesis(
+          task.sources,
+          { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
+          task.step === "directions" ? null : task.goal,
+          (message) => new import_obsidian30.Notice(message),
+          () => {
+          }
+        );
+      })
+    ).catch((error) => new import_obsidian30.Notice(errorMessage(error)));
+  }
+  /**
+   * The model for a run over several cards: when every card has the same manual model (its own or an ancestor's) that
+   * model, else the current model. The reasoning follows the override only when all of them agree on it too.
+   */
+  async selectionModel(nodes) {
+    var _a2;
+    const settings = this.plugin.settings;
+    const current = {
+      model: ((_a2 = settings.cliModel) == null ? void 0 : _a2.trim()) || FALLBACK_MODEL,
+      reasoning: normalizeReasoningLevel(settings.cliReasoning)
+    };
+    if (!nodes.length) return current;
+    const resolved = await Promise.all(
+      nodes.map((node) => {
+        var _a3;
+        return this.plugin.repo.resolveTopicModel(node.path, (_a3 = this.map) != null ? _a3 : void 0);
+      })
+    );
+    const first = resolved[0];
+    if (!resolved.every((item) => item.origin === "override" && item.model === first.model)) return current;
+    return {
+      model: first.model,
+      reasoning: resolved.every((item) => item.reasoning === first.reasoning) ? first.reasoning : current.reasoning
+    };
   }
   async topicReferenceGroup(sources2, mode = "strong", options = {}) {
     var _a2, _b2, _c, _d, _e;
@@ -49094,9 +49145,10 @@ ${note.detail.trim()}` : "",
     };
   }
   async createIntegratedNode(title, sources2, goal, rules, options, flow) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (!this.map || sources2.length < 2) return;
-    const controller = (_a2 = flow == null ? void 0 : flow.controller) != null ? _a2 : new AbortController();
+    const chosen = (_a2 = flow == null ? void 0 : flow.model) != null ? _a2 : await this.selectionModel(sources2);
+    const controller = (_b2 = flow == null ? void 0 : flow.controller) != null ? _b2 : new AbortController();
     const mapPath = this.path, mapId = this.map.id;
     const sourceGroup = await this.topicReferenceGroup(
       sources2,
@@ -49115,24 +49167,26 @@ ${note.detail.trim()}` : "",
       controller,
       state: "running",
       step: "draft",
-      directions: (_b2 = flow == null ? void 0 : flow.directions) != null ? _b2 : [],
-      progress: ""
+      directions: (_c = flow == null ? void 0 : flow.directions) != null ? _c : [],
+      progress: "",
+      model: chosen.model,
+      reasoning: chosen.reasoning
     };
     this.integrationTask = task;
     this.render();
     const progress = this.startTaskProgress(this.taskProgressKey("integration"));
-    const model = this.plugin.settings.cliModel;
+    const model = chosen.model;
     const language2 = this.plugin.settings.language;
-    const detailTemplate = this.mapDetailTemplate((_c = options == null ? void 0 : options.outputLanguage) != null ? _c : language2, options == null ? void 0 : options.detailTemplateId);
+    const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId);
     try {
       const integrationContext = {
         title,
-        summary: translateNote((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, "note.no_conclusion_yet"),
+        summary: translateNote((_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2, "note.no_conclusion_yet"),
         rules: "",
         detail: "",
         task: [goal, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
         ancestors: "",
-        referenceGroups: [...(_e = options == null ? void 0 : options.referenceGroups) != null ? _e : [], sourceGroup],
+        referenceGroups: [...(_f = options == null ? void 0 : options.referenceGroups) != null ? _f : [], sourceGroup],
         // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
         referenceDelivery: "direct",
         onProgress: (message) => {
@@ -49145,16 +49199,16 @@ ${note.detail.trim()}` : "",
         outputLanguage: options == null ? void 0 : options.outputLanguage,
         ...this.toneField(void 0, options),
         mode: "synthesize",
-        researchMode: (_f = options == null ? void 0 : options.researchMode) != null ? _f : "local",
-        researchDepth: (_g = options == null ? void 0 : options.researchDepth) != null ? _g : "normal",
-        visualMode: (_h = options == null ? void 0 : options.visualMode) != null ? _h : "auto",
+        researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
+        researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
+        visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : "auto",
         detailTemplate,
         addCharts: true
       };
       const result = await this.plugin.askModel(
         integrationContext,
         model,
-        this.plugin.settings.cliReasoning,
+        chosen.reasoning,
         controller.signal,
         void 0,
         flow == null ? void 0 : flow.accepted,
@@ -49163,7 +49217,7 @@ ${note.detail.trim()}` : "",
       );
       progress.end();
       if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== mapPath || ((_i = this.map) == null ? void 0 : _i.id) !== mapId)
+      if (controller.signal.aborted || this.path !== mapPath || ((_j = this.map) == null ? void 0 : _j.id) !== mapId)
         throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
       const latest = await this.topicReferenceGroup(
         sources2,
@@ -49193,10 +49247,10 @@ ${note.detail.trim()}` : "",
       };
       await (flow ? this.plugin.mutate(write) : write());
       this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
-      if ((_j = flow == null ? void 0 : flow.observer) == null ? void 0 : _j.isOpen()) (_l = (_k = flow.observer).written) == null ? void 0 : _l.call(_k);
+      if ((_k = flow == null ? void 0 : flow.observer) == null ? void 0 : _k.isOpen()) (_m = (_l = flow.observer).written) == null ? void 0 : _m.call(_l);
     } catch (error) {
       if (this.integrationTask !== task) return;
-      if (flow && controller.signal.aborted && ((_m = flow.observer) == null ? void 0 : _m.isOpen())) {
+      if (flow && controller.signal.aborted && ((_n = flow.observer) == null ? void 0 : _n.isOpen())) {
         if (task.directions.length) task.state = "directions";
         else this.integrationTask = null;
         this.render();
@@ -50382,27 +50436,51 @@ ${note.detail.trim()}` : "",
           case "research_standard":
             return t(
               chatResearchMode(action, (_c = this.map) == null ? void 0 : _c.aiMode) === "quick" ? "ui.map_chat_do_research_quick" : "ui.map_chat_do_research_standard"
-            );
+            ) + this.chatModelSuffix(this.chatTargetModels(action.nodeIds));
           case "expand":
-            return t("ui.map_chat_do_expand_0", targets(action.nodeIds));
-          case "synthesize":
-            return t("ui.map_chat_do_synthesize");
+            return t("ui.map_chat_do_expand_0", targets(action.nodeIds)) + this.chatModelSuffix(this.chatTargetModels(action.nodeIds));
+          case "synthesize": {
+            const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
+            const models = this.chatTargetModels(ids);
+            return t("ui.map_chat_do_synthesize") + // Several cards run on the one shared override, else the current model (see selectionModel).
+            this.chatModelSuffix(ids.length > 1 && models.length > 1 ? [this.currentModelId()] : models);
+          }
           case "rate_by_goal":
-            return t("ui.map_chat_do_rate_0", action.goal);
+            return t("ui.map_chat_do_rate_0", action.goal) + this.chatModelSuffix([this.currentModelId()]);
           case "merge":
             return t("ui.map_chat_do_merge_0", action.title);
           case "find_images": {
             const ids = action.nodeIds.length ? action.nodeIds : this.chatSelectionIds();
-            return t("ui.map_chat_do_find_images_0", ids.length === 1 ? title(ids[0]) : action.direction || "\u2026");
+            return t("ui.map_chat_do_find_images_0", ids.length === 1 ? title(ids[0]) : action.direction || "\u2026") + this.chatModelSuffix(this.chatTargetModels(ids));
           }
         }
     }
+  }
+  currentModelId() {
+    var _a2;
+    return ((_a2 = this.plugin.settings.cliModel) == null ? void 0 : _a2.trim()) || FALLBACK_MODEL;
+  }
+  /** The models the named cards (else the selection) run on, each once, from the cards the view already holds. */
+  chatTargetModels(ids) {
+    const list = ids.length ? ids : this.chatSelectionIds();
+    const models = list.map((id) => {
+      var _a2;
+      return ((_a2 = this.notes.get(id)) == null ? void 0 : _a2.model) || this.currentModelId();
+    });
+    return [...new Set(models.length ? models : [this.currentModelId()])];
+  }
+  /** "（label）" after a result row: the model(s) the task really runs on. */
+  chatModelSuffix(models) {
+    return t(
+      "ui.map_chat_model_suffix_0",
+      models.map((model) => this.plugin.modelLabel(model)).join(t("ui.map_chat_model_separator"))
+    );
   }
   chatLine(label, outcome) {
     if (outcome.status === "done" && outcome.images)
       return {
         status: "done",
-        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle),
+        text: t("ui.map_chat_line_images_started_0", outcome.images.nodeTitle) + (outcome.images.modelLabel ? t("ui.map_chat_model_suffix_0", outcome.images.modelLabel) : ""),
         images: outcome.images
       };
     if (outcome.status === "done") return { status: "done", text: t("ui.map_chat_line_done_0", label) };
@@ -51045,6 +51123,7 @@ ${note.detail.trim()}` : "",
           query,
           nodeId: node.id,
           nodeTitle: note.title,
+          modelLabel: this.plugin.modelLabel(note.model),
           mapPath: anchor.path,
           mapId: anchor.id,
           state: "searching",
@@ -51349,8 +51428,9 @@ ${addition}` : addition });
       synthesisTitle: synthesisDefaultName(resolveMapTextLanguage(map, settings.language), names3)
     });
     this.chatSelect(nodes.map((node) => node.id));
+    const chosen = await this.selectionModel(nodes);
     return this.launchChatTask(
-      settings.cliModel,
+      chosen.model,
       (failed, accepted) => this.startSelectionSynthesis(nodes, options, message, failed, accepted)
     );
   }

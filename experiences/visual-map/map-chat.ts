@@ -42,22 +42,24 @@ export function settledLine(line: MapChatLine): MapChatLine {
   const block = line.images;
   if (!block) return line;
   const title = clip(block.nodeTitle);
+  // The model the search runs on, when the block knows it (a block saved before this was added has none: no suffix).
+  const model = block.modelLabel ? t("ui.map_chat_model_suffix_0", block.modelLabel) : "";
   switch (block.state) {
     case "searching":
-      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) };
+      return { ...line, status: "done", text: t("ui.map_chat_line_images_started_0", title) + model };
     case "ready": {
       const usable = usableImageCount(block);
       return usable
-        ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) }
-        : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+        ? { ...line, status: "done", text: t("ui.map_chat_line_images_ready_0_1", title, usable) + model }
+        : { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
     }
     case "empty":
-      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) };
+      return { ...line, status: "skipped", text: t("ui.map_chat_line_images_none_0", title) + model };
     case "failed":
       return {
         ...line,
         status: "failed",
-        text: t("ui.map_chat_line_images_failed_0_1", title, clip(block.reason ?? "", 160))
+        text: t("ui.map_chat_line_images_failed_0_1", title, clip(block.reason ?? "", 160)) + model
       };
     case "stopped":
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
@@ -117,6 +119,8 @@ export interface MapChatImages {
   nodeTitle: string;
   mapPath: string;
   mapId: string;
+  /** The label of the model the search runs on, shown at the end of the line; absent in an older saved block. */
+  modelLabel?: string;
   state: "searching" | "ready" | "empty" | "failed" | "stopped";
   /** Why the search failed. */
   reason?: string;

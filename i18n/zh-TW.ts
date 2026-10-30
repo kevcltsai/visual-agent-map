@@ -1051,6 +1051,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_do_research_standard": "對選取的議題開始標準研究",
   "ui.map_chat_do_expand_0": "為 {0} 個議題展開子議題",
   "ui.map_chat_do_synthesize": "整合選取的議題（以你的訊息為方向，不開視窗）",
+  "ui.map_chat_model_suffix_0": "（{0}）",
+  "ui.map_chat_model_separator": "、",
   "ui.map_chat_do_rate_0": "依目標「{0}」分級議題",
   "ui.map_chat_do_merge_0": "把選取的議題合併成「{0}」",
   "ui.map_chat_do_create_map_0": "建立新心智圖「{0}」",

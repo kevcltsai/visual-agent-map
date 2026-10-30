@@ -33,7 +33,7 @@ test('test wiring: a file mentioned only in a comment is not wired, in test:unit
 });
 
 // test:aim must run every test of the AIM suites (tests/suites/aim-*.cjs) plus every top-level AIM test file; a dropped one is a silent gap.
-// The expected names are the fixture tests/snapshots/aim-suite-tests.json. Regenerate it after adding or renaming an AIM suite test: UPDATE_AIM_SUITE_TESTS=1 node --test tests/run.cjs --test-name-pattern='test:aim runs'
+// The expected names are the fixture tests/snapshots/aim-suite-tests.json. Regenerate it after adding or renaming an AIM suite test: UPDATE_AIM_SUITE_TESTS=1 node --test --test-name-pattern='test:aim runs' tests/run.cjs
 const { spawnSync } = require('node:child_process');
 const aimFixture = path.join(root, 'tests', 'snapshots', 'aim-suite-tests.json');
 const aimCommands = () => JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts['test:aim'].split('&&').map(part => part.trim());

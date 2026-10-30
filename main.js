@@ -550,6 +550,23 @@ var en = {
   "ui.rename_topic": "Rename",
   "ui.paste_outline_add_many": "Paste an outline to add several topics at once",
   "ui.topic_more_options": "More ways to add topics",
+  "ui.add_hypothesis": "Add hypothesis",
+  "ui.new_hypothesis": "New hypothesis",
+  "ui.add_subhypothesis": "Add sub-hypothesis",
+  "ui.new_subhypothesis": "New sub-hypothesis",
+  "ui.hypothesis_tag_0": "Hypothesis \xB7 {0}",
+  "ui.hypothesis_weak": "Weak",
+  "ui.hypothesis_medium": "Medium",
+  "ui.hypothesis_strong": "Strong",
+  "ui.hypothesis_strength": "Strength",
+  "ui.evidence_for_heading": "This topic is evidence for",
+  "ui.evidence_from_heading": "Evidence for this hypothesis",
+  "ui.add_evidence": "Add evidence\u2026",
+  "ui.add_evidence_title": "Add evidence",
+  "ui.add_evidence_description": "Choose the hypothesis this topic is evidence for.",
+  "ui.no_hypothesis_to_link": "There is no hypothesis this topic can be evidence for.",
+  "ui.remove_evidence_link_0": "Remove evidence link: {0}",
+  "log.evidence_relation_type_ignored_0": "Evidence link not drawn (it must run from a topic to a hypothesis): {0}",
   "ui.collapse_levels": "Collapse or expand the whole map",
   "ui.collapse_all": "Collapse all",
   "ui.expand_all": "Expand all",
@@ -2519,6 +2536,23 @@ var zhCN = {
   "ui.rename_topic": "\u91CD\u547D\u540D",
   "ui.paste_outline_add_many": "\u7C98\u8D34\u5927\u7EB2\uFF0C\u4E00\u6B21\u6DFB\u52A0\u591A\u4E2A",
   "ui.topic_more_options": "\u66F4\u591A\u6DFB\u52A0\u8BAE\u9898\u7684\u65B9\u5F0F",
+  "ui.add_hypothesis": "\u6DFB\u52A0\u5047\u8BBE",
+  "ui.new_hypothesis": "\u65B0\u5047\u8BBE",
+  "ui.add_subhypothesis": "\u6DFB\u52A0\u5B50\u5047\u8BBE",
+  "ui.new_subhypothesis": "\u65B0\u5B50\u5047\u8BBE",
+  "ui.hypothesis_tag_0": "\u5047\u8BBE\u30FB{0}",
+  "ui.hypothesis_weak": "\u5F31",
+  "ui.hypothesis_medium": "\u4E2D",
+  "ui.hypothesis_strong": "\u5F3A",
+  "ui.hypothesis_strength": "\u5F3A\u5EA6",
+  "ui.evidence_for_heading": "\u6B64\u8BAE\u9898\u662F\u4EE5\u4E0B\u5047\u8BBE\u7684\u8BC1\u636E",
+  "ui.evidence_from_heading": "\u652F\u6301\u6B64\u5047\u8BBE\u7684\u8BC1\u636E",
+  "ui.add_evidence": "\u6DFB\u52A0\u8BC1\u636E\u2026",
+  "ui.add_evidence_title": "\u6DFB\u52A0\u8BC1\u636E",
+  "ui.add_evidence_description": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u8981\u4F5C\u4E3A\u8BC1\u636E\u7684\u5047\u8BBE\u3002",
+  "ui.no_hypothesis_to_link": "\u6CA1\u6709\u53EF\u4EE5\u4F5C\u4E3A\u8BC1\u636E\u5BF9\u8C61\u7684\u5047\u8BBE\u3002",
+  "ui.remove_evidence_link_0": "\u79FB\u9664\u8BC1\u636E\u94FE\u63A5\uFF1A{0}",
+  "log.evidence_relation_type_ignored_0": "\u8BC1\u636E\u94FE\u63A5\u672A\u7ED8\u5236\uFF08\u5FC5\u987B\u7531\u8BAE\u9898\u6307\u5411\u5047\u8BBE\uFF09\uFF1A{0}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u5F00",
@@ -4488,6 +4522,23 @@ var zhTW = {
   "ui.rename_topic": "\u91CD\u65B0\u547D\u540D",
   "ui.paste_outline_add_many": "\u8CBC\u4E0A\u5927\u7DB1\uFF0C\u4E00\u6B21\u65B0\u589E\u591A\u500B",
   "ui.topic_more_options": "\u66F4\u591A\u65B0\u589E\u8B70\u984C\u7684\u65B9\u5F0F",
+  "ui.add_hypothesis": "\u65B0\u589E\u5047\u8A2D",
+  "ui.new_hypothesis": "\u65B0\u5047\u8A2D",
+  "ui.add_subhypothesis": "\u65B0\u589E\u5B50\u5047\u8A2D",
+  "ui.new_subhypothesis": "\u65B0\u5B50\u5047\u8A2D",
+  "ui.hypothesis_tag_0": "\u5047\u8A2D\u30FB{0}",
+  "ui.hypothesis_weak": "\u5F31",
+  "ui.hypothesis_medium": "\u4E2D",
+  "ui.hypothesis_strong": "\u5F37",
+  "ui.hypothesis_strength": "\u5F37\u5EA6",
+  "ui.evidence_for_heading": "\u6B64\u8B70\u984C\u662F\u4EE5\u4E0B\u5047\u8A2D\u7684\u8B49\u64DA",
+  "ui.evidence_from_heading": "\u652F\u6301\u6B64\u5047\u8A2D\u7684\u8B49\u64DA",
+  "ui.add_evidence": "\u65B0\u589E\u8B49\u64DA\u2026",
+  "ui.add_evidence_title": "\u65B0\u589E\u8B49\u64DA",
+  "ui.add_evidence_description": "\u9078\u64C7\u9019\u500B\u8B70\u984C\u8981\u4F5C\u70BA\u8B49\u64DA\u7684\u5047\u8A2D\u3002",
+  "ui.no_hypothesis_to_link": "\u6C92\u6709\u53EF\u4EE5\u4F5C\u70BA\u8B49\u64DA\u5C0D\u8C61\u7684\u5047\u8A2D\u3002",
+  "ui.remove_evidence_link_0": "\u79FB\u9664\u8B49\u64DA\u9023\u7D50\uFF1A{0}",
+  "log.evidence_relation_type_ignored_0": "\u8B49\u64DA\u9023\u7D50\u672A\u7E6A\u88FD\uFF08\u5FC5\u9808\u7531\u8B70\u984C\u6307\u5411\u5047\u8A2D\uFF09\uFF1A{0}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
   "ui.collapse_all": "\u5168\u90E8\u6536\u5408",
   "ui.expand_all": "\u5168\u90E8\u5C55\u958B",
@@ -15717,6 +15768,18 @@ function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
   if (kept.length) map.topicRelations = kept;
   else delete map.topicRelations;
 }
+function setTopicRelations(map, list) {
+  if (list.length) map.topicRelations = list.map((r) => ({ kind: r.kind, from: r.from, to: r.to }));
+  else delete map.topicRelations;
+}
+function legalEvidenceTargets(map, fromId, isHypothesis) {
+  var _a2;
+  if (isHypothesis(fromId)) return [];
+  const linked = new Set(
+    ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => r.kind === "evidence" && r.from === fromId).map((r) => r.to)
+  );
+  return map.nodes.filter((n) => n.id !== fromId && isHypothesis(n.id) && !linked.has(n.id)).map((n) => n.id);
+}
 function clearQuestionConvergenceEdges(map) {
   let changed = false;
   for (const node of map.nodes) {
@@ -20965,6 +21028,18 @@ function renderRelevanceTagButton(parent, tier, label, ariaLabel, open, disabled
     event.stopPropagation();
     if (!tag.disabled) open(tag);
   });
+  return tag;
+}
+
+// experiences/visual-map/hypothesis-label.ts
+var STRENGTH_LABEL = {
+  weak: "ui.hypothesis_weak",
+  medium: "ui.hypothesis_medium",
+  strong: "ui.hypothesis_strong"
+};
+function renderHypothesisTag(parent, strength, text11) {
+  const tag = parent.createSpan({ cls: "vam-hypothesis-tag", text: text11 });
+  tag.dataset.strength = strength;
   return tag;
 }
 
@@ -36362,6 +36437,21 @@ function edgePathData(x1, y1, x2, y2) {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
+var relationMarkerSequence = 0;
+function relationPathData(a, b) {
+  const y1 = a.y + a.height / 2, y2 = b.y + b.height / 2;
+  if (b.x + b.width < a.x) {
+    const x1 = a.x, x2 = b.x + b.width, bend = Math.max(60, (x1 - x2) / 2);
+    return `M ${x1} ${y1} C ${x1 - bend} ${y1}, ${x2 + bend} ${y2}, ${x2} ${y2}`;
+  }
+  return edgePathData(a.x + a.width, y1, b.x, y2);
+}
+var boxOf = (card) => ({
+  x: card.offsetLeft,
+  y: card.offsetTop,
+  width: card.offsetWidth,
+  height: card.offsetHeight
+});
 var AIM_STAGE_KEYS = {
   "research-plan": "ui.aim_stage_research-plan",
   "report-review": "ui.aim_stage_report-review",
@@ -36527,6 +36617,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
     __publicField(this, "viewportQueued", false);
     __publicField(this, "edgeEls", /* @__PURE__ */ new Map());
+    /** Evidence links on screen, keyed `fact\0hypothesis`; a drag moves them with their cards. */
+    __publicField(this, "relationEls", /* @__PURE__ */ new Map());
+    /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
+    __publicField(this, "relationMarkerId", `vam-relation-arrow-${++relationMarkerSequence}`);
+    /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
+    __publicField(this, "reportedRelations", /* @__PURE__ */ new Set());
     __publicField(this, "suppressClickUntil", 0);
     /** Node whose card should hold keyboard focus once the next render finishes. */
     __publicField(this, "focusNodeId", null);
@@ -38399,6 +38495,10 @@ ${request.requirements}` : preset.text,
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
     const menu = new import_obsidian30.Menu();
+    if (this.relationsEnabled())
+      menu.addItem(
+        (item) => item.setTitle(t("ui.add_hypothesis")).setIcon("lightbulb").onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, "hypothesis")))
+      );
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
     );
@@ -41742,7 +41842,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -41853,15 +41953,23 @@ ${request.requirements}` : preset.text,
       const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
+    const strength = this.hypothesisStrengthOf(node.id);
+    if (strength) {
+      const tagText = this.hypothesisTagText(strength);
+      card.dataset.topicKind = "hypothesis";
+      renderHypothesisTag(header, strength, tagText);
+      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
+    }
     const errorDetails = [];
-    if ((_o = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _o.length) {
+    if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
       const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
     if (batch) {
-      const currentNode = batch.currentPath ? (_p = this.map) == null ? void 0 : _p.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_q = this.notes.get(currentNode.id)) == null ? void 0 : _q.title : void 0;
+      const currentNode = batch.currentPath ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_r = this.notes.get(currentNode.id)) == null ? void 0 : _r.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -41884,9 +41992,9 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_r = this.map) == null ? void 0 : _r.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_s = this.plugin.expansionCoordinator) == null ? void 0 : _s.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_t = this.plugin.quickExpandPending) == null ? void 0 : _t.has(node.path)) || ((_u = this.plugin.running) == null ? void 0 : _u.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || ((_v = this.plugin.running) == null ? void 0 : _v.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
@@ -41904,27 +42012,27 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_w = (_v = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _v.length) != null ? _w : 0;
-    if (pendingCount && !this.builtIn && !this.integrationMode && !((_x = this.map) == null ? void 0 : _x.aim))
+    const pendingCount = (_x = (_w = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
+    if (pendingCount && !this.builtIn && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim))
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
-    if (note && note.researchMode === "local" && !this.builtIn && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
+    if (note && note.researchMode === "local" && !this.builtIn && !this.integrationMode && !((_z = this.map) == null ? void 0 : _z.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
       this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_z = this.map) == null ? void 0 : _z.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_A = this.map) == null ? void 0 : _A.aim))
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_A = this.map) == null ? void 0 : _A.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_B = this.map) == null ? void 0 : _B.aim)) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -41960,7 +42068,7 @@ ${request.requirements}` : preset.text,
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.builtIn && !this.integrationMode) {
-      if (!((_B = this.map) == null ? void 0 : _B.aim)) {
+      if (!((_C = this.map) == null ? void 0 : _C.aim)) {
         const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure2.addClass("vam-node-tool", "vam-structure-tool");
         structure2.setAttr("aria-label", t("ui.structure_and_links"));
@@ -41986,7 +42094,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_C = this.map) == null ? void 0 : _C.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (((_D = this.map) == null ? void 0 : _D.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -41998,7 +42106,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (((_D = this.map) == null ? void 0 : _D.aim) && assumptions.length) {
+      if (((_E = this.map) == null ? void 0 : _E.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -42010,7 +42118,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (((_E = this.map) == null ? void 0 : _E.aim) && node.aimKind === "conclusion") {
+      if (((_F = this.map) == null ? void 0 : _F.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -42029,17 +42137,17 @@ ${request.requirements}` : preset.text,
     details.addClass("vam-node-tool", "vam-detail-button");
     if (this.builtIn) details.setAttr("title", t("ui.view_sample_content"));
     else details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.builtIn && !this.integrationMode && !((_F = this.map) == null ? void 0 : _F.aim))
+    if (!this.builtIn && !this.integrationMode && !((_G = this.map) == null ? void 0 : _G.aim))
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.builtIn && !this.integrationMode && !((_G = this.map) == null ? void 0 : _G.aim)) {
+    if (!this.builtIn && !this.integrationMode && !((_H = this.map) == null ? void 0 : _H.aim)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
-    const title = card.createEl("h3", { text: (_H = note == null ? void 0 : note.title) != null ? _H : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_I = note == null ? void 0 : note.title) != null ? _I : node.path);
+    const title = card.createEl("h3", { text: (_I = note == null ? void 0 : note.title) != null ? _I : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_J = note == null ? void 0 : note.title) != null ? _J : node.path);
     title.setAttr("dir", "auto");
-    if (note && !this.builtIn && !this.integrationMode && !((_J = this.map) == null ? void 0 : _J.aim))
+    if (note && !this.builtIn && !this.integrationMode && !((_K = this.map) == null ? void 0 : _K.aim))
       card.addEventListener("dblclick", (event) => {
         var _a3;
         const target = event.target;
@@ -42050,18 +42158,18 @@ ${request.requirements}` : preset.text,
         event.preventDefault();
         this.renameNode(node, note.title);
       });
-    if ((_K = research == null ? void 0 : research.preview) == null ? void 0 : _K.summary)
+    if ((_L = research == null ? void 0 : research.preview) == null ? void 0 : _L.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_L = note == null ? void 0 : note.summary) != null ? _L : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
+        text: (_M = note == null ? void 0 : note.summary) != null ? _M : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from")
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_M = this.map) == null ? void 0 : _M.aim) && !this.builtIn) {
+    if (node.aimKind === "conclusion" && ((_N = this.map) == null ? void 0 : _N.aim) && !this.builtIn) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -42074,7 +42182,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_N = this.map) == null ? void 0 : _N.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_O = this.map) == null ? void 0 : _O.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -42110,11 +42218,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_O = this.map) == null ? void 0 : _O.aim)) {
+    if (node.aimKind === "question" && ((_P = this.map) == null ? void 0 : _P.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_Q = (_P = node.aimQuestion) == null ? void 0 : _P.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _Q : branch.answerSnapshot.selections;
+        const labels = (_R = (_Q = node.aimQuestion) == null ? void 0 : _Q.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _R : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -42157,11 +42265,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_R = this.map) == null ? void 0 : _R.aim)) {
+    if (node.aimKind === "answer" && ((_S = this.map) == null ? void 0 : _S.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_T = (_S = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _S.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _T : branch.answerSnapshot.selections;
+        const labels = (_U = (_T = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _T.options.filter((option2) => branch.answerSnapshot.selections.includes(option2.id)).map((option2) => option2.label)) != null ? _U : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -42393,6 +42501,24 @@ ${request.requirements}` : preset.text,
     var _a2, _b2;
     return !((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) && !!((_b2 = this.plugin.expansionCoordinator) == null ? void 0 : _b2.isQueued(node.path));
   }
+  /** Hypothesis and evidence features exist on ordinary maps only: not the built-in sample, not AIM. */
+  relationsEnabled() {
+    return !this.builtIn && !!this.map && !this.map.aim;
+  }
+  isHypothesis(id) {
+    var _a2;
+    return ((_a2 = this.notes.get(id)) == null ? void 0 : _a2.topicKind) === "hypothesis";
+  }
+  /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
+  hypothesisStrengthOf(id) {
+    var _a2, _b2, _c;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind || !this.isHypothesis(id)) return void 0;
+    return (_c = (_b2 = this.notes.get(id)) == null ? void 0 : _b2.hypothesisStrength) != null ? _c : "weak";
+  }
+  hypothesisTagText(strength) {
+    return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
+  }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   labelCard(card, text11) {
     let label = cardLabels.get(card);
@@ -42527,7 +42653,7 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${Math.max(12, Math.min(rect.top - host.top, maxTop))}px`;
   }
   refreshCard(node, redrawEdges = true) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
@@ -42565,6 +42691,11 @@ ${request.requirements}` : preset.text,
         status.className = `vam-status vam-status-${note.status}`;
         status.setText(label);
       } else header == null ? void 0 : header.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
+    }
+    const strength = this.hypothesisStrengthOf(node.id);
+    if (strength && !node.aimKind) {
+      const tagText = this.hypothesisTagText(strength), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
+      if (named && !named.includes(tagText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
     }
     if (redrawEdges) this.drawEdges();
   }
@@ -42869,6 +43000,7 @@ ${request.requirements}` : preset.text,
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
+    if (note) this.renderHypothesisSection(panel, node, close);
     const actions = (host != null ? host : panel).createDiv("vam-next-actions");
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {
@@ -43049,17 +43181,132 @@ ${request.requirements}` : preset.text,
       }))
     ).open();
   }
+  /** Sets a hypothesis's strength: the note's frontmatter and Map.md in one undoable step (undo writes the old note text back). */
+  async changeHypothesisStrength(node, strength) {
+    if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeHypothesisStrength(path, strength)).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.hypothesis_strength") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Adds an evidence link fact -> hypothesis in one undoable Map.md change; an illegal target (already linked, not a hypothesis) is refused. */
+  async addEvidence(fromId, toId) {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange((map) => {
+      var _a2;
+      if (!legalEvidenceTargets(map, fromId, (id) => this.isHypothesis(id)).includes(toId)) return;
+      setTopicRelations(map, [...(_a2 = map.topicRelations) != null ? _a2 : [], { kind: "evidence", from: fromId, to: toId }]);
+    }, false);
+  }
+  async removeEvidence(fromId, toId) {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange((map) => {
+      var _a2;
+      setTopicRelations(
+        map,
+        ((_a2 = map.topicRelations) != null ? _a2 : []).filter((r) => !(r.kind === "evidence" && r.from === fromId && r.to === toId))
+      );
+    }, false);
+  }
+  /** Opens the hypothesis picker for `node`; with no legal hypothesis it only says so. */
+  chooseEvidenceTarget(node) {
+    if (!this.map || !this.relationsEnabled()) return;
+    const legal = new Set(legalEvidenceTargets(this.map, node.id, (id) => this.isHypothesis(id)));
+    if (!legal.size) {
+      new import_obsidian30.Notice(t("ui.no_hypothesis_to_link"));
+      return;
+    }
+    new TopicTreeModal(
+      this.app,
+      t("ui.add_evidence_title"),
+      t("ui.add_evidence_description"),
+      this.map.nodes,
+      (target) => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
+      },
+      (target) => legal.has(target.id),
+      (target) => this.enqueue(() => this.addEvidence(node.id, target.id))
+    ).open();
+  }
+  /** "Add sub-hypothesis", and for a hypothesis its strength and the facts that point at it; for another topic the hypotheses it is evidence for. */
+  renderHypothesisSection(panel, node, close) {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
+    this.button(section3, t("ui.add_subhypothesis"), () => {
+      close == null ? void 0 : close();
+      this.enqueue(() => this.addNode(node, void 0, true, true, "hypothesis"));
+    });
+    const isHypothesis = this.isHypothesis(node.id);
+    const body = section3.createDiv("vam-hypothesis-body");
+    const titleOf = (id) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    };
+    const paint = () => {
+      var _a2, _b2, _c, _d;
+      body.empty();
+      if (isHypothesis) {
+        const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "weak";
+        body.createEl("strong", { text: t("ui.hypothesis_strength"), cls: "vam-topic-tree-heading" });
+        const group = body.createDiv("vam-hypothesis-strengths");
+        group.setAttr("role", "group");
+        group.setAttr("aria-label", t("ui.hypothesis_strength"));
+        for (const option2 of HYPOTHESIS_STRENGTHS) {
+          const choice2 = this.button(group, t(STRENGTH_LABEL[option2]), () => {
+            if (option2 === current) return;
+            this.enqueue(async () => {
+              await this.changeHypothesisStrength(node, option2);
+              paint();
+            });
+          });
+          choice2.setAttr("aria-pressed", String(option2 === current));
+          if (option2 === current) choice2.addClass("mod-cta");
+        }
+      }
+      const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter(
+        (r) => isHypothesis ? r.kind === "evidence" && r.to === node.id : r.kind === "evidence" && r.from === node.id
+      );
+      if (isHypothesis || links.length)
+        body.createEl("strong", {
+          text: t(isHypothesis ? "ui.evidence_from_heading" : "ui.evidence_for_heading"),
+          cls: "vam-topic-tree-heading"
+        });
+      if (links.length) {
+        const list = body.createEl("ul", { cls: "vam-relation-list" });
+        for (const link of links) {
+          const row = list.createEl("li", { cls: "vam-relation-row" }), otherId = isHypothesis ? link.from : link.to;
+          row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
+          const remove = this.button(
+            row,
+            t("ui.remove"),
+            () => this.enqueue(async () => {
+              await this.removeEvidence(link.from, link.to);
+              paint();
+            })
+          );
+          remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
+        }
+      }
+      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node));
+    };
+    paint();
+  }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
-  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true) {
+  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic") {
     var _a2, _b2, _c, _d, _e, _f, _g;
     if (!this.map) return;
+    const hypothesis = kind === "hypothesis" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
+      const dialogTitle = hypothesis ? parent ? t("ui.add_subhypothesis") : t("ui.add_hypothesis") : parent ? t("ui.new_subtopic") : t("ui.my_core_topic");
       new NameModal(
         this.app,
-        parent ? t("ui.new_subtopic") : t("ui.my_core_topic"),
+        dialogTitle,
         "",
-        (title) => this.enqueue(() => this.addNode(parent, title))
+        (title) => this.enqueue(() => this.addNode(parent, title, true, true, kind))
       ).open();
       return;
     }
@@ -43072,13 +43319,13 @@ ${request.requirements}` : preset.text,
       return;
     }
     const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (hypothesis ? parent ? t("ui.new_subhypothesis") : t("ui.new_hypothesis") : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local" }
+      { researchMode: "local", ...hypothesis ? { hypothesis: true } : {} }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0);
@@ -46930,8 +47177,21 @@ ${addition}` : addition });
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
     }
+    const linked = [];
+    for (const key2 of this.relationEls.keys()) {
+      const [fromId, toId] = key2.split("\0");
+      if (fromId !== id && toId !== id) continue;
+      const other = this.cardEls.get(fromId === id ? toId : fromId);
+      if (other) linked.push({ key: key2, dragIsFrom: fromId === id, far: boxOf(other) });
+    }
     return {
       update: (x, y) => {
+        for (const link of linked) {
+          const path = this.relationEls.get(link.key);
+          if (!path) continue;
+          const mine = { x, y, ...size };
+          path.setAttribute("d", link.dragIsFrom ? relationPathData(mine, link.far) : relationPathData(link.far, mine));
+        }
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
@@ -46976,6 +47236,59 @@ ${addition}` : addition });
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
       }
+    }
+    this.drawRelations();
+  }
+  /**
+   * Evidence links (fact -> hypothesis) in the same layer as the parent-child edges, with an arrowhead at the
+   * hypothesis. A link is not drawn when an end is off screen (collapsed) or when it runs the wrong way (the file keeps it;
+   * one warning per view); an AIM map draws none, and its file keeps the key.
+   */
+  drawRelations() {
+    var _a2;
+    this.relationEls.clear();
+    if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
+    const links = [];
+    for (const relation of (_a2 = this.map.topicRelations) != null ? _a2 : []) {
+      if (relation.kind !== "evidence") continue;
+      const from = this.cardEls.get(relation.from), to = this.cardEls.get(relation.to);
+      if (!from || !to) continue;
+      const key2 = `${relation.from}\0${relation.to}`;
+      if (this.isHypothesis(relation.from) || !this.isHypothesis(relation.to)) {
+        if (!this.reportedRelations.has(key2)) {
+          this.reportedRelations.add(key2);
+          this.plugin.logs.appendLog(
+            "warn",
+            t("log.evidence_relation_type_ignored_0", `${relation.from} -> ${relation.to}`)
+          );
+        }
+        continue;
+      }
+      links.push({ from, to, key: key2 });
+    }
+    if (!links.length) return;
+    const defs = createSvg("defs"), marker5 = createSvg("marker"), arrow = createSvg("path");
+    marker5.setAttribute("id", this.relationMarkerId);
+    marker5.setAttribute("viewBox", "0 0 10 10");
+    marker5.setAttribute("refX", "9");
+    marker5.setAttribute("refY", "5");
+    marker5.setAttribute("markerWidth", "10");
+    marker5.setAttribute("markerHeight", "10");
+    marker5.setAttribute("markerUnits", "userSpaceOnUse");
+    marker5.setAttribute("orient", "auto");
+    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.addClass("vam-relation-arrow");
+    marker5.appendChild(arrow);
+    defs.appendChild(marker5);
+    this.edgesEl.appendChild(defs);
+    for (const link of links) {
+      const path = createSvg("path");
+      path.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
+      path.setAttribute("marker-end", `url(#${this.relationMarkerId})`);
+      path.addClass("vam-relation");
+      path.addClass("vam-relation-evidence");
+      this.edgesEl.appendChild(path);
+      this.relationEls.set(link.key, path);
     }
   }
   /**

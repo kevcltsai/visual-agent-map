@@ -37,9 +37,11 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 </div>
 <div class="vam-viewport" style="height:600px">
   <div class="vam-stage">
-    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/></svg>
+    <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/><defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><path class="vam-relation vam-relation-evidence" d="M0 50 L200 50" marker-end="url(#m)"/></svg>
     ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
+    ${card('data-topic-kind="hypothesis" data-status="completed"', 660, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">Hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
+    ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="completed"', 660, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="strong">Hypothesis · Strong</span></div><h3 class="vam-card-title">Skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
@@ -55,11 +57,17 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div class="vam-node" style="position:static;width:200px"><button class="vam-add-child" style="opacity:1">+</button></div>
 </body></html>`;
 
-// [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), dot (::before fill), ring (::before border).
+// [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), fill (SVG fill), border (card frame), dot (::before fill), ring (::before border).
 const CASES = [
   ['edge', '.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)', 'stroke', 3],
   ['edge-skippable', '.vam-edge.vam-edge-side', 'stroke', 3],
   ['edge-convergence', '.vam-edge-convergence', 'stroke', 3],
+  ['edge-evidence', '.vam-relation-evidence', 'stroke', 3],
+  ['evidence-arrow', '.vam-relation-arrow', 'fill', 3],
+  ['hypothesis-border', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])', 'border', 3],
+  ['hypothesis-border-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]', 'border', 3],
+  ['hypothesis-tag', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance]) .vam-hypothesis-tag', 'color', 4.5],
+  ['hypothesis-tag-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"] .vam-hypothesis-tag', 'color', 4.5],
   ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],
   ['skippable-summary', '.vam-node[data-relevance="side"] .vam-card-summary', 'color', 4.5],
   ['skippable-tag-text', '.vam-node[data-relevance="side"] .vam-relevance-tag span:last-child', 'color', 4.5],
@@ -140,6 +148,8 @@ const PROBE = `(() => {
     const foreground = () => {
       if (kind === 'color') return rgba(style(target).color);
       if (kind === 'stroke') return rgba(style(target).stroke);
+      if (kind === 'fill') return rgba(style(target).fill);
+      if (kind === 'border') return rgba(style(target).borderTopColor);
       if (kind === 'dot') return rgba(getComputedStyle(target, '::before').backgroundColor);
       return rgba(getComputedStyle(target, '::before').borderTopColor);
     };
@@ -250,7 +260,10 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         const details = await evaluate(`(() => {
           const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
           const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
-          return { sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
+          const evidence = document.querySelector('.vam-relation-evidence'), convergence = document.querySelector('.vam-edge-convergence'), hyp = document.querySelector('.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])'), hypSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]');
+          return { evidenceDash: getComputedStyle(evidence).strokeDasharray, convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, evidencePointer: getComputedStyle(evidence).pointerEvents, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
+            hypWidth: getComputedStyle(hyp).borderTopWidth, hypStyle: getComputedStyle(hyp).borderTopStyle, hypSideWidth: getComputedStyle(hypSide).borderTopWidth, hypSideStyle: getComputedStyle(hypSide).borderTopStyle, coreWidth: getComputedStyle(core).borderTopWidth,
+            sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
             edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
         })()`);
         // Hover / selection of a skippable topic must not change its look beyond the border colour (no opacity jump).
@@ -277,6 +290,17 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         if (row.need) assert.ok(row.ratio >= row.need, `${scheme}: ${name} contrast ${row.ratio.toFixed(2)} must be >= ${row.need}`);
       }
       // Counterexamples: the cues that replace the fade stay visible and stable.
+      // hypothesis-evidence: the new line type and frame stay distinguishable without colour (dash pattern, frame weight) and leave the old ones alone.
+      assert.notEqual(details.evidenceDash, 'none', `${scheme}: an evidence link is dashed`);
+      assert.notEqual(details.evidenceDash, details.convergenceDash, `${scheme}: evidence dashes differ from the AIM 5 5 convergence dashes`);
+      assert.equal(details.edgeDash, 'none', `${scheme}: the parent-child line stays solid`);
+      assert.equal(details.edgesPointer, 'none', `${scheme}: the edge layer keeps pointer-events none`);
+      assert.equal(details.evidencePointer, 'none', `${scheme}: an evidence link does not take pointer events`);
+      assert.equal(details.hypWidth, '2px', `${scheme}: a hypothesis has a 2px frame`);
+      assert.equal(details.hypSideWidth, '2px', `${scheme}: a skippable hypothesis keeps the 2px frame`);
+      assert.equal(details.hypSideStyle, 'dashed', `${scheme}: a skippable hypothesis keeps the dashed frame`);
+      assert.notEqual(details.hypStyle, 'dashed', `${scheme}: a plain hypothesis frame is solid`);
+      assert.equal(details.coreWidth, '1px', `${scheme}: an ordinary topic keeps the 1px frame`);
       assert.equal(details.sideBorder, 'dashed', `${scheme}: a skippable topic keeps a dashed frame`);
       assert.notEqual(details.coreBorder, 'dashed', `${scheme}: only skippable topics get the dashed frame`);
       assert.equal(details.sideTag, true, `${scheme}: a skippable topic keeps its tag`);

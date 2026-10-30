@@ -55,10 +55,12 @@ import {
   descendants,
   History,
   inheritModel,
+  legalEvidenceTargets,
   type MapDocument,
   type MapNode,
   parentIdsForNode,
   removeNodes,
+  setTopicRelations,
   supersededAimNodeIds,
   visibleNodes
 } from "../../map-model";
@@ -127,12 +129,15 @@ import {
   normalizeRelevanceLevel,
   RELEVANCE_CONTEXT_MAX_LENGTH,
   RELEVANCE_GOAL_MAX_LENGTH,
+  HYPOTHESIS_STRENGTHS,
   RELEVANCE_LEVELS,
+  type HypothesisStrength,
   type NoteRelevance,
   type RelevanceLevel,
   type RelevanceTier
 } from "../../note-values";
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
+import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
 import { fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
@@ -426,6 +431,32 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
+/** Unique ids for the evidence arrowhead `<marker>`: two map tabs share one document, so an id must belong to one view. */
+let relationMarkerSequence = 0;
+interface CardBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+/** Curve for an evidence link from `a` (the fact) to `b` (the hypothesis); it leaves and enters on the sides that face each other. */
+function relationPathData(a: CardBox, b: CardBox): string {
+  const y1 = a.y + a.height / 2,
+    y2 = b.y + b.height / 2;
+  if (b.x + b.width < a.x) {
+    const x1 = a.x,
+      x2 = b.x + b.width,
+      bend = Math.max(60, (x1 - x2) / 2);
+    return `M ${x1} ${y1} C ${x1 - bend} ${y1}, ${x2 + bend} ${y2}, ${x2} ${y2}`;
+  }
+  return edgePathData(a.x + a.width, y1, b.x, y2);
+}
+const boxOf = (card: HTMLElement): CardBox => ({
+  x: card.offsetLeft,
+  y: card.offsetTop,
+  width: card.offsetWidth,
+  height: card.offsetHeight
+});
 
 /** One planned subtopic of the running AIM branch, as the map shows it before its research note exists. */
 type AimTargetProgress = {
@@ -684,6 +715,12 @@ export class VisualAgentMapView extends ItemView {
   /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
   private viewportQueued = false;
   private edgeEls = new Map<string, SVGPathElement>();
+  /** Evidence links on screen, keyed `fact\0hypothesis`; a drag moves them with their cards. */
+  private relationEls = new Map<string, SVGPathElement>();
+  /** Id of this view's evidence arrowhead; unique per view so two open maps never share (or lose) one. */
+  private readonly relationMarkerId = `vam-relation-arrow-${++relationMarkerSequence}`;
+  /** Evidence links already reported as the wrong way round, so a redraw does not log them again. */
+  private reportedRelations = new Set<string>();
   private suppressClickUntil = 0;
   /** Node whose card should hold keyboard focus once the next render finishes. */
   private focusNodeId: string | null = null;
@@ -2667,6 +2704,13 @@ export class VisualAgentMapView extends ItemView {
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   private openTopicMenu(event: MouseEvent): void {
     const menu = new Menu();
+    if (this.relationsEnabled())
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.add_hypothesis"))
+          .setIcon("lightbulb")
+          .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, "hypothesis")))
+      );
     menu.addItem(item =>
       item
         .setTitle(t("ui.paste_outline_add_many"))
@@ -6443,6 +6487,15 @@ export class VisualAgentMapView extends ItemView {
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
+    // A hypothesis: quiet "Hypothesis · strength" tag, a heavier frame (styles.css) and the same words in the card's accessible name.
+    const strength = this.hypothesisStrengthOf(node.id);
+    if (strength) {
+      const tagText = this.hypothesisTagText(strength);
+      card.dataset.topicKind = "hypothesis";
+      renderHypothesisTag(header, strength, tagText);
+      const named = cardLabels.get(card)?.textContent;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
+    }
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -7043,6 +7096,22 @@ export class VisualAgentMapView extends ItemView {
   private isResearchQueued(node: MapNode): boolean {
     return !this.plugin.running?.has(node.path) && !!this.plugin.expansionCoordinator?.isQueued(node.path);
   }
+  /** Hypothesis and evidence features exist on ordinary maps only: not the built-in sample, not AIM. */
+  private relationsEnabled(): boolean {
+    return !this.builtIn && !!this.map && !this.map.aim;
+  }
+  private isHypothesis(id: string): boolean {
+    return this.notes.get(id)?.topicKind === "hypothesis";
+  }
+  /** The strength to show on a card: only a hypothesis on an ordinary map has one. */
+  private hypothesisStrengthOf(id: string): HypothesisStrength | undefined {
+    const node = this.map?.nodes.find(item => item.id === id);
+    if (!this.relationsEnabled() || !node || node.aimKind || !this.isHypothesis(id)) return undefined;
+    return this.notes.get(id)?.hypothesisStrength ?? "weak";
+  }
+  private hypothesisTagText(strength: HypothesisStrength): string {
+    return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
+  }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   private labelCard(card: HTMLElement, text: string): void {
     let label = cardLabels.get(card);
@@ -7230,6 +7299,13 @@ export class VisualAgentMapView extends ItemView {
         status.className = `vam-status vam-status-${note.status}`;
         status.setText(label);
       } else header?.prepend(createSpan({ cls: `vam-status vam-status-${note.status}`, text: label }));
+    }
+    // The label above was rewritten from the title and status; a hypothesis keeps its strength in the accessible name.
+    const strength = this.hypothesisStrengthOf(node.id);
+    if (strength && !node.aimKind) {
+      const tagText = this.hypothesisTagText(strength),
+        named = cardLabels.get(card)?.textContent;
+      if (named && !named.includes(tagText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, tagText));
     }
     if (redrawEdges) this.drawEdges();
   }
@@ -7554,6 +7630,7 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
+    if (note) this.renderHypothesisSection(panel, node, close);
     // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -7746,19 +7823,134 @@ export class VisualAgentMapView extends ItemView {
       }))
     ).open();
   }
+  /** Sets a hypothesis's strength: the note's frontmatter and Map.md in one undoable step (undo writes the old note text back). */
+  private async changeHypothesisStrength(node: MapNode, strength: HypothesisStrength): Promise<void> {
+    if (!this.map || !this.relationsEnabled() || !this.isHypothesis(node.id)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeHypothesisStrength(path, strength))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.hypothesis_strength") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** Adds an evidence link fact -> hypothesis in one undoable Map.md change; an illegal target (already linked, not a hypothesis) is refused. */
+  private async addEvidence(fromId: string, toId: string): Promise<void> {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange(map => {
+      if (!legalEvidenceTargets(map, fromId, id => this.isHypothesis(id)).includes(toId)) return;
+      setTopicRelations(map, [...(map.topicRelations ?? []), { kind: "evidence", from: fromId, to: toId }]);
+    }, false);
+  }
+  private async removeEvidence(fromId: string, toId: string): Promise<void> {
+    if (!this.map || !this.relationsEnabled()) return;
+    await this.mapChange(map => {
+      setTopicRelations(
+        map,
+        (map.topicRelations ?? []).filter(r => !(r.kind === "evidence" && r.from === fromId && r.to === toId))
+      );
+    }, false);
+  }
+  /** Opens the hypothesis picker for `node`; with no legal hypothesis it only says so. */
+  private chooseEvidenceTarget(node: MapNode): void {
+    if (!this.map || !this.relationsEnabled()) return;
+    const legal = new Set(legalEvidenceTargets(this.map, node.id, id => this.isHypothesis(id)));
+    if (!legal.size) {
+      new Notice(t("ui.no_hypothesis_to_link"));
+      return;
+    }
+    new TopicTreeModal(
+      this.app,
+      t("ui.add_evidence_title"),
+      t("ui.add_evidence_description"),
+      this.map.nodes,
+      target => this.notes.get(target.id)?.title ?? target.path,
+      target => legal.has(target.id),
+      target => this.enqueue(() => this.addEvidence(node.id, target.id))
+    ).open();
+  }
+  /** "Add sub-hypothesis", and for a hypothesis its strength and the facts that point at it; for another topic the hypotheses it is evidence for. */
+  private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
+    this.button(section, t("ui.add_subhypothesis"), () => {
+      close?.();
+      this.enqueue(() => this.addNode(node, undefined, true, true, "hypothesis"));
+    });
+    const isHypothesis = this.isHypothesis(node.id);
+    const body = section.createDiv("vam-hypothesis-body");
+    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
+    const paint = (): void => {
+      body.empty();
+      if (isHypothesis) {
+        const current = this.notes.get(node.id)?.hypothesisStrength ?? "weak";
+        body.createEl("strong", { text: t("ui.hypothesis_strength"), cls: "vam-topic-tree-heading" });
+        const group = body.createDiv("vam-hypothesis-strengths");
+        group.setAttr("role", "group");
+        group.setAttr("aria-label", t("ui.hypothesis_strength"));
+        for (const option of HYPOTHESIS_STRENGTHS) {
+          const choice = this.button(group, t(STRENGTH_LABEL[option]), () => {
+            if (option === current) return;
+            this.enqueue(async () => {
+              await this.changeHypothesisStrength(node, option);
+              paint();
+            });
+          });
+          choice.setAttr("aria-pressed", String(option === current));
+          if (option === current) choice.addClass("mod-cta");
+        }
+      }
+      const links = (this.map?.topicRelations ?? []).filter(r =>
+        isHypothesis ? r.kind === "evidence" && r.to === node.id : r.kind === "evidence" && r.from === node.id
+      );
+      if (isHypothesis || links.length)
+        body.createEl("strong", {
+          text: t(isHypothesis ? "ui.evidence_from_heading" : "ui.evidence_for_heading"),
+          cls: "vam-topic-tree-heading"
+        });
+      if (links.length) {
+        const list = body.createEl("ul", { cls: "vam-relation-list" });
+        for (const link of links) {
+          const row = list.createEl("li", { cls: "vam-relation-row" }),
+            otherId = isHypothesis ? link.from : link.to;
+          row.createSpan({ text: titleOf(otherId), cls: "vam-relation-title", attr: { dir: "auto" } });
+          const remove = this.button(row, t("ui.remove"), () =>
+            this.enqueue(async () => {
+              await this.removeEvidence(link.from, link.to);
+              paint();
+            })
+          );
+          remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
+        }
+      }
+      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node));
+    };
+    paint();
+  }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   private async addNode(
     parentNode: MapNode | null,
     suggestedTitle?: string,
     rebuildDerivedData = true,
-    focus = true
+    focus = true,
+    kind: "topic" | "hypothesis" = "topic"
   ): Promise<void> {
     if (!this.map) return;
+    const hypothesis = kind === "hypothesis" && this.relationsEnabled();
     // The caller may hold a display copy (sorted by relevance); saved coordinates must come from the real node.
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
     if (!suggestedTitle?.trim()) {
-      new NameModal(this.app, parent ? t("ui.new_subtopic") : t("ui.my_core_topic"), "", title =>
-        this.enqueue(() => this.addNode(parent, title))
+      const dialogTitle = hypothesis
+        ? parent
+          ? t("ui.add_subhypothesis")
+          : t("ui.add_hypothesis")
+        : parent
+          ? t("ui.new_subtopic")
+          : t("ui.my_core_topic");
+      new NameModal(this.app, dialogTitle, "", title =>
+        this.enqueue(() => this.addNode(parent, title, true, true, kind))
       ).open();
       return;
     }
@@ -7772,13 +7964,19 @@ export class VisualAgentMapView extends ItemView {
     }
     const node = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
-        (parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+        (hypothesis
+          ? parent
+            ? t("ui.new_subhypothesis")
+            : t("ui.new_hypothesis")
+          : parent
+            ? t("ui.new_subtopic")
+            : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local" }
+      { researchMode: "local", ...(hypothesis ? { hypothesis: true as const } : {}) }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
@@ -11956,8 +12154,21 @@ export class VisualAgentMapView extends ItemView {
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
     }
+    const linked: { key: string; dragIsFrom: boolean; far: CardBox }[] = [];
+    for (const key of this.relationEls.keys()) {
+      const [fromId, toId] = key.split("\u0000");
+      if (fromId !== id && toId !== id) continue;
+      const other = this.cardEls.get(fromId === id ? toId : fromId);
+      if (other) linked.push({ key, dragIsFrom: fromId === id, far: boxOf(other) });
+    }
     return {
       update: (x, y) => {
+        for (const link of linked) {
+          const path = this.relationEls.get(link.key);
+          if (!path) continue;
+          const mine = { x, y, ...size };
+          path.setAttribute("d", link.dragIsFrom ? relationPathData(mine, link.far) : relationPathData(link.far, mine));
+        }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
           const path = this.edgeEls.get(edge.key);
@@ -12003,6 +12214,61 @@ export class VisualAgentMapView extends ItemView {
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
       }
+    }
+    this.drawRelations();
+  }
+  /**
+   * Evidence links (fact -> hypothesis) in the same layer as the parent-child edges, with an arrowhead at the
+   * hypothesis. A link is not drawn when an end is off screen (collapsed) or when it runs the wrong way (the file keeps it;
+   * one warning per view); an AIM map draws none, and its file keeps the key.
+   */
+  private drawRelations(): void {
+    this.relationEls.clear();
+    if (!this.edgesEl || !this.map || !this.relationsEnabled()) return;
+    const links: { from: HTMLElement; to: HTMLElement; key: string }[] = [];
+    for (const relation of this.map.topicRelations ?? []) {
+      if (relation.kind !== "evidence") continue;
+      const from = this.cardEls.get(relation.from),
+        to = this.cardEls.get(relation.to);
+      if (!from || !to) continue;
+      const key = `${relation.from}\u0000${relation.to}`;
+      if (this.isHypothesis(relation.from) || !this.isHypothesis(relation.to)) {
+        if (!this.reportedRelations.has(key)) {
+          this.reportedRelations.add(key);
+          this.plugin.logs.appendLog(
+            "warn",
+            t("log.evidence_relation_type_ignored_0", `${relation.from} -> ${relation.to}`)
+          );
+        }
+        continue;
+      }
+      links.push({ from, to, key });
+    }
+    if (!links.length) return;
+    const defs = createSvg("defs"),
+      marker = createSvg("marker"),
+      arrow = createSvg("path");
+    marker.setAttribute("id", this.relationMarkerId);
+    marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "9");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", "10");
+    marker.setAttribute("markerHeight", "10");
+    marker.setAttribute("markerUnits", "userSpaceOnUse");
+    marker.setAttribute("orient", "auto");
+    arrow.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    arrow.addClass("vam-relation-arrow");
+    marker.appendChild(arrow);
+    defs.appendChild(marker);
+    this.edgesEl.appendChild(defs);
+    for (const link of links) {
+      const path = createSvg("path");
+      path.setAttribute("d", relationPathData(boxOf(link.from), boxOf(link.to)));
+      path.setAttribute("marker-end", `url(#${this.relationMarkerId})`);
+      path.addClass("vam-relation");
+      path.addClass("vam-relation-evidence");
+      this.edgesEl.appendChild(path);
+      this.relationEls.set(link.key, path);
     }
   }
   /**

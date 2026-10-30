@@ -2029,3 +2029,164 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
   ];
   for (const [name, options] of none) assert.equal(render(options).button, undefined, `no button: ${name}`);
 });
+// ---- hypothesis-evidence (P2): hypothesis cards, the evidence panel and the evidence line ----
+const heNotes = (list) => new Map(list.map(([id, extra]) => [id, { title: id.toUpperCase(), summary: '', status: 'completed', ...extra }]));
+const heHyp = (strength) => ({ topicKind: 'hypothesis', ...(strength ? { hypothesisStrength: strength } : {}) });
+// The shared DOM stand-in has a read-only textContent; labelCard writes it.
+const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
+function heFixture(options = {}) {
+  const modals = [], notices = [], menus = [], logs = [], undone = [];
+  const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
+  const Notice = class { constructor(message) { notices.push(message); } };
+  const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: () => entry }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
+  const svgCreated = [];
+  const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
+  const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
+  const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
+  const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.app = {}; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
+  view.notes = options.notes ?? heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}]]);
+  return { VisualAgentMapView, view, doc, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
+}
+const heDrawn = (view, boxes) => {
+  view.cardEls = new Map(Object.entries(boxes).map(([id, [x, y]]) => [id, { offsetLeft: x, offsetTop: y, offsetWidth: 280, offsetHeight: 100 }]));
+  view.edgesEl = { kids: [], replaceChildren() { this.kids = []; }, appendChild(p) { this.kids.push(p); } };
+  view.stageEl = view.stageEl ?? {}; view.edgeEls = new Map(); view.canvasNodes = () => view.map.nodes; view.drawEdges();
+  return view.edgesEl.kids;
+};
+integrationTest('hypothesis-evidence: the entry points exist only on an ordinary map (not AIM, not the built-in sample)', () => {
+  for (const [options, expected] of [[{}, true], [{ aim: true }, false], [{ builtIn: true }, false]]) {
+    const { view, menus } = heFixture(options);
+    view.openTopicMenu({});
+    const menuTitles = menus.flatMap(m => m.titles);
+    assert.equal(menuTitles.includes('Add hypothesis'), expected, `toolbar menu ${JSON.stringify(options)}`);
+    const panel = dom.element('panel');
+    view.renderHypothesisSection(panel, view.map.nodes[0]);
+    const labels = dom.buttons(panel);
+    assert.equal(labels.includes('Add sub-hypothesis'), expected, `panel sub-hypothesis ${JSON.stringify(options)}`);
+    assert.equal(labels.includes('Add evidence…'), expected, `panel evidence ${JSON.stringify(options)}`);
+  }
+  const { view } = heFixture();
+  const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
+  dom.button(panel, 'Add sub-hypothesis').click();
+  assert.deepEqual(calls, [['other', undefined, true, true, 'hypothesis']], 'the panel passes the hypothesis kind to addNode');
+});
+integrationTest('hypothesis-evidence: a hypothesis has no evidence entry; an ordinary topic has no strength control', () => {
+  const { view } = heFixture();
+  const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
+  assert.equal(dom.buttons(hypPanel).includes('Add evidence…'), false);
+  assert.deepEqual(dom.buttons(hypPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), ['Weak', 'Medium', 'Strong']);
+  const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
+  assert.deepEqual(dom.buttons(factPanel).filter(label => ['Weak', 'Medium', 'Strong'].includes(label)), []);
+});
+integrationTest('hypothesis-evidence: the evidence picker offers only legal hypotheses, and with none it shows a Notice and no dialog', () => {
+  const topics = [node('fact'), node('hyp'), node('linked'), node('plain'), node('hyp2')];
+  const notes = heNotes([['fact', {}], ['hyp', heHyp('weak')], ['linked', heHyp('strong')], ['plain', {}], ['hyp2', heHyp()]]);
+  const { view, modals, notices } = heFixture({ topics, notes, relations: [{ kind: 'evidence', from: 'fact', to: 'linked' }] });
+  view.chooseEvidenceTarget(view.map.nodes[0]);
+  assert.equal(modals.length, 1); assert.deepEqual(notices, []);
+  const selectable = modals[0].selectable;
+  assert.deepEqual(view.map.nodes.filter(n => selectable(n)).map(n => n.id), ['hyp', 'hyp2'], 'not itself, not an ordinary topic, not an already linked hypothesis');
+  const none = heFixture({ notes: heNotes([['fact', {}], ['hyp', {}], ['other', {}]]) });
+  none.view.chooseEvidenceTarget(none.view.map.nodes[0]);
+  assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no hypothesis this topic can be evidence for.']);
+  const fromHyp = heFixture(); fromHyp.view.chooseEvidenceTarget(fromHyp.view.map.nodes[1]);
+  assert.equal(fromHyp.modals.length, 0, 'a hypothesis cannot be the source of evidence');
+});
+integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · strength" and carries it in its accessible name; an ordinary topic and an AIM map do not', () => {
+  const render = (options, id) => {
+    const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
+    const card = f.view.stageEl.children[0]; return { card, text: dom.texts(card), label: dom.find(card, c => hasLabel(c)) };
+  };
+  const hasLabel = c => (c.cls ?? '').split(/\s+/).includes('vam-card-label');
+  const strong = render({ notes: heNotes([['fact', {}], ['hyp', heHyp('strong')], ['other', {}]]) }, 'hyp');
+  assert.ok(strong.text.includes('Hypothesis · Strong'), 'visible tag'); assert.equal(strong.card.dataset.topicKind, 'hypothesis');
+  assert.match(strong.label.text, /Hypothesis · Strong/, 'the card name (aria-labelledby target) carries the strength');
+  assert.equal(strong.card.attrs['aria-labelledby'], strong.label.id);
+  assert.ok(render({}, 'hyp').text.includes('Hypothesis · Weak'), 'weak by default');
+  const plain = render({}, 'fact');
+  assert.equal(plain.card.dataset.topicKind, undefined); assert.equal(plain.text.some(t => /Hypothesis/.test(t)), false);
+  const aim = render({ aim: true }, 'hyp');
+  assert.equal(aim.card.dataset.topicKind, undefined, 'no hypothesis styling on an AIM map'); assert.equal(aim.text.some(t => /Hypothesis/.test(t)), false);
+});
+integrationTest('hypothesis-evidence: styles.css gives a hypothesis a 2px frame and the evidence line its own dash pattern', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const rule = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm')); assert.ok(m, `rule ${selector}`); return m[1]; };
+  assert.match(rule('[data-topic-kind="hypothesis"].vam-node'), /border-width:\s*2px/);
+  const dash = rule('.vam-relation-evidence').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
+  assert.notEqual(dash, '5 5', 'differs from the AIM convergence line'); assert.ok(!/^none$/.test(dash), 'not the solid parent-child line');
+  assert.match(css, /\.vam-edge \{[^}]*\}/); assert.doesNotMatch(rule('.vam-edge'), /dasharray/);
+  assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
+});
+integrationTest('hypothesis-evidence: an evidence line is drawn from the fact to the hypothesis with an arrowhead whose marker id is unique per view', () => {
+  const relations = [{ kind: 'evidence', from: 'fact', to: 'hyp' }];
+  const a = heFixture({ relations }), b = heFixture({ relations, shared: { VisualAgentMapView: a.VisualAgentMapView } });
+  const kidsA = heDrawn(a.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
+  const kidsB = heDrawn(b.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
+  const lineA = kidsA.find(k => k.classes.includes('vam-relation-evidence'));
+  assert.ok(lineA.classes.includes('vam-relation')); assert.match(lineA.attrs.d, /^M 280 50 C /, 'starts at the fact (right edge) and ends at the hypothesis (left edge)'); assert.match(lineA.attrs.d, / 500 90$/);
+  const defs = kidsA.find(k => k.tag === 'defs'), marker = defs.children[0];
+  assert.equal(lineA.attrs['marker-end'], `url(#${marker.attrs.id})`);
+  const lineB = kidsB.find(k => k.classes.includes('vam-relation-evidence')), markerB = kidsB.find(k => k.tag === 'defs').children[0];
+  assert.notEqual(marker.attrs.id, markerB.attrs.id, 'two views never share a marker id'); assert.equal(lineB.attrs['marker-end'], `url(#${markerB.attrs.id})`);
+  assert.equal(kidsA.filter(k => k.classes.includes('vam-edge')).length, 0, 'the parent-child edges are not touched');
+  a.view.map.aim = { mode: 'x' };
+  assert.equal(heDrawn(a.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0, 'an AIM map draws no evidence');
+  assert.equal(a.view.map.topicRelations.length, 1, 'and the file keeps the key');
+});
+integrationTest('hypothesis-evidence: a wrong-way evidence link (from a hypothesis, or to an ordinary topic) is not drawn, stays in the file and is logged once; an off-screen end is skipped quietly', () => {
+  const relations = [{ kind: 'evidence', from: 'hyp', to: 'fact' }, { kind: 'evidence', from: 'fact', to: 'other' }, { kind: 'evidence', from: 'fact', to: 'hyp' }];
+  const { view, logs } = heFixture({ relations });
+  let kids = heDrawn(view, { fact: [0, 0], hyp: [500, 0], other: [0, 200] });
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-evidence')).length, 1, 'only the legal link is drawn');
+  assert.equal(logs.length, 2); assert.ok(logs.every(([level]) => level === 'warn'));
+  heDrawn(view, { fact: [0, 0], hyp: [500, 0], other: [0, 200] });
+  assert.equal(logs.length, 2, 'a redraw does not log again');
+  assert.equal(view.map.topicRelations.length, 3, 'nothing is deleted from the file');
+  kids = heDrawn(view, { fact: [0, 0], other: [0, 200] });
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-evidence')).length, 0, 'a collapsed (missing) end is not drawn'); assert.equal(logs.length, 2, 'and not logged');
+});
+integrationTest('hypothesis-evidence: dragging a card moves the evidence line with it', () => {
+  const { view } = heFixture({ relations: [{ kind: 'evidence', from: 'fact', to: 'hyp' }] });
+  const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
+  const line = kids.find(k => k.classes.includes('vam-relation-evidence')), before = line.attrs.d;
+  const drag = view.dragEdges('fact', view.cardEls.get('fact')); drag.update(0, 300);
+  assert.notEqual(line.attrs.d, before); assert.match(line.attrs.d, /^M 280 350 C /);
+  const dragHyp = view.dragEdges('hyp', view.cardEls.get('hyp')); dragHyp.update(900, 0);
+  assert.match(line.attrs.d, / 900 50$/);
+});
+integrationTest('hypothesis-evidence: adding and removing evidence in the panel go through mapChange (undoable); an illegal target is refused', async () => {
+  const { view, doc } = heFixture({ relations: [{ kind: 'evidence', from: 'fact', to: 'hyp' }] });
+  const changes = []; view.enqueue = work => work();
+  view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
+  const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
+  assert.ok(dom.texts(factPanel).includes('HYP'), 'the linked hypothesis is listed');
+  const remove = dom.byLabel(factPanel, 'Remove evidence link: HYP'); assert.ok(remove);
+  await remove.fire('click');
+  await dom.tick();
+  assert.equal(changes.length, 1); assert.equal(changes[0], false, 'no derived-data rebuild for a relation change');
+  assert.equal('topicRelations' in doc, false, 'the empty list is dropped from Map.md');
+  assert.equal(dom.byLabel(factPanel, 'Remove evidence link: HYP'), undefined, 'the row is gone after the change');
+  await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'other'); await view.addEvidence('hyp', 'hyp');
+  assert.deepEqual(plain(doc.topicRelations), [{ kind: 'evidence', from: 'fact', to: 'hyp' }], 'added once; duplicate, ordinary-topic and hypothesis-source links refused');
+  assert.equal(changes.length, 5);
+});
+integrationTest('hypothesis-evidence: a strength change rewrites the note and Map.md in one history entry, and the buttons report the current strength', async () => {
+  const { view, writes } = heFixture();
+  const steps = []; view.enqueue = work => work();
+  const tx = { rewriteNote(p, write) { steps.push(['rewrite', p]); steps.write = write; return tx; }, editMap() { steps.push(['editMap']); return tx; }, async commit(options) { steps.push(['commit', options]); await steps.write('hyp.md'); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.refreshAfterSavedChange = async () => { view.notes.get('hyp').hypothesisStrength = 'strong'; };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
+  const pressed = () => dom.findAll(panel, c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  assert.deepEqual(pressed(), ['Weak']);
+  dom.button(panel, 'Weak').click();
+  assert.equal(steps.length, 0, 'choosing the current strength does nothing');
+  dom.button(panel, 'Strong').click(); await dom.tick();
+  assert.deepEqual(steps.map(s => s[0]), ['rewrite', 'editMap', 'commit']); assert.equal(steps[0][1], 'hyp.md');
+  assert.deepEqual(writes, [['hyp.md', 'strong']]); assert.equal(pushed.length, 1, 'one undo step');
+  assert.deepEqual(pressed(), ['Strong']);
+});

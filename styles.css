@@ -78,6 +78,16 @@
 .vam-node[data-aim-kind="research"] { border-radius: 4px; }
 .vam-node[data-aim-kind="synthesis"] { border-style: dashed; border-color: var(--interactive-accent); }
 .vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
+.vam-relation { fill: none; stroke-width: 2; pointer-events: none; }
+.vam-relation-evidence { stroke: var(--text-muted); stroke-dasharray: 12 5; }
+.vam-relation-arrow { fill: var(--text-muted); stroke: none; }
+/* Written with the attribute first so the share viewer, which does not show hypotheses, does not pick the rule up (scripts/viewer-css.mjs). */
+[data-topic-kind="hypothesis"].vam-node { border-width: 2px; border-color: var(--text-muted); }
+.vam-hypothesis-tag { display: inline-flex; align-items: center; max-width: 100%; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; white-space: nowrap; color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
+.vam-hypothesis-strengths { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.vam-relation-list { margin: 4px 0 8px; padding: 0; list-style: none; }
+.vam-relation-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.vam-relation-title { min-width: 0; overflow-wrap: anywhere; }
 .vam-aim-answer-snapshot { margin: 8px 0 0; padding: 6px 8px; border-left: 2px solid var(--interactive-accent); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-aim-statusbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-height: 42px; padding: 8px 14px; border-bottom: 1px solid var(--background-modifier-border); border-left: 4px solid var(--interactive-accent); background: var(--background-secondary); }
 .vam-aim-status-title { font-size: var(--font-ui-small); font-weight: 800; letter-spacing: .02em; }

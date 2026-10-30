@@ -1138,6 +1138,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_stage_waiting": "等待模型",
   "ui.map_chat_stage_writing": "撰寫中",
   "ui.map_chat_stage_applying": "套用中",
+  "ui.map_chat_stage_elapsed_0": "・{0}",
   "ui.map_chat_skip_stopped": "你已停止",
   "ui.map_chat_live_plan_0": "有一份計畫等你確認：{0}",
   "ui.map_chat_model_follow_short_0": "預設：{0}",

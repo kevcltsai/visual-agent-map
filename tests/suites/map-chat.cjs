@@ -252,8 +252,10 @@ test('map chat 15: begin shows "Waiting for the model" with seconds inside the A
 
 test('map chat 15: a Codex "writing" activity moves the stage to Writing before any text, and other stages are only named once', () => {
   const s = stageFixture(); const { f } = s;
-  f.panel.begin('ask'); f.panel.setStage('writing');
+  const live = () => f.panel.liveEl.text;
+  f.panel.begin('ask'); assert.equal(live(), 'Waiting for the model'); f.panel.setStage('writing'); assert.equal(live(), 'Writing');
   assert.equal(s.label(), 'Writing'); assert.ok(!hasClass(s.progress(), 'is-compact'), 'no text yet, so still the big form');
+  f.panel.setStage('writing'); f.panel.setStage('waiting'); assert.equal(live(), 'Writing', 'the same or an earlier stage says nothing new');
   f.panel.finish('x', []);
 });
 
@@ -364,8 +366,8 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {} });
-  ctx.timers = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {}, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  ctx.timers = []; ctx.intervals = new Map(); ctx.intervalSeq = 0;
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
@@ -390,7 +392,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -842,6 +844,36 @@ integrationTest('map chat: an empty draft, a second send while busy and a send o
   h.view.builtIn = true; h.type('three'); await h.view.sendMapChat();
   // B1-ui: the read-only sample is the opening screen now; a message from it is sent, and tells the model there is no map to edit.
   assert.equal(h.control.requests.length, 2); assert.equal(h.control.requests[1].context.noEditableMap, true);
+});
+
+integrationTest('map chat 15: a pure answer is never told "Applying"; a reply with actions is', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
+  h.control.reply = async (_request, _signal, onReply) => { onReply('Plain answer'); return { reply: 'Plain answer', actions: [], rejected: [] }; };
+  h.type('question'); await h.view.sendMapChat();
+  assert.ok(!writes.some(text => text === 'Applying'), 'no actions: the reader hears waiting, writing and the answer only'); assert.deepEqual(plain(writes.slice(0, 2)), ['Waiting for the model', 'Writing']); assert.match(writes.at(-1), /AI replied: Plain answer/);
+  writes.length = 0;
+  h.control.reply = async () => ({ reply: 'Renaming', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'New' }], rejected: [] });
+  h.type('rename'); await h.view.sendMapChat();
+  assert.ok(writes.includes('Applying'), 'with an action the stage says Applying');
+});
+
+integrationTest('map chat 15: closing the view and switching maps clear the stage and leave no one-second timer', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+  const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('go'); const first = h.view.sendMapChat(); await until(() => chat.isBusy);
+  assert.equal(h.intervals.size, base + 1, 'one timer while the turn runs');
+  h.view.map.id = 'another-map'; h.repaint();
+  assert.equal(chat.stage, null, 'switching maps clears the stage'); assert.equal(h.intervals.size, base, 'and the timer');
+  gate.resolve(); await first; assert.equal(h.intervals.size, base);
+  const gate2 = deferred(); h.control.reply = async () => { await gate2.promise; return { reply: 'late', actions: [], rejected: [] }; };
+  h.type('again'); const second = h.view.sendMapChat(); await until(() => chat.isBusy); assert.equal(h.intervals.size, base + 1);
+  await h.view.onClose(); assert.equal(h.intervals.size, base, 'closing the view disposes the panel and its timer'); assert.equal(chat.stage, null);
+  gate2.resolve(); await second; assert.equal(h.intervals.size, base);
+});
+
+test('map chat 15: dispose() of the panel clears the stage and its timer', () => {
+  const s = stageFixture(); s.f.panel.begin('q'); assert.equal(s.intervals.size, 1);
+  s.f.panel.dispose(); assert.equal(s.intervals.size, 0); assert.equal(s.f.panel.stage, null); s.tickSeconds(5);
 });
 
 integrationTest('map chat 15: the view turns a Codex writing event into the Writing stage, and a late event after Stop or an unrelated event changes nothing', async () => {

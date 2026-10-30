@@ -633,11 +633,7 @@ export class MapChatPanel {
   }
   private elapsedText(): string {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1000)) : 0;
-    return t(
-      "ui.aim_stage_with_elapsed_0_1",
-      "",
-      `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
-    );
+    return t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`);
   }
   /** The stage line lives in the last AI message while a turn runs, or while its plan is being applied. */
   private stageMessage(): MapChatMessage | null {
@@ -925,7 +921,7 @@ export class MapChatPanel {
     });
     // A map that has content opens the window onto an empty log: one line says what it is for.
     this.guideEl = this.bodyEl.createDiv({ cls: "vam-map-chat-guide", text: t("ui.map_chat_empty_log") });
-    // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says it once, when it ends.
+    // The log is not a live region: a streaming reply would be read out word by word. `liveEl` says each progress stage name once as it changes, then the whole turn once when it ends.
     this.logEl = this.bodyEl.createDiv({
       cls: "vam-map-chat-log",
       attr: { role: "group", "aria-label": t("ui.map_chat_log_label"), tabindex: "0" }

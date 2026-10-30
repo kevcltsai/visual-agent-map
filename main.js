@@ -1185,6 +1185,7 @@ var en = {
   "ui.map_chat_stage_waiting": "Waiting for the model",
   "ui.map_chat_stage_writing": "Writing",
   "ui.map_chat_stage_applying": "Applying",
+  "ui.map_chat_stage_elapsed_0": " \xB7 {0}",
   "ui.map_chat_skip_stopped": "you stopped it",
   "ui.map_chat_live_plan_0": "A plan is waiting for you: {0}",
   "ui.map_chat_model_follow_short_0": "Default: {0}",
@@ -3211,6 +3212,7 @@ var zhCN = {
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5199\u4E2D",
   "ui.map_chat_stage_applying": "\u5E94\u7528\u4E2D",
+  "ui.map_chat_stage_elapsed_0": "\u30FB{0}",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8BA1\u5212\u7B49\u4F60\u786E\u8BA4\uFF1A{0}",
   "ui.map_chat_model_follow_short_0": "\u9ED8\u8BA4\uFF1A{0}",
@@ -5237,6 +5239,7 @@ var zhTW = {
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5BEB\u4E2D",
   "ui.map_chat_stage_applying": "\u5957\u7528\u4E2D",
+  "ui.map_chat_stage_elapsed_0": "\u30FB{0}",
   "ui.map_chat_skip_stopped": "\u4F60\u5DF2\u505C\u6B62",
   "ui.map_chat_live_plan_0": "\u6709\u4E00\u4EFD\u8A08\u756B\u7B49\u4F60\u78BA\u8A8D\uFF1A{0}",
   "ui.map_chat_model_follow_short_0": "\u9810\u8A2D\uFF1A{0}",
@@ -22455,11 +22458,7 @@ var MapChatPanel = class {
   }
   elapsedText() {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
-    return t(
-      "ui.aim_stage_with_elapsed_0_1",
-      "",
-      `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
-    );
+    return t("ui.map_chat_stage_elapsed_0", `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`);
   }
   /** The stage line lives in the last AI message while a turn runs, or while its plan is being applied. */
   stageMessage() {
@@ -46806,7 +46805,7 @@ ${note.detail.trim()}` : "",
           }
           return;
         }
-        chat.setStage("applying");
+        if (result.actions.length) chat.setStage("applying");
         const lines = await this.applyMapChatActions(
           { ...result, message: request.message },
           request.context,

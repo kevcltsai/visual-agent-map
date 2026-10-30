@@ -11236,7 +11236,8 @@ export class VisualAgentMapView extends ItemView {
           }
           return;
         }
-        chat.setStage("applying");
+        // A pure answer has nothing to apply: the reader is not told "applying" for it.
+        if (result.actions.length) chat.setStage("applying");
         const lines = await this.applyMapChatActions(
           { ...result, message: request.message },
           request.context,

@@ -38,7 +38,7 @@ test('timing scanner: only the fake-timer delay line in expansion-and-synthesis 
 // The per-test timeout (tests/support.cjs): a test that never settles must fail its run, not hang it.
 test('test timeout: a registered test that never settles makes its run fail instead of hanging', () => {
   const { spawnSync } = require('node:child_process');
-  const script = "const { test } = require('./tests/support.cjs'); test('never settles', () => new Promise(() => {}));";
+  const script = "const { test } = require('./tests/support.cjs'); test('never settles', () => new Promise(() => setTimeout(() => {}, 5000)));"; // the pending timer keeps the event loop alive, as a real stuck test would; the child ends by itself within seconds either way
   const result = spawnSync(process.execPath, ['-e', script], { cwd: root, env: { ...process.env, VAM_TEST_TIMEOUT_MS: '200' }, encoding: 'utf8', timeout: 50000 });
   assert.equal(result.signal, null, 'the child must end by itself, not be killed after hanging');
   assert.notEqual(result.status, 0);

@@ -11197,9 +11197,9 @@ export class VisualAgentMapView extends ItemView {
       abandon(errorMessage(error));
       return;
     }
-    let confirmed = false;
+    let went = false;
     try {
-      confirmed = await this.plugin.confirmAiUsage(request.model, async () => {
+      went = await this.plugin.confirmAiUsage(request.model, async () => {
         // The view closed, the map changed or a plan began applying while the notice was open: nothing is sent.
         if (
           this.closed ||
@@ -11286,7 +11286,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     // The AI is not ready (it said why itself) or the usage notice was declined.
-    if (!confirmed && !sent) abandon(this.closed ? undefined : notSent());
+    if (!went && !sent) abandon(this.closed ? undefined : notSent());
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   private supersedeChatPlan(): void {

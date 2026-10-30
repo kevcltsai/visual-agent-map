@@ -46817,9 +46817,9 @@ ${note.detail.trim()}` : "",
       abandon(errorMessage(error));
       return;
     }
-    let confirmed = false;
+    let went = false;
     try {
-      confirmed = await this.plugin.confirmAiUsage(request.model, async () => {
+      went = await this.plugin.confirmAiUsage(request.model, async () => {
         var _a2, _b2, _c;
         if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
           abandon();
@@ -46885,7 +46885,7 @@ ${note.detail.trim()}` : "",
       abandon(errorMessage(error));
       return;
     }
-    if (!confirmed && !sent) abandon(this.closed ? void 0 : notSent());
+    if (!went && !sent) abandon(this.closed ? void 0 : notSent());
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {

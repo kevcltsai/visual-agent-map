@@ -9,6 +9,8 @@ const { test, integrationTest, root, load, core, plain, DEFAULT_SETTINGS, fixtur
 const dom = require('../support-dom.cjs');
 const { element, find, findAll, byLabel, tick } = dom;
 
+// A send is busy from the press (the "Preparing" bubble); this waits until its request has really gone out to the model.
+const requestOut = chat => until(() => chat.isBusy && chat.stage?.kind !== 'preparing');
 const eq = (actual, expected, message) => assert.deepEqual(plain(actual), plain(expected), message);
 // Text a reader would see in an element: its own text and its children's, in order.
 const visibleText = el => (el.text ?? '') + el.children.map(visibleText).join('');
@@ -357,7 +359,9 @@ async function harness({ aim = false, document = false, empty = false, realRende
     availableModels: () => control.claudeReady ? ['gpt-6-luna', 'claude:sonnet', 'claude:haiku'] : ['gpt-6-luna'], modelLabel: id => `label(${id})`,
     subscribeModelDiscovery: listener => { control.listeners.push(listener); return () => { control.listeners.splice(control.listeners.indexOf(listener), 1); }; },
     refreshModelDiscovery: async provider => { control.refreshes.push(provider); return { provider, status: 'ready', models: [] }; },
-    confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (control.decline) return false; await run(); return true; },
+    // The real confirmAiUsage asks this first; a test that stubs it to false gets the real not-ready path of the send.
+    aiReadyForModel: async () => true,
+    confirmAiUsage: async (model, run) => { control.usageAsks++; control.models.push(model); control.calls.push('confirm'); if (!(await plugin.aiReadyForModel(model))) return false; if (control.decline) return false; await run(); return true; },
     mapChat: { chat: async (request, signal, onReply, onProgress) => { control.calls.push('chat'); control.requests.push(request); return control.reply(request, signal, onReply, onProgress); } },
     // B3: the web image search of the Markdown quick action; the thumbnail check is stubbed on the view below.
     searchImages: async (query, model, signal) => { control.calls.push('search'); control.searches.push({ query, model, signal }); return control.search(query, model, signal); }
@@ -838,7 +842,7 @@ integrationTest('map chat: an empty draft, a second send while busy and a send o
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.type('   '); await h.view.sendMapChat(); eq(h.control.calls, []);
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'r', actions: [], rejected: [] }; };
-  h.type('one'); const first = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('one'); const first = h.view.sendMapChat(); await requestOut(chat);
   h.type('two'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1, 'only one request at a time');
   gate.resolve(); await first;
   h.view.builtIn = true; h.type('three'); await h.view.sendMapChat();
@@ -850,7 +854,7 @@ integrationTest('map chat 15: a pure answer is never told "Applying"; a reply wi
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
   h.control.reply = async (_request, _signal, onReply) => { onReply('Plain answer'); return { reply: 'Plain answer', actions: [], rejected: [] }; };
   h.type('question'); await h.view.sendMapChat();
-  assert.ok(!writes.some(text => text === 'Applying'), 'no actions: the reader hears waiting, writing and the answer only'); assert.deepEqual(plain(writes.slice(0, 2)), ['Waiting for the model', 'Writing']); assert.match(writes.at(-1), /AI replied: Plain answer/);
+  assert.ok(!writes.some(text => text === 'Applying'), 'no actions: the reader hears waiting, writing and the answer only'); assert.deepEqual(plain(writes.slice(0, 3)), ['Preparing', 'Waiting for the model', 'Writing']); assert.match(writes.at(-1), /AI replied: Plain answer/);
   writes.length = 0;
   h.control.reply = async () => ({ reply: 'Renaming', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'New' }], rejected: [] });
   h.type('rename'); await h.view.sendMapChat();
@@ -860,13 +864,13 @@ integrationTest('map chat 15: a pure answer is never told "Applying"; a reply wi
 integrationTest('map chat 15: closing the view and switching maps clear the stage and leave no one-second timer', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
-  h.type('go'); const first = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('go'); const first = h.view.sendMapChat(); await requestOut(chat);
   assert.equal(h.intervals.size, base + 1, 'one timer while the turn runs');
   h.view.map.id = 'another-map'; h.repaint();
   assert.equal(chat.stage, null, 'switching maps clears the stage'); assert.equal(h.intervals.size, base, 'and the timer');
   gate.resolve(); await first; assert.equal(h.intervals.size, base);
   const gate2 = deferred(); h.control.reply = async () => { await gate2.promise; return { reply: 'late', actions: [], rejected: [] }; };
-  h.type('again'); const second = h.view.sendMapChat(); await until(() => chat.isBusy); assert.equal(h.intervals.size, base + 1);
+  h.type('again'); const second = h.view.sendMapChat(); await requestOut(chat); assert.equal(h.intervals.size, base + 1);
   await h.view.onClose(); assert.equal(h.intervals.size, base, 'closing the view disposes the panel and its timer'); assert.equal(chat.stage, null);
   gate2.resolve(); await second; assert.equal(h.intervals.size, base);
 });
@@ -880,7 +884,7 @@ integrationTest('map chat 15: the view turns a Codex writing event into the Writ
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const gate = deferred(); let progress;
   h.control.reply = async (_request, _signal, _onReply, onProgress) => { progress = onProgress; await gate.promise; return { reply: 'late', actions: [], rejected: [] }; };
-  h.type('go'); const sending = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
   assert.equal(chat.stage.kind, 'waiting');
   progress({ kind: 'first-event' }); progress({ kind: 'activity', activity: 'started' }); progress({ kind: 'activity', activity: 'reading' });
   assert.equal(chat.stage.kind, 'waiting', 'only the writing activity moves the stage');
@@ -894,7 +898,7 @@ integrationTest('map chat: Stop aborts the request, releases the task, and a rep
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const gate = deferred(); let signal;
   h.control.reply = async (_request, s) => { signal = s; await gate.promise; return { reply: 'late', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'LATE' }, { kind: 'create_md_file', path: 'Late.md', content: 'x' }], rejected: [] }; };
-  h.type('go'); const sending = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
   assert.equal(h.plugin.activeTasks.size, 1, 'the request is registered so unloading the plugin can stop it');
   const writesBefore = h.control.mutates;
   chat.stopEl.click();
@@ -908,7 +912,7 @@ integrationTest('map chat: closing the view aborts the request, clears the task 
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const gate = deferred(); let signal;
   h.control.reply = async (_request, s) => { signal = s; await gate.promise; return { reply: 'late', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'LATE' }], rejected: [] }; };
-  h.type('go'); const sending = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
   await h.view.onClose();
   assert.equal(signal.aborted, true); assert.equal(h.plugin.activeTasks.size, 0);
   const writesBefore = h.control.mutates;
@@ -920,7 +924,7 @@ integrationTest('map chat: a reply that arrives after the map was switched appli
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const gate = deferred();
   h.control.reply = async () => { await gate.promise; return { reply: 'late', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'LATE' }], rejected: [] }; };
-  h.type('go'); const sending = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
   h.view.path = 'Agent Workspace/Topics/other/Map.md'; gate.resolve(); await sending;
   assert.equal(h.control.mutates, 0); assert.equal((await h.note('a')).title, 'Body');
 });
@@ -1363,7 +1367,7 @@ integrationTest('map chat C1: during a reply a direct more-detail call does not 
   h.type('q'); await h.view.sendMapChat();
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'r', actions: [], rejected: [] }; };
   const origin = chat.messages[0].origin;
-  const sending = h.view.sendMapChat(origin); await until(() => chat.isBusy);
+  const sending = h.view.sendMapChat(origin); await requestOut(chat);
   assert.equal(moreButtons({ panel: chat }).every(b => b.disabled), true);
   await h.view.sendMapChat(origin); assert.equal(h.control.requests.length, 2, 'only one request at a time');
   gate.resolve(); await sending;
@@ -3012,7 +3016,7 @@ integrationTest('B1 fix 15: the empty canvas follows the chat: building while it
   const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);
   const shown = () => visibleText(box); assert.match(shown(), /no topics/); assert.ok(findAll(box, i => i.tag === 'button').length === 1, 'the topic button of the usual hint');
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'plan', actions: planActions(h, 16).map(a => ({ ...a, parentId: '' })), rejected: [] }; };
-  h.type('Coffee'); const sent = h.view.sendMapChat(); await until(() => chat.isBusy);
+  h.type('Coffee'); const sent = h.view.sendMapChat(); await requestOut(chat);
   assert.match(shown(), /Building the map…/); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 3); assert.equal(findAll(box, i => i.tag === 'button').length, 0, 'no manual-create button meanwhile');
   assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton'))[0].attrs['aria-hidden'], 'true');
   gate.resolve(); await sent; assert.match(shown(), /Once you confirm the plan, the map appears here\./); assert.equal(findAll(box, i => hasClass(i, 'vam-chat-skeleton-card')).length, 0);
@@ -3952,4 +3956,162 @@ test('hypothesis-evidence: the guard refuses adding, switching and removing topi
   eq(heEdit(heNote('topic-kind: action\n'), heNote('topic-kind: action\n').replace('Body', 'Changed')), { ok: true }, 'a body edit with the kind untouched is allowed');
   const mapText = '```agent-map\n{"id":"m","title":"T","version":1,"nodes":[],"viewport":{"x":0,"y":0,"zoom":1}}\n```\n';
   eq(heEdit(mapText, mapText.replace('"T"', '"U"'), 'Map.md'), { ok: false, code: 'map_file' });
+});
+
+// ---- ticket 16: the press is answered at once; a send that fails before the request goes out is taken back --------------------------
+
+test('map chat 16: begin in "preparing" shows Preparing with seconds, and the next stage keeps counting from the press', () => {
+  const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text;
+  f.panel.begin('ask', undefined, false, 'preparing');
+  assert.equal(s.label(), 'Preparing'); assert.equal(live(), 'Preparing'); assert.equal(s.elapsed().text, ' · 0:00');
+  s.tickSeconds(4); assert.equal(s.elapsed().text, ' · 0:04');
+  f.panel.setStage('waiting'); assert.equal(s.label(), 'Waiting for the model'); assert.equal(live(), 'Waiting for the model'); assert.equal(s.elapsed().text, ' · 0:04', 'the seconds run from the press');
+  f.panel.streamReply('Hi'); assert.equal(s.label(), 'Writing');
+  f.panel.setStage('preparing'); assert.equal(s.label(), 'Writing', 'a stage never goes back to Preparing');
+});
+
+test('map chat 16: retract takes exactly the two messages back, restores the draft, the open choices, busy, stage and timer', () => {
+  const s = stageFixture(); const { f } = s; const panel = f.panel;
+  panel.begin('earlier'); panel.finish('an answer', []);
+  const choices = { prompt: 'p', options: [{ label: 'A', pick: () => {} }], picked: false }; panel.showChoices(choices);
+  const before = plain(panel.transcript());
+  f.parts.input().value = 'my draft';
+  const turn = panel.begin('my draft', undefined, false, 'preparing');
+  assert.equal(f.parts.input().value, '', 'begin clears the field'); assert.equal(choices.picked, true); assert.equal(panel.isBusy, true);
+  f.parts.input().value = 'typed meanwhile';
+  assert.equal(panel.retract(turn, 'my draft'), true);
+  eq(panel.transcript(), before); assert.equal(panel.isBusy, false); assert.equal(panel.stage, null); assert.equal(s.intervals.size, 0); assert.equal(s.progress(), undefined);
+  assert.equal(choices.picked, false, 'the choices that were open are open again'); assert.equal(f.parts.input().value, 'my draft\ntyped meanwhile', 'the draft goes in front of what was typed since');
+  assert.equal(panel.liveEl.text, '', 'the stage name that was said is withdrawn');
+  assert.equal(panel.retract(turn, 'my draft'), false, 'a second retract changes nothing'); assert.equal(f.parts.input().value, 'my draft\ntyped meanwhile');
+});
+
+test('map chat 16: a retract after a reset (a map switch) changes nothing, and never touches the next turn', () => {
+  const s = stageFixture(); const { f } = s; const panel = f.panel;
+  const turn = panel.begin('a', undefined, false, 'preparing'); panel.reset();
+  assert.equal(panel.hasTurn(turn), false);
+  const next = panel.begin('b', undefined, false, 'preparing');
+  assert.equal(panel.retract(turn, 'a'), false); assert.equal(panel.isBusy, true); assert.equal(panel.transcript().length, 2); assert.equal(f.parts.input().value, '', 'the old draft is not put into the new map');
+  assert.equal(panel.retract(next), true); assert.equal(panel.transcript().length, 0);
+});
+
+/** The state a taken-back send must leave: the conversation as it was, nothing busy, no stage, no timer, no task. */
+function assertTakenBack(h, chat, before, base, why) {
+  eq(chat.transcript(), before); assert.equal(chat.isBusy, false, `${why}: not busy`); assert.equal(chat.stage, null, `${why}: no stage`);
+  assert.equal(h.intervals.size, base, `${why}: no timer`); assert.equal(h.plugin.activeTasks.size, 0, `${why}: no task`); assert.equal(h.control.requests.length, 0, `${why}: nothing was sent`);
+  assert.equal(chat.messages.some(m => m.streaming), false, `${why}: no empty bubble`);
+}
+
+integrationTest('map chat 16: the press shows the messages and a Preparing bubble before the AI is checked or the request is built', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+  const gate = deferred(); const seen = [];
+  h.view.buildChatRequest = async () => { seen.push(['build', chat.isBusy, chat.stage?.kind, chat.transcript().length, chat.draft]); await gate.promise; throw new Error('stop here'); };
+  h.type('hello'); const sending = h.view.sendMapChat();
+  assert.equal(chat.isBusy, true); assert.equal(chat.stage.kind, 'preparing'); assert.equal(chat.transcript().length, 2);
+  await tick(); eq(seen, [['build', true, 'preparing', 2, '']]);
+  gate.resolve(); await sending;
+});
+
+integrationTest('map chat 16: after Preparing the request goes out and the stage becomes Waiting for the model', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const stages = [];
+  h.control.reply = async () => { stages.push(chat.stage.kind); return { reply: 'ok', actions: [], rejected: [] }; };
+  const confirm = h.plugin.confirmAiUsage; h.plugin.confirmAiUsage = async (model, run) => { stages.push(chat.stage.kind); return confirm(model, run); };
+  h.type('hello'); await h.view.sendMapChat(); eq(stages, ['preparing', 'waiting']); assert.equal(chat.transcript().at(-1).text, 'ok');
+});
+
+integrationTest('map chat 16 counter-example: the usage notice is declined, the AI is not ready, or the request cannot be built - the send is taken back with the draft and a Notice', async () => {
+  const cases = [
+    ['usage notice declined', h => { h.control.decline = true; }, /Not sent\. Your message is back in the box\./],
+    ['AI not ready', h => { h.plugin.aiReadyForModel = async () => false; }, /Not sent\. Your message is back in the box\./],
+    ['request cannot be built', h => { h.view.buildChatRequest = async () => { throw new Error('No readable map'); }; }, /^No readable map$/],
+    ['the check itself throws', h => { h.plugin.confirmAiUsage = async () => { throw new Error('readiness failed'); }; }, /^readiness failed$/]
+  ];
+  for (const [why, arrange, notice] of cases) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+    h.control.reply = async () => ({ reply: 'first answer', actions: [], rejected: [] }); h.type('earlier'); await h.view.sendMapChat(); h.control.requests.length = 0;
+    const before = plain(chat.transcript()); h.notices.length = 0; arrange(h);
+    h.type('  my draft  '); await h.view.sendMapChat();
+    assertTakenBack(h, chat, before, base, why); assert.equal(chat.draft, '  my draft  ', `${why}: the draft is back, as typed`);
+    assert.equal(h.notices.length, 1, `${why}: one Notice`); assert.match(h.notices[0], notice, why);
+  }
+});
+
+integrationTest('map chat 16 counter-example: the view closes while the usage notice is open - nothing is sent, nothing is left busy or empty', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size; const before = plain(chat.transcript());
+  const gate = deferred(); const confirm = h.plugin.confirmAiUsage; h.plugin.confirmAiUsage = async (model, run) => { await gate.promise; return confirm(model, run); };
+  h.type('hello'); const sending = h.view.sendMapChat(); assert.equal(chat.stage.kind, 'preparing');
+  await h.view.onClose(); gate.resolve(); await sending;
+  assertTakenBack(h, chat, before, base, 'view closed'); assert.equal(h.notices.length, 0, 'closing needs no Notice');
+});
+
+integrationTest('map chat 16 counter-example: the map is switched while the usage notice is open - nothing is sent, the new map\'s chat is not touched', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+  const gate = deferred(); const confirm = h.plugin.confirmAiUsage; h.plugin.confirmAiUsage = async (model, run) => { await gate.promise; return confirm(model, run); };
+  h.type('hello'); const sending = h.view.sendMapChat(); assert.equal(chat.stage.kind, 'preparing');
+  h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.transcript().length, 0, 'the switch cleared the conversation'); h.type('typed on the new map');
+  gate.resolve(); await sending;
+  assertTakenBack(h, chat, [], base, 'map switched'); assert.equal(chat.draft, 'typed on the new map', 'the new map\'s field is left alone'); assert.equal(h.notices.length, 0);
+});
+
+integrationTest('map chat 16: "say it in more detail" and a retry that fail before sending leave the conversation as it was, with a Notice that needs no draft', async () => {
+  for (const [why, send] of [['more detail', (h, origin) => h.view.sendMapChat(origin)], ['retry', (h, origin) => h.view.sendMapChat(origin, true)]]) {
+    for (const [label, expected, arrange] of [['declined', 'Not sent. The conversation is unchanged.', h => { h.control.decline = true; }], ['build error', 'boom', h => { h.view.buildChatRequest = async () => { throw new Error('boom'); }; }]]) {
+      const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+      h.control.reply = async () => ({ reply: 'first answer', actions: [], rejected: [] }); h.type('question'); await h.view.sendMapChat();
+      h.control.requests.length = 0; const before = plain(chat.transcript()); const origin = chat.messages[0].origin; h.notices.length = 0; h.type('half-typed next question');
+      arrange(h); await send(h, origin);
+      assertTakenBack(h, chat, before, base, why); assert.equal(chat.draft, 'half-typed next question', `${why}: the field is untouched`);
+      assert.equal(h.notices.length, 1); assert.equal(h.notices[0], expected, `${why}: ${label}`);
+    }
+  }
+});
+
+integrationTest('map chat 16: a failure after the request went out still shows the error bubble (it is not taken back)', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  h.control.reply = async () => { throw new Error('model broke'); };
+  h.type('hello'); await h.view.sendMapChat();
+  assert.equal(chat.transcript().length, 2); assert.equal(chat.transcript().at(-1).error, true); assert.equal(chat.isBusy, false); assert.equal(chat.draft, '');
+});
+
+integrationTest('map chat 16 counter-example: Stop while preparing takes the send back (no request, draft back, not busy) and no usage notice follows', async () => {
+  for (const [why, send] of [['normal', (h) => { h.type('  my draft  '); return h.view.sendMapChat(); }], ['more detail', (h, origin) => h.view.sendMapChat(origin)]]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+    h.control.reply = async () => ({ reply: 'first answer', actions: [], rejected: [] }); h.type('earlier'); await h.view.sendMapChat(); h.control.requests.length = 0; h.control.calls.length = 0;
+    const before = plain(chat.transcript()); const origin = chat.messages[0].origin; h.notices.length = 0;
+    const gate = deferred(); const build = h.view.buildChatRequest.bind(h.view); h.view.buildChatRequest = async (...args) => { const request = await build(...args); await gate.promise; return request; };
+    if (why !== 'normal') h.type('next typed');
+    const sending = send(h, origin); await tick(); assert.equal(chat.stage.kind, 'preparing');
+    chat.stopEl.click(); assert.equal(chat.isBusy, false, `${why}: Stop ends busy at once`);
+    gate.resolve(); await sending;
+    assertTakenBack(h, chat, before, base, why); assert.equal(chat.draft, why === 'normal' ? '  my draft  ' : 'next typed', why);
+    assert.equal(h.control.usageAsks, 1, `${why}: no usage notice after Stop (only the earlier send asked)`); assert.equal(h.notices.length, 0, `${why}: Stop needs no Notice`);
+    assert.equal(h.view.chatPrepAbandon, null, `${why}: nothing is left to stop`);
+  }
+});
+
+integrationTest('map chat 16: Stop while the usage notice is open takes the send back, and answering the notice afterwards sends nothing', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+  const gate = deferred(); const confirm = h.plugin.confirmAiUsage; h.plugin.confirmAiUsage = async (model, run) => { await gate.promise; return confirm(model, run); };
+  h.type('hello'); const sending = h.view.sendMapChat(); await tick();
+  chat.stopEl.click(); assert.equal(chat.isBusy, false); assert.equal(chat.draft, 'hello');
+  gate.resolve(); await sending; assertTakenBack(h, chat, [], base, 'stopped at the notice'); assert.equal(chat.draft, 'hello'); assert.equal(h.notices.length, 0);
+});
+
+integrationTest('map chat 16: closing the view while the request is built shows no error Notice and no usage notice', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const base = h.intervals.size;
+  const gate = deferred(); h.view.buildChatRequest = async () => { await gate.promise; throw new Error('map is gone'); };
+  h.type('hello'); const sending = h.view.sendMapChat(); await h.view.onClose(); gate.resolve(); await sending;
+  assertTakenBack(h, chat, [], base, 'closed while building'); assert.equal(h.notices.length, 0); assert.equal(h.control.usageAsks, 0);
+  const second = await harness(); await second.view.hydrate(); second.open(); const gate2 = deferred(); const build = second.view.buildChatRequest.bind(second.view);
+  second.view.buildChatRequest = async (...args) => { const request = await build(...args); await gate2.promise; return request; };
+  second.type('hello'); const sending2 = second.view.sendMapChat(); await second.view.onClose(); gate2.resolve(); await sending2;
+  assert.equal(second.control.usageAsks, 0, 'a closed view never opens the usage notice'); assert.equal(second.notices.length, 0);
+});
+
+integrationTest('map chat 16: after a map switch with the usage notice open, answering it leaves the live region empty', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open();
+  const gate = deferred(); const confirm = h.plugin.confirmAiUsage; h.plugin.confirmAiUsage = async (model, run) => { await gate.promise; return confirm(model, run); };
+  h.type('hello'); const sending = h.view.sendMapChat(); await tick(); assert.equal(chat.liveEl.text, 'Preparing');
+  h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.liveEl.text, '', 'the switch itself clears what was said');
+  gate.resolve(); await sending; assert.equal(chat.liveEl.text, '', 'and answering the notice afterwards says nothing');
 });

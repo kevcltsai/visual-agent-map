@@ -1182,6 +1182,9 @@ var en = {
   "ui.map_chat_plan_title_applied": "Applied plan",
   "ui.map_chat_plan_title_cancelled": "Cancelled plan",
   "ui.map_chat_applying": "Applying the plan\u2026",
+  "ui.map_chat_stage_preparing": "Preparing",
+  "ui.map_chat_not_sent_draft": "Not sent. Your message is back in the box.",
+  "ui.map_chat_not_sent_kept": "Not sent. The conversation is unchanged.",
   "ui.map_chat_stage_waiting": "Waiting for the model",
   "ui.map_chat_stage_writing": "Writing",
   "ui.map_chat_stage_applying": "Applying",
@@ -3209,6 +3212,9 @@ var zhCN = {
   "ui.map_chat_plan_title_applied": "\u5DF2\u5E94\u7528\u7684\u8BA1\u5212",
   "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8BA1\u5212",
   "ui.map_chat_applying": "\u6B63\u5728\u5E94\u7528\u8BA1\u5212\u2026",
+  "ui.map_chat_stage_preparing": "\u51C6\u5907\u4E2D",
+  "ui.map_chat_not_sent_draft": "\u6CA1\u6709\u53D1\u9001\uFF0C\u6D88\u606F\u5DF2\u653E\u56DE\u8F93\u5165\u6846\u3002",
+  "ui.map_chat_not_sent_kept": "\u6CA1\u6709\u53D1\u9001\uFF0C\u539F\u6765\u7684\u5BF9\u8BDD\u6CA1\u6709\u6539\u53D8\u3002",
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5199\u4E2D",
   "ui.map_chat_stage_applying": "\u5E94\u7528\u4E2D",
@@ -5236,6 +5242,9 @@ var zhTW = {
   "ui.map_chat_plan_title_applied": "\u5DF2\u5957\u7528\u7684\u8A08\u756B",
   "ui.map_chat_plan_title_cancelled": "\u5DF2\u53D6\u6D88\u7684\u8A08\u756B",
   "ui.map_chat_applying": "\u6B63\u5728\u5957\u7528\u8A08\u756B\u2026",
+  "ui.map_chat_stage_preparing": "\u6E96\u5099\u4E2D",
+  "ui.map_chat_not_sent_draft": "\u6C92\u6709\u9001\u51FA\uFF0C\u8A0A\u606F\u5DF2\u653E\u56DE\u8F38\u5165\u6846\u3002",
+  "ui.map_chat_not_sent_kept": "\u6C92\u6709\u9001\u51FA\uFF0C\u539F\u672C\u7684\u5C0D\u8A71\u6C92\u6709\u6539\u8B8A\u3002",
   "ui.map_chat_stage_waiting": "\u7B49\u5F85\u6A21\u578B",
   "ui.map_chat_stage_writing": "\u64B0\u5BEB\u4E2D",
   "ui.map_chat_stage_applying": "\u5957\u7528\u4E2D",
@@ -22062,7 +22071,7 @@ function settledLine(line) {
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
   }
 }
-var STAGE_ORDER = { waiting: 0, writing: 1, applying: 2 };
+var STAGE_ORDER = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
 var LABEL_LIMIT = 40;
 var clip = (value, limit = LABEL_LIMIT) => {
   const text11 = value.replace(/\s+/g, " ").trim();
@@ -22425,18 +22434,54 @@ var MapChatPanel = class {
     this.renderChips();
     this.renderSuggestions();
   }
-  /** A turn starts: the user's text, an empty answer, and the busy state. */
-  begin(userText, origin, keepDraft = false) {
+  /** A turn starts: the user's text, an empty answer, and the busy state (the view starts in "preparing"). */
+  begin(userText, origin, keepDraft = false, stage = "waiting") {
+    const retired = this.messages.flatMap(
+      (message) => message.choices && !message.choices.picked ? [message.choices] : []
+    );
     this.retireChoices();
-    this.messages.push({ role: "user", text: userText, lines: [], ...origin ? { origin } : {} });
-    this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
+    const user = { role: "user", text: userText, lines: [], ...origin ? { origin } : {} };
+    const assistant = { role: "assistant", text: "", lines: [], streaming: true };
+    this.messages.push(user, assistant);
     this.busy = true;
-    this.stage = { kind: "waiting", since: this.clockNow() };
+    this.stage = { kind: stage, since: this.clockNow() };
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
     this.renderBusy();
     this.startStageTimer();
     this.speakStage();
+    return { user, assistant, retired };
+  }
+  /** Whether the messages of `turn` are still in the conversation (a reset, such as a map switch, takes them away). */
+  hasTurn(turn) {
+    return this.messages.includes(turn.user) && this.messages.includes(turn.assistant);
+  }
+  /**
+   * The turn never reached the model: both of its messages are taken away as if it had not been sent, the choices it retired
+   * open again, the busy state and the stage end, and `draft` goes back into the message field (in front of what was typed
+   * meanwhile). Returns false, and changes nothing, when the turn is no longer there (a reset already took it).
+   */
+  retract(turn, draft) {
+    var _a2, _b2;
+    if (!this.hasTurn(turn)) return false;
+    this.messages = this.messages.filter((message) => message !== turn.user && message !== turn.assistant);
+    for (const choices of turn.retired) choices.picked = false;
+    this.cancelFrame();
+    this.busy = false;
+    this.clearStage();
+    if (this.built) {
+      if (draft) {
+        const typed = this.inputEl.value;
+        this.inputEl.value = typed.trim() ? `${draft}
+${typed}` : draft;
+      }
+      this.liveEl.setText("");
+    }
+    this.renderLog();
+    this.renderBusy();
+    this.renderHint();
+    (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
+    return true;
   }
   clockNow() {
     var _a2, _b2, _c;
@@ -22702,6 +22747,7 @@ var MapChatPanel = class {
     this.applying = false;
     this.clearStage();
     this.unread = false;
+    if (this.built) this.liveEl.setText("");
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();
@@ -37043,6 +37089,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     /** The map the conversation belongs to; opening another map starts a new conversation. */
     __publicField(this, "chatMapId", "");
     __publicField(this, "chatController", null);
+    /** Takes back the send that is still preparing (no request yet): what Stop does before there is a request to abort. */
+    __publicField(this, "chatPrepAbandon", null);
     __publicField(this, "chatTaskKey", null);
     /** Counts plans: a plan card only works while its number is the current one (a new message, another map or closing ends it). */
     __publicField(this, "chatPlanToken", 0);
@@ -46757,71 +46805,98 @@ ${note.detail.trim()}` : "",
       selectedIds: this.chatSelectionIds()
     };
     const anchor = { path: this.path, id: this.map.id };
+    const draft = chat.draft;
+    const turn = chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again), "preparing");
+    let sent = false;
+    const abandon = (reason) => {
+      if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+      if (!chat.retract(turn, again ? void 0 : draft)) return;
+      if (reason !== void 0) new import_obsidian30.Notice(reason);
+    };
+    const stopPreparing = () => abandon();
+    this.chatPrepAbandon = stopPreparing;
+    const notSent = () => t(again ? "ui.map_chat_not_sent_kept" : "ui.map_chat_not_sent_draft");
     let request;
     try {
       request = await this.buildChatRequest(message, chat, origin, redo);
     } catch (error) {
-      new import_obsidian30.Notice(errorMessage(error));
+      abandon(this.closed ? void 0 : errorMessage(error));
       return;
     }
-    await this.plugin.confirmAiUsage(request.model, async () => {
-      var _a2, _b2, _c;
-      if (this.closed || chat.isBusy || this.chatApplying || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id)
-        return;
-      const controller = new AbortController();
-      const key2 = `map-chat-view:${++mapChatTaskSequence}`;
-      this.chatController = controller;
-      this.chatTaskKey = key2;
-      (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.set(key2, controller);
-      const alive = () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
-      this.supersedeChatPlan();
-      chat.begin(redo ? t("ui.map_chat_more_detail_asked") : message, origin, Boolean(again));
-      this.relocateMapChat();
-      try {
-        const result = await this.plugin.mapChat.chat(
-          request,
-          controller.signal,
-          (text11) => {
-            if (alive()) chat.streamReply(text11);
-          },
-          (event) => {
-            if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
-          }
-        );
-        if (!alive()) return;
-        if (redo) {
-          const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
-          if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
+    if (this.closed || !chat.hasTurn(turn)) {
+      abandon();
+      return;
+    }
+    let went = false;
+    try {
+      went = await this.plugin.confirmAiUsage(request.model, async () => {
+        var _a2, _b2, _c;
+        if (this.closed || this.chatApplying || !chat.hasTurn(turn) || this.path !== anchor.path || ((_a2 = this.map) == null ? void 0 : _a2.id) !== anchor.id) {
+          abandon();
           return;
         }
-        const plan = result.actions.length ? planFor(result.actions, request.context, {
-          diagrams: this.plugin.settings.addDiagramsAfterResearch,
-          mapAiMode: (_c = this.map) == null ? void 0 : _c.aiMode
-        }) : null;
-        if (plan) {
-          if (chat.isBusy) {
-            chat.finish(result.reply, []);
-            this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, request.message);
+        sent = true;
+        if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
+        const controller = new AbortController();
+        const key2 = `map-chat-view:${++mapChatTaskSequence}`;
+        this.chatController = controller;
+        this.chatTaskKey = key2;
+        (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.set(key2, controller);
+        const alive = () => !this.closed && !controller.signal.aborted && this.chatController === controller && this.path === anchor.path;
+        this.supersedeChatPlan();
+        this.relocateMapChat();
+        chat.setStage("waiting");
+        try {
+          const result = await this.plugin.mapChat.chat(
+            request,
+            controller.signal,
+            (text11) => {
+              if (alive()) chat.streamReply(text11);
+            },
+            (event) => {
+              if (alive() && event.kind === "activity" && event.activity === "writing") chat.setStage("writing");
+            }
+          );
+          if (!alive()) return;
+          if (redo) {
+            const lines2 = result.actions.length ? [{ status: "skipped", text: t("ui.map_chat_redo_actions_ignored") }] : [];
+            if (alive() && chat.isBusy) chat.finish(result.reply, lines2);
+            return;
           }
-          return;
+          const plan = result.actions.length ? planFor(result.actions, request.context, {
+            diagrams: this.plugin.settings.addDiagramsAfterResearch,
+            mapAiMode: (_c = this.map) == null ? void 0 : _c.aiMode
+          }) : null;
+          if (plan) {
+            if (chat.isBusy) {
+              chat.finish(result.reply, []);
+              this.offerChatPlan(result, plan, request.context, { path: anchor.path, id: anchor.id }, request.message);
+            }
+            return;
+          }
+          if (result.actions.length) chat.setStage("applying");
+          const lines = await this.applyMapChatActions(
+            { ...result, message: request.message },
+            request.context,
+            alive,
+            anchor
+          );
+          if (alive() && chat.isBusy) chat.finish(result.reply, lines);
+        } catch (error) {
+          if (alive()) {
+            const failure = this.chatErrorText(error);
+            chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
+          }
+        } finally {
+          if (this.chatController === controller) this.releaseChatTask();
         }
-        if (result.actions.length) chat.setStage("applying");
-        const lines = await this.applyMapChatActions(
-          { ...result, message: request.message },
-          request.context,
-          alive,
-          anchor
-        );
-        if (alive() && chat.isBusy) chat.finish(result.reply, lines);
-      } catch (error) {
-        if (alive()) {
-          const failure = this.chatErrorText(error);
-          chat.fail(failure.text, failure.wrapped ? failure.text : void 0);
-        }
-      } finally {
-        if (this.chatController === controller) this.releaseChatTask();
-      }
-    });
+      });
+    } catch (error) {
+      if (sent) throw error;
+      abandon(this.closed ? void 0 : errorMessage(error));
+      return;
+    }
+    if (!went && !sent) abandon(this.closed ? void 0 : notSent());
   }
   /** Ends the plan waiting for an answer, if any: its buttons stop working and it reads as cancelled. */
   supersedeChatPlan() {
@@ -46909,18 +46984,22 @@ ${note.detail.trim()}` : "",
   }
   /** Stop button: the request is aborted and whatever came back is dropped. */
   stopMapChat() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     if (this.chatApplying && !this.chatController) {
       this.chatPlanToken++;
       (_a2 = this.chat) == null ? void 0 : _a2.focusInput();
       return;
     }
     const controller = this.chatController;
-    if (!controller) return;
+    if (!controller) {
+      (_b2 = this.chatPrepAbandon) == null ? void 0 : _b2.call(this);
+      (_c = this.chat) == null ? void 0 : _c.focusInput();
+      return;
+    }
     this.releaseChatTask();
     controller.abort();
-    (_b2 = this.chat) == null ? void 0 : _b2.markStopped();
-    (_c = this.chat) == null ? void 0 : _c.focusInput();
+    (_d = this.chat) == null ? void 0 : _d.markStopped();
+    (_e = this.chat) == null ? void 0 : _e.focusInput();
   }
   /** Closing the view or leaving the map: abort without touching the window. */
   abortMapChat() {

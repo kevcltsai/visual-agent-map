@@ -135,11 +135,19 @@ export interface MapChatSavedTurn {
 }
 
 /**
- * The progress stage shown inside the AI bubble while a turn runs. "Preparing" (before the request is built) is ticket 16's;
- * there is no "thinking": the model's thinking cannot be seen.
+ * The progress stage shown inside the AI bubble while a turn runs. "Preparing" is the time before the request reaches the
+ * model (checking the AI, building the request, the usage notice); there is no "thinking": the model's thinking cannot be seen.
  */
-export type MapChatStage = "waiting" | "writing" | "applying";
-const STAGE_ORDER: Record<MapChatStage, number> = { waiting: 0, writing: 1, applying: 2 };
+export type MapChatStage = "preparing" | "waiting" | "writing" | "applying";
+const STAGE_ORDER: Record<MapChatStage, number> = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
+
+/** What {@link MapChatPanel.begin} returns: the two messages it added, so {@link MapChatPanel.retract} can take exactly them back. */
+export interface MapChatTurnHandle {
+  readonly user: MapChatMessage;
+  readonly assistant: MapChatMessage;
+  /** The lists of choices this turn retired (they were still open), which a retract opens again. */
+  readonly retired: MapChatChoices[];
+}
 
 export interface MapChatMessage {
   role: "user" | "assistant";
@@ -599,19 +607,59 @@ export class MapChatPanel {
     this.renderSuggestions();
   }
 
-  /** A turn starts: the user's text, an empty answer, and the busy state. */
-  begin(userText: string, origin?: MapChatOrigin, keepDraft = false): void {
+  /** A turn starts: the user's text, an empty answer, and the busy state (the view starts in "preparing"). */
+  begin(
+    userText: string,
+    origin?: MapChatOrigin,
+    keepDraft = false,
+    stage: MapChatStage = "waiting"
+  ): MapChatTurnHandle {
     // A list of maps to pick from belongs to the message before; a new message ends its choices.
+    const retired = this.messages.flatMap(message =>
+      message.choices && !message.choices.picked ? [message.choices] : []
+    );
     this.retireChoices();
-    this.messages.push({ role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) });
-    this.messages.push({ role: "assistant", text: "", lines: [], streaming: true });
+    const user: MapChatMessage = { role: "user", text: userText, lines: [], ...(origin ? { origin } : {}) };
+    const assistant: MapChatMessage = { role: "assistant", text: "", lines: [], streaming: true };
+    this.messages.push(user, assistant);
     this.busy = true;
-    this.stage = { kind: "waiting", since: this.clockNow() };
+    this.stage = { kind: stage, since: this.clockNow() };
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
     this.renderBusy();
     this.startStageTimer();
     this.speakStage();
+    return { user, assistant, retired };
+  }
+  /** Whether the messages of `turn` are still in the conversation (a reset, such as a map switch, takes them away). */
+  hasTurn(turn: MapChatTurnHandle): boolean {
+    return this.messages.includes(turn.user) && this.messages.includes(turn.assistant);
+  }
+  /**
+   * The turn never reached the model: both of its messages are taken away as if it had not been sent, the choices it retired
+   * open again, the busy state and the stage end, and `draft` goes back into the message field (in front of what was typed
+   * meanwhile). Returns false, and changes nothing, when the turn is no longer there (a reset already took it).
+   */
+  retract(turn: MapChatTurnHandle, draft?: string): boolean {
+    if (!this.hasTurn(turn)) return false;
+    this.messages = this.messages.filter(message => message !== turn.user && message !== turn.assistant);
+    for (const choices of turn.retired) choices.picked = false;
+    this.cancelFrame();
+    this.busy = false;
+    this.clearStage();
+    if (this.built) {
+      if (draft) {
+        const typed = this.inputEl.value;
+        this.inputEl.value = typed.trim() ? `${draft}\n${typed}` : draft;
+      }
+      // The stage name that was said is withdrawn: nothing happened.
+      this.liveEl.setText("");
+    }
+    this.renderLog();
+    this.renderBusy();
+    this.renderHint();
+    this.host.stateChanged?.();
+    return true;
   }
   private clockNow(): number {
     return this.host.now?.() ?? Date.now();
@@ -862,6 +910,8 @@ export class MapChatPanel {
     this.applying = false;
     this.clearStage();
     this.unread = false;
+    // A stage name said for the turn that is gone must not stay in the live region.
+    if (this.built) this.liveEl.setText("");
     if (this.built) this.inputEl.value = "";
     this.renderLog();
     this.renderChips();

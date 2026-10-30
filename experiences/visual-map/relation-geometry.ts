@@ -68,83 +68,27 @@ interface Curve {
   c1: { x: number; y: number };
   c2: { x: number; y: number };
   p2: { x: number; y: number };
-  /** Unit vector along which the line runs out of `a`; the offset slides the line perpendicular to it. */
-  along: { x: number; y: number };
 }
 
-/** Gap between neighbouring lines that join the same two topics. */
-export const RELATION_OFFSET_STEP = 12;
-
-function curveOf(a: RelationBox, b: RelationBox, offset = 0): Curve {
+function curveOf(a: RelationBox, b: RelationBox): Curve {
   const { from, to, gap } = nearestSides(a, b),
     length = gap > 0 ? controlLength(gap) : 0;
-  // The line slides sideways along the edge (the normal of the `a` side turned a quarter); cards that overlap have no
-  // normal, so the centre-to-centre chord is turned instead.
-  let nx = from.nx,
-    ny = from.ny;
-  if (!nx && !ny) {
-    nx = to.x - from.x;
-    ny = to.y - from.y;
-    const size = Math.hypot(nx, ny) || 1;
-    nx /= size;
-    ny /= size;
-  }
-  const sx = offset ? -ny * offset : 0,
-    sy = offset ? nx * offset : 0;
   return {
-    p1: { x: from.x + sx, y: from.y + sy },
-    c1: { x: from.x + from.nx * length + sx, y: from.y + from.ny * length + sy },
-    c2: { x: to.x + to.nx * length + sx, y: to.y + to.ny * length + sy },
-    p2: { x: to.x + sx, y: to.y + sy },
-    along: { x: nx, y: ny }
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
   };
 }
 
-/**
- * Cubic Bezier from the nearest edge of `a` to the nearest edge of `b`; the arms follow the edges' normals, so it never takes a wide arc.
- * `offset` slides the line sideways (px) so parallel relations do not lie on top of each other.
- */
-export function relationPathData(a: RelationBox, b: RelationBox, offset = 0): string {
-  const { p1, c1, c2, p2 } = curveOf(a, b, offset);
+/** Cubic Bezier from the nearest edge of `a` to the nearest edge of `b`; the arms follow the edges' normals, so it never takes a wide arc. */
+export function relationPathData(a: RelationBox, b: RelationBox): string {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
 
-/** Vertical step (px) between the labels of parallel relations: one label height (14) plus 2px of air. */
-export const RELATION_LABEL_LANE = 16;
-
-/**
- * Where the label sits. A lone relation (offset 0) keeps the midpoint of its line (t = 0.5). Parallel relations stack
- * their labels in screen-y lanes of `RELATION_LABEL_LANE` px around the midpoint of the unshifted curve, in the order
- * of the lines' own sideways shift: the lane is `offset / RELATION_OFFSET_STEP`, signed by the screen component of that
- * shift (y for a horizontal line, x for a vertical one; for a slanted chord the larger component decides). The labels
- * of a left-right pair keep the x of the gap's middle, so they stay between the cards whatever their count; those of a
- * top-bottom pair follow the line's sideways shift in x.
- */
-export function relationLabelPoint(a: RelationBox, b: RelationBox, offset = 0): { x: number; y: number } {
-  const { p1, c1, c2, p2, along } = curveOf(a, b, 0),
-    mid = { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
-  if (!offset) return mid;
-  const horizontal = Math.abs(along.x) >= Math.abs(along.y),
-    sx = -along.y * offset,
-    sy = along.x * offset,
-    lane = (Math.sign(horizontal ? sy : sx) * Math.abs(offset)) / RELATION_OFFSET_STEP;
-  return { x: horizontal ? mid.x : mid.x + sx, y: mid.y + lane * RELATION_LABEL_LANE };
-}
-
-/**
- * One sideways offset (px) per relation, in list order. Relations on the same pair of topics (either direction) fan out:
- * 0, +12, -12, +24, -24 ... A single relation stays at 0. The offset is in a frame fixed by the pair (smaller id to
- * larger id), so a reversed relation still lands on its own side instead of crossing back onto the first line.
- */
-export function relationOffsets(relations: readonly { from: string; to: string }[]): number[] {
-  const seen = new Map<string, number>();
-  return relations.map(({ from, to }) => {
-    const forward = from <= to,
-      key = forward ? `${from}\u0000${to}` : `${to}\u0000${from}`,
-      index = seen.get(key) ?? 0;
-    seen.set(key, index + 1);
-    const step = Math.ceil(index / 2) * RELATION_OFFSET_STEP,
-      signed = index % 2 === 1 ? step : -step;
-    return signed * (forward ? 1 : -1) || 0;
-  });
+/** Where the label sits: the midpoint of the line (t = 0.5). */
+export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number; y: number } {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }

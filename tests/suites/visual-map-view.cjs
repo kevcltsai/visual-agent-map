@@ -2274,7 +2274,7 @@ integrationTest('hypothesis-evidence: an evidence line is drawn from the fact to
   assert.equal(a.view.map.topicRelations.length, 1, 'and the file keeps the key');
 });
 integrationTest('hypothesis-evidence: a supports link is drawn whatever the type of either end (no type rule, nothing logged); an off-screen end is skipped quietly', () => {
-  const relations = [{ kind: 'supports', from: 'hyp', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'other' }, { kind: 'supports', from: 'fact', to: 'hyp' }];
+  const relations = [{ kind: 'supports', from: 'hyp', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'other' }, { kind: 'supports', from: 'other', to: 'hyp' }];
   const { view, logs } = heFixture({ relations });
   let kids = heDrawn(view, { fact: [0, 0], hyp: [500, 0], other: [0, 200] });
   assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 3, 'hypothesis -> topic, topic -> topic and topic -> hypothesis are all drawn');
@@ -2320,172 +2320,75 @@ integrationTest('hypothesis-evidence: the barred marker puts the bar on the line
   assert.equal(new Set(barX).size, 1, 'the bar is vertical'); assert.ok(barX[0] >= 0 && barX[0] <= baseX(bar), `bar x ${barX[0]} is on the line, before the arrowhead base ${baseX(bar)}`);
   assert.ok(baseX(bar) < tip(bar));
 });
-integrationTest('hypothesis-evidence: relationOffsets gives a single line 0 and fans parallel lines out in list order, either direction, per pair (R3-2)', () => {
-  const { relationOffsets } = heGeo();
-  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }])), [0]);
-  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'a', to: 'b' }])), [0, 12]);
-  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'a', to: 'b' }])), [0, 12, -12, 24, -24]);
-  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }])), [0, -12], 'the reverse of the pair counts as the same pair, mirrored into its own frame');
-  assert.deepEqual(plain(relationOffsets([{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }, { from: 'b', to: 'a' }])), [0, 0, -12], 'another pair in between does not take a slot');
-  const { relationPathData } = heGeo(), a = heBox(0, 0), b = heBox(500, 0);
-  const forward = heNums(relationPathData(a, b, 12)), backward = heNums(relationPathData(b, a, -12));
-  assert.deepEqual(forward, [280, 62, 340, 62, 440, 62, 500, 62], 'a to b shifts 12 down');
-  assert.equal(backward[1], 62, 'the reversed line (own frame -12) lands on the same side, so the two do not cross');
-  assert.equal(relationPathData(a, b, 0), relationPathData(a, b), 'offset 0 is the plain path');
-  const vertical = heNums(relationPathData(heBox(0, 0), heBox(0, 200), 12));
-  assert.deepEqual([vertical[0], vertical[6]], [128, 128], 'top-bottom layout shifts sideways');
+const heGoldenGeometry = [
+  [[0, 0], [500, 0], 'M 280 50 C 340 50, 440 50, 500 50', { x: 390, y: 50 }],
+  [[500, 0], [0, 0], 'M 500 50 C 440 50, 340 50, 280 50', { x: 390, y: 50 }],
+  [[0, 0], [0, 200], 'M 140 100 C 140 150, 140 150, 140 200', { x: 140, y: 150 }],
+  [[0, 200], [0, 0], 'M 140 200 C 140 150, 140 150, 140 100', { x: 140, y: 150 }],
+  [[0, 0], [290, 0], 'M 280 50 C 296 50, 274 50, 290 50', { x: 285, y: 50 }],
+  [[0, 0], [1000, 0], 'M 280 50 C 340 50, 940 50, 1000 50', { x: 640, y: 50 }],
+  [[0, 0], [100, 40], 'M 140 50 C 140 50, 240 90, 240 90', { x: 190, y: 70 }],
+  [[0, 0], [500, 40], 'M 280 50 C 340 50, 440 90, 500 90', { x: 390, y: 70 }],
+  [[0, 0], [420, 239], 'M 280 50 C 340 50, 360 289, 420 289', { x: 350, y: 169.5 }],
+  [[0, 0], [419, 240], 'M 140 100 C 140 160, 559 180, 559 240', { x: 349.5, y: 170 }],
+  [[0, 0], [400, 260], 'M 140 100 C 140 160, 540 200, 540 260', { x: 340, y: 180 }],
+  [[0, 0], [120, 300], 'M 140 100 C 140 160, 260 240, 260 300', { x: 200, y: 200 }]
+];
+integrationTest('hypothesis-evidence: relation-geometry has no offset API (one relation per pair, decision #37); a single line keeps its nearest-side path and midpoint label', () => {
+  const geo = heGeo();
+  assert.deepEqual(Object.keys(geo).filter(name => /offset|lane/i.test(name)), [], 'no relationOffsets, RELATION_OFFSET_STEP or RELATION_LABEL_LANE export');
+  assert.equal(geo.relationOffsets, undefined);
+  assert.equal(geo.relationPathData.length, 2, 'the path takes two cards and no offset');
+  assert.equal(geo.relationLabelPoint.length, 2, 'the label point takes two cards and no offset');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/relation-geometry.ts'), 'utf8'), view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.doesNotMatch(source, /offset/i, 'the geometry file never mentions an offset');
+  assert.doesNotMatch(view, /relationOffset/, 'the view keeps no per-line offset');
+  // Goldens taken from the pre-change code at offset 0: a lone line is byte-identical.
+  for (const [a, b, path, label] of heGoldenGeometry) {
+    assert.equal(geo.relationPathData(heBox(...a), heBox(...b)), path, `path ${JSON.stringify([a, b])}`);
+    assert.deepEqual(plain(geo.relationLabelPoint(heBox(...a), heBox(...b))), label, `label ${JSON.stringify([a, b])}`);
+  }
+  assert.equal(geo.relationPathData(heBox(0, 0, 200, 60), heBox(300, 200, 100, 300)), 'M 100 60 C 100 120, 350 140, 350 200');
+  assert.deepEqual(plain(geo.relationLabelPoint(heBox(0, 0, 200, 60), heBox(300, 200, 100, 300))), { x: 225, y: 130 });
+  for (const [a, b] of heGoldenGeometry) {
+    const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] = heNums(geo.relationPathData(heBox(...a), heBox(...b)));
+    assert.deepEqual(plain(geo.relationLabelPoint(heBox(...a), heBox(...b))), { x: (x1 + 3 * cx1 + 3 * cx2 + x2) / 8, y: (y1 + 3 * cy1 + 3 * cy2 + y2) / 8 }, 'the label is the curve at t = 0.5');
+  }
 });
-integrationTest('hypothesis-evidence: several relations on one pair of topics are drawn apart; path, hit, derives-from gap and label move together (R3-2)', () => {
-  const rel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'other' }];
+integrationTest('hypothesis-evidence: relations on different pairs are each one nearest-side line with its label at the line midpoint; path, hit, derives-from gap and label move together on a drag (decision #37, was R3-2)', () => {
+  const rel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'derives_from', from: 'fact', to: 'other' }, { kind: 'contradicts', from: 'other', to: 'hyp' }];
   const fx = heFixture({ relations: rel });
   const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 0], other: [0, 300] });
   const ys = cls => kids.filter(k => k.classes.includes(cls));
-  const supports = ys('vam-relation-supports'), derives = ys('vam-relation-derives_from')[0], contradicts = ys('vam-relation-contradicts')[0], gap = ys('vam-relation-gap')[0];
-  assert.equal(supports[0].attrs.d, 'M 280 50 C 340 50, 440 50, 500 50', 'the first line of the pair is unshifted');
-  assert.equal(derives.attrs.d, 'M 280 62 C 340 62, 440 62, 500 62', 'the second is 12 down');
-  assert.equal(contradicts.attrs.d, 'M 500 38 C 440 38, 340 38, 280 38', 'the third (reversed) is 12 up');
-  assert.notEqual(supports[1].attrs.d, supports[0].attrs.d); assert.match(supports[1].attrs.d, /^M 140 100 /, 'a different pair is unaffected');
+  const supports = ys('vam-relation-supports')[0], derives = ys('vam-relation-derives_from')[0], contradicts = ys('vam-relation-contradicts')[0], gap = ys('vam-relation-gap')[0];
+  assert.equal(supports.attrs.d, 'M 280 50 C 340 50, 440 50, 500 50');
+  assert.equal(derives.attrs.d, 'M 140 100 C 140 160, 140 240, 140 300');
+  assert.equal(contradicts.attrs.d, 'M 280 350 C 340 350, 440 50, 500 50');
   assert.equal(gap.attrs.d, derives.attrs.d, 'the inner gap line follows its line');
   const hits = ys('vam-relation-hit').map(h => h.attrs.d);
-  for (const line of [supports[0], derives, contradicts]) assert.ok(hits.includes(line.attrs.d), 'every line has a hit path on the same curve');
-  // F6 oracle swap: the label no longer sits on its own line (y 50/62/38) but in a 16px screen-y lane of the pair's gap (50 / 66 / 34).
-  assert.deepEqual(ys('vam-relation-label').map(l => l.attrs.y).slice(0, 3), ['50', '66', '34'], 'labels sit in their own y lane, the first on the midpoint');
-  assert.deepEqual(ys('vam-relation-label').map(l => l.attrs.x).slice(0, 3), ['390', '390', '390'], 'and keep the x of the gap middle (390), between the two cards (280..500)');
+  for (const line of [supports, derives, contradicts]) assert.ok(hits.includes(line.attrs.d), 'every line has a hit path on the same curve');
+  assert.deepEqual(ys('vam-relation-label').map(l => [l.attrs.x, l.attrs.y]), [['390', '50'], ['140', '200'], ['390', '200']], 'each label is the midpoint of its own line');
   const drag = fx.view.dragEdges('fact', fx.view.cardEls.get('fact')); drag.update(0, 100);
-  assert.match(derives.attrs.d, /^M 280 162 C .* 500 62$/, 'dragging keeps the 12px shift'); assert.match(supports[0].attrs.d, /^M 280 150 /); assert.match(contradicts.attrs.d, / 280 138$/);
+  assert.match(supports.attrs.d, /^M 280 150 C .* 500 50$/); assert.match(derives.attrs.d, /^M 140 200 C .* 140 300$/); assert.equal(contradicts.attrs.d, 'M 280 350 C 340 350, 440 50, 500 50', 'a line that does not touch the dragged card stays');
   assert.equal(gap.attrs.d, derives.attrs.d); assert.ok(ys('vam-relation-hit').map(h => h.attrs.d).includes(derives.attrs.d), 'the hit path follows too');
-  const moved = ys('vam-relation-label')[1].attrs, expected = heGeo().relationLabelPoint(heBox(0, 100), heBox(500, 0), 12);
-  assert.deepEqual([Number(moved.x), Number(moved.y)], [expected.x, expected.y], 'and so does the label (relationLabelPoint with the same offset)');
+  const moved = ys('vam-relation-label')[0].attrs, expected = heGeo().relationLabelPoint(heBox(0, 100), heBox(500, 0));
+  assert.deepEqual([Number(moved.x), Number(moved.y)], [expected.x, expected.y], 'and so does the label (the midpoint of the moved line)');
 });
-// Label boxes as drawn: centred on the label's x/y, 14px high, 7px per character plus 8px (the estimate of the review).
-const heLabelBoxes = labels => labels.map(l => { const w = Array.from(l.text ?? '').length * 7 + 8, x = Number(l.attrs.x), y = Number(l.attrs.y); return { x: x - w / 2, y: y - 7, w, h: 14 }; });
-const heOverlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-const heStaggerKinds = ['supports', 'derives_from', 'contradicts', 'prerequisite', 'verifies', 'related'];
-const heStagger = (count, boxes, reverse = []) => {
-  const rel = Array.from({ length: count }, (_, i) => reverse.includes(i) ? { kind: heStaggerKinds[i], from: 'hyp', to: 'fact' } : { kind: heStaggerKinds[i], from: 'fact', to: 'hyp' });
-  const fx = heFixture({ relations: rel }), kids = heDrawn(fx.view, boxes);
-  fx.view.syncRelationClasses();
-  return { fx, labels: kids.filter(k => k.classes.includes('vam-relation-label')) };
-};
-const heAssertApart = (labels, why) => {
-  const boxes = heLabelBoxes(labels);
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${why}: label ${i} ${JSON.stringify(boxes[i])} overlaps label ${j} ${JSON.stringify(boxes[j])}`);
-};
-integrationTest('hypothesis-evidence: the labels of 2, 3 and 4 relations on one pair never overlap, whatever the layout, and a lone relation stays on the midpoint (F5, R3-2)', () => {
-  const layouts = { horizontal: { fact: [0, 0], hyp: [500, 0], other: [0, 300] }, 'horizontal reversed': { fact: [500, 0], hyp: [0, 0], other: [0, 300] }, vertical: { fact: [0, 0], hyp: [0, 300], other: [600, 0] }, 'vertical reversed': { fact: [0, 300], hyp: [0, 0], other: [600, 0] }, diagonal: { fact: [0, 0], hyp: [400, 260], other: [600, 0] }, 'offset sideways': { fact: [0, 0], hyp: [120, 300], other: [600, 0] } };
-  for (const [name, boxes] of Object.entries(layouts)) for (const count of [2, 3, 4, 5]) for (const reverse of [[], [2], [1, 3]]) {
-    const { labels } = heStagger(count, boxes, reverse);
-    assert.equal(labels.length, count);
-    assert.ok(labels.every(l => l.text), 'every label carries its name ');
-    heAssertApart(labels, `${name} x${count} reverse ${JSON.stringify(reverse)}`);
-  }
-  const { labels } = heStagger(1, layouts.vertical);
-  assert.deepEqual([labels[0].attrs.x, labels[0].attrs.y], ['140', '200'], 'a single relation sits on the midpoint of its line');
-  const { relationLabelPoint, relationOffsets } = heGeo();
-  for (let degrees = 0; degrees < 360; degrees += 7) for (const reach of [250, 400, 700]) for (const count of [2, 3, 4, 5]) {
-    const a = heBox(0, 0), b = heBox(Math.round(Math.cos(degrees * Math.PI / 180) * reach), Math.round(Math.sin(degrees * Math.PI / 180) * reach));
-    const rel = Array.from({ length: count }, () => ({ from: 'a', to: 'b' })), offsets = relationOffsets(rel);
-    const boxes = rel.map((_, i) => { const p = relationLabelPoint(a, b, offsets[i]); return { x: p.x - 45, y: p.y - 7, w: 90, h: 14 }; });
-    for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${degrees} deg, reach ${reach}, ${count} lines: ${i} and ${j} overlap (widest 11-letter name box)`);
-  }
-  // F6 oracle swap: relationLabelSlots is gone; the lane (offset / 12, signed by the line's screen shift) replaces the slot.
-  assert.deepEqual(plain(relationLabelPoint(heBox(0, 0), heBox(500, 0), 12)), { x: 390, y: 66 }, 'offset +12 on a left-to-right pair is one lane (16px) below the midpoint (390, 50)');
-  assert.deepEqual(plain(relationLabelPoint(heBox(500, 0), heBox(0, 0), -12)), { x: 390, y: 66 }, 'the reversed relation (own frame -12) lands in the same lane as the line it follows');
-  assert.deepEqual(plain(relationLabelPoint(heBox(0, 0), heBox(500, 0))), plain(relationLabelPoint(heBox(0, 0), heBox(500, 0), 0)), 'offset 0 is the plain midpoint');
-});
-integrationTest('hypothesis-evidence: after a drag the labels of parallel relations are still apart, and the lines and hit paths are unchanged by the label slot (F5)', () => {
-  for (const [name, boxes, to] of [['vertical', { fact: [0, 0], hyp: [0, 300] }, [40, 420]], ['horizontal', { fact: [0, 0], hyp: [500, 0] }, [700, 20]], ['vertical to horizontal', { fact: [0, 0], hyp: [0, 300] }, [600, 0]]]) {
-    const { fx, labels } = heStagger(4, boxes, [3]);
-    const paths = heDrawnPaths(fx.view);
-    fx.view.dragEdges('hyp', fx.view.cardEls.get('hyp')).update(...to);
-    heAssertApart(labels, `${name} after drag`);
-    assert.equal(paths.length, 8, 'four lines and four hit paths');
-  }
-  const { fx } = heStagger(4, { fact: [0, 0], hyp: [0, 300] });
-  const kids = fx.view.edgesEl.kids, lines = kids.filter(k => k.classes.includes('vam-relation')).map(k => k.attrs.d);
-  assert.deepEqual(lines.map(d => d.split(' ')[1]), ['140', '128', '152', '116'], 'vertical lines keep the 0/+12/-12/+24 sideways shift (turned a quarter: leftward on a downward line)');
-  assert.deepEqual(kids.filter(k => k.classes.includes('vam-relation-hit')).map(k => k.attrs.d), lines, 'hit paths equal the lines');
-  const sorted = kids.filter(k => k.classes.includes('vam-relation-label')).map(k => Number(k.attrs.y)).sort((a, b) => a - b);
-  assert.ok(sorted[3] - sorted[0] >= 3 * 14, 'on a vertical pair the labels are spread along the line');
-});
-// F6 (decision #34): label boxes against BOTH cards of the pair. Label box = w x 14 centred on the label point.
-const heLabelAt = (p, w) => ({ x: p.x - w / 2, y: p.y - 7, w, h: 14 });
-const heCardBox = box => ({ x: box.x, y: box.y, w: box.width, h: box.height });
-const heGapOf = (a, b) => ({ h: Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width)), v: Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height)) });
-const heLanes = (A, B, pattern) => {
-  // pattern: array of booleans, true = the relation runs B -> A (against the pair frame 'a' < 'b').
-  const { relationLabelPoint, relationOffsets, relationPathData } = heGeo(), rel = pattern.map(rev => rev ? { from: 'b', to: 'a' } : { from: 'a', to: 'b' }), offsets = relationOffsets(rel);
-  return rel.map((r, i) => { const from = r.from === 'a' ? A : B, to = r.from === 'a' ? B : A, p = relationLabelPoint(from, to, offsets[i]), line = heNums(relationPathData(from, to, offsets[i])), plainLine = heNums(relationPathData(from, to, 0)); return { p, shiftX: line[0] - plainLine[0], shiftY: line[1] - plainLine[1], offset: offsets[i] }; });
-};
-const hePatterns = { 1: [[false], [true]], 2: [[false, false], [false, true]], 3: [[false, false, false], [false, true, false]], 4: [[false, false, false, false], [false, true, true, false], [true, false, true, true]] };
-const heSweep = (A, B, label) => {
-  const gap = heGapOf(A, B), horizontal = gap.h >= gap.v;
-  for (const [count, patterns] of Object.entries(hePatterns)) for (const pattern of patterns) {
-    const lanes = heLanes(A, B, pattern), tag = `${label} x${count} ${JSON.stringify(pattern)}`;
-    for (const w of [24, 46, 90]) {
-      const boxes = lanes.map(l => heLabelAt(l.p, w));
-      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) assert.ok(!heOverlaps(boxes[i], boxes[j]), `${tag} w${w}: labels ${i} and ${j} overlap`);
-      const ys = lanes.map(l => l.p.y), range = Math.max(...ys) - Math.min(...ys);
-      // Gate: horizontal pair needs gap >= label width + 4; vertical pair needs gap >= lane range * 16 + 18 (range = span of the lanes in y).
-      const clear = horizontal ? gap.h >= w + 4 : gap.v >= range + 18;
-      if (clear) for (const [i, box] of boxes.entries()) for (const card of [A, B]) assert.ok(!heOverlaps(box, heCardBox(card)), `${tag} w${w}: label ${i} ${JSON.stringify(box)} meets card ${JSON.stringify(card)}`);
-    }
-    // (d) the y order of the labels is the order of the lines' sideways shift (y of a horizontal line, x of a vertical one).
-    for (let i = 0; i < lanes.length; i++) for (let j = i + 1; j < lanes.length; j++) {
-      const shift = horizontal ? lanes[i].shiftY - lanes[j].shiftY : lanes[i].shiftX - lanes[j].shiftX;
-      assert.equal(Math.sign(lanes[i].p.y - lanes[j].p.y), Math.sign(shift), `${tag}: label ${i}/${j} y order follows the line shift`);
-    }
-  }
-};
-integrationTest('hypothesis-evidence: label points of 1-4 parallel relations never overlap, stay clear of both cards when the gap allows (horizontal gap >= label width + 4; vertical gap >= lane range x 16 + 18), follow the line order, and a lone label is the t = 0.5 midpoint (F6, decision #34)', () => {
-  const A = heBox(0, 0);
-  for (const gap of [60, 140, 440]) heSweep(A, heBox(280 + gap, 0), `horizontal gap ${gap}`);
-  for (const gap of [60, 140, 440]) heSweep(heBox(280 + gap, 0), A, `horizontal reversed gap ${gap}`);
-  for (const gap of [80, 175]) heSweep(A, heBox(0, 100 + gap), `vertical gap ${gap}`);
-  for (const gap of [80, 175]) heSweep(A, heBox(120, 100 + gap), `vertical shifted gap ${gap}`);
-  for (const gap of [80, 175]) heSweep(heBox(0, 100 + gap), A, `vertical reversed gap ${gap}`);
-  // either side of the horizontal / vertical decision (hgap 140 vs vgap 139, and 139 vs 140)
-  heSweep(A, heBox(420, 239), 'diagonal h140 v139 (horizontal)'); heSweep(A, heBox(419, 240), 'diagonal h139 v140 (vertical)');
-  heSweep(A, heBox(420, 240), 'diagonal h140 v140 (tie: horizontal)'); heSweep(A, heBox(500, 400), 'diagonal h220 v300 (vertical)');
-  const { relationLabelPoint, relationPathData } = heGeo();
-  for (const [a, b] of [[A, heBox(420, 0)], [A, heBox(0, 175 + 100)], [A, heBox(419, 240)], [heBox(420, 0), A]]) {
-    const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] = heNums(relationPathData(a, b, 0));
-    assert.deepEqual(plain(relationLabelPoint(a, b)), { x: (x1 + 3 * cx1 + 3 * cx2 + x2) / 8, y: (y1 + 3 * cy1 + 3 * cy2 + y2) / 8 }, 'a lone label is the curve at t = 0.5');
-  }
-});
-integrationTest('hypothesis-evidence: F6 sample coordinates - four labels A<->B and two labels A->C across a 140px gap sit between the cards, none on a card (decision #34)', () => {
-  // From ui-evidence F5 re-check: Rel B dragged to (0,0) left of Rel A (420, y), gap 140; Rel C at x 840 right of A (right edge 700), gap 140. Widest label 90 x 14.
-  const { relationLabelPoint, relationOffsets } = heGeo(), A = heBox(420, 0), B = heBox(0, 0), C = heBox(840, 0);
-  const rel = [{ from: 'a', to: 'b' }, { from: 'a', to: 'b' }, { from: 'b', to: 'a' }, { from: 'a', to: 'b' }], off = relationOffsets(rel);
-  const ab = rel.map((r, i) => relationLabelPoint(r.from === 'a' ? A : B, r.from === 'a' ? B : A, off[i]));
-  const abBoxes = ab.map(p => heLabelAt(p, 90));
-  assert.deepEqual(plain(ab), [{ x: 350, y: 50 }, { x: 350, y: 34 }, { x: 350, y: 66 }, { x: 350, y: 18 }], 'x stays at the gap middle (350); y lanes 0, -1, +1, -2 follow the lines at y 50, 38, 62, 26');
-  assert.deepEqual(abBoxes.map(b => [b.x, b.x + b.w]), Array(4).fill([305, 395]), 'every A<->B label spans x 305..395, inside the 280..420 gap');
-  for (const [i, box] of abBoxes.entries()) for (const [name, card] of [['A', A], ['B', B]]) assert.ok(!heOverlaps(box, heCardBox(card)), `A<->B label ${i} meets card ${name}`);
-  const c = [0, 12].map(offset => relationLabelPoint(A, C, offset)), cBoxes = c.map(p => heLabelAt(p, 90));
-  assert.deepEqual(plain(c), [{ x: 770, y: 50 }, { x: 770, y: 66 }], 'A->C: the second label is one lane down, x stays at the gap middle 770');
-  for (const [i, box] of cBoxes.entries()) for (const [name, card] of [['A', A], ['C', C]]) assert.ok(!heOverlaps(box, heCardBox(card)), `A->C label ${i} meets card ${name}`);
-  assert.ok(!heOverlaps(cBoxes[0], cBoxes[1]));
-  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) assert.ok(!heOverlaps(abBoxes[i], abBoxes[j]), `A<->B labels ${i} and ${j} overlap`);
-});
-integrationTest('hypothesis-evidence: the labels drawn by the view equal relationLabelPoint after the draw and after a drag, in horizontal and vertical layouts, and stay clear of both cards (F6, decision #34)', () => {
-  const { relationLabelPoint, relationOffsets } = heGeo(), rel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
-  const offsets = relationOffsets(rel);
-  for (const [name, start, to] of [['horizontal gap 140', { fact: [0, 0], hyp: [420, 0] }, [700, 30]], ['horizontal gap 440', { fact: [0, 0], hyp: [720, 0] }, [420, 10]], ['vertical gap 175', { fact: [0, 0], hyp: [0, 275] }, [40, 380]], ['vertical to horizontal', { fact: [0, 0], hyp: [0, 275] }, [600, 0]]]) {
+integrationTest('hypothesis-evidence: the labels drawn by the view equal relationLabelPoint after the draw and after a drag, in horizontal and vertical layouts (decision #37, was F6 #34)', () => {
+  const { relationLabelPoint } = heGeo(), rel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
+  for (const [name, start, to] of [['horizontal gap 140', { fact: [0, 0], hyp: [420, 0], other: [0, 300] }, [700, 30]], ['horizontal gap 440', { fact: [0, 0], hyp: [720, 0], other: [0, 300] }, [420, 10]], ['vertical gap 175', { fact: [0, 0], hyp: [0, 275], other: [600, 0] }, [40, 380]], ['vertical to horizontal', { fact: [0, 0], hyp: [0, 275], other: [600, 0] }, [600, 0]]]) {
     const fx = heFixture({ relations: rel }), kids = heDrawn(fx.view, start), labels = () => kids.filter(k => k.classes.includes('vam-relation-label'));
-    const expected = hypPos => rel.map((r, i) => { const f = heBox(...start.fact), h = heBox(...hypPos); return relationLabelPoint(r.from === 'fact' ? f : h, r.from === 'fact' ? h : f, offsets[i]); });
+    const expected = hypPos => [relationLabelPoint(heBox(...start.fact), heBox(...hypPos)), relationLabelPoint(heBox(...start.other), heBox(...start.fact))];
     const check = (hypPos, when) => {
       const exp = expected(hypPos);
+      assert.equal(labels().length, 2);
       labels().forEach((l, i) => assert.deepEqual([Number(l.attrs.x), Number(l.attrs.y)], [exp[i].x, exp[i].y], `${name} ${when}: label ${i} is at relationLabelPoint`));
     };
     check(start.hyp, 'after draw');
     fx.view.dragEdges('hyp', fx.view.cardEls.get('hyp')).update(...to);
     check(to, 'after drag');
-    const gap = heGapOf(heBox(...start.fact), heBox(...to)), horizontal = gap.h >= gap.v;
-    if (horizontal && gap.h >= 90 + 4 || !horizontal && gap.v >= 3 * 16 + 18) for (const l of labels()) for (const card of [heBox(...start.fact), heBox(...to)]) assert.ok(!heOverlaps(heLabelAt({ x: Number(l.attrs.x), y: Number(l.attrs.y) }, 90), heCardBox(card)), `${name} after drag: a label meets a card`);
   }
 });
-const heDrawnPaths = view => view.edgesEl.kids.filter(k => k.classes.includes('vam-relation') || k.classes.includes('vam-relation-hit'));
 integrationTest('hypothesis-evidence: after a relation is added from the panel the focus is on the new "Add relation…" button (R3-3)', async () => {
   const { view, modals, menus } = heFixture();
   view.enqueue = work => work(); view.mapChange = async (change) => { change(view.map); };
@@ -2569,41 +2472,42 @@ integrationTest('hypothesis-evidence: the prerequisite target picker lists neith
   assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(pickable), ['c', 'd', 'e'], 'for A: not itself and not its existing target b; c is a new, acyclic target');
   const forC = heFixture({ topics, notes, relations }); forC.view.chooseRelationTarget(forC.view.map.nodes[2], 'prerequisite');
   assert.deepEqual(['a', 'b', 'c', 'd', 'e'].filter(id => forC.modals[0].selectable(forC.view.map.nodes.find(n => n.id === id))), ['e'], 'for C: a, b and d all lead to c (c->b would close a cycle, directly or through b)');
-  const loop = heFixture({ topics, notes, relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'a' }] });
+  const loop = heFixture({ topics, notes, relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'c' }, { kind: 'prerequisite', from: 'c', to: 'a' }] });
   loop.view.chooseRelationTarget(loop.view.map.nodes[0], 'prerequisite');
   assert.equal(loop.modals.length, 1, 'a hand-written cycle does not hang or hide the picker');
   const all = [node('a'), node('b')];
-  const none = heFixture({ topics: all, notes: heNotes(all.map(n => [n.id, {}])), relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'b', to: 'a' }] });
+  const none = heFixture({ topics: all, notes: heNotes(all.map(n => [n.id, {}])), relations: [{ kind: 'prerequisite', from: 'a', to: 'b' }] });
   none.view.chooseRelationTarget(none.view.map.nodes[0], 'prerequisite');
   assert.equal(none.modals.length, 0, 'no dialog'); assert.deepEqual(none.notices, ['There is no topic this one can be linked to with “Prerequisite”.']);
 });
 integrationTest('hypothesis-evidence: a prerequisite line runs from A to B along the nearest sides with the arrowhead at B, and shares the view marker with supports', () => {
-  const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'fact', to: 'hyp' }];
+  // Decision #37: one relation per pair, so the second prerequisite goes to another pair (other -> hyp) instead of stacking on fact/hyp.
+  const relations = [{ kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }];
   const { view } = heFixture({ relations });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
   const pre = kids.filter(k => k.classes.includes('vam-relation-prerequisite'));
   assert.equal(pre.length, 2); assert.ok(pre.every(k => k.classes.includes('vam-relation')));
-  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'the supports line for the same pair is separate');
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-supports')).length, 1, 'the supports line on its own pair is separate');
   const marker = kids.find(k => k.tag === 'defs').children[0].attrs.id;
   assert.equal(kids.filter(k => k.tag === 'defs').length, 1, 'one defs element serves every kind');
   const aToB = pre.find(k => / 140 100$/.test(k.attrs.d));
   assert.ok(aToB, 'other (A) is below fact (B): the line ends on the bottom edge of B'); assert.match(aToB.attrs.d, /^M 140 200 C /, 'and starts on the top edge of A');
   assert.equal(aToB.attrs['marker-end'], `url(#${marker})`, 'the arrowhead is at the end, which is B');
-  const toHyp = pre.find(k => / 500 102$/.test(k.attrs.d)); assert.ok(toHyp, 'second line on the fact/hyp pair: shifted 12px down (R3-2), 90 + 12'); assert.equal(toHyp.attrs['marker-end'], `url(#${marker})`);
+  const toHyp = pre.find(k => / 500 90$/.test(k.attrs.d)); assert.ok(toHyp, 'the second prerequisite is on the other/hyp pair and ends on the left edge of hyp at its middle (90)'); assert.equal(toHyp.attrs['marker-end'], `url(#${marker})`);
   const drag = view.dragEdges('other', view.cardEls.get('other')); drag.update(0, 400);
   assert.match(aToB.attrs.d, /^M 140 400 C /, 'dragging A moves the prerequisite line');
 });
 integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is, and an AIM map or the built-in sample draws no prerequisite', () => {
-  const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'fact' }];
+  const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'prerequisite', from: 'hyp', to: 'fact' }]; // a three-topic cycle: a two-topic one is a same pair (decision #37)
   const { view, logs } = heFixture({ relations });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
-  assert.equal(kids.filter(k => k.classes.includes('vam-relation-prerequisite')).length, 2, 'both halves of the cycle are drawn'); assert.deepEqual(logs, [], 'and nothing is logged or dropped');
-  assert.equal(view.map.topicRelations.length, 2);
+  assert.equal(kids.filter(k => k.classes.includes('vam-relation-prerequisite')).length, 3, 'every link of the cycle is drawn'); assert.deepEqual(logs, [], 'and nothing is logged or dropped');
+  assert.equal(view.map.topicRelations.length, 3);
   view.map.aim = { mode: 'x' };
   assert.equal(heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
   const sample = heFixture({ relations, builtIn: true });
   assert.equal(heDrawn(sample.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
-  const collapsed = heFixture({ relations }); assert.equal(heDrawn(collapsed.view, { fact: [0, 0], hyp: [500, 40] }).filter(k => k.classes.includes('vam-relation-prerequisite')).length, 0, 'an off-screen end is skipped');
+  const collapsed = heFixture({ relations }); assert.equal(heDrawn(collapsed.view, { fact: [0, 0], hyp: [500, 40] }).filter(k => k.classes.includes('vam-relation-prerequisite')).length, 1, 'an off-screen end is skipped: only hyp -> fact has both ends on screen');
 });
 integrationTest('hypothesis-evidence: styles.css gives the prerequisite line its long-short pattern, unlike contradicts, AIM and the solid parent line', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -2896,17 +2800,19 @@ integrationTest('hypothesis-evidence: with no legal target the kind shows a Noti
   assert.equal(fx.notices.length, 2);
 });
 integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A → Name" coming in and "Name — X" for related, with the note, a focusable row and Edit/Remove labels', () => {
-  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'hyp', to: 'fact' }];
-  const { view } = heFixture({ relations });
+  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'extra', to: 'fact' }]; // decision #37: one relation per pair, so the related one comes from a fourth topic
+  const { view } = heFixture({ relations, topics: [node('fact'), node('hyp'), node('other'), node('extra')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}]]) });
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
   const rows = dom.findAll(panel, c => c.tag === 'li');
-  assert.deepEqual(rows.map(r => r.attrs['aria-label']), ['Supports → HYP. measured twice', 'OTHER → Derives from', 'Related — HYP']);
+  assert.deepEqual(rows.map(r => r.attrs['aria-label']), ['Supports → HYP. measured twice', 'OTHER → Derives from', 'Related — EXTRA']);
   assert.ok(rows.every(r => r.tabIndex === 0), 'every row can take focus');
-  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER is derived from this topic', 'This topic is related to HYP'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
+  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER is derived from this topic', 'This topic is related to EXTRA'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
   assert.ok(dom.texts(panel).includes('measured twice'));
-  for (const text of ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']) { assert.ok(dom.byLabel(panel, `Edit relation: ${text}`)); assert.ok(dom.byLabel(panel, `Remove relation: ${text}`)); }
+  for (const text of ['Supports → HYP', 'OTHER → Derives from', 'Related — EXTRA']) { assert.ok(dom.byLabel(panel, `Edit relation: ${text}`)); assert.ok(dom.byLabel(panel, `Remove relation: ${text}`)); }
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
-  assert.deepEqual(dom.findAll(hypPanel, c => c.tag === 'li').map(r => r.attrs['aria-label']), ['FACT → Supports. measured twice', 'Related — FACT'], 'the same links seen from the other end');
+  assert.deepEqual(dom.findAll(hypPanel, c => c.tag === 'li').map(r => r.attrs['aria-label']), ['FACT → Supports. measured twice'], 'the same link seen from the other end');
+  const extraPanel = dom.element('panel'); view.renderHypothesisSection(extraPanel, view.map.nodes[3]);
+  assert.deepEqual(dom.findAll(extraPanel, c => c.tag === 'li').map(r => r.attrs['aria-label']), ['Related — FACT'], 'a related link reads the same from either end');
 });
 integrationTest('hypothesis-evidence: the panel "Edit" opens the editor for that row, and clicking a semantic line selects it and opens the editor, while the press alone opens nothing', () => {
   const { view, modals, evHit } = heLines();
@@ -3018,10 +2924,10 @@ const heGeo = () => load('experiences/visual-map/relation-geometry.ts', {}, {});
 const heBox = (x, y, width = 280, height = 100) => ({ x, y, width, height });
 const heNums = d => d.match(/-?\d+(\.\d+)?/g).map(Number);
 const heKinds = ['supports', 'contradicts', 'verifies', 'derives_from', 'related', 'prerequisite'];
-const heSixRel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'other' }, { kind: 'verifies', from: 'other', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'other' }, { kind: 'related', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }];
+const heSixRel = [{ kind: 'supports', from: 'fact', to: 'hyp' }, { kind: 'contradicts', from: 'hyp', to: 'other' }, { kind: 'verifies', from: 'other', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'extra' }, { kind: 'related', from: 'hyp', to: 'extra' }, { kind: 'prerequisite', from: 'other', to: 'extra' }]; // decision #37: six kinds on six different pairs (K4)
 const heSix = (options = {}) => {
-  const fx = heFixture({ relations: options.relations ?? heSixRel, shared: options.shared });
-  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300] });
+  const fx = heFixture({ relations: options.relations ?? heSixRel, shared: options.shared, topics: [node('fact'), node('hyp'), node('other'), node('extra')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}]]) });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300], extra: [500, 300] });
   return { ...fx, kids, line: kind => kids.find(k => k.classes.includes(`vam-relation-${kind}`)), labels: kids.filter(k => k.classes.includes('vam-relation-label')), hits: kids.filter(k => k.classes.includes('vam-relation-hit')) };
 };
 integrationTest('hypothesis-evidence: cards stacked one above the other are joined bottom edge to top edge, and side by side left edge to right edge', () => {
@@ -3091,7 +2997,7 @@ integrationTest('hypothesis-evidence: the labels show each kind name by default;
   assert.deepEqual(labels[0].children.map(c => [c.tag, c.textContent]), [['tspan', 'Supports: FACT → HYP'], ['tspan', 'because it was measured']]);
   assert.equal(labels[0].children[1].attrs.dy, '1.3em', 'the note is the second line'); assert.equal(labels[0].children[1].attrs.x, labels[0].attrs.x);
   hits[4].fire('pointerdown', { stopPropagation() {} });
-  assert.equal(labels[4].children[0].textContent, 'Related: HYP — FACT'); assert.equal(labels[4].children.length, 1, 'no note, no second line');
+  assert.equal(labels[4].children[0].textContent, 'Related: HYP — EXTRA'); assert.equal(labels[4].children.length, 1, 'no note, no second line');
   assert.equal(labels[0].textContent, 'Supports', 'the previously selected label folds back'); assert.equal(view.selectedRelation, heKey(rel[4]));
 });
 integrationTest('hypothesis-evidence: a long note is cut to 60 characters with an ellipsis, and markup in a note stays text (tspan textContent only, no element is built from it)', () => {
@@ -3126,8 +3032,8 @@ integrationTest('hypothesis-evidence: dragging a card moves the line, its gap li
   assert.ok(labels[0].children.every(c => c.attrs.x === labels[0].attrs.x), 'both tspans follow the label');
 });
 integrationTest('hypothesis-evidence: a press on any of the six lines stops here (no pan, no marquee); the parent-child edge keeps its DOM, class and no handlers', () => {
-  const fx = heFixture({ relations: heSixRel, topics: [node('fact'), node('hyp', 'fact'), node('other')] });
-  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300] });
+  const fx = heFixture({ relations: heSixRel, topics: [node('fact'), node('hyp', 'fact'), node('other'), node('extra')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}]]) });
+  const kids = heDrawn(fx.view, { fact: [0, 0], hyp: [500, 40], other: [0, 300], extra: [500, 300] });
   const hits = kids.filter(k => k.classes.includes('vam-relation-hit')); assert.equal(hits.length, 6);
   for (const hit of hits) { let stopped = 0; hit.fire('pointerdown', { stopPropagation() { stopped++; } }); assert.equal(stopped, 1); }
   const edge = fx.view.edgeEls.get('fact\u0000hyp'); assert.ok(edge, 'the parent-child edge is drawn');
@@ -3141,7 +3047,7 @@ integrationTest('hypothesis-evidence: selecting a topic adds no fade class to an
   const lines = kids.filter(k => k.classes.includes('vam-relation'));
   assert.equal(lines.length, 6);
   const related = lines.filter(l => l.classes.includes('is-related')).length, dimmed = lines.filter(l => l.classes.includes('is-dimmed')).length;
-  assert.equal(related, 4, 'four of the six touch fact'); assert.equal(dimmed, 2);
+  assert.equal(related, 3, 'three of the six touch fact (one relation per pair: fact-hyp, fact-other, fact-extra)'); assert.equal(dimmed, 3);
 });
 integrationTest('hypothesis-evidence: the end cards of a selected line outline themselves on the shape for the four shaped types, and the rectangle outline stays for the rest', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -3276,15 +3182,15 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
 integrationTest('hypothesis-evidence: relation rows read "A relation B" with this topic named, show the line sample, a muted note line and two icon buttons that keep the old labels; none shows a muted line (C6)', async () => {
-  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'hyp', to: 'fact' }, { kind: 'contradicts', from: 'fact', to: 'other' }];
-  const { view } = heFixture({ relations });
+  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'extra', to: 'fact' }, { kind: 'contradicts', from: 'fact', to: 'more' }];
+  const { view } = heFixture({ relations, topics: [node('fact'), node('hyp'), node('other'), node('extra'), node('more')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}], ['more', {}]]) }); // decision #37: one relation per pair
   view.enqueue = work => work();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
   const rows = dom.findAll(panel, c => c.tag === 'li');
-  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER is derived from this topic', 'This topic is related to HYP', 'This topic contradicts OTHER']);
-  const more = heFixture({ relations: [{ kind: 'verifies', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'hyp' }] });
+  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER is derived from this topic', 'This topic is related to EXTRA', 'This topic contradicts MORE']);
+  const more = heFixture({ relations: [{ kind: 'verifies', from: 'hyp', to: 'fact' }, { kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'extra', to: 'fact' }, { kind: 'derives_from', from: 'fact', to: 'more' }], topics: [node('fact'), node('hyp'), node('other'), node('extra'), node('more')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}], ['extra', {}], ['more', {}]]) });
   const morePanel = dom.element('panel'); more.view.renderHypothesisSection(morePanel, more.view.map.nodes[0]);
-  assert.deepEqual(dom.findAll(morePanel, c => (c.cls ?? '').includes('vam-relation-sentence')).map(c => c.text), ['HYP verifies this topic', 'This topic is a prerequisite for OTHER', 'OTHER is a prerequisite for this topic', 'This topic is derived from HYP'], 'one sentence per kind, A = from, B = to');
+  assert.deepEqual(dom.findAll(morePanel, c => (c.cls ?? '').includes('vam-relation-sentence')).map(c => c.text), ['HYP verifies this topic', 'This topic is a prerequisite for OTHER', 'EXTRA is a prerequisite for this topic', 'This topic is derived from MORE'], 'one sentence per kind, A = from, B = to');
   const zh = load('i18n.ts').translate;
   assert.deepEqual([['derives_from', 'A', 'B', 'A 由 B 推導而來'], ['prerequisite', 'A', 'B', 'A 是 B 的前置知識'], ['supports', 'A', 'B', 'A 支持 B'], ['contradicts', 'A', 'B', 'A 反駁 B'], ['verifies', 'A', 'B', 'A 驗證 B']].map(([k, a, b]) => zh('zh-TW', `ui.relation_sentence_${k}_0_1`, a, b)), ['A 由 B 推導而來', 'A 是 B 的前置知識', 'A 支持 B', 'A 反駁 B', 'A 驗證 B']);
   assert.equal(zh('zh-CN', 'ui.relation_sentence_prerequisite_0_1', 'A', 'B'), 'A 是 B 的前置知识'); assert.equal(zh('zh-CN', 'ui.relation_sentence_derives_from_0_1', 'A', 'B'), 'A 由 B 推导而来');
@@ -3342,4 +3248,35 @@ integrationTest('hypothesis-evidence: every P20 dialog rule is invisible to the 
   const without = parseCss(css).filter(chunk => !mine.test(chunk.prelude)).map(chunk => chunk.text).join('\n');
   assert.equal(extractViewerRules(without).map(item => item.text).join('\n'), viewer, 'byte-identical viewer rules');
   assert.doesNotMatch(viewer, /vam-topic-modal|vam-type-swatch|vam-relation-swatch|vam-section-heading/);
+});
+// ---- hypothesis-evidence (V1.7 P23): merge notice for relations dropped on the same pair (decision #37) ----
+const heMergeNotices = (relations, mergeIds, target) => {
+  const fx = heFixture({ topics: [node('f1'), node('f2'), node('x'), node('hyp')], relations });
+  const result = core.retargetTopicRelations(fx.doc, mergeIds, target);
+  fx.view.takeRetargetDrops(result);
+  fx.view.noticeDroppedCycles();
+  return { ...fx, result };
+};
+integrationTest('hypothesis-evidence: a merge that drops same-pair relations shows the count in a Notice, alone and next to the cycle notice (decision #37)', () => {
+  const same = heMergeNotices([{ kind: 'supports', from: 'f1', to: 'x' }, { kind: 'related', from: 'f2', to: 'x' }, { kind: 'contradicts', from: 'x', to: 'hyp' }], ['f1', 'f2'], 'f1');
+  assert.deepEqual(plain(same.result), { droppedCycles: 0, droppedSamePair: 1 });
+  assert.equal(same.view.droppedSamePairOfLastMerge(), 1);
+  assert.deepEqual(same.notices, ['Removed 1 duplicate relation(s) (only one relation is kept for each pair of topics)'], 'the same-pair sentence alone');
+  const two = heMergeNotices([{ kind: 'supports', from: 'f1', to: 'x' }, { kind: 'supports', from: 'f2', to: 'x' }, { kind: 'related', from: 'x', to: 'f1' }, { kind: 'verifies', from: 'f2', to: 'hyp' }], ['f1', 'f2'], 'f1');
+  assert.equal(two.view.droppedSamePairOfLastMerge(), 2);
+  assert.deepEqual(two.notices, ['Removed 2 duplicate relation(s) (only one relation is kept for each pair of topics)']);
+  const both = heMergeNotices([{ kind: 'prerequisite', from: 'f1', to: 'x' }, { kind: 'prerequisite', from: 'x', to: 'hyp' }, { kind: 'prerequisite', from: 'hyp', to: 'f2' }, { kind: 'supports', from: 'f1', to: 'hyp' }], ['f1', 'f2'], 'f1');
+  assert.deepEqual(plain(both.result), { droppedCycles: 1, droppedSamePair: 1 });
+  assert.deepEqual(both.notices, ['Removed 1 duplicate relation(s) (only one relation is kept for each pair of topics)', 'Removed 1 derives-from or prerequisite link(s) that would form a cycle'], 'both sentences show when both happened');
+  const cycleOnly = heMergeNotices([{ kind: 'prerequisite', from: 'f1', to: 'x' }, { kind: 'prerequisite', from: 'x', to: 'hyp' }, { kind: 'prerequisite', from: 'hyp', to: 'f2' }], ['f1', 'f2'], 'f1');
+  assert.deepEqual(cycleOnly.notices, ['Removed 1 derives-from or prerequisite link(s) that would form a cycle'], 'the cycle notice alone is unchanged');
+  const none = heMergeNotices([{ kind: 'supports', from: 'f1', to: 'x' }], ['f1', 'f2'], 'f1');
+  assert.deepEqual(none.notices, [], 'nothing dropped: no Notice');
+});
+integrationTest('hypothesis-evidence: every merge path hands the retarget result to the notice, and the same-pair sentence exists in all three languages (decision #37)', () => {
+  const view = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.equal((view.match(/this\.takeRetargetDrops\(retargetTopicRelations\(/g) ?? []).length, 3, 'merge, merge into a target and remove-with-adopter all record both counts');
+  assert.doesNotMatch(view, /lastDroppedCycles = retargetTopicRelations/);
+  const texts = { en: 'Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)', 'zh-TW': '已移除 {0} 條重複的關係（同一對議題只保留一條）', 'zh-CN': '已移除 {0} 条重复的关系（同一对议题只保留一条）' };
+  for (const [lang, text] of Object.entries(texts)) assert.equal(load('i18n.ts').translate(lang, 'ui.merge_dropped_same_pair_0', '3'), text.replace('{0}', '3'), lang);
 });

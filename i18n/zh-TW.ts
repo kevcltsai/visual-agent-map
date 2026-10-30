@@ -520,6 +520,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.relation_delete": "刪除關係",
   "ui.relation_gone": "這個關係已不存在。",
   "ui.merge_dropped_cycles_0": "已移除 {0} 條會形成環的推導或前置知識",
+  "ui.merge_dropped_same_pair_0": "已移除 {0} 條重複的關係（同一對議題只保留一條）",
   "ui.relation_label_full_0_1_2": "{0}：{1} → {2}",
   "ui.relation_label_full_related_0_1_2": "{0}：{1} — {2}",
   "ui.collapse_levels": "收合或展開整張心智圖",

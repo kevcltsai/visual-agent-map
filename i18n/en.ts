@@ -570,6 +570,8 @@ export const en = {
   "ui.relation_delete": "Delete relation",
   "ui.relation_gone": "This relation no longer exists.",
   "ui.merge_dropped_cycles_0": "Removed {0} derives-from or prerequisite link(s) that would form a cycle",
+  "ui.merge_dropped_same_pair_0":
+    "Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)",
   "ui.relation_label_full_0_1_2": "{0}: {1} → {2}",
   "ui.relation_label_full_related_0_1_2": "{0}: {1} — {2}",
   "ui.collapse_levels": "Collapse or expand the whole map",

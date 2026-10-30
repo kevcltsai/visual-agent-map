@@ -520,6 +520,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.relation_delete": "删除关系",
   "ui.relation_gone": "这个关系已不存在。",
   "ui.merge_dropped_cycles_0": "已移除 {0} 条会形成环的推导或前置知识",
+  "ui.merge_dropped_same_pair_0": "已移除 {0} 条重复的关系（同一对议题只保留一条）",
   "ui.relation_label_full_0_1_2": "{0}：{1} → {2}",
   "ui.relation_label_full_related_0_1_2": "{0}：{1} — {2}",
   "ui.collapse_levels": "收合或展开整张心智图",

@@ -603,6 +603,7 @@ var en = {
   "ui.relation_delete": "Delete relation",
   "ui.relation_gone": "This relation no longer exists.",
   "ui.merge_dropped_cycles_0": "Removed {0} derives-from or prerequisite link(s) that would form a cycle",
+  "ui.merge_dropped_same_pair_0": "Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)",
   "ui.relation_label_full_0_1_2": "{0}: {1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}: {1} \u2014 {2}",
   "ui.collapse_levels": "Collapse or expand the whole map",
@@ -2628,6 +2629,7 @@ var zhCN = {
   "ui.relation_delete": "\u5220\u9664\u5173\u7CFB",
   "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u63A8\u5BFC\u6216\u524D\u7F6E\u77E5\u8BC6",
+  "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u6761\u91CD\u590D\u7684\u5173\u7CFB\uFF08\u540C\u4E00\u5BF9\u8BAE\u9898\u53EA\u4FDD\u7559\u4E00\u6761\uFF09",
   "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u5F00\u6574\u5F20\u5FC3\u667A\u56FE",
@@ -4653,6 +4655,7 @@ var zhTW = {
   "ui.relation_delete": "\u522A\u9664\u95DC\u4FC2",
   "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u63A8\u5C0E\u6216\u524D\u7F6E\u77E5\u8B58",
+  "ui.merge_dropped_same_pair_0": "\u5DF2\u79FB\u9664 {0} \u689D\u91CD\u8907\u7684\u95DC\u4FC2\uFF08\u540C\u4E00\u5C0D\u8B70\u984C\u53EA\u4FDD\u7559\u4E00\u689D\uFF09",
   "ui.relation_label_full_0_1_2": "{0}\uFF1A{1} \u2192 {2}",
   "ui.relation_label_full_related_0_1_2": "{0}\uFF1A{1} \u2014 {2}",
   "ui.collapse_levels": "\u6536\u5408\u6216\u5C55\u958B\u6574\u5F35\u5FC3\u667A\u5716",
@@ -17228,46 +17231,22 @@ function nearestSides(a, b) {
   };
 }
 var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
-var RELATION_OFFSET_STEP = 12;
-function curveOf(a, b, offset = 0) {
+function curveOf(a, b) {
   const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
-  let nx = from.nx, ny = from.ny;
-  if (!nx && !ny) {
-    nx = to.x - from.x;
-    ny = to.y - from.y;
-    const size = Math.hypot(nx, ny) || 1;
-    nx /= size;
-    ny /= size;
-  }
-  const sx = offset ? -ny * offset : 0, sy = offset ? nx * offset : 0;
   return {
-    p1: { x: from.x + sx, y: from.y + sy },
-    c1: { x: from.x + from.nx * length + sx, y: from.y + from.ny * length + sy },
-    c2: { x: to.x + to.nx * length + sx, y: to.y + to.ny * length + sy },
-    p2: { x: to.x + sx, y: to.y + sy },
-    along: { x: nx, y: ny }
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
   };
 }
-function relationPathData(a, b, offset = 0) {
-  const { p1, c1, c2, p2 } = curveOf(a, b, offset);
+function relationPathData(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
   return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
 }
-var RELATION_LABEL_LANE = 16;
-function relationLabelPoint(a, b, offset = 0) {
-  const { p1, c1, c2, p2, along } = curveOf(a, b, 0), mid = { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
-  if (!offset) return mid;
-  const horizontal = Math.abs(along.x) >= Math.abs(along.y), sx = -along.y * offset, sy = along.x * offset, lane = Math.sign(horizontal ? sy : sx) * Math.abs(offset) / RELATION_OFFSET_STEP;
-  return { x: horizontal ? mid.x : mid.x + sx, y: mid.y + lane * RELATION_LABEL_LANE };
-}
-function relationOffsets(relations) {
-  const seen = /* @__PURE__ */ new Map();
-  return relations.map(({ from, to }) => {
-    var _a2;
-    const forward = from <= to, key2 = forward ? `${from}\0${to}` : `${to}\0${from}`, index = (_a2 = seen.get(key2)) != null ? _a2 : 0;
-    seen.set(key2, index + 1);
-    const step = Math.ceil(index / 2) * RELATION_OFFSET_STEP, signed = index % 2 === 1 ? step : -step;
-    return signed * (forward ? 1 : -1) || 0;
-  });
+function relationLabelPoint(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
 
 // experiences/visual-map/topic-kind-shape.ts
@@ -36926,6 +36905,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "map", null);
     /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
     __publicField(this, "lastDroppedCycles", 0);
+    /** Relations the last merge dropped because the merged topic already had one with the same other topic (one relation per pair, decision 37). */
+    __publicField(this, "lastDroppedSamePair", 0);
     __publicField(this, "path", "");
     __publicField(this, "notes", /* @__PURE__ */ new Map());
     /** Learning goal from the map file's frontmatter; shown only on mind maps (never AIM) and absent when not graded. */
@@ -37041,8 +37022,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     __publicField(this, "relationLabelEls", /* @__PURE__ */ new Map());
     /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
     __publicField(this, "relationGapEls", /* @__PURE__ */ new Map());
-    /** Sideways shift of each line from the others on the same pair of topics (see `relationOffsets`). */
-    __publicField(this, "relationOffsetBy", /* @__PURE__ */ new Map());
     __publicField(this, "relationData", /* @__PURE__ */ new Map());
     /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
     __publicField(this, "relationPainted", /* @__PURE__ */ new Set());
@@ -37128,6 +37107,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
       (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, void 0, void 0, onWebSearchEvent)
     );
     this.aimRecovery.addDiagrams = (request) => plugin.addAimDiagrams(request);
+  }
+  /** How many same-pair relations the latest merge dropped (0 when none). */
+  droppedSamePairOfLastMerge() {
+    return this.lastDroppedSamePair;
   }
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
@@ -40376,7 +40359,7 @@ ${request.requirements}` : preset.text,
           map,
           [...ids].filter((id) => id !== node.id)
         );
-        this.lastDroppedCycles = retargetTopicRelations(map, [node.id], adopterId).droppedCycles;
+        this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
       } else removeTopicRelationsFor(map, ids);
       if (adopterId && adopted.size) {
         const adopter = map.nodes.find((item) => item.id === adopterId);
@@ -40804,7 +40787,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
-        this.lastDroppedCycles = retargetTopicRelations(map, ids, merged.id).droppedCycles;
+        this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
         if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -40878,7 +40861,7 @@ ${request.requirements}` : preset.text,
             for (const id of descendants(map.nodes, item.id)) adopted.add(id);
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
-        this.lastDroppedCycles = retargetTopicRelations(map, ids, target.id).droppedCycles;
+        this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
         if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -40892,8 +40875,14 @@ ${request.requirements}` : preset.text,
     this.multiSelected.clear();
     await this.finishMerge(target.id);
   }
-  /** Tells the user how many derives-from and prerequisite links the last merge removed because they would have formed a cycle. */
+  /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
+  takeRetargetDrops(result) {
+    this.lastDroppedCycles = result.droppedCycles;
+    this.lastDroppedSamePair = result.droppedSamePair;
+  }
+  /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
   noticeDroppedCycles() {
+    if (this.lastDroppedSamePair > 0) new import_obsidian30.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
     if (this.lastDroppedCycles > 0) new import_obsidian30.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
@@ -47985,15 +47974,15 @@ ${addition}` : addition });
     }
     return {
       update: (x, y) => {
-        var _a2, _b2, _c;
+        var _a2, _b2;
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
-          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, offset = (_a2 = this.relationOffsetBy.get(link.key)) != null ? _a2 : 0, d = relationPathData(from, to, offset);
+          const mine = { x, y, ...size }, from = link.dragIsFrom ? mine : link.far, to = link.dragIsFrom ? link.far : mine, d = relationPathData(from, to);
           path.setAttribute("d", d);
-          (_b2 = this.relationHitEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
-          (_c = this.relationGapEls.get(link.key)) == null ? void 0 : _c.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationLabelPoint(from, to, offset));
+          (_a2 = this.relationHitEls.get(link.key)) == null ? void 0 : _a2.setAttribute("d", d);
+          (_b2 = this.relationGapEls.get(link.key)) == null ? void 0 : _b2.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
         }
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
@@ -48054,12 +48043,11 @@ ${addition}` : addition });
    * draws none, and its file keeps the key.
    */
   drawRelations() {
-    var _a2, _b2, _c;
+    var _a2;
     this.relationEls.clear();
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
     this.relationGapEls.clear();
-    this.relationOffsetBy.clear();
     this.relationData.clear();
     this.relationLabelAt.clear();
     this.relationPainted.clear();
@@ -48072,14 +48060,12 @@ ${addition}` : addition });
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
-    const offsets = relationOffsets(links.map((link) => link.relation));
-    links.forEach((link, index) => this.relationOffsetBy.set(link.key, offsets[index]));
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to), (_b2 = this.relationOffsetBy.get(link.key)) != null ? _b2 : 0), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
+      const d = relationPathData(boxOf(link.from), boxOf(link.to)), marker5 = link.kind === "related" ? null : `url(#${link.kind === "contradicts" ? this.relationBarMarkerId : this.relationMarkerId})`;
       const path = createSvg("path");
       path.setAttribute("d", d);
       if (marker5) path.setAttribute("marker-end", marker5);
@@ -48127,10 +48113,7 @@ ${addition}` : addition });
       label.addClass("vam-relation-label");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(
-        link.key,
-        relationLabelPoint(boxOf(link.from), boxOf(link.to), (_c = this.relationOffsetBy.get(link.key)) != null ? _c : 0)
-      );
+      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
     }
     if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;

@@ -17,7 +17,7 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import { relationLabelPoint, relationOffsets, relationPathData, type RelationBox } from "./relation-geometry";
+import { relationLabelPoint, relationPathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -590,6 +590,12 @@ export class VisualAgentMapView extends ItemView {
   private map: MapDocument | null = null;
   /** Prerequisite links the last merge or merge-style removal dropped because they would have closed a cycle (read by the notice that reports it). */
   private lastDroppedCycles = 0;
+  /** Relations the last merge dropped because the merged topic already had one with the same other topic (one relation per pair, decision 37). */
+  private lastDroppedSamePair = 0;
+  /** How many same-pair relations the latest merge dropped (0 when none). */
+  droppedSamePairOfLastMerge(): number {
+    return this.lastDroppedSamePair;
+  }
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge(): number {
     return this.lastDroppedCycles;
@@ -764,8 +770,6 @@ export class VisualAgentMapView extends ItemView {
   private relationLabelEls = new Map<string, SVGTextElement>();
   /** The canvas-coloured inner line of a "derives from" double line, per relation key; it moves with the outer line. */
   private relationGapEls = new Map<string, SVGPathElement>();
-  /** Sideways shift of each line from the others on the same pair of topics (see `relationOffsets`). */
-  private relationOffsetBy = new Map<string, number>();
   private relationData = new Map<string, TopicRelation>();
   /** Labels whose text was written since the last redraw, and which of them show the expanded text. */
   private relationPainted = new Set<string>();
@@ -4310,7 +4314,7 @@ export class VisualAgentMapView extends ItemView {
             map,
             [...ids].filter(id => id !== node.id)
           );
-          this.lastDroppedCycles = retargetTopicRelations(map, [node.id], adopterId).droppedCycles;
+          this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
         } else removeTopicRelationsFor(map, ids);
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
@@ -4796,7 +4800,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
-          this.lastDroppedCycles = retargetTopicRelations(map, ids, merged.id).droppedCycles;
+          this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
           if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -4897,7 +4901,7 @@ export class VisualAgentMapView extends ItemView {
               for (const id of descendants(map.nodes, item.id)) adopted.add(id);
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
-          this.lastDroppedCycles = retargetTopicRelations(map, ids, target.id).droppedCycles;
+          this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
           if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
         })
         .commit({ label: t("ui.merge_topics_history") });
@@ -4912,8 +4916,14 @@ export class VisualAgentMapView extends ItemView {
     this.multiSelected.clear();
     await this.finishMerge(target.id);
   }
-  /** Tells the user how many derives-from and prerequisite links the last merge removed because they would have formed a cycle. */
+  /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
+  private takeRetargetDrops(result: { droppedCycles: number; droppedSamePair: number }): void {
+    this.lastDroppedCycles = result.droppedCycles;
+    this.lastDroppedSamePair = result.droppedSamePair;
+  }
+  /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
   private noticeDroppedCycles(): void {
+    if (this.lastDroppedSamePair > 0) new Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
     if (this.lastDroppedCycles > 0) new Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
@@ -12621,12 +12631,11 @@ export class VisualAgentMapView extends ItemView {
           const mine = { x, y, ...size },
             from = link.dragIsFrom ? mine : link.far,
             to = link.dragIsFrom ? link.far : mine,
-            offset = this.relationOffsetBy.get(link.key) ?? 0,
-            d = relationPathData(from, to, offset);
+            d = relationPathData(from, to);
           path.setAttribute("d", d);
           this.relationHitEls.get(link.key)?.setAttribute("d", d);
           this.relationGapEls.get(link.key)?.setAttribute("d", d);
-          this.placeRelationLabel(link.key, relationLabelPoint(from, to, offset));
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
         }
         for (const edge of touching) {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
@@ -12693,7 +12702,6 @@ export class VisualAgentMapView extends ItemView {
     this.relationHitEls.clear();
     this.relationLabelEls.clear();
     this.relationGapEls.clear();
-    this.relationOffsetBy.clear();
     this.relationData.clear();
     this.relationLabelAt.clear();
     this.relationPainted.clear();
@@ -12713,14 +12721,12 @@ export class VisualAgentMapView extends ItemView {
       links.push({ from, to, key: relationIdentity(relation), kind: relation.kind, relation });
     }
     if (!links.length) return;
-    const offsets = relationOffsets(links.map(link => link.relation));
-    links.forEach((link, index) => this.relationOffsetBy.set(link.key, offsets[index]));
     const defs = createSvg("defs");
     defs.appendChild(this.relationMarker(this.relationMarkerId, false));
     defs.appendChild(this.relationMarker(this.relationBarMarkerId, true));
     this.edgesEl.appendChild(defs);
     for (const link of links) {
-      const d = relationPathData(boxOf(link.from), boxOf(link.to), this.relationOffsetBy.get(link.key) ?? 0),
+      const d = relationPathData(boxOf(link.from), boxOf(link.to)),
         marker =
           link.kind === "related"
             ? null
@@ -12776,10 +12782,7 @@ export class VisualAgentMapView extends ItemView {
       label.addClass("vam-relation-label");
       this.edgesEl.appendChild(label);
       this.relationLabelEls.set(link.key, label);
-      this.placeRelationLabel(
-        link.key,
-        relationLabelPoint(boxOf(link.from), boxOf(link.to), this.relationOffsetBy.get(link.key) ?? 0)
-      );
+      this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
     if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;

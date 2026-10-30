@@ -2229,6 +2229,24 @@ integrationTest('B1 plan: Apply on a plan whose map is no longer the open one wr
   assert.equal(card.state, 'cancelled'); assert.equal(h.control.mutates, 0); assert.equal(vaultState(h), before);
   assert.match(chat.transcript().at(-1).lines[0].text, /map was changed or closed/);
 });
+integrationTest('hypothesis-evidence: delete_topic from the map chat removes the evidence and prerequisite links of the removed cards (branch false and true); other links stay', async () => {
+  for (const branch of [false, true]) {
+    const h = await harness();
+    const keep = { kind: 'prerequisite', from: h.ids.root, to: h.ids.b };
+    h.view.map.topicRelations = [
+      { kind: 'evidence', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }, { kind: 'evidence', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.a }, keep
+    ];
+    await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
+    const lines = await apply(h, [{ kind: 'delete_topic', nodeId: h.ids.a, branch }]);
+    eq(lines.map(l => l.status), ['done'], `branch ${branch}: ${JSON.stringify(lines)}`);
+    const saved = await h.repo.readMap(MAP);
+    assert.equal(saved.nodes.some(n => n.id === h.ids.a), false, `branch ${branch}: the card is gone`);
+    assert.equal(saved.nodes.some(n => n.id === h.ids.c), !branch, `branch ${branch}: the subtopic goes only with the branch`);
+    const expected = branch ? [keep] : [{ kind: 'evidence', from: h.ids.c, to: h.ids.b }, keep];
+    eq(saved.topicRelations, expected, `branch ${branch}: links touching a removed card are gone, the others stay`);
+    assert.equal(h.view.history.undoEntry, undefined, `branch ${branch}: a chat write leaves no undo entry (nothing to undo)`);
+  }
+});
 integrationTest('B1 plan: exactly 15 actions are applied at once, with no plan card', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.control.reply = async () => ({ reply: 'adding', actions: Array.from({ length: 15 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] });
@@ -3749,6 +3767,19 @@ test('hypothesis-evidence: edit_md_file cannot add topic-kind, change hypothesis
   eq(heEdit(hypothesis, hypothesis.replace('topic-kind: hypothesis\n', 'topic-kind: hypothesis\ntopic-kind: hypothesis\n')), refused, 'a duplicated key');
   eq(heEdit('---\ntitle: P\n---\nText\n', '---\ntitle: P\ntopic-kind: hypothesis\n---\nText\n', 'Notes/p.md'), refused, 'an ordinary note cannot get the key either');
   eq(heEdit(hypothesis, hypothesis.replace('Body', 'Changed body')), { ok: true }, 'body edits on a hypothesis note are still allowed');
+});
+test('hypothesis-evidence: quoted hypothesis keys are guarded like bare ones', () => {
+  const refused = { ok: false, code: 'hypothesis_frontmatter_changed' };
+  const plainNote = heNote(''), hypothesis = heNote('topic-kind: hypothesis\nhypothesis-strength: weak\n');
+  eq(heEdit(plainNote, heNote('"topic-kind": hypothesis\n')), refused, 'add a double-quoted topic-kind');
+  eq(heEdit(plainNote, heNote("'topic-kind': hypothesis\n")), refused, 'add a single-quoted topic-kind');
+  eq(heEdit(plainNote, heNote('"hypothesis-strength": strong\n')), refused, 'add a double-quoted strength');
+  eq(heEdit(plainNote, heNote("'hypothesis-strength': strong\n")), refused, 'add a single-quoted strength');
+  const quoted = heNote('"topic-kind": hypothesis\n\'hypothesis-strength\': weak\n');
+  eq(heEdit(quoted, quoted.replace('weak', 'strong')), refused, 'change the value under a single-quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('topic-kind: hypothesis', '"topic-kind": note')), refused, 'change the kind through a quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('hypothesis-strength: weak', "'hypothesis-strength': strong")), refused, 'change the strength through a quoted key');
+  eq(heEdit(hypothesis, hypothesis.replace('topic-kind: hypothesis', '"topic-kind": hypothesis')), { ok: true }, 'quoting a key without changing its value is not a change');
 });
 test('hypothesis-evidence: writing the map file is still refused with map_file', () => {
   const mapText = '```agent-map\n{"id":"m","title":"T","version":1,"nodes":[],"viewport":{"x":0,"y":0,"zoom":1}}\n```\n';

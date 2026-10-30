@@ -160,6 +160,12 @@
 .vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }
 .vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }
 .vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }
+/* Hypothesis frame: 2px in every research status (a solid line, dashed only for a skippable one). Placed after the status rules and written with the attribute first so the share viewer does not pick it up (scripts/viewer-css.mjs). Colour follows running / error / selected; idea and queued keep the muted frame (>= 3:1) instead of the pale dashed idea frame. */
+[data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]) { border-width: 2px; border-style: solid; border-color: var(--text-muted); }
+[data-topic-kind="hypothesis"][data-relevance="side"].vam-node:not([data-aim-kind]) { border-style: dashed; }
+[data-topic-kind="hypothesis"].vam-node[data-status="running"]:not([data-aim-kind]) { border-color: var(--interactive-accent); }
+[data-topic-kind="hypothesis"].vam-node[data-status="error"]:not([data-aim-kind]) { border-color: var(--color-red); }
+[data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]) { border-color: var(--interactive-accent); }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @property --vam-orbit { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes vam-orbit { to { --vam-orbit: 360deg; } }

@@ -80,9 +80,11 @@ function hypothesisLines(block: string | null): string[] {
   if (block === null) return [];
   const found: string[] = [];
   for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (match && HYPOTHESIS_KEYS.includes(match[1]))
-      found.push(`${match[1]}=${match[2].replace(/^(["'])(.*)\1$/, "$2")}`);
+    // A key may be wrapped in single or double quotes (`"topic-kind": hypothesis`); YAML reads it as the same key.
+    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+    const key = match ? (match[1] ?? match[2] ?? match[3]) : undefined;
+    if (match && key !== undefined && HYPOTHESIS_KEYS.includes(key))
+      found.push(`${key}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
   }
   return found;
 }

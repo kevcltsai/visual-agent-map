@@ -7697,7 +7697,7 @@ export class VisualAgentMapView extends ItemView {
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
     // Optional call: a test double for the view may not carry the hypothesis section.
-    if (note) this.renderHypothesisSection?.(panel, node, close);
+    if (note) this.renderHypothesisSection(panel, node, close);
     // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -7938,7 +7938,7 @@ export class VisualAgentMapView extends ItemView {
     }, false);
   }
   /** Opens the picker for the prerequisite (A) of `node` (B); with no legal source it only says so. */
-  private choosePrerequisiteSource(node: MapNode): void {
+  private choosePrerequisiteSource(node: MapNode, onAdded?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
     const legal = new Set(legalPrerequisiteSources(this.map, node.id));
     if (!legal.size) {
@@ -7952,11 +7952,15 @@ export class VisualAgentMapView extends ItemView {
       this.map.nodes,
       target => this.notes.get(target.id)?.title ?? target.path,
       target => legal.has(target.id),
-      target => this.enqueue(() => this.addPrerequisite(target.id, node.id))
+      target =>
+        this.enqueue(async () => {
+          await this.addPrerequisite(target.id, node.id);
+          onAdded?.();
+        })
     ).open();
   }
   /** Opens the hypothesis picker for `node`; with no legal hypothesis it only says so. */
-  private chooseEvidenceTarget(node: MapNode): void {
+  private chooseEvidenceTarget(node: MapNode, onAdded?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
     const legal = new Set(legalEvidenceTargets(this.map, node.id, id => this.isHypothesis(id)));
     if (!legal.size) {
@@ -7970,7 +7974,11 @@ export class VisualAgentMapView extends ItemView {
       this.map.nodes,
       target => this.notes.get(target.id)?.title ?? target.path,
       target => legal.has(target.id),
-      target => this.enqueue(() => this.addEvidence(node.id, target.id))
+      target =>
+        this.enqueue(async () => {
+          await this.addEvidence(node.id, target.id);
+          onAdded?.();
+        })
     ).open();
   }
   /** "Add sub-hypothesis", and for a hypothesis its strength and the facts that point at it; for another topic the hypotheses it is evidence for. */
@@ -7984,7 +7992,7 @@ export class VisualAgentMapView extends ItemView {
     const isHypothesis = this.isHypothesis(node.id);
     const body = section.createDiv("vam-hypothesis-body");
     const titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
-    const paint = (): void => {
+    const paint = (focusStrength = false): void => {
       body.empty();
       if (isHypothesis) {
         const current = this.notes.get(node.id)?.hypothesisStrength ?? "weak";
@@ -7997,11 +8005,15 @@ export class VisualAgentMapView extends ItemView {
             if (option === current) return;
             this.enqueue(async () => {
               await this.changeHypothesisStrength(node, option);
-              paint();
+              paint(true);
             });
           });
           choice.setAttr("aria-pressed", String(option === current));
-          if (option === current) choice.addClass("mod-cta");
+          if (option === current) {
+            choice.addClass("mod-cta");
+            // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
+            if (focusStrength) choice.focus();
+          }
         }
       }
       const links = (this.map?.topicRelations ?? []).filter(r =>
@@ -8028,7 +8040,7 @@ export class VisualAgentMapView extends ItemView {
           remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
         }
       }
-      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node));
+      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
       // Prerequisites: any topic or hypothesis can be either end; each row can be removed from both ends.
       const prerequisites = (this.map?.topicRelations ?? []).filter(r => r.kind === "prerequisite");
       for (const [heading, links, otherOf] of [
@@ -8052,7 +8064,7 @@ export class VisualAgentMapView extends ItemView {
           remove.setAttr("aria-label", t("ui.remove_prerequisite_link_0", titleOf(otherId)));
         }
       }
-      this.button(body, t("ui.add_prerequisite"), () => this.choosePrerequisiteSource(node));
+      this.button(body, t("ui.add_prerequisite"), () => this.choosePrerequisiteSource(node, paint));
     };
     paint();
   }

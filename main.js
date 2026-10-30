@@ -2559,7 +2559,7 @@ var zhCN = {
   "ui.hypothesis_strong": "\u5F3A",
   "ui.hypothesis_strength": "\u5F3A\u5EA6",
   "ui.evidence_for_heading": "\u6B64\u8BAE\u9898\u662F\u4EE5\u4E0B\u5047\u8BBE\u7684\u8BC1\u636E",
-  "ui.evidence_from_heading": "\u652F\u6301\u6B64\u5047\u8BBE\u7684\u8BC1\u636E",
+  "ui.evidence_from_heading": "\u6307\u5411\u6B64\u5047\u8BBE\u7684\u8BC1\u636E",
   "ui.add_evidence": "\u6DFB\u52A0\u8BC1\u636E\u2026",
   "ui.add_evidence_title": "\u6DFB\u52A0\u8BC1\u636E",
   "ui.add_evidence_description": "\u9009\u62E9\u8FD9\u4E2A\u8BAE\u9898\u8981\u4F5C\u4E3A\u8BC1\u636E\u7684\u5047\u8BBE\u3002",
@@ -4558,7 +4558,7 @@ var zhTW = {
   "ui.hypothesis_strong": "\u5F37",
   "ui.hypothesis_strength": "\u5F37\u5EA6",
   "ui.evidence_for_heading": "\u6B64\u8B70\u984C\u662F\u4EE5\u4E0B\u5047\u8A2D\u7684\u8B49\u64DA",
-  "ui.evidence_from_heading": "\u652F\u6301\u6B64\u5047\u8A2D\u7684\u8B49\u64DA",
+  "ui.evidence_from_heading": "\u6307\u5411\u6B64\u5047\u8A2D\u7684\u8B49\u64DA",
   "ui.add_evidence": "\u65B0\u589E\u8B49\u64DA\u2026",
   "ui.add_evidence_title": "\u65B0\u589E\u8B49\u64DA",
   "ui.add_evidence_description": "\u9078\u64C7\u9019\u500B\u8B70\u984C\u8981\u4F5C\u70BA\u8B49\u64DA\u7684\u5047\u8A2D\u3002",
@@ -23582,12 +23582,14 @@ function topLevelValues(block, keys) {
 }
 var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-strength"];
 function hypothesisLines(block) {
+  var _a2, _b2;
   if (block === null) return [];
   const found = [];
   for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (match && HYPOTHESIS_KEYS.includes(match[1]))
-      found.push(`${match[1]}=${match[2].replace(/^(["'])(.*)\1$/, "$2")}`);
+    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+    const key2 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
+    if (match && key2 !== void 0 && HYPOTHESIS_KEYS.includes(key2))
+      found.push(`${key2}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
   }
   return found;
 }
@@ -43087,7 +43089,7 @@ ${request.requirements}` : preset.text,
     }(this.app).open();
   }
   renderInspector(parent, node, mode = "structure", close, host) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (this.builtIn) parent.addClass("has-inspector");
     const panel = parent.createDiv(this.builtIn ? "vam-inspector" : "vam-topic-panel"), note = this.notes.get(node.id);
     const heading = panel.createDiv("vam-inspector-heading");
@@ -43181,7 +43183,7 @@ ${request.requirements}` : preset.text,
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    if (note) (_h = this.renderHypothesisSection) == null ? void 0 : _h.call(this, panel, node, close);
+    if (note) this.renderHypothesisSection(panel, node, close);
     const actions = (host != null ? host : panel).createDiv("vam-next-actions");
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {
@@ -43411,7 +43413,7 @@ ${request.requirements}` : preset.text,
     }, false);
   }
   /** Opens the picker for the prerequisite (A) of `node` (B); with no legal source it only says so. */
-  choosePrerequisiteSource(node) {
+  choosePrerequisiteSource(node, onAdded) {
     if (!this.map || !this.relationsEnabled()) return;
     const legal = new Set(legalPrerequisiteSources(this.map, node.id));
     if (!legal.size) {
@@ -43428,11 +43430,14 @@ ${request.requirements}` : preset.text,
         return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
       },
       (target) => legal.has(target.id),
-      (target) => this.enqueue(() => this.addPrerequisite(target.id, node.id))
+      (target) => this.enqueue(async () => {
+        await this.addPrerequisite(target.id, node.id);
+        onAdded == null ? void 0 : onAdded();
+      })
     ).open();
   }
   /** Opens the hypothesis picker for `node`; with no legal hypothesis it only says so. */
-  chooseEvidenceTarget(node) {
+  chooseEvidenceTarget(node, onAdded) {
     if (!this.map || !this.relationsEnabled()) return;
     const legal = new Set(legalEvidenceTargets(this.map, node.id, (id) => this.isHypothesis(id)));
     if (!legal.size) {
@@ -43449,7 +43454,10 @@ ${request.requirements}` : preset.text,
         return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
       },
       (target) => legal.has(target.id),
-      (target) => this.enqueue(() => this.addEvidence(node.id, target.id))
+      (target) => this.enqueue(async () => {
+        await this.addEvidence(node.id, target.id);
+        onAdded == null ? void 0 : onAdded();
+      })
     ).open();
   }
   /** "Add sub-hypothesis", and for a hypothesis its strength and the facts that point at it; for another topic the hypotheses it is evidence for. */
@@ -43466,7 +43474,7 @@ ${request.requirements}` : preset.text,
       var _a2, _b2;
       return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
     };
-    const paint = () => {
+    const paint = (focusStrength = false) => {
       var _a2, _b2, _c, _d, _e, _f;
       body.empty();
       if (isHypothesis) {
@@ -43480,11 +43488,14 @@ ${request.requirements}` : preset.text,
             if (option2 === current) return;
             this.enqueue(async () => {
               await this.changeHypothesisStrength(node, option2);
-              paint();
+              paint(true);
             });
           });
           choice2.setAttr("aria-pressed", String(option2 === current));
-          if (option2 === current) choice2.addClass("mod-cta");
+          if (option2 === current) {
+            choice2.addClass("mod-cta");
+            if (focusStrength) choice2.focus();
+          }
         }
       }
       const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter(
@@ -43512,7 +43523,7 @@ ${request.requirements}` : preset.text,
           remove.setAttr("aria-label", t("ui.remove_evidence_link_0", titleOf(otherId)));
         }
       }
-      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node));
+      if (!isHypothesis) this.button(body, t("ui.add_evidence"), () => this.chooseEvidenceTarget(node, paint));
       const prerequisites = ((_f = (_e = this.map) == null ? void 0 : _e.topicRelations) != null ? _f : []).filter((r) => r.kind === "prerequisite");
       for (const [heading, links2, otherOf] of [
         ["ui.prerequisite_heading", prerequisites.filter((r) => r.to === node.id), (r) => r.from],
@@ -43536,7 +43547,7 @@ ${request.requirements}` : preset.text,
           remove.setAttr("aria-label", t("ui.remove_prerequisite_link_0", titleOf(otherId)));
         }
       }
-      this.button(body, t("ui.add_prerequisite"), () => this.choosePrerequisiteSource(node));
+      this.button(body, t("ui.add_prerequisite"), () => this.choosePrerequisiteSource(node, paint));
     };
     paint();
   }

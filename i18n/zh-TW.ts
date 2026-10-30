@@ -477,7 +477,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.hypothesis_strong": "強",
   "ui.hypothesis_strength": "強度",
   "ui.evidence_for_heading": "此議題是以下假設的證據",
-  "ui.evidence_from_heading": "支持此假設的證據",
+  "ui.evidence_from_heading": "指向此假設的證據",
   "ui.add_evidence": "新增證據…",
   "ui.add_evidence_title": "新增證據",
   "ui.add_evidence_description": "選擇這個議題要作為證據的假設。",

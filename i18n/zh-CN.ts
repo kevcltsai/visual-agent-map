@@ -477,7 +477,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.hypothesis_strong": "强",
   "ui.hypothesis_strength": "强度",
   "ui.evidence_for_heading": "此议题是以下假设的证据",
-  "ui.evidence_from_heading": "支持此假设的证据",
+  "ui.evidence_from_heading": "指向此假设的证据",
   "ui.add_evidence": "添加证据…",
   "ui.add_evidence_title": "添加证据",
   "ui.add_evidence_description": "选择这个议题要作为证据的假设。",

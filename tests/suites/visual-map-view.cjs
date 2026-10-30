@@ -962,6 +962,7 @@ integrationTest('structure panel: a parent change waits for Apply, says what wil
   const nodes = [{ id: 'a', path: 'A.md', parentId: null }, { id: 'b', path: 'B.md', parentId: null }, { id: 'c', path: 'C.md', parentId: 'a' }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
+    renderHypothesisSection() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -2173,6 +2174,33 @@ integrationTest('hypothesis-evidence: adding and removing evidence in the panel 
   await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'hyp'); await view.addEvidence('fact', 'other'); await view.addEvidence('hyp', 'hyp');
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'evidence', from: 'fact', to: 'hyp' }], 'added once; duplicate, ordinary-topic and hypothesis-source links refused');
   assert.equal(changes.length, 5);
+});
+integrationTest('hypothesis-evidence: choosing a hypothesis or a prerequisite in the picker repaints the open panel at once', async () => {
+  const { view, modals } = heFixture({ topics: [node('fact'), node('hyp'), node('pre')], notes: heNotes([['fact', {}], ['hyp', heHyp('weak')], ['pre', {}]]) });
+  view.enqueue = work => work();
+  view.mapChange = async (change, rebuild) => { change(view.map); };
+  const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
+  assert.equal(dom.byLabel(factPanel, 'Remove evidence link: HYP'), undefined);
+  dom.button(factPanel, 'Add evidence…').click();
+  assert.equal(modals.length, 1);
+  modals[0].choose(view.map.nodes[1]); await dom.tick();
+  assert.ok(dom.byLabel(factPanel, 'Remove evidence link: HYP'), 'the new evidence row shows without reopening the panel');
+  dom.button(factPanel, 'Add prerequisite…').click();
+  assert.equal(modals.length, 2);
+  modals[1].choose(view.map.nodes[2]); await dom.tick();
+  assert.ok(dom.byLabel(factPanel, 'Remove prerequisite link: PRE'), 'the new prerequisite row shows without reopening the panel');
+});
+integrationTest('hypothesis-evidence: after a strength change the focus returns to the pressed strength button', async () => {
+  const { view } = heFixture();
+  view.enqueue = work => work();
+  const tx = { rewriteNote(p, write) { tx.write = write; return tx; }, editMap() { return tx; }, async commit() { await tx.write('hyp.md'); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.refreshAfterSavedChange = async () => { view.notes.get('hyp').hypothesisStrength = 'strong'; };
+  view.history = { push() {} };
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
+  dom.button(panel, 'Strong').click(); await dom.tick();
+  const pressed = dom.findAll(panel, c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true');
+  assert.deepEqual(pressed.map(c => c.text), ['Strong']);
+  assert.equal(pressed[0].focused, true, 'focus is on the strength button that is now pressed');
 });
 integrationTest('hypothesis-evidence: a strength change rewrites the note and Map.md in one history entry, and the buttons report the current strength', async () => {
   const { view, writes } = heFixture();

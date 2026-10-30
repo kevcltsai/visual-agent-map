@@ -42,6 +42,8 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
     ${card('data-topic-kind="hypothesis" data-status="completed"', 660, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">Hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="completed"', 660, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="strong">Hypothesis · Strong</span></div><h3 class="vam-card-title">Skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
+    ${card('data-topic-kind="hypothesis" data-status="idea"', 980, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">New hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
+    ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="idea"', 980, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">New skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
@@ -72,6 +74,8 @@ const CASES = [
   ['evidence-arrow', '.vam-relation-arrow', 'fill', 3],
   ['hypothesis-border', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])', 'border', 3],
   ['hypothesis-border-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]', 'border', 3],
+  ['hypothesis-border-idea', '.vam-node[data-topic-kind="hypothesis"][data-status="idea"]:not([data-relevance])', 'border', 3],
+  ['hypothesis-border-idea-skippable', '.vam-node[data-topic-kind="hypothesis"][data-status="idea"][data-relevance="side"]', 'border', 3],
   ['hypothesis-tag', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance]) .vam-hypothesis-tag', 'color', 4.5],
   ['hypothesis-tag-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"] .vam-hypothesis-tag', 'color', 4.5],
   ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],
@@ -266,9 +270,9 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         const details = await evaluate(`(() => {
           const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
           const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
-          const evidence = document.querySelector('.vam-relation-evidence'), prerequisite = document.querySelector('.vam-relation-prerequisite'), convergence = document.querySelector('.vam-edge-convergence'), hyp = document.querySelector('.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])'), hypSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]');
+          const evidence = document.querySelector('.vam-relation-evidence'), prerequisite = document.querySelector('.vam-relation-prerequisite'), convergence = document.querySelector('.vam-edge-convergence'), hyp = document.querySelector('.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])'), hypSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]'), hypIdea = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-status="idea"]:not([data-relevance])'), hypIdeaSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-status="idea"][data-relevance="side"]');
           return { hitPointer: getComputedStyle(document.querySelector('.vam-relation-hit')).pointerEvents, hitStroke: getComputedStyle(document.querySelector('.vam-relation-hit')).stroke, labelPointer: getComputedStyle(document.querySelector('.vam-relation-label')).pointerEvents, prerequisiteDash: getComputedStyle(prerequisite).strokeDasharray, prerequisiteCap: getComputedStyle(prerequisite).strokeLinecap, prerequisitePointer: getComputedStyle(prerequisite).pointerEvents, evidenceDash: getComputedStyle(evidence).strokeDasharray, convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, evidencePointer: getComputedStyle(evidence).pointerEvents, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
-            hypWidth: getComputedStyle(hyp).borderTopWidth, hypStyle: getComputedStyle(hyp).borderTopStyle, hypSideWidth: getComputedStyle(hypSide).borderTopWidth, hypSideStyle: getComputedStyle(hypSide).borderTopStyle, coreWidth: getComputedStyle(core).borderTopWidth,
+            hypIdeaWidth: getComputedStyle(hypIdea).borderTopWidth, hypIdeaStyle: getComputedStyle(hypIdea).borderTopStyle, hypIdeaSideWidth: getComputedStyle(hypIdeaSide).borderTopWidth, hypIdeaSideStyle: getComputedStyle(hypIdeaSide).borderTopStyle, hypWidth: getComputedStyle(hyp).borderTopWidth, hypStyle: getComputedStyle(hyp).borderTopStyle, hypSideWidth: getComputedStyle(hypSide).borderTopWidth, hypSideStyle: getComputedStyle(hypSide).borderTopStyle, coreWidth: getComputedStyle(core).borderTopWidth,
             sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
             edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
         })()`);
@@ -312,6 +316,10 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
       assert.equal(details.hypWidth, '2px', `${scheme}: a hypothesis has a 2px frame`);
       assert.equal(details.hypSideWidth, '2px', `${scheme}: a skippable hypothesis keeps the 2px frame`);
       assert.equal(details.hypSideStyle, 'dashed', `${scheme}: a skippable hypothesis keeps the dashed frame`);
+      assert.equal(details.hypIdeaWidth, '2px', `${scheme}: a new (idea) hypothesis has a 2px frame`);
+      assert.equal(details.hypIdeaStyle, 'solid', `${scheme}: a new (idea) hypothesis frame is solid, not the dashed idea frame`);
+      assert.equal(details.hypIdeaSideWidth, '2px', `${scheme}: a new skippable hypothesis keeps the 2px frame`);
+      assert.equal(details.hypIdeaSideStyle, 'dashed', `${scheme}: a new skippable hypothesis keeps the dashed frame`);
       assert.notEqual(details.hypStyle, 'dashed', `${scheme}: a plain hypothesis frame is solid`);
       assert.equal(details.coreWidth, '1px', `${scheme}: an ordinary topic keeps the 1px frame`);
       assert.equal(details.sideBorder, 'dashed', `${scheme}: a skippable topic keeps a dashed frame`);

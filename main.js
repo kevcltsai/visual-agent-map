@@ -15773,8 +15773,24 @@ function applyCollapseLevel(nodes, shownLevels) {
 }
 
 // map-model.ts
-var TOPIC_RELATION_KINDS = ["evidence", "prerequisite"];
-var relationKey = (r) => `${r.kind}\0${r.from}\0${r.to}`;
+var TOPIC_RELATION_KINDS = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite",
+  "evidence"
+];
+var relationKey = (r) => r.kind === "related" && r.from > r.to ? `${r.kind}\0${r.to}\0${r.from}` : `${r.kind}\0${r.from}\0${r.to}`;
+var copyRelation = (r, from = r.from, to = r.to) => {
+  const out = { kind: r.kind, from, to };
+  if (r.description !== void 0) out.description = r.description;
+  return out;
+};
+function isAcyclicKind(kind) {
+  return kind === "derives_from" || kind === "prerequisite";
+}
 function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
   const raw = map.topicRelations;
   if (raw === void 0) return;
@@ -15787,6 +15803,7 @@ function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
   const seen = /* @__PURE__ */ new Set();
   const kept = [];
   let dropped = 0;
+  let droppedDescriptions = 0;
   for (const item of raw) {
     const r = item;
     if (!r || typeof r !== "object" || typeof r.kind !== "string" || !TOPIC_RELATION_KINDS.includes(r.kind) || typeof r.from !== "string" || typeof r.to !== "string" || !ids.has(r.from) || !ids.has(r.to) || r.from === r.to) {
@@ -15800,15 +15817,22 @@ function sanitizeTopicRelations(map, log = (l, m) => debugLog.appendLog(l, m)) {
       continue;
     }
     seen.add(key2);
+    if (typeof r.description === "string") clean4.description = r.description;
+    else if ("description" in r) droppedDescriptions++;
     kept.push(clean4);
   }
   if (dropped)
     log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (droppedDescriptions)
+    log(
+      "warn",
+      `Dropped ${droppedDescriptions} invalid topic relation description${droppedDescriptions === 1 ? "" : "s"} while reading the map.`
+    );
   if (kept.length) map.topicRelations = kept;
   else delete map.topicRelations;
 }
 function setTopicRelations(map, list) {
-  if (list.length) map.topicRelations = list.map((r) => ({ kind: r.kind, from: r.from, to: r.to }));
+  if (list.length) map.topicRelations = list.map((r) => copyRelation(r));
   else delete map.topicRelations;
 }
 function removeTopicRelationsFor(map, ids) {
@@ -15819,14 +15843,14 @@ function removeTopicRelationsFor(map, ids) {
     map.topicRelations.filter((r) => !gone.has(r.from) && !gone.has(r.to))
   );
 }
-function reachesByPrerequisite(relations, start, target) {
+function reachesByKind(relations, kind, start, target) {
   const seen = /* @__PURE__ */ new Set([start]);
   const queue = [start];
   while (queue.length) {
     const current = queue.shift();
     if (current === target) return true;
     for (const r of relations)
-      if (r.kind === "prerequisite" && r.from === current && !seen.has(r.to)) {
+      if (r.kind === kind && r.from === current && !seen.has(r.to)) {
         seen.add(r.to);
         queue.push(r.to);
       }
@@ -15841,25 +15865,30 @@ function retargetTopicRelations(map, fromIds, toId) {
   const kept = [];
   const seen = /* @__PURE__ */ new Set();
   const touched = [];
-  for (const r of map.topicRelations) {
-    const next = { kind: r.kind, from: move(r.from), to: move(r.to) };
-    if (next.from === next.to) continue;
+  map.topicRelations.forEach((r, i) => {
+    const next = copyRelation(r, move(r.from), move(r.to));
+    if (next.from === next.to) return;
     const key2 = relationKey(next);
-    if (seen.has(key2)) continue;
+    if (seen.has(key2)) return;
     seen.add(key2);
-    if (next.kind === "prerequisite" && (next.from !== r.from || next.to !== r.to)) touched.push(next);
-    else kept.push(next);
-  }
-  for (const r of touched) {
-    if (reachesByPrerequisite(kept, r.to, r.from)) result.droppedCycles++;
-    else kept.push(r);
-  }
-  const order = new Map(map.topicRelations.map((r, i) => [relationKey(r), i]));
-  kept.sort((a, b) => {
-    var _a2, _b2;
-    return ((_a2 = order.get(relationKey(a))) != null ? _a2 : 1e9) - ((_b2 = order.get(relationKey(b))) != null ? _b2 : 1e9);
+    if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
+    else kept.push({ r: next, i });
   });
-  setTopicRelations(map, kept);
+  for (const item of touched) {
+    if (reachesByKind(
+      kept.map((k) => k.r),
+      item.r.kind,
+      item.r.to,
+      item.r.from
+    ))
+      result.droppedCycles++;
+    else kept.push(item);
+  }
+  kept.sort((a, b) => a.i - b.i);
+  setTopicRelations(
+    map,
+    kept.map((k) => k.r)
+  );
   return result;
 }
 function legalEvidenceTargets(map, fromId, isHypothesis) {

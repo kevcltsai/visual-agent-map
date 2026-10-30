@@ -37,23 +37,56 @@ export interface MapDocument {
   topicRelations?: TopicRelation[];
 }
 /**
- * `evidence`: `from` is a fact topic, `to` the hypothesis it supports. `prerequisite`: `from` (A) is background for
- * `to` (B). Neither changes the parent/child tree.
+ * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind
+ * (`related` has no direction). `derives_from` and `prerequisite` must not form a cycle among links of their own kind.
+ * `evidence` is the V1.5 kind, kept only for the compatibility period (removed in the next packet).
  */
-export type TopicRelationKind = "evidence" | "prerequisite";
+export type TopicRelationKind =
+  "supports" | "contradicts" | "verifies" | "derives_from" | "related" | "prerequisite" | "evidence";
 export interface TopicRelation {
   kind: TopicRelationKind;
   from: string;
   to: string;
+  /** Optional single-line note, written through `normalizeRelationDescription`; read back as stored. */
+  description?: string;
 }
-const TOPIC_RELATION_KINDS: readonly string[] = ["evidence", "prerequisite"];
-const relationKey = (r: TopicRelation): string => `${r.kind}\0${r.from}\0${r.to}`;
+const TOPIC_RELATION_KINDS: readonly string[] = [
+  "supports",
+  "contradicts",
+  "verifies",
+  "derives_from",
+  "related",
+  "prerequisite",
+  "evidence"
+];
+export const RELATION_DESCRIPTION_MAX_LENGTH = 200;
+/** `related` has no direction, so both orders share one key. */
+const relationKey = (r: Pick<TopicRelation, "kind" | "from" | "to">): string =>
+  r.kind === "related" && r.from > r.to ? `${r.kind}\0${r.to}\0${r.from}` : `${r.kind}\0${r.from}\0${r.to}`;
+const copyRelation = (r: TopicRelation, from = r.from, to = r.to): TopicRelation => {
+  const out: TopicRelation = { kind: r.kind, from, to };
+  if (r.description !== undefined) out.description = r.description;
+  return out;
+};
 type RelationLogger = (level: LogLevel, message: string) => void;
+
+/** True for the kinds that must not form a cycle among links of their own kind. */
+export function isAcyclicKind(kind: TopicRelationKind): boolean {
+  return kind === "derives_from" || kind === "prerequisite";
+}
+
+/** Single line, collapsed whitespace, at most 200 characters; undefined when nothing is left. */
+export function normalizeRelationDescription(text: string): string | undefined {
+  const flat = String(text).replace(/\s+/g, " ").trim();
+  if (!flat) return undefined;
+  return Array.from(flat).slice(0, RELATION_DESCRIPTION_MAX_LENGTH).join("").trim() || undefined;
+}
 
 /**
  * Drops what cannot be a relation: a non-list value (the whole key), malformed entries, unknown kinds, endpoints that
- * are not topics, self links and duplicates. Prerequisite cycles are kept (a hand-written loop still opens). Logs one
- * warn with counts only; removes the key when nothing is left. Never throws.
+ * are not topics, self links and duplicates (`related` in either direction). A description that is not a string is
+ * removed but its relation is kept; a string description is kept as written. Derivation and prerequisite cycles are
+ * kept (a hand-written loop still opens). Logs warns with counts only; removes the key when nothing is left. Never throws.
  */
 export function sanitizeTopicRelations(
   map: MapDocument,
@@ -70,6 +103,7 @@ export function sanitizeTopicRelations(
   const seen = new Set<string>();
   const kept: TopicRelation[] = [];
   let dropped = 0;
+  let droppedDescriptions = 0;
   for (const item of raw as unknown[]) {
     const r = item as Partial<TopicRelation> | null;
     if (
@@ -93,19 +127,26 @@ export function sanitizeTopicRelations(
       continue;
     }
     seen.add(key);
+    if (typeof r.description === "string") clean.description = r.description;
+    else if ("description" in r) droppedDescriptions++;
     kept.push(clean);
   }
   if (dropped)
     log("warn", `Dropped ${dropped} invalid topic relation${dropped === 1 ? "" : "s"} while reading the map.`);
+  if (droppedDescriptions)
+    log(
+      "warn",
+      `Dropped ${droppedDescriptions} invalid topic relation description${droppedDescriptions === 1 ? "" : "s"} while reading the map.`
+    );
   if (kept.length) map.topicRelations = kept;
   else delete map.topicRelations;
 }
 /** Replaces the relations; an empty list removes the key. Every write goes through here. */
 export function setTopicRelations(map: MapDocument, list: TopicRelation[]): void {
-  if (list.length) map.topicRelations = list.map(r => ({ kind: r.kind, from: r.from, to: r.to }));
+  if (list.length) map.topicRelations = list.map(r => copyRelation(r));
   else delete map.topicRelations;
 }
-/** Removes every relation (both kinds) that touches one of `ids`. */
+/** Removes every relation (of any kind) that touches one of `ids`. */
 export function removeTopicRelationsFor(map: MapDocument, ids: Iterable<string>): void {
   if (!map.topicRelations) return;
   const gone = new Set(ids);
@@ -114,15 +155,20 @@ export function removeTopicRelationsFor(map: MapDocument, ids: Iterable<string>)
     map.topicRelations.filter(r => !gone.has(r.from) && !gone.has(r.to))
   );
 }
-/** True when `target` can be reached from `start` along prerequisite links (from -> to). Visited-set BFS, so loops end. */
-function reachesByPrerequisite(relations: readonly TopicRelation[], start: string, target: string): boolean {
+/** True when `target` can be reached from `start` along links of `kind` (from -> to). Visited-set BFS, so loops end. */
+function reachesByKind(
+  relations: readonly TopicRelation[],
+  kind: TopicRelationKind,
+  start: string,
+  target: string
+): boolean {
   const seen = new Set<string>([start]);
   const queue = [start];
   while (queue.length) {
     const current = queue.shift() as string;
     if (current === target) return true;
     for (const r of relations)
-      if (r.kind === "prerequisite" && r.from === current && !seen.has(r.to)) {
+      if (r.kind === kind && r.from === current && !seen.has(r.to)) {
         seen.add(r.to);
         queue.push(r.to);
       }
@@ -130,8 +176,32 @@ function reachesByPrerequisite(relations: readonly TopicRelation[], start: strin
   return false;
 }
 /**
- * Points every relation end at `fromIds` to `toId` (a merge). Self links and duplicates are dropped; a prerequisite
- * that would newly close a cycle is dropped and counted. Cycles already present are not touched.
+ * Whether `candidate` may be added. Refuses a self link, a duplicate of the same kind (`related` in either direction)
+ * and, for the two acyclic kinds, a link that would close a cycle among links of that kind (other kinds do not count).
+ * `replacingIndex` leaves that existing relation out first (changing its kind or reversing it).
+ */
+export function relationAllowed(
+  relations: readonly TopicRelation[],
+  candidate: Pick<TopicRelation, "kind" | "from" | "to">,
+  replacingIndex?: number
+): boolean {
+  if (candidate.from === candidate.to) return false;
+  const others = relations.filter((_, i) => i !== replacingIndex);
+  const key = relationKey(candidate);
+  if (others.some(r => relationKey(r) === key)) return false;
+  if (isAcyclicKind(candidate.kind) && reachesByKind(others, candidate.kind, candidate.to, candidate.from))
+    return false;
+  return true;
+}
+/** Every topic that `relationAllowed` accepts as the `to` end of a new `kind` link starting at `fromId`. */
+export function legalRelationTargets(map: MapDocument, kind: TopicRelationKind, fromId: string): string[] {
+  const relations = map.topicRelations ?? [];
+  return map.nodes.filter(n => relationAllowed(relations, { kind, from: fromId, to: n.id })).map(n => n.id);
+}
+/**
+ * Points every relation end at `fromIds` to `toId` (a merge). Self links and duplicates (`related` in either direction)
+ * are dropped; a derivation or prerequisite that would newly close a cycle is dropped and counted (both kinds together).
+ * Cycles already present are not touched.
  */
 export function retargetTopicRelations(
   map: MapDocument,
@@ -142,25 +212,35 @@ export function retargetTopicRelations(
   if (!map.topicRelations) return result;
   const merged = new Set(fromIds);
   const move = (id: string): string => (merged.has(id) ? toId : id);
-  const kept: TopicRelation[] = [];
+  const kept: { r: TopicRelation; i: number }[] = [];
   const seen = new Set<string>();
-  const touched: TopicRelation[] = [];
-  for (const r of map.topicRelations) {
-    const next: TopicRelation = { kind: r.kind, from: move(r.from), to: move(r.to) };
-    if (next.from === next.to) continue;
+  const touched: { r: TopicRelation; i: number }[] = [];
+  map.topicRelations.forEach((r, i) => {
+    const next = copyRelation(r, move(r.from), move(r.to));
+    if (next.from === next.to) return;
     const key = relationKey(next);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.add(key);
-    if (next.kind === "prerequisite" && (next.from !== r.from || next.to !== r.to)) touched.push(next);
-    else kept.push(next);
+    if (isAcyclicKind(next.kind) && (next.from !== r.from || next.to !== r.to)) touched.push({ r: next, i });
+    else kept.push({ r: next, i });
+  });
+  for (const item of touched) {
+    if (
+      reachesByKind(
+        kept.map(k => k.r),
+        item.r.kind,
+        item.r.to,
+        item.r.from
+      )
+    )
+      result.droppedCycles++;
+    else kept.push(item);
   }
-  for (const r of touched) {
-    if (reachesByPrerequisite(kept, r.to, r.from)) result.droppedCycles++;
-    else kept.push(r);
-  }
-  const order = new Map(map.topicRelations.map((r, i) => [relationKey(r), i]));
-  kept.sort((a, b) => (order.get(relationKey(a)) ?? 1e9) - (order.get(relationKey(b)) ?? 1e9));
-  setTopicRelations(map, kept);
+  kept.sort((a, b) => a.i - b.i);
+  setTopicRelations(
+    map,
+    kept.map(k => k.r)
+  );
   return result;
 }
 /** Hypotheses a topic can newly be evidence for: not itself, not a non-hypothesis, not already linked; none when the source is a hypothesis. */

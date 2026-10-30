@@ -287,16 +287,16 @@ async function heHarness() {
 }
 integrationTest('hypothesis-evidence: merging two facts that are evidence for the same hypothesis leaves one link; undo brings both back', async () => {
   const h = await heHarness();
-  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('evidence', h.ids.f2, h.ids.hyp), heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('supports', h.ids.f2, h.ids.hyp), heRel('supports', h.ids.f2, h.ids.hyp2)]);
   const original = await h.relations();
   await h.mergeKeys(['f1', 'f2']);
   const merged = await h.mergedId();
   assert.ok(merged);
-  assert.deepEqual(await h.relations(), [heRel('evidence', merged, h.ids.hyp), heRel('evidence', merged, h.ids.hyp2)], 'one link per hypothesis, from the merged topic');
+  assert.deepEqual(await h.relations(), [heRel('supports', merged, h.ids.hyp), heRel('supports', merged, h.ids.hyp2)], 'one link per hypothesis, from the merged topic');
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original, 'undo restores both original links');
   await h.view.travel(true);
-  assert.deepEqual(await h.relations(), [heRel('evidence', merged, h.ids.hyp), heRel('evidence', merged, h.ids.hyp2)], 'redo merges again');
+  assert.deepEqual(await h.relations(), [heRel('supports', merged, h.ids.hyp), heRel('supports', merged, h.ids.hyp2)], 'redo merges again');
 });
 integrationTest('hypothesis-evidence: a prerequisite that becomes a self link after a merge is deleted; the key goes when nothing is left', async () => {
   const h = await heHarness();
@@ -335,17 +335,17 @@ integrationTest('hypothesis-evidence: merging subtopics into a parent re-points 
   const h = await heHarness();
   // f1 and f2 become children of x; x is the parent that keeps its identity.
   for (const key of ['f1', 'f2']) h.mapDoc.nodes.find(n => n.id === h.ids[key]).parentId = h.ids.x;
-  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('evidence', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x), heRel('prerequisite', h.ids.f2, h.ids.hyp2)]);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('supports', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x), heRel('prerequisite', h.ids.f2, h.ids.hyp2)]);
   const original = await h.relations();
   const check = await h.mergeKeys(['x', 'f1', 'f2']);
   assert.equal(check.targetId, h.ids.x);
-  assert.deepEqual(await h.relations(), [heRel('evidence', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.x, h.ids.hyp2)], 'f1 folded into the existing x link; f2 to x became a self link');
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.x, h.ids.hyp), heRel('prerequisite', h.ids.x, h.ids.hyp2)], 'f1 folded into the existing x link; f2 to x became a self link');
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
 integrationTest('hypothesis-evidence: mergeSelected with a hypothesis selected is refused with a Notice and changes nothing', async () => {
   const h = await heHarness();
-  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp)]);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp)]);
   const before = JSON.stringify(await h.saved());
   h.view.multiSelected = new Set([h.ids.hyp, h.ids.hyp2]);
   assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_hypothesis' });
@@ -356,7 +356,7 @@ integrationTest('hypothesis-evidence: mergeSelected with a hypothesis selected i
 integrationTest('hypothesis-evidence: removing a fact or a hypothesis leaves no dangling link (both kinds) and undo restores the links', async () => {
   for (const [removeKey, branch, expected] of [['f1', false, 2], ['hyp', false, 2]]) {
     const h = await heHarness();
-    await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.hyp2), heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+    await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.hyp2), heRel('supports', h.ids.f2, h.ids.hyp2)]);
     const original = await h.relations();
     await h.view.removeToUnassigned(h.notes[removeKey], branch);
     const left = await h.relations();
@@ -369,24 +369,24 @@ integrationTest('hypothesis-evidence: removing a fact or a hypothesis leaves no 
 });
 integrationTest('hypothesis-evidence: removing the selection (removeSelected) drops links of every removed topic; undo restores them', async () => {
   const h = await heHarness();
-  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.hyp2, h.ids.x), heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.hyp2, h.ids.x), heRel('supports', h.ids.f2, h.ids.hyp2)]);
   const original = await h.relations();
   h.view.multiSelected = new Set([h.ids.hyp, h.ids.x]);
   await h.view.removeSelected();
-  assert.deepEqual(await h.relations(), [heRel('evidence', h.ids.f2, h.ids.hyp2)]);
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f2, h.ids.hyp2)]);
   await h.view.travel(false);
   assert.deepEqual(await h.relations(), original);
 });
 integrationTest('hypothesis-evidence: a structure-review merge with a hypothesis on either side is refused; otherwise links move to the adopter', async () => {
   const h = await heHarness();
-  await h.relate([heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
   const before = JSON.stringify(await h.saved());
   await h.view.removeToUnassigned(h.notes.hyp, false, h.ids.x);
   await h.view.removeToUnassigned(h.notes.f1, false, h.ids.hyp);
   assert.deepEqual(h.notices, ['A hypothesis cannot be merged into another topic or take one over', 'A hypothesis cannot be merged into another topic or take one over']);
   assert.equal(JSON.stringify(await h.saved()), before, 'nothing changed');
   await h.view.removeToUnassigned(h.notes.f1, false, h.ids.f2);
-  assert.deepEqual(await h.relations(), [heRel('evidence', h.ids.f2, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x)], 'links now start at the adopter');
+  assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f2, h.ids.hyp), heRel('prerequisite', h.ids.f2, h.ids.x)], 'links now start at the adopter');
   await h.view.travel(false);
-  assert.deepEqual(plain((await h.saved()).topicRelations), [heRel('evidence', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
+  assert.deepEqual(plain((await h.saved()).topicRelations), [heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.f1, h.ids.x)]);
 });

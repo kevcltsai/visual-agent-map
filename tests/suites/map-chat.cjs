@@ -2234,7 +2234,7 @@ integrationTest('hypothesis-evidence: delete_topic from the map chat removes the
     const h = await harness();
     const keep = { kind: 'prerequisite', from: h.ids.root, to: h.ids.b };
     h.view.map.topicRelations = [
-      { kind: 'evidence', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }, { kind: 'evidence', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.a }, keep
+      { kind: 'supports', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }, { kind: 'supports', from: h.ids.a, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.b, to: h.ids.a }, keep
     ];
     await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
     const lines = await apply(h, [{ kind: 'delete_topic', nodeId: h.ids.a, branch }]);
@@ -2242,7 +2242,7 @@ integrationTest('hypothesis-evidence: delete_topic from the map chat removes the
     const saved = await h.repo.readMap(MAP);
     assert.equal(saved.nodes.some(n => n.id === h.ids.a), false, `branch ${branch}: the card is gone`);
     assert.equal(saved.nodes.some(n => n.id === h.ids.c), !branch, `branch ${branch}: the subtopic goes only with the branch`);
-    const expected = branch ? [keep] : [{ kind: 'evidence', from: h.ids.c, to: h.ids.b }, keep];
+    const expected = branch ? [keep] : [{ kind: 'supports', from: h.ids.c, to: h.ids.b }, keep];
     eq(saved.topicRelations, expected, `branch ${branch}: links touching a removed card are gone, the others stay`);
     assert.equal(h.view.history.undoEntry, undefined, `branch ${branch}: a chat write leaves no undo entry (nothing to undo)`);
   }
@@ -3805,7 +3805,7 @@ integrationTest('hypothesis-evidence: a chat edit that touches a hypothesis key 
 });
 integrationTest('hypothesis-evidence: move_topic leaves every relation as it was', async () => {
   const h = await harness();
-  const relations = [{ kind: 'evidence', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }];
+  const relations = [{ kind: 'supports', from: h.ids.c, to: h.ids.b }, { kind: 'prerequisite', from: h.ids.a, to: h.ids.c }];
   h.view.map.topicRelations = relations; await h.repo.saveMap(MAP, h.view.map); h.view.map = await h.repo.readMap(MAP);
   const lines = await apply(h, [{ kind: 'move_topic', nodeId: h.ids.c, newParentId: h.ids.b }]);
   eq(lines.map(l => l.status), ['done'], JSON.stringify(lines));

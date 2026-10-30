@@ -330,7 +330,10 @@ export class MapChatPanel {
   /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
   private stage: { kind: MapChatStage; since: number } | null = null;
   /** The stage line inside the AI bubble, with the two texts that change. */
-  private stageEls: { box: HTMLElement; label: HTMLElement; elapsed: HTMLElement } | null = null;
+  private stageEls: { box: HTMLElement; label: HTMLElement; elapsed: HTMLElement; slow: HTMLElement | null } | null =
+    null;
+  /** The slow notice of the running turn (no model event for a long while) and what its button does. Null when not shown. */
+  private slow: { text: string; resend: () => void } | null = null;
   /** The one-second timer that rewrites the seconds (only their text). */
   private stageTimer: { cancel: () => void } | null = null;
   /** Whether the body was showing at the last applyOpen, to tell the moment it opens. */
@@ -624,6 +627,7 @@ export class MapChatPanel {
     this.messages.push(user, assistant);
     this.busy = true;
     this.stage = { kind: stage, since: this.clockNow() };
+    this.slow = null;
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
     this.renderBusy();
@@ -671,6 +675,8 @@ export class MapChatPanel {
   setStage(kind: MapChatStage): void {
     const current = this.stage;
     if (!current || STAGE_ORDER[kind] <= STAGE_ORDER[current.kind]) return;
+    // A later stage is a model event (or the actions): the slow notice has nothing left to say.
+    this.slow = null;
     // The seconds of waiting and writing run together from the question; applying counts its own.
     this.stage = { kind, since: kind === "applying" ? this.clockNow() : current.since };
     this.paintStage();
@@ -697,6 +703,72 @@ export class MapChatPanel {
     els.label.setText(this.stageLabel(stage.kind));
     els.elapsed.setText(this.elapsedText());
     els.box.toggleClass("is-compact", !!this.stageMessage()?.text);
+    this.paintSlow();
+  }
+  /** Shows or removes the slow notice inside the stage line (a rebuilt row calls this too, so the notice survives a repaint). */
+  private paintSlow(): void {
+    const els = this.stageEls;
+    if (!els) return;
+    const slow = this.stage ? this.slow : null;
+    if (!slow) {
+      els.slow?.remove();
+      els.slow = null;
+      return;
+    }
+    if (els.slow) {
+      // Already on screen for this notice.
+      return;
+    }
+    const notice = els.box.createDiv({ cls: "vam-map-chat-progress-slow" });
+    notice.createSpan({ cls: "vam-map-chat-progress-slow-text", text: slow.text });
+    const button = notice.createEl("button", {
+      cls: "vam-map-chat-progress-resend",
+      text: t("ui.map_chat_resend"),
+      attr: { type: "button" }
+    });
+    button.addEventListener("click", () => {
+      this.slow?.resend();
+      // The button leaves with the notice, and the focus would fall to the page: it goes to Stop, the one control of a waiting turn.
+      if (this.built && this.stage) this.stopEl.focus();
+    });
+    els.slow = notice;
+  }
+  /** Whether the slow notice is showing. */
+  get isSlow(): boolean {
+    return this.slow !== null;
+  }
+  /**
+   * No model event for a long while: the bubble says so (`text`) and offers `resend`. Only while the turn is still waiting for the
+   * model; the notice is said once through the live region. Anything that is a model event removes it ({@link clearSlow}).
+   */
+  showSlow(text: string, resend: () => void): void {
+    if (this.stage?.kind !== "waiting" || this.slow) return;
+    this.slow = { text, resend };
+    this.paintSlow();
+    if (this.built) this.liveEl.setText(text);
+  }
+  /** A model event arrived (or the notice is not valid any more): the slow notice goes away. */
+  clearSlow(): void {
+    if (!this.slow) return;
+    this.slow = null;
+    this.paintSlow();
+  }
+  /**
+   * The user sent the same question again: the stage goes back to "waiting" with the seconds counted from now, the notice goes away
+   * and whatever the replaced attempt had written is dropped. A turn that is not running changes nothing.
+   */
+  restartWaiting(): void {
+    const last = this.messages.at(-1);
+    if (!this.stage || !last?.streaming) return;
+    this.slow = null;
+    this.stage = { kind: "waiting", since: this.clockNow() };
+    last.text = "";
+    last.lines = [];
+    this.cancelFrame();
+    // The row is laid out again so the stage line is the big form of an empty bubble.
+    this.renderLog();
+    this.paintStage();
+    this.speakStage();
   }
   private speakStage(): void {
     // Straight to the live region: `announce` would also read out what a picture search held back.
@@ -713,6 +785,7 @@ export class MapChatPanel {
   /** The turn ended (an answer, a failure, Stop, a reset): no stage, no seconds, no timer. */
   private clearStage(): void {
     this.stage = null;
+    this.slow = null;
     this.stageEls = null;
     this.stageTimer?.cancel();
     this.stageTimer = null;
@@ -744,6 +817,7 @@ export class MapChatPanel {
     last.text = text;
     // The first characters are the proof that the model is writing.
     if (text && this.stage?.kind === "waiting") this.setStage("writing");
+    else if (text) this.clearSlow();
     if (!this.built || this.frame) return;
     // Chunks that arrive within one frame are laid out once, with the newest text.
     // The window the log is shown in (a popped-out view has its own), because only that one paints its frames.
@@ -1624,7 +1698,7 @@ export class MapChatPanel {
     const label = box.createSpan({ cls: "vam-map-chat-progress-stage" });
     const elapsed = box.createSpan({ cls: "vam-map-chat-progress-elapsed" });
     elapsed.setAttr("aria-hidden", "true");
-    this.stageEls = { box, label, elapsed };
+    this.stageEls = { box, label, elapsed, slow: null };
     this.paintStage();
   }
 

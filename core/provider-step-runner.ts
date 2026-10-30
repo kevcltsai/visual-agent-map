@@ -16,6 +16,8 @@ export interface ProviderStepHooks {
   onFirstEvent?: () => void;
   onActivity?: (activity: CodexActivity) => void;
   onText?: (text: string) => void;
+  /** Claude only: whether its output can be watched (`stream-json`) or only arrives at the end (`json`, `json-fallback`). */
+  onStreamMode?: (mode: "stream-json" | "json" | "json-fallback") => void;
 }
 
 /**
@@ -68,6 +70,7 @@ export function providerStepRunner<Request extends { model: string; reasoning: R
           ...(config.stream && onStructuredJson ? { onStructuredJson } : {}),
           ...(hooks?.onFirstEvent ? { onFirstEvent: hooks.onFirstEvent } : {}),
           ...(hooks?.onActivity ? { onActivity: hooks.onActivity } : {}),
+          ...(hooks?.onStreamMode ? { onStreamMode: hooks.onStreamMode } : {}),
           ...(hooks?.onText && !CLAUDE_MODEL_CHOICES.some(choice => choice.id === request.model)
             ? { onText: hooks.onText }
             : {})

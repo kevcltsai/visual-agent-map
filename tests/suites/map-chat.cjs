@@ -370,8 +370,10 @@ async function harness({ aim = false, document = false, empty = false, realRende
   const handlers = []; const linkOpens = [];
   app.workspace = { getLeavesOfType: type => type === 'markdown' ? leaves : [], getActiveViewOfType: () => activeMarkdown, requestSaveLayout() {}, on(name, fn) { const ref = { name, fn }; handlers.push(ref); return ref; }, openLinkText(link, source, newLeaf) { linkOpens.push([link, source, newLeaf]); } };
   class Notice { constructor(message) { notices.push(message); } hide() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: fn => { ctx.timers.push(fn); return ctx.timers.length; }, clearTimeout() {}, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, MarkdownView, Notice, Modal: class { constructor(app) { this.app = app; } open() { (control.modals ??= []).push(this); if (typeof this.resolve === 'function' && this.local) this.resolve(this.local); } close() {} }, Component: class { load() {} unload() {} }, MarkdownRenderer: { render: async (_app, text, el, sourcePath, owner) => { control.markdown.push({ text, el, sourcePath, owner }); el.setText(text); } } } }, { ...(document ? { document: { documentElement: { style: {} }, get activeElement() { return ctx.page?.doc.activeElement ?? null; } } } : {}), CSS: { escape: value => String(value) }, createSvg: tag => ({ tag, attrs: {}, classes: [], setAttribute(name, value) { this.attrs[name] = value; }, addClass(name) { this.classes.push(name); } }), requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, setTimeout: (fn, delay) => { ctx.timers.push(fn); const id = ctx.timers.length; ctx.clock.pending.push({ id, fn, at: ctx.clock.now + (delay ?? 0) }); return id; }, clearTimeout: id => { ctx.clock.pending = ctx.clock.pending.filter(entry => entry.id !== id); }, setInterval: fn => { ctx.intervals.set(++ctx.intervalSeq, fn); return ctx.intervalSeq; }, clearInterval: id => { ctx.intervals.delete(id); } });
   ctx.timers = []; ctx.intervals = new Map(); ctx.intervalSeq = 0;
+  // A fake clock for the timers the view sets: `advance(n)` runs every timer that falls due within n milliseconds, in order. Nothing waits in real time.
+  ctx.clock = { now: 0, pending: [], advance(by) { const target = this.now + by; for (;;) { const due = this.pending.filter(entry => entry.at <= target).sort((l, r) => l.at - r.at)[0]; if (!due) break; this.pending = this.pending.filter(entry => entry !== due); this.now = due.at; due.fn(); } this.now = target; } };
   const view = new VisualAgentMapView({ app }, plugin);
   ctx.view = view;
   const p = page(); const rootEl = p.root; ctx.page = p;
@@ -396,7 +398,7 @@ async function harness({ aim = false, document = false, empty = false, realRende
   };
   await reload();
   const h = {
-    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
+    repo, app, contents, files, view, plugin, ids, control, notices, focused, opened, leaves, handlers, linkOpens, page: p, rootEl, get timers() { return ctx.timers; }, clock: ctx.clock, get intervals() { return ctx.intervals; }, repaint, renders: () => renders, workspace: () => workspaceEl,
     setActive: (file, text, editor) => { const v = h.leaf(file, { editor }); activeMarkdown = v; leaves.splice(0, leaves.length, { view: v }); return v; },
     // A markdown leaf; `shown` false is a background tab, `doc` another window. Not made active.
     leaf: (file, { shown = true, doc = p.doc, editor = null } = {}) => Object.assign(new MarkdownView(), { file: app.vault.getAbstractFileByPath(file), editor, containerEl: { ownerDocument: doc, isShown: () => shown } }),
@@ -4114,4 +4116,153 @@ integrationTest('map chat 16: after a map switch with the usage notice open, ans
   h.type('hello'); const sending = h.view.sendMapChat(); await tick(); assert.equal(chat.liveEl.text, 'Preparing');
   h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.liveEl.text, '', 'the switch itself clears what was said');
   gate.resolve(); await sending; assert.equal(chat.liveEl.text, '', 'and answering the notice afterwards says nothing');
+});
+
+// ---- ticket 18: slow notice after FIRST_EVENT_WAIT_MS without a model event, and "Resend" -------------------------------------
+const slowNotice = chat => find(chat.logEl, i => hasClass(i, 'vam-map-chat-progress-slow'));
+const resendButton = chat => find(chat.logEl, i => i.tag === 'button' && hasClass(i, 'vam-map-chat-progress-resend'));
+
+test('map chat 18: the panel shows the slow notice only while waiting, says it once, and any later stage or text removes it', () => {
+  const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text; let resent = 0;
+  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model'); f.panel.showSlow('X is responding slowly; still waiting', () => { resent++; });
+  assert.ok(slowNotice(f.panel), 'shown'); assert.match(visibleText(slowNotice(f.panel)), /X is responding slowly; still waiting/); assert.equal(resendButton(f.panel).text, 'Resend'); assert.equal(resendButton(f.panel).attrs.type, 'button');
+  assert.equal(live(), 'X is responding slowly; still waiting', 'said once through the live region'); assert.equal(f.panel.isSlow, true);
+  resendButton(f.panel).click(); assert.equal(resent, 1);
+  f.panel.streamReply('He'); assert.equal(slowNotice(f.panel), undefined, 'text removes the notice'); assert.equal(f.panel.isSlow, false);
+  f.panel.showSlow('again', () => {}); assert.equal(slowNotice(f.panel), undefined, 'writing already: no notice');
+  for (const end of [p => p.finish('a', []), p => p.fail('e'), p => p.markStopped(), p => p.reset()]) {
+    const t2 = stageFixture(); t2.f.panel.begin('q'); t2.f.panel.showSlow('slow', () => {}); assert.ok(slowNotice(t2.f.panel)); end(t2.f.panel);
+    assert.equal(slowNotice(t2.f.panel), undefined, 'every way a turn ends clears the notice'); assert.equal(t2.f.panel.isSlow, false);
+  }
+  const p2 = stageFixture(); p2.f.panel.begin('q'); p2.f.panel.setStage('writing'); p2.f.panel.showSlow('late', () => {}); assert.equal(p2.f.panel.isSlow, false, 'a notice after the first model event is refused');
+});
+
+test('map chat 18: restartWaiting counts the seconds again, removes the notice and keeps one stage line and one timer', () => {
+  const s = stageFixture(); const { f } = s;
+  f.panel.begin('q'); s.tickSeconds(25); assert.match(s.elapsed().text, /0:25/); f.panel.showSlow('slow', () => {}); assert.ok(resendButton(f.panel));
+  f.panel.restartWaiting();
+  assert.equal(slowNotice(f.panel), undefined); assert.equal(s.label(), 'Waiting for the model'); assert.match(s.elapsed().text, /0:00/, 'the seconds start again'); assert.equal(s.intervals.size, 1, 'one timer');
+  assert.equal(f.panel.transcript().length, 2, 'no second pair of messages'); assert.equal(f.panel.liveEl.text, 'Waiting for the model');
+  f.panel.markStopped(); f.panel.restartWaiting(); assert.equal(f.panel.stage, null, 'a turn that is not running is not restarted');
+});
+
+integrationTest('map chat 18: 19.9 s without a model event shows nothing, the 20 s mark shows the notice with the model name, and a model event removes it', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress;
+  h.control.reply = async (_request, _signal, _onReply, onProgress) => { progress = onProgress; await gate.promise; return { reply: 'done', actions: [], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  progress({ kind: 'stream-mode', mode: 'stream-json' });
+  h.clock.advance(19_900); assert.equal(slowNotice(chat), undefined, '19.9 s: nothing yet'); assert.equal(chat.isSlow, false);
+  h.clock.advance(100); assert.ok(slowNotice(chat), '20 s: the notice'); assert.equal(visibleText(slowNotice(chat)).startsWith(`label(${h.control.requests[0].model}) is responding slowly; still waiting`), true, 'it names the model');
+  assert.ok(resendButton(chat)); assert.equal(chat.liveEl.text.endsWith('is responding slowly; still waiting'), true, 'read out once'); assert.doesNotMatch(visibleText(slowNotice(chat)), /switch|another model|faster/i, 'it never suggests another model');
+  progress({ kind: 'first-event' }); assert.equal(slowNotice(chat), undefined, 'a model event removes it');
+  gate.resolve(); await sending; assert.equal(chat.transcript().at(-1).text, 'done');
+});
+
+integrationTest('map chat 18: a model event before 20 s means the notice never shows (Claude first event, Codex searching / reading / writing, any text)', async () => {
+  for (const event of [{ kind: 'first-event' }, { kind: 'activity', activity: 'searching' }, { kind: 'activity', activity: 'reading' }, { kind: 'activity', activity: 'writing' }, { kind: 'text' }]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress; let onText;
+    h.control.reply = async (_request, _signal, onReply, onProgress) => { progress = onProgress; onText = onReply; await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(10_000); if (event.kind === 'text') onText('Hel'); else progress(event);
+    h.clock.advance(60_000); assert.equal(slowNotice(chat), undefined, `${event.kind}/${event.activity ?? ''}: no notice`);
+    gate.resolve(); await sending;
+  }
+});
+
+integrationTest('map chat 18 counter-example: json mode (no events can be seen) never shows the notice', async () => {
+  for (const mode of ['json', 'json-fallback']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred();
+    h.control.reply = async (_request, _signal, _onReply, onProgress) => { onProgress({ kind: 'stream-mode', mode }); await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined, `${mode}: no notice however long it takes`); assert.equal(chat.isBusy, true);
+    gate.resolve(); await sending; assert.equal(chat.transcript().at(-1).text, 'ok');
+  }
+});
+
+integrationTest('map chat 18 counter-example: after Resend the old attempt\'s late text, progress and result are dropped, the seconds start again and no bubble is duplicated', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal, onReply, onProgress) => new Promise((resolve, reject) => { attempts.push({ request, signal, onReply, onProgress, resolve, reject }); });
+  h.type('explain this'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  h.clock.advance(20_000); assert.ok(resendButton(chat));
+  const task = h.plugin.activeTasks.size;
+  resendButton(chat).click(); await until(() => attempts.length === 2);
+  assert.equal(attempts[0].signal.aborted, true, 'the old request is aborted'); assert.equal(attempts[1].signal.aborted, false); assert.equal(h.plugin.activeTasks.size, task, 'one task registered, the old one released');
+  assert.equal(attempts[1].request, attempts[0].request, 'the same request (same question, same mode)'); assert.equal(chat.transcript().length, 2, 'no second user bubble'); assert.equal(slowNotice(chat), undefined); assert.equal(chat.stage.kind, 'waiting');
+  attempts[0].onReply('OLD TEXT'); attempts[0].onProgress({ kind: 'activity', activity: 'writing' }); attempts[0].onProgress({ kind: 'first-event' });
+  assert.equal(chat.transcript().at(-1).text, '', 'late text of the old attempt is dropped'); assert.equal(chat.stage.kind, 'waiting', 'late progress of the old attempt is dropped');
+  h.clock.advance(19_900); assert.equal(slowNotice(chat), undefined, 'the 20 s count starts again from the resend'); h.clock.advance(100); assert.ok(slowNotice(chat), 'the new attempt gets its own notice');
+  attempts[0].resolve({ reply: 'OLD RESULT', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'OLD' }], rejected: [] });
+  await tick(); assert.equal(chat.isBusy, true, 'the old result finishes nothing'); assert.notEqual(chat.transcript().at(-1).text, 'OLD RESULT');
+  attempts[1].onProgress({ kind: 'first-event' }); attempts[1].resolve({ reply: 'NEW RESULT', actions: [], rejected: [] }); await sending;
+  assert.equal(chat.transcript().at(-1).text, 'NEW RESULT'); assert.equal(chat.transcript().length, 2); assert.equal(attempts.length, 2, 'never resent by itself'); assert.equal(h.control.mutates, 0, 'the old actions were not applied'); assert.equal(h.plugin.activeTasks.size, 0, 'the task is released');
+  h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined); assert.equal(chat.stage, null);
+});
+
+integrationTest('map chat 18 counter-example: Stop and Resend together, either order, end as Stopped and send nothing more', async () => {
+  for (const order of ['stop-then-resend', 'resend-then-stop-at-once', 'resend-sent-then-stop']) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+    h.control.reply = (request, signal) => new Promise((resolve, reject) => { attempts.push({ signal, resolve, reject }); signal.addEventListener('abort', () => reject(new Error('aborted'))); });
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+    const resend = resendButton(chat);
+    if (order === 'stop-then-resend') { chat.stopEl.click(); resend.click(); } else if (order === 'resend-then-stop-at-once') { resend.click(); chat.stopEl.click(); } else { resend.click(); await until(() => attempts.length === 2); chat.stopEl.click(); }
+    await sending;
+    assert.equal(chat.transcript().at(-1).text, 'Stopped.', `${order}: ends as stopped`); assert.equal(chat.isBusy, false); assert.equal(chat.stage, null); assert.equal(slowNotice(chat), undefined);
+    assert.equal(attempts.length, order === 'resend-sent-then-stop' ? 2 : 1, `${order}: a request that was stopped before it went out is never sent`); assert.ok(attempts.every(a => a.signal.aborted), 'every request is aborted'); assert.equal(h.plugin.activeTasks.size, 0);
+    h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined); assert.equal(chat.transcript().at(-1).text, 'Stopped.');
+  }
+});
+
+integrationTest('map chat 18: the 3-minute timeout still ends a slow turn and clears the notice; a resent turn too', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (_request, _signal) => new Promise((resolve, reject) => { attempts.push({ resolve, reject }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); assert.ok(slowNotice(chat));
+  resendButton(chat).click(); await until(() => attempts.length === 2); h.clock.advance(20_000); assert.ok(slowNotice(chat));
+  attempts[1].reject(Object.assign(new Error('Map chat timed out'), { name: 'MapChatError', code: 'failed' })); await sending;
+  assert.equal(chat.isBusy, false); assert.equal(slowNotice(chat), undefined); assert.equal(chat.transcript().at(-1).error, true); assert.equal(chat.stage, null); assert.equal(h.plugin.activeTasks.size, 0); assert.equal(h.intervals.size, 0, 'no one-second timer left');
+  h.clock.advance(120_000); assert.equal(slowNotice(chat), undefined);
+});
+
+integrationTest('map chat 18: "Say it in more detail" keeps its mode through a resend, and a resent answer that needs a plan still shows the plan card', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request) => new Promise(resolve => { attempts.push({ request, resolve }); });
+  const origin = { text: 'why', chips: [], selectedIds: [] };
+  const detail = h.view.sendMapChat(origin); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
+  assert.equal(attempts[0].request.style, 'detailed'); assert.equal(attempts[1].request.style, 'detailed', 'the resend keeps the detailed mode'); assert.equal(attempts[1].request.redo, true); assert.equal(attempts[1].request.message, attempts[0].request.message);
+  attempts[1].resolve({ reply: 'More detail.', actions: [], rejected: [] }); await detail; assert.equal(chat.transcript().at(-1).text, 'More detail.');
+  chat.reset(); attempts.length = 0; h.type('add many'); const planned = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000); resendButton(chat).click(); await until(() => attempts.length === 2);
+  attempts[1].resolve({ reply: 'sixteen cards', actions: Array.from({ length: 16 }, (_, i) => ({ kind: 'add_child', parentId: h.ids.root, title: `Card ${i}`, summary: '' })), rejected: [] }); await planned;
+  assert.equal(planCard(h).length, 1, 'the plan card shows after a resend'); assert.equal(chat.pendingPlan().state, 'pending'); assert.equal(slowNotice(chat), undefined); assert.equal(h.control.mutates, 0, 'nothing was written before Apply');
+});
+
+integrationTest('map chat 18: a Claude stream-mode event alone (before any model event) is not a model event, and closing the view leaves no live notice', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress;
+  h.control.reply = async (_request, _signal, _onReply, onProgress) => { progress = onProgress; await gate.promise; return { reply: 'x', actions: [], rejected: [] }; };
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+  progress({ kind: 'stream-mode', mode: 'stream-json' }); h.clock.advance(20_000); assert.ok(slowNotice(chat), 'only a real model event stops the watch');
+  await h.view.onClose(); gate.resolve(); await sending; assert.equal(chat.stage, null);
+});
+
+integrationTest('map chat 18 counter-example: Codex "started" (any item, even the echo of our own prompt, ~3 s in) is not a model event; the notice still shows at 20 s, and writing or text removes it', async () => {
+  for (const later of [{ kind: 'activity', activity: 'writing' }, { kind: 'text' }]) {
+    const h = await harness(); await h.view.hydrate(); const chat = h.open(); const gate = deferred(); let progress; let onText;
+    h.control.reply = async (_request, _signal, onReply, onProgress) => { progress = onProgress; onText = onReply; await gate.promise; return { reply: 'ok', actions: [], rejected: [] }; };
+    h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat);
+    h.clock.advance(3_000); progress({ kind: 'activity', activity: 'started' });
+    assert.equal(chat.stage.kind, 'waiting', 'started does not move the stage');
+    h.clock.advance(16_900); assert.equal(slowNotice(chat), undefined, '19.9 s: not yet');
+    h.clock.advance(100); assert.ok(slowNotice(chat), 'started 17 s ago did not stop the watch: the notice shows at 20 s');
+    if (later.kind === 'text') onText('Hel'); else progress(later);
+    assert.equal(slowNotice(chat), undefined, `${later.kind}: removes the notice`);
+    gate.resolve(); await sending;
+  }
+});
+
+integrationTest('map chat 18: pressing Resend moves the focus to Stop instead of letting it fall to the page', async () => {
+  const h = await harness(); await h.view.hydrate(); const chat = h.open(); const attempts = [];
+  h.control.reply = (request, signal, onReply, onProgress) => new Promise(resolve => { attempts.push({ resolve }); });
+  h.type('go'); const sending = h.view.sendMapChat(); await requestOut(chat); h.clock.advance(20_000);
+  const button = resendButton(chat); button.focus(); assert.equal(h.page.doc.activeElement, button);
+  button.click(); await until(() => attempts.length === 2);
+  assert.equal(h.page.doc.activeElement, chat.stopEl, 'the focus is on Stop');
+  attempts[1].resolve({ reply: 'ok', actions: [], rejected: [] }); await sending;
 });

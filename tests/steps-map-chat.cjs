@@ -835,6 +835,21 @@ test('B3 progress hooks: Claude onFirstEvent and Codex onActivity reach the chat
   assert.deepEqual(late, [], 'an event that arrives after Stop changes nothing');
 });
 
+// Ticket 18: whether Claude's events can be watched at all (json mode cannot) reaches the chat caller, so no false slow notice is shown.
+test('B3 progress hooks 18: the stream mode reaches the chat caller as a stream-mode event, and nothing after a stop', async () => {
+  const runtime = { runTask: async (...args) => { const controls = args[4]; controls.onStreamMode?.('json'); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const options = { pluginDirectory: () => '/plugin', exchangeLoggingEnabled: () => false, exchanges: () => null, codexRuntime: () => runtime, claudeRuntime: () => runtime };
+  const service = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, options, new Map())));
+  const events = [];
+  await service.chat(request({ model: 'gpt-6-luna' }), new AbortController().signal, undefined, event => events.push(event));
+  assert.deepEqual(JSON.parse(JSON.stringify(events)), [{ kind: 'stream-mode', mode: 'json' }]);
+  const stopper = new AbortController(); const late = [];
+  const slow = { runTask: async (...args) => { stopper.abort(); args[4].onStreamMode?.('json'); return JSON.stringify({ reply: 'ok', actions: [] }); } };
+  const stopped = new MapChatService(providerMapChatRunner(aiCallsFor(mapChatService, { ...options, codexRuntime: () => slow }, new Map())));
+  await assert.rejects(stopped.chat(request({ model: 'gpt-6-luna' }), stopper.signal, undefined, event => late.push(event)));
+  assert.deepEqual(late, []);
+});
+
 // Ticket 17: Codex streams its message text; the chat shows only the decoded `reply`, never the JSON around it.
 const explanation = 'I will answer now.';
 const codexTurn = async (texts, { model = 'gpt-6-luna', abortAfter = -1, answer = JSON.stringify({ reply: 'final', actions: [] }) } = {}) => {

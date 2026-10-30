@@ -816,6 +816,8 @@ var en = {
   "ui.subtopic_names_must_be_unique": "Subtopic names must be unique.",
   "ui.create_subtopics_without_research": "Create subtopics without research",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota": "Each new subtopic gets a short research pass, using AI quota",
+  "ui.layout_direction_right": "Lay out to the right",
+  "ui.layout_direction_left": "Lay out to the left",
   "ui.auto_layout": "Auto layout",
   "ui.layout": "Layout",
   "ui.expansion_failed": "Expansion failed",
@@ -2846,6 +2848,8 @@ var zhCN = {
   "ui.subtopic_names_must_be_unique": "\u5B50\u8BAE\u9898\u540D\u79F0\u4E0D\u80FD\u91CD\u590D\u3002",
   "ui.create_subtopics_without_research": "\u53EA\u521B\u5EFA\u5B50\u8BAE\u9898\uFF0C\u4E0D\u8FD0\u884C\u7814\u7A76",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota": "\u521B\u5EFA\u540E\u4F1A\u9010\u4E00\u505A\u7B80\u77ED\u7814\u7A76\uFF0C\u4F1A\u4F7F\u7528 AI \u989D\u5EA6",
+  "ui.layout_direction_right": "\u5411\u53F3\u6392\u5217",
+  "ui.layout_direction_left": "\u5411\u5DE6\u6392\u5217",
   "ui.auto_layout": "\u81EA\u52A8\u6392\u7248",
   "ui.layout": "\u6392\u7248",
   "ui.expansion_failed": "\u5C55\u5F00\u5931\u8D25",
@@ -4876,6 +4880,8 @@ var zhTW = {
   "ui.subtopic_names_must_be_unique": "\u5B50\u8B70\u984C\u540D\u7A31\u4E0D\u80FD\u91CD\u8907\u3002",
   "ui.create_subtopics_without_research": "\u53EA\u5EFA\u7ACB\u5B50\u8B70\u984C\uFF0C\u4E0D\u57F7\u884C\u7814\u7A76",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota": "\u5EFA\u7ACB\u5F8C\u6703\u9010\u4E00\u505A\u7C21\u77ED\u7814\u7A76\uFF0C\u6703\u4F7F\u7528 AI \u984D\u5EA6",
+  "ui.layout_direction_right": "\u5F80\u53F3\u6392\u5217",
+  "ui.layout_direction_left": "\u5F80\u5DE6\u6392\u5217",
   "ui.auto_layout": "\u81EA\u52D5\u6392\u7248",
   "ui.layout": "\u6392\u7248",
   "ui.expansion_failed": "\u5C55\u958B\u5931\u6557",
@@ -17262,6 +17268,15 @@ function relationLabelPoint(a, b) {
   const { p1, c1, c2, p2 } = curveOf(a, b);
   return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
 }
+function treeEdgePathData(parent, child, direction) {
+  const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
+  if (direction === "left") {
+    const x12 = parent.x, x22 = child.x + child.width, bend2 = Math.max(60, Math.abs(x22 - x12) / 2);
+    return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
+  }
+  const x1 = parent.x + parent.width, x2 = child.x, bend = Math.max(60, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+}
 
 // experiences/visual-map/topic-kind-shape.ts
 var TOPIC_KIND_SHAPES = {
@@ -18441,6 +18456,15 @@ var COLUMN = 360;
 var WIDTH = 300;
 var LAYOUT_GAP = 24;
 var DEFAULT_CARD_HEIGHT = 180;
+function isLayoutDirection(value) {
+  return value === "right" || value === "left";
+}
+function layoutDirectionOf(map) {
+  var _a2;
+  if (!map || map.aim) return "right";
+  const direction = (_a2 = map.layout) == null ? void 0 : _a2.direction;
+  return isLayoutDirection(direction) ? direction : "right";
+}
 var signOf = (direction) => direction === "left" ? -1 : 1;
 function medianHeight(values) {
   const sorted = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
@@ -39074,7 +39098,9 @@ ${request.requirements}` : preset.text,
         map.nodes,
         parent.id,
         /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]),
-        this.cardHeightOf
+        this.cardHeightOf,
+        void 0,
+        layoutDirectionOf(map)
       );
     });
   }
@@ -39113,7 +39139,7 @@ ${request.requirements}` : preset.text,
       if (changed) {
         await this.mapChange((map) => {
           applyCollapseLevel(map.nodes, shownLevels);
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         });
         if (this.history.undoEntry) this.history.undoEntry.label = t("ui.collapse_levels");
         this.updateHistoryButtons();
@@ -39124,9 +39150,21 @@ ${request.requirements}` : preset.text,
   autoLayout() {
     this.enqueue(
       () => this.mapChange((map) => {
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
       }, false)
     );
+  }
+  /** Stores the map's layout direction ("right" removes the field) and re-arranges the whole map in one undo step. */
+  setLayoutDirection(direction) {
+    this.enqueue(async () => {
+      if (!this.map || this.map.aim || this.builtIn) return;
+      await this.mapChange((map) => {
+        if (direction === "right") delete map.layout;
+        else map.layout = { direction };
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, direction);
+      }, false);
+      this.fit();
+    });
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
   openLayoutMenu(event) {
@@ -39141,6 +39179,17 @@ ${request.requirements}` : preset.text,
         (item) => item.setTitle(choice2.title).setIcon(choice2.icon).onClick(() => this.collapseTo(choice2.levels))
       );
     menu.addSeparator();
+    if (this.map && !this.map.aim && !this.builtIn) {
+      const current = layoutDirectionOf(this.map);
+      const directions = [
+        { direction: "right", title: t("ui.layout_direction_right"), icon: "arrow-right" },
+        { direction: "left", title: t("ui.layout_direction_left"), icon: "arrow-left" }
+      ];
+      for (const choice2 of directions)
+        menu.addItem(
+          (item) => item.setTitle(choice2.title).setIcon(choice2.icon).setChecked(choice2.direction === current).onClick(() => this.setLayoutDirection(choice2.direction))
+        );
+    }
     menu.addItem(
       (item) => item.setTitle(t("ui.auto_layout")).setIcon("workflow").onClick(() => this.autoLayout())
     );
@@ -39323,10 +39372,17 @@ ${request.requirements}` : preset.text,
             const outlineTop = next.nodes.find((node) => node.id === top2.id);
             if (owner2) {
               owner2.collapsed = false;
-              next.nodes = arrangeNewBranch(next.nodes, owner2.id, ids2, this.cardHeightOf);
+              next.nodes = arrangeNewBranch(
+                next.nodes,
+                owner2.id,
+                ids2,
+                this.cardHeightOf,
+                void 0,
+                layoutDirectionOf(next)
+              );
             } else {
               outlineTop.parentId = null;
-              next.nodes = arrangeNewTree(next.nodes, top2.id, ids2, this.cardHeightOf);
+              next.nodes = arrangeNewTree(next.nodes, top2.id, ids2, this.cardHeightOf, layoutDirectionOf(next));
             }
             after = clone(next);
           }).commit();
@@ -40525,7 +40581,14 @@ ${request.requirements}` : preset.text,
       if (adopterId && adopted.size) {
         const adopter = map.nodes.find((item) => item.id === adopterId);
         if (adopter) adopter.collapsed = false;
-        map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf);
+        map.nodes = arrangeNewBranch(
+          map.nodes,
+          adopterId,
+          adopted,
+          this.cardHeightOf,
+          void 0,
+          layoutDirectionOf(map)
+        );
       }
       this.removeAimReferences(map, ids, prior.nodes);
     }).commit();
@@ -40949,7 +41012,15 @@ ${request.requirements}` : preset.text,
           }
         map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
         this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
-        if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
+        if (adopted.size)
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            merged.id,
+            adopted,
+            this.cardHeightOf,
+            void 0,
+            layoutDirectionOf(map)
+          );
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
       this.render();
@@ -41023,7 +41094,15 @@ ${request.requirements}` : preset.text,
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
         this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
-        if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
+        if (adopted.size)
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            target.id,
+            adopted,
+            this.cardHeightOf,
+            void 0,
+            layoutDirectionOf(map)
+          );
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
       this.render();
@@ -41237,7 +41316,7 @@ ${request.requirements}` : preset.text,
         for (const id of descendants(map.nodes, root.id)) moved.add(id);
       }
       map.nodes.find((node) => node.id === target.id).collapsed = false;
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf);
+      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, void 0, layoutDirectionOf(map));
     });
     this.multiSelected.clear();
     this.render();
@@ -41339,7 +41418,14 @@ ${request.requirements}` : preset.text,
         if (!found) throw new Error(t("ui.outline_import_selected_missing"));
         map.nodes.push(...copies);
         found.collapsed = false;
-        map.nodes = arrangeNewBranch(map.nodes, target.id, new Set(copies.map((copy) => copy.id)), this.cardHeightOf);
+        map.nodes = arrangeNewBranch(
+          map.nodes,
+          target.id,
+          new Set(copies.map((copy) => copy.id)),
+          this.cardHeightOf,
+          void 0,
+          layoutDirectionOf(map)
+        );
       }).commit();
     } catch (error) {
       this.render();
@@ -42690,7 +42776,7 @@ ${request.requirements}` : preset.text,
           () => this.mapChange((map) => {
             const n = map.nodes.find((n2) => n2.id === node.id);
             n.collapsed = !n.collapsed;
-            map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+            map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
           })
         )
       );
@@ -43034,7 +43120,7 @@ ${request.requirements}` : preset.text,
     return this.relevanceSortOn() ? relevanceDisplayNodes(nodes, (id) => {
       var _a2, _b2;
       return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.relevance) == null ? void 0 : _b2.tier;
-    }, superseded) : nodes;
+    }, superseded, layoutDirectionOf(this.map)) : nodes;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
   keyboardNeighbor(node, key2) {
@@ -43046,8 +43132,10 @@ ${request.requirements}` : preset.text,
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key2)) return void 0;
     const shown = this.canvasNodes();
     const byY = (a, b) => a.y - b.y || a.x - b.x;
-    if (key2 === "ArrowLeft") return shown.find((item) => item.id === node.parentId);
-    if (key2 === "ArrowRight") return shown.filter((item) => item.parentId === node.id).sort(byY)[0];
+    const left = layoutDirectionOf(this.map) === "left";
+    if (key2 === (left ? "ArrowRight" : "ArrowLeft")) return shown.find((item) => item.id === node.parentId);
+    if (key2 === (left ? "ArrowLeft" : "ArrowRight"))
+      return shown.filter((item) => item.parentId === node.id).sort(byY)[0];
     const siblings = shown.filter((item) => {
       var _a2, _b2;
       return ((_a2 = item.parentId) != null ? _a2 : null) === ((_b2 = node.parentId) != null ? _b2 : null);
@@ -43701,8 +43789,15 @@ ${request.requirements}` : preset.text,
           const parent2 = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
           if (parent2) {
             parent2.collapsed = false;
-            map.nodes = arrangeNewBranch(map.nodes, parent2.id, branch, this.cardHeightOf);
-          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
+            map.nodes = arrangeNewBranch(
+              map.nodes,
+              parent2.id,
+              branch,
+              this.cardHeightOf,
+              void 0,
+              layoutDirectionOf(map)
+            );
+          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutDirectionOf(map));
         });
       });
     };
@@ -44376,7 +44471,14 @@ ${request.requirements}` : preset.text,
             var _a3;
             return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
           })) + LAYOUT_GAP : void 0;
-          map.nodes = arrangeNewBranch(map.nodes, owner.id, /* @__PURE__ */ new Set([node.id]), this.cardHeightOf, minTop);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            owner.id,
+            /* @__PURE__ */ new Set([node.id]),
+            this.cardHeightOf,
+            minTop,
+            layoutDirectionOf(map)
+          );
         } else if (!parent) {
           const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
           if (roots.length)
@@ -44652,7 +44754,14 @@ ${request.requirements}` : preset.text,
       if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
       if (newNodes.length)
         await this.mapChange((map) => {
-          map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map((node) => node.id)), this.cardHeightOf);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            parent.id,
+            new Set(newNodes.map((node) => node.id)),
+            this.cardHeightOf,
+            void 0,
+            layoutDirectionOf(map)
+          );
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map((node) => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
@@ -44710,7 +44819,14 @@ ${request.requirements}` : preset.text,
         );
         if (!untouched.size) return;
         const current = this.map.nodes;
-        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const arranged = arrangeNewBranch(
+          current,
+          parent.id,
+          untouched,
+          this.cardHeightOf,
+          void 0,
+          layoutDirectionOf(this.map)
+        );
         const target = /* @__PURE__ */ new Map();
         arranged.forEach((n, index) => {
           if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
@@ -48237,6 +48353,7 @@ ${addition}` : addition });
    */
   dragEdges(id, card) {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
+    const direction = layoutDirectionOf(this.map);
     const touching = [];
     for (const key2 of this.edgeEls.keys()) {
       const [parentId, childId] = key2.split("\0");
@@ -48271,7 +48388,13 @@ ${addition}` : addition });
         for (const edge of touching) {
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
-          if (edge.dragIsParent)
+          if (direction !== "right") {
+            const mine = { x, y, ...size };
+            path.setAttribute(
+              "d",
+              edge.dragIsParent ? treeEdgePathData(mine, edge.far, direction) : treeEdgePathData(edge.far, mine, direction)
+            );
+          } else if (edge.dragIsParent)
             path.setAttribute(
               "d",
               edgePathData(x + size.width, y + size.height / 2, edge.far.x, edge.far.y + edge.far.height / 2)
@@ -48293,6 +48416,7 @@ ${addition}` : addition });
     const related = new Set(
       this.relationsEnabled() ? ((_a2 = this.map.topicRelations) != null ? _a2 : []).map((r) => relationPairKey(r.from, r.to)) : []
     );
+    const direction = layoutDirectionOf(this.map);
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -48302,12 +48426,12 @@ ${addition}` : addition });
         const path = createSvg("path");
         path.setAttribute(
           "d",
-          edgePathData(
+          direction === "right" ? edgePathData(
             parent.offsetLeft + parent.offsetWidth,
             parent.offsetTop + parent.offsetHeight / 2,
             child.offsetLeft,
             child.offsetTop + child.offsetHeight / 2
-          )
+          ) : treeEdgePathData(boxOf(parent), boxOf(child), direction)
         );
         path.addClass("vam-edge");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");

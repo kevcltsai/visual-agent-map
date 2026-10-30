@@ -219,4 +219,167 @@ test('L9: the relevance display layout follows the left direction', () => {
   assert.ok(at(left, 'a').y < at(left, 'b').y, 'still sorted by relevance');
 });
 
+// ---- P2: the view. A real view over a fake vault, as in tests/steps-layout-history.cjs. ----
+const support = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const MAP = 'Agent Workspace/Topics/map-d/Map.md';
+const RIGHT_TITLE = 'Lay out to the right', LEFT_TITLE = 'Lay out to the left';
+
+/** `spec` is [title, parentTitle|null, x, y] per node; `extra` is merged into the map before it is saved. */
+async function harness(spec, extra = {}) {
+  const { repo, app } = support.fixture('en', { linkIndex: true });
+  const settings = { ...support.DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
+  repo.settings = settings;
+  const mapDoc = { id: 'map-d', title: 'Direction', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-d');
+  const byTitle = new Map();
+  for (const [title, parentTitle, x, y] of spec) {
+    const created = await repo.createNote(title, 'gpt-6-luna', mapDoc, MAP, 'workspace');
+    Object.assign(created, { parentId: parentTitle ? byTitle.get(parentTitle).id : null, x, y });
+    byTitle.set(title, created);
+    mapDoc.nodes.push(created);
+  }
+  Object.assign(mapDoc, extra);
+  await app.vault.create(MAP, support.core.serializeMap(mapDoc));
+  await repo.rebuildDerivedData();
+  const menus = [];
+  class Menu {
+    constructor() { this.items = []; menus.push(this); }
+    addItem(callback) { const item = { checked: undefined, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, setChecked(value) { this.checked = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; }
+    addSeparator() { this.items.push({ separator: true }); return this; }
+    showAtMouseEvent() { return this; }
+  }
+  const Base = dom.makeModal();
+  class Modal extends Base { open() { super.open(); this.close(); } }
+  const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } });
+  const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
+  let pending = Promise.resolve();
+  const plugin = support.withExpansionCoordinator({
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    mutate: work => (pending = Promise.resolve().then(work))
+  });
+  const view = new VisualAgentMapView({ app }, plugin);
+  view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = dom.element('div'); view.stageEl = dom.element('div');
+  let fits = 0;
+  view.focusNode = () => {}; view.openDetails = () => {}; view.render = () => {}; view.fit = () => { fits++; };
+  view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
+  await view.hydrate();
+  view.cardHeightOf = () => 180;
+  const named = title => view.map.nodes.find(n => view.notes.get(n.id)?.title === title);
+  const menuTitles = () => menus.at(-1).items.map(item => (item.separator ? '---' : item.title));
+  const choose = async title => { view.openLayoutMenu({}); menus.at(-1).items.find(item => item.title === title).click(); await pending; await pending; };
+  return { repo, view, named, menus, menuTitles, choose, settled: () => pending, fits: () => fits, saved: () => repo.readMap(MAP), createSvg };
+}
+// A card-sized DOM stand-in (as in tests/steps-map-keyboard.cjs): one handler per event name, writable text.
+const stub = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, isConnected: true,
+  createDiv(value) { return this.createEl('div', typeof value === 'string' ? { cls: value } : value); },
+  createSpan(value) { return this.createEl('span', typeof value === 'string' ? { cls: value } : value); },
+  createEl(name, value = {}) { const child = stub(name, value); child.parent = this; this.children.push(child); return child; },
+  setAttr(name, value) { this.attrs[name] = value; }, addClass(...names) { names.forEach(name => this.classes.add(name)); }, removeClass(name) { this.classes.delete(name); },
+  toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
+  setPointerCapture() {}, focus() {}, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
+  querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
+const findAll = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => findAll(c, predicate))];
+const tree4 = [['Root', null, 1000, 80], ['A', 'Root', 1360, 0], ['B', 'Root', 1360, 300], ['A1', 'A', 1720, 0]];
+const LEFT_MAP = { layout: { direction: 'left' } };
+
+test('V1: choosing Lay out to the left writes the field and the left layout in one undo step; right deletes the field', async () => {
+  const h = await harness(tree4);
+  const positions = () => JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const before = positions();
+  h.view.openLayoutMenu({});
+  const items = h.menus.at(-1).items;
+  assert.equal(items.find(item => item.title === RIGHT_TITLE).checked, true, 'right is checked on an old map');
+  assert.equal(items.find(item => item.title === LEFT_TITLE).checked, false);
+  const writes = h.view.history.past.length;
+  await h.choose(LEFT_TITLE);
+  assert.equal(h.view.history.past.length, writes + 1, 'one history entry');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.layout)), { direction: 'left' });
+  assert.deepEqual(JSON.parse(JSON.stringify((await h.saved()).layout)), { direction: 'left' }, 'stored in Map.md');
+  const root = h.named('Root');
+  assert.equal(h.named('A').x, root.x - 360); assert.equal(h.named('B').x, root.x - 360); assert.equal(h.named('A1').x, root.x - 720);
+  assert.equal(h.fits(), 1, 'the map is fitted after the change');
+  await h.view.travel(false);
+  assert.equal('layout' in h.view.map, false, 'undo removes the field'); assert.equal(positions(), before, 'undo restores the coordinates');
+  assert.equal('layout' in (await h.saved()), false);
+  await h.view.travel(true);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.view.map.layout)), { direction: 'left' }, 'redo applies it again');
+  h.view.openLayoutMenu({});
+  assert.equal(h.menus.at(-1).items.find(item => item.title === LEFT_TITLE).checked, true, 'left is checked on a left map');
+  await h.choose(RIGHT_TITLE);
+  assert.equal('layout' in h.view.map, false, 'right deletes the field instead of writing it');
+  assert.equal('layout' in (await h.saved()), false);
+  assert.equal(h.named('A').x, h.named('Root').x + 360);
+});
+
+const edgeHost = () => ({ children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); } });
+const card = (x, y, width = 300, height = 180) => ({ offsetLeft: x, offsetTop: y, offsetWidth: width, offsetHeight: height });
+
+test('V2: in a left map the parent line leaves the parent\'s left edge for the child\'s right edge; right maps keep the old curve', async () => {
+  for (const [extra, expected] of [[LEFT_MAP, 'M 1000 170 C 820 170, 820 90, 640 90'], [{}, 'M 1300 170 C 1360 170, 1300 90, 1360 90']]) {
+    const h = await harness(tree4.slice(0, 2), extra);
+    const root = h.named('Root'), a = h.named('A');
+    h.view.edgesEl = edgeHost(); h.view.relationsLayerEl = edgeHost();
+    h.view.cardEls.set(root.id, card(1000, 80)); h.view.cardEls.set(a.id, card(extra.layout ? 340 : 1360, 0));
+    h.view.drawEdges();
+    const path = h.view.edgesEl.children[0];
+    assert.equal(path.attrs.d, expected);
+    if (extra.layout) {
+      assert.ok(path.attrs.d.startsWith(`M ${h.view.cardEls.get(root.id).offsetLeft} `), 'starts at the parent\'s offsetLeft');
+      const drag = h.view.dragEdges(root.id, { offsetWidth: 300, offsetHeight: 180 });
+      drag.update(1100, 80);
+      assert.equal(h.view.edgeEls.get(`${root.id}\u0000${a.id}`).attrs.d, 'M 1100 170 C 870 170, 870 90, 640 90', 'dragging the parent keeps the left geometry');
+    }
+  }
+});
+
+test('V3: in a left map ArrowLeft goes to the first child and ArrowRight to the parent', async () => {
+  const h = await harness(tree4, LEFT_MAP);
+  const root = h.named('Root'), a = h.named('A');
+  assert.equal(h.view.keyboardNeighbor(root, 'ArrowLeft').id, a.id);
+  assert.equal(h.view.keyboardNeighbor(a, 'ArrowRight').id, root.id);
+  assert.equal(h.view.keyboardNeighbor(root, 'ArrowRight'), undefined);
+  const right = await harness(tree4);
+  assert.equal(right.view.keyboardNeighbor(right.named('Root'), 'ArrowRight').id, right.named('A').id, 'right maps keep their keys');
+  assert.equal(right.view.keyboardNeighbor(right.named('A'), 'ArrowLeft').id, right.named('Root').id);
+});
+
+test('V4: in a left map new, moved and copied topics and a fold re-layout go to the left of their parent', async () => {
+  const spec = [['Root', null, 1000, 80], ['Target', 'Root', 640, 0], ['Src', 'Root', 640, 400], ['Leaf', 'Src', 280, 400]];
+  const h = await harness(spec, LEFT_MAP);
+  await h.view.addNode(h.named('Root'), 'Added');
+  assert.ok(h.named('Added').x < h.named('Root').x, 'addNode');
+  h.view.mergeUnlocked = () => true;
+  h.view.multiSelected = new Set([h.named('Src').id]);
+  await h.view.copySelected(h.named('Target'));
+  const copies = h.view.map.nodes.filter(n => n.parentId === h.named('Target').id);
+  assert.equal(copies.length, 1);
+  assert.ok(copies[0].x < h.named('Target').x, 'copySelected');
+  h.view.multiSelected = new Set([h.named('Src').id]);
+  await h.view.moveSelected(h.named('Target'));
+  assert.ok(h.named('Src').x < h.named('Target').x && h.named('Leaf').x < h.named('Src').x, 'moveSelected');
+  const stage = stub('div');
+  h.view.stageEl = stage;
+  h.view.renderNode(h.named('Target'));
+  const collapse = findAll(stage, item => item.tag === 'button' && item.classes.has('vam-collapse-button'))[0];
+  assert.ok(collapse, 'the card has a fold button');
+  collapse.handlers.get('click')({ stopPropagation() {} }); await h.settled(); await h.settled();
+  assert.equal(h.named('Target').collapsed, true);
+  for (const child of h.view.map.nodes.filter(n => n.parentId === h.named('Root').id)) assert.ok(child.x < h.named('Root').x, `${child.id} after the fold`);
+});
+
+test('V5: an AIM map and the built-in sample offer no direction in the Layout menu', async () => {
+  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
+  const h = await harness(tree4);
+  h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  h.view.openLayoutMenu({});
+  assert.deepEqual(h.menuTitles(), original);
+  h.view.map.aim = undefined; h.view.builtIn = true;
+  h.view.openLayoutMenu({});
+  assert.deepEqual(h.menuTitles(), original);
+  h.view.builtIn = false;
+  h.view.openLayoutMenu({});
+  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Auto layout']);
+});
+
 module.exports = { layout, node, snap, sample, sampleHeight, folded, converging, sized, sizedHeight, branchBase };

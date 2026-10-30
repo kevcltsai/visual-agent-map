@@ -962,7 +962,7 @@ integrationTest('structure panel: a parent change waits for Apply, says what wil
   const nodes = [{ id: 'a', path: 'A.md', parentId: null }, { id: 'b', path: 'B.md', parentId: null }, { id: 'c', path: 'C.md', parentId: 'a' }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {},
+    renderHypothesisSection() {}, renderAddSubtopic() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -2074,8 +2074,9 @@ integrationTest('hypothesis-evidence: the panel "Add subtopic…" opens the six-
   const { view, menus } = heFixture();
   const calls = []; view.addNode = (...args) => calls.push(args.map(a => (a && a.id) ?? a)); view.enqueue = work => work();
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[2]);
-  assert.equal(dom.buttons(panel).includes('Add sub-hypothesis'), false);
-  dom.button(panel, 'Add subtopic…').click();
+  assert.equal(dom.buttons(panel).includes('Add sub-hypothesis'), false); assert.equal(dom.buttons(panel).includes('Add subtopic…'), false, 'the entry moved out of the body into the footer (C3)');
+  const footer = dom.element('actions'); view.renderAddSubtopic(footer, view.map.nodes[2]);
+  dom.button(footer, 'Add subtopic…').click();
   assert.equal(menus.length, 1); assert.deepEqual(menus[0].titles, heKindNames);
   menus[0].clicks.forEach(click => click());
   assert.deepEqual(calls, heKindIds.map(kind => ['other', undefined, true, true, kind]));
@@ -2181,7 +2182,7 @@ integrationTest('hypothesis-evidence: the panel type control is a labelled group
   view.pendingKinds = new Map();
   view.plugin.repo.writeTopicKind = async (path, kind) => view.pendingKinds.set(path.replace('.md', ''), kind);
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
-  const group = () => dom.find(panel, c => c.cls.includes('vam-topic-kinds'));
+  const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-kinds'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Topic type');
   const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
   assert.deepEqual(dom.findAll(group(), c => c.tag === 'button').map(c => c.text), heKindNames);
@@ -2499,7 +2500,7 @@ integrationTest('hypothesis-evidence: adding and removing a relation in the pane
   const changes = []; view.enqueue = work => work();
   view.mapChange = async (change, rebuild) => { changes.push(rebuild); change(view.map); };
   const factPanel = dom.element('panel'); view.renderHypothesisSection(factPanel, view.map.nodes[0]);
-  assert.ok(dom.texts(factPanel).includes('Supports → HYP'), 'the linked topic is listed');
+  assert.ok(dom.texts(factPanel).includes('This topic supports HYP'), 'the linked topic is listed as a sentence (C6)');
   const remove = dom.byLabel(factPanel, 'Remove relation: Supports → HYP'); assert.ok(remove);
   await remove.fire('click');
   await dom.tick();
@@ -2533,7 +2534,7 @@ integrationTest('hypothesis-evidence: after a strength change the focus returns 
   view.history = { push() {} };
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
   dom.button(panel, 'Strong').click(); await dom.tick();
-  const pressed = dom.findAll(dom.find(panel, c => c.cls.includes('vam-hypothesis-strengths')), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true');
+  const pressed = dom.findAll(dom.find(panel, c => (c.cls ?? '').includes('vam-hypothesis-strengths')), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true');
   assert.deepEqual(pressed.map(c => c.text), ['Strong']);
   assert.equal(pressed[0].focused, true, 'focus is on the strength button that is now pressed');
 });
@@ -2544,7 +2545,7 @@ integrationTest('hypothesis-evidence: a strength change rewrites the note and Ma
   view.beginMapTransaction = () => tx; view.refreshAfterSavedChange = async () => { view.notes.get('hyp').hypothesisStrength = 'strong'; };
   const pushed = []; view.history = { push: entry => pushed.push(entry) };
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[1]);
-  const pressed = () => dom.findAll(dom.find(panel, c => c.cls.includes('vam-hypothesis-strengths')), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  const pressed = () => dom.findAll(dom.find(panel, c => (c.cls ?? '').includes('vam-hypothesis-strengths')), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
   assert.deepEqual(pressed(), ['Weak']);
   dom.button(panel, 'Weak').click();
   assert.equal(steps.length, 0, 'choosing the current strength does nothing');
@@ -2880,7 +2881,7 @@ integrationTest('hypothesis-evidence: panel rows read "Name → B" going out, "A
   const rows = dom.findAll(panel, c => c.tag === 'li');
   assert.deepEqual(rows.map(r => r.attrs['aria-label']), ['Supports → HYP. measured twice', 'OTHER → Derives from', 'Related — HYP']);
   assert.ok(rows.every(r => r.tabIndex === 0), 'every row can take focus');
-  assert.deepEqual(dom.texts(panel).filter(x => /→|—/.test(x)), ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']);
+  assert.deepEqual(dom.texts(panel).filter(x => /^(This topic|OTHER|HYP|FACT)\b/.test(x)), ['This topic supports HYP', 'OTHER derives from This topic', 'This topic is related to HYP'], 'the visible sentence reads "A relation B" with this topic named (C6, decision 35); the aria-labels above keep the old strings');
   assert.ok(dom.texts(panel).includes('measured twice'));
   for (const text of ['Supports → HYP', 'OTHER → Derives from', 'Related — HYP']) { assert.ok(dom.byLabel(panel, `Edit relation: ${text}`)); assert.ok(dom.byLabel(panel, `Remove relation: ${text}`)); }
   const hypPanel = dom.element('panel'); view.renderHypothesisSection(hypPanel, view.map.nodes[1]);
@@ -3195,4 +3196,123 @@ integrationTest('hypothesis-evidence: relation labels are muted and medium weigh
   const base = css.indexOf(':where([data-node-id]).vam-node:where(:not([data-aim-kind])) {'), running = css.indexOf('.vam-node:not([data-aim-kind])[data-status="running"] {'), selected = css.indexOf('.vam-node.is-selected {');
   assert.ok(base > 0 && base < running && base < selected, 'the frame rule comes before the status and selection rules, which are at least as specific');
   assert.match(css.slice(base, base + 200), /border-color: var\(--background-modifier-border-hover\)/);
+});
+
+// ---- hypothesis-evidence (P20, decision 35): the "Structure and links" dialog ----
+const heDialog = (options = {}, index = 1) => {
+  const fixture = heFixture(options);
+  const { view } = fixture;
+  view.map.nodes.forEach(n => { n.parentId = null; });
+  view.referenceSourcePaths = () => [];
+  const content = dom.element('content'), host = dom.element('modal');
+  view.enqueue = work => work();
+  view.renderInspector(content, view.map.nodes[index], 'structure', () => {}, host);
+  return { ...fixture, content, host, footer: dom.find(host, c => c.cls === 'vam-next-actions') };
+};
+const heCss = () => fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line => line.startsWith(`${selector} {`)); assert.ok(hit, `rule ${selector}`); return hit.slice(hit.indexOf('{') + 1, hit.lastIndexOf('}')); };
+integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
+  const hyp = heDialog({}, 1);
+  const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Parent topic']);
+  const plain = heDialog({}, 0);
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Parent topic'], 'no strength for an ordinary topic');
+  const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
+  assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
+  const css = heCss();
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-section-heading'), /margin: 24px 0 8px;[^}]*font-size: var\(--font-ui-small\); font-weight: 600;/);
+});
+integrationTest('hypothesis-evidence: "Add subtopic…" sits in the footer left of "Remove from map", ahead of the status, "Close" and "Apply"; the body no longer has it (C3)', () => {
+  const { footer, content, menus } = heDialog({}, 1);
+  const buttons = footer.children.filter(c => c.tag === 'button');
+  assert.deepEqual(buttons.map(b => b.text), ['Add subtopic…', 'Remove from map', 'Close', 'Apply']);
+  assert.ok(buttons[0].cls.includes('vam-add-subtopic')); assert.ok(buttons[3].cls.includes('mod-cta'));
+  assert.equal(dom.buttons(content).includes('Add subtopic…'), false);
+  buttons[0].click(); assert.deepEqual(menus.at(-1).titles, heKindNames, 'it still opens the six-type menu');
+  const css = heCss(), order = selector => Number(heRuleBody(css, selector).match(/order: (-?\d)/)[1]);
+  assert.ok(order('.vam-next-actions > .vam-add-subtopic') < order('.vam-next-actions > .vam-discard'), 'the CSS order puts it before Remove');
+  const aim = heDialog({ aim: true }, 1);
+  assert.deepEqual(aim.footer.children.filter(c => c.tag === 'button').map(b => b.text), ['Remove from map', 'Close', 'Apply'], 'an AIM map has no add-subtopic entry');
+});
+integrationTest('hypothesis-evidence: the type and strength options are quiet segmented buttons: no mod-cta, aria-pressed on the current one, a swatch of the type shape on each type, three columns (C4, C5)', () => {
+  const { content } = heDialog({}, 1);
+  const group = dom.find(content, c => (c.cls ?? '').includes('vam-topic-kinds')), strengths = dom.find(content, c => (c.cls ?? '').includes('vam-hypothesis-strengths'));
+  for (const g of [group, strengths]) {
+    assert.equal(g.attrs.role, 'group'); assert.ok(g.attrs['aria-label']);
+    const buttons = dom.findAll(g, c => c.tag === 'button');
+    assert.ok(buttons.every(b => !b.cls.includes('mod-cta')), 'no solid CTA purple');
+    assert.equal(buttons.filter(b => b.attrs['aria-pressed'] === 'true').length, 1);
+    assert.ok(buttons.filter(b => b.attrs['aria-pressed'] === 'true')[0].cls.includes('is-pressed'));
+  }
+  const kindButtons = dom.findAll(group, c => c.tag === 'button');
+  assert.deepEqual(kindButtons.map(b => b.text), heKindNames, 'order of spec section 2');
+  assert.deepEqual(kindButtons.map(b => dom.find(b, c => (c.cls ?? '').includes('vam-type-swatch')).dataset.kind), heKindIds);
+  const shapeOf = kind => { const sw = dom.find(kindButtons[heKindIds.indexOf(kind)], c => (c.cls ?? '').includes('vam-type-swatch')); assert.equal(sw.attrs['aria-hidden'], 'true'); return sw.children[0].children[0]; };
+  assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
+  const css = heCss();
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
+  assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
+});
+integrationTest('hypothesis-evidence: relation rows read "A relation B" with this topic named, show the line sample, a muted note line and two icon buttons that keep the old labels; none shows a muted line (C6)', async () => {
+  const relations = [{ kind: 'supports', from: 'fact', to: 'hyp', description: 'measured twice' }, { kind: 'derives_from', from: 'other', to: 'fact' }, { kind: 'related', from: 'hyp', to: 'fact' }, { kind: 'contradicts', from: 'fact', to: 'other' }];
+  const { view } = heFixture({ relations });
+  view.enqueue = work => work();
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  const rows = dom.findAll(panel, c => c.tag === 'li');
+  assert.deepEqual(rows.map(r => dom.find(r, c => (c.cls ?? '').includes('vam-relation-sentence')).text), ['This topic supports HYP', 'OTHER derives from This topic', 'This topic is related to HYP', 'This topic contradicts OTHER']);
+  assert.equal(dom.find(rows[0], c => (c.cls ?? '').includes('vam-relation-description-text')).text, 'measured twice', 'the note is its own line');
+  assert.equal(dom.find(rows[1], c => (c.cls ?? '').includes('vam-relation-description-text')), undefined);
+  const swatch = row => row.children.find(c => (c.classes ?? []).includes('vam-relation-swatch'));
+  const lines = row => swatch(row).children.filter(c => c.tag === 'path');
+  assert.ok(lines(rows[0])[0].classes.includes('vam-relation') && lines(rows[0])[0].classes.includes('vam-relation-supports'));
+  assert.ok(lines(rows[0])[0].attrs['marker-end'].startsWith('url(#')); assert.equal(lines(rows[2])[0].attrs['marker-end'], undefined, 'related has no arrow');
+  assert.deepEqual(lines(rows[1]).map(l => l.classes.includes('vam-relation-gap')), [false, true], 'a derives-from sample is two rails');
+  const marker = row => swatch(row).children.find(c => c.tag === 'defs').children[0];
+  assert.equal(marker(rows[3]).children.length, 2, 'contradicts keeps the barred arrowhead'); assert.equal(marker(rows[0]).children.length, 1);
+  assert.notEqual(marker(rows[0]).attrs.id, marker(rows[1]).attrs.id, 'every sample has its own marker id');
+  assert.equal(lines(rows[0])[0].attrs['marker-end'], `url(#${marker(rows[0]).attrs.id})`);
+  const tools = dom.findAll(rows[0], c => c.tag === 'button');
+  assert.deepEqual(tools.map(b => b.dataset.icon), ['pencil', 'trash-2']); assert.deepEqual(tools.map(b => b.attrs['aria-label']), ['Edit relation: Supports → HYP', 'Remove relation: Supports → HYP']);
+  assert.ok(tools.every(b => b.cls.includes('clickable-icon')));
+  assert.equal(rows[0].attrs['aria-label'], 'Supports → HYP. measured twice', 'the row name is unchanged');
+  const none = heFixture(); const emptyPanel = dom.element('panel'); none.view.renderHypothesisSection(emptyPanel, none.view.map.nodes[0]);
+  assert.ok(dom.texts(emptyPanel).includes('No relations yet')); assert.equal(dom.findAll(emptyPanel, c => c.tag === 'li').length, 0);
+  const css = heCss();
+  assert.doesNotMatch(heRuleBody(css, '.vam-relation-row'), /space-between/); assert.match(heRuleBody(css, '.vam-relation-row'), /border-top: 1px solid var\(--background-modifier-border\)/);
+  assert.match(heRuleBody(css, '.vam-relation-swatch'), /width: 32px; height: 10px/); assert.match(heRuleBody(css, '.vam-relation-tools .clickable-icon'), /width: 28px; height: 28px/);
+  assert.match(heRuleBody(css, '.vam-relation-description-text'), /color: var\(--text-muted\)/);
+});
+integrationTest('hypothesis-evidence: removing a relation or adding one still repaints, and the focus goes back to "Add relation…" after adding (unchanged keyboard flow, C6)', async () => {
+  const { view, menus, modals } = heFixture({ relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] });
+  view.enqueue = work => work(); view.mapChange = async change => { change(view.map); };
+  const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
+  dom.button(panel, 'Add relation…').click(); menus[0].clicks[4]();
+  modals[0].choose(view.map.nodes[2]); await dom.tick();
+  assert.equal(dom.button(panel, 'Add relation…').focused, true, 'focus returns to the add-relation button');
+  dom.byLabel(panel, 'Remove relation: Supports → HYP').click(); await dom.tick();
+  assert.equal(dom.byLabel(panel, 'Remove relation: Supports → HYP'), undefined);
+});
+integrationTest('hypothesis-evidence: parent-tree rows have a transparent fill, including disabled ones (text-faint), matched above Obsidian button styles without !important, and the tree is capped at min(240px, 40vh) (C7)', () => {
+  const css = heCss();
+  const base = '.vam-topic-modal .vam-topic-tree button.vam-topic-tree-row';
+  assert.match(heRuleBody(css, base), /background: transparent/);
+  const disabled = heRuleBody(css, `${base}:disabled`);
+  assert.match(disabled, /background: transparent/); assert.match(disabled, /color: var\(--text-faint\)/); assert.match(disabled, /opacity: 1/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-topic-tree'), /max-height: min\(240px, 40vh\)/);
+  assert.doesNotMatch(css.split('\n').filter(l => l.includes('.vam-topic-modal')).join('\n'), /!important/);
+  assert.equal(base.split('.').length - 1, 3, 'three classes and an element (0,3,1): more specific than Obsidian button:not(.clickable-icon):hover (0,2,1)');
+  assert.equal(fs.readFileSync(path.join(root, 'ui/topic-tree.ts'), 'utf8').includes('!important'), false);
+});
+integrationTest('hypothesis-evidence: every P20 dialog rule is invisible to the share viewer: its stylesheet is the same with them removed (decision 35)', async () => {
+  const css = heCss();
+  const { parseCss, extractViewerRules } = await import(require('node:url').pathToFileURL(path.join(root, 'scripts/viewer-css.mjs')).href);
+  const mine = /vam-topic-modal|vam-section-heading|vam-add-subtopic|vam-choice-group|vam-type-swatch|vam-relation-(?:row|list|swatch|title|tools|description-text|empty)/;
+  const own = parseCss(css).filter(chunk => mine.test(chunk.prelude));
+  assert.ok(own.length >= 18, `the dialog rules exist (${own.length})`);
+  const viewer = extractViewerRules(css).map(item => item.text).join('\n');
+  for (const chunk of own) assert.equal(viewer.includes(chunk.text), false, `not in the viewer: ${chunk.prelude.slice(0, 60)}`);
+  const without = parseCss(css).filter(chunk => !mine.test(chunk.prelude)).map(chunk => chunk.text).join('\n');
+  assert.equal(extractViewerRules(without).map(item => item.text).join('\n'), viewer, 'byte-identical viewer rules');
+  assert.doesNotMatch(viewer, /vam-topic-modal|vam-type-swatch|vam-relation-swatch|vam-section-heading/);
 });

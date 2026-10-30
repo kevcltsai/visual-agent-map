@@ -443,6 +443,7 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
 }
 /** Unique ids for the arrowhead `<marker>`s: two map tabs share one document, so an id must belong to one view. */
 let relationMarkerSequence = 0;
+let relationSwatchSequence = 0;
 type CardBox = RelationBox;
 /** Below this zoom the relation names are hidden; at it they show. */
 const RELATION_LABEL_MIN_ZOOM = 0.6;
@@ -7745,8 +7746,13 @@ export class VisualAgentMapView extends ItemView {
       );
     }
     if (mode !== "structure") return;
+    // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
+    if (note) this.renderHypothesisSection(panel, node, close);
     const relationship = panel.createDiv("vam-inspector-section");
-    relationship.createEl("strong", { text: t("ui.parent_topic"), cls: "vam-topic-tree-heading" });
+    relationship.createEl("strong", {
+      text: t("ui.parent_topic"),
+      cls: "vam-topic-tree-heading vam-section-heading"
+    });
     let chosenParent = node.parentId ?? "";
     let describe = (): void => {};
     const parentTree = renderTopicTree(relationship, {
@@ -7766,9 +7772,9 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    if (note) this.renderHypothesisSection(panel, node, close);
     // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");
+    if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {
       close?.();
@@ -8047,6 +8053,19 @@ export class VisualAgentMapView extends ItemView {
       ? t("ui.relation_row_out_0_1", name, titleOf(link.to))
       : t("ui.relation_row_in_0_1", titleOf(link.from), name);
   }
+  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". */
+  private relationSentence(link: TopicRelation, selfId: string): string {
+    const self = t("ui.relation_this_topic"),
+      titleOf = (id: string): string => (id === selfId ? self : (this.notes.get(id)?.title ?? id));
+    if (link.kind === "related")
+      return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
+    return t(
+      "ui.relation_sentence_0_1_2",
+      titleOf(link.from),
+      t(RELATION_NAME_KEY[link.kind]).toLocaleLowerCase(),
+      titleOf(link.to)
+    );
+  }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   private openRelationEditor(link: TopicRelation, onChanged?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
@@ -8187,11 +8206,10 @@ export class VisualAgentMapView extends ItemView {
     };
     paint();
   }
-  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
-  private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
+  /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
+  private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {
     if (!this.relationsEnabled() || node.aimKind) return;
-    const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
-    const addChild = section.createEl("button", { text: t("ui.add_subtopic_menu") });
+    const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
     addChild.addEventListener("click", event => {
       event.stopPropagation();
       this.openKindMenu(event, kind => {
@@ -8199,12 +8217,75 @@ export class VisualAgentMapView extends ItemView {
         this.enqueue(() => this.addNode(node, undefined, true, true, kind));
       });
     });
+  }
+  /** One 18px swatch for a type: the card's own outline (TOPIC_KIND_SHAPES), stroked in the type's colour. */
+  private kindSwatch(parent: HTMLElement, kind: TopicKind): void {
+    const swatch = parent.createSpan({ cls: "vam-type-swatch" });
+    swatch.setAttr("aria-hidden", "true");
+    swatch.dataset.kind = kind;
+    let drawn: SVGElement | undefined;
+    const collector = {
+      appendChild: (child: SVGElement) => {
+        drawn = child;
+        return child;
+      }
+    } as unknown as HTMLElement;
+    let svg = renderShapeBackground(collector, kind) ?? drawn;
+    if (!svg) {
+      // A rounded or rectangular type draws no SVG on the card (its CSS frame is the shape); the swatch draws that frame.
+      svg = createSvg("svg");
+      svg.addClass("vam-kind-shape");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("aria-hidden", "true");
+      const frame = createSvg("rect");
+      frame.addClass("vam-kind-outline");
+      for (const [name, value] of [
+        ["x", "0"],
+        ["y", "0"],
+        ["width", "100"],
+        ["height", "100"],
+        ["rx", TOPIC_KIND_SHAPES[kind].shape === "rect" ? "10" : "30"],
+        ["vector-effect", "non-scaling-stroke"]
+      ])
+        frame.setAttribute(name, value);
+      svg.appendChild(frame);
+    }
+    swatch.insertBefore(svg, null);
+  }
+  /** A 32x10 sample of a relation's line (the canvas classes and arrowheads), so a row shows which line to look for. */
+  private relationSwatch(parent: HTMLElement, kind: TopicRelationKind): void {
+    const svg = createSvg("svg"),
+      defs = createSvg("defs"),
+      id = `${this.relationMarkerId}-row${++relationSwatchSequence}`;
+    svg.addClass("vam-relation-swatch");
+    svg.setAttribute("viewBox", "0 0 32 10");
+    svg.setAttribute("aria-hidden", "true");
+    const arrow = kind === "related" ? null : `url(#${id})`;
+    if (arrow) {
+      defs.appendChild(this.relationMarker(id, kind === "contradicts"));
+      svg.appendChild(defs);
+    }
+    for (const gap of kind === "derives_from" ? [false, true] : [false]) {
+      const line = createSvg("path");
+      line.setAttribute("d", "M 0 5 L 32 5");
+      if (arrow) line.setAttribute("marker-end", arrow);
+      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
+      if (!gap) line.addClass(`vam-relation-${kind}`);
+      svg.appendChild(line);
+    }
+    parent.insertBefore(svg, null);
+  }
+  /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
+  private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const section = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section.createDiv("vam-hypothesis-body");
     const paint = (focusStrength = false, focusKind = false, focusAdd = false): void => {
       body.empty();
       const currentKind = this.topicKindOf(node.id);
-      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading" });
-      const kinds = body.createDiv("vam-topic-kinds");
+      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
+      const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
       kinds.setAttr("role", "group");
       kinds.setAttr("aria-label", t("ui.topic_type"));
       for (const option of TOPIC_KINDS) {
@@ -8215,17 +8296,21 @@ export class VisualAgentMapView extends ItemView {
             paint(false, true);
           });
         });
+        this.kindSwatch(choice, option);
         choice.setAttr("aria-pressed", String(option === currentKind));
         if (option === currentKind) {
-          choice.addClass("mod-cta");
+          choice.addClass("is-pressed");
           // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
           if (focusKind) choice.focus();
         }
       }
       if (currentKind === "hypothesis") {
         const current = this.notes.get(node.id)?.hypothesisStrength ?? "weak";
-        body.createEl("strong", { text: t("ui.hypothesis_strength"), cls: "vam-topic-tree-heading" });
-        const group = body.createDiv("vam-hypothesis-strengths");
+        body.createEl("strong", {
+          text: t("ui.hypothesis_strength"),
+          cls: "vam-topic-tree-heading vam-section-heading"
+        });
+        const group = body.createDiv("vam-hypothesis-strengths vam-choice-group");
         group.setAttr("role", "group");
         group.setAttr("aria-label", t("ui.hypothesis_strength"));
         for (const option of HYPOTHESIS_STRENGTHS) {
@@ -8238,7 +8323,7 @@ export class VisualAgentMapView extends ItemView {
           });
           choice.setAttr("aria-pressed", String(option === current));
           if (option === current) {
-            choice.addClass("mod-cta");
+            choice.addClass("is-pressed");
             // Repainting replaced the pressed button; keep the keyboard focus on the one now pressed.
             if (focusStrength) choice.focus();
           }
@@ -8246,7 +8331,7 @@ export class VisualAgentMapView extends ItemView {
       }
       // Relations: every link that starts or ends at this topic, whatever its kind.
       const links = (this.map?.topicRelations ?? []).filter(r => r.from === node.id || r.to === node.id);
-      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading" });
+      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
       if (links.length) {
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
@@ -8254,21 +8339,25 @@ export class VisualAgentMapView extends ItemView {
             text = this.relationRowText(link, node.id),
             described = link.description ? `${text}. ${link.description}` : text;
           this.bindRelationRow(row, link, described);
+          this.relationSwatch(row, link.kind);
           const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-          label.createSpan({ text, attr: { dir: "auto" } });
+          label.createSpan({
+            text: this.relationSentence(link, node.id),
+            cls: "vam-relation-sentence",
+            attr: { dir: "auto" }
+          });
           if (link.description)
             label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-          const edit = this.button(row, t("ui.relation_edit"), () => this.openRelationEditor(link, paint));
-          edit.setAttr("aria-label", t("ui.edit_relation_0", text));
-          const remove = this.button(row, t("ui.remove"), () =>
+          const tools = row.createSpan({ cls: "vam-relation-tools" });
+          this.iconButton(tools, "pencil", t("ui.edit_relation_0", text), () => this.openRelationEditor(link, paint));
+          this.iconButton(tools, "trash-2", t("ui.remove_relation_0", text), () =>
             this.enqueue(async () => {
               await this.removeRelation(link);
               paint();
             })
           );
-          remove.setAttr("aria-label", t("ui.remove_relation_0", text));
         }
-      }
+      } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
       const addRelation = body.createEl("button", { text: t("ui.add_relation") });
       addRelation.addEventListener("click", event => {
         event.stopPropagation();

@@ -579,6 +579,10 @@ var en = {
   "ui.relation_row_out_0_1": "{0} \u2192 {1}",
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_this_topic": "This topic",
+  "ui.relation_sentence_0_1_2": "{0} {1} {2}",
+  "ui.relation_sentence_related_0_1": "{0} is related to {1}",
+  "ui.relations_none": "No relations yet",
   "ui.relation_edit": "Edit",
   "ui.edit_relation_0": "Edit relation: {0}",
   "ui.remove_relation_0": "Remove relation: {0}",
@@ -2596,6 +2600,10 @@ var zhCN = {
   "ui.relation_row_out_0_1": "{0} \u2192 {1}",
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_this_topic": "\u6B64\u8BAE\u9898",
+  "ui.relation_sentence_0_1_2": "{0} {1} {2}",
+  "ui.relation_sentence_related_0_1": "{0} \u4E0E {1} \u76F8\u5173",
+  "ui.relations_none": "\u8FD8\u6CA1\u6709\u5173\u7CFB",
   "ui.relation_edit": "\u7F16\u8F91",
   "ui.edit_relation_0": "\u7F16\u8F91\u5173\u7CFB\uFF1A{0}",
   "ui.remove_relation_0": "\u79FB\u9664\u5173\u7CFB\uFF1A{0}",
@@ -4613,6 +4621,10 @@ var zhTW = {
   "ui.relation_row_out_0_1": "{0} \u2192 {1}",
   "ui.relation_row_in_0_1": "{0} \u2192 {1}",
   "ui.relation_row_related_0_1": "{0} \u2014 {1}",
+  "ui.relation_this_topic": "\u6B64\u8B70\u984C",
+  "ui.relation_sentence_0_1_2": "{0} {1} {2}",
+  "ui.relation_sentence_related_0_1": "{0} \u8207 {1} \u76F8\u95DC",
+  "ui.relations_none": "\u9084\u6C92\u6709\u95DC\u4FC2",
   "ui.relation_edit": "\u7DE8\u8F2F",
   "ui.edit_relation_0": "\u7DE8\u8F2F\u95DC\u4FC2\uFF1A{0}",
   "ui.remove_relation_0": "\u79FB\u9664\u95DC\u4FC2\uFF1A{0}",
@@ -36797,6 +36809,7 @@ function edgePathData(x1, y1, x2, y2) {
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 var relationMarkerSequence = 0;
+var relationSwatchSequence = 0;
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
 var boxOf = (card) => ({
@@ -43457,8 +43470,12 @@ ${request.requirements}` : preset.text,
       );
     }
     if (mode !== "structure") return;
+    if (note) this.renderHypothesisSection(panel, node, close);
     const relationship = panel.createDiv("vam-inspector-section");
-    relationship.createEl("strong", { text: t("ui.parent_topic"), cls: "vam-topic-tree-heading" });
+    relationship.createEl("strong", {
+      text: t("ui.parent_topic"),
+      cls: "vam-topic-tree-heading vam-section-heading"
+    });
     let chosenParent = (_g = node.parentId) != null ? _g : "";
     let describe = () => {
     };
@@ -43482,8 +43499,8 @@ ${request.requirements}` : preset.text,
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    if (note) this.renderHypothesisSection(panel, node, close);
     const actions = (host != null ? host : panel).createDiv("vam-next-actions");
+    if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
     remove.addEventListener("click", () => {
       close == null ? void 0 : close();
@@ -43746,6 +43763,21 @@ ${request.requirements}` : preset.text,
       return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
     return link.from === selfId ? t("ui.relation_row_out_0_1", name, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name);
   }
+  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". */
+  relationSentence(link, selfId) {
+    const self = t("ui.relation_this_topic"), titleOf = (id) => {
+      var _a2, _b2;
+      return id === selfId ? self : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
+    };
+    if (link.kind === "related")
+      return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
+    return t(
+      "ui.relation_sentence_0_1_2",
+      titleOf(link.from),
+      t(RELATION_NAME_KEY[link.kind]).toLocaleLowerCase(),
+      titleOf(link.to)
+    );
+  }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   openRelationEditor(link, onChanged) {
     if (!this.map || !this.relationsEnabled()) return;
@@ -43875,11 +43907,10 @@ ${request.requirements}` : preset.text,
     };
     paint();
   }
-  /** "Add subtopic…", the six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
-  renderHypothesisSection(panel, node, close) {
+  /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
+  renderAddSubtopic(actions, node, close) {
     if (!this.relationsEnabled() || node.aimKind) return;
-    const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
-    const addChild = section3.createEl("button", { text: t("ui.add_subtopic_menu") });
+    const addChild = actions.createEl("button", { text: t("ui.add_subtopic_menu"), cls: "vam-add-subtopic" });
     addChild.addEventListener("click", (event) => {
       event.stopPropagation();
       this.openKindMenu(event, (kind) => {
@@ -43887,13 +43918,74 @@ ${request.requirements}` : preset.text,
         this.enqueue(() => this.addNode(node, void 0, true, true, kind));
       });
     });
+  }
+  /** One 18px swatch for a type: the card's own outline (TOPIC_KIND_SHAPES), stroked in the type's colour. */
+  kindSwatch(parent, kind) {
+    var _a2;
+    const swatch = parent.createSpan({ cls: "vam-type-swatch" });
+    swatch.setAttr("aria-hidden", "true");
+    swatch.dataset.kind = kind;
+    let drawn;
+    const collector = {
+      appendChild: (child) => {
+        drawn = child;
+        return child;
+      }
+    };
+    let svg = (_a2 = renderShapeBackground(collector, kind)) != null ? _a2 : drawn;
+    if (!svg) {
+      svg = createSvg("svg");
+      svg.addClass("vam-kind-shape");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("aria-hidden", "true");
+      const frame = createSvg("rect");
+      frame.addClass("vam-kind-outline");
+      for (const [name, value] of [
+        ["x", "0"],
+        ["y", "0"],
+        ["width", "100"],
+        ["height", "100"],
+        ["rx", TOPIC_KIND_SHAPES[kind].shape === "rect" ? "10" : "30"],
+        ["vector-effect", "non-scaling-stroke"]
+      ])
+        frame.setAttribute(name, value);
+      svg.appendChild(frame);
+    }
+    swatch.insertBefore(svg, null);
+  }
+  /** A 32x10 sample of a relation's line (the canvas classes and arrowheads), so a row shows which line to look for. */
+  relationSwatch(parent, kind) {
+    const svg = createSvg("svg"), defs = createSvg("defs"), id = `${this.relationMarkerId}-row${++relationSwatchSequence}`;
+    svg.addClass("vam-relation-swatch");
+    svg.setAttribute("viewBox", "0 0 32 10");
+    svg.setAttribute("aria-hidden", "true");
+    const arrow = kind === "related" ? null : `url(#${id})`;
+    if (arrow) {
+      defs.appendChild(this.relationMarker(id, kind === "contradicts"));
+      svg.appendChild(defs);
+    }
+    for (const gap of kind === "derives_from" ? [false, true] : [false]) {
+      const line = createSvg("path");
+      line.setAttribute("d", "M 0 5 L 32 5");
+      if (arrow) line.setAttribute("marker-end", arrow);
+      line.addClass(gap ? "vam-relation-gap" : "vam-relation");
+      if (!gap) line.addClass(`vam-relation-${kind}`);
+      svg.appendChild(line);
+    }
+    parent.insertBefore(svg, null);
+  }
+  /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
+  renderHypothesisSection(panel, node, close) {
+    if (!this.relationsEnabled() || node.aimKind) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-hypothesis-section");
     const body = section3.createDiv("vam-hypothesis-body");
     const paint = (focusStrength = false, focusKind = false, focusAdd = false) => {
       var _a2, _b2, _c, _d;
       body.empty();
       const currentKind = this.topicKindOf(node.id);
-      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading" });
-      const kinds = body.createDiv("vam-topic-kinds");
+      body.createEl("strong", { text: t("ui.topic_type"), cls: "vam-topic-tree-heading vam-section-heading" });
+      const kinds = body.createDiv("vam-topic-kinds vam-choice-group");
       kinds.setAttr("role", "group");
       kinds.setAttr("aria-label", t("ui.topic_type"));
       for (const option2 of TOPIC_KINDS) {
@@ -43904,16 +43996,20 @@ ${request.requirements}` : preset.text,
             paint(false, true);
           });
         });
+        this.kindSwatch(choice2, option2);
         choice2.setAttr("aria-pressed", String(option2 === currentKind));
         if (option2 === currentKind) {
-          choice2.addClass("mod-cta");
+          choice2.addClass("is-pressed");
           if (focusKind) choice2.focus();
         }
       }
       if (currentKind === "hypothesis") {
         const current = (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.hypothesisStrength) != null ? _b2 : "weak";
-        body.createEl("strong", { text: t("ui.hypothesis_strength"), cls: "vam-topic-tree-heading" });
-        const group = body.createDiv("vam-hypothesis-strengths");
+        body.createEl("strong", {
+          text: t("ui.hypothesis_strength"),
+          cls: "vam-topic-tree-heading vam-section-heading"
+        });
+        const group = body.createDiv("vam-hypothesis-strengths vam-choice-group");
         group.setAttr("role", "group");
         group.setAttr("aria-label", t("ui.hypothesis_strength"));
         for (const option2 of HYPOTHESIS_STRENGTHS) {
@@ -43926,35 +44022,40 @@ ${request.requirements}` : preset.text,
           });
           choice2.setAttr("aria-pressed", String(option2 === current));
           if (option2 === current) {
-            choice2.addClass("mod-cta");
+            choice2.addClass("is-pressed");
             if (focusStrength) choice2.focus();
           }
         }
       }
       const links = ((_d = (_c = this.map) == null ? void 0 : _c.topicRelations) != null ? _d : []).filter((r) => r.from === node.id || r.to === node.id);
-      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading" });
+      body.createEl("strong", { text: t("ui.relations_heading"), cls: "vam-topic-tree-heading vam-section-heading" });
       if (links.length) {
         const list = body.createEl("ul", { cls: "vam-relation-list" });
         for (const link of links) {
           const row = list.createEl("li", { cls: "vam-relation-row" }), text11 = this.relationRowText(link, node.id), described = link.description ? `${text11}. ${link.description}` : text11;
           this.bindRelationRow(row, link, described);
+          this.relationSwatch(row, link.kind);
           const label = row.createSpan({ cls: "vam-relation-title", attr: { dir: "auto" } });
-          label.createSpan({ text: text11, attr: { dir: "auto" } });
+          label.createSpan({
+            text: this.relationSentence(link, node.id),
+            cls: "vam-relation-sentence",
+            attr: { dir: "auto" }
+          });
           if (link.description)
             label.createSpan({ text: link.description, cls: "vam-relation-description-text", attr: { dir: "auto" } });
-          const edit = this.button(row, t("ui.relation_edit"), () => this.openRelationEditor(link, paint));
-          edit.setAttr("aria-label", t("ui.edit_relation_0", text11));
-          const remove = this.button(
-            row,
-            t("ui.remove"),
+          const tools = row.createSpan({ cls: "vam-relation-tools" });
+          this.iconButton(tools, "pencil", t("ui.edit_relation_0", text11), () => this.openRelationEditor(link, paint));
+          this.iconButton(
+            tools,
+            "trash-2",
+            t("ui.remove_relation_0", text11),
             () => this.enqueue(async () => {
               await this.removeRelation(link);
               paint();
             })
           );
-          remove.setAttr("aria-label", t("ui.remove_relation_0", text11));
         }
-      }
+      } else body.createEl("p", { cls: "vam-hint vam-relation-empty", text: t("ui.relations_none") });
       const addRelation = body.createEl("button", { text: t("ui.add_relation") });
       addRelation.addEventListener("click", (event) => {
         event.stopPropagation();

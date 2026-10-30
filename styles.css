@@ -108,10 +108,37 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-hypothesis-tag { display: inline-flex; align-items: center; max-width: 100%; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; white-space: nowrap; color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 /* Every typed card names its type in this tag; the hue is the type's own, mixed toward the text colour to stay at 4.5:1 on the type's tint. */
 [data-topic-kind="atomic"].vam-node .vam-hypothesis-tag, [data-topic-kind="hypothesis"].vam-node .vam-hypothesis-tag, [data-topic-kind="evidence"].vam-node .vam-hypothesis-tag, [data-topic-kind="conclusion"].vam-node .vam-hypothesis-tag, [data-topic-kind="action"].vam-node .vam-hypothesis-tag { color: color-mix(in srgb, var(--vam-kind-hue) 45%, var(--text-normal)); }
-.vam-hypothesis-strengths { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
-.vam-relation-list { margin: 4px 0 8px; padding: 0; list-style: none; }
-.vam-relation-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; }
-.vam-relation-title { min-width: 0; overflow-wrap: anywhere; }
+/* The "Structure and links" dialog (decision 35, P20). Every rule below starts with .vam-topic-modal or a class the share viewer does not collect (scripts/viewer-css.mjs), so the viewer's stylesheet is unchanged. */
+.vam-relation-list { margin: 0; padding: 0; list-style: none; }
+.vam-relation-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--background-modifier-border); }
+.vam-relation-row:first-child { border-top: 0; }
+.vam-relation-swatch { flex: none; width: 32px; height: 10px; overflow: visible; }
+.vam-relation-title { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.vam-relation-description-text { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-relation-tools { display: flex; flex: none; gap: 2px; }
+.vam-relation-tools .clickable-icon { width: 28px; height: 28px; }
+.vam-topic-modal .vam-section-heading { display: block; margin: 24px 0 8px; font-size: var(--font-ui-small); font-weight: 600; }
+.vam-topic-modal .vam-hypothesis-section > .vam-hypothesis-body > .vam-section-heading:first-child, .vam-topic-modal .vam-inspector-topic + .vam-inspector-section > .vam-section-heading:first-child { margin-top: 0; }
+.vam-topic-modal .vam-inspector-section { margin: 0; }
+.vam-topic-modal .vam-inspector-section > .vam-hint, .vam-topic-modal .vam-relation-empty { margin: 8px 0 0; }
+.vam-topic-modal .vam-choice-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.vam-topic-modal .vam-choice-group button { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 32px; padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); box-shadow: none; background: transparent; color: var(--text-normal); font-weight: 400; text-align: start; }
+.vam-topic-modal .vam-choice-group button:hover { background: var(--background-modifier-hover); }
+.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
+.vam-topic-modal .vam-choice-group button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-topic-modal .vam-type-swatch { order: -1; position: relative; isolation: isolate; display: inline-flex; flex: none; width: 18px; height: 18px; --vam-kind-hue: var(--text-muted); --vam-kind-width: 1.5px; --vam-kind-dash: none; --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 75%, var(--text-normal)); --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 14%, transparent); }
+.vam-topic-modal .vam-type-swatch[data-kind="atomic"] { --vam-kind-hue: var(--color-cyan); }
+.vam-topic-modal .vam-type-swatch[data-kind="hypothesis"] { --vam-kind-hue: var(--color-purple); }
+.vam-topic-modal .vam-type-swatch[data-kind="evidence"] { --vam-kind-hue: var(--color-green); }
+.vam-topic-modal .vam-type-swatch[data-kind="conclusion"] { --vam-kind-hue: var(--color-blue); }
+.vam-topic-modal .vam-type-swatch[data-kind="action"] { --vam-kind-hue: var(--color-orange); }
+.vam-next-actions > .vam-add-subtopic { order: -3; }
+/* The parent tree: no grey fills. Obsidian's button styles (button:not(.clickable-icon), its :hover and :disabled) are more specific than a bare class, so the rows are matched through the tree and the dialog. */
+.vam-topic-modal .vam-topic-tree { max-height: min(240px, 40vh); }
+.vam-topic-modal .vam-topic-tree button.vam-topic-tree-row { background: transparent; box-shadow: none; }
+.vam-topic-modal .vam-topic-tree button.vam-topic-tree-row:hover:not(:disabled, .is-selected) { background: var(--background-modifier-hover); }
+.vam-topic-modal .vam-topic-tree button.vam-topic-tree-row:disabled { background: transparent; color: var(--text-faint); opacity: 1; }
+.vam-topic-modal .vam-topic-tree button.vam-topic-tree-row.is-selected { background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-aim-answer-snapshot { margin: 8px 0 0; padding: 6px 8px; border-left: 2px solid var(--interactive-accent); color: var(--text-muted); font-size: var(--font-ui-smaller); }
 .vam-aim-statusbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-height: 42px; padding: 8px 14px; border-bottom: 1px solid var(--background-modifier-border); border-left: 4px solid var(--interactive-accent); background: var(--background-secondary); }
 .vam-aim-status-title { font-size: var(--font-ui-small); font-weight: 800; letter-spacing: .02em; }

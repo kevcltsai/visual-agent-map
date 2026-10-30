@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
-const { test, root } = require('../support.cjs');
+const { test, root, load } = require('../support.cjs');
 
 const tokens = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/color/obsidian-default-tokens.json'), 'utf8'));
 const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
@@ -40,13 +40,6 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     <svg class="vam-edges"><path class="vam-edge" d="M0 0 L200 0"/><path class="vam-edge vam-edge-side" d="M0 20 L200 20"/><path class="vam-edge vam-edge-convergence" d="M0 40 L200 40"/><defs><marker id="m" viewBox="0 0 10 10" markerWidth="10" markerHeight="10"><path class="vam-relation-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><path class="vam-relation vam-relation-prerequisite" d="M0 70 L200 70" marker-end="url(#m)"/><path class="vam-relation vam-relation-evidence" d="M0 50 L200 50" marker-end="url(#m)"/><path class="vam-relation vam-relation-evidence is-dimmed" d="M0 90 L200 90"/><path class="vam-relation vam-relation-prerequisite is-dimmed" d="M0 110 L200 110"/><path class="vam-relation vam-relation-evidence is-related" d="M0 130 L200 130"/><path class="vam-relation vam-relation-evidence is-selected" d="M0 150 L200 150"/><path class="vam-relation-hit" d="M0 170 L200 170"/><text class="vam-relation-label is-visible" x="100" y="190">Evidence</text></svg>
     ${card('data-relevance="core"', 20, 60, `<div class="vam-node-header">${tag('core', 'Core')}</div><div class="vam-node-tools" style="opacity:1;pointer-events:auto;transform:none"><button class="vam-node-tool vam-ai-explore">AI explore</button></div><h3 class="vam-card-title">Core topic</h3><p class="vam-card-summary">Summary</p>`)}
     ${card('data-relevance="side"', 340, 60, `<div class="vam-node-header">${tag('side', 'Skippable')}</div><h3 class="vam-card-title">Skippable topic</h3><p class="vam-card-summary">Summary of a skippable topic</p>`)}
-    ${card('data-topic-kind="hypothesis" data-status="completed"', 660, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">Hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
-    ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="completed"', 660, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="strong">Hypothesis · Strong</span></div><h3 class="vam-card-title">Skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
-    ${card('data-topic-kind="hypothesis" data-status="idea"', 980, 60, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">New hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
-    ${card('data-topic-kind="hypothesis" data-relevance="side" data-status="idea"', 980, 260, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span></div><h3 class="vam-card-title">New skippable hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
-    ${card('data-topic-kind="hypothesis" data-status="running"', 20, 440, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="medium">Hypothesis · Medium</span></div><h3 class="vam-card-title">Running hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
-    ${card('data-topic-kind="hypothesis" data-status="error"', 340, 440, `<div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="medium">Hypothesis · Medium</span></div><h3 class="vam-card-title">Failed hypothesis</h3><p class="vam-card-summary">Summary</p>`)}
-    <div class="vam-node is-selected" data-topic-kind="hypothesis" data-status="completed" style="left:660px;top:440px"><div class="vam-node-header"><span class="vam-hypothesis-tag" data-strength="strong">Hypothesis · Strong</span></div><h3 class="vam-card-title">Selected hypothesis</h3><p class="vam-card-summary">Summary</p></div>
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
@@ -75,15 +68,6 @@ const CASES = [
   ['edge-selected', '.vam-relation.is-selected', 'stroke', 3],
   ['relation-label', '.vam-relation-label.is-visible', 'fill', 4.5],
   ['evidence-arrow', '.vam-relation-arrow', 'fill', 3],
-  ['hypothesis-border', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])', 'border', 3],
-  ['hypothesis-border-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]', 'border', 3],
-  ['hypothesis-border-idea', '.vam-node[data-topic-kind="hypothesis"][data-status="idea"]:not([data-relevance])', 'border', 3],
-  ['hypothesis-border-idea-skippable', '.vam-node[data-topic-kind="hypothesis"][data-status="idea"][data-relevance="side"]', 'border', 3],
-  ['hypothesis-border-running', '.vam-node[data-topic-kind="hypothesis"][data-status="running"]', 'border', 3],
-  ['hypothesis-border-error', '.vam-node[data-topic-kind="hypothesis"][data-status="error"]', 'border', 3],
-  ['hypothesis-border-selected', '.vam-node.is-selected[data-topic-kind="hypothesis"]', 'border', 3],
-  ['hypothesis-tag', '.vam-node[data-topic-kind="hypothesis"]:not([data-relevance]) .vam-hypothesis-tag', 'color', 4.5],
-  ['hypothesis-tag-skippable', '.vam-node[data-topic-kind="hypothesis"][data-relevance="side"] .vam-hypothesis-tag', 'color', 4.5],
   ['skippable-title', '.vam-node[data-relevance="side"] .vam-card-title', 'color', 4.5],
   ['skippable-summary', '.vam-node[data-relevance="side"] .vam-card-summary', 'color', 4.5],
   ['skippable-tag-text', '.vam-node[data-relevance="side"] .vam-relevance-tag span:last-child', 'color', 4.5],
@@ -276,9 +260,9 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         const details = await evaluate(`(() => {
           const side = document.querySelector('.vam-node[data-relevance="side"]'), core = document.querySelector('.vam-node[data-relevance="core"]');
           const edge = document.querySelector('.vam-edge:not(.vam-edge-side):not(.vam-edge-convergence)'), edgeSide = document.querySelector('.vam-edge-side');
-          const evidence = document.querySelector('.vam-relation-evidence'), prerequisite = document.querySelector('.vam-relation-prerequisite'), convergence = document.querySelector('.vam-edge-convergence'), hyp = document.querySelector('.vam-node[data-topic-kind="hypothesis"]:not([data-relevance])'), hypSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-relevance="side"]'), hypIdea = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-status="idea"]:not([data-relevance])'), hypIdeaSide = document.querySelector('.vam-node[data-topic-kind="hypothesis"][data-status="idea"][data-relevance="side"]');
+          const evidence = document.querySelector('.vam-relation-evidence'), prerequisite = document.querySelector('.vam-relation-prerequisite'), convergence = document.querySelector('.vam-edge-convergence');
           return { hitPointer: getComputedStyle(document.querySelector('.vam-relation-hit')).pointerEvents, hitStroke: getComputedStyle(document.querySelector('.vam-relation-hit')).stroke, labelPointer: getComputedStyle(document.querySelector('.vam-relation-label')).pointerEvents, prerequisiteDash: getComputedStyle(prerequisite).strokeDasharray, prerequisiteCap: getComputedStyle(prerequisite).strokeLinecap, prerequisitePointer: getComputedStyle(prerequisite).pointerEvents, evidenceDash: getComputedStyle(evidence).strokeDasharray, convergenceDash: getComputedStyle(convergence).strokeDasharray, edgeDash: getComputedStyle(edge).strokeDasharray, evidencePointer: getComputedStyle(evidence).pointerEvents, edgesPointer: getComputedStyle(document.querySelector('.vam-edges')).pointerEvents,
-            hypIdeaWidth: getComputedStyle(hypIdea).borderTopWidth, hypIdeaStyle: getComputedStyle(hypIdea).borderTopStyle, hypIdeaSideWidth: getComputedStyle(hypIdeaSide).borderTopWidth, hypIdeaSideStyle: getComputedStyle(hypIdeaSide).borderTopStyle, hypWidth: getComputedStyle(hyp).borderTopWidth, hypStyle: getComputedStyle(hyp).borderTopStyle, hypSideWidth: getComputedStyle(hypSide).borderTopWidth, hypSideStyle: getComputedStyle(hypSide).borderTopStyle, coreWidth: getComputedStyle(core).borderTopWidth,
+            coreWidth: getComputedStyle(core).borderTopWidth,
             sideBorder: getComputedStyle(side).borderTopStyle, sideOpacity: getComputedStyle(side).opacity, sideTag: !!side.querySelector('.vam-relevance-tag'), coreBorder: getComputedStyle(core).borderTopStyle,
             edgeStroke: getComputedStyle(edge).stroke, sideStroke: getComputedStyle(edgeSide).stroke, edgeSideOpacity: getComputedStyle(edgeSide).opacity, sideBorderColor: getComputedStyle(side).borderTopColor };
         })()`);
@@ -306,7 +290,7 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         if (row.need) assert.ok(row.ratio >= row.need, `${scheme}: ${name} contrast ${row.ratio.toFixed(2)} must be >= ${row.need}`);
       }
       // Counterexamples: the cues that replace the fade stay visible and stable.
-      // hypothesis-evidence: the new line type and frame stay distinguishable without colour (dash pattern, frame weight) and leave the old ones alone.
+      // hypothesis-evidence: the new line types stay distinguishable without colour (dash pattern) and leave the old ones alone. The hypothesis frame is now a shape outline, measured with every other type in the kind matrix test below.
       assert.notEqual(details.evidenceDash, 'none', `${scheme}: an evidence link is dashed`);
       assert.notEqual(details.evidenceDash, details.convergenceDash, `${scheme}: evidence dashes differ from the AIM 5 5 convergence dashes`);
       assert.notEqual(details.prerequisiteDash, 'none', `${scheme}: a prerequisite link is dotted`);
@@ -319,14 +303,6 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
       assert.equal(details.edgeDash, 'none', `${scheme}: the parent-child line stays solid`);
       assert.equal(details.edgesPointer, 'none', `${scheme}: the edge layer keeps pointer-events none`);
       assert.equal(details.evidencePointer, 'none', `${scheme}: an evidence link does not take pointer events`);
-      assert.equal(details.hypWidth, '2px', `${scheme}: a hypothesis has a 2px frame`);
-      assert.equal(details.hypSideWidth, '2px', `${scheme}: a skippable hypothesis keeps the 2px frame`);
-      assert.equal(details.hypSideStyle, 'dashed', `${scheme}: a skippable hypothesis keeps the dashed frame`);
-      assert.equal(details.hypIdeaWidth, '2px', `${scheme}: a new (idea) hypothesis has a 2px frame`);
-      assert.equal(details.hypIdeaStyle, 'solid', `${scheme}: a new (idea) hypothesis frame is solid, not the dashed idea frame`);
-      assert.equal(details.hypIdeaSideWidth, '2px', `${scheme}: a new skippable hypothesis keeps the 2px frame`);
-      assert.equal(details.hypIdeaSideStyle, 'dashed', `${scheme}: a new skippable hypothesis keeps the dashed frame`);
-      assert.notEqual(details.hypStyle, 'dashed', `${scheme}: a plain hypothesis frame is solid`);
       assert.equal(details.coreWidth, '1px', `${scheme}: an ordinary topic keeps the 1px frame`);
       assert.equal(details.sideBorder, 'dashed', `${scheme}: a skippable topic keeps a dashed frame`);
       assert.notEqual(details.coreBorder, 'dashed', `${scheme}: only skippable topics get the dashed frame`);
@@ -339,6 +315,112 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
       assert.equal(details.sideHoverBorder, 'dashed', `${scheme}: hover keeps the dashed frame (no jump)`);
       assert.equal(details.sideSelectedBorder, 'dashed', `${scheme}: selection keeps the dashed frame (no jump)`);
     }
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+// ---- hypothesis-evidence (V1.6 P11): six topic types x seven research states x both themes ----
+// The shape cards are built from the real topic-kind-shape.ts (so the outline, fold and classes are the ones view.ts draws), then measured in headless Chrome.
+const KIND_STATES = [
+  ['completed', 'data-status="completed"', ''],
+  ['idea', 'data-status="idea"', ''],
+  ['idea+side', 'data-status="idea" data-relevance="side"', ''],
+  ['running', 'data-status="running"', ''],
+  ['queued', 'data-status="queued"', ''],
+  ['error', 'data-status="error"', ''],
+  ['selected', 'data-status="completed"', ' is-selected']
+];
+const KIND_IDS = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+function shapeMarkup(kind) {
+  const { renderShapeBackground } = load('experiences/visual-map/topic-kind-shape.ts', {}, {
+    createSvg: tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } })
+  });
+  let drawn = '';
+  const html = el => `<${el.tag}${el.classes.length ? ` class="${el.classes.join(' ')}"` : ''}${Object.entries(el.attrs).map(([k, v]) => ` ${k}="${v}"`).join('')}>${el.children.map(html).join('')}</${el.tag}>`;
+  renderShapeBackground({ appendChild(el) { drawn = html(el); } }, kind);
+  return drawn;
+}
+const KIND_PAGE = () => `<!doctype html><html><head><meta charset="utf-8"><style>${styles}
+body { margin: 0; width: 2400px; height: 1400px; background: var(--background-primary); color: var(--text-normal); }
+.vam-node { width: 280px; }
+</style></head><body><div class="vam-viewport" style="width:2400px;height:1400px"><div class="vam-stage">${KIND_IDS.map((kind, row) => KIND_STATES.map(([state, attrs, extra], col) => {
+  const kindAttr = kind === 'topic' ? '' : ` data-topic-kind="${kind}"`;
+  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span>' : '';
+  return `<div class="vam-node${extra}"${kindAttr} ${attrs} data-case="${kind}|${state}" style="left:${20 + col * 330}px;top:${20 + row * 220}px;padding:28px 40px">${shapeMarkup(kind)}<div class="vam-node-header">${tagHtml}</div><h3 class="vam-card-title" title="Title">Title of the topic</h3><p class="vam-card-summary">A short summary of the topic.</p></div>`;
+}).join('')).join('')}</div></div></body></html>`;
+const KIND_PROBE = `(() => {
+  const cx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const rgba = text => { const read = base => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = base; cx.fillStyle = text; cx.fillRect(0, 0, 1, 1); return [...cx.getImageData(0, 0, 1, 1).data]; }; const a = read('#000000'), b = read('#ffffff'); if (a.join() !== b.join()) throw new Error('unparsed colour: ' + text); return [a[0], a[1], a[2], a[3] / 255]; };
+  const over = (top, under) => { const a = top[3]; return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)).concat([1]); };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (x, y) => { const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+  const canvas = over(rgba(getComputedStyle(document.querySelector('.vam-viewport')).backgroundColor), [255, 255, 255, 1]);
+  const rows = {};
+  for (const card of document.querySelectorAll('[data-case]')) {
+    const [kind, state] = card.dataset.case.split('|');
+    const outline = card.querySelector('.vam-kind-outline'), style = getComputedStyle(card);
+    const cardBg = rgba(style.backgroundColor);
+    const fill = outline ? over(rgba(getComputedStyle(outline).fill), canvas) : over(cardBg, canvas);
+    const row = { text: Math.min(ratio(over(rgba(getComputedStyle(card.querySelector('.vam-card-title')).color), fill), fill), ratio(over(rgba(getComputedStyle(card.querySelector('.vam-card-summary')).color), fill), fill)) };
+    const tag = card.querySelector('.vam-hypothesis-tag');
+    if (tag) row.tag = ratio(over(rgba(getComputedStyle(tag).color), fill), fill);
+    if (kind !== 'topic') {
+      const line = over(rgba(outline ? getComputedStyle(outline).stroke : style.borderTopColor), fill);
+      row.outline = Math.min(ratio(line, fill), ratio(line, canvas));
+      row.cardFrame = outline ? { border: style.borderTopColor, bg: style.backgroundColor, shadow: style.boxShadow, outline: style.outlineStyle, width: getComputedStyle(outline).strokeWidth, dash: getComputedStyle(outline).strokeDasharray } : null;
+    }
+    rows[card.dataset.case] = row;
+  }
+  return rows;
+})()`;
+
+test('hypothesis-evidence: six topic types x seven research states keep text >= 4.5:1 and the shape outline >= 3:1 in the light and dark themes', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-kind-colour-'));
+  try {
+    const file = path.join(directory, 'kinds.html');
+    fs.writeFileSync(file, KIND_PAGE());
+    const report = await withChrome(chrome, directory, pathToFileURL(file).href, async send => {
+      const evaluate = async expression => {
+        const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? 'page error');
+        return result.result.value;
+      };
+      const out = {};
+      for (const scheme of ['light', 'dark']) {
+        await evaluate(`(() => { document.body.className = ${JSON.stringify(`theme-${scheme}`)}; document.body.removeAttribute('style'); document.body.style.cssText = 'margin:0;width:2400px;height:1400px;background:var(--background-primary);color:var(--text-normal)'; for (const [k, v] of Object.entries(${JSON.stringify(tokens[scheme])})) document.body.style.setProperty(k, v); })()`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        out[scheme] = await evaluate(KIND_PROBE);
+      }
+      return out;
+    });
+    let lowestText = Infinity, lowestOutline = Infinity, lowestTag = Infinity, lowestAt = {};
+    for (const scheme of ['light', 'dark']) {
+      const rows = report[scheme];
+      assert.equal(Object.keys(rows).length, KIND_IDS.length * KIND_STATES.length, `${scheme}: every type x state case is in the fixture`);
+      for (const [name, row] of Object.entries(rows)) {
+        assert.ok(row.text >= 4.5, `${scheme} ${name}: title / summary ${row.text.toFixed(2)} must be >= 4.5`);
+        if (row.text < lowestText) { lowestText = row.text; lowestAt.text = `${scheme} ${name}`; }
+        if (row.tag !== undefined) { assert.ok(row.tag >= 4.5, `${scheme} ${name}: hypothesis tag ${row.tag.toFixed(2)} must be >= 4.5`); if (row.tag < lowestTag) { lowestTag = row.tag; lowestAt.tag = `${scheme} ${name}`; } }
+        if (row.outline !== undefined) {
+          assert.ok(row.outline >= 3, `${scheme} ${name}: outline ${row.outline.toFixed(2)} must be >= 3 (against the fill and the canvas)`);
+          if (row.outline < lowestOutline) { lowestOutline = row.outline; lowestAt.outline = `${scheme} ${name}`; }
+        }
+        const [kind, state] = name.split('|');
+        if (row.cardFrame) {
+          // The four SVG types hide the card's own frame and shadow; selected is heavier, a skippable one is dashed, the others are solid.
+          assert.equal(row.cardFrame.shadow, 'none', `${scheme} ${name}: no card shadow behind a shape`);
+          assert.match(row.cardFrame.bg, /rgba\(0, 0, 0, 0\)|transparent/, `${scheme} ${name}: no card fill behind a shape`);
+          assert.equal(row.cardFrame.width, state === 'selected' ? '3px' : '2px', `${scheme} ${name}: outline weight`);
+          assert.equal(row.cardFrame.dash !== 'none', state === 'idea+side', `${scheme} ${name}: only a skippable topic is dashed`);
+          if (state === 'selected') assert.equal(row.cardFrame.outline, 'none', `${scheme} ${name}: no rectangular selection outline around a shape`);
+        }
+        assert.ok(KIND_IDS.includes(kind));
+      }
+    }
+    console.log(`kind matrix (6 types x 7 states x 2 themes): lowest text ${lowestText.toFixed(2)} (${lowestAt.text}), lowest hypothesis tag ${lowestTag.toFixed(2)} (${lowestAt.tag}), lowest outline ${lowestOutline.toFixed(2)} (${lowestAt.outline})`);
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }

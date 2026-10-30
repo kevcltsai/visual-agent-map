@@ -17,6 +17,7 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
+import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import {
@@ -492,14 +493,6 @@ type AimTargetProgress = {
   startedAt?: number;
 };
 
-const TOPIC_KIND_LABEL: Record<TopicKind, Parameters<typeof t>[0]> = {
-  topic: "ui.topic_kind_topic",
-  action: "ui.topic_kind_action",
-  atomic: "ui.topic_kind_atomic",
-  hypothesis: "ui.topic_kind_hypothesis",
-  evidence: "ui.topic_kind_evidence",
-  conclusion: "ui.topic_kind_conclusion"
-};
 const TOPIC_KIND_ICON: Record<TopicKind, string> = {
   topic: "circle",
   action: "square-check",
@@ -2773,7 +2766,7 @@ export class VisualAgentMapView extends ItemView {
       for (const kind of TOPIC_KINDS)
         menu.addItem(item =>
           item
-            .setTitle(t(TOPIC_KIND_LABEL[kind]))
+            .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
             .setIcon(TOPIC_KIND_ICON[kind])
             .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind)))
         );
@@ -2785,7 +2778,7 @@ export class VisualAgentMapView extends ItemView {
     for (const kind of TOPIC_KINDS)
       menu.addItem(item =>
         item
-          .setTitle(t(TOPIC_KIND_LABEL[kind]))
+          .setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey))
           .setIcon(TOPIC_KIND_ICON[kind])
           .onClick(() => pick(kind))
       );
@@ -4157,6 +4150,7 @@ export class VisualAgentMapView extends ItemView {
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text);
       else summary.querySelector<HTMLElement>(".vam-card-preview-text")?.setText(text);
+      this.fitKindShape(card, this.topicKindOf(node.id));
       return;
     }
     if (!summary?.hasClass("is-preview")) return;
@@ -4166,6 +4160,7 @@ export class VisualAgentMapView extends ItemView {
       summary.removeClass("is-preview");
       summary.setText(note.summary);
     }
+    this.fitKindShape(card, this.topicKindOf(node.id));
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   private paintHoverResearch(): void {
@@ -6454,6 +6449,9 @@ export class VisualAgentMapView extends ItemView {
       background.appendChild(shape);
       card.appendChild(background);
     }
+    // The type's SVG shape goes behind the text (an AIM card has none: its kind is always an ordinary topic).
+    const kind = this.topicKindOf(node.id);
+    renderShapeBackground(card, kind);
     card.dataset.nodeId = node.id;
     // Research state drives the card's frame: frontier (idea), running, concluded, or failed.
     const queued = this.isResearchQueued(node);
@@ -6581,11 +6579,10 @@ export class VisualAgentMapView extends ItemView {
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     // A hypothesis: quiet "Hypothesis · strength" tag; every non-ordinary type sets `data-topic-kind` and is named in the card's accessible name.
-    const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       card.dataset.topicKind = kind;
       const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength) renderHypothesisTag(header, strength, kindText);
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
@@ -7054,6 +7051,30 @@ export class VisualAgentMapView extends ItemView {
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    this.fitKindShape(card, kind);
+  }
+  /**
+   * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
+   * text block is measured and the top and bottom padding follow its height. The card then grows with its text, and
+   * dragging, arranging and the relation lines read its real height. A card that is not laid out yet (a hidden pane) is
+   * left with the stylesheet's fallback padding and fitted by the next resize.
+   */
+  private fitKindShape(card: HTMLElement, kind: TopicKind): void {
+    if (!hasSvgShape(kind)) return;
+    const width = card.offsetWidth;
+    if (!width) return;
+    const sides = shapeInsets(kind, { width, height: 0 });
+    card.style.padding = `0 ${sides.right}px 0 ${sides.left}px`;
+    const height = card.clientHeight;
+    const insets = shapeInsets(kind, { width, height });
+    card.style.padding = `${insets.top}px ${insets.right}px ${insets.bottom}px ${insets.left}px`;
+  }
+  private fitKindShapes(): void {
+    if (!this.stageEl) return;
+    for (const node of this.map?.nodes ?? []) {
+      const card = this.cardEls.get(node.id);
+      if (card) this.fitKindShape(card, this.topicKindOf(node.id));
+    }
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
   private canvasNodes(): MapNode[] {
@@ -7407,10 +7428,12 @@ export class VisualAgentMapView extends ItemView {
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]),
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey),
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    // A new title or summary changes the text's height, and the shape's padding follows it.
+    this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
   private taskSourceSettings(
@@ -8058,7 +8081,7 @@ export class VisualAgentMapView extends ItemView {
       kinds.setAttr("role", "group");
       kinds.setAttr("aria-label", t("ui.topic_type"));
       for (const option of TOPIC_KINDS) {
-        const choice = this.button(kinds, t(TOPIC_KIND_LABEL[option]), () => {
+        const choice = this.button(kinds, t(TOPIC_KIND_SHAPES[option].labelKey), () => {
           if (option === currentKind) return;
           this.enqueue(async () => {
             await this.changeTopicKind(node, option);
@@ -8158,7 +8181,7 @@ export class VisualAgentMapView extends ItemView {
     const parent = (parentNode && this.map.nodes.find(item => item.id === parentNode.id)) || parentNode;
     if (!suggestedTitle?.trim()) {
       const dialogTitle = typed
-        ? t("ui.add_kind_0", t(TOPIC_KIND_LABEL[kind]))
+        ? t("ui.add_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
         : parent
           ? t("ui.new_subtopic")
           : t("ui.my_core_topic");
@@ -8177,7 +8200,11 @@ export class VisualAgentMapView extends ItemView {
     }
     const node = await this.plugin.repo.createNote(
       sanitizeGeneratedTitle(suggestedTitle?.trim() ?? "").trim() ||
-        (typed ? t("ui.new_kind_0", t(TOPIC_KIND_LABEL[kind])) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+        (typed
+          ? t("ui.new_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey))
+          : parent
+            ? t("ui.new_subtopic")
+            : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
@@ -10470,6 +10497,7 @@ export class VisualAgentMapView extends ItemView {
   /** Obsidian calls this when the pane's size changes. */
   onResize(): void {
     this.syncChatNarrow();
+    this.fitKindShapes();
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

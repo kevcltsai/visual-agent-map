@@ -91,8 +91,6 @@
 /* Written with the class first so the share viewer, which draws no relations, does not pick the rule up (scripts/viewer-css.mjs). */
 .is-relation-end.vam-node { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 .vam-relation-row:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
-/* Written with the attribute first so the share viewer, which does not show hypotheses, does not pick the rule up (scripts/viewer-css.mjs). */
-[data-topic-kind="hypothesis"].vam-node { border-width: 2px; border-color: var(--text-muted); }
 .vam-hypothesis-tag { display: inline-flex; align-items: center; max-width: 100%; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; white-space: nowrap; color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-hypothesis-strengths { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
 .vam-relation-list { margin: 4px 0 8px; padding: 0; list-style: none; }
@@ -160,12 +158,30 @@
 .vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }
 .vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }
 .vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }
-/* Hypothesis frame: 2px in every research status (a solid line, dashed only for a skippable one). Placed after the status rules and written with the attribute first so the share viewer does not pick it up (scripts/viewer-css.mjs). Colour follows running / error / selected; idea and queued keep the muted frame (>= 3:1) instead of the pale dashed idea frame. */
-[data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]) { border-width: 2px; border-style: solid; border-color: var(--text-muted); }
-[data-topic-kind="hypothesis"][data-relevance="side"].vam-node:not([data-aim-kind]) { border-style: dashed; }
-[data-topic-kind="hypothesis"].vam-node[data-status="running"]:not([data-aim-kind]) { border-color: var(--interactive-accent); }
-[data-topic-kind="hypothesis"].vam-node[data-status="error"]:not([data-aim-kind]) { border-color: var(--color-red); }
-[data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]) { border-color: var(--interactive-accent); }
+/* Topic types (V1.6). Every rule starts with the attribute or `.vam-kind-shape`, so the share viewer, which shows no types, does not pick them up (scripts/viewer-css.mjs). An ordinary topic has no attribute and keeps the rules above unchanged.
+   Hue per type; the fill is a low share of it over the card surface and the line mixes it into the muted text colour (the ratios are what map-view-color.cjs measures). */
+[data-topic-kind="atomic"].vam-node { --vam-kind-hue: var(--color-cyan); }
+[data-topic-kind="hypothesis"].vam-node { --vam-kind-hue: var(--color-purple); }
+[data-topic-kind="evidence"].vam-node { --vam-kind-hue: var(--color-green); }
+[data-topic-kind="conclusion"].vam-node { --vam-kind-hue: var(--color-blue); }
+[data-topic-kind="action"].vam-node { --vam-kind-hue: var(--color-orange); }
+[data-topic-kind="atomic"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node:not([data-aim-kind]), [data-topic-kind="action"].vam-node:not([data-aim-kind]) { --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 9%, var(--vam-card-bg)); --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 40%, var(--text-muted)); --vam-kind-width: 2px; --vam-kind-dash: none; }
+/* Research state and selection change the line: a skippable topic is dashed, running is the accent, failed is red, selected is the accent and heavier. */
+[data-topic-kind="atomic"][data-relevance="side"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-relevance="side"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-relevance="side"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-relevance="side"].vam-node:not([data-aim-kind]) { --vam-kind-dash: 6 4; }
+[data-topic-kind="atomic"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-status="running"].vam-node:not([data-aim-kind]), [data-topic-kind="action"][data-status="running"].vam-node:not([data-aim-kind]) { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); }
+[data-topic-kind="atomic"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"][data-status="error"].vam-node:not([data-aim-kind]), [data-topic-kind="action"][data-status="error"].vam-node:not([data-aim-kind]) { --vam-kind-line: var(--color-red); }
+[data-topic-kind="atomic"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="action"].vam-node.is-selected:not([data-aim-kind]) { --vam-kind-line: color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal)); --vam-kind-width: 3px; }
+/* Action: the ordinary card with a 3px corner, the type's tint and line; the existing status rules (dashed idea / queued) stay. */
+[data-topic-kind="action"].vam-node:not([data-aim-kind]) { border-radius: 3px; border-color: var(--vam-kind-line); background: var(--vam-kind-fill); }
+/* Atomic, hypothesis, evidence, conclusion: an SVG shape behind the text replaces the card frame, shadow and fill. The padding here is the fallback; view.ts sets the real one from shapeInsets() and the measured text. */
+[data-topic-kind="atomic"].vam-node:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node:not([data-aim-kind]) { isolation: isolate; padding: 28px 40px; border-color: transparent; background: transparent; box-shadow: none; }
+[data-topic-kind="atomic"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="hypothesis"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="evidence"][data-status="running"].vam-node:not([data-aim-kind])::after, [data-topic-kind="conclusion"][data-status="running"].vam-node:not([data-aim-kind])::after { display: none; }
+[data-topic-kind="atomic"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="hypothesis"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="evidence"].vam-node.is-selected:not([data-aim-kind]), [data-topic-kind="conclusion"].vam-node.is-selected:not([data-aim-kind]) { outline: 0; border-color: transparent; }
+.vam-kind-shape { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; overflow: visible; pointer-events: none; }
+.vam-kind-shape .vam-kind-outline { fill: var(--vam-kind-fill); stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-dasharray: var(--vam-kind-dash); stroke-linejoin: round; }
+.vam-kind-shape .vam-kind-fold { fill: none; stroke: var(--vam-kind-line); stroke-width: var(--vam-kind-width); stroke-linejoin: round; }
+/* An atomic title keeps two lines at most; the full text is the title attribute (hover). */
+[data-topic-kind="atomic"] .vam-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @keyframes vam-pulse { 50% { opacity: 0.35; } }
 @property --vam-orbit { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes vam-orbit { to { --vam-orbit: 360deg; } }

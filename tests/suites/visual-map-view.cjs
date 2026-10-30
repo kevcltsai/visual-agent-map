@@ -2034,7 +2034,7 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
 const heNotes = (list) => new Map(list.map(([id, extra]) => [id, { title: id.toUpperCase(), summary: '', status: 'completed', ...extra }]));
 const heHyp = (strength) => ({ topicKind: 'hypothesis', ...(strength ? { hypothesisStrength: strength } : {}) });
 // The shared DOM stand-in has a read-only textContent; labelCard writes it.
-const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
+const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
 function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
@@ -2244,10 +2244,10 @@ integrationTest('hypothesis-evidence: a hypothesis card shows "Hypothesis · str
   const aim = render({ aim: true }, 'hyp');
   assert.equal(aim.card.dataset.topicKind, undefined, 'no hypothesis styling on an AIM map'); assert.equal(aim.text.some(t => /Hypothesis/.test(t)), false);
 });
-integrationTest('hypothesis-evidence: styles.css gives a hypothesis a 2px frame and the evidence line its own dash pattern', () => {
+integrationTest('hypothesis-evidence: styles.css gives a hypothesis no 2px card frame any more (its shape outline replaces it) and the evidence line its own dash pattern', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = selector => { const m = css.match(new RegExp(`^${selector.replace(/[.[\]"=-]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm')); assert.ok(m, `rule ${selector}`); return m[1]; };
-  assert.match(rule('[data-topic-kind="hypothesis"].vam-node'), /border-width:\s*2px/);
+  assert.doesNotMatch(css, /^\[data-topic-kind="hypothesis"\]\.vam-node\s*\{[^}]*border-width/m, 'the V1.5 2px hypothesis frame is gone: the shape outline replaces it (decision 23)');
   const dash = rule('.vam-relation-evidence').match(/stroke-dasharray:\s*([^;]+);/)[1].trim();
   assert.notEqual(dash, '5 5', 'differs from the AIM convergence line'); assert.ok(!/^none$/.test(dash), 'not the solid parent-child line');
   assert.match(css, /\.vam-edge \{[^}]*\}/); assert.doesNotMatch(rule('.vam-edge'), /dasharray/);
@@ -2525,4 +2525,114 @@ integrationTest('hypothesis-evidence: pressing a relation line starts neither a 
   assert.match(rule('.vam-relation-hit'), /pointer-events:\s*stroke/); assert.match(rule('.vam-relation-hit'), /stroke:\s*transparent/);
   assert.match(rule('.vam-edges'), /pointer-events:\s*none/); assert.match(rule('.vam-relation'), /pointer-events:\s*none/);
   assert.ok(!/\.vam-edge\s*\{[^}]*pointer-events:\s*(stroke|auto|all)/.test(css), 'a parent-child edge takes no pointer events');
+});
+
+// ---- hypothesis-evidence (V1.6 P11): topic type shapes and tints ----
+const heShapeModule = () => {
+  const make = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } });
+  const mod = load('experiences/visual-map/topic-kind-shape.ts', {}, { createSvg: make });
+  const draw = kind => { let drawn; const card = { appendChild(el) { drawn = el; } }; const result = mod.renderShapeBackground(card, kind); return { result, drawn }; };
+  return { ...mod, draw };
+};
+const heInside = (svg, W, H, x, y) => {
+  const outline = svg.children.find(c => c.classes.includes('vam-kind-outline'));
+  if (outline.tag === 'ellipse') { const cx = Number(outline.attrs.cx) * W / 100, cy = Number(outline.attrs.cy) * H / 100, rx = Number(outline.attrs.rx) * W / 100, ry = Number(outline.attrs.ry) * H / 100; return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1; }
+  const pts = outline.attrs.points.split(/\s+/).map(p => p.split(',').map(Number)).map(([px, py]) => [px * W / 100, py * H / 100]);
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+integrationTest('hypothesis-evidence: the shape table covers exactly the six topic types, each with a name key that exists in all three languages', () => {
+  const { TOPIC_KIND_SHAPES } = heShapeModule();
+  assert.deepEqual(Object.keys(TOPIC_KIND_SHAPES).sort(), [...heKindIds].sort());
+  assert.deepEqual(plain(Object.fromEntries(Object.entries(TOPIC_KIND_SHAPES).map(([k, v]) => [k, v.shape]))), { topic: 'rounded', action: 'rect', atomic: 'ellipse', hypothesis: 'diamond', evidence: 'folded', conclusion: 'hexagon' });
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const source = fs.readFileSync(path.join(root, 'i18n', `${lang}.ts`), 'utf8');
+    for (const { labelKey } of Object.values(TOPIC_KIND_SHAPES)) assert.ok(source.includes(`"${labelKey}"`), `${lang} has ${labelKey}`);
+  }
+});
+integrationTest('hypothesis-evidence: shapeInsets keeps all four corners of the text block inside the drawn shape at three content sizes', () => {
+  const mod = heShapeModule();
+  for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) {
+    for (const height of [60, 140, 320]) {
+      const W = 280, insets = mod.shapeInsets(kind, { width: W, height });
+      const H = height + insets.top + insets.bottom, svg = mod.draw(kind).drawn;
+      const corners = [[insets.left, insets.top], [W - insets.right, insets.top], [insets.left, H - insets.bottom], [W - insets.right, H - insets.bottom]];
+      for (const [x, y] of corners) assert.ok(heInside(svg, W, H, x, y), `${kind} at text height ${height}: corner (${x.toFixed(1)}, ${y.toFixed(1)}) is inside the ${W}x${H.toFixed(1)} shape`);
+      assert.ok(insets.left > 0 && insets.top > 0, `${kind}: both sides get padding`);
+    }
+  }
+  const diamond = mod.shapeInsets('hypothesis', { width: 280, height: 100 });
+  assert.equal(diamond.left, 70, 'a diamond text block is half the card width'); assert.equal(diamond.top, 54, 'and the top and bottom padding is half the text height (plus a 4px margin)');
+  assert.deepEqual(plain(mod.shapeInsets('topic', { width: 280, height: 100 })), { top: 12, right: 14, bottom: 14, left: 14 }, 'an ordinary card keeps its padding');
+  assert.deepEqual(plain(mod.shapeInsets('action', { width: 280, height: 100 })), { top: 12, right: 14, bottom: 14, left: 14 }, 'an action keeps its padding too');
+});
+integrationTest('hypothesis-evidence: renderShapeBackground draws a stretchable, non-scaling, hidden SVG for the four shaped types and nothing for topic and action', () => {
+  const mod = heShapeModule();
+  for (const kind of ['topic', 'action']) assert.equal(mod.draw(kind).result, undefined, `${kind} draws no SVG`);
+  for (const [kind, tag] of [['atomic', 'ellipse'], ['hypothesis', 'polygon'], ['evidence', 'polygon'], ['conclusion', 'polygon']]) {
+    const { result, drawn } = mod.draw(kind);
+    assert.equal(result, drawn); assert.deepEqual(plain(drawn.classes), ['vam-kind-shape']);
+    assert.equal(drawn.attrs.preserveAspectRatio, 'none'); assert.equal(drawn.attrs['aria-hidden'], 'true'); assert.equal(drawn.attrs.viewBox, '0 0 100 100');
+    const outline = drawn.children[0]; assert.equal(outline.tag, tag); assert.equal(outline.attrs['vector-effect'], 'non-scaling-stroke');
+  }
+  assert.equal(mod.draw('evidence').drawn.children.length, 2, 'evidence has the fold line too'); assert.equal(mod.draw('conclusion').drawn.attrs.viewBox && mod.draw('conclusion').drawn.children[0].attrs.points, '25,0 75,0 100,50 75,100 25,100 0,50', 'the AIM conclusion hexagon points');
+});
+integrationTest('hypothesis-evidence: a card draws its type shape as its first child; an ordinary topic, an AIM card and the built-in sample draw none', () => {
+  const draws = (options, id) => {
+    const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
+    return { shapes: f.svgCreated.filter(el => el.classes.includes('vam-kind-shape')), card: f.view.stageEl.children[0] };
+  };
+  for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) {
+    const { shapes, card } = draws({ notes: heNotes([['fact', { topicKind: kind }], ['hyp', {}], ['other', {}]]) }, 'fact');
+    assert.equal(shapes.length, 1, `${kind} draws one shape`); assert.equal(card.children[0], shapes[0], 'it is behind the text (first child)');
+  }
+  for (const kind of ['action', 'topic']) assert.equal(draws({ notes: heNotes([['fact', kind === 'topic' ? {} : { topicKind: kind }], ['hyp', {}], ['other', {}]]) }, 'fact').shapes.length, 0, `${kind} draws none`);
+  const typed = heNotes([['fact', { topicKind: 'hypothesis' }], ['hyp', {}], ['other', {}]]);
+  assert.equal(draws({ aim: true, notes: typed }, 'fact').shapes.length, 0, 'an AIM map draws no type shape (no vam-kind-shape)');
+  assert.equal(draws({ builtIn: true, notes: typed }, 'fact').shapes.length, 0, 'the built-in sample draws none');
+});
+integrationTest('hypothesis-evidence: fitKindShape sets the side padding from the width, then top and bottom from the measured text height; a hidden card is left alone', () => {
+  const f = heFixture({}), mod = heShapeModule();
+  const card = { offsetWidth: 280, clientHeight: 100, style: {} };
+  f.view.fitKindShape(card, 'hypothesis');
+  assert.equal(card.style.padding, '54px 70px 54px 70px');
+  const expected = mod.shapeInsets('conclusion', { width: 280, height: 100 }), conclusion = { offsetWidth: 280, clientHeight: 100, style: {} };
+  f.view.fitKindShape(conclusion, 'conclusion'); assert.equal(conclusion.style.padding, `${expected.top}px ${expected.right}px ${expected.bottom}px ${expected.left}px`);
+  for (const kind of ['topic', 'action']) { const plain = { offsetWidth: 280, clientHeight: 100, style: {} }; f.view.fitKindShape(plain, kind); assert.deepEqual(plain.style, {}, `${kind} keeps the stylesheet padding`); }
+  const hidden = { offsetWidth: 0, clientHeight: 0, style: {} }; f.view.fitKindShape(hidden, 'atomic'); assert.deepEqual(hidden.style, {}, 'a card that is not laid out is not fitted');
+});
+integrationTest('hypothesis-evidence: styles.css clamps an atomic title to two lines and gives each non-ordinary type its tint, its shape rules and a 3px action corner', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /^\[data-topic-kind="atomic"\] \.vam-card-title \{[^}]*-webkit-line-clamp: 2;[^}]*overflow: hidden;/m);
+  for (const [kind, hue] of [['atomic', 'cyan'], ['hypothesis', 'purple'], ['evidence', 'green'], ['conclusion', 'blue'], ['action', 'orange']]) assert.match(css, new RegExp(`^\\[data-topic-kind="${kind}"\\]\\.vam-node \\{ --vam-kind-hue: var\\(--color-${hue}\\); \\}`, 'm'), `${kind} uses ${hue}`);
+  assert.doesNotMatch(css, /--vam-kind-hue: var\(--color-(?:red|yellow|pink)\)/, 'red and yellow stay for errors and warnings');
+  assert.match(css, /--vam-kind-fill: color-mix\(in srgb, var\(--vam-kind-hue\) \d+%, var\(--vam-card-bg\)\)/);
+  assert.match(css, /^\[data-topic-kind="action"\]\.vam-node:not\(\[data-aim-kind\]\) \{ border-radius: 3px;/m);
+  assert.match(css, /^\.vam-kind-shape \{[^}]*pointer-events: none;/m);
+  // An ordinary topic is not styled by any of this: its own rules are unchanged.
+  assert.match(css, /^\.vam-node \{ --vam-card-bg: var\(--background-primary\); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var\(--background-modifier-border\); border-radius: 12px;/m);
+});
+integrationTest('hypothesis-evidence: every type rule starts with the data-topic-kind attribute or vam-kind-shape, so the share viewer picks none of them up', async () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const { parseCss, extractViewerRules } = await import(require('node:url').pathToFileURL(path.join(root, 'scripts/viewer-css.mjs')).href);
+  const own = parseCss(css).filter(chunk => /data-topic-kind|vam-kind-/.test(chunk.prelude));
+  assert.ok(own.length >= 10, 'the type rules exist');
+  for (const chunk of own) for (const selector of chunk.prelude.split(/,\s*(?=\[data-topic-kind=|\.vam-kind-shape)/)) assert.match(selector.trim(), /^(?:\[data-topic-kind=|\.vam-kind-shape)/, `selector starts with the attribute or vam-kind-shape: ${selector.slice(0, 60)}`);
+  const viewer = extractViewerRules(css).map(item => item.text).join('\n');
+  assert.doesNotMatch(viewer, /data-topic-kind|vam-kind-/, 'the viewer stylesheet carries no type rule');
+});
+integrationTest('hypothesis-evidence: the SVG types hide the card frame and shadow, draw solid outlines, dash only a skippable topic, and mark running, error and selected on the outline', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const frame = css.split('\n').find(line => line.includes('isolation: isolate; padding: 28px 40px'));
+  assert.match(frame, /border-color: transparent; background: transparent; box-shadow: none;/);
+  for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion']) assert.ok(frame.includes(`[data-topic-kind="${kind}"]`), `${kind} is in the hidden-frame rule`); assert.ok(!frame.includes('"action"') && !frame.includes('"topic"'), 'action and topic keep their card frame');
+  assert.match(css, /--vam-kind-dash: none;/); assert.match(css, /\[data-relevance="side"\][^{]*\{ --vam-kind-dash: 6 4; \}/);
+  assert.match(css, /\[data-status="running"\][^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)/);
+  assert.match(css, /\[data-status="error"\][^{]*\{ --vam-kind-line: var\(--color-red\); \}/);
+  assert.match(css, /\.is-selected:not\(\[data-aim-kind\]\)[^{]*\{ --vam-kind-line: color-mix\(in srgb, var\(--interactive-accent\)[^}]*--vam-kind-width: 3px; \}/);
+  assert.match(css, /\.vam-kind-shape \.vam-kind-outline \{[^}]*stroke-dasharray: var\(--vam-kind-dash\)/);
 });

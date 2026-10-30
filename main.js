@@ -17127,6 +17127,77 @@ function withThinkingOrigin(context, note) {
   };
 }
 
+// experiences/visual-map/topic-kind-shape.ts
+var TOPIC_KIND_SHAPES = {
+  topic: { shape: "rounded", labelKey: "ui.topic_kind_topic" },
+  action: { shape: "rect", labelKey: "ui.topic_kind_action" },
+  atomic: { shape: "ellipse", labelKey: "ui.topic_kind_atomic" },
+  hypothesis: { shape: "diamond", labelKey: "ui.topic_kind_hypothesis" },
+  evidence: { shape: "folded", labelKey: "ui.topic_kind_evidence" },
+  conclusion: { shape: "hexagon", labelKey: "ui.topic_kind_conclusion" }
+};
+var EDGE = 0;
+var FAR = 100;
+var HEXAGON = `25,${EDGE} 75,${EDGE} ${FAR},50 75,${FAR} 25,${FAR} ${EDGE},50`;
+var FOLD_X = 88;
+var FOLD_Y = 24;
+var FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR} ${EDGE},${FAR}`;
+var FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
+var DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
+function hasSvgShape(kind) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  return shape !== "rounded" && shape !== "rect";
+}
+function renderShapeBackground(card, kind) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  if (!hasSvgShape(kind)) return void 0;
+  const svg = createSvg("svg");
+  svg.addClass("vam-kind-shape");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const outline = createSvg(shape === "ellipse" ? "ellipse" : "polygon");
+  outline.addClass("vam-kind-outline");
+  if (shape === "ellipse") {
+    outline.setAttribute("cx", "50");
+    outline.setAttribute("cy", "50");
+    outline.setAttribute("rx", "50");
+    outline.setAttribute("ry", "50");
+  } else outline.setAttribute("points", shape === "diamond" ? DIAMOND : shape === "hexagon" ? HEXAGON : FOLDED);
+  outline.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(outline);
+  if (shape === "folded") {
+    const fold2 = createSvg("polyline");
+    fold2.addClass("vam-kind-fold");
+    fold2.setAttribute("points", FOLD_LINE);
+    fold2.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(fold2);
+  }
+  card.appendChild(svg);
+  return svg;
+}
+var FIT = {
+  // Corner on the ellipse needs w^2 + h^2 <= 1.
+  ellipse: { width: 0.7, height: 0.7 },
+  // Corner on the diamond needs w + h <= 1: half the card's width, so the top and bottom padding is half the text each.
+  diamond: { width: 0.5, height: 0.5 },
+  // The hexagon's slanted side needs w + h / 2 <= 1.
+  hexagon: { width: 0.7, height: 0.58 },
+  // The cut corner needs h <= 1 - 4 * (0.94 - 0.88): the top right of the block clears the fold.
+  folded: { width: 0.88, height: 0.74 }
+};
+var SAFETY = 4;
+var BASE_PADDING = { top: 12, right: 14, bottom: 14, left: 14 };
+function shapeInsets(kind, content) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  if (shape === "rounded" || shape === "rect") return { ...BASE_PADDING };
+  const fit = FIT[shape];
+  const side = content.width * (1 - fit.width) / 2;
+  const vertical = content.height * (1 / fit.height - 1) / 2 + SAFETY;
+  return { top: vertical, right: side, bottom: vertical, left: side };
+}
+
 // experiences/visual-map/view.ts
 var import_node_crypto11 = require("node:crypto");
 var import_obsidian30 = require("obsidian");
@@ -36645,14 +36716,6 @@ var boxOf = (card) => ({
   width: card.offsetWidth,
   height: card.offsetHeight
 });
-var TOPIC_KIND_LABEL = {
-  topic: "ui.topic_kind_topic",
-  action: "ui.topic_kind_action",
-  atomic: "ui.topic_kind_atomic",
-  hypothesis: "ui.topic_kind_hypothesis",
-  evidence: "ui.topic_kind_evidence",
-  conclusion: "ui.topic_kind_conclusion"
-};
 var TOPIC_KIND_ICON = {
   topic: "circle",
   action: "square-check",
@@ -38727,7 +38790,7 @@ ${request.requirements}` : preset.text,
     if (this.relationsEnabled())
       for (const kind of TOPIC_KINDS)
         menu.addItem(
-          (item) => item.setTitle(t(TOPIC_KIND_LABEL[kind])).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
+          (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
         );
     menu.showAtMouseEvent(event);
   }
@@ -38736,7 +38799,7 @@ ${request.requirements}` : preset.text,
     const menu = new import_obsidian30.Menu();
     for (const kind of TOPIC_KINDS)
       menu.addItem(
-        (item) => item.setTitle(t(TOPIC_KIND_LABEL[kind])).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
+        (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
       );
     menu.showAtMouseEvent(event);
   }
@@ -40018,6 +40081,7 @@ ${request.requirements}` : preset.text,
       if (!summary) return;
       if (!summary.hasClass("is-preview")) this.fillCardPreview(summary, text11);
       else (_e = summary.querySelector(".vam-card-preview-text")) == null ? void 0 : _e.setText(text11);
+      this.fitKindShape(card, this.topicKindOf(node.id));
       return;
     }
     if (!(summary == null ? void 0 : summary.hasClass("is-preview"))) return;
@@ -40027,6 +40091,7 @@ ${request.requirements}` : preset.text,
       summary.removeClass("is-preview");
       summary.setText(note.summary);
     }
+    this.fitKindShape(card, this.topicKindOf(node.id));
   }
   /** Plain text only (never Markdown): the answer being written, which nothing has saved yet. */
   paintHoverResearch() {
@@ -42124,6 +42189,8 @@ ${request.requirements}` : preset.text,
       background.appendChild(shape);
       card.appendChild(background);
     }
+    const kind = this.topicKindOf(node.id);
+    renderShapeBackground(card, kind);
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
@@ -42210,11 +42277,10 @@ ${request.requirements}` : preset.text,
       const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
-    const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       card.dataset.topicKind = kind;
       const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]);
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength) renderHypothesisTag(header, strength, kindText);
       const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
@@ -42626,6 +42692,31 @@ ${request.requirements}` : preset.text,
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    this.fitKindShape(card, kind);
+  }
+  /**
+   * Sizes an SVG-shaped card's padding so its text sits inside the shape: the side padding comes from the width, then the
+   * text block is measured and the top and bottom padding follow its height. The card then grows with its text, and
+   * dragging, arranging and the relation lines read its real height. A card that is not laid out yet (a hidden pane) is
+   * left with the stylesheet's fallback padding and fitted by the next resize.
+   */
+  fitKindShape(card, kind) {
+    if (!hasSvgShape(kind)) return;
+    const width = card.offsetWidth;
+    if (!width) return;
+    const sides = shapeInsets(kind, { width, height: 0 });
+    card.style.padding = `0 ${sides.right}px 0 ${sides.left}px`;
+    const height = card.clientHeight;
+    const insets = shapeInsets(kind, { width, height });
+    card.style.padding = `${insets.top}px ${insets.right}px ${insets.bottom}px ${insets.left}px`;
+  }
+  fitKindShapes() {
+    var _a2, _b2;
+    if (!this.stageEl) return;
+    for (const node of (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : []) {
+      const card = this.cardEls.get(node.id);
+      if (card) this.fitKindShape(card, this.topicKindOf(node.id));
+    }
   }
   /** What the canvas draws: visible nodes minus interim AIM results already superseded by their run's conclusion. */
   canvasNodes() {
@@ -42962,9 +43053,10 @@ ${request.requirements}` : preset.text,
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_LABEL[kind]), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
   taskSourceSettings(currentLabel, currentTopicId = ((_b2) => (_b2 = ((_a2) => (_a2 = this.map) == null ? void 0 : _a2.id)()) != null ? _b2 : "")(), synthesisLabel) {
@@ -43585,7 +43677,7 @@ ${request.requirements}` : preset.text,
       kinds.setAttr("role", "group");
       kinds.setAttr("aria-label", t("ui.topic_type"));
       for (const option2 of TOPIC_KINDS) {
-        const choice2 = this.button(kinds, t(TOPIC_KIND_LABEL[option2]), () => {
+        const choice2 = this.button(kinds, t(TOPIC_KIND_SHAPES[option2].labelKey), () => {
           if (option2 === currentKind) return;
           this.enqueue(async () => {
             await this.changeTopicKind(node, option2);
@@ -43677,7 +43769,7 @@ ${request.requirements}` : preset.text,
     const typed = kind !== "topic" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
     if (!(suggestedTitle == null ? void 0 : suggestedTitle.trim())) {
-      const dialogTitle = typed ? t("ui.add_kind_0", t(TOPIC_KIND_LABEL[kind])) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic");
+      const dialogTitle = typed ? t("ui.add_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey)) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic");
       new NameModal(
         this.app,
         dialogTitle,
@@ -43695,7 +43787,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     const node = await this.plugin.repo.createNote(
-      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (typed ? t("ui.new_kind_0", t(TOPIC_KIND_LABEL[kind])) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
+      sanitizeGeneratedTitle((_b2 = suggestedTitle == null ? void 0 : suggestedTitle.trim()) != null ? _b2 : "").trim() || (typed ? t("ui.new_kind_0", t(TOPIC_KIND_SHAPES[kind].labelKey)) : parent ? t("ui.new_subtopic") : t("ui.my_core_topic")),
       model,
       this.map,
       this.path,
@@ -45805,6 +45897,7 @@ ${note.detail.trim()}` : "",
   /** Obsidian calls this when the pane's size changes. */
   onResize() {
     this.syncChatNarrow();
+    this.fitKindShapes();
   }
   chatWidth() {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

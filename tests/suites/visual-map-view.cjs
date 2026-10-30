@@ -2747,9 +2747,10 @@ const heEditor = (relations, current, options = {}) => {
   const host = dom.element('editor');
   fx.view.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
   const kindOptions = () => dom.findAll(host, c => c.tag === 'option').map(o => o.text);
+  const openKinds = () => dom.findAll(host, c => c.tag === 'option' && !c.disabled).map(o => o.text);
   const select = () => dom.find(host, c => c.tag === 'select');
-  const input = () => dom.find(host, c => c.tag === 'input');
-  return { ...fx, host, calls, closed, changed, kindOptions, select, input };
+  const input = () => dom.find(host, c => c.tag === 'textarea');
+  return { ...fx, host, calls, closed, changed, kindOptions, openKinds, select, input };
 };
 integrationTest('hypothesis-evidence: "Add relation…" asks for the kind first (six names in order), then the picker for B titled with that kind; the panel topic is A', async () => {
   const { view, modals, menus, doc } = heFixture();
@@ -2827,11 +2828,16 @@ integrationTest('hypothesis-evidence: the panel "Edit" opens the editor for that
   const parentEdge = view.edgesEl.kids.filter(k => k.classes.includes('vam-edge'));
   assert.ok(parentEdge.every(e => !(e.listeners && e.listeners.click)), 'a parent-child edge takes no click');
 });
-integrationTest('hypothesis-evidence: the editor lists only legal kinds, always including the current one', () => {
+integrationTest('hypothesis-evidence: the editor lists all six kinds; one that would close a derives/prerequisite cycle is disabled and the reason is written beside it (E4, Q7, decision #37)', () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'b', to: 'c' }, { kind: 'derives_from', from: 'c', to: 'a' }];
-  const { kindOptions, select } = heEditor(relations, relations[0]);
-  assert.deepEqual(kindOptions(), ['Supports', 'Contradicts', 'Verifies', 'Related', 'Prerequisite'], 'the pair a-b is this relation alone, so every kind is open except Derives from, which would close a cycle a -> b -> c -> a');
+  const { kindOptions, openKinds, select, host } = heEditor(relations, relations[0]);
+  assert.deepEqual(kindOptions(), ['Supports', 'Contradicts', 'Verifies', 'Derives from', 'Related', 'Prerequisite'], 'all six are listed (the old test listed five: the illegal one was left out)');
+  assert.deepEqual(openKinds(), ['Supports', 'Contradicts', 'Verifies', 'Related', 'Prerequisite'], 'Derives from would close a cycle a -> b -> c -> a: disabled');
   assert.equal(select().value, 'supports'); assert.equal(select().attrs['aria-label'], 'Relation type');
+  const reason = dom.find(host, c => (c.cls ?? '').includes('vam-relation-reason'));
+  assert.equal(reason.text, 'Unavailable because they would form a cycle: Derives from'); assert.equal(select().attrs['aria-describedby'], reason.attrs.id);
+  assert.equal(heEditor([{ kind: 'supports', from: 'a', to: 'b' }], { kind: 'supports', from: 'a', to: 'b' }).openKinds().length, 6, 'no cycle, no disabled option');
+  assert.equal(dom.find(heEditor([{ kind: 'supports', from: 'a', to: 'b' }], { kind: 'supports', from: 'a', to: 'b' }).host, c => (c.cls ?? '').includes('vam-relation-reason')), undefined, 'and no reason');
 });
 integrationTest('hypothesis-evidence: changing the kind is one mapChange, keeps the note, follows the line selection, and is refused if the map changed meanwhile', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b', description: 'note' }];
@@ -2840,9 +2846,9 @@ integrationTest('hypothesis-evidence: changing the kind is one mapChange, keeps 
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'contradicts', from: 'a', to: 'b', description: 'note' }]);
   assert.deepEqual(calls, [false], 'exactly one undoable change, no derived-data rebuild');
   assert.equal(view.selectedRelation, heKey({ kind: 'contradicts', from: 'a', to: 'b' }), 'the same line stays selected under its new kind');
-  doc.topicRelations.push({ kind: 'prerequisite', from: 'a', to: 'b' });
-  select().value = 'prerequisite'; select().fire('change'); await dom.tick();
-  assert.equal(doc.topicRelations[0].kind, 'contradicts', 'a kind that became a duplicate in the map is refused');
+  doc.topicRelations.push({ kind: 'derives_from', from: 'b', to: 'c' }, { kind: 'derives_from', from: 'c', to: 'a' }); // decision #37: a pair holds one relation, so the refused change is now the cycle (Q7)
+  select().value = 'derives_from'; select().fire('change'); await dom.tick();
+  assert.equal(doc.topicRelations[0].kind, 'contradicts', 'a kind that became a cycle in the map is refused');
   assert.equal(calls.length, 2);
 });
 integrationTest('hypothesis-evidence: reverse swaps A and B in one change; "related" has no reverse button', async () => {
@@ -2854,29 +2860,93 @@ integrationTest('hypothesis-evidence: reverse swaps A and B in one change; "rela
   const related = heEditor([{ kind: 'related', from: 'a', to: 'b' }], { kind: 'related', from: 'a', to: 'b' });
   assert.equal(dom.buttons(related.host).includes('Reverse direction'), false);
 });
-integrationTest('hypothesis-evidence: an illegal reverse is disabled with its reason (cycle or duplicate) and does nothing', async () => {
+integrationTest('hypothesis-evidence: an illegal reverse (it would close a cycle, derives or prerequisite) is disabled with its reason and does nothing', async () => {
   const cycle = [{ kind: 'derives_from', from: 'a', to: 'b' }, { kind: 'derives_from', from: 'a', to: 'c' }, { kind: 'derives_from', from: 'c', to: 'b' }];
   const one = heEditor(cycle, cycle[0]);
   const button = dom.button(one.host, 'Reverse direction');
   assert.equal(button.disabled, true); button.click(); await dom.tick(); assert.deepEqual(one.calls, []);
   const reason = dom.find(one.host, c => String(c.cls).includes('vam-relation-reason'));
   assert.equal(reason.text, 'Cannot reverse: it would form a cycle.'); assert.equal(button.attrs['aria-describedby'], reason.attrs.id);
-  const dup = [{ kind: 'supports', from: 'a', to: 'b' }, { kind: 'supports', from: 'b', to: 'a' }];
-  const two = heEditor(dup, dup[0]);
+  const pre = [{ kind: 'prerequisite', from: 'a', to: 'b' }, { kind: 'prerequisite', from: 'a', to: 'c' }, { kind: 'prerequisite', from: 'c', to: 'b' }]; // was a same-pair duplicate fixture (decision #37); now the prerequisite cycle
+  const two = heEditor(pre, pre[0]);
   assert.equal(dom.button(two.host, 'Reverse direction').disabled, true);
-  assert.equal(dom.find(two.host, c => String(c.cls).includes('vam-relation-reason')).text, 'Cannot reverse: the reversed relation already exists.');
+  assert.equal(dom.find(two.host, c => String(c.cls).includes('vam-relation-reason')).text, 'Cannot reverse: it would form a cycle.');
 });
-integrationTest('hypothesis-evidence: the note is normalized on apply (one line, 200 characters), an empty note removes the key, and an unchanged note writes nothing', async () => {
+integrationTest('hypothesis-evidence: the note is a multi-line box saved as one line of up to 200 characters; an empty note removes the key; Apply is off until the note changes; Ctrl/Cmd+Enter applies, Enter does not (E2, E5)', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
   const { doc, calls, host, input } = heEditor(relations, relations[0]);
-  input().value = '  hello \n   world  '; dom.button(host, 'Apply').click(); await dom.tick();
-  assert.equal(doc.topicRelations[0].description, 'hello world');
-  input().value = 'hello world'; dom.button(host, 'Apply').click(); await dom.tick();
+  assert.equal(input().tag, 'textarea'); assert.equal(input().attrs.maxlength, '200');
+  assert.equal(dom.button(host, 'Apply').disabled, true, 'nothing changed yet');
+  input().value = '  hello \n   world  '; input().fire('input');
+  assert.equal(dom.button(host, 'Apply').disabled, false); assert.equal(dom.find(host, c => (c.cls ?? '').includes('vam-relation-remaining')).text, `${200 - 19} characters left`);
+  dom.button(host, 'Apply').click(); await dom.tick();
+  assert.equal(doc.topicRelations[0].description, 'hello world', 'line breaks became spaces');
+  input().value = 'hello\nworld'; input().fire('input');
+  assert.equal(dom.button(host, 'Apply').disabled, true, 'a break that normalizes to the saved text is no change'); dom.button(host, 'Apply').click(); await dom.tick();
   assert.equal(calls.length, 1, 'unchanged text is not a change');
-  input().value = 'x'.repeat(201); input().fire('keydown', { key: 'Enter' }); await dom.tick();
-  assert.equal(doc.topicRelations[0].description.length, 200, 'Enter applies too');
-  input().value = '   '; dom.button(host, 'Apply').click(); await dom.tick();
+  input().value = 'x'.repeat(201); input().fire('input'); input().fire('keydown', { key: 'Enter' }); await dom.tick();
+  assert.equal(calls.length, 1, 'plain Enter only adds a line break');
+  assert.equal(dom.find(host, c => (c.cls ?? '').includes('vam-relation-remaining')).text, '0 characters left');
+  input().fire('keydown', { key: 'Enter', ctrlKey: true }); await dom.tick();
+  assert.equal(doc.topicRelations[0].description.length, 200, 'Ctrl+Enter applies');
+  input().value = '   '; input().fire('input'); dom.button(host, 'Apply').click(); await dom.tick();
   assert.equal('description' in doc.topicRelations[0], false, 'clearing deletes the key'); assert.equal(calls.length, 3);
+});
+integrationTest('hypothesis-evidence: the editor head reads "A relation B" with both ends named and a line sample, and both follow a kind or direction change (E1)', async () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { host, select, calls } = heEditor(relations, relations[0]);
+  const sentence = () => dom.find(host, c => (c.cls ?? '').includes('vam-relation-sentence')).text, swatchKinds = () => { const svg = dom.find(host, c => (c.cls ?? '').includes('vam-relation-editor-summary'))?.children.find(c => (c.classes ?? []).includes('vam-relation-swatch')); return (svg?.children ?? []).filter(c => c.tag === 'path').flatMap(c => c.classes.join(' ')); };
+  assert.equal(sentence(), 'A supports B'); assert.ok(swatchKinds()[0].includes('vam-relation-supports'));
+  dom.button(host, 'Reverse direction').click(); await dom.tick();
+  assert.equal(sentence(), 'B supports A', 'a reverse swaps the names at once');
+  select().value = 'derives_from'; select().fire('change'); await dom.tick();
+  assert.equal(sentence(), 'B is derived from A'); assert.ok(swatchKinds().some(c => c.includes('vam-relation-derives_from')) && swatchKinds().some(c => c.includes('vam-relation-gap')), 'the double line');
+  select().value = 'related'; select().fire('change'); await dom.tick();
+  assert.equal(sentence(), 'B is related to A', 'related names both ends too, not "This topic"'); assert.equal(swatchKinds().length, 1, 'one plain line, no arrowhead'); assert.ok(swatchKinds()[0].includes('vam-relation-related'));
+  assert.equal(dom.buttons(host).includes('Reverse direction'), false, 'related has no direction row'); assert.equal(dom.texts(host).includes('Direction'), false);
+  assert.deepEqual(calls, [false, false, false]);
+});
+integrationTest('hypothesis-evidence: each field takes its own row with the label above the control; the direction row has one Reverse button (E2, E3)', () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { host } = heEditor(relations, relations[0]);
+  const rows = dom.findAll(host, c => (c.cls ?? '').split(/\s+/).includes('vam-relation-field'));
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.map(r => r.children[0].text), ['Relation type', 'Direction', 'Note (optional)'], 'label first in each row, then the control');
+  assert.equal(rows[0].children[0].attrs.for, rows[0].children[1].attrs.id, 'the label is tied to its control');
+  assert.equal(rows[1].children.filter(c => c.tag === 'button').length, 1);
+});
+integrationTest('hypothesis-evidence: the footer has Delete on the left, then Close and Apply on the right; Delete is a warning button, Apply the primary one (E5)', () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { host, closed } = heEditor(relations, relations[0]);
+  const footer = dom.find(host, c => (c.cls ?? '').split(/\s+/).includes('vam-relation-footer'));
+  assert.deepEqual(footer.children.filter(c => c.tag === 'button').map(c => c.text), ['Delete relation', 'Close', 'Apply']);
+  assert.ok(footer.children[0].cls.includes('mod-warning') && footer.children[0].cls.includes('vam-discard'));
+  assert.ok(footer.children.at(-1).cls.includes('mod-cta')); assert.equal(footer.children.at(-1).disabled, true);
+  dom.button(host, 'Close').click(); assert.equal(closed.length, 1);
+  const css = heCss();
+  assert.match(heRuleBody(css, '.vam-next-actions > .vam-discard'), /order: -2/, 'the shared footer CSS keeps Delete first');
+});
+integrationTest('hypothesis-evidence: after a change the focus stays on the control that was used (kind, reverse, note)', async () => {
+  const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
+  const { host, select, input } = heEditor(relations, relations[0]);
+  select().value = 'verifies'; select().fire('change'); await dom.tick();
+  assert.equal(select().focused, true);
+  dom.button(host, 'Reverse direction').click(); await dom.tick();
+  assert.equal(dom.button(host, 'Reverse direction').focused, true);
+  input().value = 'n'; input().fire('input'); dom.button(host, 'Apply').click(); await dom.tick();
+  assert.equal(input().focused, true);
+});
+integrationTest('hypothesis-evidence: every P24 editor rule is invisible to the share viewer and starts with .vam-topic-modal (decision 35)', async () => {
+  const css = heCss();
+  const { parseCss, extractViewerRules } = await import(require('node:url').pathToFileURL(path.join(root, 'scripts/viewer-css.mjs')).href);
+  const mine = /vam-relation-(?:editor|field|reason|remaining|footer)/;
+  const own = parseCss(css).filter(chunk => mine.test(chunk.prelude));
+  assert.ok(own.length >= 8, `the editor rules exist (${own.length})`);
+  assert.ok(own.every(chunk => chunk.prelude.split(',').every(sel => sel.trim().startsWith('.vam-topic-modal '))), 'scoped to the dialog');
+  const viewer = extractViewerRules(css).map(item => item.text).join('\n');
+  for (const chunk of own) assert.equal(viewer.includes(chunk.text), false, `not in the viewer: ${chunk.prelude.slice(0, 60)}`);
+  const without = parseCss(css).filter(chunk => !mine.test(chunk.prelude)).map(chunk => chunk.text).join('\n');
+  assert.equal(extractViewerRules(without).map(item => item.text).join('\n'), viewer, 'byte-identical viewer rules');
 });
 integrationTest('hypothesis-evidence: Delete removes the relation in one change, closes the editor, repaints the panel, and an undone/vanished relation says so', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];

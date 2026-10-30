@@ -61,6 +61,7 @@ import {
   type MapDocument,
   type MapNode,
   normalizeRelationDescription,
+  RELATION_DESCRIPTION_MAX_LENGTH,
   parentIdsForNode,
   removeNodes,
   removeTopicRelationsFor,
@@ -8073,14 +8074,16 @@ export class VisualAgentMapView extends ItemView {
       ? t("ui.relation_row_out_0_1", name, titleOf(link.to))
       : t("ui.relation_row_in_0_1", titleOf(link.from), name);
   }
-  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". */
-  private relationSentence(link: TopicRelation, selfId: string): string {
+  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
+  private relationSentence(link: TopicRelation, selfId: string | null): string {
     const self = t("ui.relation_this_topic"),
       // English needs the lower-case form after the verb ("OTHER is derived from this topic"); Chinese has one form.
       titleOf = (id: string, object = false): string =>
         id === selfId ? (object ? t("ui.relation_this_topic_object") : self) : (this.notes.get(id)?.title ?? id);
     if (link.kind === "related")
-      return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
+      return selfId === null
+        ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to))
+        : t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
     return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
@@ -8108,7 +8111,6 @@ export class VisualAgentMapView extends ItemView {
   ): void {
     let current: TopicRelation = { ...initial };
     const root = parent.createDiv("vam-relation-editor");
-    const titleOf = (id: string): string => this.notes.get(id)?.title ?? id;
     const indexOfCurrent = (): number =>
       (this.map?.topicRelations ?? []).findIndex(r => relationIdentity(r) === relationIdentity(current));
     // Runs one change on the relation held in the map being edited; `next` returns its new form, or null to delete it.
@@ -8152,6 +8154,8 @@ export class VisualAgentMapView extends ItemView {
         paint();
         onChanged?.();
       });
+    // Which control takes the keyboard focus after the next repaint (a change repaints the whole dialog).
+    let refocus: "kind" | "reverse" | "description" | null = null;
     const paint = (): void => {
       root.empty();
       const index = indexOfCurrent();
@@ -8161,65 +8165,124 @@ export class VisualAgentMapView extends ItemView {
         return;
       }
       const relations = this.map?.topicRelations ?? [];
-      root.createEl("p", { text: t("ui.relation_a_0", titleOf(current.from)), attr: { dir: "auto" } });
-      root.createEl("p", { text: t("ui.relation_b_0", titleOf(current.to)), attr: { dir: "auto" } });
-      // Type: only kinds that keep the map legal; the current one is always listed.
-      root.createEl("label", { text: t("ui.relation_kind_label") });
-      const kindSelect = root.createEl("select", { cls: "dropdown vam-relation-kind" });
+      // E1: the sentence "A relation B" and the line sample follow the kind and direction at once.
+      const summary = root.createDiv("vam-relation-editor-summary");
+      this.relationSwatch(summary, current.kind);
+      summary.createSpan({
+        text: this.relationSentence(current, null),
+        cls: "vam-relation-sentence",
+        attr: { dir: "auto" }
+      });
+      // E2: one field per row, label above the control.
+      const field = (label: string, id: string): HTMLElement => {
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
+      };
+      // Type: every kind is listed; one that would close a derives/prerequisite cycle is disabled, with the reason beside it (Q7).
+      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
+      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("id", "vam-relation-kind");
       kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-      for (const kind of RELATION_KINDS)
-        if (kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index))
-          kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+      const blocked: TopicRelationKind[] = [];
+      for (const kind of RELATION_KINDS) {
+        const open =
+          kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
+        if (!open) blocked.push(kind);
+        const option = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+        if (!open) option.disabled = true;
+      }
       kindSelect.value = current.kind;
+      if (blocked.length) {
+        const reason = kindRow.createEl("p", {
+          text: t("ui.relation_kind_blocked_cycle_0", blocked.map(kind => t(RELATION_NAME_KEY[kind])).join(", ")),
+          cls: "vam-relation-reason"
+        });
+        reason.setAttr("id", "vam-relation-kind-reason");
+        kindSelect.setAttr("aria-describedby", "vam-relation-kind-reason");
+      }
       kindSelect.addEventListener("change", () => {
         const kind = kindSelect.value as TopicRelationKind;
         if (kind === current.kind) return;
+        refocus = "kind";
         apply(rel => ({ ...rel, kind }));
       });
-      // Reverse: "related" has no direction. An illegal reverse stays visible, disabled, with the reason beside it.
+      let reverseButton: HTMLElement | null = null;
+      // E3 direction: one Reverse button; "related" has no direction and no button. A reverse that would close a cycle stays visible, disabled, with the reason beside it.
       if (current.kind !== "related") {
+        const directionRow = root.createDiv("vam-relation-field");
+        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
         const reversed = { kind: current.kind, from: current.to, to: current.from };
         const allowed = relationAllowed(relations, reversed, index);
         const reverse = this.button(
-          root,
+          directionRow,
           t("ui.relation_reverse"),
-          () => apply(rel => ({ ...rel, from: reversed.from, to: reversed.to })),
+          () => {
+            refocus = "reverse";
+            apply(rel => ({ ...rel, from: reversed.from, to: reversed.to }));
+          },
           !allowed
         );
+        reverse.addClass("vam-relation-reverse");
+        reverseButton = reverse;
         if (!allowed) {
-          const duplicate = relations.some(
-            (r, at) => at !== index && relationIdentity(r) === relationIdentity(reversed)
-          );
-          const reason = root.createEl("p", {
-            text: t(duplicate ? "ui.relation_reverse_blocked_duplicate" : "ui.relation_reverse_blocked_cycle"),
+          const reason = directionRow.createEl("p", {
+            text: t("ui.relation_reverse_blocked_cycle"),
             cls: "vam-relation-reason"
           });
           reason.setAttr("id", "vam-relation-reverse-reason");
           reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
         }
       }
-      // Note: one line, normalized on apply; an empty one removes the key.
-      root.createEl("label", { text: t("ui.relation_description_label") });
-      const description = root.createEl("input", { cls: "vam-relation-description", type: "text" });
+      // Note: a multi-line box of up to 200 characters, saved as one line (line breaks become spaces); an empty one removes the key.
+      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
+      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
+      description.setAttr("id", "vam-relation-description");
+      description.setAttr("rows", "4");
+      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
       description.value = relations[index].description ?? "";
       description.setAttr("aria-label", t("ui.relation_description_label"));
       description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
+      const draft = (): string | undefined => normalizeRelationDescription(description.value);
+      const changed = (): boolean => draft() !== relations[index].description;
       const applyDescription = (): void => {
-        const text = normalizeRelationDescription(description.value);
-        if (text === relations[index].description) return;
+        if (!changed()) return;
+        const text = draft();
+        refocus = "description";
         apply(rel => {
           const next: TopicRelation = { kind: rel.kind, from: rel.from, to: rel.to };
           if (text !== undefined) next.description = text;
           return next;
         });
       };
+      // E5 footer: Delete on the left; Close and Apply (primary, off while nothing changed) on the right.
+      const footer = root.createDiv("vam-next-actions vam-relation-footer");
+      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
+      remove.addEventListener("click", () => apply(() => null));
+      footer.createSpan({ cls: "vam-next-status" });
+      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
+      const applyButton = this.button(footer, t("ui.relation_apply"), applyDescription, true);
+      applyButton.addClass("mod-cta");
+      const refresh = (): void => {
+        remaining.setText(
+          t(
+            "ui.relation_description_remaining_0",
+            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
+          )
+        );
+        applyButton.disabled = !changed();
+      };
+      description.addEventListener("input", refresh);
+      // Enter adds a line break; Ctrl/Cmd+Enter applies.
       description.addEventListener("keydown", event => {
-        if (event.key !== "Enter") return;
+        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
         event.preventDefault();
         applyDescription();
       });
-      this.button(root, t("ui.relation_apply"), applyDescription);
-      this.button(root, t("ui.relation_delete"), () => apply(() => null));
+      refresh();
+      if (refocus) ({ kind: kindSelect, reverse: reverseButton, description })[refocus]?.focus();
+      refocus = null;
     };
     paint();
   }

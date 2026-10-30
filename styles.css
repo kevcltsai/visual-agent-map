@@ -1412,3 +1412,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat-style-option { flex: 1 1 auto; height: auto; padding: 2px 6px; border: 0; border-radius: 0; box-shadow: none; background: transparent; font-size: var(--font-ui-smaller); }
 .vam-map-chat-style-option.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
 .vam-map-chat-style-option:focus-visible, .vam-map-chat-more:focus-visible, .vam-map-chat-model:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+/* The "Edit relation" dialog (decision 35, P24). Every rule starts with .vam-topic-modal, which the share viewer does not collect (scripts/viewer-css.mjs). */
+.vam-topic-modal .vam-relation-editor-summary { display: flex; align-items: center; gap: 10px; margin: 8px 0 0; padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
+.vam-topic-modal .vam-relation-editor-summary .vam-relation-sentence { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.vam-topic-modal .vam-relation-field { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 16px 0 0; }
+.vam-topic-modal .vam-relation-field > label, .vam-topic-modal .vam-relation-field-label { font-size: var(--font-ui-small); font-weight: 600; }
+.vam-topic-modal .vam-relation-field > select, .vam-topic-modal .vam-relation-field > textarea { width: 100%; }
+.vam-topic-modal .vam-relation-field > textarea { min-height: 88px; resize: vertical; }
+.vam-topic-modal .vam-relation-reason { margin: 0; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-modal .vam-relation-remaining { align-self: flex-end; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-modal .vam-relation-footer { margin-top: 20px; }

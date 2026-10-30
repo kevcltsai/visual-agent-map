@@ -591,14 +591,14 @@ var en = {
   "ui.edit_relation_0": "Edit relation: {0}",
   "ui.remove_relation_0": "Remove relation: {0}",
   "ui.relation_editor_title": "Edit relation",
-  "ui.relation_a_0": "A: {0}",
-  "ui.relation_b_0": "B: {0}",
   "ui.relation_kind_label": "Relation type",
   "ui.relation_reverse": "Reverse direction",
   "ui.relation_reverse_blocked_cycle": "Cannot reverse: it would form a cycle.",
-  "ui.relation_reverse_blocked_duplicate": "Cannot reverse: the reversed relation already exists.",
   "ui.relation_description_label": "Note (optional)",
-  "ui.relation_description_placeholder": "One line, up to 200 characters",
+  "ui.relation_description_placeholder": "Up to 200 characters; line breaks are saved as spaces",
+  "ui.relation_direction_label": "Direction",
+  "ui.relation_description_remaining_0": "{0} characters left",
+  "ui.relation_kind_blocked_cycle_0": "Unavailable because they would form a cycle: {0}",
   "ui.relation_apply": "Apply",
   "ui.relation_delete": "Delete relation",
   "ui.relation_gone": "This relation no longer exists.",
@@ -2617,14 +2617,14 @@ var zhCN = {
   "ui.edit_relation_0": "\u7F16\u8F91\u5173\u7CFB\uFF1A{0}",
   "ui.remove_relation_0": "\u79FB\u9664\u5173\u7CFB\uFF1A{0}",
   "ui.relation_editor_title": "\u7F16\u8F91\u5173\u7CFB",
-  "ui.relation_a_0": "A\uFF1A{0}",
-  "ui.relation_b_0": "B\uFF1A{0}",
   "ui.relation_kind_label": "\u5173\u7CFB\u79CD\u7C7B",
   "ui.relation_reverse": "\u53CD\u8F6C\u65B9\u5411",
   "ui.relation_reverse_blocked_cycle": "\u65E0\u6CD5\u53CD\u8F6C\uFF1A\u4F1A\u5F62\u6210\u73AF\u3002",
-  "ui.relation_reverse_blocked_duplicate": "\u65E0\u6CD5\u53CD\u8F6C\uFF1A\u53CD\u5411\u7684\u5173\u7CFB\u5DF2\u7ECF\u5B58\u5728\u3002",
   "ui.relation_description_label": "\u8BF4\u660E\uFF08\u9009\u586B\uFF09",
-  "ui.relation_description_placeholder": "\u5355\u884C\uFF0C\u6700\u591A 200 \u5B57",
+  "ui.relation_description_placeholder": "\u6700\u591A 200 \u5B57\uFF1B\u6362\u884C\u4F1A\u5B58\u6210\u7A7A\u683C",
+  "ui.relation_direction_label": "\u65B9\u5411",
+  "ui.relation_description_remaining_0": "\u8FD8\u53EF\u8F93\u5165 {0} \u5B57",
+  "ui.relation_kind_blocked_cycle_0": "\u65E0\u6CD5\u9009\u7528\uFF0C\u4F1A\u5F62\u6210\u73AF\uFF1A{0}",
   "ui.relation_apply": "\u5E94\u7528",
   "ui.relation_delete": "\u5220\u9664\u5173\u7CFB",
   "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
@@ -4643,14 +4643,14 @@ var zhTW = {
   "ui.edit_relation_0": "\u7DE8\u8F2F\u95DC\u4FC2\uFF1A{0}",
   "ui.remove_relation_0": "\u79FB\u9664\u95DC\u4FC2\uFF1A{0}",
   "ui.relation_editor_title": "\u7DE8\u8F2F\u95DC\u4FC2",
-  "ui.relation_a_0": "A\uFF1A{0}",
-  "ui.relation_b_0": "B\uFF1A{0}",
   "ui.relation_kind_label": "\u95DC\u4FC2\u7A2E\u985E",
   "ui.relation_reverse": "\u53CD\u8F49\u65B9\u5411",
   "ui.relation_reverse_blocked_cycle": "\u7121\u6CD5\u53CD\u8F49\uFF1A\u6703\u5F62\u6210\u74B0\u3002",
-  "ui.relation_reverse_blocked_duplicate": "\u7121\u6CD5\u53CD\u8F49\uFF1A\u53CD\u5411\u7684\u95DC\u4FC2\u5DF2\u7D93\u5B58\u5728\u3002",
   "ui.relation_description_label": "\u8AAA\u660E\uFF08\u9078\u586B\uFF09",
-  "ui.relation_description_placeholder": "\u55AE\u884C\uFF0C\u6700\u591A 200 \u5B57",
+  "ui.relation_description_placeholder": "\u6700\u591A 200 \u5B57\uFF1B\u63DB\u884C\u6703\u5B58\u6210\u7A7A\u767D",
+  "ui.relation_direction_label": "\u65B9\u5411",
+  "ui.relation_description_remaining_0": "\u9084\u53EF\u8F38\u5165 {0} \u5B57",
+  "ui.relation_kind_blocked_cycle_0": "\u7121\u6CD5\u9078\u7528\uFF0C\u6703\u5F62\u6210\u74B0\uFF1A{0}",
   "ui.relation_apply": "\u5957\u7528",
   "ui.relation_delete": "\u522A\u9664\u95DC\u4FC2",
   "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
@@ -43775,14 +43775,14 @@ ${request.requirements}` : preset.text,
       return t("ui.relation_row_related_0_1", name, titleOf(link.from === selfId ? link.to : link.from));
     return link.from === selfId ? t("ui.relation_row_out_0_1", name, titleOf(link.to)) : t("ui.relation_row_in_0_1", titleOf(link.from), name);
   }
-  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". */
+  /** The row's visible sentence "A relation B" (T1), with this topic written "This topic"; "related" reads "This topic is related to B". With a null `selfId` (the editor) both ends are named by title. */
   relationSentence(link, selfId) {
     const self = t("ui.relation_this_topic"), titleOf = (id, object2 = false) => {
       var _a2, _b2;
       return id === selfId ? object2 ? t("ui.relation_this_topic_object") : self : (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
     };
     if (link.kind === "related")
-      return t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
+      return selfId === null ? t("ui.relation_sentence_related_0_1", titleOf(link.from), titleOf(link.to)) : t("ui.relation_sentence_related_0_1", self, titleOf(link.from === selfId ? link.to : link.from));
     return t(RELATION_SENTENCE_KEY[link.kind], titleOf(link.from), titleOf(link.to, true));
   }
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
@@ -43804,10 +43804,6 @@ ${request.requirements}` : preset.text,
   renderRelationEditor(parent, initial, close, onChanged) {
     let current = { ...initial };
     const root = parent.createDiv("vam-relation-editor");
-    const titleOf = (id) => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : id;
-    };
     const indexOfCurrent = () => {
       var _a2, _b2;
       return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : []).findIndex((r) => relationIdentity(r) === relationIdentity(current));
@@ -43845,8 +43841,9 @@ ${request.requirements}` : preset.text,
       paint();
       onChanged == null ? void 0 : onChanged();
     });
+    let refocus = null;
     const paint = () => {
-      var _a2, _b2, _c;
+      var _a2, _b2, _c, _d;
       root.empty();
       const index = indexOfCurrent();
       root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
@@ -43855,62 +43852,116 @@ ${request.requirements}` : preset.text,
         return;
       }
       const relations = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : [];
-      root.createEl("p", { text: t("ui.relation_a_0", titleOf(current.from)), attr: { dir: "auto" } });
-      root.createEl("p", { text: t("ui.relation_b_0", titleOf(current.to)), attr: { dir: "auto" } });
-      root.createEl("label", { text: t("ui.relation_kind_label") });
-      const kindSelect = root.createEl("select", { cls: "dropdown vam-relation-kind" });
+      const summary = root.createDiv("vam-relation-editor-summary");
+      this.relationSwatch(summary, current.kind);
+      summary.createSpan({
+        text: this.relationSentence(current, null),
+        cls: "vam-relation-sentence",
+        attr: { dir: "auto" }
+      });
+      const field = (label, id) => {
+        const row = root.createDiv("vam-relation-field");
+        row.createEl("label", { text: label, attr: { for: id } });
+        return row;
+      };
+      const kindRow = field(t("ui.relation_kind_label"), "vam-relation-kind");
+      const kindSelect = kindRow.createEl("select", { cls: "dropdown vam-relation-kind" });
+      kindSelect.setAttr("id", "vam-relation-kind");
       kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
-      for (const kind of RELATION_KINDS)
-        if (kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index))
-          kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+      const blocked = [];
+      for (const kind of RELATION_KINDS) {
+        const open = kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
+        if (!open) blocked.push(kind);
+        const option2 = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
+        if (!open) option2.disabled = true;
+      }
       kindSelect.value = current.kind;
+      if (blocked.length) {
+        const reason = kindRow.createEl("p", {
+          text: t("ui.relation_kind_blocked_cycle_0", blocked.map((kind) => t(RELATION_NAME_KEY[kind])).join(", ")),
+          cls: "vam-relation-reason"
+        });
+        reason.setAttr("id", "vam-relation-kind-reason");
+        kindSelect.setAttr("aria-describedby", "vam-relation-kind-reason");
+      }
       kindSelect.addEventListener("change", () => {
         const kind = kindSelect.value;
         if (kind === current.kind) return;
+        refocus = "kind";
         apply((rel) => ({ ...rel, kind }));
       });
+      let reverseButton = null;
       if (current.kind !== "related") {
+        const directionRow = root.createDiv("vam-relation-field");
+        directionRow.createSpan({ text: t("ui.relation_direction_label"), cls: "vam-relation-field-label" });
         const reversed = { kind: current.kind, from: current.to, to: current.from };
         const allowed = relationAllowed(relations, reversed, index);
         const reverse = this.button(
-          root,
+          directionRow,
           t("ui.relation_reverse"),
-          () => apply((rel) => ({ ...rel, from: reversed.from, to: reversed.to })),
+          () => {
+            refocus = "reverse";
+            apply((rel) => ({ ...rel, from: reversed.from, to: reversed.to }));
+          },
           !allowed
         );
+        reverse.addClass("vam-relation-reverse");
+        reverseButton = reverse;
         if (!allowed) {
-          const duplicate = relations.some(
-            (r, at) => at !== index && relationIdentity(r) === relationIdentity(reversed)
-          );
-          const reason = root.createEl("p", {
-            text: t(duplicate ? "ui.relation_reverse_blocked_duplicate" : "ui.relation_reverse_blocked_cycle"),
+          const reason = directionRow.createEl("p", {
+            text: t("ui.relation_reverse_blocked_cycle"),
             cls: "vam-relation-reason"
           });
           reason.setAttr("id", "vam-relation-reverse-reason");
           reverse.setAttr("aria-describedby", "vam-relation-reverse-reason");
         }
       }
-      root.createEl("label", { text: t("ui.relation_description_label") });
-      const description = root.createEl("input", { cls: "vam-relation-description", type: "text" });
+      const noteRow = field(t("ui.relation_description_label"), "vam-relation-description");
+      const description = noteRow.createEl("textarea", { cls: "vam-relation-description" });
+      description.setAttr("id", "vam-relation-description");
+      description.setAttr("rows", "4");
+      description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
       description.value = (_c = relations[index].description) != null ? _c : "";
       description.setAttr("aria-label", t("ui.relation_description_label"));
       description.setAttr("placeholder", t("ui.relation_description_placeholder"));
+      const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
+      const draft = () => normalizeRelationDescription(description.value);
+      const changed = () => draft() !== relations[index].description;
       const applyDescription = () => {
-        const text11 = normalizeRelationDescription(description.value);
-        if (text11 === relations[index].description) return;
+        if (!changed()) return;
+        const text11 = draft();
+        refocus = "description";
         apply((rel) => {
           const next = { kind: rel.kind, from: rel.from, to: rel.to };
           if (text11 !== void 0) next.description = text11;
           return next;
         });
       };
+      const footer = root.createDiv("vam-next-actions vam-relation-footer");
+      const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
+      remove.addEventListener("click", () => apply(() => null));
+      footer.createSpan({ cls: "vam-next-status" });
+      footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
+      const applyButton = this.button(footer, t("ui.relation_apply"), applyDescription, true);
+      applyButton.addClass("mod-cta");
+      const refresh = () => {
+        remaining.setText(
+          t(
+            "ui.relation_description_remaining_0",
+            Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
+          )
+        );
+        applyButton.disabled = !changed();
+      };
+      description.addEventListener("input", refresh);
       description.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") return;
+        if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
         event.preventDefault();
         applyDescription();
       });
-      this.button(root, t("ui.relation_apply"), applyDescription);
-      this.button(root, t("ui.relation_delete"), () => apply(() => null));
+      refresh();
+      if (refocus) (_d = { kind: kindSelect, reverse: reverseButton, description }[refocus]) == null ? void 0 : _d.focus();
+      refocus = null;
     };
     paint();
   }

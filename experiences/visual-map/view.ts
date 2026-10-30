@@ -5232,6 +5232,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.mergeUnlocked([target.id, ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])]))
       return;
     const copies: MapNode[] = [],
+      pairs: Array<{ from: string; to: string }> = [],
       replacement = new Map<string, string>(),
       repo = this.plugin.repo,
       parkFolder = repo.topicFolder(this.path, "Unassigned");
@@ -5251,8 +5252,11 @@ export class VisualAgentMapView extends ItemView {
           copy.x = target.x + 340 + (original.x - root.x);
           copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
         }
       }
+      // Only the new copies are written, before the transaction; a failure parks them like any other.
+      await repo.rewriteCopiedNoteLinks(pairs);
       const tx = this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       entry = await tx
@@ -6290,7 +6294,7 @@ export class VisualAgentMapView extends ItemView {
         this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
       this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
-      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      if (this.needsConnectionCheck()) this.renderConnectionCheck(actions);
       // The opening screen of the chat: one sentence builds a new map of the user's own, which the sample cannot be.
       start.createDiv("vam-sample-start-chat");
     }
@@ -9239,6 +9243,10 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  /** No model is usable yet: neither Codex models nor a ready Claude Code. Claude counts, so a Claude-only setup gets no check button. */
+  private needsConnectionCheck(): boolean {
+    return !this.plugin.availableModels().length;
+  }
   private renderConnectionCheck(actions: HTMLElement): HTMLButtonElement {
     const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
     return this.button(actions, t(claude ? "ui.check_claude_code" : "ui.check_codex"), () =>

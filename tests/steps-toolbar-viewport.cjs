@@ -182,6 +182,14 @@ test('the sample-start check button follows the chosen model: Claude Code repair
 });
 
 
+test('MS-10: the sample-start check button shows only when no model is usable; a Claude-only setup counts as usable', () => {
+  for (const [models, expected] of [[[], true], [['claude:sonnet', 'claude:opus'], false], [['gpt-test'], false]]) {
+    const plugin = { settings: { ...DEFAULT_SETTINGS, language: 'en', models: '' }, availableModels: () => models };
+    const view = bareView(plugin, {});
+    assert.equal(view.needsConnectionCheck(), expected, JSON.stringify(models));
+  }
+});
+
 test('the selection bar is left-anchored above the zoom cluster, names on their own line, and select mode draws no hint', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const bar = css.split('\n').find(line => line.startsWith('.vam-selection-bar {'));

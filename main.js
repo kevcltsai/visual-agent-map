@@ -19262,6 +19262,87 @@ function rewriteLinkTargets(text11, resolve, moves) {
   return { text: out + text11.slice(cursor), hits, unsupported };
 }
 
+// core/copy-links.ts
+function baseOf2(path) {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+function folderOf(path) {
+  const slash = path.lastIndexOf("/");
+  return slash < 0 ? "" : path.slice(0, slash);
+}
+function relativeTo(folder, target) {
+  const from = folder ? folder.split("/") : [], to = target.split("/");
+  let common = 0;
+  while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
+  return [...from.slice(common).map(() => ".."), ...to.slice(common)].join("/");
+}
+function candidatesFor(linkPath, target, newPath) {
+  const isNote = /\.md$/i.test(target), dropMd = isNote && !/\.md$/i.test(linkPath), spell = (path) => dropMd ? path.replace(/\.md$/i, "") : path;
+  const out = [];
+  if (!linkPath.includes("/")) out.push(spell(baseOf2(target)));
+  out.push(spell(target), spell(relativeTo(folderOf(newPath), target)));
+  return [...new Set(out)];
+}
+function isExternal(path) {
+  return /^[a-z][a-z0-9+.-]*:/i.test(path);
+}
+function encodeMarkdownPath(path) {
+  return path.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+function rewriteCopiedLinks(body, options) {
+  const { sourcePath, newPath, copies, resolve } = options, unverified = [], edits = [];
+  const retarget = (linkPath) => {
+    var _a2;
+    const source = resolve(linkPath, sourcePath);
+    if (source === void 0) return linkPath;
+    const target = (_a2 = copies.get(source)) != null ? _a2 : source;
+    if (resolve(linkPath, newPath) === target) return linkPath;
+    return candidatesFor(linkPath, target, newPath).find((candidate) => resolve(candidate, newPath) === target);
+  };
+  const wikilinks = findWikilinks(body);
+  for (const link of wikilinks) {
+    const parts = /^(!?)\[\[([^[\]\n]+)\]\]$/.exec(link.original);
+    if (!parts) continue;
+    const inner = parts[2], hash = link.target.indexOf("#"), pathPart = hash < 0 ? link.target : link.target.slice(0, hash), linkPath = linkPathOf(link.target);
+    if (!linkPath || isExternal(linkPath)) continue;
+    const next = retarget(linkPath);
+    if (next === void 0) unverified.push(link.original);
+    else if (next !== linkPath)
+      edits.push({
+        start: link.start,
+        end: link.end,
+        text: `${parts[1]}[[${next}${inner.slice(pathPart.length)}]]`
+      });
+  }
+  const code = codeRanges(body), skipped2 = (at) => code.some(([from, to]) => at >= from && at < to) || wikilinks.some((link) => at >= link.start && at < link.end);
+  for (const match of body.matchAll(/(!?\[[^\]\n]*\]\(\s*)(?:<([^>\n]+)>|([^)\s<>]+))((?:\s+"[^"\n]*")?\s*\))/g)) {
+    if (skipped2(match.index)) continue;
+    const angled = match[2] !== void 0, raw = angled ? match[2] : match[3];
+    if (isExternal(raw) || raw.startsWith("#")) continue;
+    const hash = raw.indexOf("#"), rawPath = hash < 0 ? raw : raw.slice(0, hash), subPart = hash < 0 ? "" : raw.slice(hash);
+    let linkPath = rawPath;
+    try {
+      linkPath = decodeURIComponent(rawPath);
+    } catch (e) {
+    }
+    linkPath = linkPath.trim();
+    if (!linkPath) continue;
+    const next = retarget(linkPath);
+    if (next === void 0) unverified.push(match[0]);
+    else if (next !== linkPath) {
+      const destination = angled ? `<${next}${subPart}>` : `${encodeMarkdownPath(next)}${subPart}`;
+      edits.push({ start: match.index, end: match.index + match[0].length, text: match[1] + destination + match[4] });
+    }
+  }
+  edits.sort((a, b) => a.start - b.start);
+  let text11 = "", cursor = 0;
+  for (const edit of edits) {
+    text11 += body.slice(cursor, edit.start) + edit.text;
+    cursor = edit.end;
+  }
+  return { text: text11 + body.slice(cursor), rewritten: edits.length, unverified };
+}
+
 // note-values.ts
 var managedSectionValue = (value) => value.trim();
 var managedHeadingValue = (value) => value.replace(/\n/g, " ").trim();
@@ -20369,6 +20450,29 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
 ${(0, import_obsidian14.stringifyYaml)(metadata)}---
 ${body}`);
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
+  }
+  /**
+   * Rewrites the body links of notes just copied for "Copy to…": each link is read from the source note's place and
+   * written for the copy's place, following the copies of this run. Only the copies (`to`) are written, and only when
+   * their body changes; the sources and the frontmatter are never touched.
+   */
+  async rewriteCopiedNoteLinks(pairs) {
+    const copies = new Map(pairs.map((pair6) => [pair6.from, pair6.to])), resolve = (linkPath, fromPath) => {
+      var _a2;
+      return linkPath ? (_a2 = this.app.metadataCache.getFirstLinkpathDest(linkPath, fromPath)) == null ? void 0 : _a2.path : void 0;
+    }, unverified = [];
+    let rewritten = 0;
+    for (const { from, to } of pairs) {
+      const file = this.file(to), { body } = splitFrontmatter(await this.app.vault.read(file)), result = rewriteCopiedLinks(body, { sourcePath: from, newPath: to, copies, resolve });
+      rewritten += result.rewritten;
+      unverified.push(...result.unverified);
+      if (result.text === body) continue;
+      await this.app.vault.process(file, (content) => {
+        const current = splitFrontmatter(content);
+        return current.body === body ? current.head + result.text : content;
+      });
+    }
+    return { rewritten, unverified };
   }
   async readMap(path) {
     return parseMap(await this.app.vault.read(this.file(path)));
@@ -44653,7 +44757,7 @@ ${request.requirements}` : preset.text,
     const roots = this.selectedRoots(), before = clone(this.map), viewport = clone(this.map.viewport);
     if (!this.mergeUnlocked([target.id, ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])]))
       return;
-    const copies = [], replacement = /* @__PURE__ */ new Map(), repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
+    const copies = [], pairs = [], replacement = /* @__PURE__ */ new Map(), repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
     let entry;
     try {
       for (const root of roots) {
@@ -44670,8 +44774,10 @@ ${request.requirements}` : preset.text,
           copy.x = target.x + 340 + (original.x - root.x);
           copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
         }
       }
+      await repo.rewriteCopiedNoteLinks(pairs);
       const tx = this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       entry = await tx.editMap(this.path, (map) => {
@@ -45644,7 +45750,7 @@ ${request.requirements}` : preset.text,
         () => this.enqueue(async () => this.openMapInMutation(await this.plugin.duplicateBuiltInSample()))
       ).addClass("mod-cta");
       this.button(actions, t("ui.create_an_empty_mind_map"), () => this.promptEmptyMap());
-      if (!this.plugin.settings.models.trim()) this.renderConnectionCheck(actions);
+      if (this.needsConnectionCheck()) this.renderConnectionCheck(actions);
       start.createDiv("vam-sample-start-chat");
     }
     if (!this.builtIn && !this.map.aim) this.renderMultiResearchStatus(this.contentEl);
@@ -48334,6 +48440,10 @@ ${request.requirements}` : preset.text,
     }
   }
   /** The sample start's "no models found" button: it checks the CLI of the chosen model (Claude Code or Codex). */
+  /** No model is usable yet: neither Codex models nor a ready Claude Code. Claude counts, so a Claude-only setup gets no check button. */
+  needsConnectionCheck() {
+    return !this.plugin.availableModels().length;
+  }
   renderConnectionCheck(actions) {
     const claude = providerForModel(this.plugin.settings.cliModel) === "claude";
     return this.button(

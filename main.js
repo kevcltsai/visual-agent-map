@@ -18966,9 +18966,11 @@ function readRelevanceContext(fm) {
   const context = fm["relevance-context"];
   return typeof context === "string" ? normalizeRelevanceContext(context) : void 0;
 }
+var TOPIC_KINDS = ["topic", "action", "atomic", "hypothesis", "evidence", "conclusion"];
 var HYPOTHESIS_STRENGTHS = ["weak", "medium", "strong"];
 function readTopicKind(fm) {
-  return fm["topic-kind"] === "hypothesis" ? "hypothesis" : "topic";
+  const value = fm["topic-kind"];
+  return typeof value === "string" && TOPIC_KINDS.includes(value) ? value : "topic";
 }
 function readHypothesisStrength(fm) {
   if (readTopicKind(fm) !== "hypothesis") return void 0;
@@ -19782,7 +19784,8 @@ var Repository = class {
       ...typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
-      ...readTopicKind(fm) === "hypothesis" ? { topicKind: "hypothesis", hypothesisStrength: readHypothesisStrength(fm) } : {},
+      ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
+      ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
       mapId: text5(fm["agent-map-id"]),
@@ -19886,10 +19889,11 @@ ${withReferenceLinks(body, fm, language2)}`;
     });
   }
   async createNote(title, model, map, mapPath, modelSource, initial = {}, onCreate) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID();
+    const kind = (_a2 = initial.topicKind) != null ? _a2 : initial.hypothesis ? "hypothesis" : "topic";
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -19901,9 +19905,10 @@ ${withReferenceLinks(body, fm, language2)}`;
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": (_a2 = initial.reasoning) != null ? _a2 : this.settings.cliReasoning,
+      "reasoning-level": (_b2 = initial.reasoning) != null ? _b2 : this.settings.cliReasoning,
       ...initial.researchMode ? { "research-mode": initial.researchMode } : {},
-      ...initial.hypothesis ? { "topic-kind": "hypothesis", "hypothesis-strength": "weak" } : {},
+      ...kind !== "topic" ? { "topic-kind": kind } : {},
+      ...kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {},
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -19915,7 +19920,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
       title,
       `---
 ${(0, import_obsidian13.stringifyYaml)(metadata)}---
-${noteBody(title, (_b2 = initial.summary) != null ? _b2 : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_c = initial.detail) != null ? _c : "", "", "", origin)}`,
+${noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_d = initial.detail) != null ? _d : "", "", "", origin)}`,
       onCreate
     );
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -20013,6 +20018,16 @@ ${body}`);
   async readRelevanceSetup(path) {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+  }
+  /**
+   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-strength` stays, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeTopicKind(path, kind) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
   }
   /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
   async writeHypothesisStrength(path, strength) {
@@ -43601,7 +43616,7 @@ ${request.requirements}` : preset.text,
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local", ...hypothesis ? { hypothesis: true } : {} }
+      { researchMode: "local", ...hypothesis ? { topicKind: "hypothesis" } : {} }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0);

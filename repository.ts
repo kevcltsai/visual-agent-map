@@ -1157,9 +1157,8 @@ export class Repository {
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
       ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
-      ...(readTopicKind(fm) === "hypothesis"
-        ? { topicKind: "hypothesis" as const, hypothesisStrength: readHypothesisStrength(fm) }
-        : {}),
+      ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
+      ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
@@ -1290,6 +1289,8 @@ export class Repository {
     mapPath: string,
     modelSource: ModelSource,
     initial: Pick<NotePatch, "detail" | "thinkingOrigin" | "summary" | "reasoning" | "researchMode"> & {
+      topicKind?: TopicKind;
+      /** Deprecated alias of `topicKind: "hypothesis"`; kept until merge-topics.cjs moves to `topicKind` (P14). */
       hypothesis?: true;
     } = {},
     onCreate?: (path: string) => void
@@ -1297,6 +1298,7 @@ export class Repository {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const id = crypto.randomUUID();
+    const kind: TopicKind = initial.topicKind ?? (initial.hypothesis ? "hypothesis" : "topic");
     const metadata = {
       "agent-map-node": true,
       "node-id": id,
@@ -1310,7 +1312,8 @@ export class Repository {
       "model-source": modelSource,
       "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
       ...(initial.researchMode ? { "research-mode": initial.researchMode } : {}),
-      ...(initial.hypothesis ? { "topic-kind": "hypothesis", "hypothesis-strength": "weak" } : {}),
+      ...(kind !== "topic" ? { "topic-kind": kind } : {}),
+      ...(kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {}),
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS]
     };
@@ -1432,6 +1435,16 @@ export class Repository {
   async readRelevanceSetup(path: string): Promise<RelevanceSetup> {
     const fm = frontmatter(await this.app.vault.read(this.file(path)));
     return { goal: readRelevanceGoal(fm), level: readRelevanceLevel(fm), context: readRelevanceContext(fm) };
+  }
+
+  /**
+   * Sets a note's `topic-kind` only (an ordinary topic removes the key): `hypothesis-strength` stays, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeTopicKind(path: string, kind: TopicKind): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
   }
 
   /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */

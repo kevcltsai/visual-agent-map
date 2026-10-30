@@ -1761,3 +1761,69 @@ integrationTest('hypothesis-evidence: writeHypothesisStrength changes only its k
   contents.set(h.path, after.replace('"strong"', 'bogus'));
   assert.equal((await repo.readNote(h.path)).hypothesisStrength, 'weak', 'an invalid stored strength reads as weak');
 });
+// ---- hypothesis-evidence (V1.6 P9): six topic kinds in notes ----
+const HE_KINDS = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+test('hypothesis-evidence: readTopicKind reads the six kinds and treats fact / number / list as an ordinary topic', () => {
+  const { readTopicKind, TOPIC_KINDS } = load('note-values.ts');
+  assert.deepEqual([...TOPIC_KINDS], HE_KINDS);
+  for (const kind of HE_KINDS) assert.equal(readTopicKind({ 'topic-kind': kind }), kind);
+  for (const bad of ['fact', 'Action', 'topic ', 5, null, true, ['action'], {}]) assert.equal(readTopicKind({ 'topic-kind': bad }), 'topic');
+  assert.equal(readTopicKind({}), 'topic');
+});
+test('hypothesis-evidence: hypothesis-strength maybe reads as weak, and only a hypothesis has a strength', () => {
+  const { readHypothesisStrength } = load('note-values.ts');
+  assert.equal(readHypothesisStrength({ 'topic-kind': 'hypothesis', 'hypothesis-strength': 'maybe' }), 'weak');
+  for (const kind of ['topic', 'action', 'atomic', 'evidence', 'conclusion']) assert.equal(readHypothesisStrength({ 'topic-kind': kind, 'hypothesis-strength': 'strong' }), undefined, kind);
+});
+integrationTest('hypothesis-evidence: createNote writes topic-kind for each of the six kinds; only a hypothesis gets a strength', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  for (const kind of HE_KINDS) {
+    const n = await repo.createNote(`K ${kind}`, 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: kind });
+    const text = contents.get(n.path);
+    if (kind === 'topic') assert.doesNotMatch(text, /topic-kind|hypothesis-strength/, 'an ordinary topic writes neither key');
+    else assert.match(text, new RegExp(`^topic-kind: ${kind}$`, 'm'));
+    if (kind === 'hypothesis') assert.match(text, /^hypothesis-strength: weak$/m);
+    else assert.doesNotMatch(text, /hypothesis-strength/, kind);
+  }
+});
+integrationTest('hypothesis-evidence: readNote returns topicKind for the five non-ordinary kinds and strength only for a hypothesis', async () => {
+  const { repo } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  for (const kind of HE_KINDS) {
+    const n = await repo.createNote(`R ${kind}`, 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: kind });
+    const read = await repo.readNote(n.path);
+    assert.equal(read.topicKind, kind === 'topic' ? undefined : kind, kind);
+    assert.equal(read.hypothesisStrength, kind === 'hypothesis' ? 'weak' : undefined, kind);
+  }
+});
+integrationTest('hypothesis-evidence: writeTopicKind to topic removes only the topic-kind line, every other byte and updated stay', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const n = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'action' });
+  const before = contents.get(n.path); const updated = (await repo.readNote(n.path)).updated;
+  assert.match(before, /^topic-kind: action\n/m);
+  await repo.writeTopicKind(n.path, 'topic');
+  assert.equal(contents.get(n.path), before.replace('topic-kind: action\n', ''), 'only the topic-kind line is gone');
+  assert.equal((await repo.readNote(n.path)).updated, updated);
+  assert.equal((await repo.readNote(n.path)).topicKind, undefined);
+});
+integrationTest('hypothesis-evidence: writeTopicKind changes only its line; hypothesis -> evidence -> hypothesis keeps the strength in the file', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const n = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'hypothesis' });
+  await repo.writeHypothesisStrength(n.path, 'strong');
+  const start = contents.get(n.path); const updated = (await repo.readNote(n.path)).updated;
+  await repo.writeTopicKind(n.path, 'evidence');
+  const mid = contents.get(n.path);
+  assert.equal(mid.split('\n').filter(l => !/^topic-kind:/.test(l)).join('\n'), start.split('\n').filter(l => !/^topic-kind:/.test(l)).join('\n'), 'no other line differs');
+  assert.match(mid, /hypothesis-strength: "?strong"?/);
+  const asEvidence = await repo.readNote(n.path); assert.equal(asEvidence.topicKind, 'evidence'); assert.equal(asEvidence.hypothesisStrength, undefined);
+  await repo.writeTopicKind(n.path, 'hypothesis');
+  const back = await repo.readNote(n.path);
+  assert.equal(back.topicKind, 'hypothesis'); assert.equal(back.hypothesisStrength, 'strong', 'the strength came back'); assert.equal(back.updated, updated);
+  assert.equal(contents.get(n.path).replace('topic-kind: "hypothesis"', 'topic-kind: hypothesis'), start, 'back to the start, byte for byte (setFrontmatterKeys only adds quotes on the rewritten line)');
+});
+integrationTest('hypothesis-evidence: switching to a hypothesis without a strength line does not add one and reads weak', async () => {
+  const { repo, contents } = fixture(); const mapDoc = { ...map([]), id: 'map-a' };
+  const n = await repo.createNote('Claim', 'model-a', mapDoc, 'Map.md', 'workspace', { topicKind: 'atomic' });
+  await repo.writeTopicKind(n.path, 'hypothesis');
+  assert.doesNotMatch(contents.get(n.path), /hypothesis-strength/);
+  assert.equal((await repo.readNote(n.path)).hypothesisStrength, 'weak');
+});

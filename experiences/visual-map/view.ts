@@ -8116,7 +8116,7 @@ export class VisualAgentMapView extends ItemView {
       this.path,
       parent ? "inherited" : "workspace",
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
-      { researchMode: "local", ...(hypothesis ? { hypothesis: true as const } : {}) }
+      { researchMode: "local", ...(hypothesis ? { topicKind: "hypothesis" as const } : {}) }
     );
     if (parent) {
       const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);

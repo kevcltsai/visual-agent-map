@@ -3813,3 +3813,17 @@ integrationTest('hypothesis-evidence: move_topic leaves every relation as it was
   assert.equal(saved.nodes.find(n => n.id === h.ids.c).parentId, h.ids.b, 'the topic really moved');
   eq(saved.topicRelations, relations);
 });
+test('hypothesis-evidence: the guard refuses adding, switching and removing topic-kind for all six values; the map file is still map_file', () => {
+  const refused = { ok: false, code: 'hypothesis_frontmatter_changed' };
+  const kinds = ['topic', 'action', 'atomic', 'hypothesis', 'evidence', 'conclusion'];
+  eq(heEdit(heNote(''), heNote('topic-kind: action\n')), refused, 'add topic-kind: action');
+  for (const kind of kinds.slice(1)) {
+    const note = heNote(`topic-kind: ${kind}\n`);
+    eq(heEdit(note, note.replace(`topic-kind: ${kind}\n`, '')), refused, `remove ${kind}`);
+    for (const other of kinds.filter(k => k !== kind)) eq(heEdit(note, note.replace(`topic-kind: ${kind}`, `topic-kind: ${other}`)), refused, `${kind} -> ${other}`);
+  }
+  eq(heEdit(heNote('topic-kind: atomic\n'), heNote('topic-kind: conclusion\n')), refused, 'atomic -> conclusion');
+  eq(heEdit(heNote('topic-kind: action\n'), heNote('topic-kind: action\n').replace('Body', 'Changed')), { ok: true }, 'a body edit with the kind untouched is allowed');
+  const mapText = '```agent-map\n{"id":"m","title":"T","version":1,"nodes":[],"viewport":{"x":0,"y":0,"zoom":1}}\n```\n';
+  eq(heEdit(mapText, mapText.replace('"T"', '"U"'), 'Map.md'), { ok: false, code: 'map_file' });
+});

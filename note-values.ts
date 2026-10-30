@@ -60,12 +60,16 @@ export function readRelevanceContext(fm: Record<string, unknown>): string | unde
   return typeof context === "string" ? normalizeRelevanceContext(context) : undefined;
 }
 
-export type TopicKind = "topic" | "hypothesis";
+export type TopicKind = "topic" | "action" | "atomic" | "hypothesis" | "evidence" | "conclusion";
+export const TOPIC_KINDS: readonly TopicKind[] = ["topic", "action", "atomic", "hypothesis", "evidence", "conclusion"];
 export type HypothesisStrength = "weak" | "medium" | "strong";
 export const HYPOTHESIS_STRENGTHS: readonly HypothesisStrength[] = ["weak", "medium", "strong"];
-/** `topic-kind: hypothesis` makes a hypothesis; anything else (missing, unknown) is an ordinary topic. */
+/** `topic-kind` is one of the six kinds; a missing or invalid value (wrong case, number, list) is an ordinary topic. */
 export function readTopicKind(fm: Record<string, unknown>): TopicKind {
-  return fm["topic-kind"] === "hypothesis" ? "hypothesis" : "topic";
+  const value = fm["topic-kind"];
+  return typeof value === "string" && (TOPIC_KINDS as readonly string[]).includes(value)
+    ? (value as TopicKind)
+    : "topic";
 }
 /** A hypothesis's strength; missing or invalid reads as weak. A non-hypothesis has none, whatever the key says. */
 export function readHypothesisStrength(fm: Record<string, unknown>): HypothesisStrength | undefined {

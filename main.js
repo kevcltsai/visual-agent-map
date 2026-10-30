@@ -28668,7 +28668,7 @@ ${details.join("\n")}`);
 
 // experiences/aim/create-map.ts
 async function createAimMap(repository, model, input) {
-  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
   const topic = input.topic.trim();
   if (!topic) throw new Error("AIM topic is required.");
   const problem = titleProblem(topic);
@@ -28712,28 +28712,32 @@ async function createAimMap(repository, model, input) {
   let draft = map.aim.rootDraft;
   if (!draft && !map.nodes.some((node) => node.aimKind === "topic")) {
     const notePath = repository.unique(repository.topicFolder(mapPath, "Notes"), topic);
-    const configuredReasoning = (_f = input.reasoning) != null ? _f : repository.settings.cliReasoning;
-    const reasoning = configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const chosenReasoning = normalizeReasoningLevel((_f = input.reasoning) != null ? _f : repository.settings.cliReasoning);
     draft = {
       nodeId: (0, import_node_crypto7.randomUUID)(),
       notePath,
       title: topic,
       context: rootContext,
       model: (_g = input.model) != null ? _g : model,
-      reasoning
+      // Never "auto": the map data only knows low/medium/high, so an auto choice is left out of the draft.
+      ...chosenReasoning === "auto" ? {} : { reasoning: chosenReasoning }
     };
     map.aim.rootDraft = draft;
     (_i = (_h = map.aim).contentLanguage) != null ? _i : _h.contentLanguage = noteLanguage;
     await repository.saveMap(mapPath, map);
   }
   if (draft) {
+    const noteModel = (_j = draft.model) != null ? _j : model;
+    const noteReasoning = normalizeReasoningLevel(
+      (_l = (_k = draft.reasoning) != null ? _k : input.reasoning) != null ? _l : repository.settings.cliReasoning
+    );
+    const followsCurrent = noteModel === repository.settings.cliModel && noteReasoning === normalizeReasoningLevel(repository.settings.cliReasoning);
     await repository.createNoteAt(
       draft.title,
-      (_j = draft.model) != null ? _j : model,
+      noteModel,
       map,
       mapPath,
-      // A model picked in the start dialog that differs from the workspace default is the owner's choice: keep it.
-      ((_k = draft.model) != null ? _k : model) === repository.settings.cliModel ? "workspace" : "manual",
+      followsCurrent ? "workspace" : "manual",
       draft.notePath,
       draft.nodeId,
       {
@@ -28741,7 +28745,7 @@ async function createAimMap(repository, model, input) {
         detail: draft.context ? `${translate(noteLanguage, "note.aim_user_context")}
 
 ${draft.context}` : "",
-        reasoning: (_m = (_l = draft.reasoning) != null ? _l : input.reasoning) != null ? _m : "low",
+        reasoning: noteReasoning,
         contentLanguage: noteLanguage
       }
     );
@@ -34066,6 +34070,7 @@ var AimStartModal = class extends import_obsidian25.Modal {
     const reasoning = reasoningLabel2.createEl("select");
     reasoning.setAttr("aria-label", t("ui.reasoning_level"));
     for (const [value, label] of [
+      ["auto", t("ui.auto")],
       ["low", t("ui.low")],
       ["medium", t("ui.medium")],
       ["high", t("ui.high")]
@@ -41115,7 +41120,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
     const configuredModel = ((_a2 = this.plugin.settings.cliModel) == null ? void 0 : _a2.trim()) || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    const defaultReasoning = configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const defaultReasoning = configuredReasoning;
     const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
     const modelChoices = modelIds.map((id) => ({
       id,

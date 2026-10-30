@@ -1357,8 +1357,7 @@ export class VisualAgentMapView extends ItemView {
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
     const configuredModel = this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    const defaultReasoning =
-      configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const defaultReasoning = configuredReasoning;
     const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
     const modelChoices = modelIds.map(id => ({
       id,

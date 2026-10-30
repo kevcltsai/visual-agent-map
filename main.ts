@@ -63,6 +63,7 @@ import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
 import { stepEffort } from "./core/provider-step-runner";
 import type { ReasoningLevel } from "./ai/types";
+import { resolveTaskModel, type ModelChoice } from "./ai/model-resolution";
 import responseSchema from "./response-schema.json";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
@@ -463,7 +464,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
-      model: () => this.settings.cliModel,
+      model: () => this.currentModelChoice().model,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: selected =>
         languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
@@ -1007,6 +1008,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.saveSettings();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
+  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
+  currentModelChoice(): ModelChoice {
+    const { model, reasoning } = resolveTaskModel({
+      current: { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }
+    });
+    return { model, reasoning };
+  }
   subscribeCurrentModel(listener: (model: string) => void): () => void {
     this.currentModelListeners.add(listener);
     return () => {
@@ -1119,7 +1127,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         const note = sample.notes.get(source.id)!;
         const created = await this.repo.createNote(
           note.title,
-          this.settings.cliModel,
+          this.currentModelChoice().model,
           map,
           path,
           source.parentId ? "inherited" : "workspace"

@@ -379,6 +379,8 @@ export const en = {
   "ui.image_translate_new": "Add new image",
   "ui.image_translate_replace_unavailable":
     "This image appears more than once or can't be located in the note, so it can only be added as a new image.",
+  "ui.image_translate_needs_codex":
+    "Image translation needs a Codex model. The current model is a Claude one, so choose a Codex model first.",
   "ui.image_translate_running":
     "Codex is drawing the translated image (about a minute). You can keep working; it is written to the note when ready.",
   "ui.image_translate_replaced": "Replaced the image with its translated version ({0}).",

@@ -346,6 +346,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.image_translate_replace": "取代原圖",
   "ui.image_translate_new": "新增一張",
   "ui.image_translate_replace_unavailable": "這張圖在筆記裡出現多次或無法定位，只能新增一張。",
+  "ui.image_translate_needs_codex": "圖片翻譯需要 Codex 模型。目前模型是 Claude，請先改用 Codex 模型。",
   "ui.image_translate_running": "Codex 正在繪製翻譯圖片（約一分鐘）。可以繼續編輯，完成後會自動寫入筆記。",
   "ui.image_translate_replaced": "已用翻譯版圖片取代原圖（{0}）。",
   "ui.image_translate_added": "已在原圖下方新增翻譯圖片（{0}）。",

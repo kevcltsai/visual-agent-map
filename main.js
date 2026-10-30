@@ -436,6 +436,7 @@ var en = {
   "ui.image_translate_replace": "Replace image",
   "ui.image_translate_new": "Add new image",
   "ui.image_translate_replace_unavailable": "This image appears more than once or can't be located in the note, so it can only be added as a new image.",
+  "ui.image_translate_needs_codex": "Image translation needs a Codex model. The current model is a Claude one, so choose a Codex model first.",
   "ui.image_translate_running": "Codex is drawing the translated image (about a minute). You can keep working; it is written to the note when ready.",
   "ui.image_translate_replaced": "Replaced the image with its translated version ({0}).",
   "ui.image_translate_added": "Added the translated image below the original ({0}).",
@@ -2468,6 +2469,7 @@ var zhCN = {
   "ui.image_translate_replace": "\u53D6\u4EE3\u539F\u56FE",
   "ui.image_translate_new": "\u6DFB\u52A0\u4E00\u5F20",
   "ui.image_translate_replace_unavailable": "\u8FD9\u5F20\u56FE\u5728\u7B14\u8BB0\u91CC\u51FA\u73B0\u591A\u6B21\u6216\u65E0\u6CD5\u5B9A\u4F4D\uFF0C\u53EA\u80FD\u6DFB\u52A0\u4E00\u5F20\u3002",
+  "ui.image_translate_needs_codex": "\u56FE\u7247\u7FFB\u8BD1\u9700\u8981 Codex \u6A21\u578B\u3002\u5F53\u524D\u6A21\u578B\u662F Claude\uFF0C\u8BF7\u5148\u6539\u7528 Codex \u6A21\u578B\u3002",
   "ui.image_translate_running": "Codex \u6B63\u5728\u7ED8\u5236\u7FFB\u8BD1\u56FE\u7247\uFF08\u7EA6\u4E00\u5206\u949F\uFF09\u3002\u53EF\u4EE5\u7EE7\u7EED\u7F16\u8F91\uFF0C\u5B8C\u6210\u540E\u4F1A\u81EA\u52A8\u5199\u5165\u7B14\u8BB0\u3002",
   "ui.image_translate_replaced": "\u5DF2\u7528\u7FFB\u8BD1\u7248\u56FE\u7247\u53D6\u4EE3\u539F\u56FE\uFF08{0}\uFF09\u3002",
   "ui.image_translate_added": "\u5DF2\u5728\u539F\u56FE\u4E0B\u65B9\u6DFB\u52A0\u7FFB\u8BD1\u56FE\u7247\uFF08{0}\uFF09\u3002",
@@ -4500,6 +4502,7 @@ var zhTW = {
   "ui.image_translate_replace": "\u53D6\u4EE3\u539F\u5716",
   "ui.image_translate_new": "\u65B0\u589E\u4E00\u5F35",
   "ui.image_translate_replace_unavailable": "\u9019\u5F35\u5716\u5728\u7B46\u8A18\u88E1\u51FA\u73FE\u591A\u6B21\u6216\u7121\u6CD5\u5B9A\u4F4D\uFF0C\u53EA\u80FD\u65B0\u589E\u4E00\u5F35\u3002",
+  "ui.image_translate_needs_codex": "\u5716\u7247\u7FFB\u8B6F\u9700\u8981 Codex \u6A21\u578B\u3002\u76EE\u524D\u6A21\u578B\u662F Claude\uFF0C\u8ACB\u5148\u6539\u7528 Codex \u6A21\u578B\u3002",
   "ui.image_translate_running": "Codex \u6B63\u5728\u7E6A\u88FD\u7FFB\u8B6F\u5716\u7247\uFF08\u7D04\u4E00\u5206\u9418\uFF09\u3002\u53EF\u4EE5\u7E7C\u7E8C\u7DE8\u8F2F\uFF0C\u5B8C\u6210\u5F8C\u6703\u81EA\u52D5\u5BEB\u5165\u7B46\u8A18\u3002",
   "ui.image_translate_replaced": "\u5DF2\u7528\u7FFB\u8B6F\u7248\u5716\u7247\u53D6\u4EE3\u539F\u5716\uFF08{0}\uFF09\u3002",
   "ui.image_translate_added": "\u5DF2\u5728\u539F\u5716\u4E0B\u65B9\u65B0\u589E\u7FFB\u8B6F\u5716\u7247\uFF08{0}\uFF09\u3002",
@@ -57359,6 +57362,13 @@ var ImageTranslateAction = class extends import_obsidian36.Component {
     const status = popover.createDiv({ cls: "vam-image-action-status" });
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
+    const hint = popover.createDiv({ cls: "vam-image-action-hint" });
+    hint.setAttribute("role", "note");
+    const refreshHint = () => {
+      hint.setText(providerForModel(this.options.model()) === "claude" ? t("ui.image_translate_needs_codex") : "");
+      hint.hidden = !hint.textContent;
+    };
+    refreshHint();
     const actions = popover.createDiv({ cls: "vam-image-action-buttons" });
     const replace = actions.createEl("button", { text: t("ui.image_translate_replace") });
     const add = actions.createEl("button", { text: t("ui.image_translate_new"), cls: "mod-cta" });
@@ -57369,6 +57379,7 @@ var ImageTranslateAction = class extends import_obsidian36.Component {
     if (this.running) this.showRunning(status, actions);
     const start = (placement) => {
       this.language = select.value;
+      refreshHint();
       void this.translate(target, this.language, placement, status, actions);
     };
     replace.addEventListener("click", () => start("replace"));
@@ -57797,12 +57808,11 @@ var MarkdownSelectionAi = class extends import_obsidian37.Component {
     const snapshot = this.snapshot;
     if (!snapshot) return;
     this.hideLauncher();
-    const model = this.options.model();
     (_a2 = this.panel) == null ? void 0 : _a2.close();
     this.panel = new SelectionAiPanel(
       this.app,
       snapshot,
-      model,
+      this.options.model,
       this.options.language(snapshot.text),
       (_d = (_c = (_b2 = this.options).translateTarget) == null ? void 0 : _c.call(_b2)) != null ? _d : this.options.language(snapshot.text),
       this.options.run
@@ -57811,11 +57821,11 @@ var MarkdownSelectionAi = class extends import_obsidian37.Component {
   }
 };
 var SelectionAiPanel = class extends import_obsidian37.Component {
-  constructor(app, snapshot, model, language2, translateTarget, run) {
+  constructor(app, snapshot, modelOf, language2, translateTarget, run) {
     super();
     this.app = app;
     this.snapshot = snapshot;
-    this.model = model;
+    this.modelOf = modelOf;
     this.language = language2;
     this.translateTarget = translateTarget;
     this.run = run;
@@ -58079,6 +58089,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
     this.preview.empty();
     this.setBusy(trigger);
     status.setText(t("ui.context_ai_running_0", label));
+    const model = this.modelOf();
     try {
       const at = this.snapshot.matchAt;
       const context = at >= 0 ? this.snapshot.markdown.slice(Math.max(0, at - 600), at + this.snapshot.text.length + 600) : "";
@@ -58088,7 +58099,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
         context,
         hasImage: false
       });
-      const parsedPlan = planned.parse(await this.run(planned, this.model, controller.signal));
+      const parsedPlan = planned.parse(await this.run(planned, model, controller.signal));
       const plan = requestedAction ? { ...parsedPlan, action: requestedAction } : parsedPlan;
       if (controller.signal.aborted || !this.isOpen) return;
       if (plan.action === "clarify") throw new Error(plan.instruction || t("ui.context_ai_clarify"));
@@ -58098,7 +58109,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
       if (plan.action === "image_search") {
         status.setText(t("ui.context_ai_searching_images"));
         const search = prepareStep(imageSearchStep, { query: plan.query || prompt });
-        const found = search.parse(await this.run(search, this.model, controller.signal, void 0, true));
+        const found = search.parse(await this.run(search, model, controller.signal, void 0, true));
         if (controller.signal.aborted || !this.isOpen) return;
         const candidates = await loadableImages(found, controller.signal);
         if (controller.signal.aborted || !this.isOpen) return;
@@ -58133,7 +58144,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
             this.controller = choice2;
             this.setBusy(choose);
             status.setText(t("ui.context_ai_generating"));
-            void this.imageDraft(candidate, plan.captionInstruction, choice2.signal).then((draft) => {
+            void this.imageDraft(candidate, plan.captionInstruction, choice2.signal, model).then((draft) => {
               if (this.controller === choice2 && !choice2.signal.aborted && this.isOpen) {
                 output.value = draft;
                 status.setText(t("ui.context_ai_review_result"));
@@ -58156,7 +58167,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
             attr: { target: "_blank", rel: "noopener noreferrer" }
           });
         });
-        result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal);
+        result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal, model);
         if (controller.signal.aborted || !this.isOpen) return;
       } else {
         status.setText(t("ui.context_ai_running_0", label));
@@ -58167,7 +58178,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
           action: plan.action,
           hasImage: false
         });
-        result = await this.run(request, this.model, controller.signal, void 0, plan.action === "research");
+        result = await this.run(request, model, controller.signal, void 0, plan.action === "research");
         insertAfter = plan.action === "research" || plan.action === "diagram";
         if (plan.action === "diagram") {
           result = result.replace(/\r\n?/g, "\n");
@@ -58199,7 +58210,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
       }
     }
   }
-  async imageDraft(candidate, captionInstruction, signal) {
+  async imageDraft(candidate, captionInstruction, signal, model) {
     const markdown = imageMarkdown(candidate);
     if (!captionInstruction.trim()) return markdown;
     const image = createEl("img");
@@ -58226,7 +58237,7 @@ var SelectionAiPanel = class extends import_obsidian37.Component {
     });
     const caption = await this.run(
       prepareStep(captionStep, { captionInstruction, language: this.language }),
-      this.model,
+      model,
       signal,
       image
     );
@@ -58610,7 +58621,7 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
-      model: () => this.settings.cliModel,
+      model: () => this.currentModelChoice().model,
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
         kind: "selection",
@@ -59130,6 +59141,13 @@ ${t("ui.organize_link_wait_hint")}`;
     await this.saveSettings();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
+  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
+  currentModelChoice() {
+    const { model, reasoning } = resolveTaskModel({
+      current: { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }
+    });
+    return { model, reasoning };
+  }
   subscribeCurrentModel(listener) {
     this.currentModelListeners.add(listener);
     return () => {
@@ -59235,7 +59253,7 @@ ${t("ui.organize_link_wait_hint")}`;
         const note = sample.notes.get(source.id);
         const created = await this.repo.createNote(
           note.title,
-          this.settings.cliModel,
+          this.currentModelChoice().model,
           map,
           path,
           source.parentId ? "inherited" : "workspace"

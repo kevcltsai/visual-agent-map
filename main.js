@@ -599,7 +599,6 @@ var en = {
   "ui.relation_direction_label": "Direction",
   "ui.relation_description_remaining_0": "{0} characters left",
   "ui.relation_kind_blocked_cycle_0": "Unavailable because they would form a cycle: {0}",
-  "ui.relation_apply": "Apply",
   "ui.relation_delete": "Delete relation",
   "ui.relation_gone": "This relation no longer exists.",
   "ui.merge_dropped_cycles_0": "Removed {0} derives-from or prerequisite link(s) that would form a cycle",
@@ -989,9 +988,8 @@ var en = {
   "ui.title_problem_brackets": "A title cannot contain [[ or ]]; they would break the note's links.",
   "ui.multi_research_start_0": "Start research ({0})",
   "ui.topic_0": "Topic: {0}",
-  "ui.apply_parent": "Apply",
-  "ui.will_move_under_0": "Will move under \u201C{0}\u201D.",
-  "ui.will_become_root_topic": "Will become a root topic.",
+  "ui.moved_under_0": "Moved under \u201C{0}\u201D.",
+  "ui.became_root_topic": "Now a root topic.",
   "ui.list_separator": ", ",
   "ui.synthesis_of_0": "Synthesis: {0}",
   "ui.synthesis_of_0_and_1_more": "Synthesis: {0} and others ({1} topics)",
@@ -2625,7 +2623,6 @@ var zhCN = {
   "ui.relation_direction_label": "\u65B9\u5411",
   "ui.relation_description_remaining_0": "\u8FD8\u53EF\u8F93\u5165 {0} \u5B57",
   "ui.relation_kind_blocked_cycle_0": "\u65E0\u6CD5\u9009\u7528\uFF0C\u4F1A\u5F62\u6210\u73AF\uFF1A{0}",
-  "ui.relation_apply": "\u5E94\u7528",
   "ui.relation_delete": "\u5220\u9664\u5173\u7CFB",
   "ui.relation_gone": "\u8FD9\u4E2A\u5173\u7CFB\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u6761\u4F1A\u5F62\u6210\u73AF\u7684\u63A8\u5BFC\u6216\u524D\u7F6E\u77E5\u8BC6",
@@ -3015,9 +3012,8 @@ var zhCN = {
   "ui.title_problem_brackets": "\u6807\u9898\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5219\u4F1A\u5F04\u574F\u7B14\u8BB0\u7684\u94FE\u63A5\u3002",
   "ui.multi_research_start_0": "\u5F00\u59CB\u7814\u7A76 {0} \u4E2A\u8BAE\u9898",
   "ui.topic_0": "\u8BAE\u9898\uFF1A{0}",
-  "ui.apply_parent": "\u5E94\u7528",
-  "ui.will_move_under_0": "\u5C06\u79FB\u5230\u201C{0}\u201D\u5E95\u4E0B\u3002",
-  "ui.will_become_root_topic": "\u5C06\u6210\u4E3A\u6839\u8BAE\u9898\u3002",
+  "ui.moved_under_0": "\u5DF2\u79FB\u5230\u201C{0}\u201D\u5E95\u4E0B\u3002",
+  "ui.became_root_topic": "\u5DF2\u6210\u4E3A\u6839\u8BAE\u9898\u3002",
   "ui.list_separator": "\u3001",
   "ui.synthesis_of_0": "\u6574\u5408\uFF1A{0}",
   "ui.synthesis_of_0_and_1_more": "\u6574\u5408\uFF1A{0} \u7B49 {1} \u4E2A\u8BAE\u9898",
@@ -4651,7 +4647,6 @@ var zhTW = {
   "ui.relation_direction_label": "\u65B9\u5411",
   "ui.relation_description_remaining_0": "\u9084\u53EF\u8F38\u5165 {0} \u5B57",
   "ui.relation_kind_blocked_cycle_0": "\u7121\u6CD5\u9078\u7528\uFF0C\u6703\u5F62\u6210\u74B0\uFF1A{0}",
-  "ui.relation_apply": "\u5957\u7528",
   "ui.relation_delete": "\u522A\u9664\u95DC\u4FC2",
   "ui.relation_gone": "\u9019\u500B\u95DC\u4FC2\u5DF2\u4E0D\u5B58\u5728\u3002",
   "ui.merge_dropped_cycles_0": "\u5DF2\u79FB\u9664 {0} \u689D\u6703\u5F62\u6210\u74B0\u7684\u63A8\u5C0E\u6216\u524D\u7F6E\u77E5\u8B58",
@@ -5041,9 +5036,8 @@ var zhTW = {
   "ui.title_problem_brackets": "\u6A19\u984C\u4E0D\u80FD\u5305\u542B [[ \u6216 ]]\uFF0C\u5426\u5247\u6703\u5F04\u58DE\u7B46\u8A18\u7684\u9023\u7D50\u3002",
   "ui.multi_research_start_0": "\u958B\u59CB\u7814\u7A76 {0} \u500B\u8B70\u984C",
   "ui.topic_0": "\u8B70\u984C\uFF1A{0}",
-  "ui.apply_parent": "\u5957\u7528",
-  "ui.will_move_under_0": "\u5C07\u79FB\u5230\u300C{0}\u300D\u5E95\u4E0B\u3002",
-  "ui.will_become_root_topic": "\u5C07\u6210\u70BA\u6839\u8B70\u984C\u3002",
+  "ui.moved_under_0": "\u5DF2\u79FB\u5230\u300C{0}\u300D\u5E95\u4E0B\u3002",
+  "ui.became_root_topic": "\u5DF2\u6210\u70BA\u6839\u8B70\u984C\u3002",
   "ui.list_separator": "\u3001",
   "ui.synthesis_of_0": "\u6574\u5408\uFF1A{0}",
   "ui.synthesis_of_0_and_1_more": "\u6574\u5408\uFF1A{0} \u7B49 {1} \u500B\u8B70\u984C",
@@ -43491,8 +43485,8 @@ ${request.requirements}` : preset.text,
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
     });
-    let chosenParent = (_g = node.parentId) != null ? _g : "";
-    let describe = () => {
+    let currentParent = (_g = node.parentId) != null ? _g : null;
+    let moveTo = (_parentId) => {
     };
     const parentTree = renderTopicTree(relationship, {
       nodes: this.map.nodes,
@@ -43503,12 +43497,8 @@ ${request.requirements}` : preset.text,
       label: t("ui.parent_topic_link"),
       selectable: (candidate) => canParent(this.map.nodes, node.id, candidate.id),
       rootChoice: t("ui.no_parent_root_topic"),
-      value: chosenParent,
-      onChoose: (id) => {
-        chosenParent = id;
-        parentTree.select(id);
-        describe();
-      }
+      value: currentParent != null ? currentParent : "",
+      onChoose: (id) => moveTo(id || null)
     });
     relationship.createEl("p", {
       cls: "vam-hint",
@@ -43526,21 +43516,18 @@ ${request.requirements}` : preset.text,
       attr: { "aria-live": "polite" }
     });
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
-    const apply = actions.createEl("button", { text: t("ui.apply_parent"), cls: "mod-cta" });
-    describe = () => {
-      var _a3, _b3, _c2;
-      const parentId = chosenParent || null;
-      const changed = parentId !== ((_a3 = node.parentId) != null ? _a3 : null);
-      apply.disabled = !changed;
+    moveTo = (parentId) => {
+      var _a3, _b3;
+      if (parentId === currentParent) return;
+      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) {
+        parentTree.select(currentParent != null ? currentParent : "");
+        return;
+      }
+      currentParent = parentId;
+      parentTree.select(parentId != null ? parentId : "");
       status.setText(
-        !changed ? "" : parentId ? t("ui.will_move_under_0", (_c2 = (_b3 = this.notes.get(parentId)) == null ? void 0 : _b3.title) != null ? _c2 : "") : t("ui.will_become_root_topic")
+        parentId ? t("ui.moved_under_0", (_b3 = (_a3 = this.notes.get(parentId)) == null ? void 0 : _a3.title) != null ? _b3 : "") : t("ui.became_root_topic")
       );
-    };
-    describe();
-    apply.addEventListener("click", () => {
-      const parentId = chosenParent || null;
-      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
-      close == null ? void 0 : close();
       this.enqueue(async () => {
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange((map) => {
@@ -43554,7 +43541,7 @@ ${request.requirements}` : preset.text,
           } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
         });
       });
-    });
+    };
   }
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
@@ -43791,21 +43778,27 @@ ${request.requirements}` : preset.text,
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   openRelationEditor(link, onChanged, onClosed) {
     if (!this.map || !this.relationsEnabled()) return;
-    const render = (content, close) => this.renderRelationEditor(content, link, close, onChanged);
+    let saveNote = () => Promise.resolve();
+    const render = (content, close) => {
+      saveNote = this.renderRelationEditor(content, link, close, onChanged);
+    };
     new class extends import_obsidian30.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
       }
       onClose() {
-        if (onClosed) window.setTimeout(onClosed, 0);
+        void saveNote().then(() => {
+          if (onClosed) window.setTimeout(onClosed, 0);
+        });
       }
     }(this.app).open();
   }
   /**
    * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
-   * illegal), a one-line note applied on request, and delete. Each change is one undoable Map.md step. Everything the
-   * user typed (the note, topic titles) is shown as text only.
+   * illegal), a one-line note, and delete. Each change is one undoable Map.md step and is written at once; the note is
+   * written when the box loses focus, on Ctrl/Cmd+Enter, or when the dialog closes (decision 40). Everything the user
+   * typed (the note, topic titles) is shown as text only. Returns the close-time save, settled when its write is done.
    */
   renderRelationEditor(parent, initial, close, onChanged) {
     let current = { ...initial };
@@ -43814,7 +43807,16 @@ ${request.requirements}` : preset.text,
       var _a2, _b2;
       return ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.topicRelations) != null ? _b2 : []).findIndex((r) => relationIdentity(r) === relationIdentity(current));
     };
-    const apply = (next) => this.enqueue(async () => {
+    const apply = (next, repaint = true) => new Promise(
+      (done) => this.enqueue(async () => {
+        try {
+          await change(next, repaint);
+        } finally {
+          done();
+        }
+      })
+    );
+    const change = async (next, repaint) => {
       const outcome = {};
       if (!this.map) return;
       await this.mapChange((map) => {
@@ -43844,13 +43846,19 @@ ${request.requirements}` : preset.text,
         this.selectedRelation = relationIdentity(current);
         this.syncRelationClasses();
       }
-      paint();
+      if (repaint) paint();
       onChanged == null ? void 0 : onChanged();
-    });
+    };
+    let savedNote = initial.description;
+    let noteWrite = Promise.resolve();
+    let saveNote = () => {
+    };
     let refocus = null;
     const paint = () => {
-      var _a2, _b2, _c, _d;
+      var _a2, _b2, _c;
       root.empty();
+      saveNote = () => {
+      };
       const index = indexOfCurrent();
       root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
       if (index < 0) {
@@ -43894,7 +43902,7 @@ ${request.requirements}` : preset.text,
         const kind = kindSelect.value;
         if (kind === current.kind) return;
         refocus = "kind";
-        apply((rel) => ({ ...rel, kind }));
+        void apply((rel) => ({ ...rel, kind }));
       });
       let reverseButton = null;
       if (current.kind !== "related") {
@@ -43907,7 +43915,7 @@ ${request.requirements}` : preset.text,
           t("ui.relation_reverse"),
           () => {
             refocus = "reverse";
-            apply((rel) => ({ ...rel, from: reversed.from, to: reversed.to }));
+            void apply((rel) => ({ ...rel, from: reversed.from, to: reversed.to }));
           },
           !allowed
         );
@@ -43927,29 +43935,27 @@ ${request.requirements}` : preset.text,
       description.setAttr("id", "vam-relation-description");
       description.setAttr("rows", "4");
       description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
-      description.value = (_c = relations[index].description) != null ? _c : "";
+      savedNote = relations[index].description;
+      description.value = savedNote != null ? savedNote : "";
       description.setAttr("aria-label", t("ui.relation_description_label"));
       description.setAttr("placeholder", t("ui.relation_description_placeholder"));
       const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
       const draft = () => normalizeRelationDescription(description.value);
-      const changed = () => draft() !== relations[index].description;
-      const applyDescription = () => {
-        if (!changed()) return;
+      saveNote = () => {
         const text11 = draft();
-        refocus = "description";
-        apply((rel) => {
+        if (text11 === savedNote) return;
+        savedNote = text11;
+        noteWrite = apply((rel) => {
           const next = { kind: rel.kind, from: rel.from, to: rel.to };
           if (text11 !== void 0) next.description = text11;
           return next;
-        });
+        }, false);
       };
       const footer = root.createDiv("vam-next-actions vam-relation-footer");
       const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
-      remove.addEventListener("click", () => apply(() => null));
+      remove.addEventListener("click", () => void apply(() => null));
       footer.createSpan({ cls: "vam-next-status" });
       footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close == null ? void 0 : close());
-      const applyButton = this.button(footer, t("ui.relation_apply"), applyDescription, true);
-      applyButton.addClass("mod-cta");
       const refresh = () => {
         remaining.setText(
           t(
@@ -43957,19 +43963,23 @@ ${request.requirements}` : preset.text,
             Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
           )
         );
-        applyButton.disabled = !changed();
       };
       description.addEventListener("input", refresh);
+      description.addEventListener("change", () => saveNote());
       description.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
         event.preventDefault();
-        applyDescription();
+        saveNote();
       });
       refresh();
-      if (refocus) (_d = { kind: kindSelect, reverse: reverseButton, description }[refocus]) == null ? void 0 : _d.focus();
+      if (refocus) (_c = { kind: kindSelect, reverse: reverseButton, description }[refocus]) == null ? void 0 : _c.focus();
       refocus = null;
     };
     paint();
+    return () => {
+      saveNote();
+      return noteWrite;
+    };
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   renderAddSubtopic(actions, node, close) {

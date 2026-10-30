@@ -164,7 +164,7 @@ test('FG20-06: Copy to... lays the copies out clear of the target\'s children; o
   assert.deepEqual(h.overlaps(), []);
 });
 
-test('FG20-07: Structure and links > Apply re-lays out the moved subtree; one undo restores it', async () => {
+test('FG20-07: Structure and links > choosing a parent re-lays out the moved subtree at once; one undo restores it (decision 40)', async () => {
   const spec = [['R1', null, 80, 80]];
   for (let i = 1; i <= 7; i++) spec.push([`L${i}`, i === 1 ? 'R1' : `L${i - 1}`, 80 + 340 * i, 80]);
   spec.push(['R2', null, 80, 600], ['R2kid', 'R2', 420, 600]);
@@ -177,10 +177,8 @@ test('FG20-07: Structure and links > Apply re-lays out the moved subtree; one un
   const rows = dom.findAll ? dom.findAll(panel, i => i.tag === 'button') : [];
   const row = rows.find(b => b.dataset?.id === h.node('R2').id);
   assert.ok(row, 'the topic tree lists R2');
+  assert.equal(dom.findAll(panel, i => i.tag === 'button').find(b => b.text === 'Apply'), undefined, 'there is no Apply button');
   row.click();
-  const apply = dom.findAll(panel, i => i.tag === 'button').find(b => b.text === 'Apply' && b.cls.includes('mod-cta'));
-  assert.ok(apply && !apply.disabled);
-  apply.click();
   await dom.tick();
   await dom.tick();
   assert.equal(h.node('L4').parentId, h.node('R2').id);
@@ -192,7 +190,7 @@ test('FG20-07: Structure and links > Apply re-lays out the moved subtree; one un
   assert.equal(h.view.history.canUndo, false, 'one history entry');
 });
 
-test('FG20-07: Apply with no parent makes the branch a new tree below everything, without overlap', async () => {
+test('FG20-07: choosing no parent makes the branch a new tree below everything at once, without overlap (decision 40)', async () => {
   const h = await harness([['R1', null, 80, 80], ['A', 'R1', 420, 80], ['A1', 'A', 760, 80]], { A: 200, A1: 200, R1: 200 });
   const panel = element('div');
   h.view.mergeUnlocked = () => true;
@@ -200,7 +198,6 @@ test('FG20-07: Apply with no parent makes the branch a new tree below everything
   h.view.renderInspector(panel, h.node('A'), 'structure');
   const rows = dom.findAll(panel, i => i.tag === 'button');
   rows.find(b => b.dataset?.id === '').click();
-  dom.findAll(panel, i => i.tag === 'button').find(b => b.text === 'Apply' && b.cls.includes('mod-cta')).click();
   await dom.tick(); await dom.tick();
   assert.equal(h.node('A').parentId, null);
   assert.deepEqual(h.overlaps(), []);

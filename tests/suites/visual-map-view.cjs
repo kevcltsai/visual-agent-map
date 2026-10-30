@@ -946,7 +946,7 @@ integrationTest('merge dialog (the shared synthesis dialog) names the topic afte
   finishSave(); await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(draft.closed, true);
 });
-integrationTest('structure panel: a parent change waits for Apply, says what will change, and keeps Remove apart', () => {
+integrationTest('structure panel: choosing a parent moves the topic at once and says where it went; there is no Apply, and Remove stays apart (decision 40)', () => {
   const element = (tag, options = {}) => ({
     tag, text: options.text, value: options.value ?? '', cls: options.cls ?? '', attr: options.attr ?? {}, children: [], disabled: false, style: {}, dataset: {},
     createDiv(value) { const child = element('div', typeof value === 'string' ? { cls: value } : value); this.children.push(child); return child; },
@@ -959,7 +959,8 @@ integrationTest('structure panel: a parent change waits for Apply, says what wil
   const all = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(child => all(child, predicate))];
   const find = (root, predicate) => all(root, predicate)[0];
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const nodes = [{ id: 'a', path: 'A.md', parentId: null }, { id: 'b', path: 'B.md', parentId: null }, { id: 'c', path: 'C.md', parentId: 'a' }];
+  // Every card on a map has coordinates; moving under another parent lays the branch out from them.
+  const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
     renderHypothesisSection() {}, renderAddSubtopic() {},
@@ -974,10 +975,10 @@ integrationTest('structure panel: a parent change waits for Apply, says what wil
   assert.equal(find(content, item => item.tag === 'button' && item.text === 'Remove parent link'), undefined);
   const actions = find(host, item => item.cls === 'vam-next-actions');
   const buttons = actions.children.filter(item => item.tag === 'button');
-  assert.deepEqual(buttons.map(item => item.text), ['Remove from map', 'Close', 'Apply']);
+  assert.deepEqual(buttons.map(item => item.text), ['Remove from map', 'Close']);
   assert.ok(buttons[0].cls.includes('vam-discard'));
-  const apply = buttons[2], status = find(actions, item => item.cls.includes('vam-next-status'));
-  assert.equal(apply.disabled, true);
+  const status = find(actions, item => item.cls.includes('vam-next-status'));
+  assert.equal(status.text, undefined, 'nothing moved yet');
   // The parent picker is an indented tree like the outline; the topic itself cannot be its own parent.
   const tree = find(content, item => item.cls === 'vam-topic-tree');
   const rows = tree.children.map(row => [row.dataset.id, row.text, row.style.paddingLeft, row.disabled]);
@@ -986,16 +987,17 @@ integrationTest('structure panel: a parent change waits for Apply, says what wil
   assert.ok(row('a').cls.includes('is-selected'), 'current parent starts selected');
   row('b').click();
   assert.ok(row('b').cls.includes('is-selected')); assert.ok(!row('a').cls.includes('is-selected'));
-  assert.equal(apply.disabled, false); assert.equal(status.text, 'Will move under “Water”.'); assert.equal(changes.length, 0);
+  assert.deepEqual(changes, ['b'], 'one click moves it'); assert.equal(status.text, 'Moved under “Water”.'); assert.equal(closed, 0, 'the dialog stays open');
+  row('b').click();
+  assert.deepEqual(changes, ['b'], 'choosing the parent it already has writes nothing');
   row('').click();
-  assert.equal(status.text, 'Will become a root topic.');
-  apply.click();
-  assert.equal(closed, 1); assert.deepEqual(changes, [null]);
+  assert.deepEqual(changes, ['b', null]); assert.equal(status.text, 'Now a root topic.');
   buttons[0].click();
   assert.equal(removed, 1);
-  // A card that is merging cannot get a new parent from Apply.
-  merging = true; row('b').click(); apply.click();
-  assert.deepEqual(changes, [null], 'no parent change while the card is merging');
+  // A card that is merging keeps its parent, and the tree goes back to the one it has.
+  merging = true; row('b').click();
+  assert.deepEqual(changes, ['b', null], 'no parent change while the card is merging');
+  assert.ok(row('').cls.includes('is-selected')); assert.ok(!row('b').cls.includes('is-selected'));
 });
 integrationTest('expansion suggestions panel uses the shared list, treats the topic as first-level parent and asks before discarding', async () => {
   const element = (tag, options = {}) => ({
@@ -2757,12 +2759,12 @@ const heEditor = (relations, current, options = {}) => {
   fx.view.enqueue = work => work();
   fx.view.mapChange = async (change, rebuild) => { calls.push(rebuild); change(fx.view.map); };
   const host = dom.element('editor');
-  fx.view.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
+  const saveNote = fx.view.renderRelationEditor(host, current, () => closed.push(1), () => changed.push(1));
   const kindOptions = () => dom.findAll(host, c => c.tag === 'option').map(o => o.text);
   const openKinds = () => dom.findAll(host, c => c.tag === 'option' && !c.disabled).map(o => o.text);
   const select = () => dom.find(host, c => c.tag === 'select');
   const input = () => dom.find(host, c => c.tag === 'textarea');
-  return { ...fx, host, calls, closed, changed, kindOptions, openKinds, select, input };
+  return { ...fx, host, calls, closed, changed, kindOptions, openKinds, select, input, saveNote };
 };
 integrationTest('hypothesis-evidence: "Add relation…" asks for the kind first (six names in order), then the picker for B titled with that kind; the panel topic is A', async () => {
   const { view, modals, menus, doc } = heFixture();
@@ -2884,25 +2886,29 @@ integrationTest('hypothesis-evidence: an illegal reverse (it would close a cycle
   assert.equal(dom.button(two.host, 'Reverse direction').disabled, true);
   assert.equal(dom.find(two.host, c => String(c.cls).includes('vam-relation-reason')).text, 'Cannot reverse: it would form a cycle.');
 });
-integrationTest('hypothesis-evidence: the note is a multi-line box saved as one line of up to 200 characters; an empty note removes the key; Apply is off until the note changes; Ctrl/Cmd+Enter applies, Enter does not (E2, E5)', async () => {
+integrationTest('hypothesis-evidence: the note is a multi-line box saved as one line of up to 200 characters; it saves itself on leaving the box, on Ctrl/Cmd+Enter and on close, once per change; an empty note removes the key; Enter only breaks the line (E2, decision 40)', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
-  const { doc, calls, host, input } = heEditor(relations, relations[0]);
+  const { doc, calls, host, input, saveNote } = heEditor(relations, relations[0]);
   assert.equal(input().tag, 'textarea'); assert.equal(input().attrs.maxlength, '200');
-  assert.equal(dom.button(host, 'Apply').disabled, true, 'nothing changed yet');
-  input().value = '  hello \n   world  '; input().fire('input');
-  assert.equal(dom.button(host, 'Apply').disabled, false); assert.equal(dom.find(host, c => (c.cls ?? '').includes('vam-relation-remaining')).text, `${200 - 19} characters left`);
-  dom.button(host, 'Apply').click(); await dom.tick();
-  assert.equal(doc.topicRelations[0].description, 'hello world', 'line breaks became spaces');
-  input().value = 'hello\nworld'; input().fire('input');
-  assert.equal(dom.button(host, 'Apply').disabled, true, 'a break that normalizes to the saved text is no change'); dom.button(host, 'Apply').click(); await dom.tick();
-  assert.equal(calls.length, 1, 'unchanged text is not a change');
-  input().value = 'x'.repeat(201); input().fire('input'); input().fire('keydown', { key: 'Enter' }); await dom.tick();
+  assert.equal(dom.button(host, 'Apply'), undefined, 'there is no Apply button');
+  const box = input();
+  box.value = '  hello \n   world  '; box.fire('input');
+  assert.equal(calls.length, 0, 'typing alone writes nothing'); assert.equal(dom.find(host, c => (c.cls ?? '').includes('vam-relation-remaining')).text, `${200 - 19} characters left`);
+  box.fire('change'); await dom.tick();
+  assert.equal(doc.topicRelations[0].description, 'hello world', 'leaving the box saved it; line breaks became spaces');
+  assert.equal(input(), box, 'a note save does not repaint the dialog');
+  box.value = 'hello\nworld'; box.fire('input'); box.fire('change'); await dom.tick();
+  assert.equal(calls.length, 1, 'a break that normalizes to the saved text is no change');
+  box.value = 'x'.repeat(201); box.fire('input'); box.fire('keydown', { key: 'Enter' }); await dom.tick();
   assert.equal(calls.length, 1, 'plain Enter only adds a line break');
   assert.equal(dom.find(host, c => (c.cls ?? '').includes('vam-relation-remaining')).text, '0 characters left');
-  input().fire('keydown', { key: 'Enter', ctrlKey: true }); await dom.tick();
-  assert.equal(doc.topicRelations[0].description.length, 200, 'Ctrl+Enter applies');
-  input().value = '   '; input().fire('input'); dom.button(host, 'Apply').click(); await dom.tick();
-  assert.equal('description' in doc.topicRelations[0], false, 'clearing deletes the key'); assert.equal(calls.length, 3);
+  box.fire('keydown', { key: 'Enter', ctrlKey: true }); box.fire('change'); await dom.tick();
+  assert.equal(doc.topicRelations[0].description.length, 200, 'Ctrl+Enter saves'); assert.equal(calls.length, 2, 'leaving the box after Ctrl+Enter does not save twice');
+  box.value = 'later'; box.fire('input');
+  await saveNote(); assert.equal(doc.topicRelations[0].description, 'later', 'closing saves a note still in the box'); assert.equal(calls.length, 3);
+  await saveNote(); assert.equal(calls.length, 3, 'a second close-time save has nothing to write');
+  box.value = '   '; box.fire('input'); box.fire('change'); await dom.tick();
+  assert.equal('description' in doc.topicRelations[0], false, 'clearing deletes the key'); assert.equal(calls.length, 4);
 });
 integrationTest('hypothesis-evidence: the editor head reads "A relation B" with both ends named and a line sample, and both follow a kind or direction change (E1)', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
@@ -2927,26 +2933,26 @@ integrationTest('hypothesis-evidence: each field takes its own row with the labe
   assert.equal(rows[0].children[0].attrs.for, rows[0].children[1].attrs.id, 'the label is tied to its control');
   assert.equal(rows[1].children.filter(c => c.tag === 'button').length, 1);
 });
-integrationTest('hypothesis-evidence: the footer has Delete on the left, then Close and Apply on the right; Delete is a warning button, Apply the primary one (E5)', () => {
+integrationTest('hypothesis-evidence: the footer has Delete on the left and Close on the right; Delete is a warning button; there is no Apply (E5, decision 40)', () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
   const { host, closed } = heEditor(relations, relations[0]);
   const footer = dom.find(host, c => (c.cls ?? '').split(/\s+/).includes('vam-relation-footer'));
-  assert.deepEqual(footer.children.filter(c => c.tag === 'button').map(c => c.text), ['Delete relation', 'Close', 'Apply']);
+  assert.deepEqual(footer.children.filter(c => c.tag === 'button').map(c => c.text), ['Delete relation', 'Close']);
   assert.ok(footer.children[0].cls.includes('mod-warning') && footer.children[0].cls.includes('vam-discard'));
-  assert.ok(footer.children.at(-1).cls.includes('mod-cta')); assert.equal(footer.children.at(-1).disabled, true);
+  assert.equal(dom.findAll(footer, c => (c.cls ?? '').includes('mod-cta')).length, 0, 'no primary button is left');
   dom.button(host, 'Close').click(); assert.equal(closed.length, 1);
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-next-actions > .vam-discard'), /order: -2/, 'the shared footer CSS keeps Delete first');
 });
-integrationTest('hypothesis-evidence: after a change the focus stays on the control that was used (kind, reverse, note)', async () => {
+integrationTest('hypothesis-evidence: after a change the focus stays on the control that was used (kind, reverse); a note save leaves the box in place (decision 40)', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
   const { host, select, input } = heEditor(relations, relations[0]);
   select().value = 'verifies'; select().fire('change'); await dom.tick();
   assert.equal(select().focused, true);
   dom.button(host, 'Reverse direction').click(); await dom.tick();
   assert.equal(dom.button(host, 'Reverse direction').focused, true);
-  input().value = 'n'; input().fire('input'); dom.button(host, 'Apply').click(); await dom.tick();
-  assert.equal(input().focused, true);
+  const box = input(); box.value = 'n'; box.fire('input'); box.fire('keydown', { key: 'Enter', metaKey: true }); await dom.tick();
+  assert.equal(input(), box, 'the box the user is typing in is not replaced');
 });
 integrationTest('hypothesis-evidence: every P24 editor rule is invisible to the share viewer and starts with .vam-topic-modal (decision 35)', async () => {
   const css = heCss();
@@ -3232,17 +3238,17 @@ integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesi
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-section-heading'), /margin: 24px 0 8px;[^}]*font-size: var\(--font-ui-small\); font-weight: 600;/);
 });
-integrationTest('hypothesis-evidence: "Add subtopic…" sits in the footer left of "Remove from map", ahead of the status, "Close" and "Apply"; the body no longer has it (C3)', () => {
+integrationTest('hypothesis-evidence: "Add subtopic…" sits in the footer left of "Remove from map", ahead of the status and "Close"; the body no longer has it (C3, decision 40)', () => {
   const { footer, content, menus } = heDialog({}, 1);
   const buttons = footer.children.filter(c => c.tag === 'button');
-  assert.deepEqual(buttons.map(b => b.text), ['Add subtopic…', 'Remove from map', 'Close', 'Apply']);
-  assert.ok(buttons[0].cls.includes('vam-add-subtopic')); assert.ok(buttons[3].cls.includes('mod-cta'));
+  assert.deepEqual(buttons.map(b => b.text), ['Add subtopic…', 'Remove from map', 'Close']);
+  assert.ok(buttons[0].cls.includes('vam-add-subtopic'));
   assert.equal(dom.buttons(content).includes('Add subtopic…'), false);
   buttons[0].click(); assert.deepEqual(menus.at(-1).titles, heKindNames, 'it still opens the six-type menu');
   const css = heCss(), order = selector => Number(heRuleBody(css, selector).match(/order: (-?\d)/)[1]);
   assert.ok(order('.vam-next-actions > .vam-add-subtopic') < order('.vam-next-actions > .vam-discard'), 'the CSS order puts it before Remove');
   const aim = heDialog({ aim: true }, 1);
-  assert.deepEqual(aim.footer.children.filter(c => c.tag === 'button').map(b => b.text), ['Remove from map', 'Close', 'Apply'], 'an AIM map has no add-subtopic entry');
+  assert.deepEqual(aim.footer.children.filter(c => c.tag === 'button').map(b => b.text), ['Remove from map', 'Close'], 'an AIM map has no add-subtopic entry');
 });
 integrationTest('hypothesis-evidence: the type and strength options are quiet segmented buttons: no mod-cta, aria-pressed on the current one, a swatch of the type shape on each type, three columns (C4, C5)', () => {
   const { content } = heDialog({}, 1);

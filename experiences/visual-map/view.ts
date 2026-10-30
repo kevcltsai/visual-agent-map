@@ -7779,26 +7779,22 @@ export class VisualAgentMapView extends ItemView {
       text: t("ui.parent_topic"),
       cls: "vam-topic-tree-heading vam-section-heading"
     });
-    let chosenParent = node.parentId ?? "";
-    let describe = (): void => {};
+    // Choosing a parent moves the topic at once, one undo step (decision 40); the line under the footer says where it went.
+    let currentParent = node.parentId ?? null;
+    let moveTo = (_parentId: string | null): void => {};
     const parentTree = renderTopicTree(relationship, {
       nodes: this.map!.nodes,
       title: candidate => this.notes.get(candidate.id)?.title ?? candidate.path,
       label: t("ui.parent_topic_link"),
       selectable: candidate => canParent(this.map!.nodes, node.id, candidate.id),
       rootChoice: t("ui.no_parent_root_topic"),
-      value: chosenParent,
-      onChoose: id => {
-        chosenParent = id;
-        parentTree.select(id);
-        describe();
-      }
+      value: currentParent ?? "",
+      onChoose: id => moveTo(id || null)
     });
     relationship.createEl("p", {
       cls: "vam-hint",
       text: t("ui.changing_the_parent_affects_context_for_the_next_ai_task_the")
     });
-    // Choosing a parent is a draft; nothing moves until Apply, and the dialog says what will change.
     const actions = (host ?? panel).createDiv("vam-next-actions");
     if (note) this.renderAddSubtopic(actions, node, close);
     const remove = actions.createEl("button", { text: t("ui.remove_from_map"), cls: "vam-discard" });
@@ -7811,24 +7807,18 @@ export class VisualAgentMapView extends ItemView {
       attr: { "aria-live": "polite" }
     });
     actions.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-    const apply = actions.createEl("button", { text: t("ui.apply_parent"), cls: "mod-cta" });
-    describe = (): void => {
-      const parentId = chosenParent || null;
-      const changed = parentId !== (node.parentId ?? null);
-      apply.disabled = !changed;
+    moveTo = parentId => {
+      if (parentId === currentParent) return;
+      // A merging card keeps its parent: the tree goes back to the one it has.
+      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) {
+        parentTree.select(currentParent ?? "");
+        return;
+      }
+      currentParent = parentId;
+      parentTree.select(parentId ?? "");
       status.setText(
-        !changed
-          ? ""
-          : parentId
-            ? t("ui.will_move_under_0", this.notes.get(parentId)?.title ?? "")
-            : t("ui.will_become_root_topic")
+        parentId ? t("ui.moved_under_0", this.notes.get(parentId)?.title ?? "") : t("ui.became_root_topic")
       );
-    };
-    describe();
-    apply.addEventListener("click", () => {
-      const parentId = chosenParent || null;
-      if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
-      close?.();
       this.enqueue(async () => {
         if (!this.mergeUnlocked(parentId ? [node.id, parentId] : [node.id])) return;
         await this.mapChange(map => {
@@ -7842,7 +7832,7 @@ export class VisualAgentMapView extends ItemView {
           } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
         });
       });
-    });
+    };
   }
   private renderPendingProposals(
     panel: HTMLElement,
@@ -8094,81 +8084,104 @@ export class VisualAgentMapView extends ItemView {
   /** Opens the relation editor for `link` in a dialog (the same host as the structure panel); `onChanged` repaints the panel behind it. */
   private openRelationEditor(link: TopicRelation, onChanged?: () => void, onClosed?: () => void): void {
     if (!this.map || !this.relationsEnabled()) return;
-    const render = (content: HTMLElement, close: () => void): void =>
-      this.renderRelationEditor(content, link, close, onChanged);
+    let saveNote = (): Promise<void> => Promise.resolve();
+    const render = (content: HTMLElement, close: () => void): void => {
+      saveNote = this.renderRelationEditor(content, link, close, onChanged);
+    };
     new (class extends Modal {
       onOpen(): void {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
       }
       onClose(): void {
-        // Obsidian puts focus back on the button that opened the dialog, but a change repainted the panel and that
-        // button is gone; after its restore, the caller moves focus to the row's replacement.
-        if (onClosed) window.setTimeout(onClosed, 0);
+        // Closing saves a changed note. Obsidian puts focus back on the button that opened the dialog, but a change
+        // repainted the panel and that button is gone; once the save is done, the caller moves focus to the row's replacement.
+        void saveNote().then(() => {
+          if (onClosed) window.setTimeout(onClosed, 0);
+        });
       }
     })(this.app).open();
   }
 
   /**
    * The relation editor: type (only the legal ones), reverse (not for "related"; disabled with the reason when it is
-   * illegal), a one-line note applied on request, and delete. Each change is one undoable Map.md step. Everything the
-   * user typed (the note, topic titles) is shown as text only.
+   * illegal), a one-line note, and delete. Each change is one undoable Map.md step and is written at once; the note is
+   * written when the box loses focus, on Ctrl/Cmd+Enter, or when the dialog closes (decision 40). Everything the user
+   * typed (the note, topic titles) is shown as text only. Returns the close-time save, settled when its write is done.
    */
   private renderRelationEditor(
     parent: HTMLElement,
     initial: TopicRelation,
     close?: () => void,
     onChanged?: () => void
-  ): void {
+  ): () => Promise<void> {
     let current: TopicRelation = { ...initial };
     const root = parent.createDiv("vam-relation-editor");
     const indexOfCurrent = (): number =>
       (this.map?.topicRelations ?? []).findIndex(r => relationIdentity(r) === relationIdentity(current));
     // Runs one change on the relation held in the map being edited; `next` returns its new form, or null to delete it.
-    const apply = (next: (rel: TopicRelation) => TopicRelation | null | undefined): void =>
-      this.enqueue(async () => {
-        const outcome: { value?: TopicRelation | null } = {};
-        if (!this.map) return;
-        // The line stays selected under its new identity; a deleted one is dropped by the next draw.
-        await this.mapChange(map => {
-          const list = map.topicRelations ?? [],
-            index = list.findIndex(r => relationIdentity(r) === relationIdentity(current));
-          if (index < 0) return;
-          outcome.value = next(list[index]);
-          // A type or direction change is checked again on the map being edited (the same rule as the choices offered).
-          const old = list[index];
-          if (
-            outcome.value &&
-            (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) &&
-            !relationAllowed(list, outcome.value, index)
-          )
-            outcome.value = undefined;
-          if (outcome.value === undefined) return;
-          const updated = [...list];
-          if (outcome.value) updated[index] = outcome.value;
-          else updated.splice(index, 1);
-          setTopicRelations(map, updated);
-        }, false);
-        const result = outcome.value;
-        if (result === null) {
-          if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
-          this.syncRelationClasses();
-          onChanged?.();
-          close?.();
-          return;
-        }
-        if (result) {
-          current = result;
-          this.selectedRelation = relationIdentity(current);
-          this.syncRelationClasses();
-        }
-        paint();
+    // A note save does not repaint the dialog, so a control the user is reaching for stays where it is.
+    const apply = (next: (rel: TopicRelation) => TopicRelation | null | undefined, repaint = true): Promise<void> =>
+      new Promise(done =>
+        this.enqueue(async () => {
+          try {
+            await change(next, repaint);
+          } finally {
+            done();
+          }
+        })
+      );
+    const change = async (
+      next: (rel: TopicRelation) => TopicRelation | null | undefined,
+      repaint: boolean
+    ): Promise<void> => {
+      const outcome: { value?: TopicRelation | null } = {};
+      if (!this.map) return;
+      // The line stays selected under its new identity; a deleted one is dropped by the next draw.
+      await this.mapChange(map => {
+        const list = map.topicRelations ?? [],
+          index = list.findIndex(r => relationIdentity(r) === relationIdentity(current));
+        if (index < 0) return;
+        outcome.value = next(list[index]);
+        // A type or direction change is checked again on the map being edited (the same rule as the choices offered).
+        const old = list[index];
+        if (
+          outcome.value &&
+          (outcome.value.kind !== old.kind || outcome.value.from !== old.from || outcome.value.to !== old.to) &&
+          !relationAllowed(list, outcome.value, index)
+        )
+          outcome.value = undefined;
+        if (outcome.value === undefined) return;
+        const updated = [...list];
+        if (outcome.value) updated[index] = outcome.value;
+        else updated.splice(index, 1);
+        setTopicRelations(map, updated);
+      }, false);
+      const result = outcome.value;
+      if (result === null) {
+        if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
+        this.syncRelationClasses();
         onChanged?.();
-      });
+        close?.();
+        return;
+      }
+      if (result) {
+        current = result;
+        this.selectedRelation = relationIdentity(current);
+        this.syncRelationClasses();
+      }
+      if (repaint) paint();
+      onChanged?.();
+    };
+    // The note as last written or requested; a save is asked for only when the box differs from it.
+    let savedNote = initial.description;
+    let noteWrite: Promise<void> = Promise.resolve();
+    let saveNote = (): void => {};
     // Which control takes the keyboard focus after the next repaint (a change repaints the whole dialog).
-    let refocus: "kind" | "reverse" | "description" | null = null;
+    let refocus: "kind" | "reverse" | null = null;
     const paint = (): void => {
       root.empty();
+      saveNote = () => {};
       const index = indexOfCurrent();
       root.createEl("strong", { text: t("ui.relation_editor_title"), cls: "vam-topic-tree-heading" });
       if (index < 0) {
@@ -8216,7 +8229,7 @@ export class VisualAgentMapView extends ItemView {
         const kind = kindSelect.value as TopicRelationKind;
         if (kind === current.kind) return;
         refocus = "kind";
-        apply(rel => ({ ...rel, kind }));
+        void apply(rel => ({ ...rel, kind }));
       });
       let reverseButton: HTMLElement | null = null;
       // E3 direction: one Reverse button; "related" has no direction and no button. A reverse that would close a cycle stays visible, disabled, with the reason beside it.
@@ -8230,7 +8243,7 @@ export class VisualAgentMapView extends ItemView {
           t("ui.relation_reverse"),
           () => {
             refocus = "reverse";
-            apply(rel => ({ ...rel, from: reversed.from, to: reversed.to }));
+            void apply(rel => ({ ...rel, from: reversed.from, to: reversed.to }));
           },
           !allowed
         );
@@ -8251,30 +8264,28 @@ export class VisualAgentMapView extends ItemView {
       description.setAttr("id", "vam-relation-description");
       description.setAttr("rows", "4");
       description.setAttr("maxlength", String(RELATION_DESCRIPTION_MAX_LENGTH));
-      description.value = relations[index].description ?? "";
+      savedNote = relations[index].description;
+      description.value = savedNote ?? "";
       description.setAttr("aria-label", t("ui.relation_description_label"));
       description.setAttr("placeholder", t("ui.relation_description_placeholder"));
       const remaining = noteRow.createDiv({ cls: "vam-relation-remaining" });
       const draft = (): string | undefined => normalizeRelationDescription(description.value);
-      const changed = (): boolean => draft() !== relations[index].description;
-      const applyDescription = (): void => {
-        if (!changed()) return;
+      saveNote = (): void => {
         const text = draft();
-        refocus = "description";
-        apply(rel => {
+        if (text === savedNote) return;
+        savedNote = text;
+        noteWrite = apply(rel => {
           const next: TopicRelation = { kind: rel.kind, from: rel.from, to: rel.to };
           if (text !== undefined) next.description = text;
           return next;
-        });
+        }, false);
       };
-      // E5 footer: Delete on the left; Close and Apply (primary, off while nothing changed) on the right.
+      // E5 footer (decision 40): Delete on the left, Close on the right; nothing waits for an Apply.
       const footer = root.createDiv("vam-next-actions vam-relation-footer");
       const remove = footer.createEl("button", { text: t("ui.relation_delete"), cls: "vam-discard mod-warning" });
-      remove.addEventListener("click", () => apply(() => null));
+      remove.addEventListener("click", () => void apply(() => null));
       footer.createSpan({ cls: "vam-next-status" });
       footer.createEl("button", { text: t("ui.close") }).addEventListener("click", () => close?.());
-      const applyButton = this.button(footer, t("ui.relation_apply"), applyDescription, true);
-      applyButton.addClass("mod-cta");
       const refresh = (): void => {
         remaining.setText(
           t(
@@ -8282,20 +8293,24 @@ export class VisualAgentMapView extends ItemView {
             Math.max(0, RELATION_DESCRIPTION_MAX_LENGTH - description.value.length)
           )
         );
-        applyButton.disabled = !changed();
       };
       description.addEventListener("input", refresh);
-      // Enter adds a line break; Ctrl/Cmd+Enter applies.
+      description.addEventListener("change", () => saveNote());
+      // Enter adds a line break; Ctrl/Cmd+Enter saves at once.
       description.addEventListener("keydown", event => {
         if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
         event.preventDefault();
-        applyDescription();
+        saveNote();
       });
       refresh();
       if (refocus) ({ kind: kindSelect, reverse: reverseButton, description })[refocus]?.focus();
       refocus = null;
     };
     paint();
+    return () => {
+      saveNote();
+      return noteWrite;
+    };
   }
   /** "Add subtopic…" (the structure dialog's footer, left of "Remove from map"): the six-type menu, then a new subtopic of that type. */
   private renderAddSubtopic(actions: HTMLElement, node: MapNode, close?: () => void): void {

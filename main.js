@@ -707,6 +707,13 @@ var en = {
   "ui.map_search_none": "No matches",
   "ui.map_search_position_0_1_2": "{0}/{1}: {2}",
   "ui.map_search_close": "Close search",
+  "ui.presentation_start": "Start presentation",
+  "ui.presentation_exit": "Exit presentation (Esc)",
+  "ui.presentation_position_0_1_2": "Presentation {0}/{1}: {2}",
+  "ui.presentation_count_0_1": "{0}/{1}",
+  "ui.presentation_first": "Already the first topic",
+  "ui.presentation_last": "Already the last topic",
+  "ui.presentation_exited": "Left the presentation",
   "ui.canvas_images_group": "Canvas images",
   "ui.canvas_image_label": "Image: {0}",
   "ui.canvas_image_insert": "Insert image\u2026",
@@ -2848,6 +2855,13 @@ var zhCN = {
   "ui.map_search_none": "\u6CA1\u6709\u7B26\u5408",
   "ui.map_search_position_0_1_2": "{0}\uFF0F{1}\uFF1A{2}",
   "ui.map_search_close": "\u5173\u95ED\u641C\u7D22",
+  "ui.presentation_start": "\u5F00\u59CB\u6F14\u793A",
+  "ui.presentation_exit": "\u9000\u51FA\u6F14\u793A\uFF08Esc\uFF09",
+  "ui.presentation_position_0_1_2": "\u6F14\u793A {0}\uFF0F{1}\uFF1A{2}",
+  "ui.presentation_count_0_1": "{0}\uFF0F{1}",
+  "ui.presentation_first": "\u5DF2\u662F\u7B2C\u4E00\u4E2A\u8BAE\u9898",
+  "ui.presentation_last": "\u5DF2\u662F\u6700\u540E\u4E00\u4E2A\u8BAE\u9898",
+  "ui.presentation_exited": "\u5DF2\u9000\u51FA\u6F14\u793A",
   "ui.canvas_images_group": "\u753B\u5E03\u56FE\u7247",
   "ui.canvas_image_label": "\u56FE\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u56FE\u7247\u2026",
@@ -4989,6 +5003,13 @@ var zhTW = {
   "ui.map_search_none": "\u6C92\u6709\u7B26\u5408",
   "ui.map_search_position_0_1_2": "{0}\uFF0F{1}\uFF1A{2}",
   "ui.map_search_close": "\u95DC\u9589\u641C\u5C0B",
+  "ui.presentation_start": "\u958B\u59CB\u7C21\u5831",
+  "ui.presentation_exit": "\u96E2\u958B\u7C21\u5831\uFF08Esc\uFF09",
+  "ui.presentation_position_0_1_2": "\u7C21\u5831 {0}\uFF0F{1}\uFF1A{2}",
+  "ui.presentation_count_0_1": "{0}\uFF0F{1}",
+  "ui.presentation_first": "\u5DF2\u662F\u7B2C\u4E00\u500B\u8B70\u984C",
+  "ui.presentation_last": "\u5DF2\u662F\u6700\u5F8C\u4E00\u500B\u8B70\u984C",
+  "ui.presentation_exited": "\u5DF2\u96E2\u958B\u7C21\u5831",
   "ui.canvas_images_group": "\u756B\u5E03\u5716\u7247",
   "ui.canvas_image_label": "\u5716\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u5716\u7247\u2026",
@@ -16523,6 +16544,14 @@ function readingOrder(nodes, opts = {}) {
   for (const node of cut.sort(byPosition)) order.push(node.id);
   return order;
 }
+function stepOrder(order, currentId, delta) {
+  const total2 = order.length;
+  if (total2 === 0) return null;
+  const at = currentId === null ? -1 : order.indexOf(currentId);
+  const index = at < 0 ? delta === 1 ? 0 : total2 - 1 : at + delta;
+  if (index < 0 || index >= total2) return null;
+  return { id: order[index], index, total: total2 };
+}
 
 // experiences/visual-map/map-search-bar.ts
 function searchMap(nodes, skip, titleOf, query, siblingAxis) {
@@ -16574,6 +16603,54 @@ function buildMapSearchBar(parent, options) {
       count.setText(text11);
     }
   };
+}
+
+// experiences/visual-map/presentation-mode.ts
+var NEXT_KEYS = /* @__PURE__ */ new Set(["ArrowRight", "ArrowDown", "PageDown"]);
+var PREV_KEYS = /* @__PURE__ */ new Set(["ArrowLeft", "ArrowUp", "PageUp"]);
+var READ_ONLY_KEYS = /* @__PURE__ */ new Set(["Delete", "Backspace", "Enter", "F2"]);
+function classifyPresentationKey(event) {
+  if (event.isComposing) return null;
+  const mod = !!(event.ctrlKey || event.metaKey);
+  const plain = !mod && !event.altKey && !event.shiftKey;
+  const key2 = event.key;
+  if (key2 === "Escape") return "exit";
+  if (READ_ONLY_KEYS.has(key2)) return "block";
+  if (mod && (key2 === "z" || key2 === "Z")) return "block";
+  if (key2 === " " || event.code === "Space") {
+    if (mod || event.altKey) return "block";
+    return event.shiftKey ? "prev" : "next";
+  }
+  if (NEXT_KEYS.has(key2) || PREV_KEYS.has(key2) || key2 === "Home" || key2 === "End") {
+    if (!plain) return "block";
+    if (key2 === "Home") return "first";
+    if (key2 === "End") return "last";
+    return NEXT_KEYS.has(key2) ? "next" : "prev";
+  }
+  return null;
+}
+function startingId(order, selectedId) {
+  if (selectedId !== null && order.includes(selectedId)) return selectedId;
+  return order.length ? order[0] : null;
+}
+function moveInOrder(order, currentId, action) {
+  const total2 = order.length;
+  if (!total2) return null;
+  if (action === "first") return { kind: "move", id: order[0], index: 0, total: total2 };
+  if (action === "last") return { kind: "move", id: order[total2 - 1], index: total2 - 1, total: total2 };
+  const step = stepOrder(order, currentId, action === "next" ? 1 : -1);
+  if (step) return { kind: "move", id: step.id, index: step.index, total: step.total };
+  return { kind: "edge", edge: action === "next" ? "last" : "first" };
+}
+function reconcileCurrent(oldOrder, newOrder, currentId) {
+  if (newOrder.includes(currentId)) return currentId;
+  const keep = new Set(newOrder);
+  const at = oldOrder.indexOf(currentId);
+  if (at >= 0) {
+    for (let i = at + 1; i < oldOrder.length; i++) if (keep.has(oldOrder[i])) return oldOrder[i];
+    for (let i = at - 1; i >= 0; i--) if (keep.has(oldOrder[i])) return oldOrder[i];
+  }
+  return newOrder.length ? newOrder[0] : null;
 }
 
 // experiences/visual-map/map-text-language.ts
@@ -43834,6 +43911,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
     __publicField(this, "mapSearch", null);
     __publicField(this, "mapSearchBar", null);
+    /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
+    __publicField(this, "presentation", null);
+    __publicField(this, "presentationBarEl", null);
     /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
     __publicField(this, "coverObserver", null);
     __publicField(this, "selectionBarEl", null);
@@ -43980,6 +44060,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     });
     this.bindClipboard();
     (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard());
+    this.registerDomEvent(this.contentEl, "keydown", (event) => this.presentationKey(event), { capture: true });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
@@ -44031,6 +44112,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     const seen = /* @__PURE__ */ new WeakSet();
     const run = (redo) => (event) => {
       if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
+      if (this.presentation) return false;
       if (seen.has(event)) return false;
       seen.add(event);
       this.enqueue(() => this.travel(redo));
@@ -44042,6 +44124,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     scope.register([], "F2", (event) => {
       var _a2, _b2, _c;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
+      if (this.presentation) return false;
       if (this.builtIn || this.integrationMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
       const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
@@ -44054,6 +44137,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     const cardKey = (sibling) => (event) => {
       var _a2, _b2, _c, _d, _e;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
+      if (this.presentation) return false;
       if (this.builtIn || this.integrationMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
       const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
@@ -44072,6 +44156,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   searchKey(event) {
     var _a2, _b2, _c;
     if (this.closed || event.isComposing || event.defaultPrevented || !this.map) return true;
+    if (this.presentation) return false;
     const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
     if (!active) return true;
     if (this.mapSearchBar && active === this.mapSearchBar.input) {
@@ -44245,6 +44330,154 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     const back = card != null ? card : ((_b2 = search.returnEl) == null ? void 0 : _b2.isConnected) && this.contentEl.contains(search.returnEl) ? search.returnEl : null;
     (back != null ? back : this.contentEl).focus({ preventScroll: true });
   }
+  /** The topics a presentation visits: the reading order of what is drawn (folded branches are one stop, not their descendants). */
+  presentationOrder() {
+    if (!this.map) return [];
+    const shown = new Set(this.canvasNodes().map((node) => node.id));
+    const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
+    return readingOrder(
+      this.map.nodes.filter((node) => shown.has(node.id)),
+      { siblingAxis: vertical ? "x" : "y" }
+    );
+  }
+  /** The start button is on only when there is something to show and the map is not in select mode. */
+  canPresent() {
+    return !!this.map && !this.closed && !this.integrationMode && this.canvasNodes().length > 0;
+  }
+  startPresentation() {
+    var _a2, _b2, _c;
+    if (this.presentation || !this.map || !this.canPresent()) return;
+    const order = this.presentationOrder();
+    const first = startingId(order, this.selected);
+    if (first === null) return;
+    const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    const card = active ? [...this.cardEls.entries()].find(([, el]) => el === active || el.contains(active)) : void 0;
+    this.closeMapSearch(false);
+    this.clearHoverTimer();
+    (_c = this.hoverCard) == null ? void 0 : _c.remove();
+    this.hoverCard = null;
+    this.presentation = {
+      order,
+      currentId: first,
+      viewport: { ...this.map.viewport },
+      selected: this.selected,
+      multiSelected: [...this.multiSelected],
+      returnNodeId: card ? card[0] : null,
+      returnEl: card ? null : active
+    };
+    this.applyPresentationMarks(true);
+  }
+  /** One key of a presentation. Everything it does is in memory: the camera follows, nothing is saved. */
+  stepPresentation(action) {
+    var _a2;
+    const session = this.presentation;
+    if (!session) return;
+    if (action === "exit") {
+      this.exitPresentation(true);
+      return;
+    }
+    if (action === "block") return;
+    const move = moveInOrder(session.order, session.currentId, action);
+    if (!move) return;
+    if (move.kind === "edge") {
+      (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(move.edge === "first" ? "ui.presentation_first" : "ui.presentation_last"));
+      return;
+    }
+    session.currentId = move.id;
+    this.applyPresentationMarks(true);
+  }
+  /** Capture-phase keydown: a presentation takes its keys and the read-only ones, and nothing reaches the cards. */
+  presentationKey(event) {
+    var _a2, _b2;
+    if (!this.presentation || this.closed) return;
+    const target = event.target;
+    const inBar = !!((_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, ".vam-presentation-bar"));
+    if (!inBar && target && (isEditableTarget(target) || ((_b2 = target.closest) == null ? void 0 : _b2.call(target, ".vam-map-chat")))) return;
+    if (inBar && (event.key === "Enter" || event.key === " ")) return;
+    const action = classifyPresentationKey(event);
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.stepPresentation(action);
+  }
+  /**
+   * Called at the end of every paint and after each step: re-reads the order (a repaint may have removed the current
+   * topic), marks the current card, draws the bar, centres the card and keeps DOM focus on it.
+   * `announce` speaks the position; a plain repaint speaks only when the topic changed under it.
+   */
+  applyPresentationMarks(announce = false) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const session = this.presentation;
+    if (!session || !this.map) return;
+    const order = this.presentationOrder();
+    const currentId = reconcileCurrent(session.order, order, session.currentId);
+    if (currentId === null) {
+      this.exitPresentation(this.cardEls.size > 0);
+      return;
+    }
+    if (currentId !== session.currentId) announce = true;
+    session.order = order;
+    session.currentId = currentId;
+    this.contentEl.dataset.presenting = "true";
+    if (this.stageEl) this.stageEl.dataset.presenting = "true";
+    for (const [id, card2] of this.cardEls) card2.toggleClass("is-presenting", id === currentId);
+    (_a2 = this.presentationBarEl) == null ? void 0 : _a2.remove();
+    this.presentationBarEl = null;
+    const overlay = (_c = (_b2 = this.contentEl).querySelector) == null ? void 0 : _c.call(_b2, ".vam-canvas-overlay");
+    const index = order.indexOf(currentId);
+    if (overlay) {
+      const bar = overlay.createDiv({ cls: "vam-presentation-bar", attr: { role: "group" } });
+      bar.createSpan({ cls: "vam-presentation-count", text: t("ui.presentation_count_0_1", index + 1, order.length) });
+      const exit = bar.createEl("button", {
+        cls: "vam-presentation-exit",
+        text: t("ui.presentation_exit"),
+        attr: { type: "button" }
+      });
+      exit.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.exitPresentation(true);
+      });
+      this.presentationBarEl = bar;
+    }
+    const target = this.map.nodes.find((node) => node.id === currentId);
+    if (target) this.focusNode(target, false);
+    const card = this.cardEls.get(currentId);
+    const active = (_e = (_d = this.contentEl.ownerDocument) == null ? void 0 : _d.activeElement) != null ? _e : null;
+    const lost = !active || active === this.contentEl || !this.contentEl.contains(active);
+    if (card && (announce || lost) && active !== card) card.focus({ preventScroll: true });
+    if (announce)
+      (_h = this.announcer) == null ? void 0 : _h.setText(
+        t("ui.presentation_position_0_1_2", index + 1, order.length, (_g = (_f = this.notes.get(currentId)) == null ? void 0 : _f.title) != null ? _g : "")
+      );
+  }
+  /**
+   * Leaves the presentation. `restore` puts back the viewport (in memory, never saved), the selection and the focus;
+   * switching maps or closing the view passes false because nothing of the old map is worth restoring.
+   */
+  exitPresentation(restore = true) {
+    var _a2, _b2, _c;
+    const session = this.presentation;
+    if (!session) return;
+    this.presentation = null;
+    delete this.contentEl.dataset.presenting;
+    if (this.stageEl) delete this.stageEl.dataset.presenting;
+    (_a2 = this.presentationBarEl) == null ? void 0 : _a2.remove();
+    this.presentationBarEl = null;
+    for (const card2 of this.cardEls.values()) card2.toggleClass("is-presenting", false);
+    if (!restore || this.closed || !this.map) return;
+    const ids = new Set(this.map.nodes.map((node) => node.id));
+    const previous = this.selected, touched = [...this.multiSelected];
+    this.selected = session.selected !== null && ids.has(session.selected) ? session.selected : null;
+    this.multiSelected = new Set(session.multiSelected.filter((id) => ids.has(id)));
+    this.commitSelection(previous, this.selected, [...touched, ...this.multiSelected]);
+    if (!this.map) return;
+    this.map.viewport = { ...session.viewport };
+    this.transform();
+    const card = session.returnNodeId ? this.cardEls.get(session.returnNodeId) : void 0;
+    const back = card != null ? card : ((_b2 = session.returnEl) == null ? void 0 : _b2.isConnected) && this.contentEl.contains(session.returnEl) ? session.returnEl : null;
+    (back != null ? back : this.contentEl).focus({ preventScroll: true });
+    (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.presentation_exited"));
+  }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   renameNode(node, current) {
     new NameModal(
@@ -44258,6 +44491,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     this.closed = true;
     this.closeMapSearch(false);
+    this.exitPresentation(false);
     this.releaseCovers();
     (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
     this.unbindClipboard = null;
@@ -44489,7 +44723,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     const viewEpoch = this.aimViewEpoch, openEpoch = ++this.mapOpenEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
-    if (path !== this.path) this.closeMapSearch(false);
+    if (path !== this.path) {
+      this.closeMapSearch(false);
+      this.exitPresentation(false);
+    }
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -46896,6 +47133,7 @@ ${request.requirements}` : preset.text,
     const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
     if (!this.builtIn) this.plugin.closeStaleDetails();
     this.closeMapSearch(false);
+    this.exitPresentation(false);
     this.builtIn = true;
     this.path = "";
     this.map = sample.map;
@@ -50685,6 +50923,8 @@ ${request.requirements}` : preset.text,
     this.zoomLabel = zoomReset;
     this.iconButton(zoom, "plus", t("ui.zoom_in"), () => this.zoomBy(1.2));
     this.iconButton(zoom, "maximize", t("ui.show_all"), () => this.fit());
+    const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
+    present.disabled = !this.canPresent();
     if (!this.builtIn) {
       const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
       layout.setAttr("aria-haspopup", "menu");
@@ -50745,6 +50985,7 @@ ${request.requirements}` : preset.text,
     }
     restoreRelevanceFocus();
     restoreChatFocus();
+    this.applyPresentationMarks();
     restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
@@ -51824,6 +52065,7 @@ ${request.requirements}` : preset.text,
   }
   showHoverCard(card, note) {
     var _a2, _b2, _c, _d, _e;
+    if (this.presentation) return;
     const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
     (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();

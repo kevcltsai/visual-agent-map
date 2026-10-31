@@ -69,7 +69,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout.ts', 'topic-markers.ts']);
   const graph = load('map-graph.ts');
   const model = load('map-model.ts');
   const node = { id: 'a', path: 'a', parentId: 'p', x: 0, y: 0, collapsed: false, aimKind: 'answer', aimConvergesFromNodeIds: ['p', 'q'] };
@@ -179,7 +179,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     const ui = text.shareViewerUiFor(lang);
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
-    for (const [key, value] of Object.entries(ui)) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -307,7 +307,7 @@ test('sharing viewer language: interface text for ja, ko and es is complete and 
     const ui = dictionaries.SHARE_VIEWER_UI_EXTRA[code];
     assert.equal(ui.lang, code);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
-    for (const [key, value] of Object.entries(ui)) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -895,6 +895,58 @@ test('sharing viewer colour: every text and icon in the outline, toolbar, cards 
       assert.notEqual(details.currentBg, details.plainBg, `${scheme}: the current outline row keeps its own fill`);
       assert.equal(details.currentWeight, '600', `${scheme}: the current outline row is bold`);
     }
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer: marker text exists in every language, names and the "markers: {0}" label', () => {
+  const markers = ['done', 'warning', 'star', 'priority-1', 'priority-2', 'priority-3'];
+  const everyUi = [...LANGUAGES.map(lang => text.shareViewerUiFor(lang)), ...Object.values(dictionaries.SHARE_VIEWER_UI_EXTRA)];
+  assert.equal(everyUi.length, 6);
+  for (const ui of everyUi) {
+    assert.match(ui.markerLabel, /\{0\}/, `${ui.lang}.markerLabel`);
+    assert.deepEqual(Object.keys(ui.markerNames).sort(), [...markers].sort(), ui.lang);
+    for (const id of markers) assert.ok(ui.markerNames[id].trim(), `${ui.lang}.${id}`);
+  }
+  assert.equal(text.shareViewerUiFor('zh-TW').markerLabel, '標記：{0}');
+  assert.equal(text.shareViewerUiFor('zh-TW').markerNames.done, '完成');
+  assert.equal(text.shareViewerUiFor('en').markerNames.star, 'Star');
+});
+
+test('sharing viewer markers: cards and outline show aria-hidden symbols and a named label, and a hostile id draws nothing (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-markers-'));
+  try {
+    const data = payload();
+    data.nodes[0].markers = ['star', 'done', '<img src=x onerror="document.title=1">', 'Done', 'priority-2', 'future-x'];
+    data.nodes[1].markers = 'done';
+    const out = path.join(directory, 'markers.html');
+    fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('zh-TW')));
+    const rootId = data.nodes[0].id;
+    const secondId = data.nodes[1].id;
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`(() => {
+        const card = document.querySelector('[data-node-id=${JSON.stringify(rootId)}]');
+        const other = document.querySelector('[data-node-id=${JSON.stringify(secondId)}]');
+        const row = document.querySelector('[data-outline-id=${JSON.stringify(rootId)}]');
+        const marks = el => [...el.querySelectorAll('.vam-marker')].map(m => ({ text: m.textContent, hidden: m.getAttribute('aria-hidden'), tag: m.tagName }));
+        return { card: marks(card), label: card.getAttribute('aria-label'), otherMarks: other ? other.querySelectorAll('.vam-marker').length : -1, otherLabel: other && other.getAttribute('aria-label'), row: marks(row), rowLabel: row.getAttribute('aria-label'), images: document.querySelectorAll('img[src="x"]').length, title: document.title };
+      })()`);
+    });
+    assert.deepEqual(plain(report.card.map(m => m.text)), ['✓', '★', 'P2']);
+    assert.ok(report.card.every(m => m.hidden === 'true'), 'symbols are aria-hidden');
+    assert.match(report.label, /標記：完成、星號、優先 2$/);
+    assert.deepEqual(plain(report.row.map(m => m.text)), ['✓', '★', 'P2']);
+    assert.ok(report.row.every(m => m.hidden === 'true'));
+    assert.match(report.rowLabel, /標記：完成、星號、優先 2$/);
+    assert.equal(report.otherMarks, 0, 'a non-list value draws nothing');
+    assert.ok(!/標記/.test(report.otherLabel ?? ''), 'no marker text without markers');
+    assert.equal(report.images, 0, 'a hostile id is never turned into markup');
+    assert.notEqual(report.title, '1');
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }

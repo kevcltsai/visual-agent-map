@@ -1,3 +1,4 @@
+import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
 import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE } from "./experiences/coffee-tables/view";
@@ -282,6 +283,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   private outlineMap: MapDocument | null = null;
   private outlineTitles = new Map<string, string>();
   private outlineSample = false;
+  private outlineMarkers = new Map<string, TopicMarker[]>();
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
@@ -344,9 +346,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.outlineMap = map;
     this.outlineTitles = titles;
     this.outlineSample = sample;
+    const markers = new Map<string, TopicMarker[]>();
+    for (const [id, note] of notes) if (note.markers?.length) markers.set(id, note.markers);
+    this.outlineMarkers = markers;
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
       if (leaf.view instanceof OutlineView) {
-        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample);
+        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample, markers);
       }
   }
   /** Marks the active outline row without rebuilding the outline. */
@@ -367,7 +372,8 @@ export default class VisualAgentMapPlugin extends Plugin {
             void this.coffeeOutlineSource?.confirmFillSummaries();
           }
         );
-        if (!this.coffeeOutlineActive) leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample);
+        if (!this.coffeeOutlineActive)
+          leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample, this.outlineMarkers);
       }
   }
   /** Called when a map view closes: the outline falls back to another open map, or empties. */

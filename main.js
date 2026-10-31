@@ -42845,6 +42845,7 @@ var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
 var cardCutLabels = /* @__PURE__ */ new WeakMap();
+var cardCovers = /* @__PURE__ */ new WeakMap();
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
@@ -50148,11 +50149,11 @@ ${request.requirements}` : preset.text,
    */
   paintCover(card, notePath) {
     var _a2, _b2, _c, _d;
-    const old = card.querySelector(".vam-card-cover");
+    const old = cardCovers.get(card);
     if (old) {
-      const oldImg = old.querySelector("img");
-      if (oldImg) (_a2 = this.coverObserver) == null ? void 0 : _a2.unobserve(oldImg);
-      old.remove();
+      (_a2 = this.coverObserver) == null ? void 0 : _a2.unobserve(old.img);
+      old.frame.remove();
+      cardCovers.delete(card);
     }
     let source;
     try {
@@ -50177,7 +50178,9 @@ ${request.requirements}` : preset.text,
       var _a3;
       (_a3 = this.coverObserver) == null ? void 0 : _a3.unobserve(img);
       frame.remove();
+      cardCovers.delete(card);
     });
+    cardCovers.set(card, { frame, img });
     const title = card.querySelector(".vam-card-title");
     card.insertBefore(frame, title);
     if (typeof IntersectionObserver !== "function") {

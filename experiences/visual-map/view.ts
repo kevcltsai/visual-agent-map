@@ -498,6 +498,8 @@ const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The extra accessible-name part of a card that is waiting to be moved by a paste ("cut"). */
 const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
+/** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
+const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -8528,11 +8530,11 @@ export class VisualAgentMapView extends ItemView {
    * remote or unreadable cover adds nothing. The image gets its `src` when the frame scrolls into view. Safe to call again.
    */
   private paintCover(card: HTMLElement, notePath: string): void {
-    const old = card.querySelector<HTMLElement>(".vam-card-cover");
+    const old = cardCovers.get(card);
     if (old) {
-      const oldImg = old.querySelector<HTMLImageElement>("img");
-      if (oldImg) this.coverObserver?.unobserve(oldImg);
-      old.remove();
+      this.coverObserver?.unobserve(old.img);
+      old.frame.remove();
+      cardCovers.delete(card);
     }
     let source: string | undefined;
     try {
@@ -8556,7 +8558,9 @@ export class VisualAgentMapView extends ItemView {
     img.addEventListener("error", () => {
       this.coverObserver?.unobserve(img);
       frame.remove();
+      cardCovers.delete(card);
     });
+    cardCovers.set(card, { frame, img });
     const title = card.querySelector<HTMLElement>(".vam-card-title");
     card.insertBefore(frame, title);
     if (typeof IntersectionObserver !== "function") {

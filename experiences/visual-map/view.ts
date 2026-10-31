@@ -8,15 +8,22 @@ import {
 } from "../aim/content-language";
 import {
   addImage,
+  addTextNode,
   boundaryBounds,
+  cleanText,
   moveItem,
   pruneBoundaries,
   removeItem,
+  removeTextNode,
   resizeKeepRatio,
+  treeTextNodes,
+  updateTextNode,
   IMAGE_MIN_SIZE,
+  TEXT_LIMIT,
   type BoundaryItem,
   type CanvasItem,
-  type ImageItem
+  type ImageItem,
+  type TextItem
 } from "./canvas-items";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import {
@@ -130,8 +137,9 @@ import {
 } from "../../map-model";
 import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
 import {
-  arrangeMap,
+  arrangeMapWithText,
   arrangeNewBranch,
+  arrangeNewBranchWithText,
   arrangeNewTree,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
@@ -585,6 +593,8 @@ const RELATION_LABEL_MIN_ZOOM = 0.6;
 /** A note shown under an expanded label is cut to this many characters. */
 const RELATION_LABEL_NOTE_MAX = 60;
 /** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
+const TEXT_NODE_HEIGHT = 180;
+const TEXT_NODE_WIDTH = 300;
 function depthOf(nodes: MapNode[], id: string): number {
   const byId = new Map(nodes.map(node => [node.id, node]));
   let depth = 0;
@@ -959,7 +969,49 @@ export class VisualAgentMapView extends ItemView {
   private cardEls = new Map<string, HTMLElement>();
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
   private cardHeightOf = (id: string): number | undefined =>
-    this.cardEls.get(id)?.offsetHeight || medianHeight([...this.cardEls.values()].map(card => card.offsetHeight));
+    this.cardEls.get(id)?.offsetHeight ||
+    // A text node is no card: its own rendered height, or the default while it is not drawn yet.
+    (this.isTextId(id)
+      ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
+      : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
+  /** Text node element per id (tree-attached and free), rebuilt on every render. */
+  private textEls = new Map<string, HTMLElement>();
+  /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
+  private pendingTextEditId: string | null = null;
+  private editingTextId: string | null = null;
+  private isTextId(id: string): boolean {
+    return (
+      id.startsWith("txt-") ||
+      !!this.map?.canvasItems?.some(item => item.kind === "text" && (item as TextItem).id === id)
+    );
+  }
+  /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
+  private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
+    const out = arrangeMapWithText(
+      map.nodes,
+      map.canvasItems ?? [],
+      supersededAimNodeIds(map),
+      this.cardHeightOf,
+      layoutOf(map),
+      options
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
+  private arrangeBranch(map: MapDocument, parentId: string, newIds: Set<string>, minTop?: number): void {
+    const out = arrangeNewBranchWithText(
+      map.nodes,
+      map.canvasItems ?? [],
+      parentId,
+      newIds,
+      this.cardHeightOf,
+      minTop,
+      layoutOf(map)
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
   private cardChecks = new Map<string, HTMLInputElement>();
   /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
   private mapSearch: {
@@ -1408,7 +1460,17 @@ export class VisualAgentMapView extends ItemView {
     const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
     return readingOrder(
       this.map.nodes.filter(node => shown.has(node.id)),
-      { siblingAxis: vertical ? "x" : "y" }
+      {
+        siblingAxis: vertical ? "x" : "y",
+        textNodes: treeTextNodes(
+          this.map.canvasItems ?? [],
+          this.map.nodes.map(node => node.id)
+        ).attached.flatMap(text =>
+          text.parentId !== undefined && shown.has(text.parentId) && this.textEls.has(text.id)
+            ? [{ id: text.id, parentId: text.parentId, x: text.x, y: text.y }]
+            : []
+        )
+      }
     );
   }
   /** The start button is on only when there is something to show and the map is not in select mode. */
@@ -1491,6 +1553,7 @@ export class VisualAgentMapView extends ItemView {
     this.contentEl.dataset.presenting = "true";
     if (this.stageEl) this.stageEl.dataset.presenting = "true";
     for (const [id, card] of this.cardEls) card.toggleClass("is-presenting", id === currentId);
+    for (const [id, el] of this.textEls) el.toggleClass("is-presenting", id === currentId);
     this.presentationBarEl?.remove();
     this.presentationBarEl = null;
     const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
@@ -1511,6 +1574,36 @@ export class VisualAgentMapView extends ItemView {
     }
     const target = this.map.nodes.find(node => node.id === currentId);
     if (target) this.focusNode(target, false);
+    const textStop = (this.map.canvasItems ?? []).find(
+      (item): item is TextItem => item.kind === "text" && item.id === currentId
+    );
+    if (textStop) {
+      this.focusNode(
+        {
+          id: textStop.id,
+          path: "",
+          parentId: textStop.parentId ?? null,
+          x: textStop.x,
+          y: textStop.y,
+          collapsed: false
+        },
+        false
+      );
+      const el = this.textEls.get(currentId);
+      const active = this.contentEl.ownerDocument?.activeElement ?? null;
+      if (el && (announce || !active || !this.contentEl.contains(active)) && active !== el)
+        el.focus({ preventScroll: true });
+      if (announce)
+        this.announcer?.setText(
+          t(
+            "ui.presentation_position_0_1_2",
+            index + 1,
+            order.length,
+            t("ui.text_node_label", textStop.text.slice(0, 60))
+          )
+        );
+      return;
+    }
     const card = this.cardEls.get(currentId);
     const active = this.contentEl.ownerDocument?.activeElement ?? null;
     const lost = !active || active === this.contentEl || !this.contentEl.contains(active);
@@ -3344,14 +3437,7 @@ export class VisualAgentMapView extends ItemView {
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
       map.nodes.find(item => item.id === node.id)!.parentId = parent.id;
       map.nodes.find(item => item.id === parent.id)!.collapsed = false;
-      map.nodes = arrangeNewBranch(
-        map.nodes,
-        parent.id,
-        new Set([node.id, ...descendants(map.nodes, node.id)]),
-        this.cardHeightOf,
-        undefined,
-        layoutOf(map)
-      );
+      this.arrangeBranch(map, parent.id, new Set([node.id, ...descendants(map.nodes, node.id)]), undefined);
     });
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
@@ -3424,7 +3510,7 @@ export class VisualAgentMapView extends ItemView {
       if (changed) {
         await this.mapChange(map => {
           applyCollapseLevel(map.nodes, shownLevels);
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+          this.arrangeAll(map);
         });
         if (this.history.undoEntry) this.history.undoEntry.label = t("ui.collapse_levels");
         this.updateHistoryButtons();
@@ -3435,7 +3521,7 @@ export class VisualAgentMapView extends ItemView {
   private autoLayout(): void {
     this.enqueue(() =>
       this.mapChange(map => {
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+        this.arrangeAll(map);
       }, false)
     );
   }
@@ -3455,9 +3541,7 @@ export class VisualAgentMapView extends ItemView {
         // A branch layout that points against the new direction would be dropped on the next parse; drop it now.
         cleanBranchLayouts(map.nodes, direction);
         // A new balanced map deals the topics out again instead of keeping the sides they stand on.
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map), {
-          reset: direction === "balanced" && before.direction !== "balanced"
-        });
+        this.arrangeAll(map, { reset: direction === "balanced" && before.direction !== "balanced" });
         // A balanced map decides each topic's side while arranging, so check once more with the new sides.
         if (direction === "balanced") cleanBranchLayouts(map.nodes, direction);
       }, false);
@@ -3749,7 +3833,7 @@ export class VisualAgentMapView extends ItemView {
               const outlineTop = next.nodes.find(node => node.id === top.id)!;
               if (owner) {
                 owner.collapsed = false;
-                next.nodes = arrangeNewBranch(next.nodes, owner.id, ids, this.cardHeightOf, undefined, layoutOf(next));
+                this.arrangeBranch(next, owner.id, ids, undefined);
               } else {
                 outlineTop.parentId = null;
                 next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf, layoutOf(next));
@@ -5058,7 +5142,7 @@ export class VisualAgentMapView extends ItemView {
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
           if (adopter) adopter.collapsed = false;
-          map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf, undefined, layoutOf(map));
+          this.arrangeBranch(map, adopterId, adopted, undefined);
         }
         this.removeAimReferences(map, ids, prior.nodes);
       })
@@ -5544,8 +5628,7 @@ export class VisualAgentMapView extends ItemView {
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
           this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
-          if (adopted.size)
-            map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf, undefined, layoutOf(map));
+          if (adopted.size) this.arrangeBranch(map, merged.id, adopted, undefined);
         })
         .commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -5646,8 +5729,7 @@ export class VisualAgentMapView extends ItemView {
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
           this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
-          if (adopted.size)
-            map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf, undefined, layoutOf(map));
+          if (adopted.size) this.arrangeBranch(map, target.id, adopted, undefined);
         })
         .commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -5848,8 +5930,169 @@ export class VisualAgentMapView extends ItemView {
         el.focus({ preventScroll: true });
       }
     }
+    this.renderTextNodes(stage, items);
     this.renderBoundaries(stage, items, editable);
     this.focusItemId = null;
+  }
+  /** Text nodes change only on a map the user may edit, and never while presenting. */
+  private canEditText(): boolean {
+    return this.canEditCanvasItems() && !this.presentation;
+  }
+  /**
+   * Draws the text nodes (decisions #1, #5): a node under a shown, unfolded topic, or a free one (orphan, parent gone) at
+   * its own place. A node under a folded topic is not drawn. Text goes in through textContent only; the editor is a
+   * textarea, so nothing the user writes is ever parsed as markup.
+   */
+  private renderTextNodes(stage: HTMLElement, items: readonly CanvasItem[]): void {
+    if (!this.map) return;
+    const { attached } = treeTextNodes(
+      items,
+      this.map.nodes.map(node => node.id)
+    );
+    const attachedIds = new Set(attached.map(text => text.id));
+    const texts = items.filter((item): item is TextItem => item.kind === "text");
+    if (!texts.length) return;
+    const editable = this.canEditText();
+    const layer = stage.createDiv("vam-text-nodes");
+    layer.setAttr("role", "group");
+    layer.setAttr("aria-label", t("ui.text_nodes_group"));
+    for (const text of texts) {
+      if (attachedIds.has(text.id)) {
+        const parent = this.map.nodes.find(node => node.id === text.parentId);
+        if (!parent || parent.collapsed || !this.cardEls.has(parent.id)) continue;
+      }
+      const el = layer.createDiv("vam-text-node");
+      el.dataset.itemId = text.id;
+      if (!attachedIds.has(text.id)) el.addClass("is-free");
+      el.setAttr("role", "note");
+      el.setAttr("aria-label", t("ui.text_node_label", text.text.slice(0, 60)));
+      el.tabIndex = 0;
+      el.style.left = `${text.x}px`;
+      el.style.top = `${text.y}px`;
+      el.style.width = `${TEXT_NODE_WIDTH}px`;
+      el.createDiv({ cls: "vam-text-node-body", text: text.text });
+      this.textEls.set(text.id, el);
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      if (!editable) continue;
+      el.addEventListener("dblclick", event => {
+        event.stopPropagation();
+        this.startTextEdit(text.id);
+      });
+      el.addEventListener("keydown", event => {
+        if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startTextEdit(text.id);
+        } else if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeTextItem(text.id));
+        }
+      });
+    }
+    const wanted = this.pendingTextEditId ?? this.focusItemId;
+    const pending = this.pendingTextEditId;
+    this.pendingTextEditId = null;
+    if (pending && this.textEls.has(pending)) {
+      this.focusItemId = null;
+      this.startTextEdit(pending);
+    } else if (wanted && this.textEls.has(wanted)) {
+      this.focusItemId = null;
+      this.textEls.get(wanted)?.focus({ preventScroll: true });
+    }
+  }
+  /** Swaps the node's text for a textarea: Cmd/Ctrl+Enter or leaving it saves, Esc cancels, an empty text removes the node. */
+  private startTextEdit(id: string): void {
+    const el = this.textEls.get(id);
+    const text = (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
+    if (!el || !text || !this.canEditText() || this.editingTextId) return;
+    this.editingTextId = id;
+    const body = el.querySelector<HTMLElement>(".vam-text-node-body");
+    body?.addClass("vam-sr-only");
+    const input = el.createEl("textarea", {
+      cls: "vam-text-node-input",
+      attr: { rows: "4", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
+    });
+    input.value = text.text;
+    let done = false;
+    const close = (): void => {
+      done = true;
+      this.editingTextId = null;
+      input.remove();
+      body?.removeClass("vam-sr-only");
+    };
+    const commit = (): void => {
+      if (done) return;
+      const value = input.value;
+      close();
+      this.enqueue(() => this.saveTextItem(id, value));
+    };
+    input.addEventListener("keydown", event => {
+      // The field owns its keys: Delete, arrows and shortcuts must not reach the canvas.
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        el.focus({ preventScroll: true });
+      } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        commit();
+      }
+    });
+    input.addEventListener("blur", commit);
+    input.focus({ preventScroll: true });
+    input.select?.();
+  }
+  /** Saves edited text as one undo step; an empty text removes the node (still one undo step). */
+  private async saveTextItem(id: string, value: string): Promise<void> {
+    const current = (this.map?.canvasItems ?? []).find(
+      (item): item is TextItem => item.kind === "text" && item.id === id
+    );
+    if (!current) return;
+    this.focusItemId = id;
+    if (cleanText(value) === null) {
+      this.focusItemId = null;
+      await this.changeCanvasItems(id, items => removeTextNode(items, id));
+      this.announcer?.setText(t("ui.text_node_removed"));
+    } else if (cleanText(value) !== current.text)
+      await this.changeCanvasItems(id, items => updateTextNode(items, id, value));
+  }
+  private async removeTextItem(id: string): Promise<void> {
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, items => removeTextNode(items, id));
+    this.announcer?.setText(t("ui.text_node_removed"));
+  }
+  /** Adds a text node under `parent` (or the selected topic) and opens its editor; one undo step. */
+  addTextNodeUnder(parent?: MapNode | null): void {
+    this.enqueue(async () => {
+      if (!this.map || !this.canEditText()) return;
+      const target = parent ?? this.map.nodes.find(node => node.id === this.selected);
+      const owner = target && this.map.nodes.find(node => node.id === target.id);
+      if (!owner) {
+        new Notice(t("ui.text_node_select_topic"));
+        return;
+      }
+      const id = `txt-${randomUUID().slice(0, 8)}`;
+      this.pendingTextEditId = id;
+      await this.mapChange(map => {
+        const topic = map.nodes.find(node => node.id === owner.id);
+        if (!topic) throw new Error(t("ui.text_node_select_topic"));
+        topic.collapsed = false;
+        map.canvasItems = addTextNode(map.canvasItems ?? [], {
+          id,
+          text: t("ui.text_node_placeholder"),
+          parentId: topic.id,
+          x: topic.x + TEXT_NODE_WIDTH,
+          y: topic.y
+        });
+        this.arrangeBranch(map, topic.id, new Set([id]));
+      }, false);
+      this.pendingTextEditId = null;
+      this.announcer?.setText(t("ui.text_node_added"));
+    });
   }
   /**
    * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
@@ -6232,6 +6475,7 @@ export class VisualAgentMapView extends ItemView {
       !target?.closest ||
       target.closest(".vam-node") ||
       target.closest(".vam-canvas-image") ||
+      target.closest(".vam-text-node") ||
       target.closest(".vam-boundary-label") ||
       target.closest(INTERACTIVE_SELECTOR)
     )
@@ -6439,7 +6683,7 @@ export class VisualAgentMapView extends ItemView {
       if (target) {
         map.nodes.find(node => node.id === target.id)!.collapsed = false;
         // One layout for the moved branches under the target, in the same history entry as the move.
-        map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutOf(map));
+        this.arrangeBranch(map, target.id, moved, undefined);
       } else {
         for (const root of roots)
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
@@ -6636,14 +6880,7 @@ export class VisualAgentMapView extends ItemView {
           map.nodes.push(...copies);
           if (found) {
             found.collapsed = false;
-            map.nodes = arrangeNewBranch(
-              map.nodes,
-              found.id,
-              new Set(copies.map(copy => copy.id)),
-              this.cardHeightOf,
-              undefined,
-              layoutOf(map)
-            );
+            this.arrangeBranch(map, found.id, new Set(copies.map(copy => copy.id)), undefined);
           } else
             for (const top of copies.filter(copy => copy.parentId === null))
               map.nodes = arrangeNewTree(
@@ -8581,6 +8818,7 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
     this.releaseCovers();
     this.cardEls.clear();
+    this.textEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
     this.edgesEl = createSvg("svg");
@@ -8992,7 +9230,7 @@ export class VisualAgentMapView extends ItemView {
             this.mapChange(map => {
               const n = map.nodes.find(n => n.id === node.id)!;
               n.collapsed = !n.collapsed;
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+              this.arrangeAll(map);
             })
           )
       );
@@ -9016,6 +9254,11 @@ export class VisualAgentMapView extends ItemView {
           select.addClass("vam-node-tool", "vam-select-subtopics-tool");
           select.setAttr("aria-label", t("ui.select_subtopics_hint"));
         }
+        if (this.canEditText() && !node.aimKind)
+          this.button(tools, t("ui.text_node_add"), () => this.addTextNodeUnder(node)).addClass(
+            "vam-node-tool",
+            "vam-add-text-tool"
+          );
       }
       if (node.aimKind === "question") {
         const remove = this.button(tools, t("ui.node_tool_remove"), () => this.confirmRemoveNode(node));
@@ -10323,7 +10566,7 @@ export class VisualAgentMapView extends ItemView {
           const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
           if (parent) {
             parent.collapsed = false;
-            map.nodes = arrangeNewBranch(map.nodes, parent.id, branch, this.cardHeightOf, undefined, layoutOf(map));
+            this.arrangeBranch(map, parent.id, branch, undefined);
           } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
         });
       });
@@ -10938,7 +11181,7 @@ export class VisualAgentMapView extends ItemView {
       if (direction) current.layout = { direction };
       else delete current.layout;
       cleanBranchLayouts(map.nodes, layoutOf(map).direction);
-      map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+      this.arrangeAll(map);
     }, false);
   }
   /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
@@ -11269,14 +11512,7 @@ export class VisualAgentMapView extends ItemView {
           const minTop = siblings.length
             ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
             : undefined;
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            owner.id,
-            new Set([node.id]),
-            this.cardHeightOf,
-            minTop,
-            layoutOf(map)
-          );
+          this.arrangeBranch(map, owner.id, new Set([node.id]), minTop);
         } else if (!parent) {
           const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
           if (roots.length)
@@ -11580,14 +11816,7 @@ export class VisualAgentMapView extends ItemView {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       if (newNodes.length)
         await this.mapChange(map => {
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            parent.id,
-            new Set(newNodes.map(node => node.id)),
-            this.cardHeightOf,
-            undefined,
-            layoutOf(map)
-          );
+          this.arrangeBranch(map, parent.id, new Set(newNodes.map(node => node.id)), undefined);
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map(node => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
@@ -13475,6 +13704,7 @@ export class VisualAgentMapView extends ItemView {
       // A frame's label chip is its own target: panning would capture the pointer and retarget its double-click.
       if (
         target.closest(".vam-node") ||
+        target.closest(".vam-text-node") ||
         target.closest(".vam-boundary-label") ||
         target.closest(INTERACTIVE_SELECTOR) ||
         !this.map
@@ -14659,7 +14889,7 @@ export class VisualAgentMapView extends ItemView {
             // The layout measures the cards, so the held repaint comes first.
             this.flushChatRender();
             await this.mapChange(map => {
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+              this.arrangeAll(map);
             }, false);
             const nodes = this.map?.nodes ?? [];
             const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
@@ -14933,7 +15163,7 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChange(map => {
           const target = map.nodes.find(item => item.id === node.id);
           if (target) target.collapsed = collapsed;
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+          this.arrangeAll(map);
         });
         return done;
       }
@@ -14941,7 +15171,7 @@ export class VisualAgentMapView extends ItemView {
         // The layout measures the cards, so a held repaint comes first.
         this.flushChatRender();
         await this.mapChange(map => {
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+          this.arrangeAll(map);
         }, false);
         return done;
       case "focus_topic": {
@@ -15916,7 +16146,8 @@ export class VisualAgentMapView extends ItemView {
               const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
               if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
                 const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
-                map.nodes = arrangeMap(reordered, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+                map.nodes = reordered;
+                this.arrangeAll(map);
                 return;
               }
               current.x = Math.round(position.x);
@@ -16240,6 +16471,30 @@ export class VisualAgentMapView extends ItemView {
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
       }
+    }
+    // A text node hangs from its topic by the same kind of line.
+    for (const [textId, textEl] of this.textEls) {
+      const text = (this.map.canvasItems ?? []).find(
+        item => item.kind === "text" && (item as TextItem).id === textId
+      ) as TextItem | undefined;
+      const parent = text?.parentId ? this.cardEls.get(text.parentId) : undefined;
+      if (!text || !parent || textEl.classList.contains("is-free")) continue;
+      const direction = directionOf(text.parentId as string) as LayoutKind;
+      const path = createSvg("path");
+      path.setAttribute(
+        "d",
+        direction === "right"
+          ? edgePathData(
+              parent.offsetLeft + parent.offsetWidth,
+              parent.offsetTop + parent.offsetHeight / 2,
+              textEl.offsetLeft,
+              textEl.offsetTop + textEl.offsetHeight / 2
+            )
+          : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, depthOf(allNodes, text.parentId as string) + 1)
+      );
+      path.addClass("vam-edge", "vam-text-edge");
+      if (!this.map.aim && !this.builtIn) path.setAttribute("data-parent-line", "");
+      this.edgesEl.appendChild(path);
     }
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
     if (mapDirection === "fishbone") {

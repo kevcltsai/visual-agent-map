@@ -23,6 +23,8 @@ interface SelectionSnapshot {
 
 interface SelectionAiOptions {
   model: () => string;
+  /** True while the current model cannot draw images (a Claude model): the translate popover then says so beforehand. */
+  imageNeedsCodex?: () => boolean;
   /** Show the selection button and open the panel on image clicks; the command opens the panel either way. */
   autoOpen: () => boolean;
   /**
@@ -277,12 +279,11 @@ export class MarkdownSelectionAi extends Component {
     const snapshot = this.snapshot;
     if (!snapshot) return;
     this.hideLauncher();
-    const model = this.options.model();
     this.panel?.close();
     this.panel = new SelectionAiPanel(
       this.app,
       snapshot,
-      model,
+      this.options.model,
       this.options.language(snapshot.text),
       this.options.translateTarget?.() ?? this.options.language(snapshot.text),
       this.options.run
@@ -320,7 +321,7 @@ class SelectionAiPanel extends Component {
   constructor(
     private readonly app: App,
     private readonly snapshot: SelectionSnapshot,
-    private readonly model: string,
+    private readonly modelOf: () => string,
     private readonly language: string,
     private readonly translateTarget: string,
     private readonly run: SelectionAiOptions["run"]
@@ -593,6 +594,8 @@ class SelectionAiPanel extends Component {
     this.preview.empty();
     this.setBusy(trigger);
     status.setText(t("ui.context_ai_running_0", label));
+    // Read the current model when this run starts, so a switch while the panel stays open applies to the next run.
+    const model = this.modelOf();
     try {
       const at = this.snapshot.matchAt;
       const context =
@@ -603,7 +606,7 @@ class SelectionAiPanel extends Component {
         context,
         hasImage: false
       });
-      const parsedPlan = planned.parse(await this.run(planned, this.model, controller.signal));
+      const parsedPlan = planned.parse(await this.run(planned, model, controller.signal));
       const plan = requestedAction ? { ...parsedPlan, action: requestedAction } : parsedPlan;
       if (controller.signal.aborted || !this.isOpen) return;
       if (plan.action === "clarify") throw new Error(plan.instruction || t("ui.context_ai_clarify"));
@@ -613,7 +616,7 @@ class SelectionAiPanel extends Component {
       if (plan.action === "image_search") {
         status.setText(t("ui.context_ai_searching_images"));
         const search = prepareStep(imageSearchStep, { query: plan.query || prompt });
-        const found = search.parse(await this.run(search, this.model, controller.signal, undefined, true));
+        const found = search.parse(await this.run(search, model, controller.signal, undefined, true));
         if (controller.signal.aborted || !this.isOpen) return;
         // Web results can be stale or block hotlinking: offer only images that actually load.
         const candidates = await loadableImages(found, controller.signal);
@@ -648,7 +651,7 @@ class SelectionAiPanel extends Component {
             this.controller = choice;
             this.setBusy(choose);
             status.setText(t("ui.context_ai_generating"));
-            void this.imageDraft(candidate, plan.captionInstruction, choice.signal)
+            void this.imageDraft(candidate, plan.captionInstruction, choice.signal, model)
               .then(draft => {
                 if (this.controller === choice && !choice.signal.aborted && this.isOpen) {
                   output.value = draft;
@@ -674,7 +677,7 @@ class SelectionAiPanel extends Component {
             attr: { target: "_blank", rel: "noopener noreferrer" }
           });
         });
-        result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal);
+        result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal, model);
         if (controller.signal.aborted || !this.isOpen) return;
       } else {
         status.setText(t("ui.context_ai_running_0", label));
@@ -685,7 +688,7 @@ class SelectionAiPanel extends Component {
           action: plan.action,
           hasImage: false
         });
-        result = await this.run(request, this.model, controller.signal, undefined, plan.action === "research");
+        result = await this.run(request, model, controller.signal, undefined, plan.action === "research");
         insertAfter = plan.action === "research" || plan.action === "diagram";
         if (plan.action === "diagram") {
           // CRLF and a lone CR are line breaks to the renderer too; normalize so no directive hides on a "line" the check never saw.
@@ -726,7 +729,8 @@ class SelectionAiPanel extends Component {
   private async imageDraft(
     candidate: ImageCandidate,
     captionInstruction: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    model: string
   ): Promise<string> {
     const markdown = imageMarkdown(candidate);
     if (!captionInstruction.trim()) return markdown;
@@ -754,7 +758,7 @@ class SelectionAiPanel extends Component {
     });
     const caption = await this.run(
       prepareStep(captionStep, { captionInstruction, language: this.language }),
-      this.model,
+      model,
       signal,
       image
     );

@@ -28,7 +28,13 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
+import {
+  fishboneSpinePathData,
+  relationLabelPoint,
+  relationPathData,
+  treeEdgePathData,
+  type RelationBox
+} from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
 import { resolveCover, withCoverOff, withoutCover } from "./card-cover";
@@ -877,6 +883,8 @@ export class VisualAgentMapView extends ItemView {
   /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
   private viewportQueued = false;
   private edgeEls = new Map<string, SVGPathElement>();
+  /** The spine of each fishbone head on screen, keyed by the head's node id; a drag recomputes it. */
+  private spineEls = new Map<string, SVGPathElement>();
   /** Evidence and prerequisite links on screen, keyed `from\0to\0kind`; a drag moves them with their cards. */
   private relationEls = new Map<string, SVGPathElement>();
   /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
@@ -14677,8 +14685,18 @@ export class VisualAgentMapView extends ItemView {
       const other = this.cardEls.get(fromId === id ? toId : fromId);
       if (other) linked.push({ key, dragIsFrom: fromId === id, far: boxOf(other) });
     }
+    // A fishbone spine ends at the leftmost bone joint, so dragging the head or one of its first-level topics moves it.
+    const dragged = this.map?.nodes.find(node => node.id === id);
+    const spineId = this.spineEls.has(id)
+      ? id
+      : dragged?.parentId && this.spineEls.has(dragged.parentId)
+        ? dragged.parentId
+        : null;
+    // Measured once at drag start; `update` swaps in the dragged card's box instead of re-reading the DOM.
+    const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
+        if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
@@ -14718,10 +14736,43 @@ export class VisualAgentMapView extends ItemView {
       }
     };
   }
+  /** The head and first-level topic boxes of one spine, read from the cards on screen. */
+  private spineBoxes(headId: string): { head: CardBox; topics: { id: string; box: CardBox }[] } | null {
+    const head = this.cardEls.get(headId);
+    if (!head || !this.map) return null;
+    const topics: { id: string; box: CardBox }[] = [];
+    for (const node of this.canvasNodes()) {
+      if (node.parentId !== headId) continue;
+      const card = this.cardEls.get(node.id);
+      if (card) topics.push({ id: node.id, box: boxOf(card) });
+    }
+    return { head: boxOf(head), topics };
+  }
+  /**
+   * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
+   * and `boxes` are the measured boxes a drag reuses so each move reads nothing from the DOM.
+   */
+  private placeSpine(
+    headId: string,
+    moved?: { id: string; box: CardBox },
+    boxes: { head: CardBox; topics: { id: string; box: CardBox }[] } | null = this.spineBoxes(headId)
+  ): void {
+    const path = this.spineEls.get(headId);
+    if (!path || !boxes) return;
+    const boxFor = (id: string, box: CardBox): CardBox => (moved?.id === id ? moved.box : box);
+    path.setAttribute(
+      "d",
+      fishboneSpinePathData(
+        boxFor(headId, boxes.head),
+        boxes.topics.map(topic => boxFor(topic.id, topic.box))
+      )
+    );
+  }
   private drawEdges(): void {
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
+    this.spineEls.clear();
     // A parent and child that also hold a relation show only the relation line, so one pair draws one line (decision 39).
     const related = new Set(
       this.relationsEnabled() ? (this.map.topicRelations ?? []).map(r => relationPairKey(r.from, r.to)) : []
@@ -14759,6 +14810,20 @@ export class VisualAgentMapView extends ItemView {
           path.setAttribute("data-parent-line", "");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\u0000${node.id}`, path);
+      }
+    }
+    // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
+    if (mapDirection === "fishbone") {
+      for (const node of this.canvasNodes()) {
+        if (node.parentId || !this.cardEls.has(node.id) || this.spineEls.has(node.id)) continue;
+        const path = createSvg("path");
+        path.addClass("vam-edge");
+        path.setAttribute("data-spine", "");
+        if (!this.map.aim && !this.builtIn) path.setAttribute("data-parent-line", "");
+        this.spineEls.set(node.id, path);
+        this.placeSpine(node.id);
+        if (path.getAttribute("d")) this.edgesEl.appendChild(path);
+        else this.spineEls.delete(node.id);
       }
     }
     this.drawRelations();

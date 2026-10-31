@@ -18712,12 +18712,21 @@ function treeEdgePathData(parent, child, direction, depth = 1) {
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
+function fishboneBone(parent, child) {
+  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2, above = childY < parentY, x = child.x + child.width / 2, y = above ? child.y + child.height : child.y;
+  return { jointX: x + Math.abs(parentY - y) * BONE_RUN2, parentY, x, y };
+}
+function fishboneSpinePathData(head, topics) {
+  if (!topics.length) return "";
+  const end = Math.min(...topics.map((topic) => fishboneBone(head, topic).jointX));
+  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
+}
 function fishboneEdgePathData(parent, child, depth) {
-  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2;
   if (depth <= 1) {
-    const above2 = childY < parentY, x2 = child.x + child.width / 2, y2 = above2 ? child.y + child.height : child.y, jointX = x2 + Math.abs(parentY - y2) * BONE_RUN2;
-    return `M ${jointX} ${parentY} L ${x2} ${y2}`;
+    const { jointX, parentY: parentY2, x: x2, y: y2 } = fishboneBone(parent, child);
+    return `M ${jointX} ${parentY2} L ${x2} ${y2}`;
   }
+  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2;
   const above = childY > parentY, x = parent.x + parent.width / 2, y = above ? parent.y + parent.height : parent.y, boneX = x + Math.abs(childY - y) * BONE_RUN2;
   return `M ${boneX} ${childY} L ${child.x + child.width} ${childY}`;
 }
@@ -43132,6 +43141,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     /** A viewport write is already waiting in the queue; it reads the viewport when it runs, so later saves join it. */
     __publicField(this, "viewportQueued", false);
     __publicField(this, "edgeEls", /* @__PURE__ */ new Map());
+    /** The spine of each fishbone head on screen, keyed by the head's node id; a drag recomputes it. */
+    __publicField(this, "spineEls", /* @__PURE__ */ new Map());
     /** Evidence and prerequisite links on screen, keyed `from\0to\0kind`; a drag moves them with their cards. */
     __publicField(this, "relationEls", /* @__PURE__ */ new Map());
     /** The wide transparent path over each relation line (the only part that takes the pointer) and the name shown at its midpoint. */
@@ -55813,7 +55824,7 @@ ${addition}` : addition });
    * the dragged card's new position; every other edge stays untouched.
    */
   dragEdges(id, card) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
@@ -55839,9 +55850,13 @@ ${addition}` : addition });
       const other = this.cardEls.get(fromId === id ? toId : fromId);
       if (other) linked.push({ key: key2, dragIsFrom: fromId === id, far: boxOf(other) });
     }
+    const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
+    const spineId = this.spineEls.has(id) ? id : (dragged == null ? void 0 : dragged.parentId) && this.spineEls.has(dragged.parentId) ? dragged.parentId : null;
+    const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
         var _a3, _b3;
+        if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
@@ -55875,11 +55890,40 @@ ${addition}` : addition });
       }
     };
   }
+  /** The head and first-level topic boxes of one spine, read from the cards on screen. */
+  spineBoxes(headId) {
+    const head = this.cardEls.get(headId);
+    if (!head || !this.map) return null;
+    const topics = [];
+    for (const node of this.canvasNodes()) {
+      if (node.parentId !== headId) continue;
+      const card = this.cardEls.get(node.id);
+      if (card) topics.push({ id: node.id, box: boxOf(card) });
+    }
+    return { head: boxOf(head), topics };
+  }
+  /**
+   * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
+   * and `boxes` are the measured boxes a drag reuses so each move reads nothing from the DOM.
+   */
+  placeSpine(headId, moved, boxes = this.spineBoxes(headId)) {
+    const path = this.spineEls.get(headId);
+    if (!path || !boxes) return;
+    const boxFor = (id, box) => (moved == null ? void 0 : moved.id) === id ? moved.box : box;
+    path.setAttribute(
+      "d",
+      fishboneSpinePathData(
+        boxFor(headId, boxes.head),
+        boxes.topics.map((topic) => boxFor(topic.id, topic.box))
+      )
+    );
+  }
   drawEdges() {
     var _a2, _b2, _c;
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
+    this.spineEls.clear();
     const related = new Set(
       this.relationsEnabled() ? ((_a2 = this.map.topicRelations) != null ? _a2 : []).map((r) => relationPairKey(r.from, r.to)) : []
     );
@@ -55911,6 +55955,19 @@ ${addition}` : addition });
           path.setAttribute("data-parent-line", "");
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
+      }
+    }
+    if (mapDirection === "fishbone") {
+      for (const node of this.canvasNodes()) {
+        if (node.parentId || !this.cardEls.has(node.id) || this.spineEls.has(node.id)) continue;
+        const path = createSvg("path");
+        path.addClass("vam-edge");
+        path.setAttribute("data-spine", "");
+        if (!this.map.aim && !this.builtIn) path.setAttribute("data-parent-line", "");
+        this.spineEls.set(node.id, path);
+        this.placeSpine(node.id);
+        if (path.getAttribute("d")) this.edgesEl.appendChild(path);
+        else this.spineEls.delete(node.id);
       }
     }
     this.drawRelations();

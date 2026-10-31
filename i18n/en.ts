@@ -815,6 +815,8 @@ export const en = {
   "ui.layout_direction_radial": "Lay out radially",
   "ui.layout_direction_timeline": "Lay out as a timeline",
   "ui.layout_direction_fishbone": "Lay out as a fishbone",
+  "ui.branch_layout": "Branch layout",
+  "ui.branch_layout_follow": "Follow the map",
   "ui.layout_spacing_compact": "Compact spacing",
   "ui.layout_spacing_standard": "Standard spacing",
   "ui.layout_spacing_spacious": "Spacious spacing",

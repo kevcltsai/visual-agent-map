@@ -1179,7 +1179,7 @@ async function harness(spec, extra = {}) {
   const Base = dom.makeModal();
   class Modal extends Base { open() { super.open(); this.close(); } }
   const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } });
-  const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
+  const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   let pending = Promise.resolve();
   const plugin = support.withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
@@ -1330,4 +1330,120 @@ test('V6: switching to balanced deals the topics out again even when their old x
   await h.choose(BALANCED);
   const sides = ['A', 'B', 'C', 'D'].map(title => (h.named(title).x < h.named('Root').x ? 'left' : 'right'));
   assert.ok(sides.includes('left') && sides.includes('right'), 'both halves are used');
+});
+
+// ---- PV2 (tickets 39, 41): timeline drag and the branch layout section of the inspector. ----
+const FOLLOW = 'Follow the map';
+const branchPanel = (h, title) => {
+  const panel = dom.element('panel');
+  h.view.renderBranchLayoutSection(panel, h.named(title));
+  const group = dom.find(panel, item => (item.cls ?? '').includes('vam-branch-layout'));
+  const buttons = group ? dom.findAll(group, item => item.tag === 'button') : [];
+  return { panel, group, buttons, labels: buttons.map(b => b.text), pressed: buttons.filter(b => b.attrs['aria-pressed'] === 'true').map(b => b.text), press: async label => { buttons.find(b => b.text === label).click(); await h.settled(); await h.settled(); } };
+};
+/** Drags the card of `title` by `dx`,`dy` canvas pixels through the real pointer handlers and waits for the write. */
+async function dragCard(h, title, dx, dy) {
+  const node = h.named(title);
+  const events = new Map();
+  const el = { style: {}, offsetLeft: node.x, offsetTop: node.y, offsetWidth: 300, offsetHeight: 180, setPointerCapture() {}, addEventListener: (name, fn) => events.set(name, fn), removeEventListener: name => events.delete(name) };
+  h.view.enableDrag(el, node);
+  events.get('pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+  events.get('pointermove')({ clientX: dx, clientY: dy });
+  events.get('pointerup')({ type: 'pointerup' });
+  await h.settled(); await h.settled();
+}
+const timelineTree = [['Root', null, 1000, 80], ['T1', 'Root', 1360, 0], ['T2', 'Root', 1360, 300], ['T3', 'Root', 1360, 600], ['T1a', 'T1', 1720, 0]];
+const topicOrder = h => plainJson(h.view.map.nodes.filter(n => n.parentId === h.named('Root').id).map(n => h.view.notes.get(n.id).title));
+
+test('PV2-V6: in a timeline map, dragging the 3rd topic before the 1st reorders the topics, re-lays out, and is one undo step', async () => {
+  const h = await harness(timelineTree);
+  await h.choose(TIMELINE);
+  assert.deepEqual(topicOrder(h), ['T1', 'T2', 'T3']);
+  const before = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const writes = h.view.history.past.length;
+  await dragCard(h, 'T3', h.named('T1').x - h.named('T3').x - 40, 5);
+  assert.deepEqual(topicOrder(h), ['T3', 'T1', 'T2']);
+  assert.equal(h.view.history.past.length, writes + 1, 'one history entry');
+  const [t3, t1, t2] = ['T3', 'T1', 'T2'].map(t => h.named(t));
+  assert.ok(t3.x < t1.x && t1.x < t2.x, 'the columns follow the new order');
+  assert.equal(h.named('T1a').parentId, t1.id, 'a detail stays under its topic');
+  assert.deepEqual(plainJson((await h.saved()).nodes.filter(n => n.parentId === h.named('Root').id).map(n => n.id)), [t3.id, t1.id, t2.id], 'saved order');
+  await h.view.travel(false);
+  assert.deepEqual(topicOrder(h), ['T1', 'T2', 'T3']);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), before, 'undo restores order and coordinates');
+});
+
+test('PV2-V7: dragging a first-level topic in a right map, or a detail in a timeline map, is still free placement', async () => {
+  const right = await harness(timelineTree);
+  const order = topicOrder(right), others = right.view.map.nodes.filter(n => n.id !== right.named('T3').id).map(n => [n.id, n.x, n.y]);
+  const start = { x: right.named('T3').x, y: right.named('T3').y };
+  await dragCard(right, 'T3', -700, -400);
+  assert.deepEqual(topicOrder(right), order, 'order unchanged');
+  assert.equal(right.named('T3').x, start.x - 700); assert.equal(right.named('T3').y, start.y - 400);
+  assert.deepEqual(plainJson(right.view.map.nodes.filter(n => n.id !== right.named('T3').id).map(n => [n.id, n.x, n.y])), plainJson(others), 'nothing else moved');
+  const timeline = await harness(timelineTree);
+  await timeline.choose(TIMELINE);
+  const detail = { x: timeline.named('T1a').x, y: timeline.named('T1a').y }, topics = topicOrder(timeline);
+  await dragCard(timeline, 'T1a', 33, 44);
+  assert.equal(timeline.named('T1a').x, detail.x + 33); assert.equal(timeline.named('T1a').y, detail.y + 44);
+  assert.deepEqual(topicOrder(timeline), topics);
+});
+
+test('PV2-V8: a branch set to down then back to Follow the map loses the field and returns to the map default; each is one undo step', async () => {
+  const h = await harness(tree4);
+  await h.choose('Auto layout');
+  const base = JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const writes = h.view.history.past.length;
+  await branchPanel(h, 'A').press('Lay out downward');
+  assert.equal(h.view.history.past.length, writes + 1);
+  assert.deepEqual(plainJson(h.named('A').layout), { direction: 'down' });
+  assert.deepEqual(plainJson((await h.saved()).nodes.find(n => n.id === h.named('A').id).layout), { direction: 'down' }, 'survives the parse in readMap');
+  assert.ok(h.named('A1').y > h.named('A').y, 'A1 hangs under A');
+  assert.deepEqual(plainJson(branchPanel(h, 'A').pressed), ['Lay out downward']);
+  await branchPanel(h, 'A').press(FOLLOW);
+  assert.equal(h.view.history.past.length, writes + 2);
+  assert.equal('layout' in h.named('A'), false);
+  assert.equal('layout' in (await h.saved()).nodes.find(n => n.id === h.named('A').id), false);
+  assert.equal(JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y])), base, 'coordinates are the map default again');
+  assert.deepEqual(plainJson(branchPanel(h, 'A').pressed), [FOLLOW]);
+  await h.view.travel(false);
+  assert.deepEqual(plainJson(h.named('A').layout), { direction: 'down' });
+});
+
+test('PV2-V9: no branch layout section for a root, a radial/timeline/fishbone map, an AIM map or the sample', async () => {
+  const h = await harness(tree4);
+  assert.deepEqual(plainJson(branchPanel(h, 'A').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward'], 'right map: no opposite (left)');
+  assert.equal(branchPanel(h, 'Root').group, undefined, 'a root has none');
+  for (const kind of ['radial', 'timeline', 'fishbone']) {
+    h.view.map.layout = { direction: kind };
+    assert.equal(branchPanel(h, 'A').group, undefined, kind);
+  }
+  h.view.map.layout = { direction: 'balanced' };
+  assert.deepEqual(plainJson(branchPanel(h, 'A').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward'], 'balanced: a topic on the right side is not offered left');
+  h.view.map.layout = undefined; h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  assert.equal(branchPanel(h, 'A').group, undefined, 'AIM');
+  h.view.map.aim = undefined; h.view.builtIn = true;
+  assert.equal(branchPanel(h, 'A').group, undefined, 'sample');
+});
+
+test('PV2-V10: the choices leave out the direction opposite to where the parent grows (left map, down branch, balanced side) and every offered one survives the parse', async () => {
+  const left = await harness(tree4, { layout: { direction: 'left' } });
+  assert.deepEqual(plainJson(branchPanel(left, 'A').labels), [FOLLOW, 'Lay out to the left', 'Lay out downward', 'Lay out upward']);
+  const down = await harness(tree4, { layout: { direction: 'down' } });
+  assert.deepEqual(plainJson(branchPanel(down, 'A').labels), [FOLLOW, 'Lay out to the right', 'Lay out to the left', 'Lay out downward']);
+  // Under a branch that grows to the right, a child cannot go left; it can go down, up or right.
+  const nested = await harness(tree4);
+  await branchPanel(nested, 'A').press('Lay out to the right');
+  assert.deepEqual(plainJson(branchPanel(nested, 'A1').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward']);
+  // Balanced: a topic on the left side does not get "to the right".
+  const bal = await harness([['Root', null, 1000, 80], ['L', 'Root', 600, 0], ['R', 'Root', 1400, 0]], { layout: { direction: 'balanced' } });
+  assert.deepEqual(plainJson(branchPanel(bal, 'L').labels), [FOLLOW, 'Lay out to the left', 'Lay out downward', 'Lay out upward']);
+  assert.deepEqual(plainJson(branchPanel(bal, 'R').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward']);
+  for (const [h, title, labels] of [[left, 'A', ['Lay out downward', 'Lay out upward']], [bal, 'L', ['Lay out upward']]]) {
+    for (const label of labels) {
+      await branchPanel(h, title).press(label);
+      const stored = (await h.saved()).nodes.find(n => n.id === h.named(title).id).layout;
+      assert.ok(stored, `${label} is still there after parse`);
+    }
+  }
 });

@@ -756,6 +756,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.layout_direction_radial": "放射狀排列",
   "ui.layout_direction_timeline": "時間軸排列",
   "ui.layout_direction_fishbone": "魚骨圖排列",
+  "ui.branch_layout": "分支排列",
+  "ui.branch_layout_follow": "跟隨心智圖",
   "ui.layout_spacing_compact": "緊密間距",
   "ui.layout_spacing_standard": "標準間距",
   "ui.layout_spacing_spacious": "寬鬆間距",

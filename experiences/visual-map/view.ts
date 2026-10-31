@@ -85,10 +85,12 @@ import {
   layoutDirectionOf,
   layoutOf,
   medianHeight,
+  reorderTopLevel,
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
+import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
@@ -304,6 +306,14 @@ import {
   NoteCollectionModal,
   TopicPickerModal
 } from "./modals";
+
+const BRANCH_DIRECTIONS: BranchDirection[] = ["right", "left", "down", "up"];
+const BRANCH_LABEL = {
+  right: "ui.layout_direction_right",
+  left: "ui.layout_direction_left",
+  down: "ui.layout_direction_down",
+  up: "ui.layout_direction_up"
+} as const;
 export const VIEW_TYPE = "visual-agent-map-view";
 interface Action {
   undo: () => Promise<void>;
@@ -8032,6 +8042,7 @@ export class VisualAgentMapView extends ItemView {
     // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
+    this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
@@ -8671,6 +8682,61 @@ export class VisualAgentMapView extends ItemView {
       }
     };
     paint();
+  }
+  /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
+  private branchLayoutChoices(node: MapNode): BranchDirection[] {
+    const map = this.map;
+    if (!map || map.aim || this.builtIn || !node.parentId) return [];
+    const mapDirection = layoutOf(map).direction;
+    if (!allowsBranchLayout(mapDirection)) return [];
+    // Offer only what `cleanBranchLayouts` keeps: a value it would delete on parse must never be written.
+    return BRANCH_DIRECTIONS.filter(direction => {
+      const trial = clone(map.nodes);
+      const target = trial.find(item => item.id === node.id);
+      if (!target) return false;
+      target.layout = { direction };
+      cleanBranchLayouts(trial, mapDirection);
+      return !!target.layout;
+    });
+  }
+  /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
+  private async changeBranchLayout(node: MapNode, direction: BranchDirection | null): Promise<void> {
+    if (!this.map || this.map.aim || this.builtIn) return;
+    const latest = this.map.nodes.find(item => item.id === node.id);
+    if (!latest) return;
+    if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
+    if ((branchDirectionOf(latest) ?? null) === direction) return;
+    await this.mapChange(map => {
+      const current = map.nodes.find(item => item.id === node.id);
+      if (!current) return;
+      if (direction) current.layout = { direction };
+      else delete current.layout;
+      cleanBranchLayouts(map.nodes, layoutOf(map).direction);
+      map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+    }, false);
+  }
+  /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
+  private renderBranchLayoutSection(panel: HTMLElement, node: MapNode): void {
+    const choices = this.branchLayoutChoices(node);
+    if (!choices.length) return;
+    const section = panel.createDiv("vam-inspector-section vam-branch-layout-section");
+    section.createEl("strong", { text: t("ui.branch_layout"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-branch-layout vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.branch_layout"));
+    const current = branchDirectionOf(node) ?? null;
+    const options: { direction: BranchDirection | null; label: string }[] = [
+      { direction: null, label: t("ui.branch_layout_follow") },
+      ...choices.map(direction => ({ direction, label: t(BRANCH_LABEL[direction]) }))
+    ];
+    for (const option of options) {
+      const choice = this.button(group, option.label, () =>
+        this.enqueue(() => this.changeBranchLayout(node, option.direction))
+      );
+      const on = option.direction === current;
+      choice.setAttr("aria-pressed", String(on));
+      if (on) choice.addClass("is-pressed");
+    }
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   private async changeTopicMarker(node: MapNode, id: TopicMarker): Promise<void> {
@@ -13213,6 +13279,13 @@ export class VisualAgentMapView extends ItemView {
             this.mapChange(map => {
               const current = map.nodes.find(n => n.id === node.id);
               if (!current) return;
+              // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
+              const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
+              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
+                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
+                map.nodes = arrangeMap(reordered, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+                return;
+              }
               current.x = Math.round(position.x);
               current.y = Math.round(position.y);
             })

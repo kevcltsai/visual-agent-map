@@ -827,6 +827,8 @@ var en = {
   "ui.layout_direction_radial": "Lay out radially",
   "ui.layout_direction_timeline": "Lay out as a timeline",
   "ui.layout_direction_fishbone": "Lay out as a fishbone",
+  "ui.branch_layout": "Branch layout",
+  "ui.branch_layout_follow": "Follow the map",
   "ui.layout_spacing_compact": "Compact spacing",
   "ui.layout_spacing_standard": "Standard spacing",
   "ui.layout_spacing_spacious": "Spacious spacing",
@@ -2881,6 +2883,8 @@ var zhCN = {
   "ui.layout_direction_radial": "\u653E\u5C04\u72B6\u6392\u5217",
   "ui.layout_direction_timeline": "\u65F6\u95F4\u8F74\u6392\u5217",
   "ui.layout_direction_fishbone": "\u9C7C\u9AA8\u56FE\u6392\u5217",
+  "ui.branch_layout": "\u5206\u652F\u6392\u5217",
+  "ui.branch_layout_follow": "\u8DDF\u968F\u5730\u56FE",
   "ui.layout_spacing_compact": "\u7D27\u5BC6\u95F4\u8DDD",
   "ui.layout_spacing_standard": "\u6807\u51C6\u95F4\u8DDD",
   "ui.layout_spacing_spacious": "\u5BBD\u677E\u95F4\u8DDD",
@@ -4935,6 +4939,8 @@ var zhTW = {
   "ui.layout_direction_radial": "\u653E\u5C04\u72C0\u6392\u5217",
   "ui.layout_direction_timeline": "\u6642\u9593\u8EF8\u6392\u5217",
   "ui.layout_direction_fishbone": "\u9B5A\u9AA8\u5716\u6392\u5217",
+  "ui.branch_layout": "\u5206\u652F\u6392\u5217",
+  "ui.branch_layout_follow": "\u8DDF\u96A8\u5FC3\u667A\u5716",
   "ui.layout_spacing_compact": "\u7DCA\u5BC6\u9593\u8DDD",
   "ui.layout_spacing_standard": "\u6A19\u6E96\u9593\u8DDD",
   "ui.layout_spacing_spacious": "\u5BEC\u9B06\u9593\u8DDD",
@@ -16837,6 +16843,20 @@ function arrangeNewTree(nodes, rootId, newIds, heightOf, layout = "right") {
     const point = placed.get(node.id);
     return point ? { ...node, x: point.x, y: Math.round(point.y) } : node;
   });
+}
+function reorderTopLevel(nodes, rootId, movedId, dropX) {
+  if (!Number.isFinite(dropX)) return nodes;
+  const slots = nodes.flatMap((node, index) => node.parentId === rootId ? [index] : []);
+  const moved = slots.map((index) => nodes[index]).find((node) => node.id === movedId);
+  if (!moved) return nodes;
+  const others = slots.map((index) => nodes[index]).filter((node) => node !== moved);
+  const at = others.findIndex((node) => node.x + WIDTH / 2 > dropX);
+  const order = at < 0 ? [...others, moved] : [...others.slice(0, at), moved, ...others.slice(at)];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
 }
 
 // map-model.ts
@@ -41296,6 +41316,13 @@ var MergeTopicsModal = class extends import_obsidian30.Modal {
 };
 
 // experiences/visual-map/view.ts
+var BRANCH_DIRECTIONS = ["right", "left", "down", "up"];
+var BRANCH_LABEL = {
+  right: "ui.layout_direction_right",
+  left: "ui.layout_direction_left",
+  down: "ui.layout_direction_down",
+  up: "ui.layout_direction_up"
+};
 var VIEW_TYPE = "visual-agent-map-view";
 var EDITABLE_SELECTOR = ["input", "textarea", "select", "[contenteditable]:not([contenteditable=false])"].join(",");
 var INTERACTIVE_SELECTOR = [
@@ -48265,6 +48292,7 @@ ${request.requirements}` : preset.text,
     if (mode !== "structure") return;
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
+    this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
@@ -48864,6 +48892,64 @@ ${request.requirements}` : preset.text,
       }
     };
     paint();
+  }
+  /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
+  branchLayoutChoices(node) {
+    const map = this.map;
+    if (!map || map.aim || this.builtIn || !node.parentId) return [];
+    const mapDirection = layoutOf(map).direction;
+    if (!allowsBranchLayout(mapDirection)) return [];
+    return BRANCH_DIRECTIONS.filter((direction) => {
+      const trial = clone(map.nodes);
+      const target = trial.find((item) => item.id === node.id);
+      if (!target) return false;
+      target.layout = { direction };
+      cleanBranchLayouts(trial, mapDirection);
+      return !!target.layout;
+    });
+  }
+  /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
+  async changeBranchLayout(node, direction) {
+    var _a2;
+    if (!this.map || this.map.aim || this.builtIn) return;
+    const latest = this.map.nodes.find((item) => item.id === node.id);
+    if (!latest) return;
+    if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
+    if (((_a2 = branchDirectionOf(latest)) != null ? _a2 : null) === direction) return;
+    await this.mapChange((map) => {
+      const current = map.nodes.find((item) => item.id === node.id);
+      if (!current) return;
+      if (direction) current.layout = { direction };
+      else delete current.layout;
+      cleanBranchLayouts(map.nodes, layoutOf(map).direction);
+      map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+    }, false);
+  }
+  /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
+  renderBranchLayoutSection(panel, node) {
+    var _a2;
+    const choices = this.branchLayoutChoices(node);
+    if (!choices.length) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-branch-layout-section");
+    section3.createEl("strong", { text: t("ui.branch_layout"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section3.createDiv("vam-branch-layout vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.branch_layout"));
+    const current = (_a2 = branchDirectionOf(node)) != null ? _a2 : null;
+    const options = [
+      { direction: null, label: t("ui.branch_layout_follow") },
+      ...choices.map((direction) => ({ direction, label: t(BRANCH_LABEL[direction]) }))
+    ];
+    for (const option2 of options) {
+      const choice2 = this.button(
+        group,
+        option2.label,
+        () => this.enqueue(() => this.changeBranchLayout(node, option2.direction))
+      );
+      const on = option2.direction === current;
+      choice2.setAttr("aria-pressed", String(on));
+      if (on) choice2.addClass("is-pressed");
+    }
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   async changeTopicMarker(node, id) {
@@ -53021,6 +53107,12 @@ ${addition}` : addition });
             () => this.mapChange((map) => {
               const current = map.nodes.find((n) => n.id === node.id);
               if (!current) return;
+              const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
+              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
+                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
+                map.nodes = arrangeMap(reordered, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+                return;
+              }
               current.x = Math.round(position.x);
               current.y = Math.round(position.y);
             })

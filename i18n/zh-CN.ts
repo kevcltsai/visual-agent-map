@@ -755,6 +755,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.layout_direction_radial": "放射状排列",
   "ui.layout_direction_timeline": "时间轴排列",
   "ui.layout_direction_fishbone": "鱼骨图排列",
+  "ui.branch_layout": "分支排列",
+  "ui.branch_layout_follow": "跟随地图",
   "ui.layout_spacing_compact": "紧密间距",
   "ui.layout_spacing_standard": "标准间距",
   "ui.layout_spacing_spacious": "宽松间距",

@@ -13344,7 +13344,14 @@ export class VisualAgentMapView extends ItemView {
     );
     viewport.addEventListener("pointerdown", event => {
       const target = event.target as Element;
-      if (target.closest(".vam-node") || target.closest(INTERACTIVE_SELECTOR) || !this.map) return;
+      // A frame's label chip is its own target: panning would capture the pointer and retarget its double-click.
+      if (
+        target.closest(".vam-node") ||
+        target.closest(".vam-boundary-label") ||
+        target.closest(INTERACTIVE_SELECTOR) ||
+        !this.map
+      )
+        return;
       // Normal mode: a drag pans, Shift+drag draws a selection box. Topic selection mode: a drag adds to the selection,
       // Option (Alt)+drag removes from it, and Space+drag or the middle button pans.
       const intent = canvasPointerIntent({

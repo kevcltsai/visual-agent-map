@@ -55371,7 +55371,8 @@ ${note.detail.trim()}` : "",
     );
     viewport.addEventListener("pointerdown", (event) => {
       const target = event.target;
-      if (target.closest(".vam-node") || target.closest(INTERACTIVE_SELECTOR) || !this.map) return;
+      if (target.closest(".vam-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
+        return;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.integrationMode,

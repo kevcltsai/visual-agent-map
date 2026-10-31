@@ -247,6 +247,7 @@ import {
 import { loadableImages } from "../../ui/image-candidates";
 import {
   buildMapChatContext,
+  type MapChatUserText,
   contentHash,
   isMdStale,
   type MapChatContext,
@@ -5979,6 +5980,18 @@ export class VisualAgentMapView extends ItemView {
         event.stopPropagation();
         this.startTextEdit(text.id);
       });
+      // A real button, so Tab and Enter/Space reach it (decision #2); the action itself is one undo step.
+      const promote = el.createEl("button", {
+        cls: "vam-text-node-promote",
+        text: t("ui.text_node_promote"),
+        attr: { type: "button", "aria-label": t("ui.text_node_promote_label") }
+      });
+      promote.addEventListener("click", event => {
+        event.stopPropagation();
+        this.enqueue(() => this.promoteTextNode(text.id));
+      });
+      promote.addEventListener("keydown", event => event.stopPropagation());
+      promote.addEventListener("dblclick", event => event.stopPropagation());
       el.addEventListener("keydown", event => {
         if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
         if (event.key === "Enter" && !event.shiftKey) {
@@ -6064,6 +6077,71 @@ export class VisualAgentMapView extends ItemView {
     this.focusItemId = null;
     await this.changeCanvasItems(id, items => removeTextNode(items, id));
     this.announcer?.setText(t("ui.text_node_removed"));
+  }
+  /**
+   * Turns a text node into a topic card (decision #2): the first line (at most 80 characters) is the title, the whole text the
+   * Current Summary, the card hangs under the same topic (a free node becomes a top-level card at its own place) and the text
+   * item goes away. Built from the normal add-subtopic flow; the whole thing is one undo step.
+   */
+  private async promoteTextNode(id: string): Promise<void> {
+    if (!this.map || !this.canEditText() || this.builtIn || this.map.aim) return;
+    const text = (this.map.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
+    if (!text) return;
+    const parent = this.map.nodes.find(node => node.id === text.parentId) ?? null;
+    const title = text.text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .find(Boolean);
+    if (!title) return;
+    const historyMark = this.history.mark();
+    try {
+      const before = new Set(this.map.nodes.map(node => node.id));
+      await this.addNode(parent, [...title].slice(0, 80).join(""), false, false);
+      const child = this.map.nodes.find(node => !before.has(node.id));
+      if (!child) return;
+      await this.noteChange(child, { summary: text.text });
+      await this.mapChange(map => {
+        map.canvasItems = removeTextNode(map.canvasItems ?? [], id);
+        if (!map.canvasItems.length) delete map.canvasItems;
+        const created = map.nodes.find(node => node.id === child.id);
+        if (!created) return;
+        if (parent) this.arrangeBranch(map, parent.id, new Set([created.id]));
+        else {
+          created.x = text.x;
+          created.y = text.y;
+        }
+      }, false);
+      await this.plugin.rebuildDerivedData();
+      this.selected = child.id;
+      this.announcer?.setText(t("ui.text_node_promoted"));
+    } finally {
+      this.history.collapseSince(historyMark);
+      this.updateHistoryButtons();
+    }
+  }
+  /** The text nodes the user wrote under `nodeId`, as a read-only block for the prompt; empty when there are none (decision #4). */
+  private userTextContext(nodeId: string): string {
+    if (!this.map?.canvasItems?.length) return "";
+    const { attached } = treeTextNodes(
+      this.map.canvasItems,
+      this.map.nodes.map(node => node.id)
+    );
+    return attached
+      .filter(text => text.parentId === nodeId)
+      .map(text => `- ${text.text.replace(/\n/g, "\n  ")}`)
+      .join("\n");
+  }
+  /** Every text node of the map for the chat context; a free one (its topic is gone) goes with `parentId: null` (decision #4). */
+  private chatUserTexts(): MapChatUserText[] {
+    const items = this.map?.canvasItems ?? [];
+    const ids = new Set((this.map?.nodes ?? []).map(node => node.id));
+    return items
+      .filter((item): item is TextItem => item.kind === "text")
+      .map(text => ({
+        id: text.id,
+        parentId: text.parentId && ids.has(text.parentId) ? text.parentId : null,
+        text: text.text
+      }));
   }
   /** Adds a text node under `parent` (or the selected topic) and opens its editor; one undo step. */
   addTextNodeUnder(parent?: MapNode | null): void {
@@ -12417,6 +12495,7 @@ export class VisualAgentMapView extends ItemView {
             detail: note.detail,
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node, promptLanguage),
+            userTexts: this.userTextContext(node.id),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -12538,6 +12617,7 @@ export class VisualAgentMapView extends ItemView {
           detail: note.detail,
           task: [task, options?.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
+          userTexts: this.userTextContext(node.id),
           workingFindings: note.newFindings,
           onWorkingFindingsSent: sent => {
             findingsSent = sent === note.newFindings;
@@ -14230,6 +14310,7 @@ export class VisualAgentMapView extends ItemView {
         .filter(item => !selectedIds.includes(item.id)),
       snippets,
       files,
+      userTexts: this.chatUserTexts(),
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns()
     });
@@ -16830,6 +16911,7 @@ export class VisualAgentMapView extends ItemView {
         detail: note.detail,
         task: note.prompt,
         ancestors: await this.ancestorContext(node, overrides?.outputLanguage ?? this.plugin.settings.language),
+        userTexts: this.userTextContext(node.id),
         workingFindings: note.newFindings,
         sourceContext: "",
         mode: "task",

@@ -3585,6 +3585,36 @@ integrationTest('topic-color: the menu is a radiogroup of None and six named col
   radios()[3].click(); await dom.tick(); apply.click(); await dom.tick();
   assert.deepEqual(calls.at(-1), ['fact', 'yellow', true], 'the branch button applies the colour chosen now');
 });
+integrationTest('topic-color: opening and redrawing a map of legacy notes (no topic-color key) writes nothing: every file is byte-identical and neither writeTopicColor nor vault.process runs', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-legacy/Map.md';
+  const doc = { id: 'map-legacy', title: 'legacy', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-legacy');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
+  const kid = await repo.createNote('Kid', 'gpt-6-luna', doc, MAP, 'workspace');
+  kid.parentId = root.id; doc.nodes.push(root, kid); await repo.saveMap(MAP, doc);
+  for (const n of [root, kid]) assert.doesNotMatch(contents.get(n.path), /topic-color/, 'the fixture is a legacy-format note');
+  const before = new Map(contents);
+  const writes = [], processed = [];
+  const originalColor = repo.writeTopicColor.bind(repo), originalProcess = repo.app.vault.process.bind(repo.app.vault);
+  repo.writeTopicColor = async (...args) => { writes.push(args); return originalColor(...args); };
+  repo.app.vault.process = async (...args) => { processed.push(args[0]?.path); return originalProcess(...args); };
+  const { view } = heFixture({ topics: [root] });
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  for (const n of view.map.nodes) view.notes.set(n.id, { ...await repo.readNote(n.path, view.map), status: 'completed' }); // status only keeps the DOM stand-in simple; the files are untouched
+  view.stageEl = hePatch(dom.element('stage')); view.cardEls = new Map(); view.drawEdges = () => {};
+  for (const n of view.map.nodes) view.renderNode(n);
+  const cards = view.stageEl.children.slice();
+  for (const n of view.map.nodes) { view.stageEl.querySelector = () => cards[view.map.nodes.indexOf(n)]; view.refreshCard(n, false); }
+  assert.equal(cards.length, 2); for (const card of cards) assert.equal('topicColor' in card.dataset, false, 'a legacy card shows no colour');
+  for (const n of view.map.nodes) assert.equal(view.notes.get(n.id).color, undefined);
+  assert.deepEqual([...contents.keys()].sort(), [...before.keys()].sort(), 'no file appeared or vanished');
+  for (const [path, text] of before) assert.equal(contents.get(path), text, `${path} is byte-identical`);
+  assert.deepEqual(writes, [], 'writeTopicColor was not called'); assert.deepEqual(processed, [], 'vault.process was not called');
+});
 integrationTest('topic-color: applying to a branch is one transaction that writes only the notes that change, folded descendants included; one undo restores all, redo reapplies; siblings and other keys stay put', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
   const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });

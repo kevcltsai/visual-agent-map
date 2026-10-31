@@ -22,9 +22,9 @@ test('colour read: missing, wrong casing, wrong type and injected values read as
     assert.equal(c.readTopicColor({ 'topic-color': bad }), undefined, JSON.stringify(bad));
 });
 
-test('colour label key is a plain key string per colour', () => {
-  assert.equal(c.colorLabelKey('red'), 'topic_color_red');
-  for (const id of c.TOPIC_COLORS) assert.equal(c.colorLabelKey(id), `topic_color_${id}`);
+test('colour label key is the existing share.viewer_color_* key per colour', () => {
+  assert.equal(c.colorLabelKey('red'), 'share.viewer_color_red');
+  for (const id of c.TOPIC_COLORS) assert.equal(c.colorLabelKey(id), `share.viewer_color_${id}`);
 });
 
 test('branch ids: the topic first, then every descendant including deep ones, no siblings or ancestors', () => {

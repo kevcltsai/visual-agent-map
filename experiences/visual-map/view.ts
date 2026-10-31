@@ -19,7 +19,7 @@ import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
-import { TOPIC_COLORS, branchNoteIds, type TopicColor } from "../../topic-colors";
+import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -7495,7 +7495,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const id = aim ? undefined : TOPIC_COLORS.find(color => color === note?.color);
     if (id) {
-      const text = t("share.viewer_color_0", t(`share.viewer_color_${id}`));
+      const text = t("share.viewer_color_0", t(colorLabelKey(id)));
       card.dataset.topicColor = id;
       card.dataset.colorText = text;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
@@ -8690,7 +8690,7 @@ export class VisualAgentMapView extends ItemView {
       group.empty();
       const active = current();
       choices.forEach((id, index) => {
-        const choice = this.button(group, id ? t(`share.viewer_color_${id}`) : t("ui.topic_color_none"), () => {
+        const choice = this.button(group, id ? t(colorLabelKey(id)) : t("ui.topic_color_none"), () => {
           this.enqueue(async () => {
             await this.changeTopicColor(node, id);
             paint(id);

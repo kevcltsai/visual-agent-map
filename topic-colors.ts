@@ -1,3 +1,4 @@
+import type { TranslationKey } from "./i18n/en";
 import { descendants, type MapNode } from "./map-graph";
 
 /** Topic colours kept in a note's frontmatter (`topic-color`, one string id). Only whitelisted ids are shown. */
@@ -14,8 +15,8 @@ export function readTopicColor(fm: Record<string, unknown>): TopicColor | undefi
 }
 
 /** The i18n key of a colour's name; the caller resolves it. */
-export function colorLabelKey(id: TopicColor): string {
-  return `topic_color_${id}`;
+export function colorLabelKey(id: TopicColor): TranslationKey {
+  return `share.viewer_color_${id}`;
 }
 
 /** The topic and all its descendants (folded ones included): the topic id first, then the rest. */

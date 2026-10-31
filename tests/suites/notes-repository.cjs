@@ -536,6 +536,21 @@ integrationTest('counterexample: undo of a card summary change keeps a preview t
   assert.equal(undone.preview, '第二次，我自己改的', 'the user preview survives undo');
   assert.equal(undone.previewAutoHash, edited.previewAutoHash, 'the hash is left alone with it');
 });
+integrationTest('counterexample: undo of a card summary change keeps a User Notes section added afterwards inside the preview (packet 1-fix2 R2-M1)', async () => {
+  const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo new usernotes');
+  await repo.updateNote(n.path, { summary: '第一次' });
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
+  view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
+  view.map = map([n]);
+  await view.noteChange(n, { summary: '第二次' });
+  contents.set(n.path, contents.get(n.path).replace(/\n*$/, '\n\n## User Notes\n\n後來手加的內容\n'));
+  await view.travel(false);
+  const undone = await repo.readNote(n.path);
+  assert.equal(undone.summary, '第一次');
+  assert.match(undone.preview, /後來手加的內容/, 'the new User Notes text survives undo');
+  assert.match(contents.get(n.path), /後來手加的內容/);
+});
 integrationTest('AI answer cannot replace preview edited while task was running', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Manual preview');
   await repo.updateNote(n.path, { preview: '使用者的文字' });

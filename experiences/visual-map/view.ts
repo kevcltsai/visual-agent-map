@@ -7387,7 +7387,7 @@ export class VisualAgentMapView extends ItemView {
         if (written) {
           // The preview is put back only while it is still exactly what this change wrote; a later edit of it stays.
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          if (latest.previewSection !== written.previewSection || latest.previewAutoHash !== written.previewAutoHash) {
+          if (latest.preview !== written.preview || latest.previewAutoHash !== written.previewAutoHash) {
             restore = { ...before };
             delete restore.previewSection;
             delete restore.previewInitialized;

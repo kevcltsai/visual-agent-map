@@ -49958,7 +49958,7 @@ ${request.requirements}` : preset.text,
         let restore = before;
         if (written2) {
           const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
-          if (latest.previewSection !== written2.previewSection || latest.previewAutoHash !== written2.previewAutoHash) {
+          if (latest.preview !== written2.preview || latest.previewAutoHash !== written2.previewAutoHash) {
             restore = { ...before };
             delete restore.previewSection;
             delete restore.previewInitialized;

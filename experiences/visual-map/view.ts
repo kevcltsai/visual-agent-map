@@ -6,6 +6,7 @@ import {
   rememberedOutputLanguage,
   resolveAimContentLanguage
 } from "../aim/content-language";
+import { moveItem, removeItem, resizeKeepRatio, IMAGE_MIN_SIZE, type CanvasItem, type ImageItem } from "./canvas-items";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
@@ -794,6 +795,8 @@ export class VisualAgentMapView extends ItemView {
   private viewportEl: HTMLElement | null = null;
   private stageEl: HTMLElement | null = null;
   private edgesEl: SVGSVGElement | null = null;
+  /** The canvas image that had keyboard focus when a change repainted the canvas; focus goes back to it. */
+  private focusItemId: string | null = null;
   private zoomLabel: HTMLElement | null = null;
   private refreshTimer: number | null = null;
   private viewportTimer: number | null = null;
@@ -5208,6 +5211,157 @@ export class VisualAgentMapView extends ItemView {
       hooks.dismissed
     ).open();
   }
+  /** Free images only change on a map the user may edit: not AIM, not the built-in sample, not while picking topics. */
+  private canEditCanvasItems(): boolean {
+    return !this.builtIn && !this.integrationMode && !this.map?.aim;
+  }
+  /**
+   * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
+   * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
+   */
+  private renderCanvasItems(): void {
+    const stage = this.stageEl,
+      items = this.map?.canvasItems;
+    if (!stage || !items?.length) return;
+    const layer = stage.createDiv("vam-canvas-items");
+    layer.setAttr("role", "group");
+    layer.setAttr("aria-label", t("ui.canvas_images_group"));
+    const editable = this.canEditCanvasItems();
+    for (const item of items) {
+      if (item.kind !== "image") continue;
+      const image = item as ImageItem,
+        name = image.path.split("/").pop() ?? image.path,
+        label = t("ui.canvas_image_label", name),
+        el = layer.createDiv("vam-canvas-image");
+      el.dataset.itemId = image.id;
+      el.setAttr("role", "img");
+      el.setAttr("aria-label", label);
+      el.tabIndex = 0;
+      el.style.left = `${image.x}px`;
+      el.style.top = `${image.y}px`;
+      el.style.width = `${image.w}px`;
+      el.style.height = `${image.h}px`;
+      const file = this.app.vault.getAbstractFileByPath(image.path);
+      const source = file instanceof TFile ? this.app.vault.getResourcePath?.(file) : undefined;
+      const placeholder = (): void => {
+        el.empty();
+        el.addClass("is-missing");
+        el.createSpan({ text: name });
+      };
+      if (!source) placeholder();
+      else {
+        const img = el.createEl("img", { attr: { src: source, alt: "", draggable: "false" } });
+        img.addEventListener("error", placeholder);
+      }
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      if (!editable) continue;
+      const handle = el.createDiv("vam-canvas-image-handle");
+      handle.setAttr("aria-hidden", "true");
+      this.enableCanvasItemDrag(el, handle, image);
+      el.addEventListener("keydown", event => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.enqueue(() => this.removeCanvasItem(image.id));
+      });
+      if (this.focusItemId === image.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+    this.focusItemId = null;
+  }
+  /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
+  private enableCanvasItemDrag(el: HTMLElement, handle: HTMLElement, image: ImageItem): void {
+    const begin = (event: PointerEvent, resize: boolean): void => {
+      if (event.button !== 0 || !this.map) return;
+      event.stopPropagation();
+      event.preventDefault();
+      el.focus({ preventScroll: true });
+      const start = { x: event.clientX, y: event.clientY },
+        zoom = this.map.viewport.zoom || 1,
+        from = { x: image.x, y: image.y, w: image.w, h: image.h };
+      let dx = 0,
+        dy = 0,
+        width = from.w,
+        done = false;
+      el.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        dx = (e.clientX - start.x) / zoom;
+        dy = (e.clientY - start.y) / zoom;
+        if (resize) {
+          const ratio = from.h / from.w;
+          width = Math.max(from.w + dx, IMAGE_MIN_SIZE, IMAGE_MIN_SIZE / ratio);
+          el.style.width = `${width}px`;
+          el.style.height = `${width * ratio}px`;
+        } else {
+          el.style.left = `${from.x + dx}px`;
+          el.style.top = `${from.y + dy}px`;
+        }
+      };
+      const settle = (): void => {
+        done = true;
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        el.removeEventListener("pointercancel", cancel);
+        el.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        el.style.left = `${from.x}px`;
+        el.style.top = `${from.y}px`;
+        el.style.width = `${from.w}px`;
+        el.style.height = `${from.h}px`;
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        this.focusItemId = image.id;
+        if (resize && Math.abs(width - from.w) >= 1) this.enqueue(() => this.resizeCanvasItem(image.id, width));
+        else if (!resize && Math.hypot(dx, dy) >= 1)
+          this.enqueue(() => this.moveCanvasItem(image.id, Math.round(dx), Math.round(dy)));
+        else restore();
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", cancel);
+      el.addEventListener("lostpointercapture", cancel);
+    };
+    el.addEventListener("pointerdown", event => {
+      if (event.target === handle) return;
+      begin(event, false);
+    });
+    handle.addEventListener("pointerdown", event => begin(event, true));
+  }
+  /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
+  private async changeCanvasItems(id: string, change: (items: readonly CanvasItem[]) => CanvasItem[]): Promise<void> {
+    if (!this.map || !this.canEditCanvasItems()) return;
+    if (!this.map.canvasItems?.some(item => (item as { id?: unknown }).id === id)) return;
+    await this.mapChange(map => {
+      const next = change(map.canvasItems ?? []);
+      if (next.length) map.canvasItems = next;
+      else delete map.canvasItems;
+    }, false);
+  }
+  /** Moves a free image by (dx, dy) in map units. */
+  private async moveCanvasItem(id: string, dx: number, dy: number): Promise<void> {
+    await this.changeCanvasItems(id, items => moveItem(items, id, dx, dy));
+  }
+  /** Resizes a free image to `width`, keeping its ratio. */
+  private async resizeCanvasItem(id: string, width: number): Promise<void> {
+    await this.changeCanvasItems(id, items => resizeKeepRatio(items, id, width));
+  }
+  /** Removes the reference only; the image file stays in the Vault. */
+  private async removeCanvasItem(id: string): Promise<void> {
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, items => removeItem(items, id));
+  }
   private async removeSelected(): Promise<void> {
     if (!this.map) return;
     const before = clone(this.map),
@@ -6554,6 +6708,7 @@ export class VisualAgentMapView extends ItemView {
       this.renderingCard = false;
     }
     this.renderAimPendingCards(shown);
+    this.renderCanvasItems();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {

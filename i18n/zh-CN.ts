@@ -605,6 +605,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.zoom_out": "缩小",
   "ui.zoom_in": "放大",
   "ui.show_all": "显示全部",
+  "ui.canvas_images_group": "画布图片",
+  "ui.canvas_image_label": "图片：{0}",
   "ui.zoom_level_0_reset": "当前缩放 {0}，按一下重设为 100%",
   "ui.new_map": "＋ 添加心智图",
   "ui.researched": "已研究",

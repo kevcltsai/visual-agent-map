@@ -3,6 +3,7 @@ import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
+import { sanitizeCanvasItems, type CanvasItem } from "./experiences/visual-map/canvas-items";
 import { cleanBranchLayouts } from "./layouts/compose";
 import { isLayoutKind, isStoredLayoutSpacing, type MapLayout } from "./map-layout";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
@@ -39,6 +40,8 @@ export interface MapDocument {
   toneId?: string;
   /** Semantic links between topics (evidence for a hypothesis, prerequisite knowledge). Absent when there are none. */
   topicRelations?: TopicRelation[];
+  /** Free images and boundary frames drawn on the canvas. Absent when there are none. */
+  canvasItems?: CanvasItem[];
 }
 /**
  * Semantic links between topics; none of them changes the parent/child tree. `from` is A and `to` is B for every kind
@@ -596,6 +599,11 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
     delete map.layout;
   else if (map.layout && map.layout.spacing !== undefined && !isStoredLayoutSpacing(map.layout.spacing))
     delete map.layout.spacing;
+  if (map.canvasItems !== undefined) {
+    const items = sanitizeCanvasItems(map.canvasItems);
+    if (items.length) map.canvasItems = items;
+    else delete map.canvasItems;
+  }
   const ids = new Set<string>(),
     aimQuestionRequests = new Set<string>();
   for (const n of map.nodes) {

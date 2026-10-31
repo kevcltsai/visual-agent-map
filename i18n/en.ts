@@ -659,6 +659,8 @@ export const en = {
   "ui.zoom_out": "Zoom out",
   "ui.zoom_in": "Zoom in",
   "ui.show_all": "Show all",
+  "ui.canvas_images_group": "Canvas images",
+  "ui.canvas_image_label": "Image: {0}",
   "ui.zoom_level_0_reset": "Zoom {0}, reset to 100%",
   "ui.new_map": "＋ New map",
   "ui.researched": "Researched",

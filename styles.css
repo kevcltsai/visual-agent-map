@@ -1516,7 +1516,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-summary-brace { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .vam-view .vam-summary-brace path { stroke: var(--text-muted); stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .vam-view .vam-summary.is-selected .vam-summary-brace path { stroke: var(--interactive-accent); }
-.vam-view .vam-summary-text, .vam-view .vam-summary-input { position: absolute; box-sizing: border-box; width: 200px; }
+.vam-view .vam-summary-text, .vam-view .vam-summary-input { position: absolute; box-sizing: border-box; width: min(200px, 40vw); }
 .vam-view .vam-summary-text { padding: 2px 6px; border-radius: 6px; color: var(--text-normal); font-size: var(--font-ui-small); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: auto; cursor: text; user-select: none; }
 .vam-view .vam-summary.is-selected .vam-summary-text { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-view .vam-summary-input { font: inherit; resize: vertical; user-select: text; pointer-events: auto; }
@@ -1524,4 +1524,3 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-summary.is-side-left .vam-summary-text, .vam-view .vam-summary.is-side-left .vam-summary-input { transform: translate(-100%, -50%); text-align: right; }
 .vam-view .vam-summary.is-side-down .vam-summary-text, .vam-view .vam-summary.is-side-down .vam-summary-input { transform: translate(-50%, 0); text-align: center; }
 .vam-view .vam-summary.is-side-up .vam-summary-text, .vam-view .vam-summary.is-side-up .vam-summary-input { transform: translate(-50%, -100%); text-align: center; }
-@media (max-width: 700px) { .vam-view .vam-summary-text, .vam-view .vam-summary-input { width: 150px; } }

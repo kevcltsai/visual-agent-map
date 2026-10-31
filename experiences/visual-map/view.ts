@@ -1699,12 +1699,12 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.closeMapSearch(false);
+    this.exitPresentation(false);
     this.cancelLinking(false);
     this.suspendSummaryEdit?.();
     this.pendingSummary = null;
     this.summaryEditDraft = null;
-    this.closeMapSearch(false);
-    this.exitPresentation(false);
     this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;

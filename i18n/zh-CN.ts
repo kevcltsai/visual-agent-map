@@ -691,7 +691,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.summary_select_first": "请先选取要括起来的议题。",
   "ui.summary_refused_unknown": "这些议题不能加括号。",
   "ui.summary_refused_root": "根议题不能加括号，请选它的子议题。",
-  "ui.summary_refused_cross_parent": "请选同一个母议题下的议题。",
+  "ui.summary_refused_cross_parent": "请选同一个父议题下的议题。",
   "ui.summary_refused_not_adjacent": "请选相邻的议题，中间不能漏掉。",
   "ui.summary_refused_too_many": "一个括号最多框 50 个议题。",
   "ui.summary_layout_unsupported": "此排列方向尚不支持摘要括号。",

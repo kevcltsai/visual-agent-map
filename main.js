@@ -2969,7 +2969,7 @@ var zhCN = {
   "ui.summary_select_first": "\u8BF7\u5148\u9009\u53D6\u8981\u62EC\u8D77\u6765\u7684\u8BAE\u9898\u3002",
   "ui.summary_refused_unknown": "\u8FD9\u4E9B\u8BAE\u9898\u4E0D\u80FD\u52A0\u62EC\u53F7\u3002",
   "ui.summary_refused_root": "\u6839\u8BAE\u9898\u4E0D\u80FD\u52A0\u62EC\u53F7\uFF0C\u8BF7\u9009\u5B83\u7684\u5B50\u8BAE\u9898\u3002",
-  "ui.summary_refused_cross_parent": "\u8BF7\u9009\u540C\u4E00\u4E2A\u6BCD\u8BAE\u9898\u4E0B\u7684\u8BAE\u9898\u3002",
+  "ui.summary_refused_cross_parent": "\u8BF7\u9009\u540C\u4E00\u4E2A\u7236\u8BAE\u9898\u4E0B\u7684\u8BAE\u9898\u3002",
   "ui.summary_refused_not_adjacent": "\u8BF7\u9009\u76F8\u90BB\u7684\u8BAE\u9898\uFF0C\u4E2D\u95F4\u4E0D\u80FD\u6F0F\u6389\u3002",
   "ui.summary_refused_too_many": "\u4E00\u4E2A\u62EC\u53F7\u6700\u591A\u6846 50 \u4E2A\u8BAE\u9898\u3002",
   "ui.summary_layout_unsupported": "\u6B64\u6392\u5217\u65B9\u5411\u5C1A\u4E0D\u652F\u6301\u6458\u8981\u62EC\u53F7\u3002",
@@ -45296,12 +45296,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   async onClose() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     this.closed = true;
+    this.closeMapSearch(false);
+    this.exitPresentation(false);
     this.cancelLinking(false);
     (_a2 = this.suspendSummaryEdit) == null ? void 0 : _a2.call(this);
     this.pendingSummary = null;
     this.summaryEditDraft = null;
-    this.closeMapSearch(false);
-    this.exitPresentation(false);
     this.releaseCovers();
     (_b2 = this.unbindClipboard) == null ? void 0 : _b2.call(this);
     this.unbindClipboard = null;

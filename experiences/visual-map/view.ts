@@ -31,6 +31,7 @@ import { withThinkingOrigin } from "./thinking-origin";
 import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
+import { resolveCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -911,6 +912,8 @@ export class VisualAgentMapView extends ItemView {
   private cardHeightOf = (id: string): number | undefined =>
     this.cardEls.get(id)?.offsetHeight || medianHeight([...this.cardEls.values()].map(card => card.offsetHeight));
   private cardChecks = new Map<string, HTMLInputElement>();
+  /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
+  private coverObserver: IntersectionObserver | null = null;
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
   /** While a card renders, its buttons stay out of the tab order until that card is focused. */
@@ -1012,6 +1015,17 @@ export class VisualAgentMapView extends ItemView {
     this.registerEvent(workspace.on("layout-change", () => this.chat?.refreshNote()));
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
     this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
+    // A note whose image or `topic-cover` just changed redraws only its own cover.
+    const cache = this.app.metadataCache;
+    if (typeof cache?.on === "function")
+      this.registerEvent(
+        cache.on("changed", file => {
+          if (this.closed || this.builtIn || !this.map) return;
+          const node = this.map.nodes.find(item => item.path === file.path);
+          const card = node ? this.cardEls.get(node.id) : undefined;
+          if (card && node) this.paintCover(card, node.path);
+        })
+      );
   }
   async onOpen(): Promise<void> {
     this.closed = false;
@@ -1157,6 +1171,7 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
     this.renderAfterDrag = false;
@@ -7544,6 +7559,7 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
+    this.releaseCovers();
     this.cardEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
@@ -8012,6 +8028,8 @@ export class VisualAgentMapView extends ItemView {
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
+    // The cover frame sits above the title; it adds nothing when the topic has no local image.
+    if (note && !this.builtIn) this.paintCover(card, node.path);
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
@@ -8498,6 +8516,63 @@ export class VisualAgentMapView extends ItemView {
     return markers.length
       ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
       : "";
+  }
+  /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
+  private releaseCovers(): void {
+    this.coverObserver?.disconnect();
+    this.coverObserver = null;
+  }
+  /**
+   * Puts a fixed-height cover frame before the card's title when the note's metadata names a local image (frontmatter
+   * `topic-cover`, else the first embed). Reads only the metadata cache, never the network or the note body. A missing,
+   * remote or unreadable cover adds nothing. The image gets its `src` when the frame scrolls into view. Safe to call again.
+   */
+  private paintCover(card: HTMLElement, notePath: string): void {
+    const old = card.querySelector<HTMLElement>(".vam-card-cover");
+    if (old) {
+      const oldImg = old.querySelector<HTMLImageElement>("img");
+      if (oldImg) this.coverObserver?.unobserve(oldImg);
+      old.remove();
+    }
+    let source: string | undefined;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(notePath);
+      if (!(file instanceof TFile)) return;
+      const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+        this.app.metadataCache.getFirstLinkpathDest(link, notePath)
+      );
+      if (!cover || !("path" in cover)) return;
+      const image = this.app.vault.getAbstractFileByPath(cover.path);
+      source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
+    } catch {
+      return;
+    }
+    if (!source) return;
+    const frame = createDiv({ cls: "vam-card-cover" });
+    const img = frame.createEl("img", {
+      attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async" }
+    });
+    // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
+    img.addEventListener("error", () => {
+      this.coverObserver?.unobserve(img);
+      frame.remove();
+    });
+    const title = card.querySelector<HTMLElement>(".vam-card-title");
+    card.insertBefore(frame, title);
+    if (typeof IntersectionObserver !== "function") {
+      img.setAttr("src", source);
+      return;
+    }
+    this.coverObserver ??= new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const target = entry.target as HTMLImageElement;
+        const real = target.getAttribute("data-src");
+        if (real) target.setAttr("src", real);
+        this.coverObserver?.unobserve(target);
+      }
+    });
+    this.coverObserver.observe(img);
   }
   /**
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).

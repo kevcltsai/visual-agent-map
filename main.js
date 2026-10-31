@@ -717,6 +717,18 @@ var en = {
   "ui.presentation_first": "Already the first topic",
   "ui.presentation_last": "Already the last topic",
   "ui.presentation_exited": "Left the presentation",
+  "ui.text_node_add": "Add text",
+  "ui.text_node_add_command": "Add a text node to the selected topic",
+  "ui.text_node_label": "Text node: {0}",
+  "ui.text_nodes_group": "Text nodes",
+  "ui.text_node_edit_label": "Edit text node",
+  "ui.text_node_added": "Text node added.",
+  "ui.text_node_removed": "Text node removed.",
+  "ui.text_node_promote": "To card",
+  "ui.text_node_promote_label": "Turn this text node into a topic card",
+  "ui.text_node_promoted": "Text node turned into a topic card.",
+  "ui.text_node_select_topic": "Select a topic first.",
+  "ui.text_node_placeholder": "Text",
   "ui.canvas_images_group": "Canvas images",
   "ui.canvas_image_label": "Image: {0}",
   "ui.canvas_image_insert": "Insert image\u2026",
@@ -2869,6 +2881,18 @@ var zhCN = {
   "ui.presentation_first": "\u5DF2\u662F\u7B2C\u4E00\u4E2A\u8BAE\u9898",
   "ui.presentation_last": "\u5DF2\u662F\u6700\u540E\u4E00\u4E2A\u8BAE\u9898",
   "ui.presentation_exited": "\u5DF2\u9000\u51FA\u6F14\u793A",
+  "ui.text_node_add": "\u65B0\u589E\u6587\u5B57",
+  "ui.text_node_add_command": "\u4E3A\u9009\u4E2D\u7684\u8BAE\u9898\u65B0\u589E\u6587\u5B57\u8282\u70B9",
+  "ui.text_node_label": "\u6587\u5B57\u8282\u70B9\uFF1A{0}",
+  "ui.text_nodes_group": "\u6587\u5B57\u8282\u70B9",
+  "ui.text_node_edit_label": "\u7F16\u8F91\u6587\u5B57\u8282\u70B9",
+  "ui.text_node_added": "\u5DF2\u65B0\u589E\u6587\u5B57\u8282\u70B9\u3002",
+  "ui.text_node_removed": "\u5DF2\u5220\u9664\u6587\u5B57\u8282\u70B9\u3002",
+  "ui.text_node_promote": "\u8F6C\u6210\u8BAE\u9898\u5361",
+  "ui.text_node_promote_label": "\u628A\u8FD9\u4E2A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361",
+  "ui.text_node_promoted": "\u5DF2\u628A\u6587\u5B57\u8282\u70B9\u8F6C\u6210\u8BAE\u9898\u5361\u3002",
+  "ui.text_node_select_topic": "\u8BF7\u5148\u9009\u4E2D\u4E00\u4E2A\u8BAE\u9898\u3002",
+  "ui.text_node_placeholder": "\u6587\u5B57",
   "ui.canvas_images_group": "\u753B\u5E03\u56FE\u7247",
   "ui.canvas_image_label": "\u56FE\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u56FE\u7247\u2026",
@@ -5021,6 +5045,18 @@ var zhTW = {
   "ui.presentation_first": "\u5DF2\u662F\u7B2C\u4E00\u500B\u8B70\u984C",
   "ui.presentation_last": "\u5DF2\u662F\u6700\u5F8C\u4E00\u500B\u8B70\u984C",
   "ui.presentation_exited": "\u5DF2\u96E2\u958B\u7C21\u5831",
+  "ui.text_node_add": "\u65B0\u589E\u6587\u5B57",
+  "ui.text_node_add_command": "\u70BA\u9078\u53D6\u7684\u8B70\u984C\u65B0\u589E\u6587\u5B57\u7BC0\u9EDE",
+  "ui.text_node_label": "\u6587\u5B57\u7BC0\u9EDE\uFF1A{0}",
+  "ui.text_nodes_group": "\u6587\u5B57\u7BC0\u9EDE",
+  "ui.text_node_edit_label": "\u7DE8\u8F2F\u6587\u5B57\u7BC0\u9EDE",
+  "ui.text_node_added": "\u5DF2\u65B0\u589E\u6587\u5B57\u7BC0\u9EDE\u3002",
+  "ui.text_node_removed": "\u5DF2\u522A\u9664\u6587\u5B57\u7BC0\u9EDE\u3002",
+  "ui.text_node_promote": "\u8F49\u6210\u8B70\u984C\u5361",
+  "ui.text_node_promote_label": "\u628A\u9019\u500B\u6587\u5B57\u7BC0\u9EDE\u8F49\u6210\u8B70\u984C\u5361",
+  "ui.text_node_promoted": "\u5DF2\u628A\u6587\u5B57\u7BC0\u9EDE\u8F49\u6210\u8B70\u984C\u5361\u3002",
+  "ui.text_node_select_topic": "\u8ACB\u5148\u9078\u53D6\u4E00\u500B\u8B70\u984C\u3002",
+  "ui.text_node_placeholder": "\u6587\u5B57",
   "ui.canvas_images_group": "\u756B\u5E03\u5716\u7247",
   "ui.canvas_image_label": "\u5716\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u5716\u7247\u2026",
@@ -8419,6 +8455,12 @@ var label_ancestors_zh_default = "\u7956\u5148\u8B70\u984C\u80CC\u666F\n";
 // core/steps/_shared/label-ancestors.en.md
 var label_ancestors_en_default = "Ancestor topic context\n";
 
+// core/steps/_shared/label-user-text.zh.md
+var label_user_text_zh_default = "\u4F7F\u7528\u8005\u5728\u6B64\u8B70\u984C\u4E0B\u64B0\u5BEB\u7684\u6587\u5B57\uFF08\u552F\u8B80\uFF1B\u7576\u4F5C\u4F7F\u7528\u8005\u81EA\u5DF1\u7684\u8F38\u5165\uFF0C\u4E0D\u5F97\u6539\u5BEB\uFF0C\u4E5F\u4E0D\u662F\u53EF\u5F15\u7528\u7684\u4F86\u6E90\uFF09\n";
+
+// core/steps/_shared/label-user-text.en.md
+var label_user_text_en_default = "User-written text under this topic (read-only; use it as the user's own input, never rewrite it, and it is not a source to cite)\n";
+
 // core/steps/_shared/label-rules.zh.md
 var label_rules_zh_default = "\u76EE\u524D\u8B70\u984C\u7684 AI \u898F\u5247\uFF08\u512A\u5148\u9075\u5B88\uFF09\n";
 
@@ -8565,6 +8607,7 @@ var LABEL_ANCESTORS = pair2(label_ancestors_zh_default, label_ancestors_en_defau
 var LABEL_RULES = pair2(label_rules_zh_default, label_rules_en_default);
 var LABEL_SOURCES = pair2(label_sources_zh_default, label_sources_en_default);
 var LABEL_SUMMARY = pair2(label_summary_zh_default, label_summary_en_default);
+var LABEL_USER_TEXT = pair2(label_user_text_zh_default, label_user_text_en_default);
 var LABEL_TASK = pair2(label_task_zh_default, label_task_en_default);
 var LABEL_TOPIC = pair2(label_topic_zh_default, label_topic_en_default);
 var LOCAL_FIRST = pair2(local_first_zh_default, local_first_en_default);
@@ -16045,6 +16088,8 @@ var CONTROL = /[\u0000-\u001f\u007f]/;
 var CONTROL_ALL = /[\u0000-\u001f\u007f]/g;
 var LABEL_LIMIT = 200;
 var MEMBER_LIMIT = 500;
+var TEXT_LIMIT = 2e3;
+var PARENT_ID_LIMIT = 200;
 var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var finite = (v) => typeof v === "number" && Number.isFinite(v);
 function isSafeImagePath(path) {
@@ -16069,6 +16114,23 @@ function cleanBoundary(raw) {
     item.label = label.replace(CONTROL_ALL, " ").trim().slice(0, LABEL_LIMIT);
   return item;
 }
+function cleanText(value) {
+  if (typeof value !== "string") return null;
+  const text11 = value.trim().slice(0, TEXT_LIMIT).trim();
+  return text11 ? text11 : null;
+}
+function cleanTextItem(raw) {
+  const { id, text: text11, parentId, x, y } = raw;
+  if (typeof id !== "string" || !ID.test(id) || !finite(x) || !finite(y)) return null;
+  const clean4 = cleanText(text11);
+  if (clean4 === null) return null;
+  const item = { id, kind: "text", text: clean4, x, y };
+  if (parentId !== void 0 && parentId !== null) {
+    if (typeof parentId !== "string" || !parentId || parentId.length > PARENT_ID_LIMIT) return null;
+    item.parentId = parentId;
+  }
+  return item;
+}
 function sanitizeCanvasItems(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
@@ -16078,9 +16140,10 @@ function sanitizeCanvasItems(raw) {
     let item;
     if (entry.kind === "image") item = cleanImage(entry);
     else if (entry.kind === "boundary") item = cleanBoundary(entry);
+    else if (entry.kind === "text") item = cleanTextItem(entry);
     else item = entry;
     if (!item) continue;
-    if (item.kind === "image" || item.kind === "boundary") {
+    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text") {
       const id = item.id;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -16110,6 +16173,32 @@ function resizeKeepRatio(items, id, width) {
 }
 function removeItem(items, id) {
   return items.filter((item) => !(isRecord(item) && item.id === id));
+}
+var isText = (item) => item.kind === "text";
+function addTextNode(items, text11) {
+  const clean4 = cleanTextItem({ ...text11, kind: "text" });
+  if (!clean4 || items.some((i) => i.id === clean4.id)) return [...items];
+  return [...items, clean4];
+}
+function updateTextNode(items, id, text11) {
+  const clean4 = cleanText(text11);
+  if (clean4 === null) return [...items];
+  return items.map((item) => isText(item) && item.id === id ? { ...item, text: clean4 } : item);
+}
+function removeTextNode(items, id) {
+  return items.filter((item) => !(isText(item) && item.id === id));
+}
+function treeTextNodes(items, nodeIds) {
+  const alive = new Set(nodeIds);
+  const attached = [];
+  const orphans = [];
+  for (const item of items) {
+    if (!isText(item)) continue;
+    if (item.parentId !== void 0 && item.parentId !== item.id && alive.has(item.parentId) && !alive.has(item.id))
+      attached.push(item);
+    else orphans.push(item);
+  }
+  return { attached, orphans };
 }
 function boundaryBounds(nodeIds, rectOf, pad) {
   const margin = finite(pad) && pad > 0 ? pad : 0;
@@ -16238,7 +16327,7 @@ var DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}
 var COLOR = /^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\(\s*[\d.%\s,/-]+\)|[a-zA-Z]{3,20})$/;
 var PATH_DATA = /^[MmLlHhVvCcSsQqTtAaZz0-9\s,.eE+-]+$/;
 var FONT = "sans-serif";
-var TEXT_LIMIT = 300;
+var TEXT_LIMIT2 = 300;
 var num = (value) => typeof value === "number" && Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
 var isXmlControl = (ch) => {
   const code = ch.charCodeAt(0);
@@ -16275,7 +16364,7 @@ function imageElement(image) {
 }
 function textLines(title) {
   const raw = Array.isArray(title) ? title : String(title != null ? title : "").split(/\r?\n/);
-  return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT));
+  return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
   var _a2, _b2, _c, _d, _e, _f, _g;
@@ -16293,7 +16382,7 @@ function buildMapSvg(scene) {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${originX} ${originY} ${width} ${height}">`
   ];
   if (typeof scene.title === "string" && scene.title)
-    out.push(`<title>${escapeXml(scene.title.slice(0, TEXT_LIMIT))}</title>`);
+    out.push(`<title>${escapeXml(scene.title.slice(0, TEXT_LIMIT2))}</title>`);
   out.push(`<rect x="${originX}" y="${originY}" width="${width}" height="${height}" fill="${background}"/>`);
   for (const b of (_d = scene.boundaries) != null ? _d : []) {
     const box = rect(b == null ? void 0 : b.x, b == null ? void 0 : b.y, b == null ? void 0 : b.w, b == null ? void 0 : b.h);
@@ -16304,7 +16393,7 @@ function buildMapSvg(scene) {
     );
     if (typeof b.label === "string" && b.label)
       out.push(
-        `<text x="${box[0] + 8}" y="${box[1] + 16}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(b.label.slice(0, TEXT_LIMIT))}</text>`
+        `<text x="${box[0] + 8}" y="${box[1] + 16}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(b.label.slice(0, TEXT_LIMIT2))}</text>`
       );
     out.push("</g>");
   }
@@ -16508,9 +16597,20 @@ function collapsedAncestors(nodes, id) {
 }
 
 // experiences/visual-map/presentation-order.ts
-function readingOrder(nodes, opts = {}) {
-  var _a2;
-  const axis = (_a2 = opts.siblingAxis) != null ? _a2 : "y";
+function readingOrder(topics, opts = {}) {
+  var _a2, _b2;
+  let nodes = topics;
+  if ((_a2 = opts.textNodes) == null ? void 0 : _a2.length) {
+    const known = new Set(topics.map((node) => node.id));
+    const leaves = [];
+    for (const text11 of opts.textNodes) {
+      if (known.has(text11.id) || !known.has(text11.parentId)) continue;
+      known.add(text11.id);
+      leaves.push({ id: text11.id, path: "", parentId: text11.parentId, x: text11.x, y: text11.y, collapsed: false });
+    }
+    nodes = [...topics, ...leaves];
+  }
+  const axis = (_b2 = opts.siblingAxis) != null ? _b2 : "y";
   const other = axis === "y" ? "x" : "y";
   const includeHidden = opts.includeHidden === true;
   const position = /* @__PURE__ */ new Map();
@@ -16518,8 +16618,8 @@ function readingOrder(nodes, opts = {}) {
     if (!position.has(node.id)) position.set(node.id, index);
   });
   const byPosition = (a, b) => {
-    var _a3, _b2;
-    return a[axis] - b[axis] || a[other] - b[other] || ((_a3 = position.get(a.id)) != null ? _a3 : 0) - ((_b2 = position.get(b.id)) != null ? _b2 : 0);
+    var _a3, _b3;
+    return a[axis] - b[axis] || a[other] - b[other] || ((_a3 = position.get(a.id)) != null ? _a3 : 0) - ((_b3 = position.get(b.id)) != null ? _b3 : 0);
   };
   const roots = [];
   const children = /* @__PURE__ */ new Map();
@@ -17808,6 +17908,61 @@ function reorderTopLevel(nodes, rootId, movedId, dropX) {
     result[index] = order[place];
   });
   return result;
+}
+function visibleTexts(nodes, items, hidden) {
+  const topics = new Map(nodes.map((node) => [node.id, node]));
+  return treeTextNodes(items, [...topics.keys()]).attached.filter((text11) => {
+    const parent = topics.get(text11.parentId);
+    return parent !== void 0 && !parent.collapsed && !(hidden == null ? void 0 : hidden.has(parent.id));
+  });
+}
+var asLeaf = (text11) => ({
+  id: text11.id,
+  path: "",
+  parentId: text11.parentId,
+  x: text11.x,
+  y: text11.y,
+  collapsed: false
+});
+function withTextPositions(items, texts2, placed) {
+  const at = new Map(placed.map((node) => [node.id, node]));
+  const mine = new Set(texts2.map((text11) => text11.id));
+  return items.map((item) => {
+    const text11 = item;
+    const spot = text11.kind === "text" && mine.has(text11.id) ? at.get(text11.id) : void 0;
+    return spot ? { ...text11, x: spot.x, y: spot.y } : item;
+  });
+}
+function arrangeMapWithText(nodes, items, hidden, heightOf, layout = "right", options = {}) {
+  const texts2 = visibleTexts(nodes, items, hidden);
+  if (!texts2.length) return { nodes: arrangeMap(nodes, hidden, heightOf, layout, options), items: [...items] };
+  const placed = arrangeMap([...nodes, ...texts2.map(asLeaf)], hidden, heightOf, layout, options);
+  const real = new Set(nodes.map((node) => node.id));
+  return {
+    nodes: placed.filter((node) => real.has(node.id)),
+    items: withTextPositions(
+      items,
+      texts2,
+      placed.filter((node) => !real.has(node.id))
+    )
+  };
+}
+function arrangeNewBranchWithText(nodes, items, parentId, newIds, heightOf, minTop, layout = "right") {
+  const texts2 = visibleTexts(nodes, items);
+  if (!texts2.length)
+    return { nodes: arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout), items: [...items] };
+  const withNew = new Set(newIds);
+  for (const text11 of texts2) if (newIds.has(text11.parentId)) withNew.add(text11.id);
+  const placed = arrangeNewBranch([...nodes, ...texts2.map(asLeaf)], parentId, withNew, heightOf, minTop, layout);
+  const real = new Set(nodes.map((node) => node.id));
+  return {
+    nodes: placed.filter((node) => real.has(node.id)),
+    items: withTextPositions(
+      items,
+      texts2,
+      placed.filter((node) => !real.has(node.id))
+    )
+  };
 }
 
 // map-model.ts
@@ -20389,7 +20544,7 @@ var clip = (value, limit) => {
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
 };
 function buildMapChatContext(input) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   const hashes = {};
   const topicHashes = {};
   const byId = new Map(input.outline.map((node) => [node.id, node]));
@@ -20479,6 +20634,16 @@ function buildMapChatContext(input) {
     references: input.references.map((ref) => topic(ref, false)),
     snippets,
     files,
+    ...((_e = input.userTexts) == null ? void 0 : _e.length) ? {
+      userTexts: input.userTexts.map((item) => ({
+        id: item.id,
+        parentId: item.parentId,
+        ...item.parentId === null ? { unattached: true } : {},
+        readOnly: true,
+        text: item.text
+      })),
+      userTextsNote: "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
+    } : {},
     activeFile: active,
     earlierTurns: history2.map((turn) => ({ role: turn.role, text: turn.text }))
   });
@@ -29431,6 +29596,8 @@ ${context.rules || none}`,
 ${context.workingFindings}` : "",
     context.sourceContext ? `${inLanguage(LABEL_SOURCES, language2)}:
 ${context.sourceContext}` : "",
+    ...context.userTexts ? [`${inLanguage(LABEL_USER_TEXT, language2)}:
+${context.userTexts}`] : [],
     `${inLanguage(LABEL_ANCESTORS, language2)}:
 ${context.ancestors || none}`,
     `${inLanguage(LABEL_TASK, language2)}:
@@ -43778,6 +43945,8 @@ var relationSwatchSequence = 0;
 var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
+var TEXT_NODE_HEIGHT = 180;
+var TEXT_NODE_WIDTH = 300;
 function depthOf(nodes, id) {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   let depth = 0;
@@ -44043,9 +44212,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     __publicField(this, "cardEls", /* @__PURE__ */ new Map());
     /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
     __publicField(this, "cardHeightOf", (id) => {
-      var _a2;
-      return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight));
+      var _a2, _b2;
+      return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || // A text node is no card: its own rendered height, or the default while it is not drawn yet.
+      (this.isTextId(id) ? ((_b2 = this.textEls.get(id)) == null ? void 0 : _b2.offsetHeight) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
     });
+    /** Text node element per id (tree-attached and free), rebuilt on every render. */
+    __publicField(this, "textEls", /* @__PURE__ */ new Map());
+    /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
+    __publicField(this, "pendingTextEditId", null);
+    __publicField(this, "editingTextId", null);
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
     /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
     __publicField(this, "mapSearch", null);
@@ -44122,6 +44297,39 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  isTextId(id) {
+    var _a2, _b2;
+    return id.startsWith("txt-") || !!((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) == null ? void 0 : _b2.some((item) => item.kind === "text" && item.id === id));
+  }
+  /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
+  arrangeAll(map, options = {}) {
+    var _a2;
+    const out = arrangeMapWithText(
+      map.nodes,
+      (_a2 = map.canvasItems) != null ? _a2 : [],
+      supersededAimNodeIds(map),
+      this.cardHeightOf,
+      layoutOf(map),
+      options
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
+  }
+  /** Arranges the new cards under `parentId`; text nodes under them come along, the rest stay put as obstacles. */
+  arrangeBranch(map, parentId, newIds, minTop) {
+    var _a2;
+    const out = arrangeNewBranchWithText(
+      map.nodes,
+      (_a2 = map.canvasItems) != null ? _a2 : [],
+      parentId,
+      newIds,
+      this.cardHeightOf,
+      minTop,
+      layoutOf(map)
+    );
+    map.nodes = out.nodes;
+    if (map.canvasItems) map.canvasItems = out.items;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -44471,12 +44679,21 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   }
   /** The topics a presentation visits: the reading order of what is drawn (folded branches are one stop, not their descendants). */
   presentationOrder() {
+    var _a2;
     if (!this.map) return [];
     const shown = new Set(this.canvasNodes().map((node) => node.id));
     const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
     return readingOrder(
       this.map.nodes.filter((node) => shown.has(node.id)),
-      { siblingAxis: vertical ? "x" : "y" }
+      {
+        siblingAxis: vertical ? "x" : "y",
+        textNodes: treeTextNodes(
+          (_a2 = this.map.canvasItems) != null ? _a2 : [],
+          this.map.nodes.map((node) => node.id)
+        ).attached.flatMap(
+          (text11) => text11.parentId !== void 0 && shown.has(text11.parentId) && this.textEls.has(text11.id) ? [{ id: text11.id, parentId: text11.parentId, x: text11.x, y: text11.y }] : []
+        )
+      }
     );
   }
   /** The start button is on only when there is something to show and the map is not in select mode. */
@@ -44545,7 +44762,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
    * `announce` speaks the position; a plain repaint speaks only when the topic changed under it.
    */
   applyPresentationMarks(announce = false) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const session = this.presentation;
     if (!session || !this.map) return;
     const order = this.presentationOrder();
@@ -44560,6 +44777,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     this.contentEl.dataset.presenting = "true";
     if (this.stageEl) this.stageEl.dataset.presenting = "true";
     for (const [id, card2] of this.cardEls) card2.toggleClass("is-presenting", id === currentId);
+    for (const [id, el] of this.textEls) el.toggleClass("is-presenting", id === currentId);
     (_a2 = this.presentationBarEl) == null ? void 0 : _a2.remove();
     this.presentationBarEl = null;
     const overlay = (_c = (_b2 = this.contentEl).querySelector) == null ? void 0 : _c.call(_b2, ".vam-canvas-overlay");
@@ -44580,13 +44798,43 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     }
     const target = this.map.nodes.find((node) => node.id === currentId);
     if (target) this.focusNode(target, false);
+    const textStop = ((_d = this.map.canvasItems) != null ? _d : []).find(
+      (item) => item.kind === "text" && item.id === currentId
+    );
+    if (textStop) {
+      this.focusNode(
+        {
+          id: textStop.id,
+          path: "",
+          parentId: (_e = textStop.parentId) != null ? _e : null,
+          x: textStop.x,
+          y: textStop.y,
+          collapsed: false
+        },
+        false
+      );
+      const el = this.textEls.get(currentId);
+      const active2 = (_g = (_f = this.contentEl.ownerDocument) == null ? void 0 : _f.activeElement) != null ? _g : null;
+      if (el && (announce || !active2 || !this.contentEl.contains(active2)) && active2 !== el)
+        el.focus({ preventScroll: true });
+      if (announce)
+        (_h = this.announcer) == null ? void 0 : _h.setText(
+          t(
+            "ui.presentation_position_0_1_2",
+            index + 1,
+            order.length,
+            t("ui.text_node_label", textStop.text.slice(0, 60))
+          )
+        );
+      return;
+    }
     const card = this.cardEls.get(currentId);
-    const active = (_e = (_d = this.contentEl.ownerDocument) == null ? void 0 : _d.activeElement) != null ? _e : null;
+    const active = (_j = (_i = this.contentEl.ownerDocument) == null ? void 0 : _i.activeElement) != null ? _j : null;
     const lost = !active || active === this.contentEl || !this.contentEl.contains(active);
     if (card && (announce || lost) && active !== card) card.focus({ preventScroll: true });
     if (announce)
-      (_h = this.announcer) == null ? void 0 : _h.setText(
-        t("ui.presentation_position_0_1_2", index + 1, order.length, (_g = (_f = this.notes.get(currentId)) == null ? void 0 : _f.title) != null ? _g : "")
+      (_m = this.announcer) == null ? void 0 : _m.setText(
+        t("ui.presentation_position_0_1_2", index + 1, order.length, (_l = (_k = this.notes.get(currentId)) == null ? void 0 : _k.title) != null ? _l : "")
       );
   }
   /**
@@ -46317,14 +46565,7 @@ ${request.requirements}` : preset.text,
       if (!canParent(map.nodes, node.id, parent.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
       map.nodes.find((item) => item.id === node.id).parentId = parent.id;
       map.nodes.find((item) => item.id === parent.id).collapsed = false;
-      map.nodes = arrangeNewBranch(
-        map.nodes,
-        parent.id,
-        /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]),
-        this.cardHeightOf,
-        void 0,
-        layoutOf(map)
-      );
+      this.arrangeBranch(map, parent.id, /* @__PURE__ */ new Set([node.id, ...descendants(map.nodes, node.id)]), void 0);
     });
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
@@ -46388,7 +46629,7 @@ ${request.requirements}` : preset.text,
       if (changed) {
         await this.mapChange((map) => {
           applyCollapseLevel(map.nodes, shownLevels);
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+          this.arrangeAll(map);
         });
         if (this.history.undoEntry) this.history.undoEntry.label = t("ui.collapse_levels");
         this.updateHistoryButtons();
@@ -46399,7 +46640,7 @@ ${request.requirements}` : preset.text,
   autoLayout() {
     this.enqueue(
       () => this.mapChange((map) => {
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+        this.arrangeAll(map);
       }, false)
     );
   }
@@ -46418,9 +46659,7 @@ ${request.requirements}` : preset.text,
         if (direction === "right" && spacing === "standard") delete map.layout;
         else map.layout = spacing === "standard" ? { direction } : { direction, spacing };
         cleanBranchLayouts(map.nodes, direction);
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map), {
-          reset: direction === "balanced" && before.direction !== "balanced"
-        });
+        this.arrangeAll(map, { reset: direction === "balanced" && before.direction !== "balanced" });
         if (direction === "balanced") cleanBranchLayouts(map.nodes, direction);
       }, false);
       this.fit();
@@ -46672,7 +46911,7 @@ ${request.requirements}` : preset.text,
             const outlineTop = next.nodes.find((node) => node.id === top2.id);
             if (owner2) {
               owner2.collapsed = false;
-              next.nodes = arrangeNewBranch(next.nodes, owner2.id, ids2, this.cardHeightOf, void 0, layoutOf(next));
+              this.arrangeBranch(next, owner2.id, ids2, void 0);
             } else {
               outlineTop.parentId = null;
               next.nodes = arrangeNewTree(next.nodes, top2.id, ids2, this.cardHeightOf, layoutOf(next));
@@ -47906,7 +48145,7 @@ ${request.requirements}` : preset.text,
       if (adopterId && adopted.size) {
         const adopter = map.nodes.find((item) => item.id === adopterId);
         if (adopter) adopter.collapsed = false;
-        map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf, void 0, layoutOf(map));
+        this.arrangeBranch(map, adopterId, adopted, void 0);
       }
       this.removeAimReferences(map, ids, prior.nodes);
     }).commit();
@@ -48334,8 +48573,7 @@ ${request.requirements}` : preset.text,
           }
         map.nodes = map.nodes.flatMap((item) => item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]);
         this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
-        if (adopted.size)
-          map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf, void 0, layoutOf(map));
+        if (adopted.size) this.arrangeBranch(map, merged.id, adopted, void 0);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
       this.render();
@@ -48409,8 +48647,7 @@ ${request.requirements}` : preset.text,
           }
         map.nodes = map.nodes.filter((item) => !ids.has(item.id));
         this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
-        if (adopted.size)
-          map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf, void 0, layoutOf(map));
+        if (adopted.size) this.arrangeBranch(map, target.id, adopted, void 0);
       }).commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
       this.render();
@@ -48608,8 +48845,246 @@ ${request.requirements}` : preset.text,
         el.focus({ preventScroll: true });
       }
     }
+    this.renderTextNodes(stage, items);
     this.renderBoundaries(stage, items, editable);
     this.focusItemId = null;
+  }
+  /** Text nodes change only on a map the user may edit, and never while presenting. */
+  canEditText() {
+    return this.canEditCanvasItems() && !this.presentation;
+  }
+  /**
+   * Draws the text nodes (decisions #1, #5): a node under a shown, unfolded topic, or a free one (orphan, parent gone) at
+   * its own place. A node under a folded topic is not drawn. Text goes in through textContent only; the editor is a
+   * textarea, so nothing the user writes is ever parsed as markup.
+   */
+  renderTextNodes(stage, items) {
+    var _a2, _b2;
+    if (!this.map) return;
+    const { attached } = treeTextNodes(
+      items,
+      this.map.nodes.map((node) => node.id)
+    );
+    const attachedIds = new Set(attached.map((text11) => text11.id));
+    const texts2 = items.filter((item) => item.kind === "text");
+    if (!texts2.length) return;
+    const editable = this.canEditText();
+    const layer = stage.createDiv("vam-text-nodes");
+    layer.setAttr("role", "group");
+    layer.setAttr("aria-label", t("ui.text_nodes_group"));
+    for (const text11 of texts2) {
+      if (attachedIds.has(text11.id)) {
+        const parent = this.map.nodes.find((node) => node.id === text11.parentId);
+        if (!parent || parent.collapsed || !this.cardEls.has(parent.id)) continue;
+      }
+      const el = layer.createDiv("vam-text-node");
+      el.dataset.itemId = text11.id;
+      if (!attachedIds.has(text11.id)) el.addClass("is-free");
+      el.setAttr("role", "note");
+      el.setAttr("aria-label", t("ui.text_node_label", text11.text.slice(0, 60)));
+      el.tabIndex = 0;
+      el.style.left = `${text11.x}px`;
+      el.style.top = `${text11.y}px`;
+      el.style.width = `${TEXT_NODE_WIDTH}px`;
+      el.createDiv({ cls: "vam-text-node-body", text: text11.text });
+      this.textEls.set(text11.id, el);
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      if (!editable) continue;
+      el.addEventListener("dblclick", (event) => {
+        event.stopPropagation();
+        this.startTextEdit(text11.id);
+      });
+      const promote = el.createEl("button", {
+        cls: "vam-text-node-promote",
+        text: t("ui.text_node_promote"),
+        attr: { type: "button", "aria-label": t("ui.text_node_promote_label") }
+      });
+      promote.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.enqueue(() => this.promoteTextNode(text11.id));
+      });
+      promote.addEventListener("keydown", (event) => event.stopPropagation());
+      promote.addEventListener("dblclick", (event) => event.stopPropagation());
+      el.addEventListener("keydown", (event) => {
+        if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startTextEdit(text11.id);
+        } else if (event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeTextItem(text11.id));
+        }
+      });
+    }
+    const wanted = (_a2 = this.pendingTextEditId) != null ? _a2 : this.focusItemId;
+    const pending2 = this.pendingTextEditId;
+    this.pendingTextEditId = null;
+    if (pending2 && this.textEls.has(pending2)) {
+      this.focusItemId = null;
+      this.startTextEdit(pending2);
+    } else if (wanted && this.textEls.has(wanted)) {
+      this.focusItemId = null;
+      (_b2 = this.textEls.get(wanted)) == null ? void 0 : _b2.focus({ preventScroll: true });
+    }
+  }
+  /** Swaps the node's text for a textarea: Cmd/Ctrl+Enter or leaving it saves, Esc cancels, an empty text removes the node. */
+  startTextEdit(id) {
+    var _a2, _b2, _c;
+    const el = this.textEls.get(id);
+    const text11 = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find((item) => item.kind === "text" && item.id === id);
+    if (!el || !text11 || !this.canEditText() || this.editingTextId) return;
+    this.editingTextId = id;
+    const body = el.querySelector(".vam-text-node-body");
+    body == null ? void 0 : body.addClass("vam-sr-only");
+    const input = el.createEl("textarea", {
+      cls: "vam-text-node-input",
+      attr: { rows: "4", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
+    });
+    input.value = text11.text;
+    let done = false;
+    const close = () => {
+      done = true;
+      this.editingTextId = null;
+      input.remove();
+      body == null ? void 0 : body.removeClass("vam-sr-only");
+    };
+    const commit = () => {
+      if (done) return;
+      const value = input.value;
+      close();
+      this.enqueue(() => this.saveTextItem(id, value));
+    };
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        el.focus({ preventScroll: true });
+      } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        commit();
+      }
+    });
+    input.addEventListener("blur", commit);
+    input.focus({ preventScroll: true });
+    (_c = input.select) == null ? void 0 : _c.call(input);
+  }
+  /** Saves edited text as one undo step; an empty text removes the node (still one undo step). */
+  async saveTextItem(id, value) {
+    var _a2, _b2, _c;
+    const current = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "text" && item.id === id
+    );
+    if (!current) return;
+    this.focusItemId = id;
+    if (cleanText(value) === null) {
+      this.focusItemId = null;
+      await this.changeCanvasItems(id, (items) => removeTextNode(items, id));
+      (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.text_node_removed"));
+    } else if (cleanText(value) !== current.text)
+      await this.changeCanvasItems(id, (items) => updateTextNode(items, id, value));
+  }
+  async removeTextItem(id) {
+    var _a2;
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, (items) => removeTextNode(items, id));
+    (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.text_node_removed"));
+  }
+  /**
+   * Turns a text node into a topic card (decision #2): the first line (at most 80 characters) is the title, the whole text the
+   * Current Summary, the card hangs under the same topic (a free node becomes a top-level card at its own place) and the text
+   * item goes away. Built from the normal add-subtopic flow; the whole thing is one undo step.
+   */
+  async promoteTextNode(id) {
+    var _a2, _b2, _c;
+    if (!this.map || !this.canEditText() || this.builtIn || this.map.aim) return;
+    const text11 = ((_a2 = this.map.canvasItems) != null ? _a2 : []).find((item) => item.kind === "text" && item.id === id);
+    if (!text11) return;
+    const parent = (_b2 = this.map.nodes.find((node) => node.id === text11.parentId)) != null ? _b2 : null;
+    const title = text11.text.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+    if (!title) return;
+    const historyMark = this.history.mark();
+    try {
+      const before = new Set(this.map.nodes.map((node) => node.id));
+      await this.addNode(parent, [...title].slice(0, 80).join(""), false, false);
+      const child = this.map.nodes.find((node) => !before.has(node.id));
+      if (!child) return;
+      await this.noteChange(child, { summary: text11.text });
+      await this.mapChange((map) => {
+        var _a3;
+        map.canvasItems = removeTextNode((_a3 = map.canvasItems) != null ? _a3 : [], id);
+        if (!map.canvasItems.length) delete map.canvasItems;
+        const created = map.nodes.find((node) => node.id === child.id);
+        if (!created) return;
+        if (parent) this.arrangeBranch(map, parent.id, /* @__PURE__ */ new Set([created.id]));
+        else {
+          created.x = text11.x;
+          created.y = text11.y;
+        }
+      }, false);
+      await this.plugin.rebuildDerivedData();
+      this.selected = child.id;
+      (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.text_node_promoted"));
+    } finally {
+      this.history.collapseSince(historyMark);
+      this.updateHistoryButtons();
+    }
+  }
+  /** The text nodes the user wrote under `nodeId`, as a read-only block for the prompt; empty when there are none (decision #4). */
+  userTextContext(nodeId) {
+    var _a2, _b2;
+    if (!((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) == null ? void 0 : _b2.length)) return "";
+    const { attached } = treeTextNodes(
+      this.map.canvasItems,
+      this.map.nodes.map((node) => node.id)
+    );
+    return attached.filter((text11) => text11.parentId === nodeId).map((text11) => `- ${text11.text.replace(/\n/g, "\n  ")}`).join("\n");
+  }
+  /** Every text node of the map for the chat context; a free one (its topic is gone) goes with `parentId: null` (decision #4). */
+  chatUserTexts() {
+    var _a2, _b2, _c, _d;
+    const items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [];
+    const ids = new Set(((_d = (_c = this.map) == null ? void 0 : _c.nodes) != null ? _d : []).map((node) => node.id));
+    return items.filter((item) => item.kind === "text").map((text11) => ({
+      id: text11.id,
+      parentId: text11.parentId && ids.has(text11.parentId) ? text11.parentId : null,
+      text: text11.text
+    }));
+  }
+  /** Adds a text node under `parent` (or the selected topic) and opens its editor; one undo step. */
+  addTextNodeUnder(parent) {
+    this.enqueue(async () => {
+      var _a2;
+      if (!this.map || !this.canEditText()) return;
+      const target = parent != null ? parent : this.map.nodes.find((node) => node.id === this.selected);
+      const owner = target && this.map.nodes.find((node) => node.id === target.id);
+      if (!owner) {
+        new import_obsidian32.Notice(t("ui.text_node_select_topic"));
+        return;
+      }
+      const id = `txt-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`;
+      this.pendingTextEditId = id;
+      await this.mapChange((map) => {
+        var _a3;
+        const topic = map.nodes.find((node) => node.id === owner.id);
+        if (!topic) throw new Error(t("ui.text_node_select_topic"));
+        topic.collapsed = false;
+        map.canvasItems = addTextNode((_a3 = map.canvasItems) != null ? _a3 : [], {
+          id,
+          text: t("ui.text_node_placeholder"),
+          parentId: topic.id,
+          x: topic.x + TEXT_NODE_WIDTH,
+          y: topic.y
+        });
+        this.arrangeBranch(map, topic.id, /* @__PURE__ */ new Set([id]));
+      }, false);
+      this.pendingTextEditId = null;
+      (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.text_node_added"));
+    });
   }
   /**
    * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
@@ -48970,7 +49445,7 @@ ${request.requirements}` : preset.text,
   onCanvasContextMenu(event) {
     if (!this.canEditCanvasItems()) return;
     const target = event.target;
-    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))
+    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))
       return;
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     if (!point) return;
@@ -49162,7 +49637,7 @@ ${request.requirements}` : preset.text,
       }
       if (target) {
         map.nodes.find((node) => node.id === target.id).collapsed = false;
-        map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, void 0, layoutOf(map));
+        this.arrangeBranch(map, target.id, moved, void 0);
       } else {
         for (const root of roots)
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id), this.cardHeightOf, layoutOf(map));
@@ -49312,14 +49787,7 @@ ${request.requirements}` : preset.text,
         map.nodes.push(...copies);
         if (found) {
           found.collapsed = false;
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            found.id,
-            new Set(copies.map((copy) => copy.id)),
-            this.cardHeightOf,
-            void 0,
-            layoutOf(map)
-          );
+          this.arrangeBranch(map, found.id, new Set(copies.map((copy) => copy.id)), void 0);
         } else
           for (const top of copies.filter((copy) => copy.parentId === null))
             map.nodes = arrangeNewTree(
@@ -50189,7 +50657,7 @@ ${request.requirements}` : preset.text,
    * pictures alone are over the limit (read no further).
    */
   async collectExportScene(isCurrent) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const map = this.map;
     if (!map) return null;
     const win = window;
@@ -50256,8 +50724,24 @@ ${request.requirements}` : preset.text,
       }
       cards.push(item);
     }
+    for (const el of this.textEls.values()) {
+      const box = boxOf(el);
+      grow(box.x, box.y, box.width, box.height);
+      const style = computed(el);
+      const body = el.querySelector(".vam-text-node-body");
+      cards.push({
+        x: box.x,
+        y: box.y,
+        w: box.width,
+        h: box.height,
+        title: wrapText((_d = body == null ? void 0 : body.textContent) != null ? _d : "", box.width - 28),
+        fill: colorOf(style.backgroundColor),
+        stroke: colorOf(style.borderTopColor),
+        textColor: colorOf(computed(body != null ? body : el).color)
+      });
+    }
     const images = [];
-    for (const item of (_d = map.canvasItems) != null ? _d : []) {
+    for (const item of (_e = map.canvasItems) != null ? _e : []) {
       if (item.kind !== "image") continue;
       const image = item;
       const href = await imageHref(image.path);
@@ -50268,7 +50752,7 @@ ${request.requirements}` : preset.text,
       images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
     }
     const boundaries = [];
-    for (const item of (_e = map.canvasItems) != null ? _e : []) {
+    for (const item of (_f = map.canvasItems) != null ? _f : []) {
       if (item.kind !== "boundary") continue;
       const frame = item;
       const box = boundaryBounds(
@@ -50289,26 +50773,26 @@ ${request.requirements}` : preset.text,
         w: box.w,
         h: box.h,
         ...frame.label ? { label: frame.label } : {},
-        stroke: colorOf(computed((_f = this.viewportEl) != null ? _f : this.contentEl).getPropertyValue("--text-muted"))
+        stroke: colorOf(computed((_g = this.viewportEl) != null ? _g : this.contentEl).getPropertyValue("--text-muted"))
       });
     }
     const edges = [];
-    for (const el of Array.from((_h = (_g = this.edgesEl) == null ? void 0 : _g.children) != null ? _h : [])) {
-      if (((_i = el.tagName) == null ? void 0 : _i.toLowerCase()) !== "path") continue;
+    for (const el of Array.from((_i = (_h = this.edgesEl) == null ? void 0 : _h.children) != null ? _i : [])) {
+      if (((_j = el.tagName) == null ? void 0 : _j.toLowerCase()) !== "path") continue;
       const d = el.getAttribute("d");
       const style = computed(el);
       const stroke = colorOf(style.stroke);
       if (!d || !stroke || stroke === "none" || style.display === "none") continue;
       edges.push({ d, stroke });
       try {
-        const bbox = (_j = el.getBBox) == null ? void 0 : _j.call(el);
+        const bbox = (_k = el.getBBox) == null ? void 0 : _k.call(el);
         if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
       } catch (e) {
       }
     }
     if (!cards.length && !images.length) return { refuse: "empty" };
     const margin = 24;
-    const root = computed((_k = this.viewportEl) != null ? _k : this.contentEl);
+    const root = computed((_l = this.viewportEl) != null ? _l : this.contentEl);
     const variable = (name) => colorOf(root.getPropertyValue(name));
     const scene = {
       x: bounds.minX - margin,
@@ -51132,6 +51616,7 @@ ${request.requirements}` : preset.text,
     this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
     this.releaseCovers();
     this.cardEls.clear();
+    this.textEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
     this.edgesEl = createSvg("svg");
@@ -51459,7 +51944,7 @@ ${request.requirements}` : preset.text,
           () => this.mapChange((map) => {
             const n = map.nodes.find((n2) => n2.id === node.id);
             n.collapsed = !n.collapsed;
-            map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+            this.arrangeAll(map);
           })
         )
       );
@@ -51487,6 +51972,11 @@ ${request.requirements}` : preset.text,
           select.addClass("vam-node-tool", "vam-select-subtopics-tool");
           select.setAttr("aria-label", t("ui.select_subtopics_hint"));
         }
+        if (this.canEditText() && !node.aimKind)
+          this.button(tools, t("ui.text_node_add"), () => this.addTextNodeUnder(node)).addClass(
+            "vam-node-tool",
+            "vam-add-text-tool"
+          );
       }
       if (node.aimKind === "question") {
         const remove = this.button(tools, t("ui.node_tool_remove"), () => this.confirmRemoveNode(node));
@@ -52711,7 +53201,7 @@ ${request.requirements}` : preset.text,
           const parent2 = parentId ? map.nodes.find((n) => n.id === parentId) : void 0;
           if (parent2) {
             parent2.collapsed = false;
-            map.nodes = arrangeNewBranch(map.nodes, parent2.id, branch, this.cardHeightOf, void 0, layoutOf(map));
+            this.arrangeBranch(map, parent2.id, branch, void 0);
           } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
         });
       });
@@ -53283,7 +53773,7 @@ ${request.requirements}` : preset.text,
       if (direction) current.layout = { direction };
       else delete current.layout;
       cleanBranchLayouts(map.nodes, layoutOf(map).direction);
-      map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+      this.arrangeAll(map);
     }, false);
   }
   /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
@@ -53596,14 +54086,7 @@ ${request.requirements}` : preset.text,
             var _a3;
             return n.y + ((_a3 = this.cardHeightOf(n.id)) != null ? _a3 : DEFAULT_CARD_HEIGHT);
           })) + LAYOUT_GAP : void 0;
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            owner.id,
-            /* @__PURE__ */ new Set([node.id]),
-            this.cardHeightOf,
-            minTop,
-            layoutOf(map)
-          );
+          this.arrangeBranch(map, owner.id, /* @__PURE__ */ new Set([node.id]), minTop);
         } else if (!parent) {
           const roots = map.nodes.filter((n) => n.id !== node.id && !n.parentId);
           if (roots.length)
@@ -53882,14 +54365,7 @@ ${request.requirements}` : preset.text,
       if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
       if (newNodes.length)
         await this.mapChange((map) => {
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            parent.id,
-            new Set(newNodes.map((node) => node.id)),
-            this.cardHeightOf,
-            void 0,
-            layoutOf(map)
-          );
+          this.arrangeBranch(map, parent.id, new Set(newNodes.map((node) => node.id)), void 0);
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map((node) => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
@@ -54455,6 +54931,7 @@ ${request.requirements}` : preset.text,
             detail: note.detail,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node, promptLanguage),
+            userTexts: this.userTextContext(node.id),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -54565,6 +55042,7 @@ ${request.requirements}` : preset.text,
           detail: note.detail,
           task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node, (_f = options == null ? void 0 : options.outputLanguage) != null ? _f : language2),
+          userTexts: this.userTextContext(node.id),
           workingFindings: note.newFindings,
           onWorkingFindingsSent: (sent) => {
             findingsSent = sent === note.newFindings;
@@ -55615,7 +56093,7 @@ ${note.detail.trim()}` : "",
     );
     viewport.addEventListener("pointerdown", (event) => {
       const target = event.target;
-      if (target.closest(".vam-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
+      if (target.closest(".vam-node") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
         return;
       const intent = canvasPointerIntent({
         button: event.button,
@@ -56131,6 +56609,7 @@ ${note.detail.trim()}` : "",
       references: attached.filter((chip) => chip.kind === "topic").map((chip) => ref(chip.id)).filter(notNull).filter((item) => !selectedIds.includes(item.id)),
       snippets,
       files,
+      userTexts: this.chatUserTexts(),
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns()
     });
@@ -56688,7 +57167,7 @@ ${note.detail.trim()}` : "",
             if (!same2() || !this.map) return;
             this.flushChatRender();
             await this.mapChange((map) => {
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+              this.arrangeAll(map);
             }, false);
             const nodes = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b3 : [];
             const fresh = run.created.map((id) => nodes.find((node) => node.id === id)).filter((n) => !!n);
@@ -56928,14 +57407,14 @@ ${note.detail.trim()}` : "",
         await this.mapChange((map) => {
           const target = map.nodes.find((item) => item.id === node.id);
           if (target) target.collapsed = collapsed;
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+          this.arrangeAll(map);
         });
         return done;
       }
       case "auto_layout":
         this.flushChatRender();
         await this.mapChange((map) => {
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+          this.arrangeAll(map);
         }, false);
         return done;
       case "focus_topic": {
@@ -57863,7 +58342,8 @@ ${addition}` : addition });
               const root = current.parentId ? map.nodes.find((n) => n.id === current.parentId) : void 0;
               if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
                 const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
-                map.nodes = arrangeMap(reordered, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+                map.nodes = reordered;
+                this.arrangeAll(map);
                 return;
               }
               current.x = Math.round(position.x);
@@ -58118,7 +58598,7 @@ ${addition}` : addition });
     );
   }
   drawEdges() {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     if (!this.edgesEl || !this.stageEl || !this.map) return;
     this.edgesEl.replaceChildren();
     this.edgeEls.clear();
@@ -58155,6 +58635,27 @@ ${addition}` : addition });
         this.edgesEl.appendChild(path);
         this.edgeEls.set(`${parentId}\0${node.id}`, path);
       }
+    }
+    for (const [textId, textEl] of this.textEls) {
+      const text11 = ((_d = this.map.canvasItems) != null ? _d : []).find(
+        (item) => item.kind === "text" && item.id === textId
+      );
+      const parent = (text11 == null ? void 0 : text11.parentId) ? this.cardEls.get(text11.parentId) : void 0;
+      if (!text11 || !parent || textEl.classList.contains("is-free")) continue;
+      const direction = directionOf(text11.parentId);
+      const path = createSvg("path");
+      path.setAttribute(
+        "d",
+        direction === "right" ? edgePathData(
+          parent.offsetLeft + parent.offsetWidth,
+          parent.offsetTop + parent.offsetHeight / 2,
+          textEl.offsetLeft,
+          textEl.offsetTop + textEl.offsetHeight / 2
+        ) : treeEdgePathData(boxOf(parent), boxOf(textEl), direction, depthOf(allNodes, text11.parentId) + 1)
+      );
+      path.addClass("vam-edge", "vam-text-edge");
+      if (!this.map.aim && !this.builtIn) path.setAttribute("data-parent-line", "");
+      this.edgesEl.appendChild(path);
     }
     if (mapDirection === "fishbone") {
       for (const node of this.canvasNodes()) {
@@ -58460,6 +58961,7 @@ ${addition}` : addition });
         detail: note.detail,
         task: note.prompt,
         ancestors: await this.ancestorContext(node, (_f = overrides == null ? void 0 : overrides.outputLanguage) != null ? _f : this.plugin.settings.language),
+        userTexts: this.userTextContext(node.id),
         workingFindings: note.newFindings,
         sourceContext: "",
         mode: "task",
@@ -59407,6 +59909,25 @@ var optionalText = (value) => {
   const trimmed2 = value == null ? void 0 : value.trim();
   return trimmed2 ? trimmed2 : void 0;
 };
+var SHARE_TEXT_LIMIT = 2e3;
+function shareTextNodes(map) {
+  var _a2;
+  const ids = new Set(map.nodes.map((node) => node.id));
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const item of (_a2 = map.canvasItems) != null ? _a2 : []) {
+    const raw = item;
+    if (raw.kind !== "text" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (typeof raw.text !== "string") continue;
+    const text11 = raw.text.trim().slice(0, SHARE_TEXT_LIMIT);
+    if (!text11 || typeof raw.x !== "number" || typeof raw.y !== "number") continue;
+    if (!Number.isFinite(raw.x) || !Number.isFinite(raw.y)) continue;
+    seen.add(raw.id);
+    const parentId = typeof raw.parentId === "string" && ids.has(raw.parentId) ? raw.parentId : null;
+    out.push({ id: raw.id, parentId, text: text11, x: raw.x, y: raw.y });
+  }
+  return out;
+}
 function buildSharePayload(map, notesById, options) {
   if (map.aim || map.nodes.some((node) => node.aimKind !== void 0))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
@@ -59442,6 +59963,7 @@ function buildSharePayload(map, notesById, options) {
     return out;
   });
   const goal = optionalText(options.goal);
+  const textNodes = shareTextNodes(map);
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -59452,6 +59974,7 @@ function buildSharePayload(map, notesById, options) {
     source: { vamVersion: options.vamVersion, mapId: map.id },
     viewport: { x: map.viewport.x, y: map.viewport.y, zoom: map.viewport.zoom },
     nodes,
+    ...textNodes.length ? { textNodes } : {},
     assets: options.includeImages ? { ...options.assets } : {}
   };
 }
@@ -60979,8 +61502,8 @@ function shareViewerUiExtras(languages) {
 }
 
 // experiences/sharing/viewer-bundle.generated.ts
-var SHARE_VIEWER_JS = '(()=>{function We(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}function Ye(t){var n;let r=t.aimKind==="question"?[]:(n=t.aimConvergesFromNodeIds)!=null?n:[];return[...t.parentId?[t.parentId]:[],...r.filter(s=>s!==t.parentId)]}function me(t,r){let n=new Set,s=[r];for(;s.length;){let i=s.pop();for(let c of t)c.parentId===i&&c.id!==r&&!n.has(c.id)&&(n.add(c.id),s.push(c.id))}return n}function ge(t,r){let n=new Map(t.map(c=>[c.id,c])),s=c=>{let p=0,a=new Set([c.id]);for(let m=c.parentId;m&&n.has(m)&&!a.has(m);m=n.get(m).parentId)a.add(m),p++;return p},i=new Set(t.map(c=>c.parentId).filter(c=>!!c&&n.has(c)));for(let c of t)i.has(c.id)&&(c.collapsed=r===null?!1:s(c)>=r)}function he(t){if(t>150)return"right";if(t<-150)return"left"}function Xe(t,r,n,s={left:0,right:0}){let i={...s},c=new Map;for(let p of t){let a=i.left<i.right?"left":"right";c.set(p.id,a),i[a]+=r(p)+n}return c}function Ge(t,r,n,s){let i=t.map(s),c={left:0,right:0};t.forEach((a,m)=>{let g=i[m];g&&(c[g]+=r(a)+n)});let p=Xe(t.filter((a,m)=>!i[m]),r,n,c);return new Map(t.map((a,m)=>{var g;return[a.id,(g=i[m])!=null?g:p.get(a.id)]}))}function Wn(t){return t==="right"||t==="left"||t==="down"||t==="up"}function qe(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function qt(t){if(!(t!=null&&t.parentId))return;let r=t.layout;if(!r||typeof r!="object"||Array.isArray(r))return;let n=r.direction;return Wn(n)?n:void 0}function Ze(t){let{width:r,column:n,mapDirection:s,engine:i}=t,c=(p,a)=>{var L,F;let m=[],g=(x,l)=>{for(let M of[...t.kidsOf(x),...t.joinsOf(x)])qt(M)?m.push({node:M,root:l}):g(M,l)};for(let x of p)g(x,x);let f={roots:p,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!m.length)return i(a,f);let h=a==="down"||a==="up",T=m.map(({node:x,root:l})=>{let M=c([x],qt(x)),C=1/0,b=-1/0,A=1/0,z=-1/0,E=new Map,$=v=>{E.set(v.id,v);for(let S of[...t.kidsOf(v),...t.joinsOf(v)])$(S)};$(x);for(let[v,S]of M)C=Math.min(C,S.x),b=Math.max(b,S.x+r),A=Math.min(A,S.y),z=Math.max(z,S.y+t.heightFor(E.get(v)));let w=Math.max(1,Math.ceil((b-C+n-r)/n));return{node:x,root:l,placed:M,minX:C,maxX:b,minY:A,maxY:z,slots:w}}),k=new Map(T.map(x=>[x.node.id,x])),H=x=>{let l=k.get(x.id);return!l||!h?[]:Array.from({length:l.slots},(M,C)=>({id:`${x.id}\\0pad${C}`}))},I=new Set,O=i(a,{roots:p,kidsOf:x=>{if(!k.has(x.id))return t.kidsOf(x);let l=H(x);for(let M of l)I.add(M.id);return l},joinsOf:x=>k.has(x.id)?[]:t.joinsOf(x),heightFor:x=>{if(I.has(x.id))return 0;let l=k.get(x.id);return l&&!h?l.maxY-l.minY:t.heightFor(x)}}),P=new Map;for(let[x,l]of O)!I.has(x)&&!k.has(x)&&P.set(x,l);for(let x of T){let l=O.get(x.node.id),M,C;h?(M=l.x+n/2-(x.minX+x.maxX)/2,C=a==="down"?l.y-x.minY:l.y+t.heightFor(x.node)-x.maxY):(M=a==="right"||a==="balanced"&&l.x>=((F=(L=O.get(x.root.id))==null?void 0:L.x)!=null?F:l.x)?l.x-x.minX:l.x+r-x.maxX,C=l.y-x.minY);for(let[b,A]of x.placed)P.set(b,{x:A.x+M,y:A.y+C})}return P};return c(t.roots,s)}var Qe=1/Math.tan(Math.PI/3);function Je(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:c,column:p,gap:a,left:m,top:g}=t,f=p-c,h=R=>[...n(R),...s(R)],T=r.map(R=>{let O=new Map,P=E=>E.reduce(($,w)=>$+O.get(w.id),0)+Math.max(0,E.length-1)*a,L=E=>{let $=h(E);for(let w of $)L(w);O.set(E.id,Math.max(i(E),P($)))},F=(E,$,w,v)=>{let S=h(E),K=w+(O.get(E.id)-P(S))/2,V=S.map(Q=>{let G=F(Q,$+1,K,v);return K+=O.get(Q.id)+a,G}),J=i(E),Y=V.length?(V[0]+V[V.length-1])/2:w+O.get(E.id)/2;return v.push({id:E.id,x:-$*p,centre:Y,height:J}),Y},x=h(R).map((E,$)=>{let w=$%2===0?1:-1,v=h(E);for(let rt of v)L(rt);let S=[],K=a;for(let rt of v){let ht=S.length,dt=F(rt,0,K,S)*Qe-f;for(let j=ht;j<S.length;j++)S[j].x+=dt-c;K+=O.get(rt.id)+a}let V=Math.max(p,K),J=V*Qe,Y=i(E),Q=[-c/2,...S.map(rt=>rt.x)],G=[c/2,J,...S.map(rt=>rt.x+c)];return{topic:E,side:w,length:V,height:Y,cards:S,minX:Math.min(...Q),maxX:Math.max(...G)}}),l=i(R),M=[{id:R.id,x:0,y:-l/2,height:l}],C={above:-f,below:-f};for(let E of x){let $=E.side===1?"above":"below",w=C[$]-E.maxX,v=-E.side*E.length;M.push({id:E.topic.id,x:w-c/2,y:v-E.side*(E.height/2)-E.height/2,height:E.height});for(let S of E.cards)M.push({id:S.id,x:w+S.x,y:v+E.side*S.centre-S.height/2,height:S.height});C[$]=w+E.minX-f}let b=Math.min(...M.map(E=>E.x)),A=Math.min(...M.map(E=>E.y)),z=Math.max(...M.map(E=>E.y+E.height));return{out:M,minX:b,minY:A,maxY:z}}),k=new Map,H=m+Math.max(0,...T.map(R=>-R.minX)),I=g;for(let R of T){for(let O of R.out)k.set(O.id,{x:H+O.x,y:I+O.y-R.minY});I+=R.maxY-R.minY+a}return k}var Yn=Math.PI*2,Xn=6,Gn=60;function qn(t,r,n,s){let i=[...t.values()].sort((p,a)=>p.y-a.y),c=new Set;for(let p=0;p<i.length;p++){let a=i[p];for(let m=p+1;m<i.length;m++){let g=i[m];if(g.y>=a.y+a.height+n)break;s&&s.checks++,Math.abs(a.x-g.x)<r&&a.y<g.y+g.height+n&&c.add(Math.max(a.depth,g.depth))}}return c}function tn(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:c,column:p,gap:a,left:m,top:g}=t,f=new Map,h=g;for(let T of r){let k=[],H=new Map,I=w=>[...n(w),...s(w)],R=w=>{let v=I(w),S=v.length?v.reduce((K,V)=>K+R(V),0):1;return H.set(w.id,S),S};R(T);let O=(w,v,S,K)=>{k.push({id:w.id,depth:v,angle:(S+K)/2,height:i(w)});let V=S,J=(K-S)/H.get(w.id);for(let Y of I(w)){let Q=J*H.get(Y.id);O(Y,v+1,V,V+Q),V+=Q}};O(T,0,0,Yn);let P=Math.max(...k.map(w=>w.depth)),L=Array.from({length:P+1},(w,v)=>v*p),F=()=>{let w=[];return L.forEach((v,S)=>w.push(S?Math.max(v,w[S-1]+p):0)),new Map(k.map(v=>{let S=w[v.depth];return[v.id,{x:Math.round(S*Math.sin(v.angle)-c/2),y:Math.round(-S*Math.cos(v.angle)-v.height/2),depth:v.depth,height:v.height}]}))},x=p/Xn,l=()=>(t.stats&&t.stats.rounds++,qn(F(),c,a,t.stats)),M=x,C=l(),b=L.slice();for(let w=0;C.size&&w<Gn;w++){b=L.slice();for(let v of C)L[v]+=M;M*=2,C=l()}if(!C.size&&b.some((w,v)=>L[v]-w>x)){let w=L.slice();for(;w.some((v,S)=>v-b[S]>x);){let v=w.map((S,K)=>(S+b[K])/2);L.splice(0,L.length,...v),l().size?b=v:w=v}L.splice(0,L.length,...w)}let A=F(),z=Math.min(...[...A.values()].map(w=>w.x)),E=Math.min(...[...A.values()].map(w=>w.y)),$=Math.max(...[...A.values()].map(w=>w.y+w.height));for(let[w,v]of A)f.set(w,{x:Math.round(m)+v.x-z,y:h+v.y-E});h+=$-E+a}return f}function Zt(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,column:c,rowGap:p,flip:a,left:m,top:g}=t,f=new Map,h=new Map,T=b=>b.reduce((A,z)=>A+f.get(z.id),0),k=b=>{let A=n(b),z=s(b);for(let E of[...A,...z])k(E);f.set(b.id,Math.max(c,T(A),T(z))),h.set(b.id,1+Math.max(0,...A.map(E=>h.get(E.id))))},H=new Map,I=new Map,R=(b,A,z)=>{let E=n(b),$=s(b),w=f.get(b.id),v=(J,Y)=>{let Q=z+(w-T(J))/2;return J.map(G=>{R(G,Y,Q);let rt=H.get(G.id);return Q+=f.get(G.id),rt})},S=v(E,A+1),K=v($,A+h.get(b.id)),V=S.length?S:K;I.set(b.id,A),H.set(b.id,V.length?(V[0]+V[V.length-1])/2:z)},O=m,P=[],L=b=>{P.push(b);for(let A of[...n(b),...s(b)])L(A)};for(let b of r)k(b),R(b,0,O),O+=f.get(b.id),L(b);let F=Math.max(0,...I.values()),x=Array.from({length:F+1},()=>0);for(let b of P)x[I.get(b.id)]=Math.max(x[I.get(b.id)],i(b));let l=[],M=g;for(let b=0;b<=F;b++){let A=a?F-b:b;l[A]=M,M+=x[A]+p}let C=new Map;for(let b of P){let A=I.get(b.id),z=a?l[A]+x[A]-i(b):l[A];C.set(b.id,{x:H.get(b.id),y:z})}return C}function en(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:c,column:p,gap:a,left:m,top:g}=t,f=new Map,h=g;for(let T of r){let k=new Map,H=L=>{k.set(L.id,i(L));for(let F of[...n(L),...s(L)])H(F)};H(T);let I=[{id:T.id,x:m,y:0}],R=m+p;[...n(T),...s(T)].forEach((L,F)=>{let x=Zt({roots:[L],kidsOf:n,joinsOf:s,heightFor:i,column:p,rowGap:p-c,flip:F%2===1,left:R,top:0}),l=x.get(L.id).y,M=R;for(let[C,b]of x)I.push({id:C,x:b.x,y:b.y-l}),M=Math.max(M,b.x);R=M+p});let O=Math.min(...I.map(L=>L.y)),P=Math.max(...I.map(L=>L.y+k.get(L.id)));for(let L of I)f.set(L.id,{x:L.x,y:h+L.y-O});h+=P-O+a}return f}var zt=300;function Zn(t){var r;return Math.max(0,((r=t.width)!=null?r:280)-280)}var Qn=24,Jn={compact:{column:330,gap:12},standard:{column:360,gap:Qn},spacious:{column:420,gap:48}};function tr(t){return t==="compact"||t==="spacious"}var er=180;function nr(t){let r=typeof t=="string"?t:t.direction,n=typeof t=="string"?void 0:t.spacing;return{direction:r,...Jn[tr(n)?n:"standard"]}}var rr=t=>t==="left"?-1:1;var or=(t,r)=>{let n=t==null?void 0:t(r);return n!==void 0&&Number.isFinite(n)&&n>0?n:er};function ir(t,r){var m,g;let n=new Map(t.map(f=>[f.id,f])),s=new Map,i=new Map,c=(f,h,T)=>{var k;return f.set(h,[...(k=f.get(h))!=null?k:[],T])};for(let f of t){if(!f.parentId)continue;let h=f.aimKind!=="question"&&((m=f.aimConvergesFromNodeIds)!=null&&m.length)?Ye(f).map(k=>n.get(k)):[],T=(g=h[0])==null?void 0:g.parentId;T&&n.has(T)&&h.every(k=>k&&k.parentId===T)?c(i,T,f):c(s,f.parentId,f)}return{kidsOf:f=>{var h;return r&&f.collapsed?[]:(h=s.get(f.id))!=null?h:[]},joinsOf:f=>{var h;return r&&f.collapsed?[]:((h=i.get(f.id))!=null?h:[]).filter(T=>{var k;return!(r&&((k=n.get(T.parentId))!=null&&k.collapsed))})}}}function ye(t){var x;let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,column:c,gap:p,sign:a,left:m,top:g}=t,f=new Map,h=new Map,T=new Map,k=new Map,H=new Map,I=l=>l.reduce((M,C)=>M+h.get(C.id),0)+Math.max(0,l.length-1)*p,R=l=>{let M=n(l),C=s(l);H.set(l.id,l);for(let b of[...M,...C])R(b);h.set(l.id,Math.max(i(l),I(M),I(C))),T.set(l.id,1+Math.max(0,...M.map(b=>T.get(b.id))))},O=(l,M,C)=>{let b=n(l),A=s(l),z=h.get(l.id),E=(J,Y)=>{let Q=C+(z-I(J))/2;return J.map(G=>{let rt=O(G,Y,Q);return Q+=h.get(G.id)+p,rt})},$=E(b,M+1),w=E(A,M+T.get(l.id)),v=$.length?b:A,S=$.length?$:w,K=i(l),V=C+(z-K)/2;if(S.length){let J=S[0]+i(v[0])/2,Y=S[S.length-1]+i(v[v.length-1])/2;V=(J+Y)/2-K/2}return f.set(l.id,{x:0,y:g+V}),k.set(l.id,M),V},P=0;for(let l of r)R(l),O(l,0,P),P+=h.get(l.id)+p;let L=[];for(let[l,M]of k)L[M]=Math.max((x=L[M])!=null?x:0,Zn(H.get(l)));let F=l=>{var C,b;let M=0;if(a>0)for(let A=0;A<l;A++)M+=(C=L[A])!=null?C:0;else for(let A=1;A<=l;A++)M+=(b=L[A])!=null?b:0;return M};for(let[l,M]of f){let C=k.get(l);M.x=m+a*(C*c+F(C))}return{placed:f,sizes:h}}function sr(t,r,n){let{roots:s,kidsOf:i,joinsOf:c,heightFor:p,gap:a,left:m,top:g}=r,f=ye({...r,sign:1}).sizes,h=new Map(t.map(O=>[O.id,O])),T=s.map(O=>{var x;let P=(x=h.get(O.id))!=null?x:O,L=Ge(i(O),l=>f.get(l.id),a,l=>{var M;return n?void 0:he(((M=h.get(l.id))!=null?M:l).x-P.x)}),F=l=>ye({...r,roots:[O],kidsOf:M=>M.id===O.id?i(M).filter(C=>L.get(C.id)===l):i(M),joinsOf:M=>M.id===O.id&&l==="left"?[]:c(M),sign:l==="left"?-1:1,left:0,top:0}).placed;return{root:O,right:F("right"),left:F("left")}}),k=Math.max(0,...T.flatMap(({left:O})=>[...O.values()].map(P=>-P.x))),H=m+k,I=new Map,R=0;for(let{root:O,right:P,left:L}of T){let F=A=>A.get(O.id).y+p(O)/2,x=Math.max(F(P),F(L)),l=[];for(let A of[{placed:P,isLeft:!1},{placed:L,isLeft:!0}]){let{placed:z,isLeft:E}=A,$=x-F(z);for(let[w,v]of z)E&&w===O.id||l.push([w,{x:H+v.x,y:v.y+$}])}let M=A=>p(h.get(A)),C=Math.min(...l.map(([,A])=>A.y)),b=Math.max(...l.map(([A,z])=>z.y+M(A)));for(let[A,z]of l)I.set(A,{x:z.x,y:g+R+z.y-C});R+=b-C+a}return I}function ar(t,r,n,s,i=!1,c,p="right",a=!1){let{direction:m,column:g,gap:f}=nr(p),{kidsOf:h,joinsOf:T}=ir(t,i),k=R=>or(c,R.id),H=(R,O)=>{if(R==="down"||R==="up")return Zt({...O,column:g,rowGap:g-zt,flip:R==="up",left:n,top:s});let P={...O,column:g,gap:f,left:n,top:s};if(R==="radial")return tn({...P,width:zt});if(R==="timeline")return en({...P,width:zt});if(R==="fishbone")return Je({...P,width:zt});let L={...P,sign:rr(R)};return R==="balanced"?sr(t,L,a):ye(L).placed},I={roots:r,kidsOf:h,joinsOf:T,heightFor:k};return qe(m)&&t.some(R=>qt(R))?Ze({...I,width:zt,column:g,mapDirection:m,engine:H}):H(m,I)}function nn(t,r,n,s="right",i={}){let c=r!=null&&r.size?t.filter(m=>!r.has(m.id)):t,p=c.filter(m=>!m.parentId),a=ar(c,p,80,80,!0,n,s,i.reset===!0);return t.map(m=>({...m,...a.get(m.id)}))}function rn(t,r){return!r||!(r.bottom>r.top)?0:Math.max(0,Math.ceil(r.bottom-t))+8}function on(t,r,n,s){let i=t.zoom;return{zoom:i,x:n.width/2-r.x*i,y:s+(n.height-s)/2-r.y*i}}function sn(t,r,n,s=1.2){let i=Math.max(1,r.height-n),c=t.maxX-t.minX,p=t.maxY-t.minY,a=Math.max(.25,Math.min(s,(r.width-80)/c,(i-80)/p));return{zoom:a,x:(r.width-c*a)/2-t.minX*a,y:n+(i-p*a)/2-t.minY*a}}var Qt={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function be(t){let r=3735928559,n=1103547991;for(let s=0;s<t.length;s++){let i=t.charCodeAt(s);r=Math.imul(r^i,2654435761),n=Math.imul(n^i,1597334677)}return r=Math.imul(r^r>>>16,2246822507)^Math.imul(n^n>>>13,3266489909),n=Math.imul(n^n>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),(4294967296*(2097151&n)+(r>>>0)).toString(36)}var xt="\\u27E6",Mt="\\u27E7",Ft=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,cn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),xe=new Set(["pre","script","style","textarea","template","noscript"]),lr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),cr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),dr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,ur=/\\p{L}/u,$t=t=>t.localName.toLowerCase(),dn=t=>{var r;return((r=t.getAttribute("class"))!=null?r:"").split(/\\s+/).filter(Boolean)},Jt=t=>Array.from(t.childNodes).filter(r=>r.nodeType===1);function un(t){for(let r of Jt(t))if(cn.has($t(r))||xe.has($t(r))||un(r))return!0;return!1}function pn(t){let r=$t(t);return xe.has(r)?"skip":lr.has(r)||t.getAttribute("translate")==="no"||dn(t).some(n=>cr.has(n))?"atom":cn.has(r)||un(t)?"block":"inline"}function pr(t,r){return t.replace(dr,n=>(r.push({literal:n,atom:!0}),`${xt}${r.length}/${Mt}`))}function fr(t,r){let n="",s=i=>{var p;if(i.nodeType===3){n+=pr((p=i.nodeValue)!=null?p:"",r);return}if(i.nodeType!==1){r.push({node:i,atom:!0}),n+=`${xt}${r.length}/${Mt}`;return}let c=i;if(pn(c)==="inline"){r.push({node:c,atom:!1});let a=r.length;n+=`${xt}${a}${Mt}`;for(let m of Array.from(c.childNodes))s(m);n+=`${xt}/${a}${Mt}`;return}r.push({node:c,atom:!0}),n+=`${xt}${r.length}/${Mt}`};for(let i of t)s(i);return n}function an(t){return ur.test(t.replace(Ft,""))}function fn(t){let r=[],n=p=>{let a=p.getAttribute("alt");a&&an(a)&&r.push({index:r.length,kind:"attribute",text:a.trim(),nodes:[],lead:"",trail:"",parts:[],element:p,attribute:"alt"})},s=p=>{for(let a of Jt(p)){let m=$t(a);xe.has(m)||m==="svg"||(m==="img"?n(a):s(a))}},i=p=>{if(!p.length)return;let a=[],m=fr(p,a),g=m.trim();if(!g||!an(g)||m.includes("\\u27E6\\u27E6"))return;let f=m.replace(Ft,"");if(f.includes(xt)||f.includes(Mt))return;let h=m.slice(0,m.length-m.trimStart().length),T=m.slice(m.trimEnd().length);r.push({index:r.length,kind:"run",text:g,nodes:p,lead:h,trail:T,parts:a})},c=p=>{let a=[];for(let m of Array.from(p.childNodes)){if(m.nodeType===3){a.push(m);continue}if(m.nodeType!==1){i(a),a=[];continue}let g=m,f=pn(g);f==="atom"||f==="inline"?a.push(g):(i(a),a=[],f==="block"&&c(g))}i(a)};return s(t),c(t),{units:r}}var ln=t=>[...t.matchAll(Ft)].map(r=>r[0]);function mr(t,r){if(!r.trim())return!1;let n=ln(t),s=ln(r);if(n.length!==s.length||n.some((c,p)=>c!==s[p]))return!1;let i=r.replace(Ft,"");return!i.includes(xt)&&!i.includes(Mt)}function gr(t,r,n){var m;let s=[],i=[],c=g=>{let f=i[i.length-1];f?f.appendChild(g):s.push(g)},p=g=>{g&&c(n.createTextNode(g))};p(t.lead);let a=0;for(let g of r.matchAll(Ft)){p(r.slice(a,g.index)),a=((m=g.index)!=null?m:0)+g[0].length;let f=t.parts[Number(g[2])-1];if(g[1]==="/")i.pop();else if(g[3]==="/")f.literal!==void 0?p(f.literal):f.node&&c(f.node.cloneNode(!0));else if(f.node){let h=f.node.cloneNode(!1);c(h),i.push(h)}}return p(r.slice(a)),p(t.trail),s}function mn(t,r){var i,c,p;let n={applied:0,kept:0},s=[...t.units.filter(a=>a.kind==="attribute"),...t.units.filter(a=>a.kind==="run")];for(let a of s){let m=r(a);if(m===void 0||!mr(a.text,m)){n.kept++;continue}if(a.kind==="attribute"){(c=a.element)==null||c.setAttribute((i=a.attribute)!=null?i:"alt",m.trim()),n.applied++;continue}let g=a.nodes[0],f=g==null?void 0:g.parentNode,h=g==null?void 0:g.ownerDocument;if(!g||!f||!h){n.kept++;continue}for(let T of gr(a,m,h))f.insertBefore(T,g);for(let T of a.nodes)(p=T.parentNode)==null||p.removeChild(T);n.applied++}return n}function gn(t){let r=[],n=s=>{for(let i of Jt(s))$t(i)==="svg"?r.push(i):n(i)};return n(t),r}function hn(t,r){let n=[],s=i=>{for(let c of Jt(i))dn(c).includes(r)&&n.push(c),s(c)};return s(t),n}var yn="vam-mermaid-slot",te=1,bn=3,xn=t=>{let r=t;return!!r&&(Array.isArray(r.detailSegments)||Array.isArray(r.detailDiagrams))},hr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),yr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function br(t){var r,n;return t.nodeType===bn?hr((r=t.nodeValue)!=null?r:""):t.nodeType!==te?`\\0${t.nodeType}:${(n=t.nodeValue)!=null?n:""}\\0`:Mn(t)}function Mn(t){let r=t.localName.toLowerCase(),n=t.getAttributeNames().sort().map(s=>{var i;return` ${s}="${yr((i=t.getAttribute(s))!=null?i:"")}"`}).join("");return`<${r}${n}>${xr(t)}</${r}>`}function xr(t){return Array.from(t.childNodes).map(br).join("")}function Mr(t){let r=[],n=s=>{if(r.push(s),s.nodeType===te)for(let i of Array.from(s.childNodes))n(i)};return n(t),r}function Tr(t,r){var s;let n=gn(t);for(let i of n){let c=r();c.setAttribute("class",yn),(s=i.parentNode)==null||s.replaceChild(c,i)}return{root:t,svgs:n,extraction:fn(t)}}function wr(t){let r=t.units.map(n=>`${n.kind}\\0${n.text}`).join("");return`${t.units.length}.${be(r)}`}var vr=t=>be(Mn(t));function Ar(t,r){if(!Array.isArray(r))return!1;let n=Mr(t);for(let s of r){if(!Array.isArray(s)||s.length!==2)return!1;let[i,c]=s;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=n.length)return!1;let p=n[i];if(typeof c=="string"){if(p.nodeType!==bn)return!1;p.nodeValue=c}else if(c&&typeof c=="object"&&!Array.isArray(c)){if(p.nodeType!==te)return!1;for(let[a,m]of Object.entries(c))if(m===null)p.removeAttribute(a);else if(typeof m=="string")p.setAttribute(a,m);else return!1}else return!1}return!0}function Er(t,r,n){if(!t||typeof t!="object")return null;let s=t;if(typeof s.svg=="string"){let i=n(s.svg),c=Array.from(i.childNodes).filter(p=>p.nodeType===te);return c.length===1&&c[0].localName.toLowerCase()==="svg"?c[0]:null}if(typeof s.check=="string"&&s.check===vr(r)){let i=r.cloneNode(!0);return Ar(i,s.patch)?i:null}return null}function Tn(t,r,n){var m,g;let s={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:c}=Tr(t,n.createSlot),p=r.detailSegments;if(p!==void 0||r.detailCheck!==void 0)if(Array.isArray(p)&&p.length===c.units.length&&r.detailCheck===wr(c)){let f=mn(c,T=>{let k=p[T.index];return typeof k=="string"?k:void 0}),h=p.filter(T=>typeof T!="string").length;if(s.applied=f.applied,s.kept=Math.max(0,f.kept-h),n.afterText&&!n.afterText(t))return s.fallback=!0,s}else s.fallback=!0;let a=hn(t,yn);a.length!==i.length&&(s.fallback=!0);for(let[f,h]of a.entries()){let T=i[f];if(!T)break;let k=(m=r.detailDiagrams)==null?void 0:m[f],H=T;if(k){let I=null;try{I=Er(k,T,n.parse)}catch{I=null}I?H=I:s.diagramsKept++}(g=h.parentNode)==null||g.replaceChild(H,h)}return s}function gt(t,r,n){let s=t.createElement(r);return n&&(s.className=n),s}function Nr(t,r){var p;let n=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),s=(p=n==null?void 0:n[1])!=null?p:t,[i,c=""]=r.imageSource.split("{0}");return[i,s,c]}function kr(t,r,n){let[s,i,c]=Nr(r,n),p=gt(t,"span");p.className="vam-image-source";let a=gt(t,"a");return a.setAttribute("href",r),a.setAttribute("target","_blank"),a.setAttribute("rel","noopener noreferrer"),a.textContent=i,p.append(t.createTextNode(s),a,t.createTextNode(c)),p}function Me(t,r,n,s,i){wn(t,r,new DOMParser().parseFromString(n,"text/html").body,s,i)}function wn(t,r,n,s,i){var p,a,m,g;for(let f of Array.from(n.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))f.remove();for(let f of Array.from(n.querySelectorAll("*")))for(let h of f.getAttributeNames()){let T=(p=f.getAttribute(h))!=null?p:"",k=h.toLowerCase();(k.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(k)&&/^\\s*(javascript|vbscript):/i.test(T))&&f.removeAttribute(h)}let c=()=>{let f=gt(t,"span");return f.className="vam-image-omitted",f.textContent=i.imageOmitted,f};for(let f of Array.from(n.querySelectorAll("img"))){let h=(a=f.getAttribute("src"))!=null?a:"";if(h.startsWith("vam-asset:")){let T=s[h.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?f.setAttribute("src",T):f.replaceWith(c())}else if(/^https?:\\/\\//i.test(h)){f.setAttribute("referrerpolicy","no-referrer"),f.setAttribute("loading","lazy");let T=f.closest("a");(T!=null?T:f).after(kr(t,h,i))}else/^data:image\\//i.test(h)||f.replaceWith(c())}for(let f of Array.from(n.querySelectorAll("a"))){let h=(m=f.getAttribute("href"))!=null?m:"";/^(https?:|mailto:)/i.test(h)?(f.setAttribute("target","_blank"),f.setAttribute("rel","noopener noreferrer")):h.startsWith("#")||f.removeAttribute("href")}for(let f of Array.from(n.querySelectorAll("table"))){if((g=f.parentElement)!=null&&g.classList.contains("vam-table-scroll"))continue;let h=gt(t,"div");h.className="vam-table-scroll",f.replaceWith(h),h.append(f)}r.append(...Array.from(n.childNodes).map(f=>t.importNode(f,!0)))}function vn(t,r,n,s,i,c){let p=a=>new DOMParser().parseFromString(a,"text/html").body;try{let a=p(n);Tn(a,s,{parse:p,createSlot:()=>gt(t,"div")}),wn(t,r,a,i,c)}catch{r.replaceChildren(),Me(t,r,n,i,c)}}function An(t,r,n,s){let i=Math.max(60,Math.abs(n-t)/2);return`M ${t} ${r} C ${t+i} ${r}, ${n-i} ${s}, ${n} ${s}`}var Te=["red","orange","yellow","green","blue","purple"];function En(t){let r=t["topic-color"];return Te.find(n=>n===r)}var Lr=["done","warning","star","priority-1","priority-2","priority-3"];var Sr={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3"};function Nn(t){let r=t["topic-markers"];return Array.isArray(r)?Lr.filter(n=>r.includes(n)):[]}function kn(t){return Sr[t]}var Or=(t,r)=>t.toLowerCase()===r.toLowerCase(),ee=(t,r)=>t.find(n=>Or(n,r));function Cr(t,r){if(typeof t!="string"||!t.trim())return;let n=ee(r,t.trim());if(n)return n;let s=t.trim().toLowerCase().split(/[-_]/),i=s[0];if(i==="zh"){let p=s.slice(1).some(a=>a==="hant"||a==="tw"||a==="hk"||a==="mo")?"TW":"CN";return ee(r,`${i}-${p}`)}return r.find(c=>c.toLowerCase().split(/[-_]/)[0]===i)}function Ln(t){let{languages:r}=t,n=r[0];if(typeof t.stored=="string"){let s=ee(r,t.stored);if(s)return s}if(typeof t.defaultLanguage=="string"){let s=ee(r,t.defaultLanguage);if(s)return s}for(let s of t.browser){let i=Cr(s,r);if(i)return i}return n}function Sn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Ir="https://github.com/kevcltsai/visual-agent-map?ref=share",Rr="und",ne="http://www.w3.org/2000/svg",On="vam-share-panel-width",Cn="vam-share-outline-open",Dr="(max-width: 600px)",_r=300,we=240,Pr=.25,Hr=2,zr=4,Br={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},$r={core:"target",support:"library",side:"skip"},In=t=>t==="core"||t==="support"||t==="side",Tt=(t,r)=>t.replace("{0}",String(r));function Ee(t,r){var s;let n=(s=t.getElementById(r))==null?void 0:s.textContent;if(n)try{return JSON.parse(n)}catch{return}}function Rn(t){let r={...Qt};if(t&&typeof t=="object")for(let i of Object.keys(r)){let c=t[i];typeof c=="string"&&(r[i]=c)}let n=t&&typeof t=="object"?t.markerNames:void 0;if(n&&typeof n=="object"){r.markerNames={...Qt.markerNames};for(let i of Object.keys(r.markerNames)){let c=n[i];typeof c=="string"&&c.trim()&&(r.markerNames[i]=c)}}let s=t&&typeof t=="object"?t.colorNames:void 0;if(r.colorNames={...Qt.colorNames},s&&typeof s=="object")for(let i of Te){let c=s[i];typeof c=="string"&&c.trim()&&(r.colorNames[i]=c)}return r}function Fr(t){let r=Ee(t,"vam-ui"),n=new Map,s={};if(r&&typeof r=="object"){if(r.uiByLanguage&&typeof r.uiByLanguage=="object")for(let[i,c]of Object.entries(r.uiByLanguage))n.set(i,Rn(c));if(r.languageNames&&typeof r.languageNames=="object")for(let[i,c]of Object.entries(r.languageNames))typeof c=="string"&&c&&(s[i]=c)}return{sets:n,names:s}}var ct=t=>typeof t=="string"&&t.trim()!=="";function ve(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ae(t,r){try{window.localStorage.setItem(t,r)}catch{}}var pt=()=>window.matchMedia(Dr).matches;function Dn(t){var Fe,Ue,je,Ke;let r=Rn(Ee(t,"vam-ui")),n=r;t.documentElement.lang=n.lang;let s=t.getElementById("vam-app"),i=Ee(t,"vam-map");if(!s)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){s.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let c=i.assets&&typeof i.assets=="object"?i.assets:{},p=new Map,a=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||p.has(e.id))continue;p.set(e.id,e);let o=We(e.width);a.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...o!==void 0&&o!==280?{width:o}:{}})}let m=new Map(a.map(e=>[e.id,e]));for(let e of a)e.parentId&&(!m.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let g=new Map;for(let e of a)e.parentId&&g.set(e.parentId,[...(Fe=g.get(e.parentId))!=null?Fe:[],e]);let f=Fr(t),h=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(ct))):[],T=Sn((Ue=i.source)==null?void 0:Ue.mapId),k=h.length>=2,H=k?h[0]:"",I=H;if(k){let e=[];try{e=Array.from((je=window.navigator.languages)!=null?je:[window.navigator.language]).filter(ct)}catch{}I=Ln({languages:h,stored:T?ve(T):null,defaultLanguage:ct(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let R=e=>{var o;return(o=f.sets.get(e))!=null?o:r},O=k&&H===Rr,P=()=>k&&I!==H;k&&(n=R(I),t.documentElement.lang=I);let L=e=>{var d;let o=P()?(d=e.translations)==null?void 0:d[I]:void 0;return!o||typeof o!="object"?e:{title:ct(o.title)?o.title:e.title,summary:ct(o.summary)?o.summary:e.summary,reason:ct(o.reason)?o.reason:e.reason,detailHtml:ct(o.detailHtml)?o.detailHtml:e.detailHtml,...xn(o)&&ct(e.detailHtml)?{compact:o,detailHtml:e.detailHtml}:{}}},F=()=>{var u;let e=P()?(u=i.translations)==null?void 0:u[I]:void 0,o=ct(e==null?void 0:e.title)?e.title:i.title,d=ct(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof o=="string"&&o.trim()||n.untitledMap,goal:typeof d=="string"?d.trim():""}},x=(e,o)=>{var d;try{let u=new Intl.DisplayNames([o!=null?o:e],{type:"language"}).of(e);if(u&&u!==e)return u}catch{}return(d=f.names[e])!=null?d:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),o=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};o(),e.addEventListener("change",o)}catch{}let l=(e,o,d)=>{let u=gt(t,e);return o&&(u.className=o),d!==void 0&&(u.textContent=d),u},M=e=>{let o=t.createElementNS(ne,"svg");o.setAttribute("class","svg-icon"),o.setAttribute("viewBox","0 0 24 24"),o.setAttribute("aria-hidden","true");for(let d of Br[e]){let[u,...y]=d.split("|"),N=t.createElementNS(ne,u);for(let D of y)N.setAttribute(D.slice(0,D.indexOf("=")),D.slice(D.indexOf("=")+1));o.append(N)}return o},C=(e,o,d,u)=>{let y=l("button",d,o);return y.type="button",y.addEventListener("click",N=>{N.stopPropagation(),u()}),e.append(y),y},b=(e,o,d,u)=>{let y=l("button");return y.type="button",y.setAttribute("aria-label",d),y.title=d,y.append(M(o)),y.addEventListener("click",N=>{N.stopPropagation(),u()}),e.append(y),y},A=e=>e==="core"?n.tierCore:e==="support"?n.tierSupport:n.tierSide,z=e=>Nn({"topic-markers":e.markers}),E=()=>/^(zh|ja)/.test(n.lang),$=(e,o)=>{if(!o.length)return e;let d=o.map(u=>n.markerNames[u]).join(E()?"\\u3001":", ");return`${e}${E()?"\\uFF0C":", "}${Tt(n.markerLabel,d)}`},w=e=>En({"topic-color":e.color}),v=e=>{let o=l("span","vam-markers");for(let d of e){let u=l("span","vam-marker",kn(d));u.dataset.marker=d,u.setAttribute("aria-hidden","true"),o.append(u)}return o},S=(e,o)=>{let d=l("span","vam-relevance-tag");d.dataset.tier=e,o&&(d.title=o);let u=l("span","vam-relevance-icon");return u.append(M($r[e])),d.append(u,l("span",void 0,A(e))),d};s.className="vam-app";let K=l("div","vam-toolbar"),V=l("h1","vam-map-switcher"),J=l("span","vam-shared");K.append(V,J);let Y=b(K,"list","",()=>kt(tt.hidden,!0));K.prepend(Y),Y.setAttribute("aria-controls","vam-outline");let Q=l("div","vam-toolbar-actions"),G=l("select","vam-language");if(k){for(let e of h){let o=l("option",void 0,(Ke=f.names[e])!=null?Ke:x(e));o.value=e,O&&e===H&&(o.dataset.original="1"),G.append(o)}G.value=I,Q.append(G)}let rt=l("span","vam-made-with"),ht=l("a","vam-install");ht.href=Ir,ht.target="_blank",ht.rel="noopener noreferrer",Q.append(rt,ht),K.append(Q);let wt=l("div","vam-translate-note");wt.hidden=!0;let dt=l("div","vam-workspace"),j=l("div","vam-viewport"),vt=l("div","vam-stage");vt.setAttribute("role","tree");let Lt=t.createElementNS(ne,"svg");Lt.setAttribute("class","vam-edges"),Lt.setAttribute("aria-hidden","true"),vt.append(Lt),j.append(vt);let Ut=l("div","vam-canvas-overlay"),At=l("div","vam-map-tools"),St=l("span","vam-goal"),Ne=l("span","vam-goal-text");St.append(M("target"),Ne);let ke=l("span","vam-canvas-hint"),ft=l("div","vam-zoom-controls"),_n=b(ft,"minus","",()=>It(1/1.2)),Ot=l("button","vam-zoom","100%");Ot.type="button",Ot.addEventListener("click",e=>{e.stopPropagation(),It(1/U.zoom)}),ft.append(Ot);let Pn=b(ft,"plus","",()=>It(1.2)),Hn=b(ft,"max","",()=>Rt()),ut=l("button","vam-layout-button");ut.type="button",ut.setAttribute("aria-haspopup","menu"),ut.setAttribute("aria-expanded","false"),ft.append(ut);let ot=l("div","vam-layout-menu");ot.setAttribute("role","menu"),ot.hidden=!0,ft.append(ot),Ut.append(At,ke,ft);let W=l("aside","vam-inspector");W.hidden=!0;let tt=l("nav","vam-outline");tt.id="vam-outline";let Ct=l("div","vam-outline-tree");Ct.setAttribute("role","tree"),tt.append(Ct),dt.append(tt,j,Ut,W),s.replaceChildren(...k?[K,wt,dt]:[K,dt]);let U={x:0,y:0,zoom:1},et=null,re=!1,jt=Number(ve(On))||_r,q=new Map,zn=()=>{let e=new Set,o=(d,u)=>{var y;for(let N of(y=g.get(d.id))!=null?y:[])u&&e.add(N.id),o(N,u||N.collapsed)};for(let d of a)d.parentId||o(d,d.collapsed);return e},Le=e=>{var d,u;let o=0;for(let y=e.parentId;y&&!(++o>a.length);y=(u=(d=m.get(y))==null?void 0:d.parentId)!=null?u:null);return o},Se=()=>rn(j.getBoundingClientRect().top,At.hidden?void 0:At.getBoundingClientRect());function mt(){vt.style.transform=`translate(${U.x}px, ${U.y}px) scale(${U.zoom})`;let e=`${Math.round(U.zoom*100)}%`;Ot.textContent=e,Ot.setAttribute("aria-label",Tt(n.zoomReset,e))}function It(e,o){let d=o!=null?o:{x:j.clientWidth/2,y:j.clientHeight/2},u=Math.min(Hr,Math.max(Pr,U.zoom*e)),y=u/U.zoom;U={x:d.x-(d.x-U.x)*y,y:d.y-(d.y-U.y)*y,zoom:u},mt()}let oe=!1;function Rt(){if(!q.size)return;if(!j.clientWidth||!j.clientHeight){oe=!0;return}let e=1/0,o=1/0,d=-1/0,u=-1/0;for(let y of q.values())e=Math.min(e,y.offsetLeft),o=Math.min(o,y.offsetTop),d=Math.max(d,y.offsetLeft+(y.offsetWidth||280)),u=Math.max(u,y.offsetTop+y.offsetHeight);U=sn({minX:e,minY:o,maxX:d,maxY:u},{width:j.clientWidth,height:j.clientHeight},Se()),mt()}function Oe(e){let o=q.get(e);o&&(U=on(U,{x:o.offsetLeft+o.offsetWidth/2,y:o.offsetTop+o.offsetHeight/2},{width:j.clientWidth,height:j.clientHeight},Se()),mt())}function Et(){var e;Lt.replaceChildren();for(let o of a){let d=o.parentId?q.get(o.parentId):void 0,u=q.get(o.id);if(!d||!u)continue;let y=t.createElementNS(ne,"path");y.setAttribute("d",An(d.offsetLeft+d.offsetWidth,d.offsetTop+d.offsetHeight/2,u.offsetLeft,u.offsetTop+u.offsetHeight/2)),y.setAttribute("class",((e=p.get(o.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Lt.append(y)}}let ie=0,Ce=()=>{ie||(ie=window.requestAnimationFrame(()=>{ie=0,Et()}))},se=e=>{let o=q.get(e),d=m.get(e);!o||!d||(o.style.left=`${d.x}px`,o.style.top=`${d.y}px`,d.width&&(o.style.width=`${d.width}px`))};function ae(){var o,d;for(let u of q.values())u.remove();q.clear();let e=zn();for(let u of a){if(e.has(u.id))continue;let y=p.get(u.id),N=L(y),D=me(a,u.id).size,B=In(y.tier)?y.tier:void 0,_=l("div",`vam-node${u.id===et?" is-selected":""}`);_.dataset.nodeId=u.id,_.dataset.status=y.status==="completed"?"completed":"idea",B&&(_.dataset.relevance=B),_.tabIndex=0,_.setAttribute("role","treeitem"),_.setAttribute("aria-level",String(Le(u)+1)),_.setAttribute("aria-selected",String(u.id===et));let at=z(y),lt=w(y);lt&&(_.dataset.topicColor=lt);let nt=$(String((o=N.title)!=null?o:""),at);_.setAttribute("aria-label",lt?`${nt}${E()?"\\uFF0C":", "}${Tt(n.colorLabel,n.colorNames[lt])}`:nt),D&&_.setAttribute("aria-expanded",String(!u.collapsed));let Z=l("div","vam-node-header");_.append(Z),y.status!=="completed"&&Z.append(l("span","vam-status vam-status-idea",n.toResearch)),B&&Z.append(S(B,typeof N.reason=="string"?N.reason:void 0)),at.length&&Z.append(v(at));let Ve=l("div","vam-node-tools");if(_.append(Ve),D){let st=u.collapsed?Tt(n.expandCount,D):n.collapse,fe=C(Z,st,"vam-collapse-button",()=>{u.collapsed=!u.collapsed,Dt(u.id,!0)});fe.setAttribute("aria-expanded",String(!u.collapsed)),fe.setAttribute("aria-label",st),fe.title=st}C(Ve,n.detailsButton,void 0,()=>Nt(u.id)),_.append(l("h3","vam-card-title",String((d=N.title)!=null?d:""))),typeof N.summary=="string"&&N.summary.trim()&&_.append(l("p","vam-card-summary",N.summary)),_.addEventListener("click",()=>{re||Nt(u.id)}),_.addEventListener("keydown",st=>{st.target===_&&(st.key==="Enter"||st.key===" "?(st.preventDefault(),Nt(u.id)):D&&st.key===(u.collapsed?"ArrowRight":"ArrowLeft")&&(st.preventDefault(),u.collapsed=!u.collapsed,Dt(u.id)))}),_.addEventListener("pointerdown",st=>Bn(st,u,_)),vt.append(_),q.set(u.id,_),se(u.id)}}function Kt(){nn(a,void 0,o=>{var d;return(d=q.get(o))==null?void 0:d.offsetHeight}).forEach((o,d)=>{a[d].x=o.x,a[d].y=o.y});for(let o of q.keys())se(o)}function Dt(e,o=!1){var y;let d=e?(y=q.get(e))==null?void 0:y.getBoundingClientRect():void 0;ae(),Kt(),Et();let u=e?q.get(e):void 0;if(u){if(d){let D=u.getBoundingClientRect();U={...U,x:U.x+d.left-D.left,y:U.y+d.top-D.top},mt()}let N=o?u.querySelector(".vam-collapse-button"):null;(N!=null?N:u).focus({preventScroll:!0})}}function Bn(e,o,d){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let u=e.clientX,y=e.clientY,N=o.x,D=o.y,B=!1,_=lt=>{let nt=lt.clientX-u,Z=lt.clientY-y;if(!B){if(Math.hypot(nt,Z)<=zr)return;B=!0,d.classList.add("is-dragging"),d.setPointerCapture(lt.pointerId)}o.x=N+nt/U.zoom,o.y=D+Z/U.zoom,se(o.id),Ce()},at=()=>{d.removeEventListener("pointermove",_),d.removeEventListener("pointerup",at),d.removeEventListener("pointercancel",at),d.classList.remove("is-dragging"),B&&(re=!0,window.setTimeout(()=>re=!1,0))};d.addEventListener("pointermove",_),d.addEventListener("pointerup",at),d.addEventListener("pointercancel",at)}let le=e=>Math.round(Math.min(Math.max(we,e),Math.max(we,dt.clientWidth*.7)));function Vt(){let e=pt();if(W.hidden||e){W.style.removeProperty("width"),Ut.style.removeProperty("right");return}let o=le(jt);W.style.width=`${o}px`,Ut.style.right=`${o}px`,X.setAttribute("aria-valuenow",String(o)),X.setAttribute("aria-valuemax",String(le(1/0)))}let X=l("div","vam-inspector-resizer");X.setAttribute("role","separator"),X.setAttribute("aria-orientation","vertical"),X.setAttribute("aria-label",n.resizePanel),X.setAttribute("aria-valuemin",String(we)),X.tabIndex=0;let Wt=(e,o)=>{jt=le(e),Vt(),o&&Ae(On,String(jt))};X.addEventListener("pointerdown",e=>{e.preventDefault();let o=e.clientX,d=W.offsetWidth;X.setPointerCapture(e.pointerId),X.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let u=N=>Wt(d+o-N.clientX,!1),y=()=>{X.removeEventListener("pointermove",u),X.removeEventListener("pointerup",y),X.removeEventListener("pointercancel",y),X.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),Wt(jt,!0)};X.addEventListener("pointermove",u),X.addEventListener("pointerup",y),X.addEventListener("pointercancel",y)}),X.addEventListener("keydown",e=>{let o=e.shiftKey?48:16;if(e.key==="ArrowLeft")Wt(W.offsetWidth+o,!0);else if(e.key==="ArrowRight")Wt(W.offsetWidth-o,!0);else return;e.preventDefault()});let ce=pt();window.addEventListener("resize",()=>{Vt(),mt(),pt()!==ce&&(ce=pt(),kt(ce?!1:_e(),!1))});function de(){et=null;for(let e of q.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");W.hidden=!0,dt.classList.remove("has-inspector"),W.replaceChildren(),Vt(),bt()}function Nt(e){var _,at,lt;let o=m.get(e),d=p.get(e);if(!o||!d)return;let u={...d,...L(d)};et=e;for(let[nt,Z]of q)Z.classList.toggle("is-selected",nt===e),Z.setAttribute("aria-selected",String(nt===e));W.replaceChildren(X);let y=l("div","vam-inspector-heading");y.append(l("strong",void 0,n.topicDetails)),C(y,n.close,void 0,de),W.append(y,l("h3",void 0,String((_=u.title)!=null?_:"")));let N=In(u.tier)?u.tier:void 0;if(N){let nt=l("div","vam-inspector-why");nt.append(S(N));let Z=typeof u.reason=="string"&&u.reason.trim()?u.reason:u.manual?n.manualReason:"";Z&&nt.append(l("span",void 0,Z)),W.append(nt)}typeof u.summary=="string"&&u.summary.trim()&&W.append(l("p","vam-sample-summary",u.summary));let D=l("div","vam-sample-detail");typeof u.detailHtml=="string"&&u.detailHtml.trim()?u.compact?vn(t,D,u.detailHtml,u.compact,c,n):Me(t,D,u.detailHtml,c,n):D.append(l("p","vam-inspector-empty",n.noContent)),W.append(D);let B=(at=g.get(e))!=null?at:[];if(B.length){let nt=l("div","vam-subtopics");nt.append(l("strong",void 0,n.subtopics));for(let Z of B)C(nt,String((lt=L(p.get(Z.id)).title)!=null?lt:""),void 0,()=>{o.collapsed&&(o.collapsed=!1,Dt(o.id)),Nt(Z.id),Oe(Z.id)});W.append(nt)}W.hidden=!1,dt.classList.add("has-inspector"),Vt(),W.scrollTop=0,bt(),Pe()}let ue=e=>{ge(a,e),Dt(),Rt()},_t=e=>{ot.hidden||(ot.hidden=!0,ut.setAttribute("aria-expanded","false"),e&&ut.focus())};function $n(){ot.replaceChildren();let e=[{label:n.collapseAll,run:()=>ue(0)},{label:n.expandAll,run:()=>ue(null)},...[1,2,3].map(o=>({label:Tt(n.expandToLevel,o),run:()=>ue(o)})),null,{label:n.autoLayout,run:()=>{Kt(),Et()}}];for(let o of e){if(!o){ot.append(l("hr"));continue}let d=l("button",void 0,o.label);d.type="button",d.setAttribute("role","menuitem"),d.addEventListener("click",u=>{u.stopPropagation(),_t(!0),o.run()}),ot.append(d)}}let Ie=()=>Array.from(ot.querySelectorAll("button"));ut.addEventListener("click",e=>{var o;if(e.stopPropagation(),!ot.hidden)return _t(!0);ot.hidden=!1,ut.setAttribute("aria-expanded","true"),(o=Ie()[0])==null||o.focus()}),ot.addEventListener("keydown",e=>{let o=Ie(),d=o.indexOf(t.activeElement);if(e.key==="ArrowDown")o[(d+1)%o.length].focus();else if(e.key==="ArrowUp")o[(d-1+o.length)%o.length].focus();else if(e.key==="Home")o[0].focus();else if(e.key==="End")o[o.length-1].focus();else return e.key==="Tab"?_t(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!ot.hidden&&!ft.contains(e.target)&&_t(!1);let o=e.target;pt()&&!tt.hidden&&!tt.contains(o)&&!Y.contains(o)&&kt(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!ot.hidden)_t(!0);else if(pt()&&!tt.hidden)kt(!1,!1),Y.focus();else if(!W.hidden){let o=et?q.get(et):void 0;de(),o==null||o.focus({preventScroll:!0})}}});function Re(){let e=F();if(t.title=e.title,V.textContent=e.title,vt.setAttribute("aria-label",e.title),J.textContent=n.readOnly,rt.textContent=n.madeWithVam,ht.textContent=n.install,G.setAttribute("aria-label",n.language),G.title=n.language,O)for(let d of Array.from(G.options))d.dataset.original&&(d.textContent=n.originalText);e.goal?(Ne.textContent=Tt(n.goal,e.goal),St.title=e.goal,St.parentElement||At.append(St),At.hidden=!1):(St.remove(),At.hidden=!0),ke.textContent=n.hint;let o=(d,u)=>{d.setAttribute("aria-label",u),d.title=u};if(o(_n,n.zoomOut),o(Pn,n.zoomIn),o(Hn,n.showAll),ut.textContent=n.layout,W.setAttribute("aria-label",n.topicDetails),tt.setAttribute("aria-label",n.outline),Ct.setAttribute("aria-label",n.outline),o(Y,n.outline),X.setAttribute("aria-label",n.resizePanel),$n(),P()){let d=O?n.aiTranslatedUnknown:Tt(n.aiTranslated,x(H,I));wt.textContent=`${d} ${n.imageTextUntranslated}`,wt.hidden=!1}else wt.hidden=!0;mt()}function Fn(e){if(e===I||!h.includes(e))return;I=e,n=R(e),T&&Ae(T,e),t.documentElement.lang=e;let o=W.scrollTop;Re(),ae(),Et(),ze(),et!==null&&m.has(et)&&!W.hidden&&(Nt(et),W.scrollTop=o),Ce()}G.addEventListener("change",()=>Fn(G.value));let Yt=[],De=e=>{var o;Yt.push(e);for(let d of(o=g.get(e.id))!=null?o:[])De(d)};for(let e of a)e.parentId||De(e);let Pt=new Set,yt=new Map,Xt=null;function _e(){return ve(Cn)!=="0"}function kt(e,o){tt.hidden=!e,dt.classList.toggle("has-outline",e),Y.setAttribute("aria-expanded",String(e)),o&&!pt()&&Ae(Cn,e?"1":"0")}let Un=()=>Yt.filter(e=>{var o;return!((o=yt.get(e.id))!=null&&o.hidden)});function bt(){var d,u,y;let e=[];for(let N of Yt){let D=yt.get(N.id);if(!D)continue;let B=!1;for(let _=N.parentId;_&&!B;_=(u=(d=m.get(_))==null?void 0:d.parentId)!=null?u:null)B=Pt.has(_);D.hidden=B,B||e.push(N),g.has(N.id)&&D.setAttribute("aria-expanded",String(!Pt.has(N.id))),N.id===et?D.setAttribute("aria-current","true"):D.removeAttribute("aria-current")}let o=(y=e.find(N=>N.id===Xt))!=null?y:e[0];for(let[N,D]of yt)D.tabIndex=N===(o==null?void 0:o.id)?0:-1}function Pe(){let e=et?yt.get(et):void 0;!e||e.hidden||!tt.clientHeight||(e.offsetTop<tt.scrollTop?tt.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>tt.scrollTop+tt.clientHeight&&(tt.scrollTop=e.offsetTop+e.offsetHeight-tt.clientHeight))}function pe(e){Pt.delete(e)||Pt.add(e),bt()}function jn(e){var o;Xt=e,bt(),(o=yt.get(e))==null||o.focus()}function Kn(){for(let[e,o]of q)o.classList.toggle("is-selected",e===et),o.setAttribute("aria-selected",String(e===et))}function He(e){var y,N,D;let o=m.get(e);if(!o)return;let d=!1,u=0;for(let B=o.parentId;B&&u++<=a.length;B=(N=(y=m.get(B))==null?void 0:y.parentId)!=null?N:null){let _=m.get(B);_!=null&&_.collapsed&&(_.collapsed=!1,d=!0)}et=e,d&&Dt(),Oe(e),W.hidden?Kn():Nt(e),bt(),Pe(),pt()&&kt(!1,!1),(D=q.get(e))==null||D.focus({preventScroll:!0})}function Vn(e,o){var B;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let d=Un(),u=d.indexOf(o),y=(B=g.get(o.id))!=null?B:[],N=Pt.has(o.id),D;switch(e.key){case"ArrowDown":D=d[u+1];break;case"ArrowUp":D=d[u-1];break;case"Home":D=d[0];break;case"End":D=d[d.length-1];break;case"ArrowRight":y.length&&N?pe(o.id):D=y[0];break;case"ArrowLeft":y.length&&!N?pe(o.id):D=o.parentId?m.get(o.parentId):void 0;break;case"Enter":case" ":He(o.id);break;default:return}e.preventDefault(),D&&jn(D.id)}function ze(){var e;Ct.replaceChildren(),yt.clear();for(let o of Yt){let d=String((e=L(p.get(o.id)).title)!=null?e:""),u=l("div","vam-outline-item");u.dataset.outlineId=o.id,u.setAttribute("role","treeitem");let y=Le(o)+1;u.setAttribute("aria-level",String(y)),u.style.setProperty("--depth",String(y-1));let N=l("span","vam-outline-twist");g.has(o.id)&&(N.append(M("chevron")),N.addEventListener("click",_=>{_.stopPropagation(),pe(o.id)}));let D=l("span","vam-outline-title",d);D.title=d,u.append(N,D);let B=z(p.get(o.id));B.length&&(u.append(v(B)),u.setAttribute("aria-label",$(d,B))),u.addEventListener("click",()=>He(o.id)),u.addEventListener("keydown",_=>Vn(_,o)),u.addEventListener("focus",()=>{Xt!==o.id&&(Xt=o.id,bt())}),Ct.append(u),yt.set(o.id,u)}bt()}let it=new Map,Ht=0,Gt=!1;j.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(j.setPointerCapture(e.pointerId),it.set(e.pointerId,{x:e.clientX,y:e.clientY}),j.classList.add("is-panning"),it.size===1&&(Gt=!1),it.size===2)){let[o,d]=Array.from(it.values());Ht=Math.hypot(o.x-d.x,o.y-d.y)}}),j.addEventListener("pointermove",e=>{let o=it.get(e.pointerId);if(!o)return;if(it.set(e.pointerId,{x:e.clientX,y:e.clientY}),it.size===2&&Ht){let[y,N]=Array.from(it.values()),D=Math.hypot(y.x-N.x,y.y-N.y),B=j.getBoundingClientRect();It(D/Ht,{x:(y.x+N.x)/2-B.left,y:(y.y+N.y)/2-B.top}),Ht=D,Gt=!0;return}let d=e.clientX-o.x,u=e.clientY-o.y;Gt||(Gt=Math.abs(d)+Math.abs(u)>0),U={...U,x:U.x+d,y:U.y+u},mt()});let Be=e=>{it.delete(e.pointerId)&&(it.size<2&&(Ht=0),it.size||(j.classList.remove("is-panning"),!Gt&&e.type==="pointerup"&&!W.hidden&&de()))};j.addEventListener("pointerup",Be),j.addEventListener("pointercancel",Be),j.addEventListener("wheel",e=>{e.preventDefault();let o=j.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?It(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-o.left,y:e.clientY-o.top}):(U={...U,x:U.x-e.deltaX,y:U.y-e.deltaY},mt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{oe&&(oe=!1,Rt())}).observe(j),Re(),ze(),kt(pt()?!1:_e(),!1),ge(a,1),ae(),Kt(),Et(),Rt();let $e=t.fonts;$e&&$e.ready.then(()=>{et!==null||it.size||(Kt(),Et(),Rt())})}Dn(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }\n.vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }\n.vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }\n.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n.vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }\n.vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
+var SHARE_VIEWER_JS = '(()=>{function qe(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}function Ze(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(a=>a!==t.parentId)]}function he(t,o){let r=new Set,a=[o];for(;a.length;){let i=a.pop();for(let d of t)d.parentId===i&&d.id!==o&&!r.has(d.id)&&(r.add(d.id),a.push(d.id))}return r}function ye(t,o){let r=new Map(t.map(d=>[d.id,d])),a=d=>{let u=0,l=new Set([d.id]);for(let f=d.parentId;f&&r.has(f)&&!l.has(f);f=r.get(f).parentId)l.add(f),u++;return u},i=new Set(t.map(d=>d.parentId).filter(d=>!!d&&r.has(d)));for(let d of t)i.has(d.id)&&(d.collapsed=o===null?!1:a(d)>=o)}function xe(t){if(t>150)return"right";if(t<-150)return"left"}function Qe(t,o,r,a={left:0,right:0}){let i={...a},d=new Map;for(let u of t){let l=i.left<i.right?"left":"right";d.set(u.id,l),i[l]+=o(u)+r}return d}function Je(t,o,r,a){let i=t.map(a),d={left:0,right:0};t.forEach((l,f)=>{let x=i[f];x&&(d[x]+=o(l)+r)});let u=Qe(t.filter((l,f)=>!i[f]),o,r,d);return new Map(t.map((l,f)=>{var x;return[l.id,(x=i[f])!=null?x:u.get(l.id)]}))}function qn(t){return t==="right"||t==="left"||t==="down"||t==="up"}function tn(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function Qt(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return qn(r)?r:void 0}function en(t){let{width:o,column:r,mapDirection:a,engine:i}=t,d=(u,l)=>{var L,$;let f=[],x=(T,g)=>{for(let v of[...t.kidsOf(T),...t.joinsOf(T)])Qt(v)?f.push({node:v,root:g}):x(v,g)};for(let T of u)x(T,T);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!f.length)return i(l,p);let h=l==="down"||l==="up",M=f.map(({node:T,root:g})=>{let v=d([T],Qt(T)),m=1/0,b=-1/0,A=1/0,P=-1/0,I=new Map,F=E=>{I.set(E.id,E);for(let C of[...t.kidsOf(E),...t.joinsOf(E)])F(C)};F(T);for(let[E,C]of v)m=Math.min(m,C.x),b=Math.max(b,C.x+o),A=Math.min(A,C.y),P=Math.max(P,C.y+t.heightFor(I.get(E)));let w=Math.max(1,Math.ceil((b-m+r-o)/r));return{node:T,root:g,placed:v,minX:m,maxX:b,minY:A,maxY:P,slots:w}}),S=new Map(M.map(T=>[T.node.id,T])),z=T=>{let g=S.get(T.id);return!g||!h?[]:Array.from({length:g.slots},(v,m)=>({id:`${T.id}\\0pad${m}`}))},_=new Set,k=i(l,{roots:u,kidsOf:T=>{if(!S.has(T.id))return t.kidsOf(T);let g=z(T);for(let v of g)_.add(v.id);return g},joinsOf:T=>S.has(T.id)?[]:t.joinsOf(T),heightFor:T=>{if(_.has(T.id))return 0;let g=S.get(T.id);return g&&!h?g.maxY-g.minY:t.heightFor(T)}}),H=new Map;for(let[T,g]of k)!_.has(T)&&!S.has(T)&&H.set(T,g);for(let T of M){let g=k.get(T.node.id),v,m;h?(v=g.x+r/2-(T.minX+T.maxX)/2,m=l==="down"?g.y-T.minY:g.y+t.heightFor(T.node)-T.maxY):(v=l==="right"||l==="balanced"&&g.x>=(($=(L=k.get(T.root.id))==null?void 0:L.x)!=null?$:g.x)?g.x-T.minX:g.x+o-T.maxX,m=g.y-T.minY);for(let[b,A]of T.placed)H.set(b,{x:A.x+v,y:A.y+m})}return H};return d(t.roots,a)}var nn=1/Math.tan(Math.PI/3);function rn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:d,column:u,gap:l,left:f,top:x}=t,p=u-d,h=O=>[...r(O),...a(O)],M=o.map(O=>{let k=new Map,H=I=>I.reduce((F,w)=>F+k.get(w.id),0)+Math.max(0,I.length-1)*l,L=I=>{let F=h(I);for(let w of F)L(w);k.set(I.id,Math.max(i(I),H(F)))},$=(I,F,w,E)=>{let C=h(I),W=w+(k.get(I.id)-H(C))/2,j=C.map(J=>{let Z=$(J,F+1,W,E);return W+=k.get(J.id)+l,Z}),Y=i(I),Q=j.length?(j[0]+j[j.length-1])/2:w+k.get(I.id)/2;return E.push({id:I.id,x:-F*u,centre:Q,height:Y}),Q},T=h(O).map((I,F)=>{let w=F%2===0?1:-1,E=h(I);for(let tt of E)L(tt);let C=[],W=l;for(let tt of E){let ct=C.length,yt=$(tt,0,W,C)*nn-p;for(let ut=ct;ut<C.length;ut++)C[ut].x+=yt-d;W+=k.get(tt.id)+l}let j=Math.max(u,W),Y=j*nn,Q=i(I),J=[-d/2,...C.map(tt=>tt.x)],Z=[d/2,Y,...C.map(tt=>tt.x+d)];return{topic:I,side:w,length:j,height:Q,cards:C,minX:Math.min(...J),maxX:Math.max(...Z)}}),g=i(O),v=[{id:O.id,x:0,y:-g/2,height:g}],m={above:-p,below:-p};for(let I of T){let F=I.side===1?"above":"below",w=m[F]-I.maxX,E=-I.side*I.length;v.push({id:I.topic.id,x:w-d/2,y:E-I.side*(I.height/2)-I.height/2,height:I.height});for(let C of I.cards)v.push({id:C.id,x:w+C.x,y:E+I.side*C.centre-C.height/2,height:C.height});m[F]=w+I.minX-p}let b=Math.min(...v.map(I=>I.x)),A=Math.min(...v.map(I=>I.y)),P=Math.max(...v.map(I=>I.y+I.height));return{out:v,minX:b,minY:A,maxY:P}}),S=new Map,z=f+Math.max(0,...M.map(O=>-O.minX)),_=x;for(let O of M){for(let k of O.out)S.set(k.id,{x:z+k.x,y:_+k.y-O.minY});_+=O.maxY-O.minY+l}return S}var Zn=Math.PI*2,Qn=6,Jn=60;function tr(t,o,r,a){let i=[...t.values()].sort((u,l)=>u.y-l.y),d=new Set;for(let u=0;u<i.length;u++){let l=i[u];for(let f=u+1;f<i.length;f++){let x=i[f];if(x.y>=l.y+l.height+r)break;a&&a.checks++,Math.abs(l.x-x.x)<o&&l.y<x.y+x.height+r&&d.add(Math.max(l.depth,x.depth))}}return d}function on(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:d,column:u,gap:l,left:f,top:x}=t,p=new Map,h=x;for(let M of o){let S=[],z=new Map,_=w=>[...r(w),...a(w)],O=w=>{let E=_(w),C=E.length?E.reduce((W,j)=>W+O(j),0):1;return z.set(w.id,C),C};O(M);let k=(w,E,C,W)=>{S.push({id:w.id,depth:E,angle:(C+W)/2,height:i(w)});let j=C,Y=(W-C)/z.get(w.id);for(let Q of _(w)){let J=Y*z.get(Q.id);k(Q,E+1,j,j+J),j+=J}};k(M,0,0,Zn);let H=Math.max(...S.map(w=>w.depth)),L=Array.from({length:H+1},(w,E)=>E*u),$=()=>{let w=[];return L.forEach((E,C)=>w.push(C?Math.max(E,w[C-1]+u):0)),new Map(S.map(E=>{let C=w[E.depth];return[E.id,{x:Math.round(C*Math.sin(E.angle)-d/2),y:Math.round(-C*Math.cos(E.angle)-E.height/2),depth:E.depth,height:E.height}]}))},T=u/Qn,g=()=>(t.stats&&t.stats.rounds++,tr($(),d,l,t.stats)),v=T,m=g(),b=L.slice();for(let w=0;m.size&&w<Jn;w++){b=L.slice();for(let E of m)L[E]+=v;v*=2,m=g()}if(!m.size&&b.some((w,E)=>L[E]-w>T)){let w=L.slice();for(;w.some((E,C)=>E-b[C]>T);){let E=w.map((C,W)=>(C+b[W])/2);L.splice(0,L.length,...E),g().size?b=E:w=E}L.splice(0,L.length,...w)}let A=$(),P=Math.min(...[...A.values()].map(w=>w.x)),I=Math.min(...[...A.values()].map(w=>w.y)),F=Math.max(...[...A.values()].map(w=>w.y+w.height));for(let[w,E]of A)p.set(w,{x:Math.round(f)+E.x-P,y:h+E.y-I});h+=F-I+l}return p}function Jt(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:d,rowGap:u,flip:l,left:f,top:x}=t,p=new Map,h=new Map,M=b=>b.reduce((A,P)=>A+p.get(P.id),0),S=b=>{let A=r(b),P=a(b);for(let I of[...A,...P])S(I);p.set(b.id,Math.max(d,M(A),M(P))),h.set(b.id,1+Math.max(0,...A.map(I=>h.get(I.id))))},z=new Map,_=new Map,O=(b,A,P)=>{let I=r(b),F=a(b),w=p.get(b.id),E=(Y,Q)=>{let J=P+(w-M(Y))/2;return Y.map(Z=>{O(Z,Q,J);let tt=z.get(Z.id);return J+=p.get(Z.id),tt})},C=E(I,A+1),W=E(F,A+h.get(b.id)),j=C.length?C:W;_.set(b.id,A),z.set(b.id,j.length?(j[0]+j[j.length-1])/2:P)},k=f,H=[],L=b=>{H.push(b);for(let A of[...r(b),...a(b)])L(A)};for(let b of o)S(b),O(b,0,k),k+=p.get(b.id),L(b);let $=Math.max(0,..._.values()),T=Array.from({length:$+1},()=>0);for(let b of H)T[_.get(b.id)]=Math.max(T[_.get(b.id)],i(b));let g=[],v=x;for(let b=0;b<=$;b++){let A=l?$-b:b;g[A]=v,v+=T[A]+u}let m=new Map;for(let b of H){let A=_.get(b.id),P=l?g[A]+T[A]-i(b):g[A];m.set(b.id,{x:z.get(b.id),y:P})}return m}function sn(t){let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,width:d,column:u,gap:l,left:f,top:x}=t,p=new Map,h=x;for(let M of o){let S=new Map,z=L=>{S.set(L.id,i(L));for(let $ of[...r(L),...a(L)])z($)};z(M);let _=[{id:M.id,x:f,y:0}],O=f+u;[...r(M),...a(M)].forEach((L,$)=>{let T=Jt({roots:[L],kidsOf:r,joinsOf:a,heightFor:i,column:u,rowGap:u-d,flip:$%2===1,left:O,top:0}),g=T.get(L.id).y,v=O;for(let[m,b]of T)_.push({id:m,x:b.x,y:b.y-g}),v=Math.max(v,b.x);O=v+u});let k=Math.min(..._.map(L=>L.y)),H=Math.max(..._.map(L=>L.y+S.get(L.id)));for(let L of _)p.set(L.id,{x:L.x,y:h+L.y-k});h+=H-k+l}return p}var zt=300;function er(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}var nr=24,rr={compact:{column:330,gap:12},standard:{column:360,gap:nr},spacious:{column:420,gap:48}};function or(t){return t==="compact"||t==="spacious"}var ir=180;function sr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...rr[or(r)?r:"standard"]}}var ar=t=>t==="left"?-1:1;var lr=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:ir};function cr(t,o){var f,x;let r=new Map(t.map(p=>[p.id,p])),a=new Map,i=new Map,d=(p,h,M)=>{var S;return p.set(h,[...(S=p.get(h))!=null?S:[],M])};for(let p of t){if(!p.parentId)continue;let h=p.aimKind!=="question"&&((f=p.aimConvergesFromNodeIds)!=null&&f.length)?Ze(p).map(S=>r.get(S)):[],M=(x=h[0])==null?void 0:x.parentId;M&&r.has(M)&&h.every(S=>S&&S.parentId===M)?d(i,M,p):d(a,p.parentId,p)}return{kidsOf:p=>{var h;return o&&p.collapsed?[]:(h=a.get(p.id))!=null?h:[]},joinsOf:p=>{var h;return o&&p.collapsed?[]:((h=i.get(p.id))!=null?h:[]).filter(M=>{var S;return!(o&&((S=r.get(M.parentId))!=null&&S.collapsed))})}}}function be(t){var T;let{roots:o,kidsOf:r,joinsOf:a,heightFor:i,column:d,gap:u,sign:l,left:f,top:x}=t,p=new Map,h=new Map,M=new Map,S=new Map,z=new Map,_=g=>g.reduce((v,m)=>v+h.get(m.id),0)+Math.max(0,g.length-1)*u,O=g=>{let v=r(g),m=a(g);z.set(g.id,g);for(let b of[...v,...m])O(b);h.set(g.id,Math.max(i(g),_(v),_(m))),M.set(g.id,1+Math.max(0,...v.map(b=>M.get(b.id))))},k=(g,v,m)=>{let b=r(g),A=a(g),P=h.get(g.id),I=(Y,Q)=>{let J=m+(P-_(Y))/2;return Y.map(Z=>{let tt=k(Z,Q,J);return J+=h.get(Z.id)+u,tt})},F=I(b,v+1),w=I(A,v+M.get(g.id)),E=F.length?b:A,C=F.length?F:w,W=i(g),j=m+(P-W)/2;if(C.length){let Y=C[0]+i(E[0])/2,Q=C[C.length-1]+i(E[E.length-1])/2;j=(Y+Q)/2-W/2}return p.set(g.id,{x:0,y:x+j}),S.set(g.id,v),j},H=0;for(let g of o)O(g),k(g,0,H),H+=h.get(g.id)+u;let L=[];for(let[g,v]of S)L[v]=Math.max((T=L[v])!=null?T:0,er(z.get(g)));let $=g=>{var m,b;let v=0;if(l>0)for(let A=0;A<g;A++)v+=(m=L[A])!=null?m:0;else for(let A=1;A<=g;A++)v+=(b=L[A])!=null?b:0;return v};for(let[g,v]of p){let m=S.get(g);v.x=f+l*(m*d+$(m))}return{placed:p,sizes:h}}function dr(t,o,r){let{roots:a,kidsOf:i,joinsOf:d,heightFor:u,gap:l,left:f,top:x}=o,p=be({...o,sign:1}).sizes,h=new Map(t.map(k=>[k.id,k])),M=a.map(k=>{var T;let H=(T=h.get(k.id))!=null?T:k,L=Je(i(k),g=>p.get(g.id),l,g=>{var v;return r?void 0:xe(((v=h.get(g.id))!=null?v:g).x-H.x)}),$=g=>be({...o,roots:[k],kidsOf:v=>v.id===k.id?i(v).filter(m=>L.get(m.id)===g):i(v),joinsOf:v=>v.id===k.id&&g==="left"?[]:d(v),sign:g==="left"?-1:1,left:0,top:0}).placed;return{root:k,right:$("right"),left:$("left")}}),S=Math.max(0,...M.flatMap(({left:k})=>[...k.values()].map(H=>-H.x))),z=f+S,_=new Map,O=0;for(let{root:k,right:H,left:L}of M){let $=A=>A.get(k.id).y+u(k)/2,T=Math.max($(H),$(L)),g=[];for(let A of[{placed:H,isLeft:!1},{placed:L,isLeft:!0}]){let{placed:P,isLeft:I}=A,F=T-$(P);for(let[w,E]of P)I&&w===k.id||g.push([w,{x:z+E.x,y:E.y+F}])}let v=A=>u(h.get(A)),m=Math.min(...g.map(([,A])=>A.y)),b=Math.max(...g.map(([A,P])=>P.y+v(A)));for(let[A,P]of g)_.set(A,{x:P.x,y:x+O+P.y-m});O+=b-m+l}return _}function ur(t,o,r,a,i=!1,d,u="right",l=!1){let{direction:f,column:x,gap:p}=sr(u),{kidsOf:h,joinsOf:M}=cr(t,i),S=O=>lr(d,O.id),z=(O,k)=>{if(O==="down"||O==="up")return Jt({...k,column:x,rowGap:x-zt,flip:O==="up",left:r,top:a});let H={...k,column:x,gap:p,left:r,top:a};if(O==="radial")return on({...H,width:zt});if(O==="timeline")return sn({...H,width:zt});if(O==="fishbone")return rn({...H,width:zt});let L={...H,sign:ar(O)};return O==="balanced"?dr(t,L,l):be(L).placed},_={roots:o,kidsOf:h,joinsOf:M,heightFor:S};return tn(f)&&t.some(O=>Qt(O))?en({..._,width:zt,column:x,mapDirection:f,engine:z}):z(f,_)}function an(t,o,r,a="right",i={}){let d=o!=null&&o.size?t.filter(f=>!o.has(f.id)):t,u=d.filter(f=>!f.parentId),l=ur(d,u,80,80,!0,r,a,i.reset===!0);return t.map(f=>({...f,...l.get(f.id)}))}function ln(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function cn(t,o,r,a){let i=t.zoom;return{zoom:i,x:r.width/2-o.x*i,y:a+(r.height-a)/2-o.y*i}}function dn(t,o,r,a=1.2){let i=Math.max(1,o.height-r),d=t.maxX-t.minX,u=t.maxY-t.minY,l=Math.max(.25,Math.min(a,(o.width-80)/d,(i-80)/u));return{zoom:l,x:(o.width-d*l)/2-t.minX*l,y:r+(i-u*l)/2-t.minY*l}}var te={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Te(t){let o=3735928559,r=1103547991;for(let a=0;a<t.length;a++){let i=t.charCodeAt(a);o=Math.imul(o^i,2654435761),r=Math.imul(r^i,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var vt="\\u27E6",wt="\\u27E7",Ut=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,fn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Me=new Set(["pre","script","style","textarea","template","noscript"]),pr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),fr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),mr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,gr=/\\p{L}/u,Ft=t=>t.localName.toLowerCase(),mn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},ee=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function gn(t){for(let o of ee(t))if(fn.has(Ft(o))||Me.has(Ft(o))||gn(o))return!0;return!1}function hn(t){let o=Ft(t);return Me.has(o)?"skip":pr.has(o)||t.getAttribute("translate")==="no"||mn(t).some(r=>fr.has(r))?"atom":fn.has(o)||gn(t)?"block":"inline"}function hr(t,o){return t.replace(mr,r=>(o.push({literal:r,atom:!0}),`${vt}${o.length}/${wt}`))}function yr(t,o){let r="",a=i=>{var u;if(i.nodeType===3){r+=hr((u=i.nodeValue)!=null?u:"",o);return}if(i.nodeType!==1){o.push({node:i,atom:!0}),r+=`${vt}${o.length}/${wt}`;return}let d=i;if(hn(d)==="inline"){o.push({node:d,atom:!1});let l=o.length;r+=`${vt}${l}${wt}`;for(let f of Array.from(d.childNodes))a(f);r+=`${vt}/${l}${wt}`;return}o.push({node:d,atom:!0}),r+=`${vt}${o.length}/${wt}`};for(let i of t)a(i);return r}function un(t){return gr.test(t.replace(Ut,""))}function yn(t){let o=[],r=u=>{let l=u.getAttribute("alt");l&&un(l)&&o.push({index:o.length,kind:"attribute",text:l.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},a=u=>{for(let l of ee(u)){let f=Ft(l);Me.has(f)||f==="svg"||(f==="img"?r(l):a(l))}},i=u=>{if(!u.length)return;let l=[],f=yr(u,l),x=f.trim();if(!x||!un(x)||f.includes("\\u27E6\\u27E6"))return;let p=f.replace(Ut,"");if(p.includes(vt)||p.includes(wt))return;let h=f.slice(0,f.length-f.trimStart().length),M=f.slice(f.trimEnd().length);o.push({index:o.length,kind:"run",text:x,nodes:u,lead:h,trail:M,parts:l})},d=u=>{let l=[];for(let f of Array.from(u.childNodes)){if(f.nodeType===3){l.push(f);continue}if(f.nodeType!==1){i(l),l=[];continue}let x=f,p=hn(x);p==="atom"||p==="inline"?l.push(x):(i(l),l=[],p==="block"&&d(x))}i(l)};return a(t),d(t),{units:o}}var pn=t=>[...t.matchAll(Ut)].map(o=>o[0]);function xr(t,o){if(!o.trim())return!1;let r=pn(t),a=pn(o);if(r.length!==a.length||r.some((d,u)=>d!==a[u]))return!1;let i=o.replace(Ut,"");return!i.includes(vt)&&!i.includes(wt)}function br(t,o,r){var f;let a=[],i=[],d=x=>{let p=i[i.length-1];p?p.appendChild(x):a.push(x)},u=x=>{x&&d(r.createTextNode(x))};u(t.lead);let l=0;for(let x of o.matchAll(Ut)){u(o.slice(l,x.index)),l=((f=x.index)!=null?f:0)+x[0].length;let p=t.parts[Number(x[2])-1];if(x[1]==="/")i.pop();else if(x[3]==="/")p.literal!==void 0?u(p.literal):p.node&&d(p.node.cloneNode(!0));else if(p.node){let h=p.node.cloneNode(!1);d(h),i.push(h)}}return u(o.slice(l)),u(t.trail),a}function xn(t,o){var i,d,u;let r={applied:0,kept:0},a=[...t.units.filter(l=>l.kind==="attribute"),...t.units.filter(l=>l.kind==="run")];for(let l of a){let f=o(l);if(f===void 0||!xr(l.text,f)){r.kept++;continue}if(l.kind==="attribute"){(d=l.element)==null||d.setAttribute((i=l.attribute)!=null?i:"alt",f.trim()),r.applied++;continue}let x=l.nodes[0],p=x==null?void 0:x.parentNode,h=x==null?void 0:x.ownerDocument;if(!x||!p||!h){r.kept++;continue}for(let M of br(l,f,h))p.insertBefore(M,x);for(let M of l.nodes)(u=M.parentNode)==null||u.removeChild(M);r.applied++}return r}function bn(t){let o=[],r=a=>{for(let i of ee(a))Ft(i)==="svg"?o.push(i):r(i)};return r(t),o}function Tn(t,o){let r=[],a=i=>{for(let d of ee(i))mn(d).includes(o)&&r.push(d),a(d)};return a(t),r}var Mn="vam-mermaid-slot",ne=1,vn=3,wn=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},Tr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Mr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function vr(t){var o,r;return t.nodeType===vn?Tr((o=t.nodeValue)!=null?o:""):t.nodeType!==ne?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:An(t)}function An(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(a=>{var i;return` ${a}="${Mr((i=t.getAttribute(a))!=null?i:"")}"`}).join("");return`<${o}${r}>${wr(t)}</${o}>`}function wr(t){return Array.from(t.childNodes).map(vr).join("")}function Ar(t){let o=[],r=a=>{if(o.push(a),a.nodeType===ne)for(let i of Array.from(a.childNodes))r(i)};return r(t),o}function Er(t,o){var a;let r=bn(t);for(let i of r){let d=o();d.setAttribute("class",Mn),(a=i.parentNode)==null||a.replaceChild(d,i)}return{root:t,svgs:r,extraction:yn(t)}}function kr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Te(o)}`}var Ir=t=>Te(An(t));function Nr(t,o){if(!Array.isArray(o))return!1;let r=Ar(t);for(let a of o){if(!Array.isArray(a)||a.length!==2)return!1;let[i,d]=a;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=r.length)return!1;let u=r[i];if(typeof d=="string"){if(u.nodeType!==vn)return!1;u.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(u.nodeType!==ne)return!1;for(let[l,f]of Object.entries(d))if(f===null)u.removeAttribute(l);else if(typeof f=="string")u.setAttribute(l,f);else return!1}else return!1}return!0}function Lr(t,o,r){if(!t||typeof t!="object")return null;let a=t;if(typeof a.svg=="string"){let i=r(a.svg),d=Array.from(i.childNodes).filter(u=>u.nodeType===ne);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof a.check=="string"&&a.check===Ir(o)){let i=o.cloneNode(!0);return Nr(i,a.patch)?i:null}return null}function En(t,o,r){var f,x;let a={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:d}=Er(t,r.createSlot),u=o.detailSegments;if(u!==void 0||o.detailCheck!==void 0)if(Array.isArray(u)&&u.length===d.units.length&&o.detailCheck===kr(d)){let p=xn(d,M=>{let S=u[M.index];return typeof S=="string"?S:void 0}),h=u.filter(M=>typeof M!="string").length;if(a.applied=p.applied,a.kept=Math.max(0,p.kept-h),r.afterText&&!r.afterText(t))return a.fallback=!0,a}else a.fallback=!0;let l=Tn(t,Mn);l.length!==i.length&&(a.fallback=!0);for(let[p,h]of l.entries()){let M=i[p];if(!M)break;let S=(f=o.detailDiagrams)==null?void 0:f[p],z=M;if(S){let _=null;try{_=Lr(S,M,r.parse)}catch{_=null}_?z=_:a.diagramsKept++}(x=h.parentNode)==null||x.replaceChild(z,h)}return a}function ht(t,o,r){let a=t.createElement(o);return r&&(a.className=r),a}function Sr(t,o){var u;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),a=(u=r==null?void 0:r[1])!=null?u:t,[i,d=""]=o.imageSource.split("{0}");return[i,a,d]}function Cr(t,o,r){let[a,i,d]=Sr(o,r),u=ht(t,"span");u.className="vam-image-source";let l=ht(t,"a");return l.setAttribute("href",o),l.setAttribute("target","_blank"),l.setAttribute("rel","noopener noreferrer"),l.textContent=i,u.append(t.createTextNode(a),l,t.createTextNode(d)),u}function ve(t,o,r,a,i){kn(t,o,new DOMParser().parseFromString(r,"text/html").body,a,i)}function kn(t,o,r,a,i){var u,l,f,x;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let h of p.getAttributeNames()){let M=(u=p.getAttribute(h))!=null?u:"",S=h.toLowerCase();(S.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(S)&&/^\\s*(javascript|vbscript):/i.test(M))&&p.removeAttribute(h)}let d=()=>{let p=ht(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let h=(l=p.getAttribute("src"))!=null?l:"";if(h.startsWith("vam-asset:")){let M=a[h.slice(10)];typeof M=="string"&&M.startsWith("data:image/")?p.setAttribute("src",M):p.replaceWith(d())}else if(/^https?:\\/\\//i.test(h)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let M=p.closest("a");(M!=null?M:p).after(Cr(t,h,i))}else/^data:image\\//i.test(h)||p.replaceWith(d())}for(let p of Array.from(r.querySelectorAll("a"))){let h=(f=p.getAttribute("href"))!=null?f:"";/^(https?:|mailto:)/i.test(h)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):h.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((x=p.parentElement)!=null&&x.classList.contains("vam-table-scroll"))continue;let h=ht(t,"div");h.className="vam-table-scroll",p.replaceWith(h),h.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function In(t,o,r,a,i,d){let u=l=>new DOMParser().parseFromString(l,"text/html").body;try{let l=u(r);En(l,a,{parse:u,createSlot:()=>ht(t,"div")}),kn(t,o,l,i,d)}catch{o.replaceChildren(),ve(t,o,r,i,d)}}function we(t,o,r,a){let i=Math.max(60,Math.abs(r-t)/2);return`M ${t} ${o} C ${t+i} ${o}, ${r-i} ${a}, ${r} ${a}`}var Ae=["red","orange","yellow","green","blue","purple"];function Nn(t){let o=t["topic-color"];return Ae.find(r=>r===o)}var Or=["done","warning","star","priority-1","priority-2","priority-3"];var Rr={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3"};function Ln(t){let o=t["topic-markers"];return Array.isArray(o)?Or.filter(r=>o.includes(r)):[]}function Sn(t){return Rr[t]}var _r=(t,o)=>t.toLowerCase()===o.toLowerCase(),re=(t,o)=>t.find(r=>_r(r,o));function Dr(t,o){if(typeof t!="string"||!t.trim())return;let r=re(o,t.trim());if(r)return r;let a=t.trim().toLowerCase().split(/[-_]/),i=a[0];if(i==="zh"){let u=a.slice(1).some(l=>l==="hant"||l==="tw"||l==="hk"||l==="mo")?"TW":"CN";return re(o,`${i}-${u}`)}return o.find(d=>d.toLowerCase().split(/[-_]/)[0]===i)}function Cn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let a=re(o,t.stored);if(a)return a}if(typeof t.defaultLanguage=="string"){let a=re(o,t.defaultLanguage);if(a)return a}for(let a of t.browser){let i=Dr(a,o);if(i)return i}return r}function On(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Pr="https://github.com/kevcltsai/visual-agent-map?ref=share",Hr="und",jt="http://www.w3.org/2000/svg",Rn="vam-share-panel-width",_n="vam-share-outline-open",Br="(max-width: 600px)",zr=300,Ee=240,$r=.25,Fr=2,Ur=4,jr={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},Kr={core:"target",support:"library",side:"skip"},Dn=t=>t==="core"||t==="support"||t==="side",At=(t,o)=>t.replace("{0}",String(o));function Ne(t,o){var a;let r=(a=t.getElementById(o))==null?void 0:a.textContent;if(r)try{return JSON.parse(r)}catch{return}}function Pn(t){let o={...te};if(t&&typeof t=="object")for(let i of Object.keys(o)){let d=t[i];typeof d=="string"&&(o[i]=d)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...te.markerNames};for(let i of Object.keys(o.markerNames)){let d=r[i];typeof d=="string"&&d.trim()&&(o.markerNames[i]=d)}}let a=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...te.colorNames},a&&typeof a=="object")for(let i of Ae){let d=a[i];typeof d=="string"&&d.trim()&&(o.colorNames[i]=d)}return o}function Vr(t){let o=Ne(t,"vam-ui"),r=new Map,a={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[i,d]of Object.entries(o.uiByLanguage))r.set(i,Pn(d));if(o.languageNames&&typeof o.languageNames=="object")for(let[i,d]of Object.entries(o.languageNames))typeof d=="string"&&d&&(a[i]=d)}return{sets:r,names:a}}var dt=t=>typeof t=="string"&&t.trim()!=="";function ke(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ie(t,o){try{window.localStorage.setItem(t,o)}catch{}}var ft=()=>window.matchMedia(Br).matches;function Hn(t){var Ve,We,Ye,Xe;let o=Pn(Ne(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let a=t.getElementById("vam-app"),i=Ne(t,"vam-map");if(!a)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){a.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=i.assets&&typeof i.assets=="object"?i.assets:{},u=new Map,l=[];for(let e of i.nodes){if(!e||typeof e.id!="string"||u.has(e.id))continue;u.set(e.id,e);let n=qe(e.width);l.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{}})}let f=new Map(l.map(e=>[e.id,e]));for(let e of l)e.parentId&&(!f.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let x=[];if(Array.isArray(i.textNodes)){let e=new Set;for(let n of i.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let s=typeof n.parentId=="string"?f.get(n.parentId):void 0;x.push({id:n.id,parentId:s?s.id:null,text:n.text,dx:s?n.x-s.x:n.x,dy:s?n.y-s.y:n.y})}}let p=new Map,h=new Map;for(let e of l)e.parentId&&h.set(e.parentId,[...(Ve=h.get(e.parentId))!=null?Ve:[],e]);let M=Vr(t),S=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(dt))):[],z=On((We=i.source)==null?void 0:We.mapId),_=S.length>=2,O=_?S[0]:"",k=O;if(_){let e=[];try{e=Array.from((Ye=window.navigator.languages)!=null?Ye:[window.navigator.language]).filter(dt)}catch{}k=Cn({languages:S,stored:z?ke(z):null,defaultLanguage:dt(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let H=e=>{var n;return(n=M.sets.get(e))!=null?n:o},L=_&&O===Hr,$=()=>_&&k!==O;_&&(r=H(k),t.documentElement.lang=k);let T=e=>{var s;let n=$()?(s=e.translations)==null?void 0:s[k]:void 0;return!n||typeof n!="object"?e:{title:dt(n.title)?n.title:e.title,summary:dt(n.summary)?n.summary:e.summary,reason:dt(n.reason)?n.reason:e.reason,detailHtml:dt(n.detailHtml)?n.detailHtml:e.detailHtml,...wn(n)&&dt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},g=()=>{var c;let e=$()?(c=i.translations)==null?void 0:c[k]:void 0,n=dt(e==null?void 0:e.title)?e.title:i.title,s=dt(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof s=="string"?s.trim():""}},v=(e,n)=>{var s;try{let c=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(c&&c!==e)return c}catch{}return(s=M.names[e])!=null?s:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let m=(e,n,s)=>{let c=ht(t,e);return n&&(c.className=n),s!==void 0&&(c.textContent=s),c},b=e=>{let n=t.createElementNS(jt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let s of jr[e]){let[c,...y]=s.split("|"),N=t.createElementNS(jt,c);for(let R of y)N.setAttribute(R.slice(0,R.indexOf("=")),R.slice(R.indexOf("=")+1));n.append(N)}return n},A=(e,n,s,c)=>{let y=m("button",s,n);return y.type="button",y.addEventListener("click",N=>{N.stopPropagation(),c()}),e.append(y),y},P=(e,n,s,c)=>{let y=m("button");return y.type="button",y.setAttribute("aria-label",s),y.title=s,y.append(b(n)),y.addEventListener("click",N=>{N.stopPropagation(),c()}),e.append(y),y},I=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,F=e=>Ln({"topic-markers":e.markers}),w=()=>/^(zh|ja)/.test(r.lang),E=(e,n)=>{if(!n.length)return e;let s=n.map(c=>r.markerNames[c]).join(w()?"\\u3001":", ");return`${e}${w()?"\\uFF0C":", "}${At(r.markerLabel,s)}`},C=e=>Nn({"topic-color":e.color}),W=e=>{let n=m("span","vam-markers");for(let s of e){let c=m("span","vam-marker",Sn(s));c.dataset.marker=s,c.setAttribute("aria-hidden","true"),n.append(c)}return n},j=(e,n)=>{let s=m("span","vam-relevance-tag");s.dataset.tier=e,n&&(s.title=n);let c=m("span","vam-relevance-icon");return c.append(b(Kr[e])),s.append(c,m("span",void 0,I(e))),s};a.className="vam-app";let Y=m("div","vam-toolbar"),Q=m("h1","vam-map-switcher"),J=m("span","vam-shared");Y.append(Q,J);let Z=P(Y,"list","",()=>Lt(et.hidden,!0));Y.prepend(Z),Z.setAttribute("aria-controls","vam-outline");let tt=m("div","vam-toolbar-actions"),ct=m("select","vam-language");if(_){for(let e of S){let n=m("option",void 0,(Xe=M.names[e])!=null?Xe:v(e));n.value=e,L&&e===O&&(n.dataset.original="1"),ct.append(n)}ct.value=k,tt.append(ct)}let oe=m("span","vam-made-with"),yt=m("a","vam-install");yt.href=Pr,yt.target="_blank",yt.rel="noopener noreferrer",tt.append(oe,yt),Y.append(tt);let ut=m("div","vam-translate-note");ut.hidden=!0;let xt=m("div","vam-workspace"),V=m("div","vam-viewport"),bt=m("div","vam-stage");bt.setAttribute("role","tree");let Et=t.createElementNS(jt,"svg");Et.setAttribute("class","vam-edges"),Et.setAttribute("aria-hidden","true"),bt.append(Et),V.append(bt);let Kt=m("div","vam-canvas-overlay"),kt=m("div","vam-map-tools"),St=m("span","vam-goal"),Le=m("span","vam-goal-text");St.append(b("target"),Le);let Se=m("span","vam-canvas-hint"),mt=m("div","vam-zoom-controls"),Bn=P(mt,"minus","",()=>Rt(1/1.2)),Ct=m("button","vam-zoom","100%");Ct.type="button",Ct.addEventListener("click",e=>{e.stopPropagation(),Rt(1/U.zoom)}),mt.append(Ct);let zn=P(mt,"plus","",()=>Rt(1.2)),$n=P(mt,"max","",()=>_t()),pt=m("button","vam-layout-button");pt.type="button",pt.setAttribute("aria-haspopup","menu"),pt.setAttribute("aria-expanded","false"),mt.append(pt);let ot=m("div","vam-layout-menu");ot.setAttribute("role","menu"),ot.hidden=!0,mt.append(ot),Kt.append(kt,Se,mt);let K=m("aside","vam-inspector");K.hidden=!0;let et=m("nav","vam-outline");et.id="vam-outline";let Ot=m("div","vam-outline-tree");Ot.setAttribute("role","tree"),et.append(Ot),xt.append(et,V,Kt,K),a.replaceChildren(..._?[Y,ut,xt]:[Y,xt]);let U={x:0,y:0,zoom:1},nt=null,ie=!1,Vt=Number(ke(Rn))||zr,X=new Map,Fn=()=>{let e=new Set,n=(s,c)=>{var y;for(let N of(y=h.get(s.id))!=null?y:[])c&&e.add(N.id),n(N,c||N.collapsed)};for(let s of l)s.parentId||n(s,s.collapsed);return e},Ce=e=>{var s,c;let n=0;for(let y=e.parentId;y&&!(++n>l.length);y=(c=(s=f.get(y))==null?void 0:s.parentId)!=null?c:null);return n},Oe=()=>ln(V.getBoundingClientRect().top,kt.hidden?void 0:kt.getBoundingClientRect());function gt(){bt.style.transform=`translate(${U.x}px, ${U.y}px) scale(${U.zoom})`;let e=`${Math.round(U.zoom*100)}%`;Ct.textContent=e,Ct.setAttribute("aria-label",At(r.zoomReset,e))}function Rt(e,n){let s=n!=null?n:{x:V.clientWidth/2,y:V.clientHeight/2},c=Math.min(Fr,Math.max($r,U.zoom*e)),y=c/U.zoom;U={x:s.x-(s.x-U.x)*y,y:s.y-(s.y-U.y)*y,zoom:c},gt()}let se=!1;function _t(){if(!X.size)return;if(!V.clientWidth||!V.clientHeight){se=!0;return}let e=1/0,n=1/0,s=-1/0,c=-1/0;for(let y of X.values())e=Math.min(e,y.offsetLeft),n=Math.min(n,y.offsetTop),s=Math.max(s,y.offsetLeft+(y.offsetWidth||280)),c=Math.max(c,y.offsetTop+y.offsetHeight);U=dn({minX:e,minY:n,maxX:s,maxY:c},{width:V.clientWidth,height:V.clientHeight},Oe()),gt()}function Re(e){let n=X.get(e);n&&(U=cn(U,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:V.clientWidth,height:V.clientHeight},Oe()),gt())}function It(){var e;Et.replaceChildren();for(let n of l){let s=n.parentId?X.get(n.parentId):void 0,c=X.get(n.id);if(!s||!c)continue;let y=t.createElementNS(jt,"path");y.setAttribute("d",we(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,c.offsetLeft,c.offsetTop+c.offsetHeight/2)),y.setAttribute("class",((e=u.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Et.append(y)}for(let n of x){let s=n.parentId?X.get(n.parentId):void 0,c=p.get(n.id);if(!s||!c)continue;let y=t.createElementNS(jt,"path");y.setAttribute("d",we(s.offsetLeft+s.offsetWidth,s.offsetTop+s.offsetHeight/2,c.offsetLeft,c.offsetTop+c.offsetHeight/2)),y.setAttribute("class","vam-edge vam-text-edge"),Et.append(y)}}let ae=0,_e=()=>{ae||(ae=window.requestAnimationFrame(()=>{ae=0,It()}))},le=e=>{let n=X.get(e),s=f.get(e);!n||!s||(n.style.left=`${s.x}px`,n.style.top=`${s.y}px`,s.width&&(n.style.width=`${s.width}px`),De(e))},De=e=>{let n=f.get(e);if(n)for(let s of x){let c=s.parentId===e?p.get(s.id):void 0;c&&(c.style.left=`${n.x+s.dx}px`,c.style.top=`${n.y+s.dy}px`)}};function Un(){for(let e of p.values())e.remove();p.clear();for(let e of x){let n=e.parentId?f.get(e.parentId):void 0;if(e.parentId&&(!n||!X.has(e.parentId)||n.collapsed))continue;let s=m("div",`vam-text-node${n?"":" is-free"}`);s.setAttribute("role","note"),s.textContent=e.text,n||(s.style.left=`${e.dx}px`,s.style.top=`${e.dy}px`),bt.append(s),p.set(e.id,s),n&&De(n.id)}}function ce(){var n,s;for(let c of X.values())c.remove();X.clear();let e=Fn();for(let c of l){if(e.has(c.id))continue;let y=u.get(c.id),N=T(y),R=he(l,c.id).size,B=Dn(y.tier)?y.tier:void 0,D=m("div",`vam-node${c.id===nt?" is-selected":""}`);D.dataset.nodeId=c.id,D.dataset.status=y.status==="completed"?"completed":"idea",B&&(D.dataset.relevance=B),D.tabIndex=0,D.setAttribute("role","treeitem"),D.setAttribute("aria-level",String(Ce(c)+1)),D.setAttribute("aria-selected",String(c.id===nt));let at=F(y),lt=C(y);lt&&(D.dataset.topicColor=lt);let rt=E(String((n=N.title)!=null?n:""),at);D.setAttribute("aria-label",lt?`${rt}${w()?"\\uFF0C":", "}${At(r.colorLabel,r.colorNames[lt])}`:rt),R&&D.setAttribute("aria-expanded",String(!c.collapsed));let q=m("div","vam-node-header");D.append(q),y.status!=="completed"&&q.append(m("span","vam-status vam-status-idea",r.toResearch)),B&&q.append(j(B,typeof N.reason=="string"?N.reason:void 0)),at.length&&q.append(W(at));let Ge=m("div","vam-node-tools");if(D.append(Ge),R){let st=c.collapsed?At(r.expandCount,R):r.collapse,ge=A(q,st,"vam-collapse-button",()=>{c.collapsed=!c.collapsed,Dt(c.id,!0)});ge.setAttribute("aria-expanded",String(!c.collapsed)),ge.setAttribute("aria-label",st),ge.title=st}A(Ge,r.detailsButton,void 0,()=>Nt(c.id)),D.append(m("h3","vam-card-title",String((s=N.title)!=null?s:""))),typeof N.summary=="string"&&N.summary.trim()&&D.append(m("p","vam-card-summary",N.summary)),D.addEventListener("click",()=>{ie||Nt(c.id)}),D.addEventListener("keydown",st=>{st.target===D&&(st.key==="Enter"||st.key===" "?(st.preventDefault(),Nt(c.id)):R&&st.key===(c.collapsed?"ArrowRight":"ArrowLeft")&&(st.preventDefault(),c.collapsed=!c.collapsed,Dt(c.id)))}),D.addEventListener("pointerdown",st=>jn(st,c,D)),bt.append(D),X.set(c.id,D),le(c.id)}Un()}function Wt(){an(l,void 0,n=>{var s;return(s=X.get(n))==null?void 0:s.offsetHeight}).forEach((n,s)=>{l[s].x=n.x,l[s].y=n.y});for(let n of X.keys())le(n)}function Dt(e,n=!1){var y;let s=e?(y=X.get(e))==null?void 0:y.getBoundingClientRect():void 0;ce(),Wt(),It();let c=e?X.get(e):void 0;if(c){if(s){let R=c.getBoundingClientRect();U={...U,x:U.x+s.left-R.left,y:U.y+s.top-R.top},gt()}let N=n?c.querySelector(".vam-collapse-button"):null;(N!=null?N:c).focus({preventScroll:!0})}}function jn(e,n,s){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let c=e.clientX,y=e.clientY,N=n.x,R=n.y,B=!1,D=lt=>{let rt=lt.clientX-c,q=lt.clientY-y;if(!B){if(Math.hypot(rt,q)<=Ur)return;B=!0,s.classList.add("is-dragging"),s.setPointerCapture(lt.pointerId)}n.x=N+rt/U.zoom,n.y=R+q/U.zoom,le(n.id),_e()},at=()=>{s.removeEventListener("pointermove",D),s.removeEventListener("pointerup",at),s.removeEventListener("pointercancel",at),s.classList.remove("is-dragging"),B&&(ie=!0,window.setTimeout(()=>ie=!1,0))};s.addEventListener("pointermove",D),s.addEventListener("pointerup",at),s.addEventListener("pointercancel",at)}let de=e=>Math.round(Math.min(Math.max(Ee,e),Math.max(Ee,xt.clientWidth*.7)));function Yt(){let e=ft();if(K.hidden||e){K.style.removeProperty("width"),Kt.style.removeProperty("right");return}let n=de(Vt);K.style.width=`${n}px`,Kt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(de(1/0)))}let G=m("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(Ee)),G.tabIndex=0;let Xt=(e,n)=>{Vt=de(e),Yt(),n&&Ie(Rn,String(Vt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,s=K.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let c=N=>Xt(s+n-N.clientX,!1),y=()=>{G.removeEventListener("pointermove",c),G.removeEventListener("pointerup",y),G.removeEventListener("pointercancel",y),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),Xt(Vt,!0)};G.addEventListener("pointermove",c),G.addEventListener("pointerup",y),G.addEventListener("pointercancel",y)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")Xt(K.offsetWidth+n,!0);else if(e.key==="ArrowRight")Xt(K.offsetWidth-n,!0);else return;e.preventDefault()});let ue=ft();window.addEventListener("resize",()=>{Yt(),gt(),ft()!==ue&&(ue=ft(),Lt(ue?!1:ze(),!1))});function pe(){nt=null;for(let e of X.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");K.hidden=!0,xt.classList.remove("has-inspector"),K.replaceChildren(),Yt(),Mt()}function Nt(e){var D,at,lt;let n=f.get(e),s=u.get(e);if(!n||!s)return;let c={...s,...T(s)};nt=e;for(let[rt,q]of X)q.classList.toggle("is-selected",rt===e),q.setAttribute("aria-selected",String(rt===e));K.replaceChildren(G);let y=m("div","vam-inspector-heading");y.append(m("strong",void 0,r.topicDetails)),A(y,r.close,void 0,pe),K.append(y,m("h3",void 0,String((D=c.title)!=null?D:"")));let N=Dn(c.tier)?c.tier:void 0;if(N){let rt=m("div","vam-inspector-why");rt.append(j(N));let q=typeof c.reason=="string"&&c.reason.trim()?c.reason:c.manual?r.manualReason:"";q&&rt.append(m("span",void 0,q)),K.append(rt)}typeof c.summary=="string"&&c.summary.trim()&&K.append(m("p","vam-sample-summary",c.summary));let R=m("div","vam-sample-detail");typeof c.detailHtml=="string"&&c.detailHtml.trim()?c.compact?In(t,R,c.detailHtml,c.compact,d,r):ve(t,R,c.detailHtml,d,r):R.append(m("p","vam-inspector-empty",r.noContent)),K.append(R);let B=(at=h.get(e))!=null?at:[];if(B.length){let rt=m("div","vam-subtopics");rt.append(m("strong",void 0,r.subtopics));for(let q of B)A(rt,String((lt=T(u.get(q.id)).title)!=null?lt:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Dt(n.id)),Nt(q.id),Re(q.id)});K.append(rt)}K.hidden=!1,xt.classList.add("has-inspector"),Yt(),K.scrollTop=0,Mt(),$e()}let fe=e=>{ye(l,e),Dt(),_t()},Pt=e=>{ot.hidden||(ot.hidden=!0,pt.setAttribute("aria-expanded","false"),e&&pt.focus())};function Kn(){ot.replaceChildren();let e=[{label:r.collapseAll,run:()=>fe(0)},{label:r.expandAll,run:()=>fe(null)},...[1,2,3].map(n=>({label:At(r.expandToLevel,n),run:()=>fe(n)})),null,{label:r.autoLayout,run:()=>{Wt(),It()}}];for(let n of e){if(!n){ot.append(m("hr"));continue}let s=m("button",void 0,n.label);s.type="button",s.setAttribute("role","menuitem"),s.addEventListener("click",c=>{c.stopPropagation(),Pt(!0),n.run()}),ot.append(s)}}let Pe=()=>Array.from(ot.querySelectorAll("button"));pt.addEventListener("click",e=>{var n;if(e.stopPropagation(),!ot.hidden)return Pt(!0);ot.hidden=!1,pt.setAttribute("aria-expanded","true"),(n=Pe()[0])==null||n.focus()}),ot.addEventListener("keydown",e=>{let n=Pe(),s=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(s+1)%n.length].focus();else if(e.key==="ArrowUp")n[(s-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Pt(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!ot.hidden&&!mt.contains(e.target)&&Pt(!1);let n=e.target;ft()&&!et.hidden&&!et.contains(n)&&!Z.contains(n)&&Lt(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!ot.hidden)Pt(!0);else if(ft()&&!et.hidden)Lt(!1,!1),Z.focus();else if(!K.hidden){let n=nt?X.get(nt):void 0;pe(),n==null||n.focus({preventScroll:!0})}}});function He(){let e=g();if(t.title=e.title,Q.textContent=e.title,bt.setAttribute("aria-label",e.title),J.textContent=r.readOnly,oe.textContent=r.madeWithVam,yt.textContent=r.install,ct.setAttribute("aria-label",r.language),ct.title=r.language,L)for(let s of Array.from(ct.options))s.dataset.original&&(s.textContent=r.originalText);e.goal?(Le.textContent=At(r.goal,e.goal),St.title=e.goal,St.parentElement||kt.append(St),kt.hidden=!1):(St.remove(),kt.hidden=!0),Se.textContent=r.hint;let n=(s,c)=>{s.setAttribute("aria-label",c),s.title=c};if(n(Bn,r.zoomOut),n(zn,r.zoomIn),n($n,r.showAll),pt.textContent=r.layout,K.setAttribute("aria-label",r.topicDetails),et.setAttribute("aria-label",r.outline),Ot.setAttribute("aria-label",r.outline),n(Z,r.outline),G.setAttribute("aria-label",r.resizePanel),Kn(),$()){let s=L?r.aiTranslatedUnknown:At(r.aiTranslated,v(O,k));ut.textContent=`${s} ${r.imageTextUntranslated}`,ut.hidden=!1}else ut.hidden=!0;gt()}function Vn(e){if(e===k||!S.includes(e))return;k=e,r=H(e),z&&Ie(z,e),t.documentElement.lang=e;let n=K.scrollTop;He(),ce(),It(),Ue(),nt!==null&&f.has(nt)&&!K.hidden&&(Nt(nt),K.scrollTop=n),_e()}ct.addEventListener("change",()=>Vn(ct.value));let Gt=[],Be=e=>{var n;Gt.push(e);for(let s of(n=h.get(e.id))!=null?n:[])Be(s)};for(let e of l)e.parentId||Be(e);let Ht=new Set,Tt=new Map,qt=null;function ze(){return ke(_n)!=="0"}function Lt(e,n){et.hidden=!e,xt.classList.toggle("has-outline",e),Z.setAttribute("aria-expanded",String(e)),n&&!ft()&&Ie(_n,e?"1":"0")}let Wn=()=>Gt.filter(e=>{var n;return!((n=Tt.get(e.id))!=null&&n.hidden)});function Mt(){var s,c,y;let e=[];for(let N of Gt){let R=Tt.get(N.id);if(!R)continue;let B=!1;for(let D=N.parentId;D&&!B;D=(c=(s=f.get(D))==null?void 0:s.parentId)!=null?c:null)B=Ht.has(D);R.hidden=B,B||e.push(N),h.has(N.id)&&R.setAttribute("aria-expanded",String(!Ht.has(N.id))),N.id===nt?R.setAttribute("aria-current","true"):R.removeAttribute("aria-current")}let n=(y=e.find(N=>N.id===qt))!=null?y:e[0];for(let[N,R]of Tt)R.tabIndex=N===(n==null?void 0:n.id)?0:-1}function $e(){let e=nt?Tt.get(nt):void 0;!e||e.hidden||!et.clientHeight||(e.offsetTop<et.scrollTop?et.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>et.scrollTop+et.clientHeight&&(et.scrollTop=e.offsetTop+e.offsetHeight-et.clientHeight))}function me(e){Ht.delete(e)||Ht.add(e),Mt()}function Yn(e){var n;qt=e,Mt(),(n=Tt.get(e))==null||n.focus()}function Xn(){for(let[e,n]of X)n.classList.toggle("is-selected",e===nt),n.setAttribute("aria-selected",String(e===nt))}function Fe(e){var y,N,R;let n=f.get(e);if(!n)return;let s=!1,c=0;for(let B=n.parentId;B&&c++<=l.length;B=(N=(y=f.get(B))==null?void 0:y.parentId)!=null?N:null){let D=f.get(B);D!=null&&D.collapsed&&(D.collapsed=!1,s=!0)}nt=e,s&&Dt(),Re(e),K.hidden?Xn():Nt(e),Mt(),$e(),ft()&&Lt(!1,!1),(R=X.get(e))==null||R.focus({preventScroll:!0})}function Gn(e,n){var B;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let s=Wn(),c=s.indexOf(n),y=(B=h.get(n.id))!=null?B:[],N=Ht.has(n.id),R;switch(e.key){case"ArrowDown":R=s[c+1];break;case"ArrowUp":R=s[c-1];break;case"Home":R=s[0];break;case"End":R=s[s.length-1];break;case"ArrowRight":y.length&&N?me(n.id):R=y[0];break;case"ArrowLeft":y.length&&!N?me(n.id):R=n.parentId?f.get(n.parentId):void 0;break;case"Enter":case" ":Fe(n.id);break;default:return}e.preventDefault(),R&&Yn(R.id)}function Ue(){var e;Ot.replaceChildren(),Tt.clear();for(let n of Gt){let s=String((e=T(u.get(n.id)).title)!=null?e:""),c=m("div","vam-outline-item");c.dataset.outlineId=n.id,c.setAttribute("role","treeitem");let y=Ce(n)+1;c.setAttribute("aria-level",String(y)),c.style.setProperty("--depth",String(y-1));let N=m("span","vam-outline-twist");h.has(n.id)&&(N.append(b("chevron")),N.addEventListener("click",D=>{D.stopPropagation(),me(n.id)}));let R=m("span","vam-outline-title",s);R.title=s,c.append(N,R);let B=F(u.get(n.id));B.length&&(c.append(W(B)),c.setAttribute("aria-label",E(s,B))),c.addEventListener("click",()=>Fe(n.id)),c.addEventListener("keydown",D=>Gn(D,n)),c.addEventListener("focus",()=>{qt!==n.id&&(qt=n.id,Mt())}),Ot.append(c),Tt.set(n.id,c)}Mt()}let it=new Map,Bt=0,Zt=!1;V.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(V.setPointerCapture(e.pointerId),it.set(e.pointerId,{x:e.clientX,y:e.clientY}),V.classList.add("is-panning"),it.size===1&&(Zt=!1),it.size===2)){let[n,s]=Array.from(it.values());Bt=Math.hypot(n.x-s.x,n.y-s.y)}}),V.addEventListener("pointermove",e=>{let n=it.get(e.pointerId);if(!n)return;if(it.set(e.pointerId,{x:e.clientX,y:e.clientY}),it.size===2&&Bt){let[y,N]=Array.from(it.values()),R=Math.hypot(y.x-N.x,y.y-N.y),B=V.getBoundingClientRect();Rt(R/Bt,{x:(y.x+N.x)/2-B.left,y:(y.y+N.y)/2-B.top}),Bt=R,Zt=!0;return}let s=e.clientX-n.x,c=e.clientY-n.y;Zt||(Zt=Math.abs(s)+Math.abs(c)>0),U={...U,x:U.x+s,y:U.y+c},gt()});let je=e=>{it.delete(e.pointerId)&&(it.size<2&&(Bt=0),it.size||(V.classList.remove("is-panning"),!Zt&&e.type==="pointerup"&&!K.hidden&&pe()))};V.addEventListener("pointerup",je),V.addEventListener("pointercancel",je),V.addEventListener("wheel",e=>{e.preventDefault();let n=V.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?Rt(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(U={...U,x:U.x-e.deltaX,y:U.y-e.deltaY},gt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{se&&(se=!1,_t())}).observe(V),He(),Ue(),Lt(ft()?!1:ze(),!1),ye(l,1),ce(),Wt(),It(),_t();let Ke=t.fonts;Ke&&Ke.ready.then(()=>{nt!==null||it.size||(Wt(),It(),_t())})}Hn(document);})();';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }\n.vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }\n.vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }\n.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n.vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }\n.vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n.vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }\n.vam-text-edge { opacity: 0.8; }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
@@ -65227,6 +65750,19 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         const view = this.views()[0];
         if (view) chooseAndImportExchange(view);
       }).catch((error) => new import_obsidian40.Notice(String(error)));
+    });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "add-text-node",
+        name: t("ui.text_node_add_command"),
+        checkCallback: (checking) => {
+          const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
+          if (!view) return false;
+          if (!checking) view.addTextNodeUnder();
+          return true;
+        }
+      }),
+      key: "ui.text_node_add_command"
     });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {

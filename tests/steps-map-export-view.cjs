@@ -348,3 +348,19 @@ test('frames (ticket 43) are exported as drawn: measured from the cards, label a
   assert.match(svg, />&lt;b&gt;Team&lt;\/b&gt;</, 'the label is escaped text');
   assert.doesNotMatch(svg, /<b>/);
 });
+
+test('tree-text-node: a text node is exported as a card with its text escaped, and a script text stays literal', async () => {
+  const h = await harness();
+  const el = element('div', 'vam-text-node');
+  Object.assign(el, { offsetLeft: 600, offsetTop: 40, offsetWidth: 300, offsetHeight: 50 });
+  el.computed = style({ backgroundColor: 'rgb(255, 255, 255)', borderTopColor: 'rgb(204, 204, 204)' });
+  const body = el.createDiv('vam-text-node-body');
+  body.text = 'note <script>alert(1)</script> <img src=x onerror=alert(1)>';
+  body.computed = style({ color: 'rgb(34, 34, 34)' });
+  h.view.textEls = new Map([['t1', el]]);
+  const got = await h.view.collectExportScene(() => true);
+  const svg = ex.buildMapSvg(got.scene);
+  assert.match(svg, /note &lt;script&gt;/);
+  assert.doesNotMatch(svg, /<script|<img/);
+  assert.ok(got.scene.cards.some(c => c.x === 600 && c.y === 40), 'the text node box is in the scene');
+});

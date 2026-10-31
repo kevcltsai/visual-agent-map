@@ -423,3 +423,53 @@ test('sharing card-width: the payload carries width only for a custom width and 
   assert.match(viewerSource, /clampCardWidth\(item\.width\)/);
   assert.match(viewerSource, /card\.style\.width = `\$\{node\.width\}px`/);
 });
+
+// tree-text-node (P4): text nodes travel as plain text in an optional `textNodes` list; the viewer only uses textContent.
+test('sharing text-nodes: no text nodes means no key and unchanged bytes; text nodes carry parent, orphans get null', () => {
+  const { notesById } = cleanedNotes();
+  const before = format.serializeShareJson(format.buildSharePayload(fixtureMap(), notesById, options()));
+  assert.ok(!before.includes('textNodes'));
+  const emptyItems = fixtureMap();
+  emptyItems.canvasItems = [{ id: 'img', kind: 'image', path: 'a.png', x: 0, y: 0, w: 10, h: 10 }];
+  assert.equal(format.serializeShareJson(format.buildSharePayload(emptyItems, notesById, options())), before);
+  const map = fixtureMap();
+  const first = map.nodes[0].id;
+  map.canvasItems = [
+    { id: 't1', kind: 'text', text: ' hello ', parentId: first, x: 10, y: 20 },
+    { id: 't2', kind: 'text', text: 'orphan', parentId: 'gone', x: 5, y: 6 },
+    { id: 't3', kind: 'text', text: 'free', x: 7, y: 8 },
+    { id: 't4', kind: 'text', text: 'self', parentId: 't4', x: 1, y: 2 },
+    { id: 't5', kind: 'text', text: '   ', parentId: first, x: 1, y: 2 },
+    { id: 't6', kind: 'text', text: 'x'.repeat(2500), parentId: first, x: 1, y: 2 },
+    { id: 't7', kind: 'text', text: 42, parentId: first, x: 1, y: 2 },
+    { id: 't8', kind: 'text', text: 'bad xy', parentId: first, x: Infinity, y: 2 },
+    { id: 't1', kind: 'text', text: 'dup id', parentId: first, x: 1, y: 2 }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options());
+  assert.equal(payload.version, 1);
+  const byId = Object.fromEntries(payload.textNodes.map(t => [t.id, t]));
+  assert.deepEqual(plain(Object.keys(byId).sort()), ['t1', 't2', 't3', 't4', 't6']);
+  assert.deepEqual(plain(byId.t1), { id: 't1', parentId: first, text: 'hello', x: 10, y: 20 });
+  for (const id of ['t2', 't3', 't4']) assert.equal(byId[id].parentId, null, `${id} is an orphan`);
+  assert.equal(byId.t6.text.length, 2000);
+  assert.deepEqual(plain(Object.keys(byId.t1).sort()), ['id', 'parentId', 'text', 'x', 'y']);
+  // Structure-only share still carries the user's own text: it is map structure, not note detail.
+  assert.equal(format.buildSharePayload(map, notesById, options({ includeDetail: false })).textNodes.length, 5);
+});
+
+test('sharing text-nodes: counterexample - script and img text stay literal in the file and the viewer never uses HTML', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const evil = '</script><script>alert(1)</script><img src=x onerror=alert(1)>';
+  map.canvasItems = [{ id: 't1', kind: 'text', text: evil, parentId: map.nodes[0].id, x: 0, y: 0 }];
+  const payload = format.buildSharePayload(map, notesById, options());
+  assert.equal(payload.textNodes[0].text, evil, 'stored as typed, never rewritten');
+  const json = format.serializeShareJson(payload);
+  assert.ok(!json.includes('<'), 'every < is escaped in the JSON block');
+  assert.equal(JSON.parse(json).textNodes[0].text, evil);
+  const src = fs.readFileSync(path.join(root, 'experiences', 'sharing', 'viewer', 'main.ts'), 'utf8');
+  const start = src.indexOf('function renderTexts');
+  const block = src.slice(start, src.indexOf('function renderCards'));
+  assert.ok(start > 0 && block.includes('el.textContent = text.text'));
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment/.test(block));
+});

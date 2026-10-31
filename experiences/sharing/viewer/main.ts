@@ -156,6 +156,25 @@ export function startViewer(doc: Document): void {
   const byId = new Map(nodes.map(node => [node.id, node]));
   for (const node of nodes)
     if (node.parentId && (!byId.has(node.parentId) || node.parentId === node.id)) node.parentId = null;
+  // Text nodes (tree-text-node): plain text only. One hung under a topic keeps its offset from that topic; an orphan stays at its own spot.
+  const texts: Array<{ id: string; parentId: string | null; text: string; dx: number; dy: number }> = [];
+  if (Array.isArray(data.textNodes)) {
+    const seenText = new Set<string>();
+    for (const item of data.textNodes) {
+      if (!item || typeof item.id !== "string" || seenText.has(item.id) || typeof item.text !== "string") continue;
+      if (!item.text.trim() || !Number.isFinite(item.x) || !Number.isFinite(item.y)) continue;
+      seenText.add(item.id);
+      const parent = typeof item.parentId === "string" ? byId.get(item.parentId) : undefined;
+      texts.push({
+        id: item.id,
+        parentId: parent ? parent.id : null,
+        text: item.text,
+        dx: parent ? item.x - parent.x : item.x,
+        dy: parent ? item.y - parent.y : item.y
+      });
+    }
+  }
+  const textEls = new Map<string, HTMLElement>();
   const kidsOf = new Map<string, MapNode[]>();
   for (const node of nodes) if (node.parentId) kidsOf.set(node.parentId, [...(kidsOf.get(node.parentId) ?? []), node]);
 
@@ -498,6 +517,23 @@ export function startViewer(doc: Document): void {
       path.setAttribute("class", info.get(node.id)?.tier === "side" ? "vam-edge vam-edge-side" : "vam-edge");
       edges.append(path);
     }
+    for (const text of texts) {
+      const parent = text.parentId ? cards.get(text.parentId) : undefined;
+      const child = textEls.get(text.id);
+      if (!parent || !child) continue;
+      const path = doc.createElementNS(SVG_NS, "path");
+      path.setAttribute(
+        "d",
+        edgePathData(
+          parent.offsetLeft + parent.offsetWidth,
+          parent.offsetTop + parent.offsetHeight / 2,
+          child.offsetLeft,
+          child.offsetTop + child.offsetHeight / 2
+        )
+      );
+      path.setAttribute("class", "vam-edge vam-text-edge");
+      edges.append(path);
+    }
   }
   let edgeFrame = 0;
   const scheduleEdges = (): void => {
@@ -514,8 +550,37 @@ export function startViewer(doc: Document): void {
     card.style.left = `${node.x}px`;
     card.style.top = `${node.y}px`;
     if (node.width) card.style.width = `${node.width}px`;
+    placeTexts(id);
+  };
+  const placeTexts = (parentId: string): void => {
+    const parent = byId.get(parentId);
+    if (!parent) return;
+    for (const text of texts) {
+      const el = text.parentId === parentId ? textEls.get(text.id) : undefined;
+      if (!el) continue;
+      el.style.left = `${parent.x + text.dx}px`;
+      el.style.top = `${parent.y + text.dy}px`;
+    }
   };
 
+  function renderTexts(): void {
+    for (const el of textEls.values()) el.remove();
+    textEls.clear();
+    for (const text of texts) {
+      const parent = text.parentId ? byId.get(text.parentId) : undefined;
+      if (text.parentId && (!parent || !cards.has(text.parentId) || parent.collapsed)) continue;
+      const el = make("div", `vam-text-node${parent ? "" : " is-free"}`);
+      el.setAttribute("role", "note");
+      el.textContent = text.text;
+      if (!parent) {
+        el.style.left = `${text.dx}px`;
+        el.style.top = `${text.dy}px`;
+      }
+      stage.append(el);
+      textEls.set(text.id, el);
+      if (parent) placeTexts(parent.id);
+    }
+  }
   function renderCards(): void {
     for (const card of cards.values()) card.remove();
     cards.clear();
@@ -583,6 +648,7 @@ export function startViewer(doc: Document): void {
       cards.set(node.id, card);
       place(node.id);
     }
+    renderTexts();
   }
   function layout(): void {
     const arranged = arrangeMap(nodes, undefined, id => cards.get(id)?.offsetHeight);

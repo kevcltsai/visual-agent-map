@@ -7987,6 +7987,23 @@ export class VisualAgentMapView extends ItemView {
       }
       cards.push(item);
     }
+    // Text nodes as drawn (tree-text-node): a plain card with the text wrapped; the line to the parent is in edgesEl.
+    for (const el of this.textEls.values()) {
+      const box = boxOf(el);
+      grow(box.x, box.y, box.width, box.height);
+      const style = computed(el);
+      const body = el.querySelector<HTMLElement>(".vam-text-node-body");
+      cards.push({
+        x: box.x,
+        y: box.y,
+        w: box.width,
+        h: box.height,
+        title: wrapText(body?.textContent ?? "", box.width - 28),
+        fill: colorOf(style.backgroundColor),
+        stroke: colorOf(style.borderTopColor),
+        textColor: colorOf(computed(body ?? el).color)
+      });
+    }
     const images: SceneImage[] = [];
     for (const item of map.canvasItems ?? []) {
       if (item.kind !== "image") continue;

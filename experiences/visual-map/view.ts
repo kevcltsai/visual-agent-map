@@ -440,6 +440,8 @@ type SynthesisWrite = (
 let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
+/** The model tag drawn in a card header, so a redraw replaces exactly it. */
+const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
@@ -6740,6 +6742,7 @@ export class VisualAgentMapView extends ItemView {
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
+    this.paintModelTag(header, note);
     this.paintCardMarkers(card, header, node.id);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
@@ -7407,6 +7410,21 @@ export class VisualAgentMapView extends ItemView {
       : "";
   }
   /**
+   * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
+   * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
+   */
+  private paintModelTag(header: HTMLElement, note: Note | undefined): void {
+    cardModelTags.get(header)?.remove();
+    cardModelTags.delete(header);
+    if (!note?.modelOverride) return;
+    const label = this.plugin.modelLabel(note.model),
+      tag = header.createSpan({ cls: "vam-node-model-tag", text: label }),
+      named = t("ui.card_model_override_0", label);
+    tag.setAttr("aria-label", named);
+    tag.setAttr("title", named);
+    cardModelTags.set(header, tag);
+  }
+  /**
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
@@ -7637,7 +7655,10 @@ export class VisualAgentMapView extends ItemView {
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
-    if (header) this.paintCardMarkers(card, header, node.id);
+    if (header) {
+      this.paintModelTag(header, note);
+      this.paintCardMarkers(card, header, node.id);
+    }
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();

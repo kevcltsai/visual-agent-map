@@ -1429,3 +1429,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-relation-footer { margin-top: 20px; }
 .vam-map-chat button.vam-map-chat-empty-map { align-self: center; margin-top: 8px; }
 .vam-map-chat button.vam-map-chat-empty-map[hidden] { display: none; }
+/* The model a card runs on when it is not the current model (MS-08): muted small text. */
+.vam-node-model-tag { display: inline-flex; align-items: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; color: var(--text-muted); }

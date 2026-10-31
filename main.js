@@ -20302,9 +20302,8 @@ var Repository = class {
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const { model, reasoning } = this.chooseModel(
-      await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]))
-    );
+    const effective = await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]));
+    const { model, reasoning } = this.chooseModel(effective);
     const state = text5(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -20323,6 +20322,7 @@ var Repository = class {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
+      ...effective.overridden ? { modelOverride: true } : {},
       reasoning,
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
@@ -22532,6 +22532,8 @@ var MapChatPanel = class {
     __publicField(this, "frame", null);
     /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
     __publicField(this, "stage", null);
+    /** The label of the model the running turn was sent with (read once when the turn begins, so a switch mid-turn does not change it). */
+    __publicField(this, "stageModel", "");
     /** The stage line inside the AI bubble, with the two texts that change. */
     __publicField(this, "stageEls", null);
     /** The slow notice of the running turn (no model event for a long while) and what its button does. Null when not shown. */
@@ -22811,6 +22813,7 @@ var MapChatPanel = class {
     this.messages.push(user, assistant);
     this.busy = true;
     this.stage = { kind: stage, since: this.clockNow() };
+    this.stageModel = this.currentModelLabel();
     this.slow = null;
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
@@ -22866,8 +22869,15 @@ ${typed}` : draft;
     this.paintStage();
     this.speakStage();
   }
+  currentModelLabel() {
+    var _a2, _b2;
+    const model = this.host.model();
+    return (_b2 = (_a2 = this.host.modelChoices().find((choice2) => choice2.value === model)) == null ? void 0 : _a2.label) != null ? _b2 : model;
+  }
+  /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   stageLabel(kind) {
-    return t(`ui.map_chat_stage_${kind}`);
+    const name = t(`ui.map_chat_stage_${kind}`);
+    return kind === "applying" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
   elapsedText() {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
@@ -40541,6 +40551,7 @@ var MERGE_DONE_NOTICE_MS = 15e3;
 var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
+var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
@@ -46271,6 +46282,7 @@ ${request.requirements}` : preset.text,
       const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    this.paintModelTag(header, note);
     this.paintCardMarkers(card, header, node.id);
     const errorDetails = [];
     if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
@@ -46879,6 +46891,20 @@ ${request.requirements}` : preset.text,
     return markers.length ? t("share.viewer_markers_0", markers.map((id) => t(markerLabelKey(id))).join(t("ui.list_separator"))) : "";
   }
   /**
+   * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
+   * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
+   */
+  paintModelTag(header, note) {
+    var _a2;
+    (_a2 = cardModelTags.get(header)) == null ? void 0 : _a2.remove();
+    cardModelTags.delete(header);
+    if (!(note == null ? void 0 : note.modelOverride)) return;
+    const label = this.plugin.modelLabel(note.model), tag = header.createSpan({ cls: "vam-node-model-tag", text: label }), named = t("ui.card_model_override_0", label);
+    tag.setAttr("aria-label", named);
+    tag.setAttr("title", named);
+    cardModelTags.set(header, tag);
+  }
+  /**
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
@@ -47090,7 +47116,10 @@ ${request.requirements}` : preset.text,
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
-    if (header) this.paintCardMarkers(card, header, node.id);
+    if (header) {
+      this.paintModelTag(header, note);
+      this.paintCardMarkers(card, header, node.id);
+    }
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
@@ -58317,7 +58346,7 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
     return true;
   }
   openForCurrentSelection() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const snapshot = this.snapshot;
     if (!snapshot) return;
     this.hideLauncher();
@@ -58326,19 +58355,21 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
       this.app,
       snapshot,
       this.options.model,
+      (_b2 = this.options.modelLabel) != null ? _b2 : (model) => model,
       this.options.language(snapshot.text),
-      (_d = (_c = (_b2 = this.options).translateTarget) == null ? void 0 : _c.call(_b2)) != null ? _d : this.options.language(snapshot.text),
+      (_e = (_d = (_c = this.options).translateTarget) == null ? void 0 : _d.call(_c)) != null ? _e : this.options.language(snapshot.text),
       this.options.run
     );
     this.panel.open();
   }
 };
 var SelectionAiPanel = class extends import_obsidian38.Component {
-  constructor(app, snapshot, modelOf, language2, translateTarget, run) {
+  constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run) {
     super();
     this.app = app;
     this.snapshot = snapshot;
     this.modelOf = modelOf;
+    this.modelLabel = modelLabel;
     this.language = language2;
     this.translateTarget = translateTarget;
     this.run = run;
@@ -58601,8 +58632,10 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     this.previewChild = null;
     this.preview.empty();
     this.setBusy(trigger);
-    status.setText(t("ui.context_ai_running_0", label));
     const model = this.modelOf();
+    const withModel = (text11) => t("ui.progress_stage_with_model_0_1", text11, this.modelLabel(model));
+    const running = () => withModel(t("ui.context_ai_running_0", label));
+    status.setText(running());
     try {
       const at = this.snapshot.matchAt;
       const context = at >= 0 ? this.snapshot.markdown.slice(Math.max(0, at - 600), at + this.snapshot.text.length + 600) : "";
@@ -58620,7 +58653,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
       let result;
       let insertAfter = false;
       if (plan.action === "image_search") {
-        status.setText(t("ui.context_ai_searching_images"));
+        status.setText(withModel(t("ui.context_ai_searching_images")));
         const search = prepareStep(imageSearchStep, { query: plan.query || prompt });
         const found = search.parse(await this.run(search, model, controller.signal, void 0, true));
         if (controller.signal.aborted || !this.isOpen) return;
@@ -58656,7 +58689,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
             const choice2 = new AbortController();
             this.controller = choice2;
             this.setBusy(choose);
-            status.setText(t("ui.context_ai_generating"));
+            status.setText(withModel(t("ui.context_ai_generating")));
             void this.imageDraft(candidate, plan.captionInstruction, choice2.signal, model).then((draft) => {
               if (this.controller === choice2 && !choice2.signal.aborted && this.isOpen) {
                 output.value = draft;
@@ -58683,7 +58716,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
         result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal, model);
         if (controller.signal.aborted || !this.isOpen) return;
       } else {
-        status.setText(t("ui.context_ai_running_0", label));
+        status.setText(running());
         const request = prepareStep(transformStep, {
           instruction: plan.instruction || prompt,
           selected: this.snapshot.text,
@@ -59142,6 +59175,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
+      modelLabel: (model) => this.modelLabel(model),
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
         kind: "selection",

@@ -8,10 +8,13 @@ import {
 } from "../aim/content-language";
 import {
   addImage,
+  boundaryBounds,
   moveItem,
+  pruneBoundaries,
   removeItem,
   resizeKeepRatio,
   IMAGE_MIN_SIZE,
+  type BoundaryItem,
   type CanvasItem,
   type ImageItem
 } from "./canvas-items";
@@ -30,6 +33,7 @@ import {
   toDataUri,
   wrapText,
   type MapScene,
+  type SceneBoundary,
   type SceneCard,
   type SceneEdge,
   type SceneImage
@@ -573,6 +577,7 @@ function depthOf(nodes: MapNode[], id: string): number {
   for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId)) depth++;
   return depth;
 }
+const BOUNDARY_PAD = 16;
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -5380,12 +5385,12 @@ export class VisualAgentMapView extends ItemView {
     const stage = this.stageEl,
       items = this.map?.canvasItems;
     if (!stage || !items?.length) return;
-    const layer = stage.createDiv("vam-canvas-items");
-    layer.setAttr("role", "group");
-    layer.setAttr("aria-label", t("ui.canvas_images_group"));
     const editable = this.canEditCanvasItems();
+    const layer = items.some(item => item.kind === "image") ? stage.createDiv("vam-canvas-items") : null;
+    layer?.setAttr("role", "group");
+    layer?.setAttr("aria-label", t("ui.canvas_images_group"));
     for (const item of items) {
-      if (item.kind !== "image") continue;
+      if (item.kind !== "image" || !layer) continue;
       const image = item as ImageItem,
         name = image.path.split("/").pop() ?? image.path,
         label = t("ui.canvas_image_label", name),
@@ -5428,7 +5433,146 @@ export class VisualAgentMapView extends ItemView {
         el.focus({ preventScroll: true });
       }
     }
+    this.renderBoundaries(stage, items, editable);
     this.focusItemId = null;
+  }
+  /**
+   * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
+   * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
+   * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
+   * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
+   */
+  private renderBoundaries(stage: HTMLElement, items: readonly CanvasItem[], editable: boolean): void {
+    const boundaries = items.filter((item): item is BoundaryItem => item.kind === "boundary");
+    if (!boundaries.length) return;
+    const rectOf = (id: string): { x: number; y: number; w: number; h: number } | null => {
+      const card = this.cardEls.get(id);
+      if (!card) return null;
+      const box = boxOf(card);
+      return { x: box.x, y: box.y, w: box.width, h: box.height };
+    };
+    let layer: HTMLElement | null = null;
+    for (const boundary of boundaries) {
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      if (!box) continue;
+      if (!layer) {
+        layer = stage.createDiv("vam-boundaries");
+        layer.setAttr("role", "group");
+        layer.setAttr("aria-label", t("ui.canvas_boundaries_group"));
+      }
+      const label = boundary.label ?? "",
+        el = layer.createDiv("vam-boundary");
+      el.dataset.itemId = boundary.id;
+      el.setAttr("role", "group");
+      el.setAttr("aria-label", label ? t("ui.canvas_boundary_label", label) : t("ui.canvas_boundary_default"));
+      el.tabIndex = 0;
+      el.style.left = `${box.x}px`;
+      el.style.top = `${box.y}px`;
+      el.style.width = `${box.w}px`;
+      el.style.height = `${box.h}px`;
+      const chip = el.createSpan({ cls: "vam-boundary-label", text: label });
+      if (!label) chip.addClass("is-empty");
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      chip.addEventListener("pointerdown", event => {
+        if (event.button === 0) el.focus({ preventScroll: true });
+      });
+      if (!editable) continue;
+      chip.addEventListener("dblclick", event => {
+        event.stopPropagation();
+        this.editBoundaryLabel(boundary.id);
+      });
+      chip.addEventListener("contextmenu", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new Menu();
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.canvas_boundary_edit"))
+            .setIcon("pencil")
+            .onClick(() => this.editBoundaryLabel(boundary.id))
+        );
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.canvas_boundary_remove"))
+            .setIcon("trash")
+            .onClick(() => this.enqueue(() => this.removeCanvasItem(boundary.id)))
+        );
+        menu.showAtMouseEvent(event);
+      });
+      el.addEventListener("keydown", event => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (!event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeCanvasItem(boundary.id));
+        } else if (!event.shiftKey && (event.key === "Enter" || event.key === "F2")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.editBoundaryLabel(boundary.id);
+        }
+      });
+      if (this.focusItemId === boundary.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+  }
+  /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
+  private editBoundaryLabel(id: string): void {
+    const current = (this.map?.canvasItems ?? []).find(
+      (item): item is BoundaryItem => item.kind === "boundary" && (item as BoundaryItem).id === id
+    );
+    if (!current || !this.canEditCanvasItems()) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      current.label ?? "",
+      label => {
+        this.focusItemId = id;
+        this.enqueue(() => this.renameBoundary(id, label));
+      },
+      { allowEmpty: true }
+    ).open();
+  }
+  /** Sets or clears (blank) a frame's label. */
+  private async renameBoundary(id: string, label: string): Promise<void> {
+    const text = label.trim();
+    await this.changeCanvasItems(id, items =>
+      items.map(item => {
+        if (item.kind !== "boundary" || (item as BoundaryItem).id !== id) return item;
+        const { label: _old, ...rest } = item as BoundaryItem;
+        return text ? { ...rest, label: text } : rest;
+      })
+    );
+  }
+  /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
+  private async addBoundary(ids: readonly string[], label: string): Promise<string | null> {
+    if (!this.map || this.builtIn || this.map.aim) return null;
+    const known = new Set(this.map.nodes.map(node => node.id)),
+      members = [...new Set(ids)].filter(id => known.has(id));
+    if (!members.length) return null;
+    const id = `frame-${randomUUID().slice(0, 8)}`,
+      text = label.trim();
+    this.focusItemId = id;
+    const frame: BoundaryItem = { id, kind: "boundary", members, ...(text ? { label: text } : {}) };
+    await this.mapChange(map => {
+      const alive = map.nodes.map(node => node.id);
+      map.canvasItems = [...pruneBoundaries(map.canvasItems ?? [], alive), frame];
+    }, false);
+    return id;
+  }
+  /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
+  private openAddBoundary(): void {
+    const ids = [...this.multiSelected];
+    if (!this.map || this.builtIn || this.map.aim || !ids.length) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      "",
+      label => this.enqueue(async () => void (await this.addBoundary(ids, label))),
+      { allowEmpty: true }
+    ).open();
   }
   /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
   private enableCanvasItemDrag(el: HTMLElement, handle: HTMLElement, image: ImageItem): void {
@@ -5501,7 +5645,11 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!this.map.canvasItems?.some(item => (item as { id?: unknown }).id === id)) return;
     await this.mapChange(map => {
-      const next = change(map.canvasItems ?? []);
+      // An empty frame (every member gone) is cleared with the next canvas write, so an undo of a topic removal still finds it.
+      const next = pruneBoundaries(
+        change(map.canvasItems ?? []),
+        map.nodes.map(node => node.id)
+      );
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
     }, false);
@@ -5669,6 +5817,7 @@ export class VisualAgentMapView extends ItemView {
       !target?.closest ||
       target.closest(".vam-node") ||
       target.closest(".vam-canvas-image") ||
+      target.closest(".vam-boundary-label") ||
       target.closest(INTERACTIVE_SELECTOR)
     )
       return;
@@ -7096,6 +7245,32 @@ export class VisualAgentMapView extends ItemView {
       grow(image.x, image.y, image.w, image.h);
       images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
     }
+    // Frames as drawn on screen: measured from the same cards, so they follow the layout; a frame with no card is left out.
+    const boundaries: SceneBoundary[] = [];
+    for (const item of map.canvasItems ?? []) {
+      if (item.kind !== "boundary") continue;
+      const frame = item as BoundaryItem;
+      const box = boundaryBounds(
+        frame.members,
+        id => {
+          const card = this.cardEls.get(id);
+          if (!card) return null;
+          const b = boxOf(card);
+          return { x: b.x, y: b.y, w: b.width, h: b.height };
+        },
+        BOUNDARY_PAD
+      );
+      if (!box) continue;
+      grow(box.x, box.y, box.w, box.h);
+      boundaries.push({
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        ...(frame.label ? { label: frame.label } : {}),
+        stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted"))
+      });
+    }
     const edges: SceneEdge[] = [];
     for (const el of Array.from(this.edgesEl?.children ?? [])) {
       if (el.tagName?.toLowerCase() !== "path") continue;
@@ -7127,6 +7302,7 @@ export class VisualAgentMapView extends ItemView {
         stroke: variable("--background-modifier-border"),
         card: variable("--background-primary")
       },
+      boundaries,
       edges,
       cards,
       images
@@ -11358,6 +11534,9 @@ export class VisualAgentMapView extends ItemView {
       !this.multiSelected.size
     );
     this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+    // Frames are added from here (the only multi-selection surface); AIM maps and the built-in sample get no entry (D11).
+    if (!this.map?.aim && !this.builtIn)
+      this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;

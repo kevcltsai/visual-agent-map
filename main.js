@@ -708,6 +708,13 @@ var en = {
   "ui.canvas_image_refused": "Not added: {0} is not a PNG, JPEG, GIF or WebP image.",
   "ui.canvas_image_too_large": "Not added: {0} is larger than 10 MB.",
   "ui.canvas_image_unreadable": "Not added: {0} could not be read.",
+  "ui.canvas_boundaries_group": "Frames",
+  "ui.canvas_boundary_label": "Frame: {0}",
+  "ui.canvas_boundary_default": "Frame",
+  "ui.canvas_boundary_add": "Add frame",
+  "ui.canvas_boundary_name": "Frame label (optional)",
+  "ui.canvas_boundary_edit": "Edit frame label\u2026",
+  "ui.canvas_boundary_remove": "Remove frame",
   "ui.export_map": "Export map",
   "ui.export_png_vault": "Save PNG image in the Vault",
   "ui.export_png_download": "Download PNG image",
@@ -2832,6 +2839,13 @@ var zhCN = {
   "ui.canvas_image_refused": "\u672A\u52A0\u5165\uFF1A{0} \u4E0D\u662F PNG\u3001JPEG\u3001GIF \u6216 WebP \u56FE\u7247\u3002",
   "ui.canvas_image_too_large": "\u672A\u52A0\u5165\uFF1A{0} \u8D85\u8FC7 10 MB\u3002",
   "ui.canvas_image_unreadable": "\u672A\u52A0\u5165\uFF1A\u65E0\u6CD5\u8BFB\u53D6 {0}\u3002",
+  "ui.canvas_boundaries_group": "\u5916\u6846",
+  "ui.canvas_boundary_label": "\u5916\u6846\uFF1A{0}",
+  "ui.canvas_boundary_default": "\u5916\u6846",
+  "ui.canvas_boundary_add": "\u52A0\u5916\u6846",
+  "ui.canvas_boundary_name": "\u5916\u6846\u6807\u7B7E\uFF08\u53EF\u7559\u7A7A\uFF09",
+  "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6807\u7B7E\u2026",
+  "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
   "ui.export_map": "\u5BFC\u51FA\u5730\u56FE",
   "ui.export_png_vault": "\u5C06 PNG \u56FE\u7247\u5B58\u5165 Vault",
   "ui.export_png_download": "\u4E0B\u8F7D PNG \u56FE\u7247",
@@ -4956,6 +4970,13 @@ var zhTW = {
   "ui.canvas_image_refused": "\u672A\u52A0\u5165\uFF1A{0} \u4E0D\u662F PNG\u3001JPEG\u3001GIF \u6216 WebP \u5716\u7247\u3002",
   "ui.canvas_image_too_large": "\u672A\u52A0\u5165\uFF1A{0} \u8D85\u904E 10 MB\u3002",
   "ui.canvas_image_unreadable": "\u672A\u52A0\u5165\uFF1A\u7121\u6CD5\u8B80\u53D6 {0}\u3002",
+  "ui.canvas_boundaries_group": "\u5916\u6846",
+  "ui.canvas_boundary_label": "\u5916\u6846\uFF1A{0}",
+  "ui.canvas_boundary_default": "\u5916\u6846",
+  "ui.canvas_boundary_add": "\u52A0\u5916\u6846",
+  "ui.canvas_boundary_name": "\u5916\u6846\u6A19\u7C64\uFF08\u53EF\u7559\u7A7A\uFF09",
+  "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6A19\u7C64\u2026",
+  "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
   "ui.export_map": "\u532F\u51FA\u5FC3\u667A\u5716",
   "ui.export_png_vault": "\u5C07 PNG \u5716\u7247\u5B58\u9032 Vault",
   "ui.export_png_download": "\u4E0B\u8F09 PNG \u5716\u7247",
@@ -16024,6 +16045,27 @@ function resizeKeepRatio(items, id, width) {
 function removeItem(items, id) {
   return items.filter((item) => !(isRecord(item) && item.id === id));
 }
+function boundaryBounds(nodeIds, rectOf, pad) {
+  const margin = finite(pad) && pad > 0 ? pad : 0;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const id of nodeIds) {
+    const r = rectOf(id);
+    if (!r || !finite(r.x) || !finite(r.y) || !finite(r.w) || !finite(r.h)) continue;
+    left = Math.min(left, r.x);
+    top = Math.min(top, r.y);
+    right = Math.max(right, r.x + r.w);
+    bottom = Math.max(bottom, r.y + r.h);
+  }
+  if (left === Infinity) return null;
+  return { x: left - margin, y: top - margin, w: right - left + margin * 2, h: bottom - top + margin * 2 };
+}
+function pruneBoundaries(items, existingIds) {
+  const alive = new Set(existingIds);
+  return items.filter((item) => item.kind !== "boundary" || item.members.some((m) => alive.has(m)));
+}
 
 // experiences/visual-map/image-input.ts
 var IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -22606,11 +22648,12 @@ function titleProblemText(text11) {
 
 // ui/modals/name-modal.ts
 var NameModal = class extends import_obsidian13.Modal {
-  constructor(app, titleText, value, submit) {
+  constructor(app, titleText, value, submit, options = {}) {
     super(app);
     this.titleText = titleText;
     this.value = value;
     this.submit = submit;
+    this.options = options;
   }
   onOpen() {
     this.titleEl.setText(this.titleText);
@@ -22622,15 +22665,16 @@ var NameModal = class extends import_obsidian13.Modal {
     const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
     const save = () => {
       const value = input.value.trim();
-      if (!value || titleProblemText(value)) return;
+      if (this.options.allowEmpty ? !!value && !!titleProblemText(value) : !value || !!titleProblemText(value)) return;
       this.close();
       this.submit(value);
     };
     const check = () => {
       const empty = !input.value.trim();
       const problem = empty ? "" : titleProblemText(input.value);
-      saveButton.disabled = empty || !!problem;
-      status.setText(empty ? t("ui.name_required") : problem);
+      const blankOk = empty && !!this.options.allowEmpty;
+      saveButton.disabled = empty && !blankOk || !!problem;
+      status.setText(empty && !blankOk ? t("ui.name_required") : problem);
     };
     input.addEventListener("input", check);
     input.addEventListener("keydown", (event) => {
@@ -43266,6 +43310,7 @@ function depthOf(nodes, id) {
   for (let node = byId.get(id); (node == null ? void 0 : node.parentId) && depth < nodes.length; node = byId.get(node.parentId)) depth++;
   return depth;
 }
+var BOUNDARY_PAD = 16;
 var boxOf = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -47650,12 +47695,12 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d;
     const stage = this.stageEl, items = (_a2 = this.map) == null ? void 0 : _a2.canvasItems;
     if (!stage || !(items == null ? void 0 : items.length)) return;
-    const layer = stage.createDiv("vam-canvas-items");
-    layer.setAttr("role", "group");
-    layer.setAttr("aria-label", t("ui.canvas_images_group"));
     const editable = this.canEditCanvasItems();
+    const layer = items.some((item) => item.kind === "image") ? stage.createDiv("vam-canvas-items") : null;
+    layer == null ? void 0 : layer.setAttr("role", "group");
+    layer == null ? void 0 : layer.setAttr("aria-label", t("ui.canvas_images_group"));
     for (const item of items) {
-      if (item.kind !== "image") continue;
+      if (item.kind !== "image" || !layer) continue;
       const image = item, name = (_b2 = image.path.split("/").pop()) != null ? _b2 : image.path, label = t("ui.canvas_image_label", name), el = layer.createDiv("vam-canvas-image");
       el.dataset.itemId = image.id;
       el.setAttr("role", "img");
@@ -47695,7 +47740,141 @@ ${request.requirements}` : preset.text,
         el.focus({ preventScroll: true });
       }
     }
+    this.renderBoundaries(stage, items, editable);
     this.focusItemId = null;
+  }
+  /**
+   * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
+   * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
+   * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
+   * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
+   */
+  renderBoundaries(stage, items, editable) {
+    var _a2;
+    const boundaries = items.filter((item) => item.kind === "boundary");
+    if (!boundaries.length) return;
+    const rectOf = (id) => {
+      const card = this.cardEls.get(id);
+      if (!card) return null;
+      const box = boxOf(card);
+      return { x: box.x, y: box.y, w: box.width, h: box.height };
+    };
+    let layer = null;
+    for (const boundary of boundaries) {
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      if (!box) continue;
+      if (!layer) {
+        layer = stage.createDiv("vam-boundaries");
+        layer.setAttr("role", "group");
+        layer.setAttr("aria-label", t("ui.canvas_boundaries_group"));
+      }
+      const label = (_a2 = boundary.label) != null ? _a2 : "", el = layer.createDiv("vam-boundary");
+      el.dataset.itemId = boundary.id;
+      el.setAttr("role", "group");
+      el.setAttr("aria-label", label ? t("ui.canvas_boundary_label", label) : t("ui.canvas_boundary_default"));
+      el.tabIndex = 0;
+      el.style.left = `${box.x}px`;
+      el.style.top = `${box.y}px`;
+      el.style.width = `${box.w}px`;
+      el.style.height = `${box.h}px`;
+      const chip = el.createSpan({ cls: "vam-boundary-label", text: label });
+      if (!label) chip.addClass("is-empty");
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      chip.addEventListener("pointerdown", (event) => {
+        if (event.button === 0) el.focus({ preventScroll: true });
+      });
+      if (!editable) continue;
+      chip.addEventListener("dblclick", (event) => {
+        event.stopPropagation();
+        this.editBoundaryLabel(boundary.id);
+      });
+      chip.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new import_obsidian32.Menu();
+        menu.addItem(
+          (item) => item.setTitle(t("ui.canvas_boundary_edit")).setIcon("pencil").onClick(() => this.editBoundaryLabel(boundary.id))
+        );
+        menu.addItem(
+          (item) => item.setTitle(t("ui.canvas_boundary_remove")).setIcon("trash").onClick(() => this.enqueue(() => this.removeCanvasItem(boundary.id)))
+        );
+        menu.showAtMouseEvent(event);
+      });
+      el.addEventListener("keydown", (event) => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (!event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeCanvasItem(boundary.id));
+        } else if (!event.shiftKey && (event.key === "Enter" || event.key === "F2")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.editBoundaryLabel(boundary.id);
+        }
+      });
+      if (this.focusItemId === boundary.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+  }
+  /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
+  editBoundaryLabel(id) {
+    var _a2, _b2, _c;
+    const current = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "boundary" && item.id === id
+    );
+    if (!current || !this.canEditCanvasItems()) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      (_c = current.label) != null ? _c : "",
+      (label) => {
+        this.focusItemId = id;
+        this.enqueue(() => this.renameBoundary(id, label));
+      },
+      { allowEmpty: true }
+    ).open();
+  }
+  /** Sets or clears (blank) a frame's label. */
+  async renameBoundary(id, label) {
+    const text11 = label.trim();
+    await this.changeCanvasItems(
+      id,
+      (items) => items.map((item) => {
+        if (item.kind !== "boundary" || item.id !== id) return item;
+        const { label: _old, ...rest } = item;
+        return text11 ? { ...rest, label: text11 } : rest;
+      })
+    );
+  }
+  /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
+  async addBoundary(ids, label) {
+    if (!this.map || this.builtIn || this.map.aim) return null;
+    const known = new Set(this.map.nodes.map((node) => node.id)), members = [...new Set(ids)].filter((id2) => known.has(id2));
+    if (!members.length) return null;
+    const id = `frame-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, text11 = label.trim();
+    this.focusItemId = id;
+    const frame = { id, kind: "boundary", members, ...text11 ? { label: text11 } : {} };
+    await this.mapChange((map) => {
+      var _a2;
+      const alive = map.nodes.map((node) => node.id);
+      map.canvasItems = [...pruneBoundaries((_a2 = map.canvasItems) != null ? _a2 : [], alive), frame];
+    }, false);
+    return id;
+  }
+  /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
+  openAddBoundary() {
+    const ids = [...this.multiSelected];
+    if (!this.map || this.builtIn || this.map.aim || !ids.length) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      "",
+      (label) => this.enqueue(async () => void await this.addBoundary(ids, label)),
+      { allowEmpty: true }
+    ).open();
   }
   /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
   enableCanvasItemDrag(el, handle, image) {
@@ -47766,7 +47945,10 @@ ${request.requirements}` : preset.text,
     if (!((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.id === id))) return;
     await this.mapChange((map) => {
       var _a3;
-      const next = change((_a3 = map.canvasItems) != null ? _a3 : []);
+      const next = pruneBoundaries(
+        change((_a3 = map.canvasItems) != null ? _a3 : []),
+        map.nodes.map((node) => node.id)
+      );
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
     }, false);
@@ -47920,7 +48102,7 @@ ${request.requirements}` : preset.text,
   onCanvasContextMenu(event) {
     if (!this.canEditCanvasItems()) return;
     const target = event.target;
-    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(INTERACTIVE_SELECTOR))
+    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))
       return;
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     if (!point) return;
@@ -49119,7 +49301,7 @@ ${request.requirements}` : preset.text,
    * pictures alone are over the limit (read no further).
    */
   async collectExportScene(isCurrent) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const map = this.map;
     if (!map) return null;
     const win = window;
@@ -49197,23 +49379,48 @@ ${request.requirements}` : preset.text,
       grow(image.x, image.y, image.w, image.h);
       images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
     }
+    const boundaries = [];
+    for (const item of (_e = map.canvasItems) != null ? _e : []) {
+      if (item.kind !== "boundary") continue;
+      const frame = item;
+      const box = boundaryBounds(
+        frame.members,
+        (id) => {
+          const card = this.cardEls.get(id);
+          if (!card) return null;
+          const b = boxOf(card);
+          return { x: b.x, y: b.y, w: b.width, h: b.height };
+        },
+        BOUNDARY_PAD
+      );
+      if (!box) continue;
+      grow(box.x, box.y, box.w, box.h);
+      boundaries.push({
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        ...frame.label ? { label: frame.label } : {},
+        stroke: colorOf(computed((_f = this.viewportEl) != null ? _f : this.contentEl).getPropertyValue("--text-muted"))
+      });
+    }
     const edges = [];
-    for (const el of Array.from((_f = (_e = this.edgesEl) == null ? void 0 : _e.children) != null ? _f : [])) {
-      if (((_g = el.tagName) == null ? void 0 : _g.toLowerCase()) !== "path") continue;
+    for (const el of Array.from((_h = (_g = this.edgesEl) == null ? void 0 : _g.children) != null ? _h : [])) {
+      if (((_i = el.tagName) == null ? void 0 : _i.toLowerCase()) !== "path") continue;
       const d = el.getAttribute("d");
       const style = computed(el);
       const stroke = colorOf(style.stroke);
       if (!d || !stroke || stroke === "none" || style.display === "none") continue;
       edges.push({ d, stroke });
       try {
-        const bbox = (_h = el.getBBox) == null ? void 0 : _h.call(el);
+        const bbox = (_j = el.getBBox) == null ? void 0 : _j.call(el);
         if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
       } catch (e) {
       }
     }
     if (!cards.length && !images.length) return { refuse: "empty" };
     const margin = 24;
-    const root = computed((_i = this.viewportEl) != null ? _i : this.contentEl);
+    const root = computed((_k = this.viewportEl) != null ? _k : this.contentEl);
     const variable = (name) => colorOf(root.getPropertyValue(name));
     const scene = {
       x: bounds.minX - margin,
@@ -49227,6 +49434,7 @@ ${request.requirements}` : preset.text,
         stroke: variable("--background-modifier-border"),
         card: variable("--background-primary")
       },
+      boundaries,
       edges,
       cards,
       images
@@ -53135,7 +53343,7 @@ ${request.requirements}` : preset.text,
     );
   }
   renderSelectionBar(workspace) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const selection = workspace.createDiv("vam-selection-bar");
     const names3 = [...this.multiSelected].map((id) => {
       var _a3;
@@ -53162,13 +53370,15 @@ ${request.requirements}` : preset.text,
       !this.multiSelected.size
     );
     this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+    if (!((_a2 = this.map) == null ? void 0 : _a2.aim) && !this.builtIn)
+      this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
-    if (!((_a2 = this.map) == null ? void 0 : _a2.aim) && !this.builtIn) {
+    if (!((_b2 = this.map) == null ? void 0 : _b2.aim) && !this.builtIn) {
       const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
@@ -53176,8 +53386,8 @@ ${request.requirements}` : preset.text,
         merge.setAttr("title", t(check.reason));
       }
     }
-    if (!((_b2 = this.map) == null ? void 0 : _b2.aim)) {
-      const running = ((_c = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _c.status) === "running";
+    if (!((_c = this.map) == null ? void 0 : _c.aim)) {
+      const running = ((_d = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _d.status) === "running";
       const research = this.button(
         selection,
         t("ui.multi_research"),

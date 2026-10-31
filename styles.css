@@ -77,6 +77,12 @@
 .vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }
 .vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }
 .vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }
+/* Frames (map-images P7): a layer behind the image layer (z-index -2 inside the stage's stacking context). The frame is an outline and ignores the pointer; only its label chip takes it. */
+.vam-boundaries { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -2; pointer-events: none; }
+.vam-boundary { position: absolute; box-sizing: border-box; pointer-events: none; border: 2px dashed color-mix(in srgb, var(--text-muted) 60%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--interactive-accent) 4%, transparent); }
+.vam-boundary:focus-visible, .vam-boundary.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.vam-boundary-label { position: absolute; left: 10px; top: -12px; max-width: calc(100% - 20px); padding: 1px 8px; overflow: hidden; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-primary); color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; pointer-events: auto; cursor: pointer; user-select: none; }
+.vam-boundary-label.is-empty { min-width: 28px; min-height: 12px; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
 /* Mind-map-only polish (decision 35). None of these starts with a class the share viewer collects (scripts/viewer-css.mjs), so the viewer's stylesheet is unchanged. The parent line is a thin low-saturation line, lighter than the semantic lines; AIM, the sample and skippable edges do not carry the attribute. */

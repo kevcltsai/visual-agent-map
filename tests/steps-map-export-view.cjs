@@ -332,3 +332,19 @@ test('helpers: colour normalising, data URI, file stem', () => {
   assert.equal(ex.exportFileStem('  '), 'Mind map');
   assert.deepEqual(JSON.parse(JSON.stringify(ex.wrapText('abcdefghij', 35))), ['abcde', 'fghij']);
 });
+
+test('frames (ticket 43) are exported as drawn: measured from the cards, label as text, a frame without cards left out', async () => {
+  const h = await harness();
+  h.view.map.canvasItems = [
+    { id: 'f1', kind: 'boundary', members: [h.root.id, h.child.id], label: '<b>Team</b>' },
+    { id: 'f2', kind: 'boundary', members: ['gone'] }
+  ];
+  const { scene } = await h.view.collectExportScene(() => true);
+  assert.equal(scene.boundaries.length, 1);
+  assert.deepEqual([scene.boundaries[0].x, scene.boundaries[0].y, scene.boundaries[0].w, scene.boundaries[0].h], [84, 34, 712, 342]);
+  assert.equal(scene.x, 84 - 24, 'the drawing area grows to hold the frame');
+  const svg = ex.buildMapSvg(scene);
+  assert.match(svg, /stroke-dasharray="6 4"/);
+  assert.match(svg, />&lt;b&gt;Team&lt;\/b&gt;</, 'the label is escaped text');
+  assert.doesNotMatch(svg, /<b>/);
+});

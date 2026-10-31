@@ -148,17 +148,40 @@ export function treeEdgePathData(parent: RelationBox, child: RelationBox, direct
 /** Horizontal run of a 60 degree bone for each unit of height it climbs (the same angle the fishbone layout uses). */
 const BONE_RUN = 1 / Math.tan(Math.PI / 3);
 
+/**
+ * Where a first-level topic's bone meets the spine: the joint on the head's middle line (`jointX`, `parentY`) and the
+ * topic card's edge midpoint (`x`, `y`) the bone ends at. The bone and the spine both read this, so they meet at one point.
+ */
+function fishboneBone(
+  parent: RelationBox,
+  child: RelationBox
+): { jointX: number; parentY: number; x: number; y: number } {
+  const parentY = parent.y + parent.height / 2,
+    childY = child.y + child.height / 2,
+    above = childY < parentY,
+    x = child.x + child.width / 2,
+    y = above ? child.y + child.height : child.y;
+  return { jointX: x + Math.abs(parentY - y) * BONE_RUN, parentY, x, y };
+}
+
+/**
+ * The spine of a fishbone: a horizontal line on the head's middle line, from the head's left edge to the leftmost joint
+ * of its first-level bones. `topics` are the visible first-level topic cards; no topics, no spine (empty string).
+ */
+export function fishboneSpinePathData(head: RelationBox, topics: RelationBox[]): string {
+  if (!topics.length) return "";
+  const end = Math.min(...topics.map(topic => fishboneBone(head, topic).jointX));
+  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
+}
+
 /** The straight line of a fishbone: a bone for a first-level topic, a rib for one of its details. */
 function fishboneEdgePathData(parent: RelationBox, child: RelationBox, depth: number): string {
-  const parentY = parent.y + parent.height / 2,
-    childY = child.y + child.height / 2;
   if (depth <= 1) {
-    const above = childY < parentY,
-      x = child.x + child.width / 2,
-      y = above ? child.y + child.height : child.y,
-      jointX = x + Math.abs(parentY - y) * BONE_RUN;
+    const { jointX, parentY, x, y } = fishboneBone(parent, child);
     return `M ${jointX} ${parentY} L ${x} ${y}`;
   }
+  const parentY = parent.y + parent.height / 2,
+    childY = child.y + child.height / 2;
   // The topic is the parent: above the spine its details lie below it, and the bone leaves its bottom edge midpoint.
   const above = childY > parentY,
     x = parent.x + parent.width / 2,

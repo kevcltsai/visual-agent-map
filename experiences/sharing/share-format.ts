@@ -1,6 +1,7 @@
 import type { MapDocument } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
+import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
 export const SHARE_FORMAT = "vam-share";
@@ -86,6 +87,8 @@ export interface ShareNodePayload {
   tier?: RelevanceTier;
   reason?: string;
   manual?: true;
+  /** Optional (ticket 33): whitelisted topic marker ids in fixed order. Absent means none; `version` stays 1. */
+  markers?: TopicMarker[];
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
   detailHtml?: string;
   /** Optional (D-2026-10-116): this note's text per translated language, keyed by language id. The original stays in the fields above. */
@@ -121,6 +124,8 @@ export interface ShareNoteInput {
   relevance?: { tier: RelevanceTier; manual?: true };
   /** Legacy `relevance-reason`, still shown when an older note has one. */
   reason?: string;
+  /** Topic marker ids from the note; anything not on the whitelist is dropped when the payload is built. */
+  markers?: readonly unknown[];
   /** Rendered, sanitized HTML (supplied by the Obsidian-side exporter). */
   detailHtml?: string;
 }
@@ -178,6 +183,8 @@ export function buildSharePayload(
       const reason = optionalText(note.reason);
       if (reason) out.reason = reason;
     }
+    const markers = readTopicMarkers({ "topic-markers": note?.markers });
+    if (markers.length) out.markers = markers;
     if (options.includeDetail) {
       if (note?.detailHtml?.trim()) out.detailHtml = note.detailHtml;
     }

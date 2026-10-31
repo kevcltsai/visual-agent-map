@@ -7,6 +7,7 @@ import { isCompactEntry } from "../share-translate-compact";
 import { fillDetail, fillTranslatedDetail } from "./detail";
 import { edgePathData } from "./edge-path";
 import { createViewerElement } from "./dom";
+import { markerSymbol, readTopicMarkers, type TopicMarker } from "../../../topic-markers";
 import { pickShareLanguage, shareLanguageKey } from "./language";
 
 /** Where "Install VAM" points. The only link the viewer itself carries. */
@@ -71,6 +72,14 @@ function uiFrom(raw: unknown): ShareViewerUi {
       const value = (raw as Record<string, unknown>)[key];
       if (typeof value === "string") (ui as unknown as Record<string, string>)[key] = value;
     }
+  const names = raw && typeof raw === "object" ? (raw as Record<string, unknown>).markerNames : undefined;
+  if (names && typeof names === "object") {
+    ui.markerNames = { ...SHARE_VIEWER_UI_DEFAULT.markerNames };
+    for (const id of Object.keys(ui.markerNames) as TopicMarker[]) {
+      const value = (names as Record<string, unknown>)[id];
+      if (typeof value === "string" && value.trim()) ui.markerNames[id] = value;
+    }
+  }
   return ui;
 }
 
@@ -274,6 +283,26 @@ export function startViewer(doc: Document): void {
   };
   const tierLabel = (tier: Tier): string =>
     tier === "core" ? ui.tierCore : tier === "support" ? ui.tierSupport : ui.tierSide;
+  /** Untrusted input: only whitelisted ids, in the fixed order, so cards and the outline show the same row. */
+  const markersOf = (item: ShareNodePayload): TopicMarker[] => readTopicMarkers({ "topic-markers": item.markers });
+  const cjk = (): boolean => /^(zh|ja)/.test(ui.lang);
+  /** The accessible name of a topic: its title, plus the marker names when it has markers. */
+  const nameWithMarkers = (title: string, markers: TopicMarker[]): string => {
+    if (!markers.length) return title;
+    const names = markers.map(id => ui.markerNames[id]).join(cjk() ? "、" : ", ");
+    return `${title}${cjk() ? "，" : ", "}${fill(ui.markerLabel, names)}`;
+  };
+  /** The symbols are decoration (aria-hidden); the names reach assistive technology through the label of the topic. */
+  const markerRow = (markers: TopicMarker[]): HTMLElement => {
+    const row = make("span", "vam-markers");
+    for (const id of markers) {
+      const mark = make("span", "vam-marker", markerSymbol(id));
+      mark.dataset.marker = id;
+      mark.setAttribute("aria-hidden", "true");
+      row.append(mark);
+    }
+    return row;
+  };
   const tierTag = (tier: Tier, title?: string): HTMLElement => {
     const tag = make("span", "vam-relevance-tag");
     tag.dataset.tier = tier;
@@ -492,12 +521,14 @@ export function startViewer(doc: Document): void {
       card.setAttribute("role", "treeitem");
       card.setAttribute("aria-level", String(depthOf(node) + 1));
       card.setAttribute("aria-selected", String(node.id === selected));
-      card.setAttribute("aria-label", String(shown.title ?? ""));
+      const markers = markersOf(item);
+      card.setAttribute("aria-label", nameWithMarkers(String(shown.title ?? ""), markers));
       if (count) card.setAttribute("aria-expanded", String(!node.collapsed));
       const header = make("div", "vam-node-header");
       card.append(header);
       if (item.status !== "completed") header.append(make("span", "vam-status vam-status-idea", ui.toResearch));
       if (tier) header.append(tierTag(tier, typeof shown.reason === "string" ? shown.reason : undefined));
+      if (markers.length) header.append(markerRow(markers));
       const cardTools = make("div", "vam-node-tools");
       card.append(cardTools);
       if (count) {
@@ -1020,6 +1051,11 @@ export function startViewer(doc: Document): void {
       const label = make("span", "vam-outline-title", title);
       label.title = title;
       row.append(twist, label);
+      const markers = markersOf(info.get(node.id)!);
+      if (markers.length) {
+        row.append(markerRow(markers));
+        row.setAttribute("aria-label", nameWithMarkers(title, markers));
+      }
       row.addEventListener("click", () => goTo(node.id));
       row.addEventListener("keydown", event => outlineKey(event, node));
       row.addEventListener("focus", () => {

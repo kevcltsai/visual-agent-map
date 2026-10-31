@@ -1305,13 +1305,16 @@ integrationTest('AI merge: a missing, blank or over-long AI name falls back to t
 });
 integrationTest('AI merge model: the nearest manual parent model is used for the usage notice, the request and the new note; a workspace parent follows the workspace model', async () => {
   const manual = await aiMergeHarness({ parentModel: 'claude:haiku', parentSource: 'manual' });
+  await manual.repo.updateNote(manual.parent.path, { reasoning: 'high' });
   const { task } = await manual.begin('M'); await manual.untilSettled(task);
   assert.deepEqual([manual.usage, manual.asks.map(a => a.model), task.model], [['claude:haiku'], ['claude:haiku'], 'claude:haiku']);
+  assert.equal(manual.asks[0].reasoning, 'high', 'MS-04: the request carries the manual parent reasoning, not the current low');
   const merged = (await manual.repo.readMap(manual.path)).nodes.find(n => n.path.endsWith('M.md'));
   const note = await manual.repo.readNote(merged.path); assert.equal(note.model, 'claude:haiku'); assert.equal(note.modelSource, 'inherited');
   const workspace = await aiMergeHarness();
   const run = await workspace.begin('W'); await workspace.untilSettled(run.task);
   assert.deepEqual([workspace.usage, workspace.asks.map(a => a.model)], [['claude:sonnet'], ['claude:sonnet']]);
+  assert.equal(workspace.asks[0].reasoning, 'low', 'MS-04: a workspace parent uses the current reasoning');
 });
 integrationTest('structure merge also takes the parent-resolved model (manual parent inherits, workspace parent stays workspace)', async () => {
   const h = await mergeHarness({ parentModel: 'claude:haiku', parentSource: 'manual' });
@@ -1855,4 +1858,41 @@ integrationTest('hypothesis-evidence: switching to a hypothesis without a streng
   await repo.writeTopicKind(n.path, 'hypothesis');
   assert.doesNotMatch(contents.get(n.path), /hypothesis-strength/);
   assert.equal((await repo.readNote(n.path)).hypothesisStrength, 'weak');
+});
+integrationTest('topic-markers: readNote reads only whitelisted ids and a note without markers has no markers field', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  assert.equal('markers' in (await repo.readNote(n.path)), false, 'no markers key when none are set');
+  const withValue = value => contents.set(n.path, contents.get(n.path).replace(/^topic-markers:.*\n(  - .*\n)*/m, '').replace('---\n', `---\ntopic-markers: ${value}\n`));
+  withValue('done');
+  assert.equal('markers' in (await repo.readNote(n.path)), false, 'a string value reads as nothing');
+  withValue('[Done, 3, star, star]');
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['star']);
+  withValue('{}');
+  assert.equal('markers' in (await repo.readNote(n.path)), false);
+  withValue('["<img onerror=x>", done]');
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['done']);
+});
+integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values, keeps priority single, removes the key when empty, and leaves updated alone', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  const updatedLine = () => contents.get(n.path).match(/^updated:.*$/m)?.[0];
+  const before = updatedLine();
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\ntopic-markers: [future-x, star]\n'));
+  await repo.writeTopicMarkers(n.path, 'done');
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['done', 'star']);
+  assert.match(contents.get(n.path), /"future-x"/, 'an unknown value is kept');
+  assert.match(contents.get(n.path), /custom: retain me/);
+  await repo.writeTopicMarkers(n.path, 'priority-1');
+  await repo.writeTopicMarkers(n.path, 'priority-3');
+  const markers = (await repo.readNote(n.path)).markers;
+  assert.ok(markers.includes('priority-3') && !markers.includes('priority-1'), 'priority is one of three');
+  await repo.writeTopicMarkers(n.path, 'priority-3');
+  await repo.writeTopicMarkers(n.path, 'done');
+  await repo.writeTopicMarkers(n.path, 'star');
+  assert.match(contents.get(n.path), /"future-x"/);
+  contents.set(n.path, contents.get(n.path).replace(/^topic-markers:\n(  - .*\n)+/m, ''));
+  assert.equal(/topic-markers/.test(contents.get(n.path)), false);
+  await repo.writeTopicMarkers(n.path, 'star');
+  await repo.writeTopicMarkers(n.path, 'star');
+  assert.equal(/topic-markers/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
+  assert.equal(updatedLine(), before, 'updated is not changed');
 });

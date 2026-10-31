@@ -52,3 +52,34 @@ test('outline search folds Turkish İ to i and keeps ordinary case folding', () 
   assert.ok(!foldOutlineSearch('Berlin').includes('istanbul'));
 });
 
+
+// Topic markers in the outline (ticket 33 P3): symbols are decoration, the names reach assistive technology.
+const outlineRows = (markers, titles = new Map([['a', 'Alpha'], ['b', 'Beta']])) => {
+  const dom = require('./support-dom.cjs');
+  const { OutlineView } = load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } });
+  const view = new OutlineView({ app: {} }, async () => {});
+  const map = { title: 'M', nodes: [{ id: 'a', parentId: null, path: 'a.md' }, { id: 'b', parentId: 'a', path: 'b.md' }] };
+  if (markers === undefined) view.setMap(map, titles);
+  else view.setMap(map, titles, false, markers);
+  return { dom, view, rows: dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-note')) };
+};
+
+test('outline: a marked topic shows aria-hidden symbols and a name with the marker names', () => {
+  const { dom, rows } = outlineRows(new Map([['a', ['done', 'priority-2']]]));
+  const [alpha, beta] = rows;
+  const symbols = dom.findAll(alpha, i => dom.hasCls(i, 'vam-marker'));
+  assert.deepEqual(symbols.map(s => s.text), ['✓', 'P2']);
+  assert.ok(symbols.every(s => s.attrs['aria-hidden'] === 'true'));
+  assert.equal(alpha.text, 'Alpha', 'the visible title text is unchanged');
+  assert.equal(alpha.attrs['aria-label'], 'Alpha, Markers: Done, Priority 2');
+  assert.equal(dom.findAll(beta, i => dom.hasCls(i, 'vam-marker')).length, 0);
+  assert.equal(beta.attrs['aria-label'], undefined, 'an unmarked topic keeps its plain name');
+});
+
+test('outline: no markers map, empty lists and non-whitelisted ids add nothing', () => {
+  for (const markers of [undefined, new Map(), new Map([['a', []]]), new Map([['a', ['<img src=x onerror=1>', 'Done']]])]) {
+    const { dom, rows } = outlineRows(markers);
+    assert.equal(dom.findAll(rows[0], i => dom.hasCls(i, 'vam-marker')).length, 0);
+    assert.equal(rows[0].attrs['aria-label'], undefined);
+  }
+});

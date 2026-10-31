@@ -7,6 +7,28 @@ export const LAYOUT_GAP = 24;
 /** Card height assumed when the rendered height is unknown (not yet rendered or hidden). */
 export const DEFAULT_CARD_HEIGHT = 180;
 
+/** Which way a map's branches grow from their root: "right" (the original layout) or "left" (the root on the right). */
+export type LayoutDirection = "right" | "left";
+
+/** A map's stored layout choice; absent means "right". */
+export interface MapLayout {
+  direction: LayoutDirection;
+}
+
+export function isLayoutDirection(value: unknown): value is LayoutDirection {
+  return value === "right" || value === "left";
+}
+
+/** The direction a map is laid out in. AIM maps always grow to the right; a missing or unknown choice is "right". */
+export function layoutDirectionOf(map: { layout?: MapLayout; aim?: unknown } | null | undefined): LayoutDirection {
+  if (!map || map.aim) return "right";
+  const direction = map.layout?.direction;
+  return isLayoutDirection(direction) ? direction : "right";
+}
+
+/** +1 when columns grow to the right, -1 when they grow to the left. */
+const signOf = (direction: LayoutDirection): number => (direction === "left" ? -1 : 1);
+
 /** Rendered card height in canvas units, or undefined when unknown. */
 export type HeightOf = (id: string) => number | undefined;
 
@@ -29,8 +51,10 @@ function positions(
   left: number,
   top: number,
   folded = false,
-  heightOf?: HeightOf
+  heightOf?: HeightOf,
+  direction: LayoutDirection = "right"
 ): Map<string, { x: number; y: number }> {
+  const sign = signOf(direction);
   const ids = new Map(nodes.map(node => [node.id, node]));
   const children = new Map<string, MapNode[]>();
   const joins = new Map<string, MapNode[]>();
@@ -91,7 +115,7 @@ function positions(
       const last = ys[ys.length - 1] + heightFor(list[list.length - 1]) / 2;
       y = (first + last) / 2 - own / 2;
     }
-    result.set(node.id, { x: left + depth * COLUMN, y: top + y });
+    result.set(node.id, { x: left + sign * depth * COLUMN, y: top + y });
     return y;
   };
   let offset = 0;
@@ -104,10 +128,15 @@ function positions(
 }
 
 /** Lays out what is on screen: a collapsed topic is a leaf, and its hidden branch keeps its coordinates until it is shown again. */
-export function arrangeMap(nodes: MapNode[], hidden?: Set<string>, heightOf?: HeightOf): MapNode[] {
+export function arrangeMap(
+  nodes: MapNode[],
+  hidden?: Set<string>,
+  heightOf?: HeightOf,
+  direction: LayoutDirection = "right"
+): MapNode[] {
   const laidOut = hidden?.size ? nodes.filter(node => !hidden.has(node.id)) : nodes;
   const roots = laidOut.filter(node => !node.parentId);
-  const placed = positions(laidOut, roots, 80, 80, true, heightOf);
+  const placed = positions(laidOut, roots, 80, 80, true, heightOf, direction);
   return nodes.map(node => ({ ...node, ...placed.get(node.id) }));
 }
 
@@ -117,13 +146,14 @@ export function arrangeNewBranch(
   newIds: Set<string>,
   heightOf?: HeightOf,
   /** The new branch's top edge starts at or below this y (before collision avoidance); undefined keeps the centred start. */
-  minTop?: number
+  minTop?: number,
+  direction: LayoutDirection = "right"
 ): MapNode[] {
   const parent = nodes.find(node => node.id === parentId);
   if (!parent || !newIds.size) return nodes;
   const fresh = nodes.filter(node => newIds.has(node.id));
   const roots = fresh.filter(node => node.parentId === parentId);
-  const placed = positions(fresh, roots, parent.x + COLUMN, 0, false, heightOf);
+  const placed = positions(fresh, roots, parent.x + signOf(direction) * COLUMN, 0, false, heightOf, direction);
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
@@ -151,7 +181,13 @@ export function arrangeNewBranch(
 }
 
 /** Lays out a new top-level tree below every existing node, in the leftmost root column; existing nodes never move. */
-export function arrangeNewTree(nodes: MapNode[], rootId: string, newIds: Set<string>, heightOf?: HeightOf): MapNode[] {
+export function arrangeNewTree(
+  nodes: MapNode[],
+  rootId: string,
+  newIds: Set<string>,
+  heightOf?: HeightOf,
+  direction: LayoutDirection = "right"
+): MapNode[] {
   const root = nodes.find(node => node.id === rootId);
   if (!root || !newIds.has(rootId)) return nodes;
   const fixed = nodes.filter(node => !newIds.has(node.id));
@@ -164,7 +200,8 @@ export function arrangeNewTree(nodes: MapNode[], rootId: string, newIds: Set<str
     left,
     top,
     false,
-    heightOf
+    heightOf,
+    direction
   );
   return nodes.map(node => {
     const point = placed.get(node.id);

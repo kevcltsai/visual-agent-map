@@ -5,6 +5,8 @@ import { imageTranslateStep } from "./steps/image-translate/step";
 
 export interface ImageTranslateOptions {
   model: () => string;
+  /** True while the current model cannot draw images (a Claude model): the translate popover then says so beforehand. */
+  imageNeedsCodex?: () => boolean;
   run: <Input, Output>(
     prepared: PreparedStep<Input, Output>,
     model: string,
@@ -211,6 +213,15 @@ export class ImageTranslateAction extends Component {
     const status = popover.createDiv({ cls: "vam-image-action-status" });
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
+    // Image generation needs Codex: say so beside the buttons while the current model is a Claude one. A run still
+    // goes ahead, so the runtime's own error stays the last line of defence.
+    const hint = popover.createDiv({ cls: "vam-image-action-hint" });
+    hint.setAttribute("role", "note");
+    const refreshHint = (): void => {
+      hint.setText(this.options.imageNeedsCodex?.() ? t("ui.image_translate_needs_codex") : "");
+      hint.hidden = !hint.textContent;
+    };
+    refreshHint();
     const actions = popover.createDiv({ cls: "vam-image-action-buttons" });
     const replace = actions.createEl("button", { text: t("ui.image_translate_replace") });
     const add = actions.createEl("button", { text: t("ui.image_translate_new"), cls: "mod-cta" });
@@ -222,6 +233,7 @@ export class ImageTranslateAction extends Component {
     if (this.running) this.showRunning(status, actions);
     const start = (placement: Placement): void => {
       this.language = select.value as ContentLanguage;
+      refreshHint();
       void this.translate(target, this.language, placement, status, actions);
     };
     replace.addEventListener("click", () => start("replace"));

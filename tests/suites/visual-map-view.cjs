@@ -963,7 +963,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderAddSubtopic() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -1633,17 +1633,18 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   view.autoLayout(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?\);/, 'the card collapse button re-arranges in the same change');
+  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutDirectionOf\(map\)\);/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
 });
-integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator and Auto layout', () => {
+integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the two directions and Auto layout', () => {
   const menus = [];
-  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } }
+  class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, setChecked(value) { this.checked = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } }
   const { view } = selectionView(load, {}, { ...obsidian, Menu });
-  const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange');
+  const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayoutDirection = direction => calls.push(direction);
   view.openLayoutMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout']);
+  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Auto layout']);
+  assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, undefined], 'the current direction is checked');
   menus[0].items.filter(item => !item.separator).forEach(item => item.click());
-  assert.deepEqual(calls, [0, null, 1, 2, 3, 'arrange']);
+  assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'arrange']);
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.layout'), '排版'); assert.equal(translate('en', 'ui.layout'), 'Layout');
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-layout-button::after \{ content: "▾" \/ "";/, 'the menu caret is decoration, not part of the name');
@@ -2036,7 +2037,7 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
 const heNotes = (list) => new Map(list.map(([id, extra]) => [id, { title: id.toUpperCase(), summary: '', status: 'completed', ...extra }]));
 const heHyp = (strength) => ({ topicKind: 'hypothesis', ...(strength ? { hypothesisStrength: strength } : {}) });
 // The shared DOM stand-in has a read-only textContent; labelCard writes it.
-const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
+const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); }; el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
 function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
@@ -2048,6 +2049,7 @@ function heFixture(options = {}) {
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
+  plugin.currentModelChoice = () => ({ model: plugin.settings.cliModel, reasoning: plugin.settings.cliReasoning });
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.app = {}; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
   view.notes = options.notes ?? heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}]]);
@@ -3230,9 +3232,9 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Parent topic']);
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Parent topic'], 'the marker section sits after the relations (ticket 33)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Parent topic'], 'no strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Parent topic'], 'no strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
   const css = heCss();
@@ -3379,4 +3381,132 @@ integrationTest('hypothesis-evidence: every merge path hands the retarget result
   assert.doesNotMatch(view, /lastDroppedCycles = retargetTopicRelations/);
   const texts = { en: 'Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)', 'zh-TW': '已移除 {0} 條重複的關係（同一對議題只保留一條）', 'zh-CN': '已移除 {0} 条重复的关系（同一对议题只保留一条）' };
   for (const [lang, text] of Object.entries(texts)) assert.equal(load('i18n.ts').translate(lang, 'ui.merge_dropped_same_pair_0', '3'), text.replace('{0}', '3'), lang);
+});
+// ---- topic markers (ticket 33, P2b) ----
+const tmRender = (options, id) => {
+  const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
+  const card = f.view.stageEl.children[0];
+  return { card, label: dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label')), marks: dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')) };
+};
+integrationTest('topic-markers: a card shows whitelisted markers as aria-hidden symbols in a fixed order and names them in its accessible name; a topic without any shows none', () => {
+  const notes = heNotes([['fact', { markers: ['star', 'done', 'priority-2'] }], ['hyp', heHyp('weak')], ['other', {}]]);
+  const shown = tmRender({ notes }, 'fact');
+  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★', 'P2'], 'whitelist order, plain Unicode');
+  const row = dom.find(shown.card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-markers'));
+  assert.equal(row.attrs['aria-hidden'], 'true');
+  assert.match(shown.label.text, /Markers: Done, Star, Priority 2/); assert.match(shown.label.text, /^FACT, /);
+  assert.equal(shown.card.attrs['aria-labelledby'], shown.label.id);
+  const kindToo = tmRender({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) }, 'fact');
+  assert.match(kindToo.label.text, /Evidence/); assert.match(kindToo.label.text, /Markers: Done/);
+  const none = tmRender({ notes }, 'other');
+  assert.deepEqual(none.marks, []); assert.doesNotMatch(none.label.text, /Markers/);
+  const aim = tmRender({ aim: true, notes }, 'fact');
+  assert.equal(aim.marks.length, 3, 'a read-only map still shows the markers');
+});
+integrationTest('topic-markers: a value outside the whitelist is not shown, not drawn and not read out', () => {
+  const notes = heNotes([['fact', { markers: ['<img src=x onerror=alert(1)>', 'DONE', 3, 'star', 'star'] }], ['hyp', {}], ['other', {}]]);
+  const shown = tmRender({ notes }, 'fact');
+  assert.deepEqual(shown.marks.map(m => m.text), ['★']);
+  assert.doesNotMatch(shown.label.text, /img|onerror|DONE|3/); assert.match(shown.label.text, /Markers: Star$/);
+});
+integrationTest('topic-markers: refreshing a card replaces its symbols and its name part (no duplicates)', () => {
+  const f = heFixture({ notes: heNotes([['fact', { markers: ['done'] }], ['hyp', {}], ['other', {}]]) });
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+  const node = f.view.map.nodes[0], card = f.view.stageEl.children[0];
+  f.view.stageEl.querySelector = sel => card;
+  f.view.drawEdges = () => {};
+  f.view.notes.get('fact').markers = ['warning', 'priority-3'];
+  f.view.refreshCard(node, false);
+  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠', 'P3']);
+  const label = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
+  assert.match(label.text, /Markers: Warning, Priority 3/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
+  f.view.notes.get('fact').markers = [];
+  f.view.refreshCard(node, false);
+  assert.doesNotMatch(label.text, /Markers/);
+});
+integrationTest('topic-markers: refreshCard keeps the marker row where it was (after the type tag), and the row carries the tag style', () => {
+  const f = heFixture({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) });
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+  const node = f.view.map.nodes[0], card = f.view.stageEl.children[0];
+  f.view.stageEl.querySelector = () => card; f.view.drawEdges = () => {};
+  const header = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+  const order = () => header.children.map(c => (c.cls ?? '').split(/\s+/).find(n => ['vam-card-markers', 'vam-kind-tag', 'vam-status'].includes(n)) ?? c.cls);
+  const before = order(), at = before.indexOf('vam-card-markers');
+  assert.ok(at > before.indexOf('vam-kind-tag') && before.indexOf('vam-kind-tag') >= 0, 'first draw: after the type tag');
+  assert.match(header.children[at].cls, /vam-hypothesis-tag/);
+  f.view.notes.get('fact').markers = ['star'];
+  f.view.refreshCard(node, false);
+  assert.deepEqual(order(), before, 'same position after a redraw');
+  f.view.notes.get('fact').markers = [];
+  f.view.refreshCard(node, false);
+  assert.ok(!order().includes('vam-card-markers'));
+  f.view.notes.get('fact').markers = ['done'];
+  f.view.refreshCard(node, false);
+  assert.ok(order().indexOf('vam-card-markers') > order().indexOf('vam-kind-tag'), 'a row added later goes after the type tag');
+});
+integrationTest('topic-markers: the sample, an AIM map and select mode have no marker menu and refuse a toggle', async () => {
+  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+    const { view, writes } = heFixture(options);
+    if (options.integration) view.integrationMode = true;
+    const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[2]);
+    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
+    view.beginMapTransaction = () => assert.fail('no transaction');
+    await view.changeTopicMarker(view.map.nodes[2], 'done');
+    assert.deepEqual(writes, []);
+  }
+});
+integrationTest('topic-markers: the panel has one aria-pressed toggle per marker and priority is one of three', async () => {
+  const { view } = heFixture();
+  view.enqueue = work => work();
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.history = { push() {} };
+  const toggled = [];
+  view.plugin.repo.writeTopicMarkers = async (path, id) => {
+    toggled.push(id); const note = view.notes.get(path.replace('.md', '')); const cur = note.markers ?? [];
+    note.markers = cur.includes(id) ? cur.filter(x => x !== id) : [...cur.filter(x => !(id.startsWith('priority') && x.startsWith('priority'))), id];
+  };
+  view.refreshAfterSavedChange = async () => {};
+  const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
+  const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
+  assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, 6);
+  assert.deepEqual(pressed(), []);
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
+  assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
+  assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
+  click('Done'); await dom.tick();
+  assert.equal(pressed().length, 1);
+});
+integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-m/Map.md';
+  const doc = { id: 'map-m', title: 'm', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-m');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const topic = await repo.createNote('Topic', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(topic); await repo.saveMap(MAP, doc);
+  const { view } = heFixture({ topics: [topic] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  await view.refreshAfterSavedChange();
+  const text = () => contents.get(topic.path).match(/topic-markers:.*(\n\s+- .*)*/g)?.join('').replace(/"/g, '') ?? null;
+  const before = contents.get(topic.path);
+  await view.changeTopicMarker(view.map.nodes[0], 'star');
+  assert.equal(pushed.length, 1, 'one history entry per toggle'); assert.ok(text()); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['star']);
+  await pushed[0].undo();
+  assert.equal(contents.get(topic.path), before, 'one undo gives back the exact note text'); assert.equal(text(), null);
+  await pushed[0].redo(); assert.ok(text());
+  await pushed[0].undo();
+  await view.refreshAfterSavedChange();
+  await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
+  await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
+  assert.equal(pushed.length, 3); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
 });

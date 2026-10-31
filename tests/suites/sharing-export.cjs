@@ -600,3 +600,17 @@ test('share publish: instructions per language, zh-TW is the owner baseline verb
   }
   assert.match(i18n.translate('zh-TW', 'share.publish_instructions', 'P'), /<我的帳號>/);
 });
+
+// Ticket 33 P4: the exporter hands the note's markers to the payload.
+test('share exporter assemble: a note\'s markers reach the payload node, a note without markers adds no key', () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }, { id: 'b', path: 'Folder/B.md', parentId: 'a', x: 0, y: 0, collapsed: false }] };
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', markers: ['done', 'priority-2'] }], ['b', { title: 'B', summary: 'S', status: 'idea', model: '' }]]);
+  const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  const result = exporter.assemble({ includeDetail: false, includeImages: false });
+  assert.deepEqual(plain(result.leakCategories), []);
+  assert.deepEqual(plain(result.payload.nodes[0].markers), ['done', 'priority-2']);
+  assert.equal('markers' in result.payload.nodes[1], false);
+  assert.equal(result.payload.version, 1);
+});

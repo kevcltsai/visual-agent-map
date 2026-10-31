@@ -1,6 +1,7 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
+import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
 import {
   isNoteLanguage,
@@ -99,6 +100,8 @@ export interface Note {
   topicKind?: Exclude<TopicKind, "topic">;
   /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as weak). */
   hypothesisStrength?: HypothesisStrength;
+  /** From `topic-markers` frontmatter, whitelisted ids only; absent when there are none. */
+  markers?: TopicMarker[];
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
@@ -1120,20 +1123,34 @@ export class Repository {
 
   /**
    * Resolve the model for a topic: run-once choice, then the topic's override (inherited upward), then the current
-   * model. Reasoning follows the current setting until MS-04 moves it into the same resolution.
+   * model. Reasoning is resolved together with the model.
    */
   async resolveTopicModel(
     path: string,
     map?: MapDocument,
     runOnce?: { model: string; reasoning?: ReasoningLevel } | null
   ): Promise<ReturnType<typeof resolveTaskModel>> {
-    const note = this.file(path);
-    const fm = frontmatter(await this.app.vault.read(note));
-    const raw = text(fm["model-source"], "workspace");
-    const source: ModelSource = raw === "manual" || raw === "inherited" ? raw : "workspace";
-    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
+    const fm = frontmatter(await this.app.vault.read(this.file(path)));
+    const source = this.modelSourceOf(fm);
     const effective = await this.effectiveModel(path, text(fm.model), source, map, text(fm["reasoning-level"]));
-    // The override brings its own reasoning (the manual topic's, or its manual ancestor's); only a missing value falls back.
+    return this.chooseModel(effective, runOnce);
+  }
+
+  private modelSourceOf(fm: Record<string, unknown>): ModelSource {
+    const raw = text(fm["model-source"], "workspace");
+    return raw === "manual" || raw === "inherited" ? raw : "workspace";
+  }
+
+  /**
+   * One resolveTaskModel over an effective lookup, shared by readNote and resolveTopicModel. Only an override brings
+   * its own reasoning (the manual topic's, or its manual ancestor's); a stored value on a workspace or inherited topic
+   * is ignored and never rewritten.
+   */
+  private chooseModel(
+    effective: { model: string; overridden: boolean; reasoning?: string },
+    runOnce?: { model: string; reasoning?: ReasoningLevel } | null
+  ): ReturnType<typeof resolveTaskModel> {
+    const current = { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) };
     const overrideReasoning = normalizeReasoningLevel(effective.reasoning ?? this.settings.cliReasoning);
     return resolveTaskModel({
       runOnce,
@@ -1165,7 +1182,9 @@ export class Repository {
     const modelSource: ModelSource = ["workspace", "inherited", "manual"].includes(source)
       ? (source as ModelSource)
       : "workspace";
-    const { model } = await this.effectiveModel(path, text(fm.model), modelSource, map);
+    const { model, reasoning } = this.chooseModel(
+      await this.effectiveModel(path, text(fm.model), modelSource, map, text(fm["reasoning-level"]))
+    );
     const state = text(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -1184,8 +1203,7 @@ export class Repository {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
-      // Reasoning stays as before; MS-04 moves it into the same resolution as the model.
-      reasoning: normalizeReasoningLevel(fm["reasoning-level"] ?? this.settings.cliReasoning),
+      reasoning,
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       ...(typeof fm["detail-template"] === "string" && fm["detail-template"]
@@ -1196,6 +1214,7 @@ export class Repository {
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
+      ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
@@ -1352,7 +1371,7 @@ export class Repository {
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
+      ...(modelSource === "manual" ? { "reasoning-level": initial.reasoning ?? this.settings.cliReasoning } : {}),
       ...(initial.researchMode ? { "research-mode": initial.researchMode } : {}),
       ...(kind !== "topic" ? { "topic-kind": kind } : {}),
       ...(kind === "hypothesis" ? { "hypothesis-strength": "weak" } : {}),
@@ -1432,7 +1451,7 @@ export class Repository {
       "preview-initialized": false,
       model,
       "model-source": modelSource,
-      "reasoning-level": initial.reasoning ?? this.settings.cliReasoning,
+      ...(modelSource === "manual" ? { "reasoning-level": initial.reasoning ?? this.settings.cliReasoning } : {}),
       status: "idea",
       cssclasses: [NOTE_CSS_CLASS],
       ...(initial.contentLanguage ? { "content-language": initial.contentLanguage } : {})
@@ -1515,6 +1534,16 @@ export class Repository {
   async writeTopicKind(path: string, kind: TopicKind): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
+  }
+
+  /**
+   * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
+   * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
+   */
+  async writeTopicMarkers(path: string, id: TopicMarker): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
     );
   }
 

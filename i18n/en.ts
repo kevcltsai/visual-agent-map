@@ -379,6 +379,8 @@ export const en = {
   "ui.image_translate_new": "Add new image",
   "ui.image_translate_replace_unavailable":
     "This image appears more than once or can't be located in the note, so it can only be added as a new image.",
+  "ui.image_translate_needs_codex":
+    "Image translation needs a Codex model. The current model is a Claude one, so choose a Codex model first.",
   "ui.image_translate_running":
     "Codex is drawing the translated image (about a minute). You can keep working; it is written to the note when ready.",
   "ui.image_translate_replaced": "Replaced the image with its translated version ({0}).",
@@ -524,6 +526,7 @@ export const en = {
   "ui.topic_kind_conclusion": "Conclusion",
   "ui.topic_kind_action": "Action",
   "ui.topic_type": "Topic type",
+  "ui.topic_markers": "Markers",
   "ui.add_subtopic_menu": "Add subtopic…",
   "ui.add_kind_0": "Add {0}",
   "ui.new_kind_0": "New {0}",
@@ -804,6 +807,8 @@ export const en = {
   "ui.create_subtopics_without_research": "Create subtopics without research",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota":
     "Each new subtopic gets a short research pass, using AI quota",
+  "ui.layout_direction_right": "Lay out to the right",
+  "ui.layout_direction_left": "Lay out to the left",
   "ui.auto_layout": "Auto layout",
   "ui.layout": "Layout",
   "ui.expansion_failed": "Expansion failed",
@@ -2194,6 +2199,13 @@ export const en = {
   "share.viewer_ai_translated_unknown": "Translated by AI.",
   "share.viewer_original_text": "Original",
   "share.viewer_image_text_untranslated": "Text inside images is not translated.",
+  "share.viewer_markers_0": "Markers: {0}",
+  "share.viewer_marker_done": "Done",
+  "share.viewer_marker_warning": "Warning",
+  "share.viewer_marker_star": "Star",
+  "share.viewer_marker_priority_1": "Priority 1",
+  "share.viewer_marker_priority_2": "Priority 2",
+  "share.viewer_marker_priority_3": "Priority 3",
   // Share dialog
   "share.command": "Share this map",
   "share.button": "Share this map",

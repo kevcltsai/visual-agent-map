@@ -47890,7 +47890,9 @@ ${request.requirements}` : preset.text,
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode((_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node);
+    const placed = (_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node;
+    this.focusNode(placed);
+    this.moveKeyboardFocus(placed);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;

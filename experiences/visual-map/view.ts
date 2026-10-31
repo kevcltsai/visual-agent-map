@@ -8666,7 +8666,10 @@ export class VisualAgentMapView extends ItemView {
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode(this.map?.nodes.find(n => n.id === node.id) ?? node);
+    const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
+    this.focusNode(placed);
+    // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
+    this.moveKeyboardFocus(placed);
   }
   private async proposeChildren(
     parent: MapNode,

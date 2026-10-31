@@ -13,7 +13,7 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   createEl(name, value = {}) { const child = make(name, value); child.parent = this; this.children.push(child); return child; },
   setAttr(name, value) { this.attrs[name] = value; }, addClass(...names) { names.forEach(name => this.classes.add(name)); }, removeClass(name) { this.classes.delete(name); },
   toggleClass(name, on) { if (on) this.classes.add(name); else this.classes.delete(name); }, addEventListener(name, handler) { this.handlers.set(name, handler); }, removeEventListener() {},
-  setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
+  setPointerCapture() {}, focus() { this.focused++; make.last = this; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
 const findAll = (root, predicate) => [...(predicate(root) ? [root] : []), ...root.children.flatMap(c => findAll(c, predicate))];
 
@@ -281,4 +281,74 @@ test('0.25 retest: Mod+Enter and Shift+Enter live on the view scope (Obsidian ea
     target.handlers.get('keydown')(event);
   }
   await tick(); assert.deepEqual(h.added, [], 'defaultPrevented key: the card handler adds nothing');
+});
+
+// Ticket 36: the real addNode (NameModal and all). Only the camera (focusNode) stays a stub, counted per call.
+const realAdd = h => { delete h.view.addNode; h.cameraMoves = []; h.view.focusNode = (node, persist) => { h.cameraMoves.push([node.id, persist]); }; };
+const nameModal = h => h.modals.filter(m => m.constructor.name === 'NameModal').at(-1);
+const typeAndSave = (modal, text) => { const input = findAll(modal.contentEl, i => i.tag === 'input')[0]; input.value = text; input.keydown({ key: 'Enter', isComposing: false }); };
+const cardOf = (h, id) => h.stage.children.find(c => c.dataset.nodeId === id);
+const noteCount = h => [...h.contents.keys()].filter(p => p.endsWith('.md') && !p.endsWith('Map.md')).length;
+
+test('36: Mod+Enter opens the name dialog, saving puts keyboard focus on the new card, and one undo step removes it (redo restores it)', async () => {
+  const h = await harness(); realAdd(h);
+  const notesBefore = noteCount(h), past = h.view.history.past.length;
+  h.view.contentEl.ownerDocument = { activeElement: h.card('leaf') };
+  send(h, 'leaf', 'Enter', { ctrlKey: true }); h.view.scope.keys.find(k => k.key === 'Enter' && k.modifiers.includes('Mod')).func({ key: 'Enter', isComposing: false, defaultPrevented: false }, {});
+  await tick();
+  assert.equal(h.modals.filter(m => m.constructor.name === 'NameModal').length >= 1, true, 'the name dialog opens first');
+  assert.equal(h.map().nodes.length, 4, 'nothing created before the name is saved');
+  const focusedBefore = make.last;
+  typeAndSave(nameModal(h), 'Fresh');
+  await until(() => h.map().nodes.length === 5); await tick(); await tick();
+  const fresh = h.map().nodes.find(n => n.id !== undefined && !Object.values(h.ids).includes(n.id));
+  assert.equal(fresh.parentId, h.ids.leaf, 'a child of the focused card');
+  assert.equal(h.view.history.past.length, past + 1, 'one history entry');
+  assert.equal(make.last, cardOf(h, fresh.id), 'DOM focus is on the new card, not the parent');
+  assert.notEqual(make.last, focusedBefore);
+  await h.view.travel(false); await tick();
+  assert.equal(h.map().nodes.some(n => n.id === fresh.id), false, 'undo removes the card');
+  assert.equal(unassignedHas(h, 'Fresh'), true, 'its note waits in Unassigned');
+  await h.view.travel(true); await tick();
+  assert.equal(h.map().nodes.some(n => n.id === fresh.id), true, 'redo brings the card back');
+  assert.equal(unassignedHas(h, 'Fresh'), false, 'the note left Unassigned');
+  assert.equal(noteCount(h), notesBefore + 1);
+});
+
+test('36: Esc in the name dialog (close without save) leaves notes, nodes and history alone and does not move focus', async () => {
+  const h = await harness(); realAdd(h);
+  const notes = noteCount(h), past = h.view.history.past.length, last = make.last;
+  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf));
+  nameModal(h).close(); await tick(); await tick();
+  assert.equal(noteCount(h), notes); assert.equal(h.map().nodes.length, 4); assert.equal(h.view.history.past.length, past);
+  assert.equal(make.last, last, 'no card took focus'); assert.deepEqual(h.cameraMoves, []);
+});
+
+test('36: Enter during IME composition in the name dialog does not save', async () => {
+  const h = await harness(); realAdd(h);
+  await h.view.addNode(null);
+  const input = findAll(nameModal(h).contentEl, i => i.tag === 'input')[0]; input.value = 'Composing';
+  input.keydown({ key: 'Enter', isComposing: true }); await tick(); await tick();
+  assert.equal(h.map().nodes.length, 4); assert.equal(nameModal(h).closeCount, 0);
+});
+
+test('36: Shift+Enter on a root adds a new root and focus lands on that root card', async () => {
+  const h = await harness(); realAdd(h);
+  const roots = h.map().nodes.filter(n => !n.parentId).length;
+  h.view.contentEl.ownerDocument = { activeElement: h.card('root') };
+  h.view.scope.keys.find(k => k.key === 'Enter' && k.modifiers.length === 1 && k.modifiers[0] === 'Shift').func({ key: 'Enter', isComposing: false, defaultPrevented: false }, {});
+  await tick();
+  typeAndSave(nameModal(h), 'Second root');
+  await until(() => h.map().nodes.length === 5); await tick(); await tick();
+  const fresh = h.map().nodes.find(n => !Object.values(h.ids).includes(n.id));
+  assert.equal(fresh.parentId ?? null, null); assert.equal(h.map().nodes.filter(n => !n.parentId).length, roots + 1);
+  assert.equal(make.last, cardOf(h, fresh.id));
+});
+
+test('36: addNode with focus=false (AI suggestion, outline import, map chat) does not take focus', async () => {
+  const h = await harness(); realAdd(h);
+  const last = make.last;
+  await h.view.addNode(h.map().nodes.find(n => n.id === h.ids.leaf), 'Quiet', true, false);
+  await tick(); assert.equal(h.map().nodes.length, 5);
+  assert.equal(make.last, last, 'focus unchanged'); assert.deepEqual(h.cameraMoves, [], 'camera unchanged');
 });

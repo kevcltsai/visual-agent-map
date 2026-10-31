@@ -1395,6 +1395,7 @@ function panelFocusFixture(language = 'en') {
   const docListeners = new Map();
   const doc = { activeElement: null, addEventListener(name, fn) { docListeners.set(name, fn); }, removeEventListener(name, fn) { if (docListeners.get(name) === fn) docListeners.delete(name); } };
   const plugin = { settings: { ...DEFAULT_SETTINGS, language }, relevanceGrades: new Map(), releaseOutline() {} };
+  plugin.currentModelChoice = () => ({ model: plugin.settings.cliModel, reasoning: plugin.settings.cliReasoning });
   const view = new VisualAgentMapView({ app: {} }, plugin);
   const root = node('root'), child = node('child', 'root');
   view.path = PANEL_MAP_PATH; view.map = map([root, child]);

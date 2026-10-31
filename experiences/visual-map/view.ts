@@ -1542,7 +1542,7 @@ export class VisualAgentMapView extends ItemView {
       generate: async (request, signal, started) => {
         if (this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -1568,7 +1568,7 @@ export class VisualAgentMapView extends ItemView {
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -1803,7 +1803,7 @@ export class VisualAgentMapView extends ItemView {
     showWindow({
       review: async (signal, started) => {
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) cancels; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -1831,7 +1831,7 @@ export class VisualAgentMapView extends ItemView {
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -1963,10 +1963,10 @@ export class VisualAgentMapView extends ItemView {
    * very same command the run uses, so sending only has to write the prompt.
    */
   private prewarmRelevance(mode: RelevanceMode): void {
-    const settings = this.plugin.settings;
+    const { model, reasoning } = this.plugin.currentModelChoice();
     this.plugin.prewarmClaudeStep?.(
-      settings.cliModel,
-      normalizeReasoningLevel(settings.cliReasoning),
+      model,
+      reasoning,
       mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
     );
   }
@@ -2307,7 +2307,7 @@ export class VisualAgentMapView extends ItemView {
         });
         this.updateHistoryButtons();
       });
-      const model = settings.cliModel;
+      const { model, reasoning: gradeReasoning } = this.plugin.currentModelChoice();
       // The run stays "running" (the map is locked and Stop works) but the bar must not claim grading while the
       // usage notice waits for an answer.
       // Only a notice that really opens needs the bar to say so; otherwise this is not repainted at all.
@@ -2334,7 +2334,7 @@ export class VisualAgentMapView extends ItemView {
           nodes: basis,
           language: settings.language,
           model,
-          reasoning: normalizeReasoningLevel(settings.cliReasoning),
+          reasoning: gradeReasoning,
           ...(pins.length ? { pins } : {})
         };
         const hooks = {
@@ -8604,10 +8604,10 @@ export class VisualAgentMapView extends ItemView {
       ).open();
       return;
     }
-    const model = inheritModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).model : undefined,
-      this.plugin.settings.cliModel
-    );
+    // One resolution: a manual ancestor's model is inherited, otherwise the current model.
+    const model = parent
+      ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+      : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
       return;

@@ -19,6 +19,7 @@ import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
+import { TOPIC_COLORS, branchNoteIds, type TopicColor } from "../../topic-colors";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -6745,6 +6746,8 @@ export class VisualAgentMapView extends ItemView {
     this.paintCardMarkers(card, header, node.id);
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
+    // The topic colour comes last: its attribute and its name part (see paintCardColor).
+    this.paintCardColor(card, note, !!node.aimKind);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -7478,6 +7481,30 @@ export class VisualAgentMapView extends ItemView {
     }
     if (named) this.labelCard(card, text ? t("ui.topic_card_label_0_1", named, text) : named);
   }
+  /**
+   * Sets `data-topic-color` (only a whitelisted id; the value is never copied from the note as it is) and adds "Color: Red"
+   * to the card's accessible name, like the marker and model parts: the old part is taken out first, so a redraw replaces
+   * it in place and never doubles it. An AIM card has its own look and shows no topic colour. Safe to call again.
+   */
+  private paintCardColor(card: HTMLElement, note: Note | undefined, aim: boolean): void {
+    const previous = card.dataset.colorText ?? "";
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    const id = aim ? undefined : TOPIC_COLORS.find(color => color === note?.color);
+    if (id) {
+      const text = t("share.viewer_color_0", t(`share.viewer_color_${id}`));
+      card.dataset.topicColor = id;
+      card.dataset.colorText = text;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
+    } else {
+      delete card.dataset.topicColor;
+      delete card.dataset.colorText;
+      if (named) this.labelCard(card, named);
+    }
+  }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   private labelCard(card: HTMLElement, text: string): void {
     let label = cardLabels.get(card);
@@ -7679,6 +7706,7 @@ export class VisualAgentMapView extends ItemView {
       this.paintCardMarkers(card, header, node.id);
       this.paintModelTag(card, header, note);
     }
+    this.paintCardColor(card, note, !!node.aimKind);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -7986,6 +8014,7 @@ export class VisualAgentMapView extends ItemView {
     // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
+    if (note) this.renderColorSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
@@ -8643,6 +8672,89 @@ export class VisualAgentMapView extends ItemView {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.topic_markers") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
+  private renderColorSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-color-section");
+    section.createEl("strong", { text: t("ui.topic_color"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-colors vam-choice-group");
+    group.setAttr("role", "radiogroup");
+    group.setAttr("aria-label", t("ui.topic_color"));
+    const choices: (TopicColor | null)[] = [null, ...TOPIC_COLORS];
+    const current = (): TopicColor | null =>
+      TOPIC_COLORS.find(color => color === this.notes.get(node.id)?.color) ?? null;
+    const paint = (focusId?: TopicColor | null): void => {
+      group.empty();
+      const active = current();
+      choices.forEach((id, index) => {
+        const choice = this.button(group, id ? t(`share.viewer_color_${id}`) : t("ui.topic_color_none"), () => {
+          this.enqueue(async () => {
+            await this.changeTopicColor(node, id);
+            paint(id);
+          });
+        });
+        if (id) {
+          const swatch = choice.createSpan({ cls: "vam-color-swatch", attr: { "aria-hidden": "true" } });
+          swatch.dataset.topicColorSwatch = id;
+        }
+        const on = id === active;
+        choice.setAttr("role", "radio");
+        choice.setAttr("aria-checked", String(on));
+        if (on) choice.addClass("is-pressed");
+        // One tab stop for the group; the arrow keys move and choose, as in a native radio group.
+        if (!this.renderingCard) choice.tabIndex = on ? 0 : -1;
+        choice.addEventListener("keydown", event => {
+          const step =
+            event.key === "ArrowRight" || event.key === "ArrowDown"
+              ? 1
+              : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                ? -1
+                : 0;
+          if (!step) return;
+          event.preventDefault();
+          const next = (index + step + choices.length) % choices.length;
+          this.enqueue(async () => {
+            await this.changeTopicColor(node, choices[next]);
+            paint(choices[next]);
+          });
+        });
+        // Repainting replaced the button; keep the keyboard focus on the one just chosen.
+        if (focusId !== undefined && id === focusId) choice.focus();
+      });
+    };
+    paint();
+    this.button(
+      section,
+      t("ui.topic_color_apply_branch"),
+      () => this.enqueue(() => this.changeTopicColor(node, current(), true)),
+      branchNoteIds(this.map!.nodes, node.id).length < 2
+    );
+  }
+  /**
+   * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
+   * in one undoable step. Only the notes whose colour really changes are written; Map.md changes only its viewport. A
+   * child never inherits: a branch is just several writes in the same transaction.
+   */
+  private async changeTopicColor(node: MapNode, color: TopicColor | null, branch = false): Promise<void> {
+    if (!this.map || !this.markersEditable(node)) return;
+    const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
+    const targets = ids
+      .map(id => this.map!.nodes.find(item => item.id === id))
+      .filter((item): item is MapNode => !!item && !item.aimKind && !!this.notes.get(item.id))
+      .filter(item => (TOPIC_COLORS.find(id => id === this.notes.get(item.id)?.color) ?? null) !== color);
+    if (!targets.length) return;
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeTopicColor(path, color));
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_color") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }

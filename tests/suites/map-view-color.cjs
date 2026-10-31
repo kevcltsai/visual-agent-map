@@ -462,3 +462,102 @@ test('hypothesis-evidence: the colour matrix measures six line kinds x normal / 
   assert.ok(CASES.some(([n, , , need]) => n === 'relation-arrow' && need === 3) && CASES.some(([n]) => n === 'relation-arrow-bar'));
   assert.match(PAGE, /vam-relation-gap/, 'the double line gap is in the fixture');
 });
+
+// ---- topic colour (ticket 37 P2b): six colours x six types x light / dark ----
+// Same cards as the kind matrix, with `data-topic-color`. Text >= 4.5 on the tinted fill; the 4px stripe >= 3 against the card fill and the canvas.
+const COLOR_IDS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+const COLOR_STATES = KIND_STATES;
+const COLOR_PAGE = () => `<!doctype html><html><head><meta charset="utf-8"><style>${styles}
+body { margin: 0; width: 1200px; height: 9000px; background: var(--background-primary); color: var(--text-normal); }
+.vam-node { width: 280px; }
+</style></head><body><div class="vam-viewport" style="width:2400px;height:9000px"><div class="vam-stage">${COLOR_IDS.flatMap((color, c) => KIND_IDS.map((kind, row) => COLOR_STATES.map(([state, attrs, extra], col) => {
+  const kindAttr = kind === 'topic' ? '' : ` data-topic-kind="${kind}"`;
+  const tagHtml = kind === 'hypothesis' ? '<span class="vam-hypothesis-tag" data-strength="weak">Hypothesis · Weak</span>' : kind === 'topic' ? '' : `<span class="vam-hypothesis-tag vam-kind-tag">${kind}</span>`;
+  return `<div class="vam-node${extra}"${kindAttr} data-topic-color="${color}" ${attrs} data-case="${kind}|${state}|${color}" style="left:${20 + col * 330}px;top:${20 + (c * KIND_IDS.length + row) * 220}px;padding:28px 40px">${shapeMarkup(kind)}<div class="vam-node-header">${tagHtml}</div><h3 class="vam-card-title" title="Title">Title of the topic</h3><p class="vam-card-summary">A short summary of the topic.</p></div>`;
+})).flat()).join('')}</div></div></body></html>`;
+const COLOR_PROBE = `(() => {
+  const cx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const rgba = text => { const read = base => { cx.clearRect(0, 0, 1, 1); cx.fillStyle = base; cx.fillStyle = text; cx.fillRect(0, 0, 1, 1); return [...cx.getImageData(0, 0, 1, 1).data]; }; const a = read('#000000'), b = read('#ffffff'); if (a.join() !== b.join()) throw new Error('unparsed colour: ' + text); return [a[0], a[1], a[2], a[3] / 255]; };
+  const over = (top, under) => { const a = top[3]; return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)).concat([1]); };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (x, y) => { const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p); return (hi + 0.05) / (lo + 0.05); };
+  const canvas = over(rgba(getComputedStyle(document.querySelector('.vam-viewport')).backgroundColor), [255, 255, 255, 1]);
+  const rows = {};
+  for (const card of document.querySelectorAll('[data-case]')) {
+    const outline = card.querySelector('.vam-kind-outline'), style = getComputedStyle(card);
+    const fill = outline ? over(rgba(getComputedStyle(outline).fill), canvas) : over(rgba(style.backgroundColor), canvas);
+    const text = el => ratio(over(rgba(getComputedStyle(el).color), fill), fill);
+    const row = { text: Math.min(text(card.querySelector('.vam-card-title')), text(card.querySelector('.vam-card-summary'))), plain: fill.join() === canvas.join() };
+    const tag = card.querySelector('.vam-hypothesis-tag');
+    if (tag) row.tag = text(tag);
+    const stripe = getComputedStyle(card, '::before');
+    row.stripeShown = stripe.content !== 'none' && stripe.width === '4px';
+    if (row.stripeShown) { const bar = over(rgba(stripe.backgroundColor), fill); row.stripe = Math.min(ratio(bar, fill), ratio(bar, canvas)); }
+    rows[card.dataset.case] = row;
+  }
+  return rows;
+})()`;
+
+test('topic-color: six colours x six types x light / dark keep text >= 4.5:1 on the tinted fill and the stripe >= 3:1 against the fill and the canvas', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-topic-color-'));
+  try {
+    const file = path.join(directory, 'colors.html');
+    fs.writeFileSync(file, COLOR_PAGE());
+    const report = await withChrome(chrome, directory, pathToFileURL(file).href, async send => {
+      const evaluate = async expression => {
+        const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+        if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? 'page error');
+        return result.result.value;
+      };
+      const out = {};
+      for (const scheme of ['light', 'dark']) {
+        await evaluate(`(() => { document.body.className = ${JSON.stringify(`theme-${scheme}`)}; document.body.removeAttribute('style'); document.body.style.cssText = 'margin:0;width:2400px;height:9000px;background:var(--background-primary);color:var(--text-normal)'; for (const [k, v] of Object.entries(${JSON.stringify(tokens[scheme])})) document.body.style.setProperty(k, v); })()`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        out[scheme] = await evaluate(COLOR_PROBE);
+      }
+      return out;
+    });
+    let lowestText = Infinity, lowestStripe = Infinity, lowestTag = Infinity, at = {};
+    for (const scheme of ['light', 'dark']) {
+      const rows = report[scheme];
+      assert.equal(Object.keys(rows).length, COLOR_IDS.length * KIND_IDS.length * COLOR_STATES.length, `${scheme}: every colour x type x state case is in the fixture`);
+      for (const [name, row] of Object.entries(rows)) {
+        assert.equal(row.plain, false, `${scheme} ${name}: the colour tints the fill`);
+        assert.ok(row.text >= 4.5, `${scheme} ${name}: title / summary ${row.text.toFixed(2)} must be >= 4.5`);
+        assert.ok(row.stripeShown, `${scheme} ${name}: the 4px stripe is drawn`);
+        assert.ok(row.stripe >= 3, `${scheme} ${name}: stripe ${row.stripe?.toFixed(2)} must be >= 3`);
+        if (row.tag !== undefined) assert.ok(row.tag >= 4.5, `${scheme} ${name}: type tag ${row.tag.toFixed(2)} must be >= 4.5`);
+        if (row.text < lowestText) { lowestText = row.text; at.text = `${scheme} ${name}`; }
+        if (row.stripe < lowestStripe) { lowestStripe = row.stripe; at.stripe = `${scheme} ${name}`; }
+        if (row.tag !== undefined && row.tag < lowestTag) { lowestTag = row.tag; at.tag = `${scheme} ${name}`; }
+      }
+    }
+    console.log(`topic-color matrix (6 colours x 6 types x ${COLOR_STATES.length} states x 2 themes): lowest text ${lowestText.toFixed(2)} (${at.text}), lowest type tag ${lowestTag.toFixed(2)} (${at.tag}), lowest stripe ${lowestStripe.toFixed(2)} (${at.stripe})`);
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('topic-color: the menu swatches and the stripe colours come from the six whitelisted ids only, and no rule reads a frontmatter value', () => {
+  for (const id of COLOR_IDS) {
+    assert.match(styles, new RegExp(`\\.vam-node\\[data-topic-color="${id}"\\]`), `${id} card rule`);
+    assert.match(styles, new RegExp(`\\[data-topic-color-swatch="${id}"\\]`), `${id} swatch rule`);
+  }
+  assert.doesNotMatch(styles, /data-topic-color\s*[~|^$*]=/, 'only exact whitelisted ids are matched');
+  const swatchRules = styles.split('\n').filter(l => /data-topic-color-swatch/.test(l));
+  assert.ok(swatchRules.every(l => /^\.vam-topic-modal /.test(l)), 'menu swatch rules start with .vam-topic-modal so the share viewer does not collect them');
+});
+
+test('topic-color: the share viewer defines all six colour tokens, light and dark, with the values of the Obsidian defaults, so a shared card tints like the plugin card', () => {
+  const css = fs.readFileSync(path.join(root, 'experiences/sharing/viewer/viewer.css'), 'utf8');
+  const dark = css.indexOf('@media (prefers-color-scheme: dark)');
+  assert.ok(dark > 0);
+  for (const [scheme, block] of [['light', css.slice(0, dark)], ['dark', css.slice(dark)]])
+    for (const id of COLOR_IDS) {
+      const found = block.match(new RegExp(`--color-${id}:\\s*([^;]+);`));
+      assert.ok(found, `${scheme} --color-${id} is defined`);
+      assert.equal(found[1].trim(), tokens[scheme][`--color-${id}`], `${scheme} --color-${id} equals the Obsidian default`);
+    }
+});

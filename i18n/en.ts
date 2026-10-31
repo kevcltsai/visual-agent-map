@@ -2287,7 +2287,11 @@ export const en = {
   "share.translate_diagrams_kept_0": "{0} diagrams could not be translated and keep their original labels.",
   "share.translate_images_note": "Text inside images is not translated.",
   "share.translate_total_size_0": "Total size with these languages: {0}",
-  "share.translate_languages_included_0": "Languages in the file: {0}"
+  "share.translate_languages_included_0": "Languages in the file: {0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "Could not copy the selection as a branch.",
+  "ui.clipboard_paste_readonly": "This map is read-only here, so nothing was pasted.",
+  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted."
 } as const;
 
 export type TranslationKey = keyof typeof en;

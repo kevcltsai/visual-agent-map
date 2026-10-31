@@ -215,6 +215,16 @@ import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
 import { addOutlineToMap, createOutlineMap, limitOutline, type OutlineNode } from "./outline-import";
 import {
+  buildClipboardPayload,
+  clipboardOutline,
+  parseClipboard,
+  serializeClipboard,
+  type ClipboardPayload
+} from "./clipboard";
+import { inClipboardScope, readClipboardData, writeClipboardData } from "./clipboard-io";
+import { planPaste } from "./clipboard-paste";
+import { sessionFor } from "./clipboard-session";
+import {
   OutlineImportModal,
   type OutlineDraftInputs,
   type OutlineDraftPrefill,
@@ -948,6 +958,10 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl.win ?? window, "blur", () => {
       this.spaceHeld = false;
     });
+    // Copy and paste of branches: on the document, popout windows included (decision #29, evidence/clipboard-mime.md).
+    this.bindClipboard();
+    this.register(() => this.unbindClipboard?.());
+    this.register(this.contentEl.onWindowMigrated?.(() => this.bindClipboard()) ?? (() => {}));
     this.registerDomEvent(this.contentEl, "keydown", event => {
       // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
@@ -5294,19 +5308,33 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private async copySelected(target: MapNode): Promise<void> {
-    if (!this.map) return;
-    const roots = this.selectedRoots(),
-      before = clone(this.map),
-      viewport = clone(this.map.viewport);
-    if (!this.mergeUnlocked([target.id, ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])]))
-      return;
-    const copies: MapNode[] = [],
-      pairs: Array<{ from: string; to: string }> = [],
-      replacement = new Map<string, string>(),
-      repo = this.plugin.repo,
-      parkFolder = repo.topicFolder(this.path, "Unassigned");
-    let entry: TransactionEntry;
-    try {
+    await this.copyBranches(this.selectedRoots(), target, {});
+  }
+  /**
+   * Duplicates the branches under `roots` below `target` (null = as new top-level trees), as one transaction. Copy to…
+   * gives each copy the "copy" suffix; a paste keeps the title (`keepTitle`) and may add relations between copied
+   * topics, given by the original ids. Returns the new top topics.
+   */
+  private async copyBranches(
+    roots: MapNode[],
+    target: MapNode | null,
+    options: {
+      keepTitle?: boolean;
+      relations?: readonly { kind: TopicRelationKind; from: string; to: string; description?: string }[];
+    }
+  ): Promise<MapNode[]> {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (
+      !this.mergeUnlocked([
+        ...(target ? [target.id] : []),
+        ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])
+      ])
+    )
+      return [];
+    const repo = this.plugin.repo,
+      replacement = new Map<string, string>();
+    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
       for (const root of roots) {
         const branch: MapNode[] = [];
         const append = (node: MapNode): void => {
@@ -5315,34 +5343,87 @@ export class VisualAgentMapView extends ItemView {
         };
         append(root);
         for (const original of branch) {
-          const copy = await repo.duplicateNote(original.path, before, this.path);
+          const copy = await repo.duplicateNote(
+            original.path,
+            before,
+            this.path,
+            options.keepTitle ? { keepTitle: true } : {}
+          );
           replacement.set(original.id, copy.id);
-          copy.parentId = original.id === root.id ? target.id : (replacement.get(original.parentId!) ?? target.id);
-          copy.x = target.x + 340 + (original.x - root.x);
-          copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
+          copy.parentId =
+            original.id === root.id
+              ? (target?.id ?? null)
+              : (replacement.get(original.parentId!) ?? target?.id ?? null);
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
           pairs.push({ from: original.path, to: copy.path });
         }
       }
+      for (const link of options.relations ?? []) {
+        const from = replacement.get(link.from),
+          to = replacement.get(link.to);
+        if (from && to)
+          relations.push({
+            kind: link.kind,
+            from,
+            to,
+            ...(link.description !== undefined ? { description: link.description } : {})
+          });
+      }
+    });
+  }
+  /**
+   * Writes new notes (made by `create`, which pushes each one into `copies` as soon as it exists) together with the
+   * Map.md edit as one transaction and one history step. A failure parks the notes in Unassigned (never deletes them).
+   */
+  private async writeNewBranches(
+    before: MapDocument,
+    target: MapNode | null,
+    create: (copies: MapNode[], pairs: Array<{ from: string; to: string }>, relations: TopicRelation[]) => Promise<void>
+  ): Promise<MapNode[]> {
+    const viewport = clone(before.viewport);
+    const copies: MapNode[] = [],
+      pairs: Array<{ from: string; to: string }> = [],
+      newRelations: TopicRelation[] = [],
+      repo = this.plugin.repo,
+      parkFolder = repo.topicFolder(this.path, "Unassigned");
+    let entry: TransactionEntry;
+    try {
+      await create(copies, pairs, newRelations);
       // Only the new copies are written, before the transaction; a failure parks them like any other.
-      await repo.rewriteCopiedNoteLinks(pairs);
+      if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
       const tx = this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       entry = await tx
         .editMap(this.path, map => {
           map.viewport = clone(viewport);
-          const found = map.nodes.find(node => node.id === target.id);
-          if (!found) throw new Error(t("ui.outline_import_selected_missing"));
+          const found = target ? map.nodes.find(node => node.id === target.id) : null;
+          if (target && !found) throw new Error(t("ui.outline_import_selected_missing"));
           map.nodes.push(...copies);
-          found.collapsed = false;
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            target.id,
-            new Set(copies.map(copy => copy.id)),
-            this.cardHeightOf,
-            undefined,
-            layoutDirectionOf(map)
-          );
+          if (found) {
+            found.collapsed = false;
+            map.nodes = arrangeNewBranch(
+              map.nodes,
+              found.id,
+              new Set(copies.map(copy => copy.id)),
+              this.cardHeightOf,
+              undefined,
+              layoutDirectionOf(map)
+            );
+          } else
+            for (const top of copies.filter(copy => copy.parentId === null))
+              map.nodes = arrangeNewTree(
+                map.nodes,
+                top.id,
+                new Set([top.id, ...descendants(copies, top.id)]),
+                this.cardHeightOf,
+                layoutDirectionOf(map)
+              );
+          for (const link of newRelations) {
+            if (!relationAllowed(map.topicRelations ?? [], link)) continue;
+            setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+          }
         })
         .commit();
     } catch (error) {
@@ -5378,6 +5459,172 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(this.copyEntry(entry));
     this.multiSelected.clear();
     await this.refreshAfterSavedChange();
+    return copies.filter(copy => copy.parentId === (target?.id ?? null));
+  }
+  // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
+  /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
+  private unbindClipboard: (() => void) | null = null;
+  private bindClipboard(): void {
+    this.unbindClipboard?.();
+    const doc: Document = this.contentEl.doc ?? document;
+    const copy = (event: Event): void => this.onClipboardEvent("copy", event as ClipboardEvent);
+    const paste = (event: Event): void => this.onClipboardEvent("paste", event as ClipboardEvent);
+    doc.addEventListener("copy", copy);
+    doc.addEventListener("paste", paste);
+    this.unbindClipboard = () => {
+      doc.removeEventListener("copy", copy);
+      doc.removeEventListener("paste", paste);
+    };
+  }
+  private onClipboardEvent(kind: "copy" | "paste", event: ClipboardEvent): void {
+    if (this.closed || event.defaultPrevented || !this.map || !event.clipboardData) return;
+    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (kind === "copy") this.copyToClipboard(event);
+    else this.pasteFromClipboard(event);
+  }
+  private copyToClipboard(event: ClipboardEvent): void {
+    const map = this.map;
+    const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    if (!map || !ids.length || !event.clipboardData) return;
+    // Selected text (for example in a preview) is copied as text, not as a branch.
+    const selection = this.contentEl.ownerDocument?.getSelection?.();
+    if (selection && !selection.isCollapsed && selection.anchorNode && this.contentEl.contains(selection.anchorNode))
+      return;
+    const visited: string[] = [];
+    const built = buildClipboardPayload({
+      nodes: map.nodes,
+      order: [...map.nodes].sort((a, b) => a.y - b.y || a.x - b.x).map(node => node.id),
+      selectedIds: ids,
+      noteOf: id => {
+        visited.push(id);
+        const note = this.notes.get(id);
+        const node = map.nodes.find(item => item.id === id);
+        return {
+          title: note?.title ?? node?.path.replace(/^.*\//, "").replace(/\.md$/, "") ?? "",
+          body: note?.detail ?? "",
+          kind: note?.topicKind ?? "topic",
+          ...(note?.hypothesisStrength !== undefined ? { strength: note.hypothesisStrength } : {})
+        };
+      },
+      relations: map.topicRelations ?? [],
+      clipId: crypto.randomUUID()
+    });
+    if (!built.ok || !visited.length) {
+      new Notice(t("ui.clipboard_copy_failed"));
+      return;
+    }
+    const serialized = serializeClipboard(built.payload);
+    writeClipboardData(event.clipboardData, serialized, clipboardOutline(built.payload));
+    event.preventDefault();
+    sessionFor(this.plugin).record({
+      clipId: built.payload.clipId,
+      serialized,
+      mode: "copy",
+      sourceMapPath: this.path,
+      sourceMapId: map.id,
+      nodeIds: visited,
+      notePaths: visited.map(id => map.nodes.find(node => node.id === id)?.path ?? "")
+    });
+  }
+  private pasteFromClipboard(event: ClipboardEvent): void {
+    const { vam } = readClipboardData(event.clipboardData);
+    // Without the private format this is plain text: the text paste is a later packet, so the event is left alone.
+    if (!vam) return;
+    event.preventDefault();
+    if (this.integrationMode || this.outlineImportTarget().map !== "editable") {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseClipboard(vam);
+    if (!parsed.ok) {
+      new Notice(t("ui.clipboard_paste_invalid"));
+      return;
+    }
+    this.enqueue(() => this.pasteBranches(parsed.payload, vam));
+  }
+  /**
+   * Pastes under the selected topic (or as new top-level trees). When the clipboard string is exactly what this plugin
+   * wrote and its source is still this map, the source notes are duplicated (D2); otherwise only the payload's
+   * whitelisted fields make new notes.
+   */
+  private async pasteBranches(payload: ClipboardPayload, raw: string): Promise<void> {
+    const map = this.map;
+    if (!map || this.builtIn || this.integrationMode || map.aim || this.outlineImportTarget().map !== "editable") {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const target = map.nodes.find(node => node.id === this.selected) ?? null;
+    const record = sessionFor(this.plugin).match(raw);
+    let tops: MapNode[] = [];
+    const source = record && record.sourceMapPath === this.path && record.sourceMapId === map.id ? record : null;
+    const nodeIds = source?.nodeIds ?? [];
+    const ids = new Set(nodeIds);
+    const byId = new Map(map.nodes.map(node => [node.id, node] as const));
+    // The source must still be the same tree: every copied topic exists and keeps the parent the payload recorded.
+    const intact =
+      source !== null &&
+      nodeIds.length === payload.nodes.length &&
+      payload.nodes.every((clip, index) => {
+        const node = byId.get(nodeIds[index]);
+        if (!node) return false;
+        if (clip.parent === null) return !node.parentId || !ids.has(node.parentId);
+        return node.parentId === nodeIds[payload.nodes.findIndex(item => item.id === clip.parent)];
+      });
+    if (source && intact) {
+      const roots = payload.nodes
+        .map((clip, index) => (clip.parent === null ? byId.get(nodeIds[index]) : undefined))
+        .filter((node): node is MapNode => !!node);
+      const original = (clipId: string): string => nodeIds[payload.nodes.findIndex(item => item.id === clipId)];
+      tops = await this.copyBranches(roots, target, {
+        keepTitle: true,
+        relations: payload.relations.map(link => ({
+          kind: link.kind,
+          from: original(link.from),
+          to: original(link.to),
+          ...(link.description !== undefined ? { description: link.description } : {})
+        }))
+      });
+    } else {
+      const plan = planPaste(payload);
+      if (!plan.ok) {
+        new Notice(t("ui.clipboard_paste_invalid"));
+        return;
+      }
+      const repo = this.plugin.repo,
+        settings = this.plugin.settings,
+        before = clone(map),
+        model = target
+          ? inheritModel((await repo.readNote(target.path, map)).model, settings.cliModel)
+          : settings.cliModel;
+      tops = await this.writeNewBranches(before, target, async (copies, _pairs, relations) => {
+        for (const item of plan.items) {
+          const node = await repo.createNote(
+            item.title,
+            model,
+            before,
+            this.path,
+            target || item.parent !== null ? "inherited" : "workspace",
+            { topicKind: item.kind, detail: item.body }
+          );
+          node.parentId = item.parent === null ? (target?.id ?? null) : copies[item.parent].id;
+          copies.push(node);
+          if (item.kind === "hypothesis" && item.strength) await repo.writeHypothesisStrength(node.path, item.strength);
+        }
+        for (const link of plan.relations)
+          relations.push({
+            kind: link.kind,
+            from: copies[link.from].id,
+            to: copies[link.to].id,
+            ...(link.description !== undefined ? { description: link.description } : {})
+          });
+      });
+    }
+    const placed = this.map?.nodes.find(node => node.id === tops[0]?.id);
+    if (placed) {
+      this.selected = placed.id;
+      this.render();
+      this.focusNode(placed);
+    }
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   private copyEntry(entry: TransactionEntry): TransactionEntry {

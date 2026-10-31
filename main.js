@@ -2135,7 +2135,11 @@ var en = {
   "share.translate_diagrams_kept_0": "{0} diagrams could not be translated and keep their original labels.",
   "share.translate_images_note": "Text inside images is not translated.",
   "share.translate_total_size_0": "Total size with these languages: {0}",
-  "share.translate_languages_included_0": "Languages in the file: {0}"
+  "share.translate_languages_included_0": "Languages in the file: {0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "Could not copy the selection as a branch.",
+  "ui.clipboard_paste_readonly": "This map is read-only here, so nothing was pasted.",
+  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted."
 };
 
 // i18n/zh-CN.ts
@@ -4170,7 +4174,11 @@ var zhCN = {
   "share.translate_diagrams_kept_0": "{0} \u5F20\u56FE\u8868\u65E0\u6CD5\u7FFB\u8BD1\uFF0C\u4FDD\u7559\u539F\u672C\u7684\u6807\u7B7E\u3002",
   "share.translate_images_note": "\u56FE\u7247\u91CC\u7684\u6587\u5B57\u4E0D\u4F1A\u7FFB\u8BD1\u3002",
   "share.translate_total_size_0": "\u52A0\u4E0A\u8FD9\u4E9B\u8BED\u8A00\u540E\u7684\u6587\u4EF6\u5927\u5C0F\uFF1A{0}",
-  "share.translate_languages_included_0": "\u6587\u4EF6\u5305\u542B\u7684\u8BED\u8A00\uFF1A{0}"
+  "share.translate_languages_included_0": "\u6587\u4EF6\u5305\u542B\u7684\u8BED\u8A00\uFF1A{0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "\u65E0\u6CD5\u628A\u9009\u62E9\u7684\u5185\u5BB9\u590D\u5236\u6210\u5206\u652F\u3002",
+  "ui.clipboard_paste_readonly": "\u8FD9\u5F20\u56FE\u5728\u8FD9\u91CC\u662F\u53EA\u8BFB\u7684\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_paste_invalid": "\u526A\u8D34\u677F\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -6205,7 +6213,11 @@ var zhTW = {
   "share.translate_diagrams_kept_0": "{0} \u5F35\u5716\u8868\u7121\u6CD5\u7FFB\u8B6F\uFF0C\u4FDD\u7559\u539F\u672C\u7684\u6A19\u7C64\u3002",
   "share.translate_images_note": "\u5716\u7247\u88E1\u7684\u6587\u5B57\u4E0D\u6703\u7FFB\u8B6F\u3002",
   "share.translate_total_size_0": "\u52A0\u4E0A\u9019\u4E9B\u8A9E\u8A00\u5F8C\u7684\u6A94\u6848\u5927\u5C0F\uFF1A{0}",
-  "share.translate_languages_included_0": "\u6A94\u6848\u5305\u542B\u7684\u8A9E\u8A00\uFF1A{0}"
+  "share.translate_languages_included_0": "\u6A94\u6848\u5305\u542B\u7684\u8A9E\u8A00\uFF1A{0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "\u7121\u6CD5\u628A\u9078\u53D6\u7684\u5167\u5BB9\u8907\u88FD\u6210\u5206\u652F\u3002",
+  "ui.clipboard_paste_readonly": "\u9019\u5F35\u5716\u5728\u9019\u88E1\u662F\u552F\u8B80\u7684\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_paste_invalid": "\u526A\u8CBC\u7C3F\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002"
 };
 
 // i18n/languages.ts
@@ -16601,20 +16613,20 @@ function begin(deps) {
       }
     };
     const stale = async (direction) => {
-      const fail = () => {
+      const fail2 = () => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
       for (const op of ops) {
-        if (!op.target) fail();
+        if (!op.target) fail2();
         const here = toward(op, direction) ? op.original : op.target, there = toward(op, direction) ? op.target : op.original;
-        if (!exists(here) || exists(there)) fail();
+        if (!exists(here) || exists(there)) fail2();
       }
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
-        if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
+        if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail2();
       }
       if (direction === "redo") {
-        for (const item of attachments) if (!exists(item.path)) fail();
+        for (const item of attachments) if (!exists(item.path)) fail2();
       }
     };
     const apply = async (direction) => {
@@ -18447,8 +18459,8 @@ function resolveTaskModel(input) {
   if (once) {
     return { model: once, reasoning: (_d = (_c = input.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input.current.reasoning, origin: "run-once" };
   }
-  const own = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
-  if (input.override && own) return { model: own, reasoning: input.override.reasoning, origin: "override" };
+  const own2 = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
+  if (input.override && own2) return { model: own2, reasoning: input.override.reasoning, origin: "override" };
   return { model: input.current.model, reasoning: input.current.reasoning, origin: "current" };
 }
 
@@ -18645,12 +18657,12 @@ function positions(nodes, roots, left, top, folded = false, heightOf, direction 
     const joinYs = stack(extra, depth + spans.get(node.id));
     const list = kidYs.length ? kids : extra;
     const ys = kidYs.length ? kidYs : joinYs;
-    const own = heightFor(node);
-    let y = topY + (size - own) / 2;
+    const own2 = heightFor(node);
+    let y = topY + (size - own2) / 2;
     if (ys.length) {
       const first = ys[0] + heightFor(list[0]) / 2;
       const last = ys[ys.length - 1] + heightFor(list[list.length - 1]) / 2;
-      y = (first + last) / 2 - own / 2;
+      y = (first + last) / 2 - own2 / 2;
     }
     result.set(node.id, { x: left + sign * depth * COLUMN, y: top + y });
     return y;
@@ -18684,11 +18696,11 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, direction =
   for (; ; ) {
     let next = offset;
     for (const [id, point] of placed) {
-      const own = cardHeight(heightOf, id);
+      const own2 = cardHeight(heightOf, id);
       for (const node of fixed) {
         const other = cardHeight(heightOf, node.id);
         const top = point.y + offset;
-        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP && node.y < top + own + LAYOUT_GAP)
+        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP && node.y < top + own2 + LAYOUT_GAP)
           next = Math.max(next, node.y + other + LAYOUT_GAP - point.y);
       }
     }
@@ -18931,11 +18943,11 @@ async function applyCharts(detail, charts, options) {
   const used = /* @__PURE__ */ new Set(), items = [];
   for (let index = 0; index < charts.length; index++) {
     const chart = charts[index], body = normBody(chart.mermaid);
-    const fail = (code) => ({ ok: false, code, index });
+    const fail2 = (code) => ({ ok: false, code, index });
     const nonBlank = body.split("\n").filter((l) => l.trim()).length;
-    if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail("bad_body");
+    if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail2("bad_body");
     const fence = "```mermaid\n" + body + "\n```";
-    if (neutralizeUnsafeMermaid(fence) !== fence) return fail("unsafe_or_header");
+    if (neutralizeUnsafeMermaid(fence) !== fence) return fail2("unsafe_or_header");
     if (options.parses) {
       let ok = true;
       try {
@@ -18943,15 +18955,15 @@ async function applyCharts(detail, charts, options) {
       } catch (e) {
         ok = false;
       }
-      if (!ok) return fail("unparsable");
+      if (!ok) return fail2("unparsable");
     }
     const tokens2 = numberTokens(body.replace(/^\s*\S+/, ""));
-    if (tokens2.some((n) => !noteNums.has(n))) return fail("number_not_in_note");
+    if (tokens2.some((n) => !noteNums.has(n))) return fail2("number_not_in_note");
     const anchor = anchorCheck(lines, mask, chart.anchor);
-    if (anchor.code) return fail(anchor.code);
+    if (anchor.code) return fail2(anchor.code);
     const block = anchor.block;
     const key2 = block.join("-");
-    if (used.has(key2)) return fail("anchor_shared");
+    if (used.has(key2)) return fail2("anchor_shared");
     used.add(key2);
     items.push({ body, block });
   }
@@ -20474,14 +20486,15 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
     );
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
-  async duplicateNote(sourcePath, map, mapPath) {
+  /** `keepTitle` keeps the source title as is (a paste); without it the copy gets the translated "copy" suffix. */
+  async duplicateNote(sourcePath, map, mapPath, options = {}) {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = text5(metadata.title, this.file(sourcePath).basename);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
-    const title = `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
+    const title = options.keepTitle ? sourceTitle : `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;
@@ -20700,8 +20713,8 @@ ${body}`);
    */
   renameAffectsVam(file, oldPath) {
     var _a2, _b2, _c;
-    const own = this.app.metadataCache.getFileCache(file);
-    if (!own || marker2((_a2 = own.frontmatter) == null ? void 0 : _a2["agent-map-node"]) || marker2((_b2 = own.frontmatter) == null ? void 0 : _b2["visual-agent-map"]))
+    const own2 = this.app.metadataCache.getFileCache(file);
+    if (!own2 || marker2((_a2 = own2.frontmatter) == null ? void 0 : _a2["agent-map-node"]) || marker2((_b2 = own2.frontmatter) == null ? void 0 : _b2["visual-agent-map"]))
       return true;
     for (const note of this.app.vault.getMarkdownFiles()) {
       const fm = (_c = this.app.metadataCache.getFileCache(note)) == null ? void 0 : _c.frontmatter;
@@ -27225,9 +27238,9 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
   if (strictGapAudit && (!["user_condition", "external_evidence"].includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
     throw new Error("AIM research-gap audit returned an invalid structured classification.");
   }
-  const isRecord2 = (value) => typeof value === "object" && value !== null;
+  const isRecord3 = (value) => typeof value === "object" && value !== null;
   const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(
-    (item) => isRecord2(item) && typeof item.title === "string" && typeof item.task === "string"
+    (item) => isRecord3(item) && typeof item.title === "string" && typeof item.task === "string"
   ).map((item) => ({
     title: String(item.title).trim(),
     task: String(item.task).trim(),
@@ -27235,7 +27248,7 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
     parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : ""
   })).filter((item) => item.title) : [];
   const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter(
-    (item) => isRecord2(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
+    (item) => isRecord3(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
   ).map((item) => ({
     title: typeof item.title === "string" ? item.title.trim() : translateNote(language2, "note.visual_reference"),
     imageUrl: String(item.imageUrl).trim(),
@@ -29216,6 +29229,337 @@ function limitOutline(nodes, limits) {
   return { nodes: result, dropped: nodes.length - result.length };
 }
 
+// experiences/visual-map/clipboard.ts
+var CLIPBOARD_FORMAT = "vam-branch";
+var CLIPBOARD_VERSION = 1;
+var CLIPBOARD_MAX_CHARS = 2e6;
+var CLIPBOARD_MAX_NODES = 500;
+var CLIPBOARD_MAX_BODY = 2e5;
+var CLIPBOARD_MAX_RELATIONS = 2e3;
+var CLIP_ID = /^[A-Za-z0-9_-]{8,64}$/;
+var NODE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+var TITLE_FORBIDDEN = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+var RELATION_KIND_RECORD = {
+  supports: true,
+  contradicts: true,
+  verifies: true,
+  derives_from: true,
+  related: true,
+  prerequisite: true
+};
+var RELATION_KINDS = Object.keys(RELATION_KIND_RECORD);
+var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var own = (record, key2) => Object.prototype.hasOwnProperty.call(record, key2) ? record[key2] : void 0;
+var fail = (reason) => ({ ok: false, reason });
+var startsWithFrontmatter = (body) => /^---[ \t]*(?:\r?\n|$)/.test(body.replace(/^\uFEFF/, ""));
+function parseClipboard(raw) {
+  try {
+    if (typeof raw !== "string") return fail("not-text");
+    if (raw.length > CLIPBOARD_MAX_CHARS) return fail("too-large");
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      return fail("bad-json");
+    }
+    if (!isRecord(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
+    if (own(data, "version") !== CLIPBOARD_VERSION) return fail("version");
+    const clipId = own(data, "clipId");
+    if (typeof clipId !== "string" || !CLIP_ID.test(clipId)) return fail("bad-clip-id");
+    const rawNodes = own(data, "nodes");
+    if (!Array.isArray(rawNodes) || rawNodes.length === 0) return fail("bad-nodes");
+    if (rawNodes.length > CLIPBOARD_MAX_NODES) return fail("too-many-nodes");
+    const nodes = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const item of rawNodes) {
+      if (!isRecord(item)) return fail("bad-nodes");
+      const id = own(item, "id");
+      if (typeof id !== "string" || !NODE_ID.test(id) || seen.has(id)) return fail("bad-id");
+      const parent = own(item, "parent");
+      if (parent !== null && (typeof parent !== "string" || !seen.has(parent))) return fail("bad-parent");
+      const title = own(item, "title");
+      if (typeof title !== "string") return fail("bad-title");
+      const trimmed2 = title.trim();
+      if (!trimmed2 || [...trimmed2].length > OUTLINE_TITLE_LIMIT || TITLE_FORBIDDEN.test(trimmed2))
+        return fail("bad-title");
+      const kind = own(item, "kind");
+      if (typeof kind !== "string" || !TOPIC_KINDS.includes(kind)) return fail("bad-kind");
+      const body = own(item, "body");
+      if (typeof body !== "string" || body.length > CLIPBOARD_MAX_BODY || body.includes("\0") || body.includes("<!-- visual-agent-map:") || startsWithFrontmatter(body))
+        return fail("bad-body");
+      seen.add(id);
+      const node = { id, parent, title: trimmed2, kind, body };
+      const strength = own(item, "strength");
+      if (kind === "hypothesis" && typeof strength === "string" && HYPOTHESIS_STRENGTHS.includes(strength))
+        node.strength = strength;
+      nodes.push(node);
+    }
+    const rawRelations = own(data, "relations");
+    if (rawRelations !== void 0 && !Array.isArray(rawRelations)) return fail("bad-relations");
+    const list = Array.isArray(rawRelations) ? rawRelations : [];
+    if (list.length > CLIPBOARD_MAX_RELATIONS) return fail("too-many-relations");
+    const relations = [];
+    const pairs = /* @__PURE__ */ new Set();
+    let droppedRelations = 0;
+    for (const item of list) {
+      if (!isRecord(item)) {
+        droppedRelations++;
+        continue;
+      }
+      const kind = own(item, "kind");
+      const from = own(item, "from");
+      const to = own(item, "to");
+      if (typeof kind !== "string" || !RELATION_KINDS.includes(kind) || typeof from !== "string" || typeof to !== "string" || !seen.has(from) || !seen.has(to) || from === to) {
+        droppedRelations++;
+        continue;
+      }
+      const key2 = from > to ? `${to}\0${from}` : `${from}\0${to}`;
+      if (pairs.has(key2)) {
+        droppedRelations++;
+        continue;
+      }
+      pairs.add(key2);
+      const relation = { kind, from, to };
+      const description = own(item, "description");
+      const normalized = typeof description === "string" ? normalizeRelationDescription(description) : void 0;
+      if (normalized !== void 0) relation.description = normalized;
+      relations.push(relation);
+    }
+    return {
+      ok: true,
+      payload: { format: CLIPBOARD_FORMAT, version: CLIPBOARD_VERSION, clipId, nodes, relations },
+      droppedRelations
+    };
+  } catch (e) {
+    return fail("bad-json");
+  }
+}
+function serializeClipboard(payload) {
+  return JSON.stringify(payload);
+}
+function clipboardOutline(payload) {
+  var _a2;
+  const depth = /* @__PURE__ */ new Map();
+  const lines = [];
+  for (const node of payload.nodes) {
+    const level = node.parent === null ? 0 : ((_a2 = depth.get(node.parent)) != null ? _a2 : 0) + 1;
+    depth.set(node.id, level);
+    lines.push("	".repeat(level) + "- " + node.title);
+  }
+  return lines.join("\n");
+}
+function buildClipboardPayload(input) {
+  var _a2;
+  try {
+    const parentOf = new Map(input.nodes.map((n) => [n.id, n.parentId]));
+    const position = /* @__PURE__ */ new Map();
+    input.order.forEach((id, index) => {
+      if (!position.has(id)) position.set(id, index);
+    });
+    input.nodes.forEach((n) => {
+      if (!position.has(n.id)) position.set(n.id, input.order.length + position.size);
+    });
+    const rank = (id) => {
+      var _a3;
+      return (_a3 = position.get(id)) != null ? _a3 : Number.MAX_SAFE_INTEGER;
+    };
+    const selected = new Set(input.selectedIds.filter((id) => parentOf.has(id)));
+    const hasSelectedAncestor = (id) => {
+      var _a3, _b2;
+      const visited = /* @__PURE__ */ new Set([id]);
+      let current = (_a3 = parentOf.get(id)) != null ? _a3 : null;
+      while (current !== null && !visited.has(current)) {
+        if (selected.has(current)) return true;
+        visited.add(current);
+        current = (_b2 = parentOf.get(current)) != null ? _b2 : null;
+      }
+      return false;
+    };
+    const roots = [...selected].filter((id) => !hasSelectedAncestor(id)).sort((a, b) => rank(a) - rank(b));
+    const children = /* @__PURE__ */ new Map();
+    for (const n of input.nodes) {
+      if (n.parentId === null) continue;
+      const siblings = (_a2 = children.get(n.parentId)) != null ? _a2 : [];
+      siblings.push(n.id);
+      children.set(n.parentId, siblings);
+    }
+    const newId2 = /* @__PURE__ */ new Map();
+    const nodes = [];
+    const visit = (id, parent) => {
+      var _a3;
+      if (newId2.has(id)) return;
+      const clipped = `n${newId2.size + 1}`;
+      newId2.set(id, clipped);
+      const note = input.noteOf(id);
+      const node = { id: clipped, parent, title: note.title, kind: note.kind, body: note.body };
+      if (note.strength !== void 0) node.strength = note.strength;
+      nodes.push(node);
+      for (const child of [...(_a3 = children.get(id)) != null ? _a3 : []].sort((a, b) => rank(a) - rank(b))) visit(child, clipped);
+    };
+    for (const root of roots) visit(root, null);
+    const relations = [];
+    for (const r of input.relations) {
+      const from = newId2.get(r.from);
+      const to = newId2.get(r.to);
+      if (from === void 0 || to === void 0) continue;
+      const out = { kind: r.kind, from, to };
+      if (r.description !== void 0) out.description = r.description;
+      relations.push(out);
+    }
+    const raw = {
+      format: CLIPBOARD_FORMAT,
+      version: CLIPBOARD_VERSION,
+      clipId: input.clipId,
+      nodes,
+      relations
+    };
+    return parseClipboard(serializeClipboard(raw));
+  } catch (e) {
+    return fail("bad-nodes");
+  }
+}
+
+// experiences/visual-map/clipboard-io.ts
+var CLIPBOARD_MIME = "application/x-vam-branch";
+var EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditable=false]), .vam-map-chat";
+function inClipboardScope(target, root) {
+  const element = target;
+  if (!element || typeof element.closest !== "function") return false;
+  if (!root.contains(element)) return false;
+  return !element.closest(EDITABLE);
+}
+function writeClipboardData(data, serialized, outline) {
+  data.setData(CLIPBOARD_MIME, serialized);
+  data.setData("text/plain", outline);
+}
+function readClipboardData(data) {
+  const read = (type) => {
+    try {
+      const value = data == null ? void 0 : data.getData(type);
+      return typeof value === "string" ? value : "";
+    } catch (e) {
+      return "";
+    }
+  };
+  return { vam: read(CLIPBOARD_MIME), text: read("text/plain") };
+}
+
+// experiences/visual-map/clipboard-paste.ts
+function planPaste(payload) {
+  var _a2, _b2, _c;
+  try {
+    const nodes = payload.nodes;
+    const byId = /* @__PURE__ */ new Map();
+    for (let i = 0; i < nodes.length; i++) {
+      if (byId.has(nodes[i].id)) return { ok: false, reason: "bad-tree" };
+      byId.set(nodes[i].id, i);
+    }
+    const children = /* @__PURE__ */ new Map();
+    for (let i = 0; i < nodes.length; i++) {
+      const parent = nodes[i].parent === null ? null : (_a2 = byId.get(nodes[i].parent)) != null ? _a2 : -1;
+      if (parent === -1) return { ok: false, reason: "bad-tree" };
+      const list = (_b2 = children.get(parent)) != null ? _b2 : [];
+      list.push(i);
+      children.set(parent, list);
+    }
+    const order = [];
+    const itemOf = /* @__PURE__ */ new Map();
+    const visit = (from) => {
+      var _a3;
+      const pending2 = [from];
+      while (pending2.length) {
+        const node = pending2.pop();
+        itemOf.set(node, order.length);
+        order.push(node);
+        const kids = (_a3 = children.get(node)) != null ? _a3 : [];
+        for (let k = kids.length - 1; k >= 0; k--) pending2.push(kids[k]);
+      }
+    };
+    for (const root of (_c = children.get(null)) != null ? _c : []) visit(root);
+    if (order.length !== nodes.length) return { ok: false, reason: "bad-tree" };
+    const items = order.map((nodeIndex, index) => {
+      const n = nodes[nodeIndex];
+      const item = {
+        index,
+        parent: n.parent === null ? null : itemOf.get(byId.get(n.parent)),
+        title: n.title,
+        kind: n.kind,
+        body: n.body
+      };
+      if (n.strength !== void 0) item.strength = n.strength;
+      return item;
+    });
+    const relations = [];
+    let droppedRelations = 0;
+    for (const r of payload.relations) {
+      const from = byId.has(r.from) ? itemOf.get(byId.get(r.from)) : void 0;
+      const to = byId.has(r.to) ? itemOf.get(byId.get(r.to)) : void 0;
+      if (from === void 0 || to === void 0 || from === to) {
+        droppedRelations++;
+        continue;
+      }
+      const out = { kind: r.kind, from, to };
+      if (r.description !== void 0) out.description = r.description;
+      relations.push(out);
+    }
+    return { ok: true, items, relations, droppedRelations };
+  } catch (e) {
+    return { ok: false, reason: "bad-tree" };
+  }
+}
+
+// experiences/visual-map/clipboard-session.ts
+var ClipboardSession = class {
+  constructor() {
+    __publicField(this, "current", null);
+  }
+  /** Replaces any earlier record. The arrays are copied, so later changes by the caller cannot alter it. */
+  record(input) {
+    this.current = Object.freeze({
+      clipId: input.clipId,
+      serialized: input.serialized,
+      mode: input.mode,
+      sourceMapPath: input.sourceMapPath,
+      sourceMapId: input.sourceMapId,
+      nodeIds: Object.freeze([...input.nodeIds]),
+      notePaths: Object.freeze([...input.notePaths])
+    });
+    return this.current;
+  }
+  /** The record, or null when there is none. */
+  get() {
+    return this.current;
+  }
+  /** True only when `raw` is exactly the recorded string: one changed, added or missing character is a mismatch. */
+  matches(raw) {
+    return this.current !== null && typeof raw === "string" && raw === this.current.serialized;
+  }
+  /** The record when `raw` matches it, else null. */
+  match(raw) {
+    return this.matches(raw) ? this.current : null;
+  }
+  /** Drops a pending cut (the source cards lose their mark); a copy record is left alone. Returns whether one was dropped. */
+  cancelCut() {
+    var _a2;
+    if (((_a2 = this.current) == null ? void 0 : _a2.mode) !== "cut") return false;
+    this.current = null;
+    return true;
+  }
+  clear() {
+    this.current = null;
+  }
+};
+var sessions = /* @__PURE__ */ new WeakMap();
+function sessionFor(plugin) {
+  if (typeof plugin !== "object" || plugin === null) throw new TypeError("sessionFor needs the plugin object");
+  let session = sessions.get(plugin);
+  if (!session) {
+    session = new ClipboardSession();
+    sessions.set(plugin, session);
+  }
+  return session;
+}
+
 // experiences/visual-map/outline-import-modal.ts
 var import_obsidian18 = require("obsidian");
 
@@ -30194,7 +30538,7 @@ var ReferencePicker = class {
 var import_obsidian21 = require("obsidian");
 
 // ai-exchange-log.ts
-function isRecord(value) {
+function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isUnknownArray(value) {
@@ -30213,12 +30557,12 @@ function promptMetrics(entry) {
   if (!prompt && entry.request) {
     try {
       const parsed = JSON.parse(entry.request);
-      const parsedRecord = isRecord(parsed) ? parsed : void 0;
+      const parsedRecord = isRecord2(parsed) ? parsed : void 0;
       const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
-      const request = isRecord(requestValue) ? requestValue : void 0;
+      const request = isRecord2(requestValue) ? requestValue : void 0;
       if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
       else if (request && isUnknownArray(request.input)) {
-        prompt = request.input.map((item) => isRecord(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
+        prompt = request.input.map((item) => isRecord2(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
       }
     } catch (e) {
     }
@@ -30284,7 +30628,7 @@ var AiExchangeLog = class {
         const entry = item;
         return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
           (key2) => typeof entry[key2] === "string"
-        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
+        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord2(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
       });
       if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
       this.entries = entries.slice(-this.limit);
@@ -40493,7 +40837,7 @@ var TOPIC_KIND_ICON = {
   evidence: "file-search",
   conclusion: "flag"
 };
-var RELATION_KINDS = [
+var RELATION_KINDS2 = [
   "supports",
   "contradicts",
   "verifies",
@@ -40759,6 +41103,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
+    // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
+    /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
+    __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     this.installUndoScope();
@@ -40832,7 +41179,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     }));
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -40856,6 +41203,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     });
     this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
       this.spaceHeld = false;
+    });
+    this.bindClipboard();
+    this.register(() => {
+      var _a3;
+      return (_a3 = this.unbindClipboard) == null ? void 0 : _a3.call(this);
+    });
+    this.register((_o = (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard())) != null ? _o : () => {
     });
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
@@ -41435,14 +41789,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
           if (signal.aborted) return;
           const inputs = started();
           signal.removeEventListener("abort", forward);
-          const own = {
+          const own2 = {
             mapPath: this.path,
             controller,
             state: "running",
             inputs
           };
-          run.task = own;
-          this.outlineDraftTask = own;
+          run.task = own2;
+          this.outlineDraftTask = own2;
           if (!this.closed) this.render();
           try {
             const result = await this.plugin.outlineGeneration.generate(
@@ -41455,18 +41809,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
               },
               controller.signal
             );
-            if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
-            own.state = "done";
-            own.markdown = result.markdown;
+            if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
+            own2.state = "done";
+            own2.markdown = result.markdown;
             backgroundResultNotice(t("ui.outline_ai_ready"), {
               label: t("ui.background_review"),
-              open: () => this.reopenOutlineDraft(own)
+              open: () => this.reopenOutlineDraft(own2)
             });
           } catch (error) {
-            if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
-            own.state = "failed";
-            own.message = errorMessage(error);
-            new import_obsidian31.Notice(own.message);
+            if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
+            own2.state = "failed";
+            own2.message = errorMessage(error);
+            new import_obsidian31.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
@@ -41679,14 +42033,14 @@ ${request.requirements}` : preset.text,
           if (signal.aborted) return;
           run.began = true;
           signal.removeEventListener("abort", forward);
-          const own = {
+          const own2 = {
             mapPath,
             scopeId,
             controller,
             state: "running",
-            reopen: (result) => reopen(result, own)
+            reopen: (result) => reopen(result, own2)
           };
-          this.structureReviewTask = own;
+          this.structureReviewTask = own2;
           if (!this.closed) this.render();
           started();
           try {
@@ -41701,18 +42055,18 @@ ${request.requirements}` : preset.text,
               },
               controller.signal
             );
-            if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
-            own.state = "done";
-            own.result = review;
+            if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
+            own2.state = "done";
+            own2.result = review;
             backgroundResultNotice(t("ui.structure_review_ready_0", review.suggestions.length), {
               label: t("ui.structure_review_view_0", review.suggestions.length),
-              open: () => this.reopenStructureReview(own)
+              open: () => this.reopenStructureReview(own2)
             });
           } catch (error) {
-            if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
-            own.state = "failed";
-            own.message = errorMessage(error);
-            new import_obsidian31.Notice(own.message);
+            if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
+            own2.state = "failed";
+            own2.message = errorMessage(error);
+            new import_obsidian31.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
@@ -44885,14 +45239,24 @@ ${request.requirements}` : preset.text,
     }
   }
   async copySelected(target) {
-    var _a2, _b2;
-    if (!this.map) return;
-    const roots = this.selectedRoots(), before = clone(this.map), viewport = clone(this.map.viewport);
-    if (!this.mergeUnlocked([target.id, ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])]))
-      return;
-    const copies = [], pairs = [], replacement = /* @__PURE__ */ new Map(), repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
-    let entry;
-    try {
+    await this.copyBranches(this.selectedRoots(), target, {});
+  }
+  /**
+   * Duplicates the branches under `roots` below `target` (null = as new top-level trees), as one transaction. Copy to…
+   * gives each copy the "copy" suffix; a paste keeps the title (`keepTitle`) and may add relations between copied
+   * topics, given by the original ids. Returns the new top topics.
+   */
+  async copyBranches(roots, target, options) {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (!this.mergeUnlocked([
+      ...target ? [target.id] : [],
+      ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])
+    ]))
+      return [];
+    const repo = this.plugin.repo, replacement = /* @__PURE__ */ new Map();
+    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
+      var _a2, _b2, _c, _d;
       for (const root of roots) {
         const branch = [];
         const append = (node) => {
@@ -44901,32 +45265,75 @@ ${request.requirements}` : preset.text,
         };
         append(root);
         for (const original of branch) {
-          const copy = await repo.duplicateNote(original.path, before, this.path);
+          const copy = await repo.duplicateNote(
+            original.path,
+            before,
+            this.path,
+            options.keepTitle ? { keepTitle: true } : {}
+          );
           replacement.set(original.id, copy.id);
-          copy.parentId = original.id === root.id ? target.id : (_a2 = replacement.get(original.parentId)) != null ? _a2 : target.id;
-          copy.x = target.x + 340 + (original.x - root.x);
-          copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
+          copy.parentId = original.id === root.id ? (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null : (_c = (_b2 = replacement.get(original.parentId)) != null ? _b2 : target == null ? void 0 : target.id) != null ? _c : null;
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
           pairs.push({ from: original.path, to: copy.path });
         }
       }
-      await repo.rewriteCopiedNoteLinks(pairs);
+      for (const link of (_d = options.relations) != null ? _d : []) {
+        const from = replacement.get(link.from), to = replacement.get(link.to);
+        if (from && to)
+          relations.push({
+            kind: link.kind,
+            from,
+            to,
+            ...link.description !== void 0 ? { description: link.description } : {}
+          });
+      }
+    });
+  }
+  /**
+   * Writes new notes (made by `create`, which pushes each one into `copies` as soon as it exists) together with the
+   * Map.md edit as one transaction and one history step. A failure parks the notes in Unassigned (never deletes them).
+   */
+  async writeNewBranches(before, target, create) {
+    var _a2;
+    const viewport = clone(before.viewport);
+    const copies = [], pairs = [], newRelations = [], repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
+    let entry;
+    try {
+      await create(copies, pairs, newRelations);
+      if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
       const tx = this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
       entry = await tx.editMap(this.path, (map) => {
+        var _a3, _b2;
         map.viewport = clone(viewport);
-        const found = map.nodes.find((node) => node.id === target.id);
-        if (!found) throw new Error(t("ui.outline_import_selected_missing"));
+        const found = target ? map.nodes.find((node) => node.id === target.id) : null;
+        if (target && !found) throw new Error(t("ui.outline_import_selected_missing"));
         map.nodes.push(...copies);
-        found.collapsed = false;
-        map.nodes = arrangeNewBranch(
-          map.nodes,
-          target.id,
-          new Set(copies.map((copy) => copy.id)),
-          this.cardHeightOf,
-          void 0,
-          layoutDirectionOf(map)
-        );
+        if (found) {
+          found.collapsed = false;
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            found.id,
+            new Set(copies.map((copy) => copy.id)),
+            this.cardHeightOf,
+            void 0,
+            layoutDirectionOf(map)
+          );
+        } else
+          for (const top of copies.filter((copy) => copy.parentId === null))
+            map.nodes = arrangeNewTree(
+              map.nodes,
+              top.id,
+              /* @__PURE__ */ new Set([top.id, ...descendants(copies, top.id)]),
+              this.cardHeightOf,
+              layoutDirectionOf(map)
+            );
+        for (const link of newRelations) {
+          if (!relationAllowed((_a3 = map.topicRelations) != null ? _a3 : [], link)) continue;
+          setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], link]);
+        }
       }).commit();
     } catch (error) {
       this.render();
@@ -44944,7 +45351,7 @@ ${request.requirements}` : preset.text,
         parkFailure = { error: parkError };
       }
       if (parkFailure || isTransactionError(error, "rollback-failed")) {
-        const earlier = isTransactionError(error, "rollback-failed") ? (_b2 = error.errors) != null ? _b2 : [error] : [error];
+        const earlier = isTransactionError(error, "rollback-failed") ? (_a2 = error.errors) != null ? _a2 : [error] : [error];
         throw Object.assign(
           new AggregateError(
             parkFailure ? [...earlier, parkFailure.error] : earlier,
@@ -44958,6 +45365,170 @@ ${request.requirements}` : preset.text,
     this.history.push(this.copyEntry(entry));
     this.multiSelected.clear();
     await this.refreshAfterSavedChange();
+    return copies.filter((copy) => {
+      var _a3;
+      return copy.parentId === ((_a3 = target == null ? void 0 : target.id) != null ? _a3 : null);
+    });
+  }
+  bindClipboard() {
+    var _a2, _b2;
+    (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
+    const doc = (_b2 = this.contentEl.doc) != null ? _b2 : document;
+    const copy = (event) => this.onClipboardEvent("copy", event);
+    const paste = (event) => this.onClipboardEvent("paste", event);
+    doc.addEventListener("copy", copy);
+    doc.addEventListener("paste", paste);
+    this.unbindClipboard = () => {
+      doc.removeEventListener("copy", copy);
+      doc.removeEventListener("paste", paste);
+    };
+  }
+  onClipboardEvent(kind, event) {
+    if (this.closed || event.defaultPrevented || !this.map || !event.clipboardData) return;
+    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (kind === "copy") this.copyToClipboard(event);
+    else this.pasteFromClipboard(event);
+  }
+  copyToClipboard(event) {
+    var _a2, _b2, _c;
+    const map = this.map;
+    const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    if (!map || !ids.length || !event.clipboardData) return;
+    const selection = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.getSelection) == null ? void 0 : _b2.call(_a2);
+    if (selection && !selection.isCollapsed && selection.anchorNode && this.contentEl.contains(selection.anchorNode))
+      return;
+    const visited = [];
+    const built = buildClipboardPayload({
+      nodes: map.nodes,
+      order: [...map.nodes].sort((a, b) => a.y - b.y || a.x - b.x).map((node) => node.id),
+      selectedIds: ids,
+      noteOf: (id) => {
+        var _a3, _b3, _c2, _d;
+        visited.push(id);
+        const note = this.notes.get(id);
+        const node = map.nodes.find((item) => item.id === id);
+        return {
+          title: (_b3 = (_a3 = note == null ? void 0 : note.title) != null ? _a3 : node == null ? void 0 : node.path.replace(/^.*\//, "").replace(/\.md$/, "")) != null ? _b3 : "",
+          body: (_c2 = note == null ? void 0 : note.detail) != null ? _c2 : "",
+          kind: (_d = note == null ? void 0 : note.topicKind) != null ? _d : "topic",
+          ...(note == null ? void 0 : note.hypothesisStrength) !== void 0 ? { strength: note.hypothesisStrength } : {}
+        };
+      },
+      relations: (_c = map.topicRelations) != null ? _c : [],
+      clipId: crypto.randomUUID()
+    });
+    if (!built.ok || !visited.length) {
+      new import_obsidian31.Notice(t("ui.clipboard_copy_failed"));
+      return;
+    }
+    const serialized = serializeClipboard(built.payload);
+    writeClipboardData(event.clipboardData, serialized, clipboardOutline(built.payload));
+    event.preventDefault();
+    sessionFor(this.plugin).record({
+      clipId: built.payload.clipId,
+      serialized,
+      mode: "copy",
+      sourceMapPath: this.path,
+      sourceMapId: map.id,
+      nodeIds: visited,
+      notePaths: visited.map((id) => {
+        var _a3, _b3;
+        return (_b3 = (_a3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.path) != null ? _b3 : "";
+      })
+    });
+  }
+  pasteFromClipboard(event) {
+    const { vam } = readClipboardData(event.clipboardData);
+    if (!vam) return;
+    event.preventDefault();
+    if (this.integrationMode || this.outlineImportTarget().map !== "editable") {
+      new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseClipboard(vam);
+    if (!parsed.ok) {
+      new import_obsidian31.Notice(t("ui.clipboard_paste_invalid"));
+      return;
+    }
+    this.enqueue(() => this.pasteBranches(parsed.payload, vam));
+  }
+  /**
+   * Pastes under the selected topic (or as new top-level trees). When the clipboard string is exactly what this plugin
+   * wrote and its source is still this map, the source notes are duplicated (D2); otherwise only the payload's
+   * whitelisted fields make new notes.
+   */
+  async pasteBranches(payload, raw) {
+    var _a2, _b2, _c;
+    const map = this.map;
+    if (!map || this.builtIn || this.integrationMode || map.aim || this.outlineImportTarget().map !== "editable") {
+      new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const target = (_a2 = map.nodes.find((node) => node.id === this.selected)) != null ? _a2 : null;
+    const record = sessionFor(this.plugin).match(raw);
+    let tops = [];
+    const source = record && record.sourceMapPath === this.path && record.sourceMapId === map.id ? record : null;
+    const nodeIds = (_b2 = source == null ? void 0 : source.nodeIds) != null ? _b2 : [];
+    const ids = new Set(nodeIds);
+    const byId = new Map(map.nodes.map((node) => [node.id, node]));
+    const intact = source !== null && nodeIds.length === payload.nodes.length && payload.nodes.every((clip4, index) => {
+      const node = byId.get(nodeIds[index]);
+      if (!node) return false;
+      if (clip4.parent === null) return !node.parentId || !ids.has(node.parentId);
+      return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip4.parent)];
+    });
+    if (source && intact) {
+      const roots = payload.nodes.map((clip4, index) => clip4.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
+      const original = (clipId) => nodeIds[payload.nodes.findIndex((item) => item.id === clipId)];
+      tops = await this.copyBranches(roots, target, {
+        keepTitle: true,
+        relations: payload.relations.map((link) => ({
+          kind: link.kind,
+          from: original(link.from),
+          to: original(link.to),
+          ...link.description !== void 0 ? { description: link.description } : {}
+        }))
+      });
+    } else {
+      const plan = planPaste(payload);
+      if (!plan.ok) {
+        new import_obsidian31.Notice(t("ui.clipboard_paste_invalid"));
+        return;
+      }
+      const repo = this.plugin.repo, settings = this.plugin.settings, before = clone(map), model = target ? inheritModel((await repo.readNote(target.path, map)).model, settings.cliModel) : settings.cliModel;
+      tops = await this.writeNewBranches(before, target, async (copies, _pairs, relations) => {
+        var _a3;
+        for (const item of plan.items) {
+          const node = await repo.createNote(
+            item.title,
+            model,
+            before,
+            this.path,
+            target || item.parent !== null ? "inherited" : "workspace",
+            { topicKind: item.kind, detail: item.body }
+          );
+          node.parentId = item.parent === null ? (_a3 = target == null ? void 0 : target.id) != null ? _a3 : null : copies[item.parent].id;
+          copies.push(node);
+          if (item.kind === "hypothesis" && item.strength) await repo.writeHypothesisStrength(node.path, item.strength);
+        }
+        for (const link of plan.relations)
+          relations.push({
+            kind: link.kind,
+            from: copies[link.from].id,
+            to: copies[link.to].id,
+            ...link.description !== void 0 ? { description: link.description } : {}
+          });
+      });
+    }
+    const placed = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => {
+      var _a3;
+      return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
+    });
+    if (placed) {
+      this.selected = placed.id;
+      this.render();
+      this.focusNode(placed);
+    }
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   copyEntry(entry) {
@@ -46990,17 +47561,17 @@ ${request.requirements}` : preset.text,
    * the provider accepts (`end`), and a result that arrives with the dialog closed is announced by one Notice.
    */
   backgroundHooks(key2, node) {
-    let own;
+    let own2;
     const mapPath = this.path;
     return {
       begin: (controller) => {
-        own = controller;
+        own2 = controller;
         this.startingTasks.set(key2, controller);
         this.render();
       },
       end: () => {
-        if (own && this.startingTasks.get(key2) === own) this.startingTasks.delete(key2);
-        own = void 0;
+        if (own2 && this.startingTasks.get(key2) === own2) this.startingTasks.delete(key2);
+        own2 = void 0;
         if (!this.closed) this.render();
       },
       outlineReady: (outline) => {
@@ -47477,7 +48048,7 @@ ${request.requirements}` : preset.text,
   /** The six relation kinds as a menu; `pick` gets the chosen one. */
   openRelationKindMenu(event, pick) {
     const menu = new import_obsidian31.Menu();
-    for (const kind of RELATION_KINDS)
+    for (const kind of RELATION_KINDS2)
       menu.addItem(
         (item) => item.setTitle(t(RELATION_NAME_KEY[kind])).setIcon("link").onClick(() => pick(kind))
       );
@@ -47635,7 +48206,7 @@ ${request.requirements}` : preset.text,
       kindSelect.setAttr("id", "vam-relation-kind");
       kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
       const blocked = [];
-      for (const kind of RELATION_KINDS) {
+      for (const kind of RELATION_KINDS2) {
         const open = kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
         if (!open) blocked.push(kind);
         const option2 = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
@@ -49102,7 +49673,7 @@ ${request.requirements}` : preset.text,
       (_a2 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a2.call(observer, () => controller.abort());
       accepted();
     };
-    const fail = (message) => {
+    const fail2 = (message) => {
       if (outcome) return;
       outcome = "failed";
       if (this.synthesisTasks.get(path) === task) {
@@ -49134,7 +49705,7 @@ ${request.requirements}` : preset.text,
                 open: () => this.openSynthesisDirections(node, task)
               });
           },
-          fail,
+          fail2,
           markAccepted
         );
       else
@@ -49152,12 +49723,12 @@ ${request.requirements}` : preset.text,
             this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
             if (observer == null ? void 0 : observer.isOpen()) (_c = observer.written) == null ? void 0 : _c.call(observer);
           },
-          fail,
+          fail2,
           markAccepted
         );
-      if (!outcome) fail(t("ui.ai_task_cancelled"));
+      if (!outcome) fail2(t("ui.ai_task_cancelled"));
     } catch (error) {
-      fail(error instanceof Error ? error.message : String(error));
+      fail2(error instanceof Error ? error.message : String(error));
     } finally {
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
       if (this.plugin.activeTasks.get(path) === controller) this.plugin.activeTasks.delete(path);
@@ -49277,7 +49848,7 @@ ${request.requirements}` : preset.text,
     const abortBeforeAcceptance = () => controller.abort();
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let own;
+    let own2;
     let progress;
     const runOptions = {
       ...base,
@@ -49299,11 +49870,11 @@ ${request.requirements}` : preset.text,
       (_a3 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a3.call(observer, () => controller.abort());
       accepted();
     };
-    const fail = (error) => {
+    const fail2 = (error) => {
       const aborted = controller.signal.aborted || error instanceof Error && error.name === "AbortError";
       const task = this.integrationTask;
       if (aborted && (observer == null ? void 0 : observer.isOpen())) {
-        if (own && this.integrationTask === own) this.integrationTask = null;
+        if (own2 && this.integrationTask === own2) this.integrationTask = null;
         this.render();
         failed(t("ui.research_stopped_existing_content_was_preserved"));
         return;
@@ -49356,7 +49927,7 @@ ${request.requirements}` : preset.text,
         reasoning: chosen.reasoning
       };
       this.integrationTask = task;
-      own = task;
+      own2 = task;
       this.render();
       const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
       progress = taskProgress;
@@ -49419,7 +49990,7 @@ ${request.requirements}` : preset.text,
           }
         });
     } catch (error) {
-      fail(error);
+      fail2(error);
     } finally {
       progress == null ? void 0 : progress.end();
       this.selectionStarting = false;
@@ -50656,11 +51227,11 @@ ${note.detail.trim()}` : "",
     const refTitles = this.chatRefTitles(result.actions);
     const items = result.actions.map((action) => this.chatActionLabel(action, refTitles));
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
-      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
-      return own.length ? [
+      const own2 = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      return own2.length ? [
         {
-          label: t(`ui.map_chat_plan_group_${group}_0`, own.length),
-          items: own,
+          label: t(`ui.map_chat_plan_group_${group}_0`, own2.length),
+          items: own2,
           // Removing cards is said in words as well as in the warning colour.
           ...group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {}
         }
@@ -50933,7 +51504,7 @@ ${note.detail.trim()}` : "",
     let wrote = false;
     let noNewMap = false;
     let noNewMapReason = "ui.map_chat_skip_map_not_created";
-    const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    const own2 = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
     const adds = result.actions.filter((action) => action.kind === "add_child").length;
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
@@ -50961,7 +51532,7 @@ ${note.detail.trim()}` : "",
           if (outcome.status === "done") {
             wrote = true;
             touched.add(anchor.path);
-            own.topicHashes = {};
+            own2.topicHashes = {};
           } else {
             noNewMap = true;
             if ("created" in outcome && outcome.created) noNewMapReason = "ui.map_chat_skip_map_not_opened";
@@ -50972,7 +51543,7 @@ ${note.detail.trim()}` : "",
         const box = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, own, same2, run);
+            box.outcome = await this.applyChatWrite(action, own2, same2, run);
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
@@ -54298,9 +54869,9 @@ function detailCheckOf(extraction) {
 var svgCheckOf = (svg) => segmentHash(canonicalElement(svg));
 function normalizeSvgId(translated, originalId) {
   var _a2, _b2;
-  const own = translated.getAttribute("id");
-  if (!own || !originalId || own === originalId) return false;
-  const fix = (text11) => text11.split(own).join(originalId);
+  const own2 = translated.getAttribute("id");
+  if (!own2 || !originalId || own2 === originalId) return false;
+  const fix = (text11) => text11.split(own2).join(originalId);
   for (const node of flatNodes(translated)) {
     if (node.nodeType === TEXT_NODE2) node.nodeValue = fix((_a2 = node.nodeValue) != null ? _a2 : "");
     else if (node.nodeType === ELEMENT_NODE2) {
@@ -55459,8 +56030,8 @@ function originalLanguage(source, uiLanguage) {
     const detected = detectAimContentLanguage(text11);
     return detected === void 0 || isFollowInputLanguage(detected) ? SHARE_UNKNOWN_LANGUAGE : detected;
   };
-  const own = [source.map.title, source.goal].find(hasLetter);
-  if (own !== void 0) return named(own);
+  const own2 = [source.map.title, source.goal].find(hasLetter);
+  if (own2 !== void 0) return named(own2);
   const found = /* @__PURE__ */ new Set();
   for (const note of Array.from(source.notes.values()).slice(0, 30))
     for (const text11 of [note.title, note.summary]) if (hasLetter(text11)) found.add(named(text11));

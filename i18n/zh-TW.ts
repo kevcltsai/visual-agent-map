@@ -2123,5 +2123,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.translate_diagrams_kept_0": "{0} 張圖表無法翻譯，保留原本的標籤。",
   "share.translate_images_note": "圖片裡的文字不會翻譯。",
   "share.translate_total_size_0": "加上這些語言後的檔案大小：{0}",
-  "share.translate_languages_included_0": "檔案包含的語言：{0}"
+  "share.translate_languages_included_0": "檔案包含的語言：{0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "無法把選取的內容複製成分支。",
+  "ui.clipboard_paste_readonly": "這張圖在這裡是唯讀的，沒有貼上任何內容。",
+  "ui.clipboard_paste_invalid": "剪貼簿內容不是有效的分支，沒有貼上任何內容。"
 };

@@ -2121,5 +2121,9 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.translate_diagrams_kept_0": "{0} 张图表无法翻译，保留原本的标签。",
   "share.translate_images_note": "图片里的文字不会翻译。",
   "share.translate_total_size_0": "加上这些语言后的文件大小：{0}",
-  "share.translate_languages_included_0": "文件包含的语言：{0}"
+  "share.translate_languages_included_0": "文件包含的语言：{0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "无法把选择的内容复制成分支。",
+  "ui.clipboard_paste_readonly": "这张图在这里是只读的，没有粘贴任何内容。",
+  "ui.clipboard_paste_invalid": "剪贴板内容不是有效的分支，没有粘贴任何内容。"
 };

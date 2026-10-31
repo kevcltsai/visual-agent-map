@@ -8,7 +8,9 @@ export class NameModal extends Modal {
     app: App,
     private titleText: string,
     private value: string,
-    private submit: (value: string) => void
+    private submit: (value: string) => void,
+    /** `allowEmpty` lets the field stay blank (an optional label); the default still refuses an empty name. */
+    private options: { allowEmpty?: boolean } = {}
   ) {
     super(app);
   }
@@ -22,7 +24,7 @@ export class NameModal extends Modal {
     const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
     const save = (): void => {
       const value = input.value.trim();
-      if (!value || titleProblemText(value)) return;
+      if (this.options.allowEmpty ? !!value && !!titleProblemText(value) : !value || !!titleProblemText(value)) return;
       this.close();
       this.submit(value);
     };
@@ -30,8 +32,9 @@ export class NameModal extends Modal {
     const check = (): void => {
       const empty = !input.value.trim();
       const problem = empty ? "" : titleProblemText(input.value);
-      saveButton.disabled = empty || !!problem;
-      status.setText(empty ? t("ui.name_required") : problem);
+      const blankOk = empty && !!this.options.allowEmpty;
+      saveButton.disabled = (empty && !blankOk) || !!problem;
+      status.setText(empty && !blankOk ? t("ui.name_required") : problem);
     };
     input.addEventListener("input", check);
     input.addEventListener("keydown", event => {

@@ -73,9 +73,11 @@ test('S1: spacing compact and spacious survive a round trip; standard, huge and 
   // An invalid direction still removes the whole layout, spacing included.
   assert.equal('layout' in roundTrip({ direction: 'sideways', spacing: 'compact' }), false);
   assert.equal('layout' in roundTrip({ spacing: 'compact' }), false);
-  // The arrangements whose engines do not exist yet are not accepted by parse; each engine packet adds its own value.
+  // Every arrangement has an engine now, so parse accepts all eight; only unknown names are dropped.
   for (const direction of ['fishbone'])
-    assert.equal('layout' in roundTrip({ direction, spacing: 'compact' }), false, direction);
+    assert.deepEqual(plain(roundTrip({ direction, spacing: 'compact' }).layout), { direction, spacing: 'compact' }, direction);
+  for (const direction of ['zigzag', 'RIGHT', 3, null, ['right']])
+    assert.equal('layout' in roundTrip({ direction, spacing: 'compact' }), false, String(direction));
 });
 
 test('S2: passing {direction:"right"} gives the same coordinates as "right" and as no argument (the G0 golden)', () => {
@@ -103,7 +105,7 @@ test('S2b: layoutOf returns direction and stored spacing; AIM maps and bad value
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'standard' } }), { direction: 'left' });
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'compact' }, aim: { version: 1 } }), { direction: 'right' });
   assert.deepEqual(layoutOf({ layout: { direction: 'radial', spacing: 'huge' } }), { direction: 'radial' });
-  assert.deepEqual(layoutOf({ layout: { direction: 'fishbone', spacing: 'huge' } }), { direction: 'right' });
+  assert.deepEqual(layoutOf({ layout: { direction: 'fishbone', spacing: 'huge' } }), { direction: 'fishbone' });
   assert.deepEqual(layoutOf({ layout: { direction: 'balanced', spacing: 'huge' } }), { direction: 'balanced' });
   assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left', spacing: 'compact' } }), 'left');
 });
@@ -343,7 +345,8 @@ test('P1 data: down and up are stored and read back; layoutOf keeps them, layout
   assert.equal(layout.isLayoutKind('balanced'), true);
   assert.equal(layout.isLayoutKind('radial'), true);
   assert.equal(layout.isLayoutKind('timeline'), true);
-  assert.equal(layout.isLayoutKind('fishbone'), false);
+  assert.equal(layout.isLayoutKind('fishbone'), true);
+  assert.equal(layout.isLayoutKind('zigzag'), false);
 });
 
 // ---- P2 (ticket 21): balanced ----
@@ -793,4 +796,325 @@ test('P3 navigation: radial and timeline arrow keys follow the right layout', ()
   for (const direction of ['radial', 'timeline'])
     for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
       assert.equal(neighborKey(direction, key), neighborKey('right', key), `${direction} ${key}`);
+});
+
+// ---- P4 (ticket 40): fishbone ----
+const fishSpec = spacing => ({ direction: 'fishbone', spacing });
+const K = 1 / Math.tan(Math.PI / 3);
+const rootsOf = list => list.filter(item => !item.parentId);
+const centreY = (item, heightOf) => item.y + heightIn([], heightOf)(item.id) / 2;
+const treeOf = (list, rootId) => { const by = new Map(list.map(item => [item.id, item])); return list.filter(item => { let n = item; while (n.parentId) n = by.get(n.parentId); return n.id === rootId; }); };
+
+test('F-1: fishbone never overlaps on every fixture at three spacings, is repeatable, and has the head at the right end', () => {
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries(everyTree())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, fishSpec(spacing));
+      assert.equal(placed.length, nodes.length, name);
+      assert.ok(placed.every(item => Number.isFinite(item.x) && Number.isFinite(item.y)), `${name} ${spacing} finite`);
+      assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${name} ${spacing}`);
+      assert.deepEqual(snap(layout.arrangeMap(nodes, undefined, heightOf, fishSpec(spacing))), snap(placed), `${name} ${spacing} repeatable`);
+      if (nodes.length > 2) assert.notDeepEqual(snap(placed), snap(layout.arrangeMap(nodes, undefined, heightOf, { direction: 'right', spacing })), `${name} ${spacing} is its own arrangement`);
+      const heads = rootsOf(placed);
+      assert.equal(new Set(heads.map(item => item.x)).size, 1, `${name} ${spacing} heads share one x`);
+      for (const head of heads) {
+        const own = treeOf(placed, head.id);
+        for (const item of own) if (item.id !== head.id) assert.ok(item.x + WIDTH <= head.x, `${name} ${spacing} ${item.id} is left of the head`);
+        // The first-level topics alternate above and below the spine, the first one above.
+        const topics = placed.filter(item => item.parentId === head.id);
+        topics.forEach((topic, index) => {
+          const above = centreY(topic, heightOf) < centreY(head, heightOf);
+          assert.equal(above, index % 2 === 0, `${name} ${spacing} ${topic.id} side`);
+        });
+        // Each side is far enough from the spine that the topics never sit on it.
+        for (const item of own) if (item.id !== head.id) assert.ok(item.y + heightIn([], heightOf)(item.id) <= centreY(head, heightOf) || item.y >= centreY(head, heightOf), `${name} ${spacing} ${item.id} clears the spine`);
+      }
+    }
+  assert.deepEqual(snap(layout.arrangeMap([], undefined, undefined, 'fishbone')), []);
+  assert.deepEqual(snap(layout.arrangeMap([node('r')], undefined, undefined, 'fishbone')), [['r', 80, 80]]);
+  const folded = wide().map(item => (item.id === 't4' ? { ...item, collapsed: true } : item));
+  const hidden = new Set(folded.filter(item => item.parentId === 't4').map(item => item.id));
+  const placed = layout.arrangeMap(folded, hidden, wideHeight, fishSpec('standard'));
+  assert.ok(noOverlap(placed.filter(item => !hidden.has(item.id)), wideHeight, 24));
+  for (const id of hidden) assert.deepEqual([placed.find(i => i.id === id).x, placed.find(i => i.id === id).y], [0, 0]);
+});
+
+test('F-1b: adding topics to a fishbone map re-arranges the whole map without overlap and keeps the first root in place', () => {
+  for (const spacing of SPACINGS) {
+    const spec = fishSpec(spacing);
+    const base = layout.arrangeMap(wide(), undefined, wideHeight, spec);
+    const grown = [...base, node('n1', 'root'), node('n2', 'root'), node('n1a', 'n1')];
+    const heightOf = id => wideHeight(id) ?? 150;
+    const out = layout.arrangeNewBranch(grown, 'root', new Set(['n1', 'n2', 'n1a']), heightOf, undefined, spec);
+    assert.equal(out.length, grown.length);
+    assert.ok(noOverlap(out, heightOf, GAPS[spacing]), spacing);
+    const rootOf = list => list.find(item => item.id === 'root');
+    assert.deepEqual([rootOf(out).x, rootOf(out).y], [rootOf(base).x, rootOf(base).y], `${spacing} root stays`);
+    assert.notDeepEqual(snap(out.filter(item => base.some(b => b.id === item.id))), snap(base), `${spacing} older cards were arranged again`);
+    const tree = [...base, node('z'), node('z1', 'z')];
+    const placed = layout.arrangeNewTree(tree, 'z', new Set(['z', 'z1']), heightOf, spec);
+    assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${spacing} new tree`);
+    for (const item of base) assert.deepEqual([placed.find(o => o.id === item.id).x, placed.find(o => o.id === item.id).y], [item.x, item.y]);
+  }
+});
+
+test('F-2: fishbone bones are 60 degree straight lines from the topic card edge midpoint to the spine; ribs run from the bone to the detail card edge midpoint', () => {
+  const near = (a, b, message) => assert.ok(Math.abs(a - b) < 1e-6, `${message}: ${a} vs ${b}`);
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries(everyTree())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, fishSpec(spacing));
+      const by = new Map(placed.map(item => [item.id, boxOf(item, heightOf)]));
+      const bone = new Map();
+      for (const item of placed) {
+        if (!item.parentId) continue;
+        const p = by.get(item.parentId), c = by.get(item.id);
+        const parentItem = placed.find(o => o.id === item.parentId);
+        const depth = depthOf(placed, item.id);
+        const path = geometry.treeEdgePathData(p, c, 'fishbone', depth);
+        const label = `${name} ${spacing} ${item.id}`;
+        if (depth === 1) {
+          assert.match(path, /^M \S+ \S+ L \S+ \S+$/, label);
+          const [jx, jy] = firstPoint(path), [ax, ay] = lastPoint(path);
+          const above = c.y + c.height / 2 < p.y + p.height / 2;
+          near(jy, p.y + p.height / 2, `${label} joint is on the spine`);
+          assert.ok(jx <= p.x, `${label} joint is left of the head`);
+          near(ax, c.x + c.width / 2, `${label} bone meets the card edge midpoint x`);
+          near(ay, above ? c.y + c.height : c.y, `${label} bone meets the card edge midpoint y`);
+          near(Math.abs(jy - ay) / Math.abs(jx - ax), Math.tan(Math.PI / 3), `${label} slope`);
+          assert.ok(jx > ax, `${label} the bone leans toward the head`);
+          bone.set(item.id, { jx, jy, ax, ay });
+        } else if (depth === 2) {
+          const { jx, jy, ax, ay } = bone.get(parentItem.id);
+          const [sx, sy] = firstPoint(path), [ex, ey] = lastPoint(path);
+          assert.match(path, /^M \S+ \S+ L \S+ \S+$/, label);
+          near(ex, c.x + c.width, `${label} rib meets the card right edge`);
+          near(ey, c.y + c.height / 2, `${label} rib meets the card edge midpoint`);
+          near(sy, ey, `${label} rib is horizontal`);
+          // The rib starts on the bone: the point lies on the segment from the topic card to the spine joint.
+          near((sx - ax) * (jy - ay), (sy - ay) * (jx - ax), `${label} rib starts on the bone line`);
+          assert.ok(sy >= Math.min(ay, jy) - 1e-6 && sy <= Math.max(ay, jy) + 1e-6, `${label} rib starts within the bone`);
+          assert.ok(sx > ex, `${label} rib has length`);
+        } else assert.equal(path, geometry.treeEdgePathData(p, c, 'left'), `${label} deeper edges curve to the left`);
+      }
+    }
+});
+
+test('P4 data: fishbone is stored and read back; the AIM map and layoutDirectionOf still answer right; arrow keys follow the right layout', () => {
+  for (const spacing of [undefined, 'compact', 'spacious']) {
+    const value = spacing ? { direction: 'fishbone', spacing } : { direction: 'fishbone' };
+    assert.deepEqual(plain(roundTrip(value).layout), value);
+    assert.deepEqual(layoutOf({ layout: value }), value);
+    assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
+  }
+  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'fishbone' } }), 'right');
+  const { neighborKey } = nav();
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
+    assert.equal(neighborKey('fishbone', key), neighborKey('right', key), key);
+});
+
+// ---- P4 (ticket 41): per-branch layout ----
+const withLayout = (list, id, direction) => list.map(item => (item.id === id ? { ...item, layout: { direction } } : item));
+const without = list => list.map(({ layout: _unused, ...rest }) => rest);
+/** The first-level topic with the most cards below it, which makes the biggest block. */
+const bigTopic = list => {
+  const root = rootsOf(list)[0];
+  return list.filter(item => item.parentId === root.id).map(item => [item, subtreeIds(list, item.id).length]).sort((a, b) => b[1] - a[1])[0][0];
+};
+const COLUMNS = { compact: 330, standard: 360, spacious: 420 };
+const boundsOf = (list, ids, heightOf) => {
+  const by = new Map(list.map(item => [item.id, item]));
+  const high = heightIn(list, heightOf);
+  const cards = ids.map(id => by.get(id));
+  return { left: Math.min(...cards.map(c => c.x)), right: Math.max(...cards.map(c => c.x + WIDTH)), top: Math.min(...cards.map(c => c.y)), bottom: Math.max(...cards.map(c => c.y + high(c.id))) };
+};
+
+test('C-1: a down branch in a right map lies under its head without overlapping, and the block starts one column right of the parent', () => {
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries({ wide: [wide(), wideHeight], sample: [sample(), sampleHeight], sized: [sized(), sizedHeight] })) {
+      const head = bigTopic(nodes);
+      const spec = { direction: 'right', spacing };
+      const plainOut = layout.arrangeMap(nodes, undefined, heightOf, spec);
+      const out = layout.arrangeMap(withLayout(nodes, head.id, 'down'), undefined, heightOf, spec);
+      const label = `${name} ${spacing}`;
+      assert.ok(noOverlap(out, heightOf, GAPS[spacing]), label);
+      assert.notDeepEqual(snap(out), snap(plainOut), `${label} the override changes the arrangement`);
+      const by = new Map(out.map(item => [item.id, item]));
+      const block = subtreeIds(out, head.id);
+      for (const item of out) if (item.parentId === head.id) assert.ok(item.y > by.get(head.id).y, `${label} ${item.id} is below the head`);
+      const box = boundsOf(out, block, heightOf);
+      const parent = by.get(head.parentId);
+      assert.equal(box.left, parent.x + COLUMNS[spacing], `${label} block starts at the column right of the parent`);
+      // Cards outside the block keep the right layout: column by depth.
+      for (const item of out) if (!block.includes(item.id)) assert.equal(item.x, 80 + depthOf(out, item.id) * COLUMNS[spacing], `${label} ${item.id}`);
+    }
+});
+
+test('C-1b: every map direction with every branch direction (not the opposite one) never overlaps; nested overrides too', () => {
+  const opposite = { right: 'left', left: 'right', down: 'up', up: 'down' };
+  for (const spacing of SPACINGS)
+    for (const mapDirection of ['right', 'left', 'down', 'up'])
+      for (const branch of ['right', 'left', 'down', 'up'].filter(d => d !== opposite[mapDirection]))
+        for (const [name, [nodes, heightOf]] of Object.entries({ wide: [wide(), wideHeight], sample: [sample(), sampleHeight], sized: [sized(), sizedHeight], converging: [converging(), undefined] })) {
+          const head = bigTopic(nodes);
+          const spec = { direction: mapDirection, spacing };
+          const out = layout.arrangeMap(withLayout(nodes, head.id, branch), undefined, heightOf, spec);
+          assert.equal(out.length, nodes.length);
+          assert.ok(noOverlap(out, heightOf, GAPS[spacing]), `${name} ${mapDirection}+${branch} ${spacing}`);
+          if (branch !== mapDirection) assert.notDeepEqual(snap(out), snap(layout.arrangeMap(nodes, undefined, heightOf, spec)), `${name} ${mapDirection}+${branch} ${spacing} the override takes effect`);
+          // A nested override: a deeper branch inside the block turns the other way.
+          const inner = nodes.find(item => item.parentId === head.id && nodes.some(o => o.parentId === item.id));
+          if (inner) {
+            const turn = ['right', 'down'].includes(branch) ? 'down' : 'up';
+            const nested = layout.arrangeMap(withLayout(withLayout(nodes, head.id, branch), inner.id, turn === branch ? 'right' : turn), undefined, heightOf, spec);
+            assert.ok(noOverlap(nested, heightOf, GAPS[spacing]), `${name} ${mapDirection}+${branch}+nested ${spacing}`);
+          }
+        }
+  // Two sibling branches with different directions, and an override on a branch of a second root.
+  const nodes = twoRoots();
+  const set = withLayout(withLayout(withLayout(nodes, 'a', 'down'), 'c', 'up'), 'b3', 'left');
+  for (const spacing of SPACINGS) assert.ok(noOverlap(layout.arrangeMap(set, undefined, twoRootsHeight, { direction: 'right', spacing }), twoRootsHeight, GAPS[spacing]), spacing);
+});
+
+test('C-2: an up branch on the left half of a balanced map stays on the left, above its head, without overlap', () => {
+  for (const spacing of SPACINGS) {
+    const spec = balancedSpec(spacing);
+    const base = layout.arrangeMap(wide(), undefined, wideHeight, spec);
+    const root = base.find(item => item.id === 'root');
+    const lefts = base.filter(item => item.parentId === 'root' && item.x < root.x);
+    assert.ok(lefts.length, 'there is a left side');
+    const head = lefts.map(item => [item, subtreeIds(base, item.id).length]).sort((a, b) => b[1] - a[1])[0][0];
+    const out = layout.arrangeMap(withLayout(base, head.id, 'up'), undefined, wideHeight, spec);
+    assert.ok(noOverlap(out, wideHeight, GAPS[spacing]), spacing);
+    const by = new Map(out.map(item => [item.id, item]));
+    const block = subtreeIds(out, head.id);
+    const box = boundsOf(out, block, wideHeight);
+    assert.equal(box.right, by.get('root').x - COLUMNS[spacing] + WIDTH, `${spacing} the block ends at the column left of the root`);
+    for (const item of out) if (item.parentId === head.id) assert.ok(item.y < by.get(head.id).y, `${spacing} ${item.id} is above the head`);
+    const sidesAfter = out.filter(item => item.parentId === 'root').map(item => item.x < by.get('root').x ? 'left' : 'right');
+    assert.deepEqual(sidesAfter, base.filter(item => item.parentId === 'root').map(item => item.x < root.x ? 'left' : 'right'), `${spacing} no topic changes side`);
+    // The same on the right half, with a down branch.
+    const rights = base.filter(item => item.parentId === 'root' && item.x > root.x);
+    const rhead = rights[0];
+    const down = layout.arrangeMap(withLayout(base, rhead.id, 'down'), undefined, wideHeight, spec);
+    assert.ok(noOverlap(down, wideHeight, GAPS[spacing]), `${spacing} right half down`);
+  }
+});
+
+test('C-3: removing the override and arranging again gives exactly the arrangement without it', () => {
+  for (const spacing of SPACINGS)
+    for (const mapDirection of ['right', 'left', 'down', 'up']) {
+      const spec = { direction: mapDirection, spacing };
+      const head = bigTopic(wide());
+      const baseline = layout.arrangeMap(wide(), undefined, wideHeight, spec);
+      const direction = mapDirection === 'right' || mapDirection === 'left' ? 'down' : 'right';
+      const overridden = layout.arrangeMap(withLayout(wide(), head.id, direction), undefined, wideHeight, spec);
+      assert.notDeepEqual(snap(overridden), snap(baseline), `${mapDirection} ${spacing} the override takes effect`);
+      assert.deepEqual(snap(layout.arrangeMap(without(overridden), undefined, wideHeight, spec)), snap(baseline), `${mapDirection} ${spacing}`);
+    }
+  // Radial, timeline and fishbone maps ignore overrides (decision D9).
+  for (const direction of ['radial', 'timeline', 'fishbone']) {
+    const head = bigTopic(wide());
+    assert.deepEqual(snap(layout.arrangeMap(withLayout(wide(), head.id, 'down'), undefined, wideHeight, direction)), snap(layout.arrangeMap(wide(), undefined, wideHeight, direction)), direction);
+  }
+});
+
+test('C-4: parseMap deletes a node layout that is not one of right, left, down or up, sits on a root, or points opposite its parent', () => {
+  const parse = (nodes, extra = {}) => {
+    const out = core.parseMap(core.serializeMap(doc({ nodes, ...extra })));
+    return Object.fromEntries(out.nodes.map(item => [item.id, item.layout]));
+  };
+  const tree = overrides => [node('r', null, overrides.r ? { layout: overrides.r } : {}), ...['a', 'b', 'c'].map(id => node(id, 'r', overrides[id] ? { layout: overrides[id] } : {})), node('a1', 'a', overrides.a1 ? { layout: overrides.a1 } : {})];
+  // Invalid values.
+  for (const bad of [{ direction: 'radial' }, { direction: 'timeline' }, { direction: 'fishbone' }, { direction: 'balanced' }, { direction: 'sideways' }, { direction: 3 }, { spacing: 'compact' }, {}, 3, 'down', [], [{ direction: 'down' }], null, true])
+    assert.equal(parse(tree({ a: bad })).a, undefined, JSON.stringify(bad));
+  // Valid values stay; stray keys inside are dropped.
+  for (const direction of ['right', 'left', 'down', 'up']) assert.deepEqual(plain(parse(tree({ a: { direction } }), { layout: { direction: 'balanced' } }).a), { direction }, direction);
+  assert.deepEqual(plain(parse(tree({ a: { direction: 'down', spacing: 'compact', extra: 1 } })).a), { direction: 'down' });
+  // A root has no branch layout.
+  assert.equal(parse(tree({ r: { direction: 'down' } })).r, undefined);
+  // The opposite of the parent's direction is deleted; the same direction and the sideways ones stay.
+  const opposite = { right: 'left', left: 'right', down: 'up', up: 'down' };
+  for (const mapDirection of ['right', 'left', 'down', 'up']) {
+    const parsed = parse(tree({ a: { direction: opposite[mapDirection] }, b: { direction: mapDirection }, c: { direction: mapDirection === 'right' || mapDirection === 'left' ? 'down' : 'right' } }), { layout: { direction: mapDirection } });
+    assert.equal(parsed.a, undefined, `${mapDirection} opposite`);
+    assert.deepEqual(plain(parsed.b), { direction: mapDirection }, `${mapDirection} same`);
+    assert.ok(parsed.c, `${mapDirection} sideways`);
+  }
+  // A map without a stored layout is a right map.
+  assert.equal(parse(tree({ a: { direction: 'left' } })).a, undefined);
+  // The parent's direction is the nearest override above: under a down branch, up is opposite and right is not.
+  const nested = parse(tree({ a: { direction: 'down' }, a1: { direction: 'up' } }));
+  assert.deepEqual(plain(nested.a), { direction: 'down' });
+  assert.equal(nested.a1, undefined);
+  assert.deepEqual(plain(parse(tree({ a: { direction: 'down' }, a1: { direction: 'right' } })).a1), { direction: 'right' });
+  // An override that was deleted does not decide for its children: the child of a deleted 'left' still follows the map.
+  assert.equal(parse(tree({ a: { direction: 'left' }, a1: { direction: 'left' } })).a1, undefined);
+  // In a balanced map the opposite is the other way than the topic's side; a topic near the root has no side yet.
+  const sided = (x, direction) => [node('r', null, { x: 1000 }), node('a', 'r', { x, layout: { direction } }), node('a1', 'a', { x: x + (x > 1000 ? 360 : -360) })];
+  const sidedParse = (x, direction) => core.parseMap(core.serializeMap(doc({ nodes: sided(x, direction), layout: { direction: 'balanced' } }))).nodes[1].layout;
+  assert.equal(sidedParse(1400, 'left'), undefined, 'right half: left is opposite');
+  assert.deepEqual(plain(sidedParse(1400, 'right')), { direction: 'right' });
+  assert.equal(sidedParse(600, 'right'), undefined, 'left half: right is opposite');
+  assert.deepEqual(plain(sidedParse(600, 'up')), { direction: 'up' });
+  assert.deepEqual(plain(sidedParse(1050, 'left')), { direction: 'left' }, 'a topic that is too close to the root has no side');
+  // Radial, timeline and fishbone maps keep valid values (ignored when arranging) and skip the opposite check.
+  for (const direction of ['radial', 'timeline', 'fishbone'])
+    assert.deepEqual(plain(parse(tree({ a: { direction: 'left' } }), { layout: { direction } }).a), { direction: 'left' }, direction);
+  // The map-level check is as strict as before.
+  assert.equal('layout' in roundTrip({ direction: 'zigzag' }), false);
+});
+
+test('C-5: layoutDirectionFor finds the nearest branch override above a card, the card itself included', () => {
+  const nodes = withLayout(withLayout([node('r'), node('a', 'r'), node('a1', 'a'), node('a1x', 'a1'), node('b', 'r'), node('b1', 'b')], 'a', 'down'), 'a1', 'left');
+  const dir = (id, mapDirection = 'right') => layout.layoutDirectionFor(nodes, id, mapDirection);
+  assert.equal(dir('r'), 'right');
+  assert.equal(dir('b'), 'right');
+  assert.equal(dir('b1', 'balanced'), 'balanced');
+  assert.equal(dir('a'), 'down', 'the head grows in its own direction');
+  assert.equal(dir('a1'), 'left', 'the nearest override wins');
+  assert.equal(dir('a1x'), 'left');
+  assert.equal(dir('missing'), 'right');
+  for (const mapDirection of ['radial', 'timeline', 'fishbone']) assert.equal(dir('a1x', mapDirection), mapDirection, mapDirection);
+  // A root never carries an override, and a cycle does not hang.
+  assert.equal(layout.layoutDirectionFor(withLayout([node('r')], 'r', 'down'), 'r', 'right'), 'right');
+  const cyc = withLayout([node('x', 'y'), node('y', 'x')], 'x', 'up');
+  assert.equal(layout.layoutDirectionFor(cyc, 'y', 'right'), 'up');
+  assert.equal(layout.layoutDirectionFor(without(cyc), 'y', 'right'), 'right');
+});
+
+test('C-6: a new branch inside an override branch grows in that branch\'s direction and older cards stay put', () => {
+  for (const spacing of SPACINGS) {
+    const spec = { direction: 'right', spacing };
+    const head = bigTopic(wide());
+    const base = layout.arrangeMap(withLayout(wide(), head.id, 'down'), undefined, wideHeight, spec);
+    const kid = base.find(item => item.parentId === head.id);
+    const grown = [...base, node('n1', kid.id), node('n2', kid.id), node('n1a', 'n1')];
+    const heightOf = id => wideHeight(id) ?? 150;
+    const out = layout.arrangeNewBranch(grown, kid.id, new Set(['n1', 'n2', 'n1a']), heightOf, undefined, spec);
+    assert.deepEqual(snap(out.filter(item => base.some(b => b.id === item.id))), snap(base), `${spacing} older cards stay`);
+    assert.ok(noOverlap(out, heightOf, GAPS[spacing]), spacing);
+    const by = new Map(out.map(item => [item.id, item]));
+    assert.ok(by.get('n1').y > by.get(kid.id).y, `${spacing} the new card is below its parent, as in a down branch`);
+    // Under the head itself too.
+    const more = [...base, node('h1', head.id)];
+    const placed = layout.arrangeNewBranch(more, head.id, new Set(['h1']), heightOf, undefined, spec);
+    assert.ok(placed.find(item => item.id === 'h1').y > placed.find(item => item.id === head.id).y, `${spacing} under the head`);
+    assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${spacing} under the head`);
+  }
+  // In a balanced map a branch inside an override follows the override, not the side.
+  const balanced = layout.arrangeMap(wide(), undefined, wideHeight, balancedSpec('standard'));
+  const left = balanced.find(item => item.parentId === 'root' && item.x < balanced.find(o => o.id === 'root').x && balanced.some(o => o.parentId === item.id));
+  const set = layout.arrangeMap(withLayout(balanced, left.id, 'up'), undefined, wideHeight, balancedSpec('standard'));
+  const out = layout.arrangeNewBranch([...set, node('q', left.id)], left.id, new Set(['q']), wideHeight, undefined, balancedSpec('standard'));
+  assert.ok(out.find(item => item.id === 'q').y < out.find(item => item.id === left.id).y, 'above the head');
+});
+
+test('C-4b: cleanBranchLayouts keeps none on an AIM map and is safe on long parent chains', () => {
+  const compose = load('layouts/compose.ts');
+  const chain = Array.from({ length: 5000 }, (_, i) => node(`n${i}`, i ? `n${i - 1}` : null, { layout: { direction: 'down' } }));
+  compose.cleanBranchLayouts(chain, 'right', false);
+  assert.equal(chain[0].layout, undefined, 'the root has none');
+  assert.ok(chain.slice(1).every(item => item.layout.direction === 'down'));
+  const aimNodes = [node('r'), node('a', 'r', { layout: { direction: 'down' } })];
+  compose.cleanBranchLayouts(aimNodes, 'right', true);
+  assert.equal(aimNodes[1].layout, undefined);
 });

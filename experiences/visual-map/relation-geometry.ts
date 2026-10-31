@@ -103,10 +103,17 @@ export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number;
  * edge midpoint to the child's bottom edge midpoint.
  * "radial" runs between the nearest edge midpoints of the two cards (see `nearestSides`), so a ring of children fans out
  * in every direction.
+ * "fishbone" draws straight lines. A first-level topic (depth 1) is joined by its bone: from the spine point on the
+ * head's middle line to the midpoint of the topic card's edge that faces the spine, leaning 60 degrees towards the head. A
+ * detail of a topic (depth 2) hangs on that bone by a horizontal rib that ends at the right edge midpoint of the detail
+ * card; whether the topic is above or below the spine follows from where the detail stands. Deeper cards (depth 3 and more)
+ * use the "left" curve. `depth` is the child's distance from its root and is only read for "fishbone".
  * "balanced" uses the "left" curve when the child's centre is left of the parent's centre and the "right" curve otherwise.
  */
-export function treeEdgePathData(parent: RelationBox, child: RelationBox, direction: LayoutKind): string {
+export function treeEdgePathData(parent: RelationBox, child: RelationBox, direction: LayoutKind, depth = 1): string {
   if (direction === "radial") return relationPathData(parent, child);
+  if (direction === "fishbone")
+    return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
   if (direction === "down" || direction === "up") {
     const x1 = parent.x + parent.width / 2,
       x2 = child.x + child.width / 2,
@@ -131,4 +138,26 @@ export function treeEdgePathData(parent: RelationBox, child: RelationBox, direct
     x2 = child.x,
     bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+}
+
+/** Horizontal run of a 60 degree bone for each unit of height it climbs (the same angle the fishbone layout uses). */
+const BONE_RUN = 1 / Math.tan(Math.PI / 3);
+
+/** The straight line of a fishbone: a bone for a first-level topic, a rib for one of its details. */
+function fishboneEdgePathData(parent: RelationBox, child: RelationBox, depth: number): string {
+  const parentY = parent.y + parent.height / 2,
+    childY = child.y + child.height / 2;
+  if (depth <= 1) {
+    const above = childY < parentY,
+      x = child.x + child.width / 2,
+      y = above ? child.y + child.height : child.y,
+      jointX = x + Math.abs(parentY - y) * BONE_RUN;
+    return `M ${jointX} ${parentY} L ${x} ${y}`;
+  }
+  // The topic is the parent: above the spine its details lie below it, and the bone leaves its bottom edge midpoint.
+  const above = childY > parentY,
+    x = parent.x + parent.width / 2,
+    y = above ? parent.y + parent.height : parent.y,
+    boneX = x + Math.abs(childY - y) * BONE_RUN;
+  return `M ${boneX} ${childY} L ${child.x + child.width} ${childY}`;
 }

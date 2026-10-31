@@ -1,4 +1,6 @@
 import { assignSides, greedySides, sideFromOffset, type BalancedSide } from "./layouts/balanced";
+import { allowsBranchLayout, branchDirectionOf, composePositions, layoutDirectionFor } from "./layouts/compose";
+import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
 import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
@@ -36,8 +38,8 @@ export interface MapLayout {
   spacing?: LayoutSpacing;
 }
 
-/** The arrangements whose engines exist, so a map file may store them; each engine packet adds its own value. */
-export function isLayoutKind(value: unknown): value is Exclude<LayoutKind, "fishbone"> {
+/** The arrangements a map file may store: every one of them has an engine. */
+export function isLayoutKind(value: unknown): value is LayoutKind {
   return (
     value === "right" ||
     value === "left" ||
@@ -45,9 +47,13 @@ export function isLayoutKind(value: unknown): value is Exclude<LayoutKind, "fish
     value === "up" ||
     value === "balanced" ||
     value === "radial" ||
-    value === "timeline"
+    value === "timeline" ||
+    value === "fishbone"
   );
 }
+
+/** The direction the cards below a card grow in: the nearest branch layout at or above it, else the map's direction. */
+export { layoutDirectionFor };
 
 export function isLayoutDirection(value: unknown): value is LayoutDirection {
   return value === "right" || value === "left";
@@ -266,35 +272,29 @@ function positions(
   const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const { kidsOf, joinsOf } = structureOf(nodes, folded);
   const heightFor = (node: MapNode) => cardHeight(heightOf, node.id);
-  if (isVertical(direction))
-    return verticalPositions({
-      roots,
-      kidsOf,
-      joinsOf,
-      heightFor,
-      column: COLUMN,
-      rowGap: COLUMN - WIDTH,
-      flip: direction === "up",
-      left,
-      top
-    });
-  if (direction === "radial" || direction === "timeline") {
-    const engine = direction === "radial" ? radialPositions : timelinePositions;
-    return engine({ roots, kidsOf, joinsOf, heightFor, width: WIDTH, column: COLUMN, gap: LAYOUT_GAP, left, top });
-  }
-  const input = {
-    roots,
-    kidsOf,
-    joinsOf,
-    heightFor,
-    column: COLUMN,
-    gap: LAYOUT_GAP,
-    sign: signOf(direction),
-    left,
-    top
+  type Tree = {
+    roots: MapNode[];
+    kidsOf: (node: MapNode) => MapNode[];
+    joinsOf: (node: MapNode) => MapNode[];
+    heightFor: (node: MapNode) => number;
   };
-  if (direction === "balanced") return balancedPositions(nodes, input, reset);
-  return horizontalPositions(input).placed;
+  /** One arrangement for the given tree; branches with their own layout call this once per direction. */
+  const engine = (kind: string, tree: Tree): Map<string, { x: number; y: number }> => {
+    if (kind === "down" || kind === "up")
+      return verticalPositions({ ...tree, column: COLUMN, rowGap: COLUMN - WIDTH, flip: kind === "up", left, top });
+    const flat = { ...tree, column: COLUMN, gap: LAYOUT_GAP, left, top };
+    if (kind === "radial") return radialPositions({ ...flat, width: WIDTH });
+    if (kind === "timeline") return timelinePositions({ ...flat, width: WIDTH });
+    if (kind === "fishbone") return fishbonePositions({ ...flat, width: WIDTH });
+    const input = { ...flat, sign: signOf(kind as LayoutKind) };
+    if (kind === "balanced") return balancedPositions(nodes, input, reset);
+    return horizontalPositions(input).placed;
+  };
+  const tree = { roots, kidsOf, joinsOf, heightFor };
+  // Branches with a layout of their own are arranged as blocks (decision D9); the other maps ignore them.
+  if (allowsBranchLayout(direction) && nodes.some(node => branchDirectionOf(node)))
+    return composePositions({ ...tree, width: WIDTH, column: COLUMN, mapDirection: direction, engine });
+  return engine(direction, tree);
 }
 
 /** Lays out what is on screen: a collapsed topic is a leaf, and its hidden branch keeps its coordinates until it is shown again. */
@@ -310,7 +310,7 @@ export function arrangeMap(
   return nodes.map(node => ({ ...node, ...placed.get(node.id) }));
 }
 
-/** Radial and timeline maps lay the whole map out again when a branch is added; hand-placed cards are reset (decision D5). */
+/** Radial, timeline and fishbone maps lay the whole map out again when a branch is added; hand-placed cards are reset (decision D5). */
 function rearrangeWhole(nodes: MapNode[], heightOf: HeightOf | undefined, layout: LayoutKind | MapLayout): MapNode[] {
   const roots = nodes.filter(node => !node.parentId);
   if (!roots.length) return nodes;
@@ -470,9 +470,17 @@ export function arrangeNewBranch(
   const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const parent = nodes.find(node => node.id === parentId);
   if (!parent || !newIds.size) return nodes;
+  // Inside a branch with its own layout the new cards grow the way that branch does.
+  const actual = layoutDirectionFor(nodes, parentId, direction);
+  if (actual !== direction) {
+    const spacing = typeof layout === "string" ? undefined : layout.spacing;
+    const own = { direction: actual as LayoutKind, ...(spacing ? { spacing } : {}) };
+    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own);
+  }
   const fresh = nodes.filter(node => newIds.has(node.id));
   const roots = fresh.filter(node => node.parentId === parentId);
-  if (direction === "radial" || direction === "timeline") return rearrangeWhole(nodes, heightOf, layout);
+  if (direction === "radial" || direction === "timeline" || direction === "fishbone")
+    return rearrangeWhole(nodes, heightOf, layout);
   if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
   if (direction === "balanced")
     return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);

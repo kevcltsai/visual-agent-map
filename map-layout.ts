@@ -225,10 +225,11 @@ function balancedPositions(
     const centreOf = (placed: Map<string, { x: number; y: number }>) => placed.get(root.id)!.y + heightFor(root) / 2;
     const middle = Math.max(centreOf(right), centreOf(leftHalf));
     const entries: [string, { x: number; y: number }][] = [];
-    for (const [placed, isLeft] of [
-      [right, false],
-      [leftHalf, true]
-    ] as const) {
+    for (const half of [
+      { placed: right, isLeft: false },
+      { placed: leftHalf, isLeft: true }
+    ]) {
+      const { placed, isLeft } = half;
       const shift = middle - centreOf(placed);
       for (const [id, point] of placed)
         if (!(isLeft && id === root.id)) entries.push([id, { x: rootX + point.x, y: point.y + shift }]);

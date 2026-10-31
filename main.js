@@ -57551,7 +57551,7 @@ ${addition}` : addition });
    * double click goes back to the standard width (the field is removed).
    */
   attachResizeHandle(card, node) {
-    const handle = card.createDiv({
+    const handle = card.createSpan({
       cls: "vam-card-resize",
       attr: {
         role: "separator",

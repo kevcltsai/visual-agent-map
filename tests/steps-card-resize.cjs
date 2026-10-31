@@ -93,7 +93,7 @@ const viewHarness = (width) => {
   const handle = { attrs, handlers, tabIndex: 0, focused: false,
     setAttr(name, value) { attrs[name] = value; }, addEventListener(name, fn) { handlers.set(name, fn); }, removeEventListener(name) { handlers.delete(name); }, setPointerCapture() {} };
   const style = { removeProperty(name) { delete style[name]; } };
-  const card = { style, createDiv: opts => { Object.assign(attrs, opts.attr); return handle; } };
+  const card = { style, createSpan: opts => { Object.assign(attrs, opts.attr); return handle; } };
   const changes = [];
   view.enqueue = work => work();
   view.mapChange = async change => { changes.push(change); };

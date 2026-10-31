@@ -15585,7 +15585,7 @@ export class VisualAgentMapView extends ItemView {
    * double click goes back to the standard width (the field is removed).
    */
   private attachResizeHandle(card: HTMLElement, node: MapNode): void {
-    const handle = card.createDiv({
+    const handle = card.createSpan({
       cls: "vam-card-resize",
       attr: {
         role: "separator",

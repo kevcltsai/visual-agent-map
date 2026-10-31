@@ -1756,7 +1756,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.chartJobs.set(job.path, controller);
     const progressId = `charts-${++this.chartProgressSeq}`;
     this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
     this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async (): Promise<void> => {

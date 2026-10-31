@@ -1915,6 +1915,8 @@ var en = {
   "ui.research_stage_searching_0": "Searching: {0}",
   "ui.research_stage_reading": "Reading sources",
   "ui.research_stage_writing": "Writing",
+  "ui.progress_stage_with_model_0_1": "{0} ({1})",
+  "ui.card_model_override_0": "Model set for this topic: {0}",
   "ui.research_stage_charts": "Adding diagrams",
   "ui.research_slow_waiting": "Responding slowly, still waiting",
   "ui.research_announcement_0_1": "{0}: {1}",
@@ -3958,6 +3960,8 @@ var zhCN = {
   "ui.research_stage_searching_0": "\u641C\u7D22\u4E2D\uFF1A{0}",
   "ui.research_stage_reading": "\u9605\u8BFB\u6765\u6E90",
   "ui.research_stage_writing": "\u64B0\u5199\u4E2D",
+  "ui.progress_stage_with_model_0_1": "{0}\u30FB{1}",
+  "ui.card_model_override_0": "\u6B64\u8BAE\u9898\u6307\u5B9A\u7684\u6A21\u578B\uFF1A{0}",
   "ui.research_stage_charts": "\u52A0\u5165\u56FE\u8868\u4E2D",
   "ui.research_slow_waiting": "\u54CD\u5E94\u8F83\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
   "ui.research_announcement_0_1": "{0}\uFF1A{1}",
@@ -6001,6 +6005,8 @@ var zhTW = {
   "ui.research_stage_searching_0": "\u641C\u5C0B\u4E2D\uFF1A{0}",
   "ui.research_stage_reading": "\u95B1\u8B80\u4F86\u6E90",
   "ui.research_stage_writing": "\u64B0\u5BEB\u4E2D",
+  "ui.progress_stage_with_model_0_1": "{0}\u30FB{1}",
+  "ui.card_model_override_0": "\u6B64\u8B70\u984C\u6307\u5B9A\u7684\u6A21\u578B\uFF1A{0}",
   "ui.research_stage_charts": "\u52A0\u5165\u5716\u8868\u4E2D",
   "ui.research_slow_waiting": "\u56DE\u61C9\u8F03\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
   "ui.research_announcement_0_1": "{0}\uFF1A{1}",
@@ -40824,6 +40830,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimProgress", null);
     /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
     __publicField(this, "aimProgressEls", /* @__PURE__ */ new Map());
+    /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
+    __publicField(this, "aimBranchModels", /* @__PURE__ */ new Map());
+    __publicField(this, "aimBranchModelPending", /* @__PURE__ */ new Set());
     __publicField(this, "aimProgressTimer", null);
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
@@ -43691,6 +43700,7 @@ ${request.requirements}` : preset.text,
   onAimProgress(event) {
     var _a2;
     if (this.closed || event.mapPath !== this.path) return;
+    this.ensureAimBranchModel(event.branchId);
     let structural = false;
     if (event.kind === "plan") {
       this.aimProgress = {
@@ -43740,6 +43750,7 @@ ${request.requirements}` : preset.text,
   }
   stopAimProgress() {
     this.aimProgress = null;
+    this.aimBranchModels.clear();
     this.aimProgressEls.clear();
     if (this.aimProgressTimer !== null) window.clearInterval(this.aimProgressTimer);
     if (this.aimProgressRenderTimer !== null) window.clearTimeout(this.aimProgressRenderTimer);
@@ -43756,6 +43767,22 @@ ${request.requirements}` : preset.text,
       Math.round((Date.now() - ((_a2 = target.startedAt) != null ? _a2 : Date.now())) / 1e3)
     );
   }
+  /** The branch root topic's resolved model, read once per branch (the cache answers every later event and tick). */
+  ensureAimBranchModel(branchId) {
+    var _a2, _b2, _c, _d, _e, _f;
+    if (this.aimBranchModels.has(branchId) || this.aimBranchModelPending.has(branchId)) return;
+    const branches = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.aim) == null ? void 0 : _b2.branches) != null ? _c : [];
+    let root = branches.find((item) => item.id === branchId);
+    for (let depth = 0; (root == null ? void 0 : root.parentBranchId) && depth < branches.length; depth++)
+      root = (_d = branches.find((item) => item.id === (root == null ? void 0 : root.parentBranchId))) != null ? _d : root;
+    const node = root && ((_e = this.map) == null ? void 0 : _e.nodes.find((item) => item.id === root.questionNodeId));
+    if (!node) return;
+    this.aimBranchModelPending.add(branchId);
+    void this.plugin.repo.resolveTopicModel(node.path, (_f = this.map) != null ? _f : void 0).then((resolved) => {
+      if (!this.closed && this.aimProgress) this.aimBranchModels.set(branchId, resolved.model);
+    }).catch(() => {
+    }).finally(() => this.aimBranchModelPending.delete(branchId));
+  }
   aimStageText() {
     var _a2;
     const progress = this.aimProgress;
@@ -43768,7 +43795,9 @@ ${request.requirements}` : preset.text,
       targets.filter((item) => item.state === "done" || item.state === "skipped").length,
       targets.length
     ) : t((_a2 = AIM_STAGE_KEYS[progress.stage]) != null ? _a2 : "ui.aim_stage_research");
-    return t("ui.aim_stage_with_elapsed_0_1", stage, clock);
+    const model = this.aimBranchModels.get(progress.branchId);
+    const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
+    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   paintAimProgress() {
@@ -43837,6 +43866,10 @@ ${request.requirements}` : preset.text,
     return progress ? [progress.stage, (_a2 = progress.query) != null ? _a2 : "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|") : "";
   }
   researchStageText(progress) {
+    const stage = this.researchStageName(progress);
+    return progress.model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model)) : stage;
+  }
+  researchStageName(progress) {
     switch (progress.stage) {
       case "searching":
         return progress.query ? t("ui.research_stage_searching_0", progress.query) : t("ui.research_stage_searching");
@@ -43879,12 +43912,12 @@ ${request.requirements}` : preset.text,
    * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
    * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
    */
-  startTaskProgress(key2) {
+  startTaskProgress(key2, model) {
     const progress = this.plugin.researchProgress;
     if (!progress || progress.get(key2)) return { end: () => {
     } };
     let attempt = "starting";
-    progress.begin(key2, attempt, Date.now());
+    progress.begin(key2, attempt, Date.now(), model);
     return {
       observer: {
         onAttempt: (id) => {
@@ -44306,7 +44339,7 @@ ${request.requirements}` : preset.text,
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async runMergeDraft(task) {
     const language2 = this.plugin.settings.language;
-    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath));
+    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
     try {
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
@@ -48913,7 +48946,7 @@ ${request.requirements}` : preset.text,
     const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -49033,7 +49066,7 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     let findingsSent = false;
     try {
       const synthesisContext = withThinkingOrigin(
@@ -49519,7 +49552,7 @@ ${request.requirements}` : preset.text,
       this.integrationTask = task;
       own = task;
       this.render();
-      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
+      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
       progress = taskProgress;
       const language2 = this.plugin.settings.language;
       const result = await this.plugin.askModel(
@@ -49696,7 +49729,7 @@ ${note.detail.trim()}` : "",
     };
     this.integrationTask = task;
     this.render();
-    const progress = this.startTaskProgress(this.taskProgressKey("integration"));
+    const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
     const model = chosen.model;
     const language2 = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId);
@@ -57098,9 +57131,16 @@ var ResearchProgressStore = class {
     __publicField(this, "lastNotified", /* @__PURE__ */ new Map());
     __publicField(this, "pending", /* @__PURE__ */ new Map());
   }
-  begin(path, attemptId, now) {
+  begin(path, attemptId, now, model) {
     this.cancelPending(path);
-    this.entries.set(path, { attemptId, startedAt: now, stage: "waiting", stageAt: now, slow: false });
+    this.entries.set(path, {
+      attemptId,
+      startedAt: now,
+      stage: "waiting",
+      stageAt: now,
+      slow: false,
+      ...model ? { model } : {}
+    });
     this.notify(path);
   }
   stage(path, attemptId, stage, now, query) {
@@ -60275,7 +60315,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.chartJobs.set(job.path, controller);
     const progressId = `charts-${++this.chartProgressSeq}`;
     this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
     this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async () => {

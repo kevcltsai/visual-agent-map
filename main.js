@@ -16374,11 +16374,11 @@ async function svgToPngBlob(svg, width, height, scale, env) {
     loaded.release();
   }
 }
-function browserPngEnv(doc, urls) {
+function browserPngEnv(urls) {
   return {
     async load(svg) {
       const url = urls.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-      const image = doc.createEl("img");
+      const image = createEl("img");
       try {
         await new Promise((resolve, reject2) => {
           image.onload = () => resolve();
@@ -16392,7 +16392,7 @@ function browserPngEnv(doc, urls) {
       return { image, release: () => urls.revokeObjectURL(url) };
     },
     canvas(width, height) {
-      const canvas = doc.createEl("canvas");
+      const canvas = createEl("canvas");
       canvas.width = width;
       canvas.height = height;
       return {
@@ -50141,7 +50141,7 @@ ${request.requirements}` : preset.text,
     return { scene };
   }
   async pngBlob(svg, width, height, scale) {
-    return svgToPngBlob(svg, width, height, scale, browserPngEnv(activeDocument, window.URL));
+    return svgToPngBlob(svg, width, height, scale, browserPngEnv(window.URL));
   }
   /** A download through a blob URL; the URL is released shortly after the click. */
   downloadBlob(blob, name) {

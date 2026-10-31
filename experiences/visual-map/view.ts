@@ -7686,7 +7686,7 @@ export class VisualAgentMapView extends ItemView {
     return { scene };
   }
   private async pngBlob(svg: string, width: number, height: number, scale: number): Promise<Blob> {
-    return svgToPngBlob(svg, width, height, scale, browserPngEnv(activeDocument, window.URL));
+    return svgToPngBlob(svg, width, height, scale, browserPngEnv(window.URL));
   }
   /** A download through a blob URL; the URL is released shortly after the click. */
   private downloadBlob(blob: Blob, name: string): void {

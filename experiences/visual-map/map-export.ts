@@ -268,11 +268,11 @@ export async function svgToPngBlob(
 }
 
 /** The real image/canvas plumbing of a window; kept out of `svgToPngBlob` so the limits can be tested without a canvas. */
-export function browserPngEnv(doc: Document, urls: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">): PngEnv {
+export function browserPngEnv(urls: Pick<typeof URL, "createObjectURL" | "revokeObjectURL">): PngEnv {
   return {
     async load(svg: string) {
       const url = urls.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-      const image = doc.createEl("img");
+      const image = createEl("img");
       try {
         await new Promise<void>((resolve, reject) => {
           image.onload = () => resolve();
@@ -286,7 +286,7 @@ export function browserPngEnv(doc: Document, urls: Pick<typeof URL, "createObjec
       return { image, release: () => urls.revokeObjectURL(url) };
     },
     canvas(width: number, height: number) {
-      const canvas = doc.createEl("canvas");
+      const canvas = createEl("canvas");
       canvas.width = width;
       canvas.height = height;
       return {

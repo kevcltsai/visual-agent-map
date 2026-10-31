@@ -17937,6 +17937,7 @@ function begin(deps) {
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
         if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail2();
+        if (await repo.coordinatesChangedOutside(record.mapPath)) fail2();
       }
       if (direction === "redo") {
         for (const item of attachments) if (!exists(item.path)) fail2();
@@ -20291,12 +20292,18 @@ function guardWrites(target, writes, disposed, message) {
     }
   });
 }
+function coordinatePrint(map) {
+  const nodes = [...map.nodes].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  return JSON.stringify(nodes.map((node) => [node.id, node.x, node.y]));
+}
 var Repository = class {
   constructor(app, settings) {
     this.settings = settings;
     __publicField(this, "app");
     /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
     __publicField(this, "disposed", false);
+    /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
+    __publicField(this, "writtenCoordinates", /* @__PURE__ */ new Map());
     /** Containers that temporarily count as managed while a folder-setting change moves topics into them. */
     __publicField(this, "pendingContainers", []);
     /** Called once per vault-wide scan that skipped unreadable maps. */
@@ -20913,10 +20920,39 @@ ${body}`);
   }
   async saveMap(path, map) {
     this.stampAimContentLanguage(map);
+    let print = "";
     await this.app.vault.process(this.file(path), (content) => {
-      parseMap(content);
-      return writeMapContent(content, map);
+      const text11 = writeMapContent(content, map);
+      print = this.printAfterWrite(path, coordinatePrint(parseMap(content)), coordinatePrint(map));
+      return text11;
     });
+    this.writtenCoordinates.set(path, print);
+  }
+  /**
+   * The signature to remember after a write. When the file's coordinates were not the ones this plugin last wrote
+   * (something else moved a node) and this write only carries them through unchanged, the old signature stays, so a
+   * background write cannot make the outside change look like the plugin's own.
+   */
+  printAfterWrite(path, before, after) {
+    const recorded = this.writtenCoordinates.get(path);
+    return recorded !== void 0 && before !== recorded && after === before ? recorded : after;
+  }
+  /**
+   * True when Map.md's node coordinates are not the ones this plugin last wrote there (something else moved a node).
+   * A map this plugin has not written since it started has nothing to compare with, so it is never reported.
+   * Viewport is not part of the comparison.
+   */
+  async coordinatesChangedOutside(path) {
+    const written2 = this.writtenCoordinates.get(path);
+    return written2 !== void 0 && coordinatePrint(await this.readMap(path)) !== written2;
+  }
+  /** Records the coordinates of a Map.md text this plugin put back byte for byte (rollbacks). */
+  noteRestoredMap(path, text11) {
+    try {
+      this.writtenCoordinates.set(path, coordinatePrint(parseMap(text11)));
+    } catch (e) {
+      this.writtenCoordinates.delete(path);
+    }
   }
   /**
    * Read-modify-write on the current file content in one vault.process call, so a caller holding an older copy of
@@ -20924,13 +20960,18 @@ ${body}`);
    */
   async updateMap(path, change) {
     let updated;
+    let print = "";
     await this.app.vault.process(this.file(path), (content) => {
       const map = parseMap(content);
+      const before = coordinatePrint(map);
       change(map);
       this.stampAimContentLanguage(map);
       updated = map;
-      return writeMapContent(content, map);
+      const text11 = writeMapContent(content, map);
+      print = this.printAfterWrite(path, before, coordinatePrint(map));
+      return text11;
     });
+    this.writtenCoordinates.set(path, print);
     return updated;
   }
   /**
@@ -21637,6 +21678,7 @@ ${body}`;
           }
           await this.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
           await this.app.vault.modify(this.file(`${move.fromRoot}/Map.md`), originalMap);
+          this.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);
         } catch (rollbackError) {
           rollbackErrors.push(
             `${move.fromRoot}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
@@ -21723,6 +21765,7 @@ ${body}`;
           if (!(restoredMap instanceof import_obsidian12.TFile))
             throw new Error("Original Map.md was not found after restoring the topic folder.");
           await this.app.vault.modify(restoredMap, originalContent);
+          this.noteRestoredMap(originalMapPath, originalContent);
           await rebuild2();
         } catch (rollbackError) {
           const originalMessage = error instanceof Error ? error.message : String(error);
@@ -21732,6 +21775,7 @@ ${body}`;
         }
       } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof import_obsidian12.TFile) {
         await this.app.vault.modify(this.file(originalMapPath), originalContent);
+        this.noteRestoredMap(originalMapPath, originalContent);
         await rebuild2();
       }
       throw error;

@@ -6,6 +6,7 @@ const path = require('node:path');
 const { load, loadSource } = require('./support-replay.cjs');
 const ci = load('experiences/visual-map/canvas-items.ts');
 const layout = load('map-layout.ts');
+const layoutText = load('map-layout-text.ts');
 const order = load('experiences/visual-map/presentation-order.ts');
 const plain = value => JSON.parse(JSON.stringify(value));
 const sanitize = raw => plain(ci.sanitizeCanvasItems(raw));
@@ -108,10 +109,10 @@ const overlaps = rects =>
 test('A3: arrangeMapWithText equals arrangeMap when there are no attached text nodes', () => {
   for (const kind of KINDS) {
     const plainRun = plain(layout.arrangeMap(tree(), undefined, heightOf, kind));
-    const none = layout.arrangeMapWithText(tree(), [img], undefined, heightOf, kind);
+    const none = layoutText.arrangeMapWithText(tree(), [img], undefined, heightOf, kind);
     assert.deepEqual(plain(none.nodes), plainRun, kind);
     assert.deepEqual(plain(none.items), [img]);
-    const orphanOnly = layout.arrangeMapWithText(tree(), [txt({ parentId: 'gone' })], undefined, heightOf, kind);
+    const orphanOnly = layoutText.arrangeMapWithText(tree(), [txt({ parentId: 'gone' })], undefined, heightOf, kind);
     assert.deepEqual(plain(orphanOnly.nodes), plainRun, kind);
   }
 });
@@ -119,7 +120,7 @@ test('A3: arrangeMapWithText equals arrangeMap when there are no attached text n
 test('A3: text nodes are leaves in every layout, never overlap, orphans and other items stay put', () => {
   for (const kind of KINDS) {
     const items = [...textsFor(), img];
-    const out = layout.arrangeMapWithText(tree(), items, undefined, heightOf, kind);
+    const out = layoutText.arrangeMapWithText(tree(), items, undefined, heightOf, kind);
     const texts = plain(out.items).filter(i => i.kind === 'text');
     const rects = [...out.nodes, ...texts.filter(i => i.id !== 'orph')].map(i => ({ x: i.x, y: i.y }));
     assert.equal(rects.length, 5 + 3, kind);
@@ -138,18 +139,18 @@ test('A3: text nodes under a collapsed or hidden parent are left alone', () => {
   nodes.find(n => n.id === 'a').collapsed = true;
   const hidden = new Set(['a1', 'a2']);
   const items = textsFor();
-  const out = layout.arrangeMapWithText(nodes, items, hidden, heightOf, 'right');
+  const out = layoutText.arrangeMapWithText(nodes, items, hidden, heightOf, 'right');
   const t = plain(out.items);
   assert.deepEqual(t[1], items[1]);
   assert.deepEqual(t[2], items[2]);
   assert.notDeepEqual(t[0], items[0]);
-  const hiddenParent = layout.arrangeMapWithText(tree(), items, new Set(['a']), heightOf, 'right');
+  const hiddenParent = layoutText.arrangeMapWithText(tree(), items, new Set(['a']), heightOf, 'right');
   assert.deepEqual(plain(hiddenParent.items)[1], items[1]);
 });
 
 test('A3: a text node takes the vertical space of a leaf (siblings shift to make room)', () => {
   const base = plain(layout.arrangeMap(tree(), undefined, heightOf, 'right'));
-  const out = layout.arrangeMapWithText(tree(), [txt({ id: 't1', parentId: 'b' })], undefined, heightOf, 'right');
+  const out = layoutText.arrangeMapWithText(tree(), [txt({ id: 't1', parentId: 'b' })], undefined, heightOf, 'right');
   const b = plain(out.nodes).find(n => n.id === 'b');
   const t = plain(out.items)[0];
   assert.ok(t.x > b.x);
@@ -162,12 +163,12 @@ test('A3: arrangeNewBranchWithText keeps existing text nodes as obstacles and pl
   const placedNodes = layout.arrangeMap(nodes.filter(n => n.id !== 'n1'), undefined, heightOf, 'right').concat(node('n1', 'b'));
   const existing = txt({ id: 'old', parentId: 'a', x: 700, y: 500 });
   const fresh = txt({ id: 'newt', parentId: 'n1', x: 0, y: 0 });
-  const out = layout.arrangeNewBranchWithText(placedNodes, [existing, fresh], 'b', new Set(['n1']), heightOf, undefined, 'right');
+  const out = layoutText.arrangeNewBranchWithText(placedNodes, [existing, fresh], 'b', new Set(['n1']), heightOf, undefined, 'right');
   const items = plain(out.items);
   assert.deepEqual(items[0], existing);
   const n1 = plain(out.nodes).find(n => n.id === 'n1');
   assert.ok(items[1].x > n1.x);
-  const none = layout.arrangeNewBranchWithText(placedNodes, [img], 'b', new Set(['n1']), heightOf, undefined, 'right');
+  const none = layoutText.arrangeNewBranchWithText(placedNodes, [img], 'b', new Set(['n1']), heightOf, undefined, 'right');
   assert.deepEqual(plain(none.nodes), plain(layout.arrangeNewBranch(placedNodes, 'b', new Set(['n1']), heightOf, undefined, 'right')));
 });
 

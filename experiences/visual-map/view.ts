@@ -137,9 +137,7 @@ import {
 } from "../../map-model";
 import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
 import {
-  arrangeMapWithText,
   arrangeNewBranch,
-  arrangeNewBranchWithText,
   arrangeNewTree,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
@@ -150,6 +148,7 @@ import {
   type LayoutKind,
   type LayoutSpacing
 } from "../../map-layout";
+import { arrangeMapWithText, arrangeNewBranchWithText } from "../../map-layout-text";
 import { neighborKey, type NavigationSide } from "../../layouts/navigation";
 import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";

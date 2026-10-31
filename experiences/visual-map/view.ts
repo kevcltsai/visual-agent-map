@@ -31,7 +31,7 @@ import { withThinkingOrigin } from "./thinking-origin";
 import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
-import { resolveCover } from "./card-cover";
+import { resolveCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -2926,7 +2926,48 @@ export class VisualAgentMapView extends ItemView {
             .setIcon(TOPIC_KIND_ICON[kind])
             .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind)))
         );
+    const target = this.map?.nodes.find(item => item.id === this.selected);
+    if (target && this.markersEditable(target))
+      menu.addItem(item =>
+        item
+          .setTitle(t(this.topicCoverOff(target) ? "ui.topic_cover_on" : "ui.topic_cover_off"))
+          .setIcon("image")
+          .onClick(() =>
+            this.enqueue(async () => {
+              await this.changeTopicCover(target);
+            })
+          )
+      );
     menu.showAtMouseEvent(event);
+  }
+  /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
+  private topicCoverOff(node: MapNode): boolean {
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    const value: unknown =
+      file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter?.["topic-cover"] : null;
+    return typeof value === "string" && value.trim().toLowerCase() === "none";
+  }
+  /**
+   * Turns a topic's card cover off (`topic-cover: none`) or back on (the key is removed) in one undoable step: the note
+   * rewrite and Map.md (viewport only). Undo writes the old note text back, so the frontmatter is identical to before.
+   */
+  private async changeTopicCover(node: MapNode): Promise<TransactionEntry | null> {
+    if (!this.map) return null;
+    const off = this.topicCoverOff(node);
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error(path);
+        await this.app.vault.process(file, content => (off ? withoutCover(content) : withCoverOff(content)));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return entry;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {

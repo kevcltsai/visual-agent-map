@@ -565,6 +565,9 @@ var en = {
   "ui.rename_topic": "Rename",
   "ui.paste_outline_add_many": "Paste an outline to add several topics at once",
   "ui.topic_more_options": "More ways to add topics",
+  "ui.topic_cover": "Topic cover",
+  "ui.topic_cover_off": "Turn card cover off",
+  "ui.topic_cover_on": "Turn card cover on",
   "ui.topic_kind_topic": "Topic",
   "ui.topic_kind_atomic": "Atomic knowledge",
   "ui.topic_kind_hypothesis": "Hypothesis",
@@ -2672,6 +2675,9 @@ var zhCN = {
   "ui.rename_topic": "\u91CD\u547D\u540D",
   "ui.paste_outline_add_many": "\u7C98\u8D34\u5927\u7EB2\uFF0C\u4E00\u6B21\u6DFB\u52A0\u591A\u4E2A",
   "ui.topic_more_options": "\u66F4\u591A\u6DFB\u52A0\u8BAE\u9898\u7684\u65B9\u5F0F",
+  "ui.topic_cover": "\u8BAE\u9898\u5C01\u9762",
+  "ui.topic_cover_off": "\u5173\u95ED\u5361\u7247\u5C01\u9762",
+  "ui.topic_cover_on": "\u5F00\u542F\u5361\u7247\u5C01\u9762",
   "ui.topic_kind_topic": "\u4E00\u822C\u8BAE\u9898",
   "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8BC6",
   "ui.topic_kind_hypothesis": "\u5047\u8BBE",
@@ -4779,6 +4785,9 @@ var zhTW = {
   "ui.rename_topic": "\u91CD\u65B0\u547D\u540D",
   "ui.paste_outline_add_many": "\u8CBC\u4E0A\u5927\u7DB1\uFF0C\u4E00\u6B21\u65B0\u589E\u591A\u500B",
   "ui.topic_more_options": "\u66F4\u591A\u65B0\u589E\u8B70\u984C\u7684\u65B9\u5F0F",
+  "ui.topic_cover": "\u8B70\u984C\u5C01\u9762",
+  "ui.topic_cover_off": "\u95DC\u9589\u5361\u7247\u5C01\u9762",
+  "ui.topic_cover_on": "\u958B\u555F\u5361\u7247\u5C01\u9762",
   "ui.topic_kind_topic": "\u4E00\u822C\u8B70\u984C",
   "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8B58",
   "ui.topic_kind_hypothesis": "\u5047\u8A2D",
@@ -21756,6 +21765,12 @@ function resolveCover(cache, resolve) {
     if (path) return { path };
   }
   return null;
+}
+function withCoverOff(content) {
+  return setFrontmatterKeys(content, { [COVER_KEY]: "none" });
+}
+function withoutCover(content) {
+  return setFrontmatterKeys(content, { [COVER_KEY]: null });
 }
 
 // experiences/visual-map/topic-kind-shape.ts
@@ -45047,6 +45062,7 @@ ${request.requirements}` : preset.text,
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
+    var _a2;
     const menu = new import_obsidian32.Menu();
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
@@ -45056,7 +45072,42 @@ ${request.requirements}` : preset.text,
         menu.addItem(
           (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
         );
+    const target = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === this.selected);
+    if (target && this.markersEditable(target))
+      menu.addItem(
+        (item) => item.setTitle(t(this.topicCoverOff(target) ? "ui.topic_cover_on" : "ui.topic_cover_off")).setIcon("image").onClick(
+          () => this.enqueue(async () => {
+            await this.changeTopicCover(target);
+          })
+        )
+      );
     menu.showAtMouseEvent(event);
+  }
+  /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
+  topicCoverOff(node) {
+    var _a2, _b2;
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    const value = file instanceof import_obsidian32.TFile ? (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["topic-cover"] : null;
+    return typeof value === "string" && value.trim().toLowerCase() === "none";
+  }
+  /**
+   * Turns a topic's card cover off (`topic-cover: none`) or back on (the key is removed) in one undoable step: the note
+   * rewrite and Map.md (viewport only). Undo writes the old note text back, so the frontmatter is identical to before.
+   */
+  async changeTopicCover(node) {
+    if (!this.map) return null;
+    const off = this.topicCoverOff(node);
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof import_obsidian32.TFile)) throw new Error(path);
+      await this.app.vault.process(file, (content) => off ? withoutCover(content) : withCoverOff(content));
+    }).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return entry;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   openKindMenu(event, pick) {

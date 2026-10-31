@@ -173,3 +173,61 @@ test('the frame is 96px tall with object-fit cover, fixed before the image loads
   const image = css.split('\n').find(line => line.startsWith('.vam-card-cover img'));
   assert.match(image, /object-fit: cover/);
 });
+
+// map-images P4b: the topic menu turns a topic's cover off or on again as one undoable rewriteNote transaction.
+const { begin } = S.load('experiences/visual-map/map-transaction.ts', { obsidian: S.obsidian });
+const NOTE = 'Topics/m.md';
+async function coverHarness(text, { cache } = {}) {
+  const { repo, app, contents } = S.fixture('en', { linkIndex: true });
+  await app.vault.create(NOTE, text);
+  await app.vault.create('Topics/Map.md', S.core.serializeMap({ id: 'map-u', title: 'map-u', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }));
+  const view = make(null);
+  view.app = app;
+  const read = () => {
+    const m = /^---\n([\s\S]*?)\n---/.exec(contents.get(NOTE));
+    return /^topic-cover:\s*"?none"?\s*$/m.test(m?.[1] ?? '') ? { 'topic-cover': 'none' } : {};
+  };
+  app.metadataCache = { getFileCache: () => ({ frontmatter: read() }), getFirstLinkpathDest: () => null };
+  Object.assign(view, {
+    plugin: { repo }, map: { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }, path: 'Topics/Map.md', history: { push() {} },
+    beginMapTransaction: () => begin({ repo, rebuildDerivedData: async () => {}, onApplied: () => {}, checkConflict: async () => {} }),
+    refreshAfterSavedChange: async () => {}
+  });
+  return { view, contents };
+}
+const TEXT = '---\ntype: topic\ntitle: M\ntopic-color: red\n---\n\nBody line\n';
+
+test('P4b: turning the cover off writes topic-cover none; undo restores the note byte for byte, redo writes it again', async () => {
+  const h = await coverHarness(TEXT);
+  const entry = await h.view.changeTopicCover({ id: 'm', path: NOTE });
+  assert.ok(entry, 'one history entry');
+  assert.match(h.contents.get(NOTE), /topic-cover: "?none"?/);
+  assert.match(h.contents.get(NOTE), /topic-color: red\ntopic-cover: "none"\n---\n\nBody line\n$/);
+  await entry.undo();
+  assert.equal(h.contents.get(NOTE), TEXT, 'undo is byte-identical');
+  await entry.redo();
+  assert.match(h.contents.get(NOTE), /topic-cover: "?none"?/);
+  await entry.undo();
+  assert.equal(h.contents.get(NOTE), TEXT);
+});
+
+test('P4b: turning it back on removes the key; undo of that restores the none line byte for byte', async () => {
+  const off = '---\ntype: topic\ntitle: M\ntopic-cover: "none"\n---\n\nBody\n';
+  const h = await coverHarness(off);
+  const entry = await h.view.changeTopicCover({ id: 'm', path: NOTE });
+  assert.doesNotMatch(h.contents.get(NOTE), /topic-cover/);
+  await entry.undo();
+  assert.equal(h.contents.get(NOTE), off);
+});
+
+test('P4b: the topic menu offers the toggle for the selected topic, with the right label for each state', () => {
+  const source = read('experiences/visual-map/view.ts');
+  const body = source.match(/private openTopicMenu\([\s\S]*?\n  }\n/)[0];
+  assert.match(body, /ui\.topic_cover_off/);
+  assert.match(body, /ui\.topic_cover_on/);
+  assert.match(body, /changeTopicCover/);
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
+    const text = read(`i18n/${lang}.ts`);
+    for (const key of ['ui.topic_cover_off', 'ui.topic_cover_on', 'ui.topic_cover']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
+  }
+});

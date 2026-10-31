@@ -29633,6 +29633,33 @@ function canPasteCut(nodes, rootIds, targetId) {
   }
   return { ok: true };
 }
+function resolveCrossSource(payload, record, sourceMap) {
+  try {
+    if (sourceMap.id !== record.sourceMapId) return null;
+    const count = payload.nodes.length;
+    if (!count || record.nodeIds.length !== count || record.notePaths.length !== count) return null;
+    const byId = new Map(sourceMap.nodes.map((node) => [node.id, node]));
+    const ids = new Set(record.nodeIds);
+    const branch = [];
+    const roots = [];
+    for (let i = 0; i < count; i++) {
+      const node = byId.get(record.nodeIds[i]);
+      if (!node || node.path !== record.notePaths[i]) return null;
+      const clip4 = payload.nodes[i];
+      if (clip4.parent === null) {
+        if (node.parentId && ids.has(node.parentId)) return null;
+        roots.push(node);
+      } else {
+        const parentIndex = payload.nodes.findIndex((item) => item.id === clip4.parent);
+        if (parentIndex < 0 || node.parentId !== record.nodeIds[parentIndex]) return null;
+      }
+      branch.push(node);
+    }
+    return { branch, roots };
+  } catch (e) {
+    return null;
+  }
+}
 
 // experiences/visual-map/clipboard-text.ts
 var PASTE_TEXT_MAX_CHARS = 1e5;
@@ -45760,7 +45787,10 @@ ${request.requirements}` : preset.text,
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
-    if (source && intact) {
+    const cross = (record == null ? void 0 : record.mode) === "copy" && !source && record.sourceMapPath !== this.path ? await this.crossSourceOf(payload, record) : null;
+    if (cross && record) {
+      tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
+    } else if (source && intact) {
       const roots = payload.nodes.map((clip4, index) => clip4.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
       if ((record == null ? void 0 : record.mode) === "cut") {
         const check = canPasteCut(
@@ -45833,6 +45863,51 @@ ${request.requirements}` : preset.text,
       this.render();
       this.focusNode(placed);
     }
+  }
+  /** The recorded source of a copy made in another map, when that map still holds exactly those topics and notes; else null. */
+  async crossSourceOf(payload, record) {
+    try {
+      const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
+      const found = resolveCrossSource(payload, record, sourceMap);
+      if (!found || found.branch.some((node) => !this.app.vault.getAbstractFileByPath(node.path))) return null;
+      return found;
+    } catch (e) {
+      return null;
+    }
+  }
+  /**
+   * Duplicates topics of another map under `target` (null = new top-level trees) as one transaction of this map. The
+   * source notes are only read; links in the copies are rewritten from the source note's place by writeNewBranches.
+   */
+  async copyFromOtherMap(source, target, payload, nodeIds) {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (!this.mergeUnlocked(target ? [target.id] : [])) return [];
+    const repo = this.plugin.repo, replacement = /* @__PURE__ */ new Map(), rootOf = /* @__PURE__ */ new Map();
+    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
+      var _a2, _b2, _c, _d;
+      for (const original of source.branch) {
+        const root = source.roots.includes(original) ? original : (_a2 = rootOf.get(original.parentId)) != null ? _a2 : original;
+        rootOf.set(original.id, root);
+        const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
+        replacement.set(original.id, copy.id);
+        copy.parentId = source.roots.includes(original) ? (_b2 = target == null ? void 0 : target.id) != null ? _b2 : null : (_d = (_c = replacement.get(original.parentId)) != null ? _c : target == null ? void 0 : target.id) != null ? _d : null;
+        copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+        copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
+        copies.push(copy);
+        pairs.push({ from: original.path, to: copy.path });
+      }
+      for (const link of payload.relations) {
+        const from = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.from)]), to = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.to)]);
+        if (from && to)
+          relations.push({
+            kind: link.kind,
+            from,
+            to,
+            ...link.description !== void 0 ? { description: link.description } : {}
+          });
+      }
+    });
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   copyEntry(entry) {

@@ -230,7 +230,7 @@ import {
   type ClipboardPayload
 } from "./clipboard";
 import { inClipboardScope, readClipboardData, writeClipboardData } from "./clipboard-io";
-import { canPasteCut, planPaste } from "./clipboard-paste";
+import { canPasteCut, planPaste, resolveCrossSource } from "./clipboard-paste";
 import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } from "./clipboard-text";
 import { sessionFor } from "./clipboard-session";
 import {
@@ -5675,7 +5675,14 @@ export class VisualAgentMapView extends ItemView {
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
-    if (source && intact) {
+    // A copy made in another map: its notes are duplicated into this one, the source map is only read (D2, D3).
+    const cross =
+      record?.mode === "copy" && !source && record.sourceMapPath !== this.path
+        ? await this.crossSourceOf(payload, record)
+        : null;
+    if (cross && record) {
+      tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
+    } else if (source && intact) {
       const roots = payload.nodes
         .map((clip, index) => (clip.parent === null ? byId.get(nodeIds[index]) : undefined))
         .filter((node): node is MapNode => !!node);
@@ -5751,6 +5758,63 @@ export class VisualAgentMapView extends ItemView {
       this.render();
       this.focusNode(placed);
     }
+  }
+  /** The recorded source of a copy made in another map, when that map still holds exactly those topics and notes; else null. */
+  private async crossSourceOf(
+    payload: ClipboardPayload,
+    record: { sourceMapPath: string; sourceMapId: string; nodeIds: readonly string[]; notePaths: readonly string[] }
+  ): Promise<{ branch: MapNode[]; roots: MapNode[] } | null> {
+    try {
+      const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
+      const found = resolveCrossSource(payload, record, sourceMap);
+      if (!found || found.branch.some(node => !this.app.vault.getAbstractFileByPath(node.path))) return null;
+      return found;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Duplicates topics of another map under `target` (null = new top-level trees) as one transaction of this map. The
+   * source notes are only read; links in the copies are rewritten from the source note's place by writeNewBranches.
+   */
+  private async copyFromOtherMap(
+    source: { branch: MapNode[]; roots: MapNode[] },
+    target: MapNode | null,
+    payload: ClipboardPayload,
+    nodeIds: readonly string[]
+  ): Promise<MapNode[]> {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (!this.mergeUnlocked(target ? [target.id] : [])) return [];
+    const repo = this.plugin.repo,
+      replacement = new Map<string, string>(),
+      rootOf = new Map<string, MapNode>();
+    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
+      for (const original of source.branch) {
+        const root = source.roots.includes(original) ? original : (rootOf.get(original.parentId!) ?? original);
+        rootOf.set(original.id, root);
+        const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
+        replacement.set(original.id, copy.id);
+        copy.parentId = source.roots.includes(original)
+          ? (target?.id ?? null)
+          : (replacement.get(original.parentId!) ?? target?.id ?? null);
+        copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+        copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
+        copies.push(copy);
+        pairs.push({ from: original.path, to: copy.path });
+      }
+      for (const link of payload.relations) {
+        const from = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.from)]),
+          to = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.to)]);
+        if (from && to)
+          relations.push({
+            kind: link.kind,
+            from,
+            to,
+            ...(link.description !== undefined ? { description: link.description } : {})
+          });
+      }
+    });
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   private copyEntry(entry: TransactionEntry): TransactionEntry {

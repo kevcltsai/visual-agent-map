@@ -113,3 +113,52 @@ export function canPasteCut(
   }
   return { ok: true };
 }
+
+export interface CrossSourceNode {
+  id: string;
+  path: string;
+  parentId: string | null;
+}
+export interface CrossSource<N extends CrossSourceNode> {
+  /** The copied topics in clipboard order (parents first), looked up in the source map. */
+  branch: N[];
+  /** The top topics of the copied branches, in payload order. */
+  roots: N[];
+}
+
+/**
+ * Checks that the copy recorded in the session is still what the source map holds: same map id, every copied topic
+ * present at the recorded note path, and the same parent shape as the payload. Anything else returns null and the
+ * paste falls back to the payload's whitelisted fields (nothing is read from the source files). Pure; never throws.
+ */
+export function resolveCrossSource<N extends CrossSourceNode>(
+  payload: ClipboardPayload,
+  record: { sourceMapId: string; nodeIds: readonly string[]; notePaths: readonly string[] },
+  sourceMap: { id: string; nodes: readonly N[] }
+): CrossSource<N> | null {
+  try {
+    if (sourceMap.id !== record.sourceMapId) return null;
+    const count = payload.nodes.length;
+    if (!count || record.nodeIds.length !== count || record.notePaths.length !== count) return null;
+    const byId = new Map(sourceMap.nodes.map(node => [node.id, node] as const));
+    const ids = new Set(record.nodeIds);
+    const branch: N[] = [];
+    const roots: N[] = [];
+    for (let i = 0; i < count; i++) {
+      const node = byId.get(record.nodeIds[i]);
+      if (!node || node.path !== record.notePaths[i]) return null;
+      const clip = payload.nodes[i];
+      if (clip.parent === null) {
+        if (node.parentId && ids.has(node.parentId)) return null;
+        roots.push(node);
+      } else {
+        const parentIndex = payload.nodes.findIndex(item => item.id === clip.parent);
+        if (parentIndex < 0 || node.parentId !== record.nodeIds[parentIndex]) return null;
+      }
+      branch.push(node);
+    }
+    return { branch, roots };
+  } catch {
+    return null;
+  }
+}

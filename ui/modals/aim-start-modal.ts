@@ -26,10 +26,12 @@ export interface AimStartInput {
   outcomeExpectation: AimOutcomeExpectation;
   requestId: string;
   model: string;
-  reasoning: "low" | "medium" | "high";
+  reasoning: AimStartReasoning;
   minimumAnswersBeforeConclusion: number;
   interaction: "unattended" | "interactive";
 }
+/** `auto` lets the task decide; AIM map data never stores it (the root draft omits it). */
+export type AimStartReasoning = "auto" | "low" | "medium" | "high";
 type ModelChoice = { id: string; label: string };
 type ModelRefreshResult = ModelChoice[] | { models: ModelChoice[]; message?: string; preserveSelection?: boolean };
 
@@ -40,7 +42,7 @@ export class AimStartModal extends Modal {
     private submit: (input: AimStartInput) => Promise<void>,
     private models: ModelChoice[] = [],
     private defaultModel = FALLBACK_MODEL,
-    private defaultReasoning: "low" | "medium" | "high" = "low",
+    private defaultReasoning: AimStartReasoning = "low",
     private refreshModels?: () => Promise<ModelRefreshResult>
   ) {
     super(app);
@@ -181,6 +183,7 @@ export class AimStartModal extends Modal {
     const reasoning = reasoningLabel.createEl("select");
     reasoning.setAttr("aria-label", t("ui.reasoning_level"));
     for (const [value, label] of [
+      ["auto", t("ui.auto")],
       ["low", t("ui.low")],
       ["medium", t("ui.medium")],
       ["high", t("ui.high")]

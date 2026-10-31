@@ -1,3 +1,4 @@
+import type { TopicMarker } from "./topic-markers";
 import { registerInternalMarkerPresentation } from "./experiences/markdown-context/internal-markers";
 import { registerMermaidZoom, type MermaidZoomHandle } from "./experiences/mermaid-zoom/register";
 import { CoffeeTablesView, COFFEE_TABLES_VIEW_TYPE } from "./experiences/coffee-tables/view";
@@ -63,6 +64,7 @@ import { normalizePresets } from "./ai/prompt-presets";
 import { effectiveReasoningLevel } from "./ai/task-policy";
 import { stepEffort } from "./core/provider-step-runner";
 import type { ReasoningLevel } from "./ai/types";
+import { resolveTaskModel, type ModelChoice } from "./ai/model-resolution";
 import responseSchema from "./response-schema.json";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
@@ -281,6 +283,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   private outlineMap: MapDocument | null = null;
   private outlineTitles = new Map<string, string>();
   private outlineSample = false;
+  private outlineMarkers = new Map<string, TopicMarker[]>();
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
@@ -343,9 +346,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.outlineMap = map;
     this.outlineTitles = titles;
     this.outlineSample = sample;
+    const markers = new Map<string, TopicMarker[]>();
+    for (const [id, note] of notes) if (note.markers?.length) markers.set(id, note.markers);
+    this.outlineMarkers = markers;
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
       if (leaf.view instanceof OutlineView) {
-        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample);
+        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample, markers);
       }
   }
   /** Marks the active outline row without rebuilding the outline. */
@@ -366,7 +372,8 @@ export default class VisualAgentMapPlugin extends Plugin {
             void this.coffeeOutlineSource?.confirmFillSummaries();
           }
         );
-        if (!this.coffeeOutlineActive) leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample);
+        if (!this.coffeeOutlineActive)
+          leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample, this.outlineMarkers);
       }
   }
   /** Called when a map view closes: the outline falls back to another open map, or empties. */
@@ -416,8 +423,8 @@ export default class VisualAgentMapPlugin extends Plugin {
         dom: obsidianTranslateDom(),
         models: () => this.availableModels(),
         modelLabel: model => this.modelLabel(model),
-        defaultModel: () => this.settings.cliModel,
-        reasoning: () => normalizeReasoningLevel(this.settings.cliReasoning),
+        defaultModel: () => this.currentModelChoice().model,
+        reasoning: () => this.currentModelChoice().reasoning,
         confirmAiUsage: (model, run) => this.confirmAiUsage(model, run)
       }
     }).open();
@@ -463,7 +470,9 @@ export default class VisualAgentMapPlugin extends Plugin {
     registerInternalMarkerPresentation(this);
     this.mermaidZoom = registerMermaidZoom(this);
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
-      model: () => this.settings.cliModel,
+      model: () => this.currentModelChoice().model,
+      imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
+      modelLabel: model => this.modelLabel(model),
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: selected =>
         languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
@@ -1007,6 +1016,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.saveSettings();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
+  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
+  currentModelChoice(): ModelChoice {
+    const { model, reasoning } = resolveTaskModel({
+      current: { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }
+    });
+    return { model, reasoning };
+  }
   subscribeCurrentModel(listener: (model: string) => void): () => void {
     this.currentModelListeners.add(listener);
     return () => {
@@ -1119,7 +1135,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         const note = sample.notes.get(source.id)!;
         const created = await this.repo.createNote(
           note.title,
-          this.settings.cliModel,
+          this.currentModelChoice().model,
           map,
           path,
           source.parentId ? "inherited" : "workspace"
@@ -1561,7 +1577,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.pluginDirectory();
     const effort = effectiveReasoningLevel(
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
-      normalizeReasoningLevel(this.settings.cliReasoning)
+      this.currentModelChoice().reasoning
     );
     return this.aiCalls.run(
       prepared,
@@ -1741,7 +1757,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.chartJobs.set(job.path, controller);
     const progressId = `charts-${++this.chartProgressSeq}`;
     this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
     this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async (): Promise<void> => {

@@ -17,7 +17,9 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import { relationLabelPoint, relationPathData, type RelationBox } from "./relation-geometry";
+import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
+import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
+import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -80,8 +82,16 @@ import {
   arrangeNewTree,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
-  medianHeight
+  layoutDirectionFor,
+  layoutDirectionOf,
+  layoutOf,
+  medianHeight,
+  reorderTopLevel,
+  type LayoutKind,
+  type LayoutSpacing
 } from "../../map-layout";
+import { neighborKey, type NavigationSide } from "../../layouts/navigation";
+import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchDirection } from "../../layouts/compose";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
@@ -297,6 +307,14 @@ import {
   NoteCollectionModal,
   TopicPickerModal
 } from "./modals";
+
+const BRANCH_DIRECTIONS: BranchDirection[] = ["right", "left", "down", "up"];
+const BRANCH_LABEL = {
+  right: "ui.layout_direction_right",
+  left: "ui.layout_direction_left",
+  down: "ui.layout_direction_down",
+  up: "ui.layout_direction_up"
+} as const;
 export const VIEW_TYPE = "visual-agent-map-view";
 interface Action {
   undo: () => Promise<void>;
@@ -406,6 +424,7 @@ interface MergeTask {
   /** Parent mode: the parent topic that keeps its card (first of `sources`); null when a new topic replaces siblings. */
   targetId: string | null;
   model: string;
+  reasoning: ModelChoice["reasoning"];
   /** The sources as sent to the model (JSON of the reference documents); compared again before the draft is saved. */
   sourceContent: string;
   controller: AbortController;
@@ -435,12 +454,35 @@ type SynthesisWrite = (
 /** Unique ids for the hidden card labels; any view may render a card. */
 let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
+/** The model tag drawn in a card header, so a redraw replaces exactly it. */
+const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
+/** The marker row drawn in each card header, so a refresh can replace it. */
+const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
 /** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
 const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
+/** `layoutDirectionFor` for many ids at once: builds the id lookup one time and remembers each answer. */
+function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: string) => string {
+  if (!allowsBranchLayout(mapDirection)) return () => mapDirection;
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const known = new Map<string, string>();
+  const resolve = (id: string, seen: Set<string>): string => {
+    const hit = known.get(id);
+    if (hit !== undefined) return hit;
+    const node = byId.get(id);
+    let answer = mapDirection;
+    if (node && !seen.has(id)) {
+      seen.add(id);
+      answer = branchDirectionOf(node) ?? (node.parentId ? resolve(node.parentId, seen) : mapDirection);
+    }
+    known.set(id, answer);
+    return answer;
+  };
+  return id => resolve(id, new Set());
+}
 function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
@@ -455,6 +497,13 @@ type CardBox = RelationBox;
 const RELATION_LABEL_MIN_ZOOM = 0.6;
 /** A note shown under an expanded label is cut to this many characters. */
 const RELATION_LABEL_NOTE_MAX = 60;
+/** A card's distance from its root (a root is 0); only the fishbone edge reads it. */
+function depthOf(nodes: MapNode[], id: string): number {
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  let depth = 0;
+  for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId)) depth++;
+  return depth;
+}
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -843,6 +892,9 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
   private aimProgressEls = new Map<string, HTMLElement>();
+  /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
+  private aimBranchModels = new Map<string, string>();
+  private aimBranchModelPending = new Set<string>();
   private aimProgressTimer: number | null = null;
   private aimProgressRenderTimer: number | null = null;
   private aimFailedReports = new Map<string, { runId: string; diagnosticNotePath: string }>();
@@ -1356,8 +1408,7 @@ export class VisualAgentMapView extends ItemView {
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
     const configuredModel = this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    const defaultReasoning =
-      configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const defaultReasoning = configuredReasoning;
     const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
     const modelChoices = modelIds.map(id => ({
       id,
@@ -1540,7 +1591,7 @@ export class VisualAgentMapView extends ItemView {
       generate: async (request, signal, started) => {
         if (this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -1566,7 +1617,7 @@ export class VisualAgentMapView extends ItemView {
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -1801,7 +1852,7 @@ export class VisualAgentMapView extends ItemView {
     showWindow({
       review: async (signal, started) => {
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) cancels; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -1829,7 +1880,7 @@ export class VisualAgentMapView extends ItemView {
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -1961,10 +2012,10 @@ export class VisualAgentMapView extends ItemView {
    * very same command the run uses, so sending only has to write the prompt.
    */
   private prewarmRelevance(mode: RelevanceMode): void {
-    const settings = this.plugin.settings;
+    const { model, reasoning } = this.plugin.currentModelChoice();
     this.plugin.prewarmClaudeStep?.(
-      settings.cliModel,
-      normalizeReasoningLevel(settings.cliReasoning),
+      model,
+      reasoning,
       mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
     );
   }
@@ -2305,7 +2356,7 @@ export class VisualAgentMapView extends ItemView {
         });
         this.updateHistoryButtons();
       });
-      const model = settings.cliModel;
+      const { model, reasoning: gradeReasoning } = this.plugin.currentModelChoice();
       // The run stays "running" (the map is locked and Stop works) but the bar must not claim grading while the
       // usage notice waits for an answer.
       // Only a notice that really opens needs the bar to say so; otherwise this is not repainted at all.
@@ -2332,7 +2383,7 @@ export class VisualAgentMapView extends ItemView {
           nodes: basis,
           language: settings.language,
           model,
-          reasoning: normalizeReasoningLevel(settings.cliReasoning),
+          reasoning: gradeReasoning,
           ...(pins.length ? { pins } : {})
         };
         const hooks = {
@@ -2778,7 +2829,9 @@ export class VisualAgentMapView extends ItemView {
         map.nodes,
         parent.id,
         new Set([node.id, ...descendants(map.nodes, node.id)]),
-        this.cardHeightOf
+        this.cardHeightOf,
+        undefined,
+        layoutOf(map)
       );
     });
   }
@@ -2823,7 +2876,7 @@ export class VisualAgentMapView extends ItemView {
       if (changed) {
         await this.mapChange(map => {
           applyCollapseLevel(map.nodes, shownLevels);
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
         });
         if (this.history.undoEntry) this.history.undoEntry.label = t("ui.collapse_levels");
         this.updateHistoryButtons();
@@ -2834,9 +2887,34 @@ export class VisualAgentMapView extends ItemView {
   private autoLayout(): void {
     this.enqueue(() =>
       this.mapChange(map => {
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
       }, false)
     );
+  }
+  /**
+   * Stores the map's arrangement and spacing and re-arranges the whole map in one undo step. A right map at standard
+   * spacing leaves no `layout` field; a standard spacing is never stored.
+   */
+  private setLayout(patch: { direction?: LayoutKind; spacing?: LayoutSpacing }): void {
+    this.enqueue(async () => {
+      if (!this.map || this.map.aim || this.builtIn) return;
+      const before = layoutOf(this.map);
+      const direction = patch.direction ?? before.direction;
+      const spacing = patch.spacing ?? before.spacing ?? "standard";
+      await this.mapChange(map => {
+        if (direction === "right" && spacing === "standard") delete map.layout;
+        else map.layout = spacing === "standard" ? { direction } : { direction, spacing };
+        // A branch layout that points against the new direction would be dropped on the next parse; drop it now.
+        cleanBranchLayouts(map.nodes, direction);
+        // A new balanced map deals the topics out again instead of keeping the sides they stand on.
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map), {
+          reset: direction === "balanced" && before.direction !== "balanced"
+        });
+        // A balanced map decides each topic's side while arranging, so check once more with the new sides.
+        if (direction === "balanced") cleanBranchLayouts(map.nodes, direction);
+      }, false);
+      this.fit();
+    });
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
   private openLayoutMenu(event: MouseEvent): void {
@@ -2854,6 +2932,42 @@ export class VisualAgentMapView extends ItemView {
           .onClick(() => this.collapseTo(choice.levels))
       );
     menu.addSeparator();
+    // An AIM map and the built-in sample always grow to the right.
+    if (this.map && !this.map.aim && !this.builtIn) {
+      const current = layoutOf(this.map);
+      const directions: { direction: LayoutKind; title: string; icon: string }[] = [
+        { direction: "right", title: t("ui.layout_direction_right"), icon: "arrow-right" },
+        { direction: "left", title: t("ui.layout_direction_left"), icon: "arrow-left" },
+        { direction: "down", title: t("ui.layout_direction_down"), icon: "arrow-down" },
+        { direction: "up", title: t("ui.layout_direction_up"), icon: "arrow-up" },
+        { direction: "balanced", title: t("ui.layout_direction_balanced"), icon: "move-horizontal" },
+        { direction: "radial", title: t("ui.layout_direction_radial"), icon: "orbit" },
+        { direction: "timeline", title: t("ui.layout_direction_timeline"), icon: "git-commit-horizontal" },
+        { direction: "fishbone", title: t("ui.layout_direction_fishbone"), icon: "fish" }
+      ];
+      for (const choice of directions)
+        menu.addItem(item =>
+          item
+            .setTitle(choice.title)
+            .setIcon(choice.icon)
+            .setChecked(choice.direction === current.direction)
+            .onClick(() => this.setLayout({ direction: choice.direction }))
+        );
+      menu.addSeparator();
+      const spacings: { spacing: LayoutSpacing; title: string }[] = [
+        { spacing: "compact", title: t("ui.layout_spacing_compact") },
+        { spacing: "standard", title: t("ui.layout_spacing_standard") },
+        { spacing: "spacious", title: t("ui.layout_spacing_spacious") }
+      ];
+      for (const choice of spacings)
+        menu.addItem(item =>
+          item
+            .setTitle(choice.title)
+            .setIcon("move-vertical")
+            .setChecked(choice.spacing === (current.spacing ?? "standard"))
+            .onClick(() => this.setLayout({ spacing: choice.spacing }))
+        );
+    }
     menu.addItem(item =>
       item
         .setTitle(t("ui.auto_layout"))
@@ -3063,10 +3177,10 @@ export class VisualAgentMapView extends ItemView {
               const outlineTop = next.nodes.find(node => node.id === top.id)!;
               if (owner) {
                 owner.collapsed = false;
-                next.nodes = arrangeNewBranch(next.nodes, owner.id, ids, this.cardHeightOf);
+                next.nodes = arrangeNewBranch(next.nodes, owner.id, ids, this.cardHeightOf, undefined, layoutOf(next));
               } else {
                 outlineTop.parentId = null;
-                next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf);
+                next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf, layoutOf(next));
               }
               after = clone(next);
             })
@@ -3870,6 +3984,7 @@ export class VisualAgentMapView extends ItemView {
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
   private onAimProgress(event: AimProgressEvent): void {
     if (this.closed || event.mapPath !== this.path) return;
+    this.ensureAimBranchModel(event.branchId);
     let structural = false;
     if (event.kind === "plan") {
       this.aimProgress = {
@@ -3921,6 +4036,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private stopAimProgress(): void {
     this.aimProgress = null;
+    this.aimBranchModels.clear();
     this.aimProgressEls.clear();
     if (this.aimProgressTimer !== null) window.clearInterval(this.aimProgressTimer);
     if (this.aimProgressRenderTimer !== null) window.clearTimeout(this.aimProgressRenderTimer);
@@ -3936,6 +4052,24 @@ export class VisualAgentMapView extends ItemView {
       Math.round((Date.now() - (target.startedAt ?? Date.now())) / 1000)
     );
   }
+  /** The branch root topic's resolved model, read once per branch (the cache answers every later event and tick). */
+  private ensureAimBranchModel(branchId: string): void {
+    if (this.aimBranchModels.has(branchId) || this.aimBranchModelPending.has(branchId)) return;
+    const branches = this.map?.aim?.branches ?? [];
+    let root = branches.find(item => item.id === branchId);
+    for (let depth = 0; root?.parentBranchId && depth < branches.length; depth++)
+      root = branches.find(item => item.id === root?.parentBranchId) ?? root;
+    const node = root && this.map?.nodes.find(item => item.id === root.questionNodeId);
+    if (!node) return;
+    this.aimBranchModelPending.add(branchId);
+    void this.plugin.repo
+      .resolveTopicModel(node.path, this.map ?? undefined)
+      .then(resolved => {
+        if (!this.closed && this.aimProgress) this.aimBranchModels.set(branchId, resolved.model);
+      })
+      .catch(() => {})
+      .finally(() => this.aimBranchModelPending.delete(branchId));
+  }
   private aimStageText(): string {
     const progress = this.aimProgress;
     if (!progress) return "";
@@ -3950,7 +4084,9 @@ export class VisualAgentMapView extends ItemView {
             targets.length
           )
         : t(AIM_STAGE_KEYS[progress.stage] ?? "ui.aim_stage_research");
-    return t("ui.aim_stage_with_elapsed_0_1", stage, clock);
+    const model = this.aimBranchModels.get(progress.branchId);
+    const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
+    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   private paintAimProgress(): void {
@@ -4016,6 +4152,12 @@ export class VisualAgentMapView extends ItemView {
       : "";
   }
   private researchStageText(progress: ResearchProgress): string {
+    const stage = this.researchStageName(progress);
+    return progress.model
+      ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model))
+      : stage;
+  }
+  private researchStageName(progress: ResearchProgress): string {
     switch (progress.stage) {
       case "searching":
         return progress.query ? t("ui.research_stage_searching_0", progress.query) : t("ui.research_stage_searching");
@@ -4059,11 +4201,11 @@ export class VisualAgentMapView extends ItemView {
    * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
    * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
    */
-  private startTaskProgress(key: string): { observer?: ResearchObserver; end: () => void } {
+  private startTaskProgress(key: string, model: string): { observer?: ResearchObserver; end: () => void } {
     const progress = this.plugin.researchProgress;
     if (!progress || progress.get(key)) return { end: () => {} };
     let attempt = "starting";
-    progress.begin(key, attempt, Date.now());
+    progress.begin(key, attempt, Date.now(), model);
     return {
       observer: {
         onAttempt: id => {
@@ -4333,7 +4475,7 @@ export class VisualAgentMapView extends ItemView {
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
           if (adopter) adopter.collapsed = false;
-          map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf);
+          map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf, undefined, layoutOf(map));
         }
         this.removeAimReferences(map, ids, prior.nodes);
       })
@@ -4431,12 +4573,18 @@ export class VisualAgentMapView extends ItemView {
    * The model of a merged topic: the common parent's model like a new subtopic, else the workspace model. In parent mode
    * the parent topic itself is the one whose model counts.
    */
-  private async mergeModel(parentId: string | null): Promise<string> {
+  private async mergeModel(parentId: string | null): Promise<ModelChoice> {
     const parent = parentId ? this.map?.nodes.find(node => node.id === parentId) : undefined;
-    return resolveMergeModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).model : undefined,
-      this.plugin.settings.cliModel
-    );
+    const current: ModelChoice = {
+      model: this.plugin.settings.cliModel,
+      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
+    };
+    if (!parent) return current;
+    const resolved = await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined);
+    return {
+      model: resolveMergeModel(resolved.model, current.model),
+      reasoning: resolved.reasoning
+    };
   }
   /**
    * Starts the AI merge from the dialog. The usage notice comes first (declining leaves the dialog open and starts
@@ -4471,7 +4619,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.merge_draft_stale"));
       return false;
     }
-    const model = await this.mergeModel(snapshot.targetId ?? snapshot.parentId);
+    const { model, reasoning } = await this.mergeModel(snapshot.targetId ?? snapshot.parentId);
     let began = false;
     const accepted = await this.plugin.confirmAiUsage(model, async () => {
       if (signal.aborted || !stillValid()) return;
@@ -4485,6 +4633,7 @@ export class VisualAgentMapView extends ItemView {
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
         model,
+        reasoning,
         sourceContent: "",
         controller: new AbortController(),
         state: "running",
@@ -4505,7 +4654,7 @@ export class VisualAgentMapView extends ItemView {
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   private async runMergeDraft(task: MergeTask): Promise<void> {
     const language = this.plugin.settings.language;
-    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath));
+    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
     try {
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
@@ -4537,7 +4686,7 @@ export class VisualAgentMapView extends ItemView {
         this.plugin.askModel(
           context,
           task.model,
-          this.plugin.settings.cliReasoning,
+          task.reasoning,
           task.controller.signal,
           undefined,
           undefined,
@@ -4757,7 +4906,7 @@ export class VisualAgentMapView extends ItemView {
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
     }
-    const model = content?.task.model ?? (await this.mergeModel(check.parentId));
+    const model = content?.task.model ?? (await this.mergeModel(check.parentId)).model;
     // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
     const firstNote = this.notes.get(sources[0].id),
       firstKind = firstNote?.topicKind,
@@ -4815,7 +4964,8 @@ export class VisualAgentMapView extends ItemView {
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
           this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
-          if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
+          if (adopted.size)
+            map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf, undefined, layoutOf(map));
         })
         .commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -4916,7 +5066,8 @@ export class VisualAgentMapView extends ItemView {
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
           this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
-          if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
+          if (adopted.size)
+            map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf, undefined, layoutOf(map));
         })
         .commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -5134,7 +5285,7 @@ export class VisualAgentMapView extends ItemView {
       }
       map.nodes.find(node => node.id === target.id)!.collapsed = false;
       // One layout for the moved branches under the target, in the same history entry as the move.
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf);
+      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutDirectionOf(map));
     });
     this.multiSelected.clear();
     this.render();
@@ -5266,7 +5417,14 @@ export class VisualAgentMapView extends ItemView {
           if (!found) throw new Error(t("ui.outline_import_selected_missing"));
           map.nodes.push(...copies);
           found.collapsed = false;
-          map.nodes = arrangeNewBranch(map.nodes, target.id, new Set(copies.map(copy => copy.id)), this.cardHeightOf);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            target.id,
+            new Set(copies.map(copy => copy.id)),
+            this.cardHeightOf,
+            undefined,
+            layoutDirectionOf(map)
+          );
         })
         .commit();
     } catch (error) {
@@ -6629,6 +6787,12 @@ export class VisualAgentMapView extends ItemView {
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
+    this.paintCardMarkers(card, header, node.id);
+    // The model tag follows the marker row (see paintModelTag).
+    this.paintModelTag(card, header, note);
+    // The topic colour comes last: its attribute and its name part (see paintCardColor).
+    this.paintCardColor(card, note, !!node.aimKind);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -6752,7 +6916,7 @@ export class VisualAgentMapView extends ItemView {
             this.mapChange(map => {
               const n = map.nodes.find(n => n.id === node.id)!;
               n.collapsed = !n.collapsed;
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
             })
           )
       );
@@ -7128,7 +7292,7 @@ export class VisualAgentMapView extends ItemView {
     const nodes = superseded.size ? shown.filter(node => !superseded.has(node.id)) : shown;
     // A view only: these copies carry display positions and must never be written back to the map.
     return this.relevanceSortOn()
-      ? relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, superseded)
+      ? relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, superseded, layoutOf(this.map))
       : nodes;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
@@ -7141,11 +7305,43 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) return undefined;
     const shown = this.canvasNodes();
     const byY = (a: MapNode, b: MapNode): number => a.y - b.y || a.x - b.x;
-    if (key === "ArrowLeft") return shown.find(item => item.id === node.parentId);
-    if (key === "ArrowRight") return shown.filter(item => item.parentId === node.id).sort(byY)[0];
-    const siblings = shown.filter(item => (item.parentId ?? null) === (node.parentId ?? null)).sort(byY);
+    const byX = (a: MapNode, b: MapNode): number => a.x - b.x || a.y - b.y;
+    // Cards in a branch with its own arrangement follow that arrangement's keys; timeline, radial and fishbone follow the right map's.
+    const direction = layoutDirectionFor(this.map.nodes, node.id, layoutOf(this.map).direction) as LayoutKind;
+    const byId = new Map(shown.map(item => [item.id, item]));
+    // In a balanced map a card's half is the half of its first-level topic; the root has none.
+    const sideOf = (card: MapNode): NavigationSide => {
+      if (!card.parentId) return "root";
+      let top = card;
+      for (let guard = 0; top.parentId && guard < 10000; guard++) {
+        const up = byId.get(top.parentId);
+        if (!up?.parentId) break;
+        top = up;
+      }
+      const root = byId.get(top.parentId ?? "");
+      return root && top.x < root.x ? "left" : "right";
+    };
+    const move = neighborKey(direction, key, direction === "balanced" ? sideOf(node) : undefined);
+    const vertical = direction === "down" || direction === "up";
+    const order = vertical ? byX : byY;
+    const kids = shown.filter(item => item.parentId === node.id).sort(order);
+    if (move === "parent") return shown.find(item => item.id === node.parentId);
+    if (move === "child") return kids[0];
+    if (move === "child-left" || move === "child-right") {
+      const root = byId.get(node.id) ?? node;
+      return shown
+        .filter(item => item.parentId === node.id && item.x < root.x === (move === "child-left"))
+        .sort(byY)[0];
+    }
+    let siblings = shown.filter(item => (item.parentId ?? null) === (node.parentId ?? null));
+    // A balanced root keeps each half's topics in their own walk.
+    if (direction === "balanced" && node.parentId && !byId.get(node.parentId)?.parentId) {
+      const mine = sideOf(node);
+      siblings = siblings.filter(item => sideOf(item) === mine);
+    }
+    siblings.sort(order);
     const index = siblings.findIndex(item => item.id === node.id);
-    return siblings[index + (key === "ArrowUp" ? -1 : 1)];
+    return move === "sibling-" ? siblings[index - 1] : move === "sibling+" ? siblings[index + 1] : undefined;
   }
   private moveKeyboardFocus(target: MapNode): void {
     const card =
@@ -7279,6 +7475,109 @@ export class VisualAgentMapView extends ItemView {
   }
   private hypothesisTagText(strength: HypothesisStrength): string {
     return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
+  }
+  /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
+  private markersOf(id: string): TopicMarker[] {
+    const raw = this.notes.get(id)?.markers;
+    return raw ? TOPIC_MARKERS.filter(marker => raw.includes(marker)) : [];
+  }
+  /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
+  private markersText(markers: readonly TopicMarker[]): string {
+    return markers.length
+      ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
+      : "";
+  }
+  /**
+   * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
+   * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
+   */
+  private paintModelTag(card: HTMLElement, header: HTMLElement, note: Note | undefined): void {
+    const old = cardModelTags.get(header);
+    cardModelTags.delete(header);
+    const previous = card.dataset.modelText ?? "";
+    // The accessible name is the card label (aria-labelledby), so the model part is merged into it and replaced on a redraw.
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (note?.modelOverride) {
+      const label = this.plugin.modelLabel(note.model),
+        text = t("ui.card_model_override_0", label),
+        tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
+      // The card name already carries the text, so the tag itself is hidden from screen readers (no second reading).
+      tag.setAttr("aria-hidden", "true");
+      tag.setAttr("title", text);
+      // In place on a redraw; otherwise right after the marker row (painted first), so renderNode and refreshCard agree.
+      const row = cardMarkerRows.get(card);
+      if (old) old.replaceWith(tag);
+      else if (row && row.parentElement === header) row.after(tag);
+      cardModelTags.set(header, tag);
+      card.dataset.modelText = text;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
+    } else {
+      old?.remove();
+      delete card.dataset.modelText;
+      if (named) this.labelCard(card, named);
+    }
+  }
+  /**
+   * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
+   * name. Safe to call again: the old symbols and the old name part are replaced.
+   */
+  private paintCardMarkers(card: HTMLElement, header: HTMLElement, id: string): void {
+    const old = cardMarkerRows.get(card);
+    cardMarkerRows.delete(card);
+    const markers = this.markersOf(id),
+      text = this.markersText(markers),
+      previous = card.dataset.markerText ?? "";
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (markers.length) {
+      // After the type tag on a first draw; a redraw puts the new row where the old one was.
+      const kindTag = old ? null : header.querySelector(".vam-hypothesis-tag");
+      const row = header.createSpan("vam-card-markers vam-hypothesis-tag");
+      if (old) old.replaceWith(row);
+      else if (kindTag) kindTag.after(row);
+      row.setAttr("aria-hidden", "true");
+      cardMarkerRows.set(card, row);
+      for (const marker of markers) {
+        const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker) });
+        mark.dataset.marker = marker;
+      }
+      card.dataset.markerText = text;
+    } else {
+      old?.remove();
+      delete card.dataset.markerText;
+    }
+    if (named) this.labelCard(card, text ? t("ui.topic_card_label_0_1", named, text) : named);
+  }
+  /**
+   * Sets `data-topic-color` (only a whitelisted id; the value is never copied from the note as it is) and adds "Color: Red"
+   * to the card's accessible name, like the marker and model parts: the old part is taken out first, so a redraw replaces
+   * it in place and never doubles it. An AIM card has its own look and shows no topic colour. Safe to call again.
+   */
+  private paintCardColor(card: HTMLElement, note: Note | undefined, aim: boolean): void {
+    const previous = card.dataset.colorText ?? "";
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    const id = aim ? undefined : TOPIC_COLORS.find(color => color === note?.color);
+    if (id) {
+      const text = t("share.viewer_color_0", t(colorLabelKey(id)));
+      card.dataset.topicColor = id;
+      card.dataset.colorText = text;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
+    } else {
+      delete card.dataset.topicColor;
+      delete card.dataset.colorText;
+      if (named) this.labelCard(card, named);
+    }
   }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   private labelCard(card: HTMLElement, text: string): void {
@@ -7477,6 +7776,11 @@ export class VisualAgentMapView extends ItemView {
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    if (header) {
+      this.paintCardMarkers(card, header, node.id);
+      this.paintModelTag(card, header, note);
+    }
+    this.paintCardColor(card, note, !!node.aimKind);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -7783,6 +8087,9 @@ export class VisualAgentMapView extends ItemView {
     if (mode !== "structure") return;
     // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
+    if (note) this.renderMarkerSection(panel, node);
+    if (note) this.renderColorSection(panel, node);
+    this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
@@ -7837,8 +8144,8 @@ export class VisualAgentMapView extends ItemView {
           const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
           if (parent) {
             parent.collapsed = false;
-            map.nodes = arrangeNewBranch(map.nodes, parent.id, branch, this.cardHeightOf);
-          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
+            map.nodes = arrangeNewBranch(map.nodes, parent.id, branch, this.cardHeightOf, undefined, layoutOf(map));
+          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutOf(map));
         });
       });
     };
@@ -8391,6 +8698,189 @@ export class VisualAgentMapView extends ItemView {
     }
     parent.insertBefore(svg, null);
   }
+  /** Markers can be edited only on an ordinary editable map: not the sample, an AIM map or the select mode. */
+  private markersEditable(node: MapNode): boolean {
+    return this.relationsEnabled() && !node.aimKind && !this.integrationMode;
+  }
+  /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
+  private renderMarkerSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-marker-section");
+    section.createEl("strong", { text: t("ui.topic_markers"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_markers"));
+    const paint = (focusId?: TopicMarker): void => {
+      group.empty();
+      const active = this.markersOf(node.id);
+      for (const id of TOPIC_MARKERS) {
+        const choice = this.button(group, t(markerLabelKey(id)), () => {
+          this.enqueue(async () => {
+            await this.changeTopicMarker(node, id);
+            paint(id);
+          });
+        });
+        choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+        const on = active.includes(id);
+        choice.setAttr("aria-pressed", String(on));
+        if (on) choice.addClass("is-pressed");
+        // Repainting replaced the button; keep the keyboard focus on the one just toggled.
+        if (id === focusId) choice.focus();
+      }
+    };
+    paint();
+  }
+  /** The directions this branch may take of its own: those the parse keeps (never the one opposite its parent's). */
+  private branchLayoutChoices(node: MapNode): BranchDirection[] {
+    const map = this.map;
+    if (!map || map.aim || this.builtIn || !node.parentId) return [];
+    const mapDirection = layoutOf(map).direction;
+    if (!allowsBranchLayout(mapDirection)) return [];
+    // Offer only what `cleanBranchLayouts` keeps: a value it would delete on parse must never be written.
+    return BRANCH_DIRECTIONS.filter(direction => {
+      const trial = clone(map.nodes);
+      const target = trial.find(item => item.id === node.id);
+      if (!target) return false;
+      target.layout = { direction };
+      cleanBranchLayouts(trial, mapDirection);
+      return !!target.layout;
+    });
+  }
+  /** One undo step: sets or clears this branch's own arrangement (null follows the map), then re-arranges. */
+  private async changeBranchLayout(node: MapNode, direction: BranchDirection | null): Promise<void> {
+    if (!this.map || this.map.aim || this.builtIn) return;
+    const latest = this.map.nodes.find(item => item.id === node.id);
+    if (!latest) return;
+    if (direction && !this.branchLayoutChoices(latest).includes(direction)) return;
+    if ((branchDirectionOf(latest) ?? null) === direction) return;
+    await this.mapChange(map => {
+      const current = map.nodes.find(item => item.id === node.id);
+      if (!current) return;
+      if (direction) current.layout = { direction };
+      else delete current.layout;
+      cleanBranchLayouts(map.nodes, layoutOf(map).direction);
+      map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+    }, false);
+  }
+  /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
+  private renderBranchLayoutSection(panel: HTMLElement, node: MapNode): void {
+    const choices = this.branchLayoutChoices(node);
+    if (!choices.length) return;
+    const section = panel.createDiv("vam-inspector-section vam-branch-layout-section");
+    section.createEl("strong", { text: t("ui.branch_layout"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-branch-layout vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.branch_layout"));
+    const current = branchDirectionOf(node) ?? null;
+    const options: { direction: BranchDirection | null; label: string }[] = [
+      { direction: null, label: t("ui.branch_layout_follow") },
+      ...choices.map(direction => ({ direction, label: t(BRANCH_LABEL[direction]) }))
+    ];
+    for (const option of options) {
+      const choice = this.button(group, option.label, () =>
+        this.enqueue(() => this.changeBranchLayout(node, option.direction))
+      );
+      const on = option.direction === current;
+      choice.setAttr("aria-pressed", String(on));
+      if (on) choice.addClass("is-pressed");
+    }
+  }
+  /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
+  private async changeTopicMarker(node: MapNode, id: TopicMarker): Promise<void> {
+    if (!this.map || !this.markersEditable(node)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeTopicMarkers(path, id))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_markers") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
+  private renderColorSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-color-section");
+    section.createEl("strong", { text: t("ui.topic_color"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-colors vam-choice-group");
+    group.setAttr("role", "radiogroup");
+    group.setAttr("aria-label", t("ui.topic_color"));
+    const choices: (TopicColor | null)[] = [null, ...TOPIC_COLORS];
+    const current = (): TopicColor | null =>
+      TOPIC_COLORS.find(color => color === this.notes.get(node.id)?.color) ?? null;
+    const paint = (focusId?: TopicColor | null): void => {
+      group.empty();
+      const active = current();
+      choices.forEach((id, index) => {
+        const choice = this.button(group, id ? t(colorLabelKey(id)) : t("ui.topic_color_none"), () => {
+          this.enqueue(async () => {
+            await this.changeTopicColor(node, id);
+            paint(id);
+          });
+        });
+        if (id) {
+          const swatch = choice.createSpan({ cls: "vam-color-swatch", attr: { "aria-hidden": "true" } });
+          swatch.dataset.topicColorSwatch = id;
+        }
+        const on = id === active;
+        choice.setAttr("role", "radio");
+        choice.setAttr("aria-checked", String(on));
+        if (on) choice.addClass("is-pressed");
+        // One tab stop for the group; the arrow keys move and choose, as in a native radio group.
+        if (!this.renderingCard) choice.tabIndex = on ? 0 : -1;
+        choice.addEventListener("keydown", event => {
+          const step =
+            event.key === "ArrowRight" || event.key === "ArrowDown"
+              ? 1
+              : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                ? -1
+                : 0;
+          if (!step) return;
+          event.preventDefault();
+          const next = (index + step + choices.length) % choices.length;
+          this.enqueue(async () => {
+            await this.changeTopicColor(node, choices[next]);
+            paint(choices[next]);
+          });
+        });
+        // Repainting replaced the button; keep the keyboard focus on the one just chosen.
+        if (focusId !== undefined && id === focusId) choice.focus();
+      });
+    };
+    paint();
+    this.button(
+      section,
+      t("ui.topic_color_apply_branch"),
+      () => this.enqueue(() => this.changeTopicColor(node, current(), true)),
+      branchNoteIds(this.map!.nodes, node.id).length < 2
+    );
+  }
+  /**
+   * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
+   * in one undoable step. Only the notes whose colour really changes are written; Map.md changes only its viewport. A
+   * child never inherits: a branch is just several writes in the same transaction.
+   */
+  private async changeTopicColor(node: MapNode, color: TopicColor | null, branch = false): Promise<void> {
+    if (!this.map || !this.markersEditable(node)) return;
+    const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
+    const targets = ids
+      .map(id => this.map!.nodes.find(item => item.id === id))
+      .filter((item): item is MapNode => !!item && !item.aimKind && !!this.notes.get(item.id))
+      .filter(item => (TOPIC_COLORS.find(id => id === this.notes.get(item.id)?.color) ?? null) !== color);
+    if (!targets.length) return;
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, path => this.plugin.repo.writeTopicColor(path, color));
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_color") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
   /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {
     if (!this.relationsEnabled() || node.aimKind) return;
@@ -8495,13 +8985,18 @@ export class VisualAgentMapView extends ItemView {
     };
     paint();
   }
-  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
+  /**
+   * `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out).
+   * `keyboardFocus` also hands DOM focus to the new card; only the name dialog's save asks for it, because other
+   * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
+   */
   private async addNode(
     parentNode: MapNode | null,
     suggestedTitle?: string,
     rebuildDerivedData = true,
     focus = true,
-    kind: TopicKind = "topic"
+    kind: TopicKind = "topic",
+    keyboardFocus = false
   ): Promise<void> {
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -8514,14 +9009,14 @@ export class VisualAgentMapView extends ItemView {
           ? t("ui.new_subtopic")
           : t("ui.my_core_topic");
       new NameModal(this.app, dialogTitle, "", title =>
-        this.enqueue(() => this.addNode(parent, title, true, true, kind))
+        this.enqueue(() => this.addNode(parent, title, true, true, kind, true))
       ).open();
       return;
     }
-    const model = inheritModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).model : undefined,
-      this.plugin.settings.cliModel
-    );
+    // One resolution: a manual ancestor's model is inherited, otherwise the current model.
+    const model = parent
+      ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+      : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
       return;
@@ -8540,10 +9035,7 @@ export class VisualAgentMapView extends ItemView {
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
       { researchMode: "local", ...(typed ? { topicKind: kind } : {}) }
     );
-    if (parent) {
-      const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
-    }
+    // The child is inherited: its reasoning is resolved at read time (manual ancestor, else current), never written.
     node.parentId = parent?.id ?? null;
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
     node.x = parent ? parent.x + 340 : 80;
@@ -8564,7 +9056,14 @@ export class VisualAgentMapView extends ItemView {
           const minTop = siblings.length
             ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
             : undefined;
-          map.nodes = arrangeNewBranch(map.nodes, owner.id, new Set([node.id]), this.cardHeightOf, minTop);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            owner.id,
+            new Set([node.id]),
+            this.cardHeightOf,
+            minTop,
+            layoutOf(map)
+          );
         } else if (!parent) {
           const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
           if (roots.length)
@@ -8576,7 +9075,10 @@ export class VisualAgentMapView extends ItemView {
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode(this.map?.nodes.find(n => n.id === node.id) ?? node);
+    const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
+    this.focusNode(placed);
+    // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
+    if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   private async proposeChildren(
     parent: MapNode,
@@ -8864,7 +9366,14 @@ export class VisualAgentMapView extends ItemView {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       if (newNodes.length)
         await this.mapChange(map => {
-          map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map(node => node.id)), this.cardHeightOf);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            parent.id,
+            new Set(newNodes.map(node => node.id)),
+            this.cardHeightOf,
+            undefined,
+            layoutOf(map)
+          );
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map(node => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
@@ -8919,7 +9428,14 @@ export class VisualAgentMapView extends ItemView {
         );
         if (!untouched.size) return;
         const current = this.map.nodes;
-        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const arranged = arrangeNewBranch(
+          current,
+          parent.id,
+          untouched,
+          this.cardHeightOf,
+          undefined,
+          layoutOf(this.map)
+        );
         const target = new Map<string, { x: number; y: number }>();
         arranged.forEach((n, index) => {
           if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
@@ -9395,7 +9911,7 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -9526,7 +10042,7 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
     try {
@@ -10071,7 +10587,7 @@ export class VisualAgentMapView extends ItemView {
       this.integrationTask = task;
       own = task;
       this.render();
-      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
+      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
       progress = taskProgress;
       const language = this.plugin.settings.language;
       const result = await this.plugin.askModel(
@@ -10266,7 +10782,7 @@ export class VisualAgentMapView extends ItemView {
     };
     this.integrationTask = task;
     this.render();
-    const progress = this.startTaskProgress(this.taskProgressKey("integration"));
+    const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
     const model = chosen.model;
     const language = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
@@ -11870,7 +12386,7 @@ export class VisualAgentMapView extends ItemView {
             // The layout measures the cards, so the held repaint comes first.
             this.flushChatRender();
             await this.mapChange(map => {
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
             }, false);
             const nodes = this.map?.nodes ?? [];
             const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
@@ -11967,7 +12483,7 @@ export class VisualAgentMapView extends ItemView {
       if (done.has(top.id)) continue;
       if (!top.parentId) {
         const ids = subtree(top.id);
-        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf);
+        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf, layoutOf(this.map));
         for (const id of ids) done.add(id);
         continue;
       }
@@ -11975,7 +12491,7 @@ export class VisualAgentMapView extends ItemView {
       const siblings = tops.filter(other => other.parentId === top.parentId);
       const ids = new Set<string>();
       for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
-      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf);
+      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf, undefined, layoutOf(this.map));
       for (const id of ids) done.add(id);
     }
     return placed;
@@ -12144,7 +12660,7 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChange(map => {
           const target = map.nodes.find(item => item.id === node.id);
           if (target) target.collapsed = collapsed;
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
         });
         return done;
       }
@@ -12152,7 +12668,7 @@ export class VisualAgentMapView extends ItemView {
         // The layout measures the cards, so a held repaint comes first.
         this.flushChatRender();
         await this.mapChange(map => {
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
         }, false);
         return done;
       case "focus_topic": {
@@ -12893,6 +13409,13 @@ export class VisualAgentMapView extends ItemView {
             this.mapChange(map => {
               const current = map.nodes.find(n => n.id === node.id);
               if (!current) return;
+              // A first-level topic dragged in a timeline map is a change of order: re-order, then lay the map out again.
+              const root = current.parentId ? map.nodes.find(n => n.id === current.parentId) : undefined;
+              if (!map.aim && layoutOf(map).direction === "timeline" && root && !root.parentId) {
+                const reordered = reorderTopLevel(map.nodes, root.id, current.id, position.x + card.offsetWidth / 2);
+                map.nodes = arrangeMap(reordered, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+                return;
+              }
               current.x = Math.round(position.x);
               current.y = Math.round(position.y);
             })
@@ -12944,8 +13467,13 @@ export class VisualAgentMapView extends ItemView {
    */
   private dragEdges(id: string, card: HTMLElement): { update: (x: number, y: number) => void } {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
+    const mapDirection = layoutOf(this.map).direction;
+    const nodes = this.map?.nodes ?? [];
+    const directionOf = branchDirectionResolver(nodes, mapDirection);
     const touching: {
       key: string;
+      direction: string;
+      depth: number;
       dragIsParent: boolean;
       far: { x: number; y: number; width: number; height: number };
     }[] = [];
@@ -12956,6 +13484,8 @@ export class VisualAgentMapView extends ItemView {
       if (!other) continue;
       touching.push({
         key,
+        direction: directionOf(parentId),
+        depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
       });
@@ -12985,7 +13515,16 @@ export class VisualAgentMapView extends ItemView {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
-          if (edge.dragIsParent)
+          if (edge.direction !== "right") {
+            const mine = { x, y, ...size };
+            const kind = edge.direction as LayoutKind;
+            path.setAttribute(
+              "d",
+              edge.dragIsParent
+                ? treeEdgePathData(mine, edge.far, kind, edge.depth)
+                : treeEdgePathData(edge.far, mine, kind, edge.depth)
+            );
+          } else if (edge.dragIsParent)
             path.setAttribute(
               "d",
               edgePathData(x + size.width, y + size.height / 2, edge.far.x, edge.far.y + edge.far.height / 2)
@@ -13007,6 +13546,9 @@ export class VisualAgentMapView extends ItemView {
     const related = new Set(
       this.relationsEnabled() ? (this.map.topicRelations ?? []).map(r => relationPairKey(r.from, r.to)) : []
     );
+    const mapDirection = layoutOf(this.map).direction;
+    const allNodes = this.map.nodes;
+    const directionOf = branchDirectionResolver(allNodes, mapDirection);
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -13015,14 +13557,18 @@ export class VisualAgentMapView extends ItemView {
         if (!parent || !child) continue;
         if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
+        // The edge follows its parent's arrangement, which a branch of its own may change.
+        const direction = directionOf(parentId) as LayoutKind;
         path.setAttribute(
           "d",
-          edgePathData(
-            parent.offsetLeft + parent.offsetWidth,
-            parent.offsetTop + parent.offsetHeight / 2,
-            child.offsetLeft,
-            child.offsetTop + child.offsetHeight / 2
-          )
+          direction === "right"
+            ? edgePathData(
+                parent.offsetLeft + parent.offsetWidth,
+                parent.offsetTop + parent.offsetHeight / 2,
+                child.offsetLeft,
+                child.offsetTop + child.offsetHeight / 2
+              )
+            : treeEdgePathData(boxOf(parent), boxOf(child), direction, depthOf(allNodes, node.id))
         );
         path.addClass("vam-edge");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
@@ -13366,7 +13912,7 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now());
+    progress?.begin(taskPath, progressAttempt, Date.now(), note.model);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;

@@ -658,7 +658,9 @@ export class ShareExporter {
         title: plainWikilinks(note.title),
         summary: plainWikilinks(note.summary),
         status: note.status,
-        ...(note.relevance ? { relevance: note.relevance } : {})
+        ...(note.relevance ? { relevance: note.relevance } : {}),
+        ...(note.markers?.length ? { markers: note.markers } : {}),
+        ...(note.color ? { color: note.color } : {})
       };
       const rendered = this.rendered.get(node.id);
       if (note.detail?.trim()) notesWithContent++;

@@ -124,6 +124,21 @@ integrationTest('the "no conclusion yet" placeholder in a task prompt follows th
     assert.match(seen.ancestors, expected); assert.doesNotMatch(seen.ancestors, absent);
   }
 });
+integrationTest('counterexample: an ordinary research run starts its progress entry with the model that askModel runs (MS-08 F1)', async () => {
+  const { repo, app } = fixture(), n = await topicNote(repo, 'Progress model', 'a');
+  await repo.updateNote(n.path, { prompt: 'Research this' });
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view, askedModel; const begun = [];
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
+    researchProgress: { begin: (...args) => begun.push(args), newAttempt() {}, stage() {}, preview() {}, markSlow() {}, end() {}, get: () => undefined },
+    askModel: async (_context, model) => { askedModel = model; const error = new Error('stop'); error.name = 'AbortError'; throw error; }, mutate: async work => work(), views: () => [view] };
+  view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
+  try { await view.runAgent(n, undefined, undefined, { task: 'Research it' }); } catch { /* the model call is the stop point */ }
+  assert.ok(askedModel, 'the model was asked with a model id');
+  assert.equal(begun.length, 1);
+  assert.equal(begun[0][3], askedModel, 'begin carries the model askModel runs');
+});
 integrationTest('a successful AI task immediately updates summary and MD detail', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
   await repo.updateNote(n.path, { prompt: 'Research this', rules: 'Use a comparison table.', detail: 'Existing detail', newFindings: 'Legacy finding', sourcePaths: ['Other.md'] });
@@ -275,8 +290,8 @@ integrationTest('a completed but stale answer cannot overwrite an edited note', 
   const after = await repo.readNote(n.path);
   assert.equal(after.detail, 'User edit'); assert.equal(after.status, 'idea'); assert.notEqual(after.summary, 'Stale summary');
 });
-integrationTest('new child topics inherit reasoning without activating legacy rules', async () => {
-  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
+integrationTest('new child topics follow the resolved reasoning without activating legacy rules (MS-04)', async () => {
+  const { repo, app, contents } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   await repo.updateNote(parent.path, { rules: 'Use official sources and tables.', reasoning: 'high' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -287,7 +302,11 @@ integrationTest('new child topics inherit reasoning without activating legacy ru
   await view.addNode(parent, 'Child');
   const child = (await repo.readMap(mapPath)).nodes.at(-1);
   assert.equal((await repo.readNote(child.path)).rules, '');
-  assert.equal((await repo.readNote(child.path)).reasoning, 'high');
+  assert.equal(contents.get(child.path).match(/^reasoning-level:/m), null, 'MS-04: an inherited child is created without reasoning-level');
+  assert.equal((await repo.readNote(child.path)).reasoning, DEFAULT_SETTINGS.cliReasoning, 'MS-04: no manual ancestor, so the child follows the current reasoning');
+  await repo.updateNote(parent.path, { model: 'own', modelSource: 'manual', reasoning: 'high' });
+  const manualChild = (await repo.readMap(mapPath)).nodes.at(-1);
+  assert.equal((await repo.readNote(manualChild.path, await repo.readMap(mapPath))).reasoning, 'high', 'MS-04: a manual parent with high gives its child high');
 });
 integrationTest('AI task timeout override reaches both providers with accurate non-Coffee timeout text', async () => {
   const { AiTaskService } = load('core/ai-task-service.ts');

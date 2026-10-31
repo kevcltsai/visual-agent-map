@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { test, load, core, plain, obsidian, DEFAULT_SETTINGS, normalizeReasoningLevel } = require('../support.cjs');
+const { test, integrationTest, load, core, plain, obsidian, DEFAULT_SETTINGS, normalizeReasoningLevel } = require('../support.cjs');
 test('model inheritance distinguishes CLI default from absent parent and copies once', () => {
   assert.equal(core.inheritModel(undefined, 'root-model'), 'root-model');
   assert.equal(core.inheritModel('', 'root-model'), '');
@@ -232,6 +232,115 @@ test('model resolution (MS-01 review): an override brings its own reasoning-leve
   await repo.updateNote(root.path, { model: 'anc-model', modelSource: 'manual' });
   await app.vault.process(repo.file(root.path), content => content.replace(/^reasoning-level:.*\n/m, ''));
   assert.equal((await repo.resolveTopicModel(root.path, map)).reasoning, 'low', 'no reasoning-level in the note: fall back to cliReasoning');
+});
+
+// MS-04: reasoning follows the model resolution; only an override keeps its own stored reasoning-level.
+const rawLevel = (contents, path) => contents.get(path).match(/^reasoning-level: (.*)$/m)?.[1];
+async function reasoningFixture() {
+  const support = require('../support.cjs');
+  const { repo, app, contents } = support.fixture('en'); repo.settings.cliModel = 'cur-model'; repo.settings.cliReasoning = 'low';
+  const root = await support.topicNote(repo, 'Root', 'gpt-5.5');
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', map = support.map([root]); map.id = 'map-a';
+  await app.vault.create(mapPath, support.core.serializeMap(map));
+  const child = await repo.createNote('Child', 'gpt-5.5', map, mapPath, 'inherited');
+  child.parentId = root.id; map.nodes.push(child);
+  return { repo, app, contents, root, child, map, mapPath, support };
+}
+const setFm = (app, repo, path, edit) => app.vault.process(repo.file(path), content => edit(content));
+integrationTest('MS-04: a workspace topic with a stored reasoning-level high follows the current reasoning (low)', async () => {
+  const { repo, app, root } = await reasoningFixture();
+  await setFm(app, repo, root.path, c => c.replace(/^reasoning-level:.*$/m, 'reasoning-level: high'));
+  assert.equal((await repo.readNote(root.path)).reasoning, 'low');
+  assert.equal((await repo.resolveTopicModel(root.path)).reasoning, 'low');
+});
+integrationTest('MS-04: a manual topic keeps its own reasoning (high) while the current one is low', async () => {
+  const { repo, root } = await reasoningFixture();
+  await repo.updateNote(root.path, { model: 'own-model', modelSource: 'manual', reasoning: 'high' });
+  const note = await repo.readNote(root.path);
+  assert.equal(note.reasoning, 'high'); assert.equal(note.model, 'own-model');
+  assert.equal((await repo.resolveTopicModel(root.path)).reasoning, 'high');
+});
+integrationTest('MS-04: an inherited topic takes its manual ancestor\'s reasoning (medium)', async () => {
+  const { repo, root, child, map } = await reasoningFixture();
+  await repo.updateNote(root.path, { model: 'anc', modelSource: 'manual', reasoning: 'medium' });
+  const note = await repo.readNote(child.path, map);
+  assert.equal(note.reasoning, 'medium'); assert.equal(note.model, 'anc');
+});
+integrationTest('MS-04: an inherited topic with no manual ancestor ignores a stored high and uses the current reasoning', async () => {
+  const { repo, app, child, map } = await reasoningFixture();
+  await setFm(app, repo, child.path, c => c.replace(/^reasoning-level:.*$/m, 'reasoning-level: high'));
+  assert.equal((await repo.readNote(child.path, map)).reasoning, 'low');
+});
+integrationTest('MS-04: a manual topic without a stored model uses the current reasoning even if a level is stored', async () => {
+  const { repo, root } = await reasoningFixture();
+  await repo.updateNote(root.path, { modelSource: 'manual', model: '', reasoning: 'high' });
+  const note = await repo.readNote(root.path);
+  assert.equal(note.reasoning, 'low'); assert.equal(note.model, 'cur-model');
+});
+integrationTest('MS-04: changing the current reasoning changes the next read of an existing non-override topic (the askModel input), not an override', async () => {
+  const { repo, root, child, map } = await reasoningFixture();
+  const other = await repo.createNote('Own', 'x', map, 'Agent Workspace/Topics/map-a/Map.md', 'manual', { reasoning: 'high' });
+  repo.settings.cliReasoning = 'medium';
+  assert.equal((await repo.readNote(root.path)).reasoning, 'medium');
+  assert.equal((await repo.readNote(child.path, map)).reasoning, 'medium');
+  assert.equal((await repo.resolveTopicModel(root.path)).reasoning, 'medium');
+  assert.equal((await repo.readNote(other.path, map)).reasoning, 'high');
+  repo.settings.cliReasoning = 'auto';
+  assert.equal((await repo.readNote(root.path)).reasoning, 'auto');
+});
+integrationTest('MS-04: createNote and createNoteAt write reasoning-level only for a manual topic', async () => {
+  const { repo, contents, map, mapPath } = await reasoningFixture();
+  for (const source of ['workspace', 'inherited']) {
+    const n = await repo.createNote(`N ${source}`, 'm', map, mapPath, source, { reasoning: 'high' });
+    assert.equal(rawLevel(contents, n.path), undefined, `createNote ${source}`);
+    const at = await repo.createNoteAt(`A ${source}`, 'm', map, mapPath, source, `${repo.topicFolder(mapPath, 'Notes')}/A ${source}.md`, `id-${source}`, { reasoning: 'high' });
+    assert.equal(rawLevel(contents, at.path), undefined, `createNoteAt ${source}`);
+  }
+  const m = await repo.createNote('N manual', 'm', map, mapPath, 'manual', { reasoning: 'high' });
+  assert.equal(rawLevel(contents, m.path), 'high');
+  const mDefault = await repo.createNote('N manual2', 'm', map, mapPath, 'manual');
+  assert.equal(rawLevel(contents, mDefault.path), 'low');
+  const mAt = await repo.createNoteAt('A manual', 'm', map, mapPath, 'manual', `${repo.topicFolder(mapPath, 'Notes')}/A manual.md`, 'id-manual', { reasoning: 'medium' });
+  assert.equal(rawLevel(contents, mAt.path), 'medium');
+});
+integrationTest('MS-04: upgrade-0.18 notes keep their stored reasoning-level byte for byte; reading ignores it for non-override topics', async () => {
+  const fs = require('node:fs'), path = require('node:path'), support = require('../support.cjs');
+  const root = path.join(__dirname, '..', 'fixtures', 'upgrade-0.18', 'vault');
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]);
+  const notes = walk(root).filter(f => /reasoning-level:/.test(fs.readFileSync(f, 'utf8')));
+  assert.ok(notes.length >= 5, `fixture notes with reasoning-level: ${notes.length}`);
+  const { repo, app, contents } = support.fixture('en'); repo.settings.cliReasoning = 'high';
+  for (const file of notes) {
+    const rel = path.relative(root, file).split(path.sep).join('/');
+    await repo.folder(path.posix.dirname(rel)); await app.vault.create(rel, fs.readFileSync(file, 'utf8'));
+  }
+  for (const file of notes) {
+    const rel = path.relative(root, file).split(path.sep).join('/');
+    const note = await repo.readNote(rel);
+    assert.equal(note.reasoning, 'high', `${rel}: stored low is ignored`);
+    assert.equal(contents.get(rel), fs.readFileSync(file, 'utf8'), `${rel} is byte-identical after reading`);
+  }
+});
+integrationTest('MS-04: a dialog that only changes the model of an old workspace note (stored high, current low) leaves the note reading low', async () => {
+  const { repo, app, root } = await reasoningFixture();
+  await setFm(app, repo, root.path, c => c.replace(/^reasoning-level:.*$/m, 'reasoning-level: high'));
+  // The patch the dialog now saves for workspace -> manual: the model, manual and the level shown (low).
+  await repo.updateNote(root.path, { model: 'picked', modelSource: 'manual', reasoning: 'low' });
+  const note = await repo.readNote(root.path);
+  assert.equal(note.model, 'picked'); assert.equal(note.reasoning, 'low');
+  assert.equal((await repo.resolveTopicModel(root.path)).reasoning, 'low');
+});
+
+integrationTest('MS-04: merge model and reasoning follow the upper topic resolution (manual parent, workspace parent, no parent)', async () => {
+  const { repo, root, child, map, support } = await reasoningFixture();
+  const plugin = { repo, settings: { ...support.DEFAULT_SETTINGS, cliModel: 'cur-model', cliReasoning: 'low' } };
+  const { VisualAgentMapView } = support.load('main.ts', { obsidian: support.obsidian });
+  const view = new VisualAgentMapView({ app: {} }, plugin); view.map = map;
+  assert.deepEqual(plain(await view.mergeModel(root.id)), { model: 'cur-model', reasoning: 'low' });
+  await repo.updateNote(root.path, { model: 'anc', modelSource: 'manual', reasoning: 'high' });
+  assert.deepEqual(plain(await view.mergeModel(root.id)), { model: 'anc', reasoning: 'high' });
+  assert.deepEqual(plain(await view.mergeModel(child.id)), { model: 'anc', reasoning: 'high' });
+  assert.deepEqual(plain(await view.mergeModel(null)), { model: 'cur-model', reasoning: 'low' });
 });
 
 function settingsTabHarness(initial = 'gpt-a') {

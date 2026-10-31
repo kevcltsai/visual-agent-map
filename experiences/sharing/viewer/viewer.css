@@ -17,7 +17,11 @@
   --text-accent: #6f42e0;
   --color-red: #e93147;
   --color-red-rgb: 233, 49, 71;
-  --color-orange: #e9973f;
+  --color-orange: #ec7500;
+  --color-yellow: #e0ac00;
+  --color-green: #08b94e;
+  --color-blue: #086ddd;
+  --color-purple: #7852ee;
   --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
   --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);
   --radius-s: 4px;
@@ -47,6 +51,11 @@
     --text-accent: #a88bfa;
     --color-red: #fb464c;
     --color-red-rgb: 251, 70, 76;
+    --color-orange: #e9973f;
+    --color-yellow: #e0de71;
+    --color-green: #44cf6e;
+    --color-blue: #027aff;
+    --color-purple: #a882ff;
     --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
     --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);
   }
@@ -118,6 +127,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node.vam-node[data-relevance="side"] { opacity: 1; }
 .vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }
+/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */
+.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }
+.vam-outline-item .vam-markers { margin-left: 6px; }
 .vam-status-idea.vam-status-idea { color: var(--text-muted); }
 .vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }
 /* Reading styles for the note HTML that Obsidian rendered at export time. */

@@ -1,3 +1,6 @@
+import type { TopicColor } from "../../topic-colors";
+import type { TopicMarker } from "../../topic-markers";
+
 /**
  * Interface text of the share viewer. The exporter fills it in its own interface language and it travels inside the file
  * (`<script type="application/json" id="vam-ui">`), so the viewer needs no dictionary. `{0}` is replaced by the viewer.
@@ -54,6 +57,14 @@ export interface ShareViewerUi {
   originalText: string;
   /** Shown beside the AI notice: pictures keep their original text. */
   imageTextUntranslated: string;
+  /** Accessible-name part of a topic that has markers; `{0}` is the marker names joined (ticket 33). */
+  markerLabel: string;
+  /** The name of each topic marker, read by screen readers instead of the symbol. */
+  markerNames: Record<TopicMarker, string>;
+  /** Accessible-name part of a topic that has a colour; `{0}` is the colour name (ticket 37). */
+  colorLabel: string;
+  /** The name of each topic colour, so colour is never the only cue. */
+  colorNames: Record<TopicColor, string>;
 }
 
 /**
@@ -103,5 +114,16 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   aiTranslated: "Translated by AI from {0}.",
   aiTranslatedUnknown: "Translated by AI.",
   originalText: "Original",
-  imageTextUntranslated: "Text inside images is not translated."
+  imageTextUntranslated: "Text inside images is not translated.",
+  markerLabel: "Markers: {0}",
+  markerNames: {
+    done: "Done",
+    warning: "Warning",
+    star: "Star",
+    "priority-1": "Priority 1",
+    "priority-2": "Priority 2",
+    "priority-3": "Priority 3"
+  },
+  colorLabel: "Color: {0}",
+  colorNames: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple" }
 };

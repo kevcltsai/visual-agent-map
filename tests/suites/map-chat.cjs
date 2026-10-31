@@ -243,22 +243,41 @@ test('map chat 15: begin shows "Waiting for the model" with seconds inside the A
   f.panel.begin('ask');
   const bubble = find(f.parts.log(), i => hasClass(i, 'is-assistant'));
   assert.ok(s.progress() && bubble.children.includes(s.progress()), 'the stage is a child of the AI message, not a line far away');
-  assert.equal(s.label(), 'Waiting for the model'); assert.equal(s.elapsed().text, ' · 0:00'); assert.equal(s.elapsed().attrs['aria-hidden'], 'true', 'the ticking seconds are hidden from screen readers');
+  assert.equal(s.label(), 'Waiting for the model (Haiku)'); assert.equal(s.elapsed().text, ' · 0:00'); assert.equal(s.elapsed().attrs['aria-hidden'], 'true', 'the ticking seconds are hidden from screen readers');
   assert.ok(!hasClass(s.progress(), 'is-compact'), 'no text yet: the stage fills the empty bubble');
   assert.equal(s.intervals.size, 1, 'one one-second timer');
   f.panel.streamReply('Hello'); s.clock.run();
-  assert.equal(s.label(), 'Writing'); assert.ok(hasClass(s.progress(), 'is-compact'), 'after the first character it becomes a small line under the text');
-  f.panel.setStage('waiting'); assert.equal(s.label(), 'Writing', 'a stage never goes back');
+  assert.equal(s.label(), 'Writing (Haiku)'); assert.ok(hasClass(s.progress(), 'is-compact'), 'after the first character it becomes a small line under the text');
+  f.panel.setStage('waiting'); assert.equal(s.label(), 'Writing (Haiku)', 'a stage never goes back');
   f.panel.finish('Hello world', []);
   assert.equal(s.progress(), undefined, 'finished: no stage left'); assert.equal(s.intervals.size, 0, 'finished: the timer is cleared');
 });
 
+test('map chat MS-08: every model stage names the model the turn was sent with (D4 format); Applying names none; a switch mid-turn changes nothing', () => {
+  const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text;
+  f.panel.begin('ask');
+  assert.equal(s.label(), 'Waiting for the model (Haiku)');
+  assert.equal(live(), 'Waiting for the model (Haiku)', 'the reader hears the same text');
+  f.prefs.model = 'gpt-6'; f.panel.setStage('writing');
+  assert.equal(s.label(), 'Writing (Haiku)', 'the model is read once when the turn begins');
+  f.panel.finish('ok', []); f.panel.begin('again');
+  assert.equal(s.label(), 'Waiting for the model (GPT 6)', 'the next turn reads the model then');
+  f.panel.finish('Here is a plan', []); f.panel.showPlan({ reasons: ['r'], items: ['i'], estimate: 'e', state: 'pending', apply() {}, cancel() {} }); f.panel.setApplying(true);
+  assert.equal(s.label(), 'Applying', 'applying a plan is local work and names no model');
+});
+test('map chat MS-08: a model with no entry in the choices shows its id, and a Chinese interface joins with the middle dot', () => {
+  const s = stageFixture(); const { f } = s;
+  f.prefs.model = 'unlisted:x'; f.panel.begin('ask');
+  assert.equal(s.label(), 'Waiting for the model (unlisted:x)');
+  f.panel.finish('ok', []); f.setLanguage('zh-TW'); f.prefs.model = 'gpt-6'; f.panel.begin('q');
+  assert.match(s.label(), /^.+・GPT 6$/); f.setLanguage('en');
+});
 test('map chat 15: a Codex "writing" activity moves the stage to Writing before any text, and other stages are only named once', () => {
   const s = stageFixture(); const { f } = s;
   const live = () => f.panel.liveEl.text;
-  f.panel.begin('ask'); assert.equal(live(), 'Waiting for the model'); f.panel.setStage('writing'); assert.equal(live(), 'Writing');
-  assert.equal(s.label(), 'Writing'); assert.ok(!hasClass(s.progress(), 'is-compact'), 'no text yet, so still the big form');
-  f.panel.setStage('writing'); f.panel.setStage('waiting'); assert.equal(live(), 'Writing', 'the same or an earlier stage says nothing new');
+  f.panel.begin('ask'); assert.equal(live(), 'Waiting for the model (Haiku)'); f.panel.setStage('writing'); assert.equal(live(), 'Writing (Haiku)');
+  assert.equal(s.label(), 'Writing (Haiku)'); assert.ok(!hasClass(s.progress(), 'is-compact'), 'no text yet, so still the big form');
+  f.panel.setStage('writing'); f.panel.setStage('waiting'); assert.equal(live(), 'Writing (Haiku)', 'the same or an earlier stage says nothing new');
   f.panel.finish('x', []);
 });
 
@@ -305,10 +324,10 @@ test('map chat 15 counter-example: Stop, a failure, a reset and a new turn never
 
 test('map chat 15: the reader hears each stage name once through the live region, and the stream is never read word by word', () => {
   const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text;
-  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model');
-  f.panel.streamReply('a'); s.clock.run(); assert.equal(live(), 'Writing');
-  f.panel.streamReply('ab'); f.panel.streamReply('abc'); s.clock.run(); s.tickSeconds(3); assert.equal(live(), 'Writing', 'more text and ticking seconds say nothing new');
-  f.panel.setStage('writing'); assert.equal(live(), 'Writing');
+  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model (Haiku)');
+  f.panel.streamReply('a'); s.clock.run(); assert.equal(live(), 'Writing (Haiku)');
+  f.panel.streamReply('ab'); f.panel.streamReply('abc'); s.clock.run(); s.tickSeconds(3); assert.equal(live(), 'Writing (Haiku)', 'more text and ticking seconds say nothing new');
+  f.panel.setStage('writing'); assert.equal(live(), 'Writing (Haiku)');
   assert.equal(s.progress().attrs['aria-live'], undefined, 'the stage element itself is not a live region'); assert.equal(f.parts.log().attrs['aria-live'], undefined);
   f.panel.finish('abc', []);
 });
@@ -863,7 +882,7 @@ integrationTest('map chat 15: a pure answer is never told "Applying"; a reply wi
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
   h.control.reply = async (_request, _signal, onReply) => { onReply('Plain answer'); return { reply: 'Plain answer', actions: [], rejected: [] }; };
   h.type('question'); await h.view.sendMapChat();
-  assert.ok(!writes.some(text => text === 'Applying'), 'no actions: the reader hears waiting, writing and the answer only'); assert.deepEqual(plain(writes.slice(0, 3)), ['Preparing', 'Waiting for the model', 'Writing']); assert.match(writes.at(-1), /AI replied: Plain answer/);
+  assert.ok(!writes.some(text => text === 'Applying'), 'no actions: the reader hears waiting, writing and the answer only'); assert.deepEqual(plain(writes.slice(0, 3)), ['Preparing', 'Waiting for the model', 'Writing'].map(name => `${name} (label(claude:sonnet))`)); assert.match(writes.at(-1), /AI replied: Plain answer/);
   writes.length = 0;
   h.control.reply = async () => ({ reply: 'Renaming', actions: [{ kind: 'rename_topic', nodeId: h.ids.a, title: 'New' }], rejected: [] });
   h.type('rename'); await h.view.sendMapChat();
@@ -2267,13 +2286,19 @@ test('map chat E2: the cut is found while parsing: a reply is parsed once, whate
 test('map chat E2: laying a dense single-line reply out costs about one parse of it, not a search that parses many prefixes', () => {
   const spy = spyRender();
   for (const text of [DENSE.repeat(1850), SPARSE.repeat(900)]) {
-    // KF-013: one parse takes a few ms, below what a wall-clock ratio can tell apart on a CI runner. Each sample repeats both
-    // sides until the parse baseline is at least 25 ms; the ratio itself is unchanged.
-    const reps = Math.max(1, Math.ceil(25 / Math.max(bestOf(3, () => spy.parseInline(text.slice(0, 50000))), 0.05)));
+    // KF-013: one parse takes a few ms, below what a wall-clock ratio can tell apart on a CI runner, and best-of-N on each side
+    // separately lets one side land in a quiet moment and the other in a busy one. So each sample repeats both sides until the
+    // parse is at least 25 ms, runs the parse and then the layout back to back, and takes the ratio of that pair; the test uses
+    // the median of 9 pairs, which load shifts for both sides at once. Measured median ratios: a correct layout is at most 1.94
+    // times one parse on a quiet machine (typically 1.3-1.7), but a CI runner measured a median of 2.42 (pairs 0.99-3.09, see
+    // KF-013), so the limit is 5. A layout that parses the reply ten times or searches prefixes is about 7-12 times one parse,
+    // which still fails it; the character count in the test above catches the same regression without a clock.
+    const one = () => spy.parseInline(text.slice(0, 50000));
+    const timed = run => { const start = process.hrtime.bigint(); run(); return Number(process.hrtime.bigint() - start) / 1e6; };
+    const reps = Math.max(1, Math.ceil(25 / Math.max(bestOf(3, one), 0.05)));
     const repeated = run => () => { for (let i = 0; i < reps; i++) run(); };
-    const one = bestOf(9, repeated(() => spy.parseInline(text.slice(0, 50000))));
-    const cut = bestOf(9, repeated(() => spy.__layoutReply(text)));
-    assert.ok(cut <= one * 2, `layout ${cut.toFixed(1)} ms against ${one.toFixed(1)} ms for one parse`);
+    const ratios = Array.from({ length: 9 }, () => { const parse = timed(repeated(one)); return timed(repeated(() => spy.__layoutReply(text))) / parse; }).sort((a, b) => a - b);
+    assert.ok(ratios[4] <= 5, `layout takes ${ratios[4].toFixed(2)} times one parse (median of 9 pairs; ${ratios.map(r => r.toFixed(2)).join(' ')})`);
   }
 });
 
@@ -2941,15 +2966,15 @@ integrationTest('B1 ui: the window is a labelled region; the log has no aria-liv
   assert.equal(chat.logEl.attrs['aria-live'], undefined); assert.notEqual(chat.logEl.attrs.role, 'log'); assert.equal(findAll(chat.bodyEl, i => i.attrs['aria-live'] !== undefined).length, 0, 'nothing in the body is live');
   const writes = []; const live = chat.liveEl; const setText = live.setText.bind(live); live.setText = value => { writes.push(value); setText(value); };
   assert.equal(live.attrs['aria-live'], 'polite'); assert.equal(live.attrs['aria-atomic'], 'true');
-  chat.begin('ask'); for (const part of ['He', 'Hello', 'Hello wor', 'Hello world']) { chat.streamReply(part); await tick(); } eq(writes, ['Waiting for the model', 'Writing'], 'ticket 15: only each stage name is said, once; never the streaming text');
+  chat.begin('ask'); for (const part of ['He', 'Hello', 'Hello wor', 'Hello world']) { chat.streamReply(part); await tick(); } eq(writes, ['Waiting for the model (label(claude:sonnet))', 'Writing (label(claude:sonnet))'], 'ticket 15: only each stage name is said, once; never the streaming text');
   chat.finish('Hello world', [{ status: 'done', text: 'Done: A' }, { status: 'done', text: 'Done: B' }, { status: 'skipped', text: 'Skipped: C (x)' }]);
   eq(writes.slice(2), ['AI replied: Hello world Results: 2 done, 1 skipped'], 'once, with the counts'); assert.equal(live.text, writes[2]);
-  chat.begin('again'); chat.fail('boom'); eq(writes.length, 5); assert.equal(writes[3], 'Waiting for the model'); assert.match(writes[4], /AI chat failed: boom/);
+  chat.begin('again'); chat.fail('boom'); eq(writes.length, 5); assert.equal(writes[3], 'Waiting for the model (label(claude:sonnet))'); assert.match(writes[4], /AI chat failed: boom/);
 });
 
 integrationTest('B1 ui: stopping a turn and applying a plan each say one thing; the long reply in the summary is clipped', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open(); const writes = []; const setText = chat.liveEl.setText.bind(chat.liveEl); chat.liveEl.setText = value => { writes.push(value); setText(value); };
-  chat.begin('q'); chat.streamReply('partial'); chat.markStopped(); eq(writes, ['Waiting for the model', 'Writing', 'Stopped.'], 'ticket 15: the stage names, then the one stop sentence');
+  chat.begin('q'); chat.streamReply('partial'); chat.markStopped(); eq(writes, ['Waiting for the model (label(claude:sonnet))', 'Writing (label(claude:sonnet))', 'Stopped.'], 'ticket 15: the stage names, then the one stop sentence');
   chat.begin('q2'); chat.finish('x'.repeat(500), []); assert.ok(writes.at(-1).length < 200, 'clipped');
 });
 
@@ -3737,9 +3762,9 @@ integrationTest('B3 find_images: nothing is inserted unless a candidate is click
 integrationTest('B3 find_images: the reader hears the candidates once, not while a reply streams', async () => {
   const { h, chat } = await imageHarness(); const gate = deferred();
   h.control.search = async () => { await gate.promise; return imageItems(2); };
-  await apply(h, [findAct(h, 'a')]); assert.equal(chat.liveEl.text, 'Waiting for the model', 'ticket 15: only the stage name is said while searching');
+  await apply(h, [findAct(h, 'a')]); assert.equal(chat.liveEl.text, 'Waiting for the model (label(claude:sonnet))', 'ticket 15: only the stage name is said while searching');
   gate.resolve(); await withTimeout(until(() => lastImages(h).state === 'ready'));
-  assert.equal(chat.liveEl.text, 'Waiting for the model', 'the turn is still streaming: the candidates are held back');
+  assert.equal(chat.liveEl.text, 'Waiting for the model (label(claude:sonnet))', 'the turn is still streaming: the candidates are held back');
   chat.finish('Reply done', []);
   assert.match(chat.liveEl.text, /AI replied: Reply done/); assert.match(chat.liveEl.text, /Found 2 usable pictures\. Pick one to insert into “Body”\./);
   assert.equal(chat.liveEl.text.match(/Found 2 usable pictures/g).length, 1);
@@ -4063,11 +4088,11 @@ test('hypothesis-evidence: the guard refuses adding, switching and removing topi
 test('map chat 16: begin in "preparing" shows Preparing with seconds, and the next stage keeps counting from the press', () => {
   const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text;
   f.panel.begin('ask', undefined, false, 'preparing');
-  assert.equal(s.label(), 'Preparing'); assert.equal(live(), 'Preparing'); assert.equal(s.elapsed().text, ' · 0:00');
+  assert.equal(s.label(), 'Preparing (Haiku)'); assert.equal(live(), 'Preparing (Haiku)'); assert.equal(s.elapsed().text, ' · 0:00');
   s.tickSeconds(4); assert.equal(s.elapsed().text, ' · 0:04');
-  f.panel.setStage('waiting'); assert.equal(s.label(), 'Waiting for the model'); assert.equal(live(), 'Waiting for the model'); assert.equal(s.elapsed().text, ' · 0:04', 'the seconds run from the press');
-  f.panel.streamReply('Hi'); assert.equal(s.label(), 'Writing');
-  f.panel.setStage('preparing'); assert.equal(s.label(), 'Writing', 'a stage never goes back to Preparing');
+  f.panel.setStage('waiting'); assert.equal(s.label(), 'Waiting for the model (Haiku)'); assert.equal(live(), 'Waiting for the model (Haiku)'); assert.equal(s.elapsed().text, ' · 0:04', 'the seconds run from the press');
+  f.panel.streamReply('Hi'); assert.equal(s.label(), 'Writing (Haiku)');
+  f.panel.setStage('preparing'); assert.equal(s.label(), 'Writing (Haiku)', 'a stage never goes back to Preparing');
 });
 
 test('map chat 16: retract takes exactly the two messages back, restores the draft, the open choices, busy, stage and timer', () => {
@@ -4211,7 +4236,7 @@ integrationTest('map chat 16: closing the view while the request is built shows 
 integrationTest('map chat 16: after a map switch with the usage notice open, answering it leaves the live region empty', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   const gate = deferred(); const confirm = h.plugin.confirmAiUsage; h.plugin.confirmAiUsage = async (model, run) => { await gate.promise; return confirm(model, run); };
-  h.type('hello'); const sending = h.view.sendMapChat(); await tick(); assert.equal(chat.liveEl.text, 'Preparing');
+  h.type('hello'); const sending = h.view.sendMapChat(); await tick(); assert.equal(chat.liveEl.text, 'Preparing (label(claude:sonnet))');
   h.view.map.id = 'another-map'; h.repaint(); assert.equal(chat.liveEl.text, '', 'the switch itself clears what was said');
   gate.resolve(); await sending; assert.equal(chat.liveEl.text, '', 'and answering the notice afterwards says nothing');
 });
@@ -4222,7 +4247,7 @@ const resendButton = chat => find(chat.logEl, i => i.tag === 'button' && hasClas
 
 test('map chat 18: the panel shows the slow notice only while waiting, says it once, and any later stage or text removes it', () => {
   const s = stageFixture(); const { f } = s; const live = () => f.panel.liveEl.text; let resent = 0;
-  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model'); f.panel.showSlow('X is responding slowly; still waiting', () => { resent++; });
+  f.panel.begin('q'); assert.equal(live(), 'Waiting for the model (Haiku)'); f.panel.showSlow('X is responding slowly; still waiting', () => { resent++; });
   assert.ok(slowNotice(f.panel), 'shown'); assert.match(visibleText(slowNotice(f.panel)), /X is responding slowly; still waiting/); assert.equal(resendButton(f.panel).text, 'Resend'); assert.equal(resendButton(f.panel).attrs.type, 'button');
   assert.equal(live(), 'X is responding slowly; still waiting', 'said once through the live region'); assert.equal(f.panel.isSlow, true);
   resendButton(f.panel).click(); assert.equal(resent, 1);
@@ -4239,8 +4264,8 @@ test('map chat 18: restartWaiting counts the seconds again, removes the notice a
   const s = stageFixture(); const { f } = s;
   f.panel.begin('q'); s.tickSeconds(25); assert.match(s.elapsed().text, /0:25/); f.panel.showSlow('slow', () => {}); assert.ok(resendButton(f.panel));
   f.panel.restartWaiting();
-  assert.equal(slowNotice(f.panel), undefined); assert.equal(s.label(), 'Waiting for the model'); assert.match(s.elapsed().text, /0:00/, 'the seconds start again'); assert.equal(s.intervals.size, 1, 'one timer');
-  assert.equal(f.panel.transcript().length, 2, 'no second pair of messages'); assert.equal(f.panel.liveEl.text, 'Waiting for the model');
+  assert.equal(slowNotice(f.panel), undefined); assert.equal(s.label(), 'Waiting for the model (Haiku)'); assert.match(s.elapsed().text, /0:00/, 'the seconds start again'); assert.equal(s.intervals.size, 1, 'one timer');
+  assert.equal(f.panel.transcript().length, 2, 'no second pair of messages'); assert.equal(f.panel.liveEl.text, 'Waiting for the model (Haiku)');
   f.panel.markStopped(); f.panel.restartWaiting(); assert.equal(f.panel.stage, null, 'a turn that is not running is not restarted');
 });
 

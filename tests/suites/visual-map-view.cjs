@@ -2049,6 +2049,7 @@ function heFixture(options = {}) {
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
+  plugin.currentModelChoice = () => ({ model: plugin.settings.cliModel, reasoning: plugin.settings.cliReasoning });
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.app = {}; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
   view.notes = options.notes ?? heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}]]);

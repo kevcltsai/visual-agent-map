@@ -167,7 +167,9 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   assert.match(definitions, /ui\.installation_guide/);
   assert.match(source, /this\.settingTab\?\.refreshAfterLanguageChange\(\)/);
   assert.match(mapSource, /setAttr\("aria-label", t\("ui\.reasoning_level"\)\)/);
-  assert.match(mapSource, /save\(\{ reasoning: normalizeReasoningLevel\(reasoning\.value\) \}\)/);
+  const reasoningHandler = mapSource.slice(mapSource.indexOf('reasoning.addEventListener("change"'));
+  assert.match(reasoningHandler.slice(0, 1200), /save\(\{ model: settings\.model, modelSource: "manual", reasoning: level \}\)/, 'a non-override topic stores the whole set as a manual override (MS-04 D1)');
+  assert.match(reasoningHandler.slice(0, 1200), /save\(\{ reasoning: level \}\)/);
 });
 integrationTest('full rebuild refreshes derived data and open views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;

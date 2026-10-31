@@ -408,6 +408,7 @@ interface MergeTask {
   /** Parent mode: the parent topic that keeps its card (first of `sources`); null when a new topic replaces siblings. */
   targetId: string | null;
   model: string;
+  reasoning: ModelChoice["reasoning"];
   /** The sources as sent to the model (JSON of the reference documents); compared again before the draft is saved. */
   sourceContent: string;
   controller: AbortController;
@@ -1358,8 +1359,7 @@ export class VisualAgentMapView extends ItemView {
     const availableModels = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
     const configuredModel = this.plugin.settings.cliModel?.trim() || FALLBACK_MODEL;
     const configuredReasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
-    const defaultReasoning =
-      configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const defaultReasoning = configuredReasoning;
     const modelIds = [...new Set([configuredModel, ...availableModels].filter(Boolean))];
     const modelChoices = modelIds.map(id => ({
       id,
@@ -1542,7 +1542,7 @@ export class VisualAgentMapView extends ItemView {
       generate: async (request, signal, started) => {
         if (this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -1568,7 +1568,7 @@ export class VisualAgentMapView extends ItemView {
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -1803,7 +1803,7 @@ export class VisualAgentMapView extends ItemView {
     showWindow({
       review: async (signal, started) => {
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) cancels; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -1831,7 +1831,7 @@ export class VisualAgentMapView extends ItemView {
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -1963,10 +1963,10 @@ export class VisualAgentMapView extends ItemView {
    * very same command the run uses, so sending only has to write the prompt.
    */
   private prewarmRelevance(mode: RelevanceMode): void {
-    const settings = this.plugin.settings;
+    const { model, reasoning } = this.plugin.currentModelChoice();
     this.plugin.prewarmClaudeStep?.(
-      settings.cliModel,
-      normalizeReasoningLevel(settings.cliReasoning),
+      model,
+      reasoning,
       mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
     );
   }
@@ -2307,7 +2307,7 @@ export class VisualAgentMapView extends ItemView {
         });
         this.updateHistoryButtons();
       });
-      const model = settings.cliModel;
+      const { model, reasoning: gradeReasoning } = this.plugin.currentModelChoice();
       // The run stays "running" (the map is locked and Stop works) but the bar must not claim grading while the
       // usage notice waits for an answer.
       // Only a notice that really opens needs the bar to say so; otherwise this is not repainted at all.
@@ -2334,7 +2334,7 @@ export class VisualAgentMapView extends ItemView {
           nodes: basis,
           language: settings.language,
           model,
-          reasoning: normalizeReasoningLevel(settings.cliReasoning),
+          reasoning: gradeReasoning,
           ...(pins.length ? { pins } : {})
         };
         const hooks = {
@@ -4477,12 +4477,18 @@ export class VisualAgentMapView extends ItemView {
    * The model of a merged topic: the common parent's model like a new subtopic, else the workspace model. In parent mode
    * the parent topic itself is the one whose model counts.
    */
-  private async mergeModel(parentId: string | null): Promise<string> {
+  private async mergeModel(parentId: string | null): Promise<ModelChoice> {
     const parent = parentId ? this.map?.nodes.find(node => node.id === parentId) : undefined;
-    return resolveMergeModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).model : undefined,
-      this.plugin.settings.cliModel
-    );
+    const current: ModelChoice = {
+      model: this.plugin.settings.cliModel,
+      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
+    };
+    if (!parent) return current;
+    const resolved = await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined);
+    return {
+      model: resolveMergeModel(resolved.model, current.model),
+      reasoning: resolved.reasoning
+    };
   }
   /**
    * Starts the AI merge from the dialog. The usage notice comes first (declining leaves the dialog open and starts
@@ -4517,7 +4523,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.merge_draft_stale"));
       return false;
     }
-    const model = await this.mergeModel(snapshot.targetId ?? snapshot.parentId);
+    const { model, reasoning } = await this.mergeModel(snapshot.targetId ?? snapshot.parentId);
     let began = false;
     const accepted = await this.plugin.confirmAiUsage(model, async () => {
       if (signal.aborted || !stillValid()) return;
@@ -4531,6 +4537,7 @@ export class VisualAgentMapView extends ItemView {
         parentId: snapshot.parentId,
         targetId: snapshot.targetId ?? null,
         model,
+        reasoning,
         sourceContent: "",
         controller: new AbortController(),
         state: "running",
@@ -4583,7 +4590,7 @@ export class VisualAgentMapView extends ItemView {
         this.plugin.askModel(
           context,
           task.model,
-          this.plugin.settings.cliReasoning,
+          task.reasoning,
           task.controller.signal,
           undefined,
           undefined,
@@ -4803,7 +4810,7 @@ export class VisualAgentMapView extends ItemView {
         sources.map((_, index) => ({ title: sourceNotes[index].title, detail: sourceNotes[index].detail }))
       );
     }
-    const model = content?.task.model ?? (await this.mergeModel(check.parentId));
+    const model = content?.task.model ?? (await this.mergeModel(check.parentId)).model;
     // The new topic keeps the type (and a hypothesis its strength) of the first source in reading order.
     const firstNote = this.notes.get(sources[0].id),
       firstKind = firstNote?.topicKind,
@@ -8574,13 +8581,18 @@ export class VisualAgentMapView extends ItemView {
     };
     paint();
   }
-  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
+  /**
+   * `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out).
+   * `keyboardFocus` also hands DOM focus to the new card; only the name dialog's save asks for it, because other
+   * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
+   */
   private async addNode(
     parentNode: MapNode | null,
     suggestedTitle?: string,
     rebuildDerivedData = true,
     focus = true,
-    kind: TopicKind = "topic"
+    kind: TopicKind = "topic",
+    keyboardFocus = false
   ): Promise<void> {
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -8593,14 +8605,14 @@ export class VisualAgentMapView extends ItemView {
           ? t("ui.new_subtopic")
           : t("ui.my_core_topic");
       new NameModal(this.app, dialogTitle, "", title =>
-        this.enqueue(() => this.addNode(parent, title, true, true, kind))
+        this.enqueue(() => this.addNode(parent, title, true, true, kind, true))
       ).open();
       return;
     }
-    const model = inheritModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, this.map ?? undefined)).model : undefined,
-      this.plugin.settings.cliModel
-    );
+    // One resolution: a manual ancestor's model is inherited, otherwise the current model.
+    const model = parent
+      ? (await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)).model
+      : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new Notice(t("ui.legacy_map_view_only"));
       return;
@@ -8619,10 +8631,7 @@ export class VisualAgentMapView extends ItemView {
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
       { researchMode: "local", ...(typed ? { topicKind: kind } : {}) }
     );
-    if (parent) {
-      const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
-    }
+    // The child is inherited: its reasoning is resolved at read time (manual ancestor, else current), never written.
     node.parentId = parent?.id ?? null;
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
     node.x = parent ? parent.x + 340 : 80;
@@ -8662,7 +8671,10 @@ export class VisualAgentMapView extends ItemView {
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode(this.map?.nodes.find(n => n.id === node.id) ?? node);
+    const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
+    this.focusNode(placed);
+    // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
+    if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   private async proposeChildren(
     parent: MapNode,

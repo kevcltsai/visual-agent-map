@@ -2,15 +2,25 @@ import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapDocument, MapNode } from "../map-model";
+import { markerSymbol, readTopicMarkers, type TopicMarker } from "../topic-markers";
 import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 /** Lower-case for outline search; U+0307 is dropped so Turkish "İ" (which lowercases to "i" + a combining dot) finds "i". Traditional Chinese folds to Simplified so 图 finds 圖 and vice versa. */
 export const foldOutlineSearch = (text: string): string =>
   toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
+const MARKER_NAME_KEYS = {
+  done: "share.viewer_marker_done",
+  warning: "share.viewer_marker_warning",
+  star: "share.viewer_marker_star",
+  "priority-1": "share.viewer_marker_priority_1",
+  "priority-2": "share.viewer_marker_priority_2",
+  "priority-3": "share.viewer_marker_priority_3"
+} as const satisfies Record<TopicMarker, string>;
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();
+  private markers = new Map<string, TopicMarker[]>();
   private collapsed = new Set<string>();
   private query = "";
   private activePath = "";
@@ -37,13 +47,19 @@ export class OutlineView extends ItemView {
   async onOpen(): Promise<void> {
     this.render();
   }
-  setMap(map: MapDocument | null, titles: Map<string, string>, sample = false): void {
+  setMap(
+    map: MapDocument | null,
+    titles: Map<string, string>,
+    sample = false,
+    markers: Map<string, TopicMarker[]> = new Map()
+  ): void {
     const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
     const restoreFocus = !!search && search === document.activeElement;
     const selection = restoreFocus ? ([search.selectionStart, search.selectionEnd] as const) : null;
     this.map = map;
     this.sample = sample;
     this.titles = titles;
+    this.markers = markers;
     if (map) this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
     this.render();
     if (restoreFocus) {
@@ -193,6 +209,21 @@ export class OutlineView extends ItemView {
       button.title = title;
       button.setAttr("dir", "auto");
       button.setAttr("data-path", node.path);
+      // Only whitelisted ids, in the fixed order. The symbols are decoration; the names reach assistive technology.
+      const marks = readTopicMarkers({ "topic-markers": this.markers.get(node.id) });
+      if (marks.length) {
+        const listSeparator = t("ui.list_separator");
+        const names = marks.map(id => t(MARKER_NAME_KEYS[id])).join(listSeparator);
+        button.setAttr(
+          "aria-label",
+          `${title}${listSeparator === "、" ? "，" : ", "}${t("share.viewer_markers_0", names)}`
+        );
+        const row = button.createSpan("vam-markers");
+        for (const id of marks) {
+          const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+          mark.dataset.marker = id;
+        }
+      }
       if (node.path === this.activePath) {
         button.addClass("is-active");
         button.setAttr("aria-current", "true");

@@ -108,10 +108,15 @@ export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number;
  * detail of a topic (depth 2) hangs on that bone by a horizontal rib that ends at the right edge midpoint of the detail
  * card; whether the topic is above or below the spine follows from where the detail stands. Deeper cards (depth 3 and more)
  * use the "left" curve. `depth` is the child's distance from its root and is only read for "fishbone".
+ * "timeline" joins a first-level topic as "right" does (along the axis) and a detail of it (depth 2 and more) as "down"
+ * when the detail stands below its parent and as "up" when it stands above.
  * "balanced" uses the "left" curve when the child's centre is left of the parent's centre and the "right" curve otherwise.
  */
 export function treeEdgePathData(parent: RelationBox, child: RelationBox, direction: LayoutKind, depth = 1): string {
   if (direction === "radial") return relationPathData(parent, child);
+  // A timeline's first level follows the axis like "right"; a detail hangs below or above its topic like "down" or "up".
+  if (direction === "timeline" && depth >= 2)
+    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
   if (direction === "fishbone")
     return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
   if (direction === "down" || direction === "up") {

@@ -29255,7 +29255,8 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
         model,
         map,
         mapPath,
-        manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
+        // A manual model marks only the top-level topic; its children inherit it and resolve to the same model.
+        top && manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
         // A topic created from an outline starts in Quick mode (its first research, if any, is the short one).
         top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
       );

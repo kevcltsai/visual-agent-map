@@ -1315,6 +1315,8 @@ export class VisualAgentMapView extends ItemView {
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
     if (map.aim?.creationId && map.aim.rootDraft) {
+      // The draft is compared with the current model and reasoning at this moment (plan D9); createAimMap decides
+      // workspace or manual, so no field is added to the map data.
       const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
         requestId: map.aim.creationId,
         topic: map.title,

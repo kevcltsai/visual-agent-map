@@ -26444,7 +26444,11 @@ var MAP_CHAT_MAP_TITLE_LIMIT = 200;
 var TITLE_LIMIT = 200;
 var SUMMARY_LIMIT = 240;
 var ERROR_LIMIT = 200;
-var errorFields = (node) => node.status === "error" ? { status: "error", ...node.error ? { error: clip2(node.error, ERROR_LIMIT) } : {} } : {};
+var errorFields = (node) => node.status === "error" ? {
+  status: "error",
+  ...node.error ? { error: clip2(node.error, ERROR_LIMIT) } : {},
+  ...node.retryWith ? { retryWith: clip2(node.retryWith, TITLE_LIMIT) } : {}
+} : {};
 function contentHash2(text11) {
   let h1 = 3735928559, h2 = 1103547991;
   for (let i = 0; i < text11.length; i++) {

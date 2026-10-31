@@ -4617,3 +4617,18 @@ integrationTest('MS-09 counterexample: targets that do not all share one other-p
   await apply(h, [researchAct({ nodeIds: [h.ids.a, h.ids.b], otherProvider: true })]);
   assert.equal(started.length, 1); assert.equal(started[0].request.model, undefined);
 });
+
+integrationTest('MS-09 (a): the context a chat sends marks a quota failure with retryWith (outline and selected); a timeout carries none', async () => {
+  const h = await harness(); await ms09Fail(h, 'a', 'gpt-6-luna', ms09Quota); await ms09Fail(h, 'b', 'gpt-6-luna', 'The AI call timed out after 300 seconds');
+  h.open(); h.type('why did it fail?'); await h.view.sendMapChat();
+  const context = JSON.parse(h.control.requests[0].context.json); const outline = id => context.outline.find(n => n.id === id);
+  assert.equal(outline(h.ids.a).status, 'error'); assert.match(outline(h.ids.a).error, /usage limit/);
+  assert.equal(outline(h.ids.a).retryWith, 'label(claude:sonnet)', 'the model the retry would use');
+  assert.equal(outline(h.ids.b).status, 'error'); assert.equal(outline(h.ids.b).retryWith, undefined, 'a timeout offers no other provider');
+});
+test('MS-09: buildMapChatContext keeps retryWith next to a failure and drops it without one', () => {
+  const out = (extra = {}) => ({ id: 'a', title: 'A', summary: '', parentId: null, depth: 0, ...extra });
+  const build = outline => JSON.parse(buildMapChatContext({ mapTitle: 'M', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] }).json);
+  assert.equal(build([out({ status: 'error', error: 'x', retryWith: 'L' })]).outline[0].retryWith, 'L');
+  assert.equal(build([out({ retryWith: 'L' })]).outline[0].retryWith, undefined, 'only a failed card carries it');
+});

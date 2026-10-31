@@ -2,6 +2,74 @@
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-01
+
+### One model, everywhere
+
+The model you pick in the chat menu is now the model VAM uses. Pick Claude Sonnet once and research, expand, integrate and the map chat all use it.
+
+- **Only this time, or pin it.** Choosing a model from a menu applies to that run only. To keep a model for one topic, pin it to that topic.
+- **Reasoning follows the model.** Topics that are not pinned use the reasoning level you have chosen now, and the AI Next Step dialog offers Auto.
+- **See which model ran.** Progress text, result lines and pinned-topic cards name the model that actually did the work.
+- **Provider hiccup? Switch in one click.** When Claude or Codex returns an error, press **Retry with** the other provider on the failed step.
+- **Claude only?** If only Claude Code is installed, the sample start no longer shows a Codex connection check.
+
+### More ways to lay out a map
+
+Choose how a map is arranged from the map's layout setting: left, right, down, up, balanced, radial, timeline or fishbone.
+
+- **Down and up** make an org chart. **Radial** puts the root in the middle. **Timeline** lines up the first level in order and alternates details above and below. **Fishbone** puts the root at the head and the first-level topics on the bones.
+- **A different layout for one branch.** Open a topic's menu, choose a layout for that branch, and the rest of the map keeps the map's layout. Remove the setting to go back.
+
+### Pictures on your map
+
+- **Covers.** Give a topic a cover picture; drop an image onto a card to set it.
+- **Free pictures.** Place a picture anywhere on the map canvas.
+- **Frames.** Select several topics and draw a frame, with an optional label, around them. The frame follows the topics when you move or lay them out again; double-click the label to rename it.
+- **Export.** Export the whole map as a PNG or SVG picture, or as a Markdown outline.
+
+### Copy, cut and paste topics
+
+Select a topic and press Cmd/Ctrl+C, then Cmd/Ctrl+V, to copy the branch. Cut and paste moves it.
+
+- **Between maps.** Paste into another map. Cut from one map and paste into another can be undone, and VAM refuses to undo if the other map was changed outside VAM.
+- **Paste an outline.** Paste indented text or a Markdown list, such as "- Market\n  - Pricing", and it becomes branches under the selected topic in one undo step.
+- **OPML and FreeMind.** Import a map from OPML or FreeMind, and export your map in those formats.
+- **Copy to...** Copying a map to a new place now rewrites its links so the copies point to copies, and attachments stay with the right map.
+
+### Find, present and mark
+
+- **Search the map.** Press Cmd/Ctrl+F while the map is focused, type part of a title, and matching topics light up. Press Enter to jump to the next one; folded matches open. Esc closes the search.
+- **Present.** Presentation mode shows one topic at a time, centred, with the rest dimmed. Use the arrow keys or Space to move, and Esc to leave; your view and selection come back.
+- **Markers and colours.** Add markers (done, warning, star, priority) and a colour to any topic or whole branch from its menu. They show on cards, in the outline and in shared HTML.
+- **Keyboard adding.** After you add a topic with the keyboard, focus moves to the new card, and one Undo removes it.
+
+### Topic types and relations
+
+Say what kind of knowledge a topic is, and how topics relate beyond the tree.
+
+- **Types.** Switch a topic between plain topic, atomic fact, hypothesis, evidence, conclusion and action. Each has its own card shape.
+- **Relations.** Link any two topics as supports, contradicts, verifies, derived from, related or prerequisite. Each has its own line style, and you can change the kind, flip the direction or add a note.
+
+### Map AI chat
+
+- **Start from an empty map.** The chat's opening screen offers **Create an empty mind map**.
+- **Know it is working.** The reply bubble shows the stage and seconds at once, a failed send is taken back so you can try again, and after a long wait a notice offers **Resend**.
+- **Codex replies stream** into the bubble as they arrive.
+- **Failed research tells you why.** The reason stays on the topic card, and the chat can read it.
+- Changes the chat makes now add their attachments in the same undo step.
+
+### Changed
+
+- **Choosing a model from a menu no longer pins the topic to it.** It now applies to that run only; pin a model on the topic when you want it kept.
+- **Researching many topics at once no longer writes the model you picked into every topic.**
+
+### Known issues
+
+- A shared HTML page always lays the map out to the right, even when the map uses another layout.
+- Mostly tested with Claude. Codex was only lightly tested.
+- Not yet tested on Windows or Linux.
+
 ## [0.27.1] - 2026-10-30
 
 ### Easier to read shared maps

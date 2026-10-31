@@ -67,3 +67,18 @@ test('counter-example 6: the outline writes collapsed branches in full', () => {
   assert.equal(ex.mapOutline(nodes, id => titles[id]), '- Root\n  - A line\n    - A1\n  - B\n- Orphan');
   assert.equal(ex.mapOutline([{ id: 'x', parentId: 'y' }, { id: 'y', parentId: 'x' }], id => id), '');
 });
+
+test('UI batch 5 G-3: the PNG plumbing makes detached img and canvas elements with the global createEl', async () => {
+  const made = [];
+  const createEl = tag => {
+    const el = { tag, width: 0, height: 0, getContext: () => ({}), toBlob: cb => cb('blob') };
+    if (tag === 'img') Object.defineProperty(el, 'src', { set() { el.onload(); } });
+    made.push(el);
+    return el;
+  };
+  const env = load('experiences/visual-map/map-export.ts', {}, { createEl }).browserPngEnv({ createObjectURL: () => 'blob:x', revokeObjectURL: () => {} });
+  (await env.load('<svg/>')).release();
+  const canvas = env.canvas(4, 3);
+  assert.equal(await canvas.toBlob(), 'blob');
+  assert.deepEqual(made.map(el => [el.tag, el.width]), [['img', 0], ['canvas', 4]]);
+});

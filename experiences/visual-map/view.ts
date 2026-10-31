@@ -5460,7 +5460,8 @@ export class VisualAgentMapView extends ItemView {
     if (!viewport || !v) return null;
     const rect = viewport.getBoundingClientRect(),
       zoom = v.zoom || 1,
-      inside = client && client.x >= rect.left && client.x <= rect.right && client.y >= rect.top && client.y <= rect.bottom;
+      inside =
+        client && client.x >= rect.left && client.x <= rect.right && client.y >= rect.top && client.y <= rect.bottom;
     const local = inside
       ? { x: client.x - rect.left, y: client.y - rect.top }
       : { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
@@ -5490,7 +5491,12 @@ export class VisualAgentMapView extends ItemView {
   private onCanvasContextMenu(event: MouseEvent): void {
     if (!this.canEditCanvasItems()) return;
     const target = event.target as Element | null;
-    if (!target?.closest || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(INTERACTIVE_SELECTOR))
+    if (
+      !target?.closest ||
+      target.closest(".vam-node") ||
+      target.closest(".vam-canvas-image") ||
+      target.closest(INTERACTIVE_SELECTOR)
+    )
       return;
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     if (!point) return;

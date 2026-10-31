@@ -16050,7 +16050,8 @@ function imageSize(bytes) {
     case "image/webp": {
       if (b.length < 30) return null;
       const kind = String.fromCharCode(b[12], b[13], b[14], b[15]);
-      if (kind === "VP8X") return sized((b[24] | b[25] << 8 | b[26] << 16) + 1, (b[27] | b[28] << 8 | b[29] << 16) + 1);
+      if (kind === "VP8X")
+        return sized((b[24] | b[25] << 8 | b[26] << 16) + 1, (b[27] | b[28] << 8 | b[29] << 16) + 1);
       if (kind === "VP8 ") return sized(view.getUint16(26, true) & 16383, view.getUint16(28, true) & 16383);
       if (kind === "VP8L") {
         const bits = view.getUint32(21, true);

@@ -88,7 +88,12 @@ export function safeImageName(name: string, mime: string): string | null {
 
 const SIZE_LIMIT = 65535 * 16;
 const sized = (width: number, height: number): { width: number; height: number } | null =>
-  Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= SIZE_LIMIT && height <= SIZE_LIMIT
+  Number.isInteger(width) &&
+  Number.isInteger(height) &&
+  width > 0 &&
+  height > 0 &&
+  width <= SIZE_LIMIT &&
+  height <= SIZE_LIMIT
     ? { width, height }
     : null;
 
@@ -126,7 +131,8 @@ export function imageSize(bytes: ArrayBuffer | Uint8Array): { width: number; hei
     case "image/webp": {
       if (b.length < 30) return null;
       const kind = String.fromCharCode(b[12], b[13], b[14], b[15]);
-      if (kind === "VP8X") return sized((b[24] | (b[25] << 8) | (b[26] << 16)) + 1, (b[27] | (b[28] << 8) | (b[29] << 16)) + 1);
+      if (kind === "VP8X")
+        return sized((b[24] | (b[25] << 8) | (b[26] << 16)) + 1, (b[27] | (b[28] << 8) | (b[29] << 16)) + 1);
       if (kind === "VP8 ") return sized(view.getUint16(26, true) & 0x3fff, view.getUint16(28, true) & 0x3fff);
       if (kind === "VP8L") {
         const bits = view.getUint32(21, true);

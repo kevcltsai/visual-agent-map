@@ -44,7 +44,16 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     aiTranslated: text("share.viewer_ai_translated_0"),
     aiTranslatedUnknown: text("share.viewer_ai_translated_unknown"),
     originalText: text("share.viewer_original_text"),
-    imageTextUntranslated: text("share.viewer_image_text_untranslated")
+    imageTextUntranslated: text("share.viewer_image_text_untranslated"),
+    markerLabel: text("share.viewer_markers_0"),
+    markerNames: {
+      done: text("share.viewer_marker_done"),
+      warning: text("share.viewer_marker_warning"),
+      star: text("share.viewer_marker_star"),
+      "priority-1": text("share.viewer_marker_priority_1"),
+      "priority-2": text("share.viewer_marker_priority_2"),
+      "priority-3": text("share.viewer_marker_priority_3")
+    }
   };
 }
 

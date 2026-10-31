@@ -4581,3 +4581,54 @@ integrationTest('MS-03: the saved transcript writes the same picture line text a
   assert.equal(h.view.chat.transcript().at(-1).lines[0].text, 'Done: found 2 pictures for “Body” (label(claude:sonnet))');
   assert.equal(resultTexts(h)[0], h.view.chat.transcript().at(-1).lines[0].text, 'the same text on screen and in the saved turn');
 });
+
+// ---- MS-09 P9b: the chat retries a provider failure on the other provider (fixed cases (b), (c)) ---------------------------
+const stepApi = load('core/steps/map-chat/step.ts');
+const ms09Fail = async (h, key, model, lastError) => { await h.repo.updateNote(h.node(key).path, { model, status: 'error', lastError }); await h.view.hydrate(); };
+const ms09Quota = "You've hit your usage limit. Upgrade to Pro, visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 3:21 PM.";
+test('MS-09: the strict schema has otherProvider as a required boolean, and the parser keeps it only on research_standard', () => {
+  const items = stepApi.MAP_CHAT_SCHEMA.properties.actions.items;
+  assert.deepEqual(plain(items.properties.otherProvider), { type: 'boolean' }); assert.ok(items.required.includes('otherProvider'));
+  const base = { kind: 'run_map_action', nodeId: '', ref: '', parentId: '', newParentId: '', title: '', summary: '', detail: '', path: '', find: '', replace: '', content: '', nodeIds: ['a'], all: false, branch: false, goal: '', direction: '', mode: '', images: false };
+  const context = buildMapChatContext({ mapTitle: 'M', outline: [{ id: 'a', title: 'A', summary: '', parentId: null, depth: 0 }], selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] });
+  const parse = fields => stepApi.parseMapChat(JSON.stringify({ reply: 'r', actions: [{ ...base, ...fields }] }), context).actions[0];
+  assert.equal(parse({ action: 'research_standard', otherProvider: true })?.otherProvider, true);
+  assert.equal(parse({ action: 'research_standard', otherProvider: false })?.otherProvider, undefined, 'false is not carried');
+  assert.equal(parse({ action: 'expand', otherProvider: true })?.otherProvider, undefined, 'other actions ignore it');
+});
+
+integrationTest('MS-09 (c): research_standard with otherProvider on a quota-failed topic runs it once with the Claude model, and the topic and cliModel are untouched', async () => {
+  const h = await harness(); await ms09Fail(h, 'a', 'gpt-6-luna', ms09Quota); const started = startedResearch(h);
+  const before = await h.repo.readNote(h.node('a').path);
+  await apply(h, [researchAct({ nodeIds: [h.ids.a], otherProvider: true })]);
+  assert.equal(started.length, 1); assert.equal(started[0].request.model, 'claude:sonnet'); eq(started[0].selected, [h.ids.a]);
+  const after = await h.repo.readNote(h.node('a').path);
+  assert.equal(after.model, before.model); assert.equal(after.modelSource, before.modelSource); assert.equal(h.plugin.settings.cliModel, 'claude:sonnet');
+});
+
+integrationTest('MS-09 (b) counterexample: otherProvider on a timed-out topic or on a topic that did not fail is ignored and the research runs as usual', async () => {
+  const h = await harness(); await ms09Fail(h, 'a', 'gpt-6-luna', 'The AI call timed out after 300 seconds'); const started = startedResearch(h);
+  await apply(h, [researchAct({ nodeIds: [h.ids.a], otherProvider: true }), researchAct({ nodeIds: [h.ids.b], otherProvider: true })]);
+  assert.equal(started.length, 2); assert.equal(started[0].request.model, undefined); assert.equal(started[1].request.model, undefined);
+});
+
+integrationTest('MS-09 counterexample: targets that do not all share one other-provider model run as usual (the flag is ignored)', async () => {
+  const h = await harness(); await ms09Fail(h, 'a', 'gpt-6-luna', ms09Quota); await ms09Fail(h, 'b', 'gpt-6-luna', 'timed out'); const started = startedResearch(h);
+  await apply(h, [researchAct({ nodeIds: [h.ids.a, h.ids.b], otherProvider: true })]);
+  assert.equal(started.length, 1); assert.equal(started[0].request.model, undefined);
+});
+
+integrationTest('MS-09 (a): the context a chat sends marks a quota failure with retryWith (outline and selected); a timeout carries none', async () => {
+  const h = await harness(); await ms09Fail(h, 'a', 'gpt-6-luna', ms09Quota); await ms09Fail(h, 'b', 'gpt-6-luna', 'The AI call timed out after 300 seconds');
+  h.open(); h.type('why did it fail?'); await h.view.sendMapChat();
+  const context = JSON.parse(h.control.requests[0].context.json); const outline = id => context.outline.find(n => n.id === id);
+  assert.equal(outline(h.ids.a).status, 'error'); assert.match(outline(h.ids.a).error, /usage limit/);
+  assert.equal(outline(h.ids.a).retryWith, 'label(claude:sonnet)', 'the model the retry would use');
+  assert.equal(outline(h.ids.b).status, 'error'); assert.equal(outline(h.ids.b).retryWith, undefined, 'a timeout offers no other provider');
+});
+test('MS-09: buildMapChatContext keeps retryWith next to a failure and drops it without one', () => {
+  const out = (extra = {}) => ({ id: 'a', title: 'A', summary: '', parentId: null, depth: 0, ...extra });
+  const build = outline => JSON.parse(buildMapChatContext({ mapTitle: 'M', outline, selected: [], references: [], snippets: [], files: [], activeFile: null, history: [] }).json);
+  assert.equal(build([out({ status: 'error', error: 'x', retryWith: 'L' })]).outline[0].retryWith, 'L');
+  assert.equal(build([out({ retryWith: 'L' })]).outline[0].retryWith, undefined, 'only a failed card carries it');
+});

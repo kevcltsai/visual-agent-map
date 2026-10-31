@@ -131,6 +131,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.shallow_research_counts": "简短研究：完成 {0}／{1}",
   "ui.shallow_research_current": "研究中：{0}",
   "ui.retry_failed_topics": "重试失败的议题（{0}）",
+  "ui.retry_with_other_provider_0": "改用 {0} 重试",
   "ui.dismiss": "关闭",
   "ui.multi_research_skipped": "已略过 {0} 个正在运行 AI 的议题。",
   "ui.multi_research_all_skipped": "已选议题都正在运行 AI。",

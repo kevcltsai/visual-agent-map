@@ -15,8 +15,15 @@ const TITLE_LIMIT = 200;
 const SUMMARY_LIMIT = 240;
 const ERROR_LIMIT = 200;
 
-const errorFields = (node: { status?: "error"; error?: string }): { status?: "error"; error?: string } =>
-  node.status === "error" ? { status: "error", ...(node.error ? { error: clip(node.error, ERROR_LIMIT) } : {}) } : {};
+type ErrorFields = { status?: "error"; error?: string; retryWith?: string };
+const errorFields = (node: ErrorFields): ErrorFields =>
+  node.status === "error"
+    ? {
+        status: "error",
+        ...(node.error ? { error: clip(node.error, ERROR_LIMIT) } : {}),
+        ...(node.retryWith ? { retryWith: clip(node.retryWith, TITLE_LIMIT) } : {})
+      }
+    : {};
 
 export interface MapChatOutlineNode {
   id: string;
@@ -28,6 +35,8 @@ export interface MapChatOutlineNode {
   status?: "error";
   /** Why it failed; only with `status: "error"`. */
   error?: string;
+  /** Label of the model on the other provider the failure can be retried with; only for a provider error that has one. */
+  retryWith?: string;
 }
 export interface MapChatTopicRef {
   id: string;
@@ -40,6 +49,8 @@ export interface MapChatTopicRef {
   status?: "error";
   /** Why it failed; only with `status: "error"`. */
   error?: string;
+  /** Label of the model on the other provider the failure can be retried with; only for a provider error that has one. */
+  retryWith?: string;
 }
 export interface MapChatSnippet {
   path: string;

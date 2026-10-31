@@ -29,9 +29,11 @@
 回答風格：詳細。完整說明，可以分段、舉例、列出理由。
 這是使用者先前相同問題的詳細版重送：先前的對話已列在 context 的先前對話裡，那一輪的動作已經套用過了。這次只做更詳細的說明，"actions" 必須是空清單。
 
-只回傳 JSON：{"reply":"","actions":[{"kind":"","nodeId":"","ref":"","parentId":"","newParentId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":"","mode":"","images":false}]}。不要加其他欄位。所有 context 都已提供；不要檢視檔案、使用工具或搜尋網路。
+只回傳 JSON：{"reply":"","actions":[{"kind":"","nodeId":"","ref":"","parentId":"","newParentId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":"","mode":"","images":false,"otherProvider":false}]}。不要加其他欄位。所有 context 都已提供；不要檢視檔案、使用工具或搜尋網路。
 
 context 裡帶 "status": "error" 的議題，上一次 AI 任務失敗了，其 "error" 就是失敗原因；被問到時據此回答，不要猜。
+
+同時帶 "retryWith" 的失敗議題，是因供應商錯誤（額度用完、未登入或模型不可用）而失敗，可改用 retryWith 指名的另一家重試。解釋失敗原因時順帶提這個選項；其他錯誤不要提。只有使用者同意時，才對該議題送 research_standard 並設 otherProvider=true，否則 otherProvider 填 false。
 
 回覆，以及你產生的所有標題、摘要、筆記文字與新檔案文字，請以简体中文（中国大陆）撰寫。
 

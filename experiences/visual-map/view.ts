@@ -38,6 +38,8 @@ import {
   type SceneEdge,
   type SceneImage
 } from "./map-export";
+import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
+import { collapsedAncestors } from "./map-search";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
@@ -945,6 +947,15 @@ export class VisualAgentMapView extends ItemView {
   private cardHeightOf = (id: string): number | undefined =>
     this.cardEls.get(id)?.offsetHeight || medianHeight([...this.cardEls.values()].map(card => card.offsetHeight));
   private cardChecks = new Map<string, HTMLInputElement>();
+  /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
+  private mapSearch: {
+    query: string;
+    currentId: string | null;
+    returnNodeId: string | null;
+    returnEl: HTMLElement | null;
+    announceTimer: number | null;
+  } | null = null;
+  private mapSearchBar: MapSearchBar | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
   private selectionBarEl: HTMLElement | null = null;
@@ -1194,7 +1205,176 @@ export class VisualAgentMapView extends ItemView {
       };
     scope.register(["Mod"], "Enter", cardKey(false));
     scope.register(["Shift"], "Enter", cardKey(true));
+    // Mod+F opens the map search only while the keyboard is on the map itself; in an editor, the chat or any field it stays Obsidian's.
+    scope.register(["Mod"], "f", (event: KeyboardEvent): boolean => this.searchKey(event));
     this.scope = scope;
+  }
+  /** Mod+F: true leaves the key to Obsidian, false means the map search took it. */
+  private searchKey(event: KeyboardEvent): boolean {
+    if (this.closed || event.isComposing || event.defaultPrevented || !this.map) return true;
+    const active = (this.contentEl.ownerDocument?.activeElement ?? null) as HTMLElement | null;
+    if (!active) return true;
+    // The search field itself: Mod+F selects its text instead of opening Obsidian's search.
+    if (this.mapSearchBar && active === this.mapSearchBar.input) {
+      this.focusMapSearch();
+      return false;
+    }
+    if (!this.contentEl.contains(active)) return true;
+    if (isEditableTarget(active) || active.closest?.(".vam-map-chat")) return true;
+    this.openMapSearch(active);
+    return false;
+  }
+  private focusMapSearch(): void {
+    const input = this.mapSearchBar?.input;
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    input.select();
+  }
+  private openMapSearch(origin: HTMLElement | null = null): void {
+    if (this.closed || !this.map) return;
+    if (this.mapSearch) {
+      this.focusMapSearch();
+      return;
+    }
+    const from = origin ?? ((this.contentEl.ownerDocument?.activeElement ?? null) as HTMLElement | null);
+    const card = from ? [...this.cardEls.entries()].find(([, el]) => el === from || el.contains(from)) : undefined;
+    this.mapSearch = {
+      query: "",
+      currentId: null,
+      returnNodeId: card ? card[0] : null,
+      returnEl: card ? null : from,
+      announceTimer: null
+    };
+    this.mountMapSearch();
+    this.applySearchMarks();
+    this.focusMapSearch();
+  }
+  private mountMapSearch(): void {
+    const search = this.mapSearch;
+    const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    if (!search || !overlay) return;
+    this.mapSearchBar = buildMapSearchBar(overlay, {
+      query: search.query,
+      label: t("ui.map_search_label"),
+      closeLabel: t("ui.map_search_close"),
+      countText: this.mapSearchCountText(),
+      onInput: value => {
+        search.query = value;
+        search.currentId = null;
+        this.applySearchMarks();
+        this.announceSearchLater(search);
+      },
+      onStep: delta => this.enqueue(() => this.stepMapSearch(delta)),
+      onClose: () => this.closeMapSearch(true)
+    });
+  }
+  /** Call before a repaint: the returned function (call it after) rebuilds the box and gives the field its focus, query and caret back. */
+  private holdMapSearch(): () => void {
+    const bar = this.mapSearchBar;
+    this.mapSearchBar = null;
+    if (!this.mapSearch) return () => {};
+    const focused = !!bar && this.contentEl?.ownerDocument?.activeElement === bar.input;
+    const start = focused ? bar.input.selectionStart : null,
+      end = focused ? bar.input.selectionEnd : null;
+    return () => {
+      if (!this.mapSearch) return;
+      this.mountMapSearch();
+      this.applySearchMarks();
+      const input = this.mapSearchBar?.input;
+      if (!focused || !input) return;
+      input.focus({ preventScroll: true });
+      if (start !== null && end !== null) input.setSelectionRange(start, end);
+    };
+  }
+  private mapSearchResult(): MapSearchResult | null {
+    if (!this.map || !this.mapSearch) return null;
+    const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
+    return searchMap(
+      this.map.nodes,
+      supersededAimNodeIds(this.map),
+      id => this.notes.get(id)?.title ?? "",
+      this.mapSearch.query,
+      vertical ? "x" : "y"
+    );
+  }
+  private mapSearchCountText(): string {
+    const search = this.mapSearch;
+    if (!search || search.query === "") return "";
+    const matches = this.mapSearchResult()?.matches ?? [];
+    if (!matches.length) return t("ui.map_search_none");
+    const at = search.currentId === null ? -1 : matches.indexOf(search.currentId);
+    return at >= 0 ? `${at + 1}/${matches.length}` : t("ui.map_search_count_0", matches.length);
+  }
+  /** Marks the matching cards (the current one stronger) and refreshes the visible count. Never touches how a card is built. */
+  private applySearchMarks(): void {
+    const search = this.mapSearch;
+    const matches = new Set(search ? (this.mapSearchResult()?.matches ?? []) : []);
+    for (const [id, card] of this.cardEls) {
+      card.toggleClass("is-search-match", matches.has(id));
+      card.toggleClass("is-search-current", !!search && id === search.currentId && matches.has(id));
+    }
+    this.mapSearchBar?.setCount(this.mapSearchCountText());
+  }
+  /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
+  private announceSearchLater(search: { query: string; announceTimer: number | null }): void {
+    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    search.announceTimer = window.setTimeout(() => {
+      search.announceTimer = null;
+      if (this.closed || this.mapSearch !== search || search.query === "") return;
+      const total = this.mapSearchResult()?.matches.length ?? 0;
+      this.announcer?.setText(total ? t("ui.map_search_count_0", total) : t("ui.map_search_none"));
+    }, 300);
+  }
+  /** Enter / Shift+Enter: jump to the next / previous match (cycling). A match inside folded branches opens them in one history step. */
+  private async stepMapSearch(delta: 1 | -1): Promise<void> {
+    const search = this.mapSearch;
+    if (!search || !this.map || this.closed) return;
+    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    search.announceTimer = null;
+    const result = this.mapSearchResult();
+    const step = result ? stepSearch(result, search.currentId, delta) : null;
+    if (!step) {
+      this.announcer?.setText(t("ui.map_search_none"));
+      return;
+    }
+    search.currentId = step.id;
+    const collapsed = collapsedAncestors(this.map.nodes, step.id);
+    if (collapsed.length && this.builtIn) {
+      // The sample is never saved, so its folds open in memory only.
+      for (const item of this.map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
+      this.render();
+    } else if (collapsed.length) {
+      await this.mapChange(map => {
+        for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
+      });
+    }
+    if (this.closed || this.mapSearch !== search) return;
+    const target = this.map?.nodes.find(item => item.id === step.id);
+    if (!target) return;
+    // Keyboard-style move: the camera follows in memory and Map.md's viewport is not written.
+    this.focusNode(target, false);
+    this.applySearchMarks();
+    this.announcer?.setText(
+      t("ui.map_search_position_0_1_2", step.index + 1, step.total, this.notes.get(step.id)?.title ?? "")
+    );
+  }
+  /** Closes the box and clears the marks. Esc passes `restoreFocus`: focus returns to where the search began, else to the map. */
+  private closeMapSearch(restoreFocus: boolean): void {
+    const search = this.mapSearch;
+    if (!search) return;
+    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    this.mapSearch = null;
+    this.mapSearchBar?.root.remove();
+    this.mapSearchBar = null;
+    for (const card of this.cardEls.values()) {
+      card.toggleClass("is-search-match", false);
+      card.toggleClass("is-search-current", false);
+    }
+    if (!restoreFocus || this.closed) return;
+    const card = search.returnNodeId ? this.cardEls.get(search.returnNodeId) : undefined;
+    const back =
+      card ?? (search.returnEl?.isConnected && this.contentEl.contains(search.returnEl) ? search.returnEl : null);
+    (back ?? this.contentEl).focus({ preventScroll: true });
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   private renameNode(node: MapNode, current: string): void {
@@ -1204,6 +1384,7 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.closeMapSearch(false);
     this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
@@ -1443,6 +1624,7 @@ export class VisualAgentMapView extends ItemView {
       openEpoch = ++this.mapOpenEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
+    if (path !== this.path) this.closeMapSearch(false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -4007,6 +4189,7 @@ export class VisualAgentMapView extends ItemView {
     this.abortRelevanceGrade();
     const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
     if (!this.builtIn) this.plugin.closeStaleDetails();
+    this.closeMapSearch(false);
     this.builtIn = true;
     this.path = "";
     this.map = sample.map;
@@ -7742,6 +7925,7 @@ export class VisualAgentMapView extends ItemView {
     if (focusedCard && this.contentEl.contains(focusedCard)) this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
+    const restoreSearch = this.holdMapSearch();
     // The repaint removes the focused panel field first; its late focusout must not close the panel that is redrawn below.
     this.relevancePanelGen++;
     this.relevancePanelCleanup?.();
@@ -8185,6 +8369,7 @@ export class VisualAgentMapView extends ItemView {
     }
     restoreRelevanceFocus();
     restoreChatFocus();
+    restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "plan" {

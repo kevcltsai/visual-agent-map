@@ -15,7 +15,25 @@ import {
   type CanvasItem,
   type ImageItem
 } from "./canvas-items";
-import { acceptImage, imageFilesFrom, imageSize, safeImageName, IMAGE_MAX_BYTES } from "./image-input";
+import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
+import {
+  EXPORT_MAX_EDGE,
+  EXPORT_MAX_EMBEDDED_BYTES,
+  EXPORT_MAX_PIXELS,
+  browserPngEnv,
+  buildMapSvg,
+  exportFileStem,
+  exportLimits,
+  mapOutline,
+  normalizeCssColor,
+  svgToPngBlob,
+  toDataUri,
+  wrapText,
+  type MapScene,
+  type SceneCard,
+  type SceneEdge,
+  type SceneImage
+} from "./map-export";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
@@ -6961,6 +6979,237 @@ export class VisualAgentMapView extends ItemView {
       }
     }
   }
+  /** The header's export button (AIM, the built-in sample and integration mode included, decision D11). */
+  private addExportButton(parent: HTMLElement): HTMLButtonElement {
+    return this.iconButton(parent, "download", t("ui.export_map"), event => this.openExportMenu(event));
+  }
+  private openExportMenu(event: MouseEvent): void {
+    const menu = new Menu();
+    const add = (title: string, icon: string, format: "png" | "svg" | "md", target: "vault" | "download"): void => {
+      menu.addItem(item =>
+        item
+          .setTitle(title)
+          .setIcon(icon)
+          .onClick(() => void this.exportMap(format, target))
+      );
+    };
+    add(t("ui.export_png_vault"), "image-down", "png", "vault");
+    add(t("ui.export_png_download"), "download", "png", "download");
+    add(t("ui.export_svg_vault"), "image-down", "svg", "vault");
+    add(t("ui.export_svg_download"), "download", "svg", "download");
+    add(t("ui.export_md_vault"), "file-down", "md", "vault");
+    add(t("ui.export_md_download"), "download", "md", "download");
+    menu.showAtMouseEvent(event);
+  }
+  /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
+  private exportCoverPath(notePath: string): string | null {
+    const file = this.app.vault.getAbstractFileByPath(notePath);
+    if (!(file instanceof TFile)) return null;
+    const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+      this.app.metadataCache.getFirstLinkpathDest(link, notePath)
+    );
+    return cover && "path" in cover ? cover.path : null;
+  }
+  /**
+   * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
+   * read from the drawn DOM, so every layout is followed without a second layout engine; colours come from computed
+   * styles; covers and free pictures are read with `readBinary` and embedded as data URIs. `isCurrent` is checked
+   * after every await. Returns null when the view moved on, `{ empty }` for nothing to draw, `{ refuse }` when the
+   * pictures alone are over the limit (read no further).
+   */
+  private async collectExportScene(
+    isCurrent: () => boolean
+  ): Promise<{ scene: MapScene; refuse?: undefined } | { scene?: undefined; refuse: "embedded" | "empty" } | null> {
+    const map = this.map;
+    if (!map) return null;
+    const win = window;
+    const computed = (el: Element, pseudo?: string): CSSStyleDeclaration => win.getComputedStyle(el, pseudo);
+    const colorOf = (value: unknown): string | undefined => normalizeCssColor(value) || undefined;
+    let embedded = 0;
+    const loaded = new Map<string, string | null>();
+    const imageHref = async (path: string): Promise<string | null | false> => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) return null;
+      if (!loaded.has(path)) {
+        const data = await this.app.vault.readBinary(file);
+        const mime = sniffImage(data);
+        loaded.set(path, mime ? toDataUri(mime, data) : null);
+        sizes.set(path, mime ? data.byteLength : 0);
+      }
+      embedded += sizes.get(path) ?? 0;
+      return embedded > EXPORT_MAX_EMBEDDED_BYTES ? false : (loaded.get(path) ?? null);
+    };
+    const sizes = new Map<string, number>();
+    const cards: SceneCard[] = [];
+    const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const grow = (x: number, y: number, w: number, h: number): void => {
+      bounds.minX = Math.min(bounds.minX, x);
+      bounds.minY = Math.min(bounds.minY, y);
+      bounds.maxX = Math.max(bounds.maxX, x + w);
+      bounds.maxY = Math.max(bounds.maxY, y + h);
+    };
+    for (const [id, card] of this.cardEls) {
+      const node = map.nodes.find(item => item.id === id);
+      if (!node) continue;
+      const box = boxOf(card);
+      grow(box.x, box.y, box.width, box.height);
+      const style = computed(card);
+      const titleEl = card.querySelector<HTMLElement>(".vam-card-title");
+      const title = (titleEl?.textContent ?? this.notes.get(id)?.title ?? "").trim();
+      const item: SceneCard = {
+        x: box.x,
+        y: box.y,
+        w: box.width,
+        h: box.height,
+        title: wrapText(title, box.width - 28),
+        fill: colorOf(style.backgroundColor),
+        stroke: colorOf(style.borderTopColor),
+        textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
+        accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
+      };
+      const frame = card.querySelector<HTMLElement>(".vam-card-cover");
+      const coverPath = frame ? this.exportCoverPath(node.path) : null;
+      if (frame && coverPath) {
+        const href = await imageHref(coverPath);
+        if (!isCurrent()) return null;
+        if (href === false) return { refuse: "embedded" };
+        if (href)
+          item.cover = {
+            x: box.x + frame.offsetLeft,
+            y: box.y + frame.offsetTop,
+            w: frame.offsetWidth,
+            h: frame.offsetHeight,
+            href,
+            fit: "cover"
+          };
+      }
+      cards.push(item);
+    }
+    const images: SceneImage[] = [];
+    for (const item of map.canvasItems ?? []) {
+      if (item.kind !== "image") continue;
+      const image = item as ImageItem;
+      const href = await imageHref(image.path);
+      if (!isCurrent()) return null;
+      if (href === false) return { refuse: "embedded" };
+      if (!href) continue;
+      grow(image.x, image.y, image.w, image.h);
+      images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
+    }
+    const edges: SceneEdge[] = [];
+    for (const el of Array.from(this.edgesEl?.children ?? [])) {
+      if (el.tagName?.toLowerCase() !== "path") continue;
+      const d = el.getAttribute("d");
+      const style = computed(el);
+      const stroke = colorOf(style.stroke);
+      if (!d || !stroke || stroke === "none" || style.display === "none") continue;
+      edges.push({ d, stroke });
+      try {
+        const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();
+        if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
+      } catch {
+        // A path that cannot be measured is still drawn; it only does not widen the picture.
+      }
+    }
+    if (!cards.length && !images.length) return { refuse: "empty" };
+    const margin = 24;
+    const root = computed(this.viewportEl ?? this.contentEl);
+    const variable = (name: string): string | undefined => colorOf(root.getPropertyValue(name));
+    const scene: MapScene = {
+      x: bounds.minX - margin,
+      y: bounds.minY - margin,
+      width: bounds.maxX - bounds.minX + margin * 2,
+      height: bounds.maxY - bounds.minY + margin * 2,
+      title: map.title,
+      theme: {
+        background: variable("--background-primary"),
+        text: variable("--text-normal"),
+        stroke: variable("--background-modifier-border"),
+        card: variable("--background-primary")
+      },
+      edges,
+      cards,
+      images
+    };
+    return { scene };
+  }
+  private async pngBlob(svg: string, width: number, height: number, scale: number): Promise<Blob> {
+    return svgToPngBlob(svg, width, height, scale, browserPngEnv(activeDocument, window.URL));
+  }
+  /** A download through a blob URL; the URL is released shortly after the click. */
+  private downloadBlob(blob: Blob, name: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name } });
+    link.click();
+    link.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  }
+  /**
+   * Exports the map as PNG, SVG or a Markdown outline, saved next to the other attachments of Map.md or downloaded.
+   * An export is not a map edit: no transaction, no undo step. A result that is ready after the view closed or moved
+   * to another map is thrown away (nothing written, nothing said).
+   */
+  private async exportMap(format: "png" | "svg" | "md", target: "vault" | "download"): Promise<void> {
+    const map = this.map;
+    if (!map) return;
+    const mapPath = this.path,
+      epoch = this.mapOpenEpoch,
+      isCurrent = (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
+    try {
+      let blob: Blob;
+      if (format === "md") {
+        const outline = mapOutline(map.nodes, id => this.notes.get(id)?.title ?? "");
+        blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });
+      } else {
+        const got = await this.collectExportScene(isCurrent);
+        if (!got || !isCurrent()) return;
+        if (got.refuse) {
+          new Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
+          return;
+        }
+        const limit = exportLimits(got.scene);
+        if (limit.action === "refuse") {
+          new Notice(
+            t(
+              limit.reason === "embedded"
+                ? "ui.export_refused_embedded"
+                : limit.reason === "pixels"
+                  ? "ui.export_refused_pixels"
+                  : "ui.export_empty"
+            )
+          );
+          return;
+        }
+        const svg = buildMapSvg(got.scene);
+        if (format === "svg") blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        else {
+          const { width, height } = got.scene;
+          let scale = 1;
+          if (limit.action === "scaleDown") {
+            scale = limit.scale;
+            new Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
+          } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS)
+            scale = 2;
+          blob = await this.pngBlob(svg, width, height, scale);
+          if (!isCurrent()) return;
+        }
+      }
+      const name = `${exportFileStem(map.title)}.${format}`;
+      if (target === "download") {
+        this.downloadBlob(blob, name);
+        new Notice(t("ui.export_downloaded", name));
+        return;
+      }
+      const data = await blob.arrayBuffer();
+      const destination = await this.app.fileManager.getAvailablePathForAttachment(name, mapPath);
+      // Last check before anything is written.
+      if (!isCurrent()) return;
+      await this.app.vault.createBinary(destination, data);
+      new Notice(t("ui.export_saved", destination));
+    } catch (error) {
+      if (isCurrent()) new Notice(t("ui.export_failed", errorMessage(error)));
+    }
+  }
   private openMapActions(): void {
     const choices: { label: string; description?: string; buttonLabel?: string; action: () => void }[] = [];
     if (this.map) {
@@ -7339,6 +7588,7 @@ export class VisualAgentMapView extends ItemView {
           this.showSampleTour = true;
           this.render();
         });
+      if (this.map) this.addExportButton(headerActions);
     } else if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
       newMap.createSpan({ text: t("ui.new_map") });
@@ -7359,6 +7609,7 @@ export class VisualAgentMapView extends ItemView {
       this.updateHistoryButtons();
       if (!this.map.aim)
         this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
+      this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
     const selectedNode = this.map?.nodes.find(node => node.id === this.selected);

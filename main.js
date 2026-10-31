@@ -228,6 +228,7 @@ var en = {
   "ui.shallow_research_counts": "Short research: {0} of {1} done",
   "ui.shallow_research_current": "researching: {0}",
   "ui.retry_failed_topics": "Retry failed topics ({0})",
+  "ui.retry_with_other_provider_0": "Retry with {0}",
   "ui.dismiss": "Dismiss",
   "ui.multi_research_skipped": "Skipped {0} topics that are already running AI.",
   "ui.multi_research_all_skipped": "All selected topics are already running AI.",
@@ -2376,6 +2377,7 @@ var zhCN = {
   "ui.shallow_research_counts": "\u7B80\u77ED\u7814\u7A76\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.shallow_research_current": "\u7814\u7A76\u4E2D\uFF1A{0}",
   "ui.retry_failed_topics": "\u91CD\u8BD5\u5931\u8D25\u7684\u8BAE\u9898\uFF08{0}\uFF09",
+  "ui.retry_with_other_provider_0": "\u6539\u7528 {0} \u91CD\u8BD5",
   "ui.dismiss": "\u5173\u95ED",
   "ui.multi_research_skipped": "\u5DF2\u7565\u8FC7 {0} \u4E2A\u6B63\u5728\u8FD0\u884C AI \u7684\u8BAE\u9898\u3002",
   "ui.multi_research_all_skipped": "\u5DF2\u9009\u8BAE\u9898\u90FD\u6B63\u5728\u8FD0\u884C AI\u3002",
@@ -4524,6 +4526,7 @@ var zhTW = {
   "ui.shallow_research_counts": "\u7C21\u77ED\u7814\u7A76\uFF1A\u5B8C\u6210 {0}\uFF0F{1}",
   "ui.shallow_research_current": "\u7814\u7A76\u4E2D\uFF1A{0}",
   "ui.retry_failed_topics": "\u91CD\u8A66\u5931\u6557\u7684\u8B70\u984C\uFF08{0}\uFF09",
+  "ui.retry_with_other_provider_0": "\u6539\u7528 {0} \u91CD\u8A66",
   "ui.dismiss": "\u95DC\u9589",
   "ui.multi_research_skipped": "\u5DF2\u7565\u904E {0} \u500B\u6B63\u5728\u57F7\u884C AI \u7684\u8B70\u984C\u3002",
   "ui.multi_research_all_skipped": "\u5DF2\u9078\u8B70\u984C\u90FD\u6B63\u5728\u57F7\u884C AI\u3002",
@@ -9474,6 +9477,9 @@ function providerForModel(model) {
 }
 function providerModelId(model) {
   return providerForModel(model) === "claude" ? model.slice("claude:".length) : model;
+}
+function claudeModelChoice(model) {
+  return CLAUDE_MODEL_CHOICES.find((choice2) => choice2.id === model);
 }
 
 // core/model-discovery.ts
@@ -22878,6 +22884,34 @@ ${ordered.join("\n")}
     ...end < textLines2.length && textLines2[end].trim() ? [""] : [],
     ...textLines2.slice(end)
   ].join("\n");
+}
+
+// ai/provider-error.ts
+var QUOTA = /usage limit|rate[ -]?limit|quota|額度|额度|用量上限/i;
+var AUTH = /not logged in|please (?:run )?\/login|\/login|\b401\b|invalid api key|unauthori[sz]ed/i;
+var MODEL_UNAVAILABLE = /model[^.]{0,40}(?:not found|not supported|does not exist|unavailable)|(?:unknown|unsupported) model|model_not_found/i;
+var providerOf = (model) => claudeModelChoice(model) ? "claude" : "codex";
+function classifyProviderError(reason) {
+  const text11 = reason == null ? void 0 : reason.trim();
+  if (!text11) return null;
+  if (QUOTA.test(text11)) return "quota";
+  if (AUTH.test(text11)) return "auth";
+  if (MODEL_UNAVAILABLE.test(text11)) return "model-unavailable";
+  return null;
+}
+function providerOfFailure(reason, model) {
+  const text11 = reason != null ? reason : "";
+  if (/claude|anthropic/i.test(text11)) return "claude";
+  if (/codex|openai|chatgpt/i.test(text11)) return "codex";
+  return providerOf(model);
+}
+function otherProviderModel(failed, available, current) {
+  var _a2;
+  if (failed === "codex") return available.includes("claude:sonnet") ? "claude:sonnet" : null;
+  const codex = available.filter((model) => providerOf(model) === "codex");
+  if (providerOf(current) === "codex" && available.includes(current)) return current;
+  if (available.includes(FALLBACK_MODEL)) return FALLBACK_MODEL;
+  return (_a2 = codex[0]) != null ? _a2 : null;
 }
 
 // ui/modals/name-modal.ts
@@ -51228,6 +51262,8 @@ ${request.requirements}` : preset.text,
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
+    if ((note == null ? void 0 : note.status) === "error" && !this.integrationMode && !node.aimKind && !active && !queued && !research && !merging)
+      this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
     if (waitingOutline && waitingOutline.mapPath === this.path && !this.builtIn && !this.integrationMode && !((_A = this.map) == null ? void 0 : _A.aim))
       this.button(
@@ -54002,8 +54038,44 @@ ${request.requirements}` : preset.text,
   }
   renderRetryFailedButton(parent, batchKey, batch) {
     const failed = this.retryableFailures(batch);
-    if (failed.length)
+    if (failed.length) {
       this.button(parent, t("ui.retry_failed_topics", failed.length), () => this.retryFailed(batchKey));
+      this.renderOtherProviderButton(parent, failed, batchKey);
+    }
+  }
+  /**
+   * The model on the other provider that every one of `nodes` can be retried with, or null. Each topic must be in error with a
+   * provider error (quota, auth, unavailable model) and all must point at the same target; mixed batches get none (D13).
+   */
+  otherProviderTarget(nodes) {
+    if (!nodes.length) return null;
+    const available = this.plugin.availableModels();
+    const targets = /* @__PURE__ */ new Set();
+    for (const node of nodes) {
+      const note = this.notes.get(node.id);
+      if (!note || note.status !== "error" || !classifyProviderError(note.lastError)) return null;
+      const failed = providerOfFailure(note.lastError, note.model);
+      targets.add(otherProviderModel(failed, available, this.currentModelId()));
+    }
+    const [target] = [...targets];
+    return targets.size === 1 && target ? target : null;
+  }
+  /** "Retry with <other provider>": only when {@link otherProviderTarget} has one. Never an automatic switch. */
+  renderOtherProviderButton(parent, nodes, retryBatchKey) {
+    var _a2;
+    if (this.builtIn || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return;
+    const target = this.otherProviderTarget(nodes);
+    if (!target) return;
+    this.button(
+      parent,
+      t("ui.retry_with_other_provider_0", this.plugin.modelLabel(target)),
+      () => void this.retryWithOtherProvider(nodes, target, retryBatchKey)
+    );
+  }
+  /** Retries `nodes` with `model` for this run only (through the batch's run-once model): no setting or frontmatter is written. */
+  async retryWithOtherProvider(nodes, model, retryBatchKey) {
+    this.multiSelected = new Set(nodes.map((node) => node.id));
+    await this.startMultiResearch({ requirements: "", model }, retryBatchKey);
   }
   /** Selects the failed topics and opens the multi-research dialog so the owner can pick another model. */
   retryFailed(batchKey) {

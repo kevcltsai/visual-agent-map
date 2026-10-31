@@ -141,6 +141,7 @@ export const en = {
   "ui.shallow_research_counts": "Short research: {0} of {1} done",
   "ui.shallow_research_current": "researching: {0}",
   "ui.retry_failed_topics": "Retry failed topics ({0})",
+  "ui.retry_with_other_provider_0": "Retry with {0}",
   "ui.dismiss": "Dismiss",
   "ui.multi_research_skipped": "Skipped {0} topics that are already running AI.",
   "ui.multi_research_all_skipped": "All selected topics are already running AI.",

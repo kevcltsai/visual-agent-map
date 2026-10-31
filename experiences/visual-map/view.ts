@@ -98,6 +98,7 @@ import {
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { providerForModel } from "../../ai/providers/provider";
+import { classifyProviderError, otherProviderModel, providerOfFailure } from "../../ai/provider-error";
 import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
@@ -8868,6 +8869,17 @@ export class VisualAgentMapView extends ItemView {
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
+    // A research that failed with a provider error (quota, login, unavailable model) offers one retry on the other provider.
+    if (
+      note?.status === "error" &&
+      !this.integrationMode &&
+      !node.aimKind &&
+      !active &&
+      !queued &&
+      !research &&
+      !merging
+    )
+      this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
     if (
       waitingOutline &&
@@ -11848,8 +11860,43 @@ export class VisualAgentMapView extends ItemView {
   }
   private renderRetryFailedButton(parent: HTMLElement, batchKey: string, batch: ExpansionBatchState): void {
     const failed = this.retryableFailures(batch);
-    if (failed.length)
+    if (failed.length) {
       this.button(parent, t("ui.retry_failed_topics", failed.length), () => this.retryFailed(batchKey));
+      this.renderOtherProviderButton(parent, failed, batchKey);
+    }
+  }
+  /**
+   * The model on the other provider that every one of `nodes` can be retried with, or null. Each topic must be in error with a
+   * provider error (quota, auth, unavailable model) and all must point at the same target; mixed batches get none (D13).
+   */
+  private otherProviderTarget(nodes: MapNode[]): string | null {
+    if (!nodes.length) return null;
+    const available = this.plugin.availableModels();
+    const targets = new Set<string | null>();
+    for (const node of nodes) {
+      const note = this.notes.get(node.id);
+      if (!note || note.status !== "error" || !classifyProviderError(note.lastError)) return null;
+      const failed = providerOfFailure(note.lastError, note.model);
+      targets.add(otherProviderModel(failed, available, this.currentModelId()));
+    }
+    const [target] = [...targets];
+    return targets.size === 1 && target ? target : null;
+  }
+  /** "Retry with <other provider>": only when {@link otherProviderTarget} has one. Never an automatic switch. */
+  private renderOtherProviderButton(parent: HTMLElement, nodes: MapNode[], retryBatchKey?: string): void {
+    if (this.builtIn || this.map?.aim) return;
+    const target = this.otherProviderTarget(nodes);
+    if (!target) return;
+    this.button(
+      parent,
+      t("ui.retry_with_other_provider_0", this.plugin.modelLabel(target)),
+      () => void this.retryWithOtherProvider(nodes, target, retryBatchKey)
+    );
+  }
+  /** Retries `nodes` with `model` for this run only (through the batch's run-once model): no setting or frontmatter is written. */
+  private async retryWithOtherProvider(nodes: MapNode[], model: string, retryBatchKey?: string): Promise<void> {
+    this.multiSelected = new Set(nodes.map(node => node.id));
+    await this.startMultiResearch({ requirements: "", model }, retryBatchKey);
   }
   /** Selects the failed topics and opens the multi-research dialog so the owner can pick another model. */
   private retryFailed(batchKey: string): void {

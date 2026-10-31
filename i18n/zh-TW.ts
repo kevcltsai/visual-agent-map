@@ -131,6 +131,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.shallow_research_counts": "簡短研究：完成 {0}／{1}",
   "ui.shallow_research_current": "研究中：{0}",
   "ui.retry_failed_topics": "重試失敗的議題（{0}）",
+  "ui.retry_with_other_provider_0": "改用 {0} 重試",
   "ui.dismiss": "關閉",
   "ui.multi_research_skipped": "已略過 {0} 個正在執行 AI 的議題。",
   "ui.multi_research_all_skipped": "已選議題都正在執行 AI。",

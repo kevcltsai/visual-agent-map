@@ -2934,18 +2934,6 @@ export class VisualAgentMapView extends ItemView {
             .setIcon(TOPIC_KIND_ICON[kind])
             .onClick(() => this.enqueue(() => this.addNode(null, undefined, true, true, kind)))
         );
-    const target = this.map?.nodes.find(item => item.id === this.selected);
-    if (target && this.markersEditable(target))
-      menu.addItem(item =>
-        item
-          .setTitle(t(this.topicCoverOff(target) ? "ui.topic_cover_on" : "ui.topic_cover_off"))
-          .setIcon("image")
-          .onClick(() =>
-            this.enqueue(async () => {
-              await this.changeTopicCover(target);
-            })
-          )
-      );
     menu.showAtMouseEvent(event);
   }
   /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
@@ -2960,7 +2948,7 @@ export class VisualAgentMapView extends ItemView {
    * rewrite and Map.md (viewport only). Undo writes the old note text back, so the frontmatter is identical to before.
    */
   private async changeTopicCover(node: MapNode): Promise<TransactionEntry | null> {
-    if (!this.map) return null;
+    if (!this.map || !this.markersEditable(node)) return null;
     const off = this.topicCoverOff(node);
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction()
@@ -9267,6 +9255,7 @@ export class VisualAgentMapView extends ItemView {
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
     if (note) this.renderColorSection(panel, node);
+    if (note) this.renderCoverSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -9985,6 +9974,30 @@ export class VisualAgentMapView extends ItemView {
       .commit({ deferRebuild: true, label: t("ui.topic_markers") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+  }
+  /** The card cover switch of the topic panel: one `aria-pressed` button, pressed while the cover is turned off. */
+  private renderCoverSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-cover-section");
+    section.createEl("strong", { text: t("ui.topic_cover"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_cover"));
+    // The metadata cache may lag behind the write, so the state after a click is tracked here.
+    let off = this.topicCoverOff(node);
+    const paint = (focus = false): void => {
+      group.empty();
+      const choice = this.button(group, t("ui.topic_cover_off"), () => {
+        this.enqueue(async () => {
+          if (await this.changeTopicCover(node)) off = !off;
+          paint(true);
+        });
+      });
+      choice.setAttr("aria-pressed", String(off));
+      if (off) choice.addClass("is-pressed");
+      if (focus) choice.focus();
+    };
+    paint();
   }
   /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
   private renderColorSection(panel: HTMLElement, node: MapNode): void {

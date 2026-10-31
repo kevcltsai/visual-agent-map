@@ -45073,7 +45073,6 @@ ${request.requirements}` : preset.text,
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
-    var _a2;
     const menu = new import_obsidian32.Menu();
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
@@ -45083,15 +45082,6 @@ ${request.requirements}` : preset.text,
         menu.addItem(
           (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
         );
-    const target = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === this.selected);
-    if (target && this.markersEditable(target))
-      menu.addItem(
-        (item) => item.setTitle(t(this.topicCoverOff(target) ? "ui.topic_cover_on" : "ui.topic_cover_off")).setIcon("image").onClick(
-          () => this.enqueue(async () => {
-            await this.changeTopicCover(target);
-          })
-        )
-      );
     menu.showAtMouseEvent(event);
   }
   /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
@@ -45106,7 +45096,7 @@ ${request.requirements}` : preset.text,
    * rewrite and Map.md (viewport only). Undo writes the old note text back, so the frontmatter is identical to before.
    */
   async changeTopicCover(node) {
-    if (!this.map) return null;
+    if (!this.map || !this.markersEditable(node)) return null;
     const off = this.topicCoverOff(node);
     const viewport = clone(this.map.viewport);
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
@@ -50865,6 +50855,7 @@ ${request.requirements}` : preset.text,
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
     if (note) this.renderColorSection(panel, node);
+    if (note) this.renderCoverSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -51542,6 +51533,29 @@ ${request.requirements}` : preset.text,
     }).commit({ deferRebuild: true, label: t("ui.topic_markers") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+  }
+  /** The card cover switch of the topic panel: one `aria-pressed` button, pressed while the cover is turned off. */
+  renderCoverSection(panel, node) {
+    if (!this.markersEditable(node)) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-cover-section");
+    section3.createEl("strong", { text: t("ui.topic_cover"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section3.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_cover"));
+    let off = this.topicCoverOff(node);
+    const paint = (focus = false) => {
+      group.empty();
+      const choice2 = this.button(group, t("ui.topic_cover_off"), () => {
+        this.enqueue(async () => {
+          if (await this.changeTopicCover(node)) off = !off;
+          paint(true);
+        });
+      });
+      choice2.setAttr("aria-pressed", String(off));
+      if (off) choice2.addClass("is-pressed");
+      if (focus) choice2.focus();
+    };
+    paint();
   }
   /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
   renderColorSection(panel, node) {

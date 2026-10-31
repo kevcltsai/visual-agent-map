@@ -220,14 +220,42 @@ test('P4b: turning it back on removes the key; undo of that restores the none li
   assert.equal(h.contents.get(NOTE), off);
 });
 
-test('P4b: the topic menu offers the toggle for the selected topic, with the right label for each state', () => {
+test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover is off; the topic menu no longer has it', async () => {
   const source = read('experiences/visual-map/view.ts');
-  const body = source.match(/private openTopicMenu\([\s\S]*?\n  }\n/)[0];
-  assert.match(body, /ui\.topic_cover_off/);
-  assert.match(body, /ui\.topic_cover_on/);
-  assert.match(body, /changeTopicCover/);
+  const menu = source.match(/private openTopicMenu\([\s\S]*?\n  }\n/)[0];
+  assert.doesNotMatch(menu, /changeTopicCover|topic_cover/, 'the "+ Topic" menu is for adding topics only');
+  assert.match(source, /if \(note\) this\.renderCoverSection\(panel, node\);/);
+  const panelOf = async (text, editable = true) => {
+    const h = await coverHarness(text);
+    const calls = [];
+    Object.assign(h.view, {
+      builtIn: !editable, integrationMode: false, enqueue: fn => fn(),
+      changeTopicCover: async node => { calls.push(node.id); return {}; }
+    });
+    h.view.map = { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+    const panel = dom.element('div');
+    h.view.renderCoverSection(panel, { id: 'm', path: NOTE });
+    return { ...h, panel, calls };
+  };
+  const toggle = panel => dom.findAll(panel, i => i.tag === 'button' && i.attrs['aria-pressed'] !== undefined)[0];
+  const on = await panelOf(TEXT);
+  assert.equal(toggle(on.panel).attrs['aria-pressed'], 'false', 'cover shown: not pressed');
+  toggle(on.panel).click();
+  await dom.tick();
+  assert.deepEqual(on.calls, ['m'], 'a click runs changeTopicCover for this topic');
+  assert.equal(toggle(on.panel).attrs['aria-pressed'], 'true', 'the section repaints without closing the panel');
+  const off = await panelOf('---\ntype: topic\ntitle: M\ntopic-cover: "none"\n---\n\nBody\n');
+  assert.equal(toggle(off.panel).attrs['aria-pressed'], 'true', 'cover off: pressed');
+  assert.equal(dom.findAll((await panelOf(TEXT, false)).panel, i => i.tag === 'button').length, 0, 'not editable: no section');
   for (const lang of ['en', 'zh-TW', 'zh-CN']) {
     const text = read(`i18n/${lang}.ts`);
-    for (const key of ['ui.topic_cover_off', 'ui.topic_cover_on', 'ui.topic_cover']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
+    for (const key of ['ui.topic_cover_off', 'ui.topic_cover']) assert.ok(text.includes(`"${key}"`), `${lang} ${key}`);
   }
+});
+
+test('P4b: changeTopicCover refuses a topic that is not editable', async () => {
+  const h = await coverHarness(TEXT);
+  Object.assign(h.view, { builtIn: true });
+  assert.equal(await h.view.changeTopicCover({ id: 'm', path: NOTE }), null);
+  assert.equal(h.contents.get(NOTE), TEXT);
 });

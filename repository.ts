@@ -1174,15 +1174,17 @@ export class Repository {
 
   /**
    * What "follow the default" resolves to for a topic: a root follows the workspace model, a child follows its upper
-   * topic (nearest manual ancestor, else the workspace model).
+   * topic (nearest manual ancestor, else the workspace model; `overridden` tells which).
    */
   async followDefaultModel(
     path: string,
     map?: MapDocument
-  ): Promise<{ source: Exclude<ModelSource, "manual">; model: string }> {
+  ): Promise<{ source: Exclude<ModelSource, "manual">; model: string; overridden: boolean }> {
     const node = map?.nodes.find(item => item.path === path);
-    if (!node?.parentId) return { source: "workspace", model: this.settings.cliModel };
-    return { source: "inherited", model: (await this.effectiveModel(path, undefined, "inherited", map)).model };
+    if (!node?.parentId) return { source: "workspace", model: this.settings.cliModel, overridden: false };
+    const effective = await this.effectiveModel(path, undefined, "inherited", map);
+    // `overridden` is true only when a manual ancestor supplies the model; the menu then says "upper topic", not "current model".
+    return { source: "inherited", model: effective.model, overridden: effective.overridden };
   }
 
   async readNote(path: string, map?: MapDocument): Promise<Note> {

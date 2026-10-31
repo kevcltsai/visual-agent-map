@@ -333,7 +333,7 @@ integrationTest('MS-04: a dialog that only changes the model of an old workspace
 
 integrationTest('MS-04: merge model and reasoning follow the upper topic resolution (manual parent, workspace parent, no parent)', async () => {
   const { repo, root, child, map, support } = await reasoningFixture();
-  const plugin = { repo, settings: { ...support.DEFAULT_SETTINGS, cliModel: 'cur-model', cliReasoning: 'low' } };
+  const plugin = { repo, settings: { ...support.DEFAULT_SETTINGS, cliModel: 'cur-model', cliReasoning: 'low' }, currentModelChoice() { return { model: this.settings.cliModel, reasoning: support.normalizeReasoningLevel(this.settings.cliReasoning) }; } };
   const { VisualAgentMapView } = support.load('main.ts', { obsidian: support.obsidian });
   const view = new VisualAgentMapView({ app: {} }, plugin); view.map = map;
   assert.deepEqual(plain(await view.mergeModel(root.id)), { model: 'cur-model', reasoning: 'low' });

@@ -196,7 +196,7 @@ integrationTest('Next Step: the model select starts with Follow default; saves o
   const first = select.children.find(c => c.tag === 'option');
   assert.equal(first.value, '__follow_default__', 'the follow option is the first option');
   assert.equal(select.value, '__follow_default__', 'a non-manual topic shows it selected');
-  assert.match(first.text, /Follow default \(now: gpt-test\)/);
+  assert.match(first.text, /^Follow current model \(gpt-test\)$/, 'MS-06: a topic with no manual ancestor follows the current model');
   await run(untouched);
   assert.deepEqual(plain(untouched.saved), [], 'an untouched topic writes nothing');
   const manual = nextStepHarness({ modelSettings: { topicStatus: 'idea', model: 'gpt-other', modelSource: 'manual' } });
@@ -211,24 +211,97 @@ integrationTest('Next Step: the model select starts with Follow default; saves o
   assert.deepEqual(plain(back.saved), [{ modelSource: 'workspace' }], 'a specific model picked then dropped is not written');
 });
 
-integrationTest('MS-04: choosing a model on a non-manual topic also saves the shown reasoning; choosing a level then follow-default restores the current level', async () => {
+integrationTest('MS-06 (was MS-04 D1): a model picked on a non-manual topic is used once by default and saved, with the shown reasoning, only when the scope is "pin"', async () => {
   const pick = (h, value) => { const select = byLabel(h.modal.contentEl, 'Model'); select.value = value; select.fire('change'); };
+  const scope = h => byLabel(h.modal.contentEl, 'Apply to');
+  const choose = (h, value) => { scope(h).value = value; scope(h).fire('change'); };
   const run = async h => { button(h.actions(), 'Confirm research task').click(); await tick(); await tick(); };
   const model = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
-  pick(model, 'gpt-other'); await run(model);
+  assert.equal(scope(model).hidden, true, 'nothing differs yet: no scope menu');
+  pick(model, 'gpt-other'); assert.equal(scope(model).hidden, false); choose(model, 'pin'); await run(model);
   assert.deepEqual(plain(model.saved), [{ model: 'gpt-other', modelSource: 'manual', reasoning: 'low' }], 'the shown level is stored with the new override');
   const already = nextStepHarness({ modelSettings: { topicStatus: 'idea', model: 'gpt-test', modelSource: 'manual', reasoning: 'high' } });
-  pick(already, 'gpt-other'); await run(already);
-  assert.deepEqual(plain(already.saved), [{ model: 'gpt-other', modelSource: 'manual' }], 'an existing override keeps its own stored level');
+  pick(already, 'gpt-other'); choose(already, 'pin'); await run(already);
+  assert.deepEqual(plain(already.saved), [{ model: 'gpt-other', modelSource: 'manual', reasoning: 'high' }], 'pinning an override writes its model, manual and the shown level');
   const level = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
   const reasoning = byLabel(level.modal.contentEl, 'Reasoning level'), modelSelect = byLabel(level.modal.contentEl, 'Model');
   reasoning.value = 'high'; reasoning.fire('change');
-  assert.equal(modelSelect.value, 'gpt-test', 'the model menu shows the stored override, not follow-default');
-  assert.ok(find(level.modal.contentEl, i => hasCls(i, 'vam-hint') && /Manually selected/.test(i.text)), 'the summary says manual');
+  assert.equal(modelSelect.value, '__follow_default__', 'MS-06: a level change no longer turns the topic into an override, so the menu keeps the follow option');
+  assert.ok(find(level.modal.contentEl, i => hasCls(i, 'vam-hint') && /This run only/.test(i.text)), 'the summary says this run only');
   pick(level, '__follow_default__');
   assert.equal(reasoning.value, 'low', 'follow-default brings the level back to the current setting');
+  assert.equal(scope(level).hidden, true, 'following needs no scope');
   await run(level);
   assert.deepEqual(plain(level.saved), [{ modelSource: 'workspace' }], 'nothing else is written');
+  assert.equal(level.calls.research[0].runOnce, undefined);
+});
+integrationTest('counterexample 2 (MS-06): a model picked with the default scope changes no frontmatter and is the model of this run', async () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
+  const select = byLabel(h.modal.contentEl, 'Model'); select.value = 'gpt-other'; select.fire('change');
+  assert.equal(byLabel(h.modal.contentEl, 'Apply to').value, 'once', 'the scope defaults to this run only');
+  assert.deepEqual(byLabel(h.modal.contentEl, 'Apply to').children.map(c => c.text), ['This run only', 'Pin to this topic']);
+  button(h.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(h.saved), [], 'nothing is saved');
+  assert.deepEqual(plain(h.calls.research[0].runOnce), { model: 'gpt-other', reasoning: 'low' });
+});
+integrationTest('counterexample 3 (MS-06): choosing "pin to this topic" writes manual, the model and the reasoning, and the run then uses them', async () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
+  const select = byLabel(h.modal.contentEl, 'Model'); select.value = 'gpt-other'; select.fire('change');
+  const reasoning = byLabel(h.modal.contentEl, 'Reasoning level'); reasoning.value = 'high'; reasoning.fire('change');
+  const scope = byLabel(h.modal.contentEl, 'Apply to'); scope.value = 'pin'; scope.fire('change');
+  button(h.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(h.saved), [{ model: 'gpt-other', modelSource: 'manual', reasoning: 'high' }]);
+  assert.equal(h.calls.research[0].runOnce, undefined, 'the saved override is what the run reads');
+});
+integrationTest('counterexample 4 (MS-06): on a topic that is not an override, changing only the reasoning with the default scope writes nothing and sends that level this once', async () => {
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
+  const reasoning = byLabel(h.modal.contentEl, 'Reasoning level'); reasoning.value = 'high'; reasoning.fire('change');
+  assert.equal(byLabel(h.modal.contentEl, 'Model').value, '__follow_default__');
+  button(h.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(h.saved), []);
+  assert.deepEqual(plain(h.calls.research[0].runOnce), { model: 'gpt-test', reasoning: 'high' });
+  assert.equal(h.settings.modelSource, 'workspace');
+});
+integrationTest('MS-06: a manual topic that changes model or level also defaults to this run only; pin updates its override; following still removes it without a scope', async () => {
+  const manual = { topicStatus: 'idea', model: 'gpt-test', modelSource: 'manual', reasoning: 'high' };
+  const once = nextStepHarness({ modelSettings: manual });
+  assert.equal(byLabel(once.modal.contentEl, 'Apply to').hidden, true, 'untouched');
+  const select = byLabel(once.modal.contentEl, 'Model'); select.value = 'gpt-other'; select.fire('change');
+  button(once.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(once.saved), []); assert.deepEqual(plain(once.calls.research[0].runOnce), { model: 'gpt-other', reasoning: 'high' });
+  const back = nextStepHarness({ modelSettings: manual });
+  const again = byLabel(back.modal.contentEl, 'Model'); again.value = 'gpt-other'; again.fire('change'); again.value = 'gpt-test'; again.fire('change');
+  assert.equal(byLabel(back.modal.contentEl, 'Apply to').hidden, true, 'choosing the stored model again is no change');
+  button(back.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(back.saved), []); assert.equal(back.calls.research[0].runOnce, undefined, 'a manual topic left alone runs on its own model');
+  const level = nextStepHarness({ modelSettings: manual });
+  const effort = byLabel(level.modal.contentEl, 'Reasoning level'); effort.value = 'low'; effort.fire('change');
+  button(level.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(level.saved), []); assert.deepEqual(plain(level.calls.research[0].runOnce), { model: 'gpt-test', reasoning: 'low' });
+  const follow = nextStepHarness({ modelSettings: manual });
+  const menu = byLabel(follow.modal.contentEl, 'Model'); menu.value = '__follow_default__'; menu.fire('change');
+  assert.equal(byLabel(follow.modal.contentEl, 'Apply to').hidden, true);
+  button(follow.actions(), 'Confirm research task').click(); await tick(); await tick();
+  assert.deepEqual(plain(follow.saved), [{ modelSource: 'workspace' }]);
+});
+integrationTest('counterexample 5 (MS-06): the follow option names the upper topic only when a manual ancestor exists, else the current model', () => {
+  const label = followDefault => byLabel(nextStepHarness({ modelSettings: { topicStatus: 'idea', followDefault } }).modal.contentEl, 'Model').children.find(c => c.value === '__follow_default__').text;
+  assert.equal(label({ source: 'inherited', model: 'gpt-test', overridden: false }), 'Follow current model (gpt-test)');
+  assert.equal(label({ source: 'inherited', model: 'gpt-x', overridden: true }), 'Follow upper topic (gpt-x)');
+  assert.equal(label({ source: 'workspace', model: 'gpt-test', overridden: false }), 'Follow current model (gpt-test)');
+});
+integrationTest('MS-06: the quick outline request and the synthesis options carry the run-once model', async () => {
+  const requests = [];
+  const expanding = nextStepHarness({ modelSettings: { topicStatus: 'completed', reasoning: 'low', quickOutline: { presets: [{ id: 'knowledge-tree', name: 'Knowledge tree' }], generate: async request => { requests.push(request); return []; }, create: async () => {} } }, children: 0 });
+  const select = byLabel(expanding.modal.contentEl, 'Model'); select.value = 'gpt-other'; select.fire('change');
+  button(expanding.actions(), 'Expand').click(); await tick(); await tick(); await tick();
+  assert.deepEqual(plain(expanding.calls.expand.map(c => c.runOnce)), [], 'the quick outline path does not call expand');
+  assert.deepEqual(plain(requests[0].runOnce), { model: 'gpt-other', reasoning: 'low' });
+  assert.deepEqual(plain(expanding.saved), []);
+  const synth = nextStepHarness({ modelSettings: { topicStatus: 'completed', reasoning: 'low' }, children: 2 });
+  const menu = byLabel(synth.modal.contentEl, 'Model'); menu.value = 'gpt-other'; menu.fire('change');
+  cardsOf(synth).children[2].click(); button(synth.actions(), 'Get synthesis suggestions first').click(); await tick(); await tick(); await tick();
+  assert.deepEqual(plain(synth.calls.synthesize[0].options.runOnce), { model: 'gpt-other', reasoning: 'low' });
 });
 
 integrationTest('Next Step: the tone select defaults to keeping the topic tone and its choice reaches the run options', async () => {
@@ -471,11 +544,13 @@ integrationTest('one-click dialog: model and effort are saved once when a run st
   byLabel(started.modal.contentEl, 'Model').value = 'gpt-other'; byLabel(started.modal.contentEl, 'Model').fire('change');
   byLabel(started.modal.contentEl, 'Reasoning level').value = 'high'; byLabel(started.modal.contentEl, 'Reasoning level').fire('change');
   assert.deepEqual(plain(started.saved), []);
+  byLabel(started.modal.contentEl, 'Apply to').value = 'pin'; byLabel(started.modal.contentEl, 'Apply to').fire('change');
   button(started.actions(), 'Confirm research task').click(); await tick(); await tick();
   assert.deepEqual(plain(started.saved), [{ model: 'gpt-other', modelSource: 'manual', reasoning: 'high' }]);
   // A start that fails to save reports the reason and does not run.
   const failing = nextStepHarness({ modelSettings: { topicStatus: 'idea', save: async () => { throw new Error('disk full'); } } });
   byLabel(failing.modal.contentEl, 'Reasoning level').value = 'high'; byLabel(failing.modal.contentEl, 'Reasoning level').fire('change');
+  byLabel(failing.modal.contentEl, 'Apply to').value = 'pin'; byLabel(failing.modal.contentEl, 'Apply to').fire('change');
   button(failing.actions(), 'Confirm research task').click(); await tick(); await tick();
   assert.equal(failing.calls.research.length, 0);
   assert.ok(findAll(failing.modal.contentEl, i => hasCls(i, 'vam-next-status')).some(i => /disk full/.test(i.text)));
@@ -875,7 +950,7 @@ integrationTest('synthesis: nothing is written when the topic changed while the 
 });
 
 // Fields that belong to the run itself: both dialogs must show exactly these (the name is the selection's own extra).
-const fieldLabels = modal => findAll(modal.contentEl, i => ['select', 'textarea', 'input'].includes(i.tag) && i.type !== 'file' && i.type !== 'radio').map(i => i['aria-label'] ?? i.type ?? i.tag).filter(label => label !== 'New topic name' && label !== 'Model' && label !== 'Reasoning level');
+const fieldLabels = modal => findAll(modal.contentEl, i => ['select', 'textarea', 'input'].includes(i.tag) && i.type !== 'file' && i.type !== 'radio').map(i => i['aria-label'] ?? i.type ?? i.tag).filter(label => label !== 'New topic name' && label !== 'Model' && label !== 'Reasoning level' && label !== 'Apply to');
 integrationTest('single-topic and multi-select synthesis share one flow and one field set', async () => {
   const h = await synthesisHarness();
   const single = await h.openSingle();

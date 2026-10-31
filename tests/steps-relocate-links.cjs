@@ -296,7 +296,7 @@ async function viewScenario() {
   for (const note of [parent, ...sources])
     contents.set(note.path, `${contents.get(note.path)}\nCites ${cite([parent, ...sources].filter(other => other !== note))}.\n`);
   await repo.rebuildDerivedData();
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: work => work(), running: new Set(), abortChartJobs() {}, addChartsAfterWrite() {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map() };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: work => work(), running: new Set(), abortChartJobs() {}, addChartsAfterWrite() {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map(), currentModelChoice() { return { model: this.settings.cliModel, reasoning: 'auto' }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = mapPath; view.map = doc; view.render = () => {}; view.focusNode = () => {}; view.drawEdges = () => {}; view.updateHistoryButtons = () => {};

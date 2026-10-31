@@ -23,7 +23,7 @@ test('root pinned to gpt-5.5 returns to the workspace model after choosing follo
   const { repo, root, map } = await setup();
   assert.equal((await repo.readNote(root.path, map)).model, 'gpt-5.5');
   const follow = await repo.followDefaultModel(root.path, map);
-  assert.deepEqual(support.plain(follow), { source: 'workspace', model: 'claude:sonnet' });
+  assert.deepEqual(support.plain(follow), { source: 'workspace', model: 'claude:sonnet', overridden: false });
   await repo.updateNote(root.path, { modelSource: follow.source });
   const note = await repo.readNote(root.path, map);
   assert.equal(note.modelSource, 'workspace');
@@ -34,13 +34,21 @@ test('child follow default resolves through the nearest manual ancestor and is s
   const { repo, root, child, map } = await setup();
   await repo.updateNote(child.path, { model: 'gpt-6-sol', modelSource: 'manual' });
   const follow = await repo.followDefaultModel(child.path, map);
-  assert.deepEqual(support.plain(follow), { source: 'inherited', model: 'gpt-5.5' });
+  assert.deepEqual(support.plain(follow), { source: 'inherited', model: 'gpt-5.5', overridden: true });
   await repo.updateNote(child.path, { modelSource: follow.source });
   assert.equal((await repo.readNote(child.path, map)).modelSource, 'inherited');
   assert.equal((await repo.readNote(child.path, map)).model, 'gpt-5.5');
   // Root follows the workspace: the whole chain now runs on the workspace model.
   await repo.updateNote(root.path, { modelSource: 'workspace' });
   assert.equal((await repo.readNote(child.path, map)).model, 'claude:sonnet');
+});
+
+test('MS-06: "overridden" is true only when a manual ancestor supplies the model; a child with none follows the current model', async () => {
+  const { repo, root, child, map } = await setup();
+  assert.equal((await repo.followDefaultModel(child.path, map)).overridden, true, 'the root is manual');
+  await repo.updateNote(root.path, { modelSource: 'workspace' });
+  const follow = await repo.followDefaultModel(child.path, map);
+  assert.deepEqual(support.plain(follow), { source: 'inherited', model: 'claude:sonnet', overridden: false });
 });
 
 test('the dialog wiring and strings exist', () => {

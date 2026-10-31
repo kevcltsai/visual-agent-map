@@ -741,7 +741,8 @@ function followedPreview(
   }
   if (!initialized) return text ? { preview: null, hash: PREVIEW_MANUAL } : replaceFirst(0);
   const [first, second] = paragraphs;
-  if (!first || first.includes("\n") || LEGACY_PREVIEW_BLOCK_START.test(first)) return { preview: null, hash: PREVIEW_MANUAL };
+  if (!first || first.includes("\n") || LEGACY_PREVIEW_BLOCK_START.test(first))
+    return { preview: null, hash: PREVIEW_MANUAL };
   return replaceFirst(second !== undefined && LEGACY_PREVIEW_IMAGE.test(second) ? 2 : 1);
 }
 

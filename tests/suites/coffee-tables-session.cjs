@@ -603,3 +603,41 @@ integrationTest('Convergence preview Notice (also used by the Coffee view button
   assert.equal(Notice.all.length, 1); assert.equal(reviews.length, 0);
   Notice.all[0].actions[0].click(); assert.equal(reviews.length, 1);
 });
+
+// MS-07 P7a (plan D7): a new table starts from the current model and reasoning; the summary confirmation shows the model's label.
+const homeSelects = async plugin => {
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] }; await view.home();
+  const selects = []; const visit = node => { if (node.tag === 'select') selects.push(node); node.children.forEach(visit); }; visit(view.contentEl);
+  await until(() => !selects[0].disabled); return { view, selects };
+};
+integrationTest('Coffee Tables new table defaults to the current model and reasoning, not the stale settings or a previous table', async () => {
+  let current = { model: 'cur', reasoning: 'medium' };
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'old', cliReasoning: 'low' }, currentModelChoice: () => current, coffeeReasoningEfforts: () => ['low', 'medium', 'high'], refreshCoffeeModels: async () => ['old', 'cur', 'opus'], confirmAiUsage: async (_model, run) => run() }, ['old', 'cur', 'opus']);
+  const first = await homeSelects(plugin); assert.equal(first.selects[0].value, 'cur'); assert.equal(first.selects[1].value, 'medium');
+  first.view.homeForm = { model: 'opus', reasoning: 'high' }; first.view.homeForm = {};
+  const second = await homeSelects(plugin); assert.equal(second.selects[0].value, 'cur', 'a previous table with opus does not carry over');
+  current = { model: 'old', reasoning: 'low' };
+  const third = await homeSelects(plugin); assert.equal(third.selects[0].value, 'old'); assert.equal(third.selects[1].value, 'low');
+});
+integrationTest('Coffee Tables home form does not freeze the current model: only a model that differs from the current one is remembered', async () => {
+  let current = { model: 'cur', reasoning: 'medium' };
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'cur', cliReasoning: 'medium' }, currentModelChoice: () => current, coffeeReasoningEfforts: () => ['low', 'medium', 'high'], refreshCoffeeModels: async () => ['cur', 'next', 'opus'], confirmAiUsage: async (_model, run) => run() }, ['cur', 'next', 'opus']);
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] };
+  const render = async () => { view.contentEl = coffeeElement('root'); await view.home(); const selects = []; const visit = node => { if (node.tag === 'select') selects.push(node); node.children.forEach(visit); }; visit(view.contentEl); await until(() => !selects[0].disabled); return selects; };
+  let selects = await render(); const topic = coffeeFind(view.contentEl, e => e.tag === 'textarea' || e.tag === 'input'); topic.input?.();
+  current = { model: 'next', reasoning: 'medium' };
+  selects = await render(); assert.equal(selects[0].value, 'next', 'untouched form follows the new current model');
+  selects[0].value = 'opus'; selects[0].change(); selects[1].change();
+  selects = await render(); assert.equal(selects[0].value, 'opus', 'a hand-picked different model is kept when the form is rebuilt');
+});
+integrationTest('Coffee Tables summary confirmation shows the model label, not the raw id', async () => {
+  const modals = []; class Modal { constructor() { this.contentEl = coffeeElement('content'); } open() { modals.push(this); this.onOpen?.(); } close() { this.onClose?.(); } }
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian: { ...obsidian, Modal } });
+  const plugin = { settings: { language: 'en' }, modelLabel: id => `Label of ${id}`, confirmAiUsage: async (_m, run) => run() };
+  const view = new CoffeeTablesView({ app: {} }, plugin); view.engine = { busy: false, session: { model: 'raw-id' }, fillSegmentSummaries: async () => {} };
+  const pending = view.confirmFillSummaries(); const text = []; const visit = node => { text.push(node.text); node.children.forEach(visit); }; visit(modals[0].contentEl);
+  assert.ok(text.some(value => value.includes('Label of raw-id')), text.join('|')); assert.equal(text.some(value => value.includes('raw-id') && !value.includes('Label of raw-id')), false);
+  modals[0].close(); await pending;
+});

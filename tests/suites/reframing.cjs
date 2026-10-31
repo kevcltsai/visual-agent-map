@@ -248,3 +248,26 @@ integrationTest('Guided proposals fence Thinking Origin at publication and after
     assert.equal(view.map.nodes.length,1);assert.equal(plugin.pendingSuggestions.size,0);
   }
 });
+
+// MS-07 P7a (decision #14 D2, plan D8): the handoff root follows the workspace only when model and reasoning both equal the current ones.
+const handoffArtifact = metadata => ({ version: 1, id: 'op', kind: 'question', title: 'Question', content: 'Context', origin: { experience: 'coffee-tables' }, sources: [], metadata });
+const handoffRoot = async (metadata, current) => {
+  const { receiveVisualMapHandoff } = load('experiences/visual-map/handoff.ts', { obsidian }); const { repo, files, contents } = fixture('en');
+  const result = await receiveVisualMapHandoff(handoffArtifact(metadata), { repo, defaultModel: () => current.model, currentModel: () => current, exists: p => files.has(p), mutate: work => work(), navigate: async () => {} });
+  const path = (await repo.readMap(result.targetPath)).nodes[0].path; const note = await repo.readNote(path);
+  return { note, raw: contents.get(path) };
+};
+integrationTest('Visual Map handoff: the same model and reasoning as the current ones make a workspace root with no reasoning-level', async () => {
+  const { note, raw } = await handoffRoot({ model: 'cur', reasoning: 'medium' }, { model: 'cur', reasoning: 'medium' });
+  assert.equal(note.modelSource, 'workspace'); assert.equal(note.model, 'cur'); assert.equal(raw.match(/^reasoning-level: (.*)$/m)?.[1], undefined);
+});
+integrationTest('Visual Map handoff: the same model with a different reasoning is a manual root that keeps its reasoning', async () => {
+  const { note, raw } = await handoffRoot({ model: 'cur', reasoning: 'high' }, { model: 'cur', reasoning: 'medium' });
+  assert.equal(note.modelSource, 'manual'); assert.equal(note.reasoning, 'high'); assert.equal(raw.match(/^reasoning-level: (.*)$/m)?.[1], 'high');
+});
+integrationTest('Visual Map handoff: a different model is a manual root; no table model falls back to the current one as workspace', async () => {
+  const other = await handoffRoot({ model: 'opus', reasoning: 'medium' }, { model: 'cur', reasoning: 'medium' });
+  assert.equal(other.note.modelSource, 'manual'); assert.equal(other.note.model, 'opus');
+  const none = await handoffRoot({}, { model: 'cur', reasoning: 'auto' });
+  assert.equal(none.note.modelSource, 'workspace'); assert.equal(none.note.model, 'cur');
+});

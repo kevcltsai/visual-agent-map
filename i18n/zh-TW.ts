@@ -2140,6 +2140,13 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.clipboard_cut_readonly": "這張圖在這裡是唯讀的，沒有剪下任何內容。",
   "ui.clipboard_cut_into_own": "不能把分支貼到它自己或它的子主題底下，沒有移動任何內容。",
   "ui.clipboard_cut_missing": "剪下的分支或目標主題已不在圖上，沒有移動任何內容。",
+  "ui.clipboard_cut_cross_changed": "剪下分支的那張圖在剪下之後已經變動，沒有移動任何內容。請重新剪下。",
+  "ui.clipboard_cut_cross_busy": "剪下分支的那張圖正開著衝突視窗。請先處理再貼上；沒有移動任何內容。",
+  "ui.clipboard_cut_cross_unsupported": "AIM 圖的分支或含 AIM 主題的分支不能移出，沒有移動任何內容。",
+  "ui.clipboard_cut_cross_history": "從另一張圖移入分支",
+  "ui.cross_map_undo_refused":
+    "這個變更動到兩張圖，之後筆記或圖又在其他地方被更動，所以沒有復原或重做，也沒有改動任何內容。",
+  "ui.cross_map_undo_broken": "這個變更動到兩張圖，先前的復原或重做沒能完整還原，所以不能再復原或重做。",
   "ui.clipboard_text_too_long": "貼上的文字超過 {0} 個字元，沒有貼上任何內容。",
   "ui.clipboard_text_too_many": "第 {0} 行：貼上的文字超過 {1} 個主題，沒有貼上任何內容。",
   "ui.clipboard_text_empty_title": "第 {0} 行：這一行沒有標題文字，沒有貼上任何內容。",

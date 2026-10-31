@@ -2138,6 +2138,13 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.clipboard_cut_readonly": "这张图在这里是只读的，没有剪切任何内容。",
   "ui.clipboard_cut_into_own": "不能把分支粘贴到它自己或它的子主题下面，没有移动任何内容。",
   "ui.clipboard_cut_missing": "剪切的分支或目标主题已不在图上，没有移动任何内容。",
+  "ui.clipboard_cut_cross_changed": "剪切分支的那张图在剪切之后已经变动，没有移动任何内容。请重新剪切。",
+  "ui.clipboard_cut_cross_busy": "剪切分支的那张图正开着冲突窗口。请先处理再粘贴；没有移动任何内容。",
+  "ui.clipboard_cut_cross_unsupported": "AIM 图的分支或含 AIM 主题的分支不能移出，没有移动任何内容。",
+  "ui.clipboard_cut_cross_history": "从另一张图移入分支",
+  "ui.cross_map_undo_refused":
+    "此更改涉及两张图，之后笔记或图又在其他地方被更改，所以没有撤销或重做，也没有改动任何内容。",
+  "ui.cross_map_undo_broken": "此更改涉及两张图，之前的撤销或重做没能完整还原，所以不能再撤销或重做。",
   "ui.clipboard_text_too_long": "粘贴的文字超过 {0} 个字符，没有粘贴任何内容。",
   "ui.clipboard_text_too_many": "第 {0} 行：粘贴的文字超过 {1} 个主题，没有粘贴任何内容。",
   "ui.clipboard_text_empty_title": "第 {0} 行：这一行没有标题文字，没有粘贴任何内容。",

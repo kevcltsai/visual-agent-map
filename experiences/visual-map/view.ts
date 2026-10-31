@@ -232,7 +232,8 @@ import {
 import { inClipboardScope, readClipboardData, writeClipboardData } from "./clipboard-io";
 import { canPasteCut, planPaste, resolveCrossSource } from "./clipboard-paste";
 import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } from "./clipboard-text";
-import { sessionFor } from "./clipboard-session";
+import { sessionFor, type ClipRecord } from "./clipboard-session";
+import { cutSourceProblem, ledgerFor, sameApartFromStamps } from "./cross-map-history";
 import {
   OutlineImportModal,
   type OutlineDraftInputs,
@@ -319,6 +320,16 @@ import {
   TopicPickerModal
 } from "./modals";
 export const VIEW_TYPE = "visual-agent-map-view";
+/** What a cross-map cut adds to writeNewBranches: its own transaction, the source map's part of it, and the success step. */
+interface CrossCut {
+  /** Reads what must be put back byte for byte if the commit fails; runs before `begin`. */
+  snapshot: () => Promise<void>;
+  /** After a failed commit that rolled back cleanly: puts back the exact text of what the rollback only restored in value. */
+  restore: () => Promise<void>;
+  begin: () => Transaction;
+  join: (tx: Transaction) => void;
+  finish: (entry: TransactionEntry) => Promise<void>;
+}
 interface Action {
   undo: () => Promise<void>;
   redo: () => Promise<void>;
@@ -774,6 +785,8 @@ export class VisualAgentMapView extends ItemView {
   private zoomLabel: HTMLElement | null = null;
   private refreshTimer: number | null = null;
   private viewportTimer: number | null = null;
+  /** True while the Map.md conflict window of this view is open. */
+  private conflictOpen = false;
   private hoverTimer: number | null = null;
   private hoverCard: HTMLElement | null = null;
   /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
@@ -1376,6 +1389,7 @@ export class VisualAgentMapView extends ItemView {
     this.selected = null;
     this.multiSelected.clear();
     this.history.clear();
+    this.restoreCrossProxies();
     await this.hydrate(isCurrent);
     if (!isCurrent()) return;
     this.render();
@@ -4315,7 +4329,13 @@ export class VisualAgentMapView extends ItemView {
     const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
     if (structure(disk) === structure(this.map)) return false;
     const local = clone(this.map);
-    this.map = await new Promise<MapDocument>(resolve => new MapConflictModal(this.app, local, disk, resolve).open());
+    // A cross-map cut refuses to touch this map while its conflict window is still open.
+    this.conflictOpen = true;
+    try {
+      this.map = await new Promise<MapDocument>(resolve => new MapConflictModal(this.app, local, disk, resolve).open());
+    } finally {
+      this.conflictOpen = false;
+    }
     this.history.clear();
     return true;
   }
@@ -5414,7 +5434,12 @@ export class VisualAgentMapView extends ItemView {
   private async writeNewBranches(
     before: MapDocument,
     target: MapNode | null,
-    create: (copies: MapNode[], pairs: Array<{ from: string; to: string }>, relations: TopicRelation[]) => Promise<void>
+    create: (
+      copies: MapNode[],
+      pairs: Array<{ from: string; to: string }>,
+      relations: TopicRelation[]
+    ) => Promise<void>,
+    cross?: CrossCut
   ): Promise<MapNode[]> {
     const viewport = clone(before.viewport);
     const copies: MapNode[] = [],
@@ -5424,11 +5449,13 @@ export class VisualAgentMapView extends ItemView {
       parkFolder = repo.topicFolder(this.path, "Unassigned");
     let entry: TransactionEntry;
     try {
+      await cross?.snapshot();
       await create(copies, pairs, newRelations);
       // Only the new copies are written, before the transaction; a failure parks them like any other.
       if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
-      const tx = this.beginMapTransaction();
+      const tx = cross ? cross.begin() : this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
+      cross?.join(tx);
       entry = await tx
         .editMap(this.path, map => {
           map.viewport = clone(viewport);
@@ -5462,6 +5489,9 @@ export class VisualAgentMapView extends ItemView {
         .commit();
     } catch (error) {
       this.render();
+      // A rollback that did not fail is complete in value; the source notes also get their exact bytes back. A failure
+      // here loses nothing (the values are already back), so it is not reported as a failed rollback.
+      if (cross && !isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {});
       // The copies are created outside the transaction: park them (never delete them) and rebuild.
       let parkFailure: { error: unknown } | undefined;
       try {
@@ -5490,7 +5520,8 @@ export class VisualAgentMapView extends ItemView {
       }
       throw error;
     }
-    this.history.push(this.copyEntry(entry));
+    if (cross) await cross.finish(entry);
+    else this.history.push(this.copyEntry(entry));
     this.multiSelected.clear();
     await this.refreshAfterSavedChange();
     return copies.filter(copy => copy.parentId === (target?.id ?? null));
@@ -5675,6 +5706,25 @@ export class VisualAgentMapView extends ItemView {
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
+    // A cut made in another map: this map gets copies, the originals park in the source map's Unassigned (D8).
+    if (record?.mode === "cut" && !source && record.sourceMapPath !== this.path) {
+      const accepted = await this.acceptCrossCut(payload, record);
+      if (!accepted) return;
+      tops = await this.copyFromOtherMap(
+        accepted,
+        target,
+        payload,
+        record.nodeIds,
+        this.crossCutOf(payload, record, accepted.branch)
+      );
+      const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
+      if (landed) {
+        this.selected = landed.id;
+        this.render();
+        this.focusNode(landed);
+      }
+      return;
+    }
     // A copy made in another map: its notes are duplicated into this one, the source map is only read (D2, D3).
     const cross =
       record?.mode === "copy" && !source && record.sourceMapPath !== this.path
@@ -5781,7 +5831,8 @@ export class VisualAgentMapView extends ItemView {
     source: { branch: MapNode[]; roots: MapNode[] },
     target: MapNode | null,
     payload: ClipboardPayload,
-    nodeIds: readonly string[]
+    nodeIds: readonly string[],
+    cross?: CrossCut
   ): Promise<MapNode[]> {
     if (!this.map) return [];
     const before = clone(this.map);
@@ -5789,32 +5840,192 @@ export class VisualAgentMapView extends ItemView {
     const repo = this.plugin.repo,
       replacement = new Map<string, string>(),
       rootOf = new Map<string, MapNode>();
-    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
-      for (const original of source.branch) {
-        const root = source.roots.includes(original) ? original : (rootOf.get(original.parentId!) ?? original);
-        rootOf.set(original.id, root);
-        const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
-        replacement.set(original.id, copy.id);
-        copy.parentId = source.roots.includes(original)
-          ? (target?.id ?? null)
-          : (replacement.get(original.parentId!) ?? target?.id ?? null);
-        copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
-        copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
-        copies.push(copy);
-        pairs.push({ from: original.path, to: copy.path });
+    return this.writeNewBranches(
+      before,
+      target,
+      async (copies, pairs, relations) => {
+        for (const original of source.branch) {
+          const root = source.roots.includes(original) ? original : (rootOf.get(original.parentId!) ?? original);
+          rootOf.set(original.id, root);
+          const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
+          replacement.set(original.id, copy.id);
+          copy.parentId = source.roots.includes(original)
+            ? (target?.id ?? null)
+            : (replacement.get(original.parentId!) ?? target?.id ?? null);
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
+          copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
+        }
+        for (const link of payload.relations) {
+          const from = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.from)]),
+            to = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.to)]);
+          if (from && to)
+            relations.push({
+              kind: link.kind,
+              from,
+              to,
+              ...(link.description !== undefined ? { description: link.description } : {})
+            });
+        }
+      },
+      cross
+    );
+  }
+  /**
+   * A cut made in another map: decides, before anything is written, whether its branches can still be cut out of the
+   * source map. Returns the branches found there, or null after saying why (the cut mark stays unless the source is
+   * gone, so the paste can be retried).
+   */
+  private async acceptCrossCut(
+    payload: ClipboardPayload,
+    record: ClipRecord
+  ): Promise<{ branch: MapNode[]; roots: MapNode[] } | null> {
+    const session = sessionFor(this.plugin),
+      from = record.sourceMapPath;
+    const refuse = (key: TranslationKey, drop = false): null => {
+      if (drop && session.cancelCut()) this.refreshCutMarks();
+      new Notice(t(key));
+      return null;
+    };
+    if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
+    // The source map may be open in another view: its pending save goes out first, and an open conflict window stops the cut.
+    for (const view of this.plugin.views()) {
+      if (view === this || view.path !== from) continue;
+      if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
+      await view.flushForCrossMap();
+    }
+    let sourceMap: MapDocument;
+    try {
+      sourceMap = await this.plugin.repo.readMap(from);
+    } catch {
+      return refuse("ui.clipboard_cut_missing", true);
+    }
+    const found = resolveCrossSource(payload, record, sourceMap);
+    const problem = cutSourceProblem(sourceMap, record, found);
+    if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
+    if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
+    if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
+    if (found.branch.some(node => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    return found;
+  }
+  /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
+  private crossCutOf(payload: ClipboardPayload, record: ClipRecord, branch: MapNode[]): CrossCut {
+    const plugin = this.plugin,
+      repo = plugin.repo,
+      from = record.sourceMapPath,
+      into = this.path,
+      id = crypto.randomUUID(),
+      removed = new Set(branch.map(node => node.id)),
+      texts = new Map<string, string>();
+    const assertSource = (sourceMap: MapDocument): void => {
+      const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
+      if (problem)
+        throw new Error(
+          t(
+            problem === "aim"
+              ? "ui.clipboard_cut_cross_unsupported"
+              : problem === "gone"
+                ? "ui.clipboard_cut_missing"
+                : "ui.clipboard_cut_cross_changed"
+          )
+        );
+    };
+    return {
+      snapshot: async () => {
+        for (const node of branch) texts.set(node.path, await this.app.vault.read(repo.file(node.path)));
+      },
+      restore: async () => {
+        for (const [path, text] of texts) {
+          if (!this.app.vault.getAbstractFileByPath(path)) continue;
+          const file = repo.file(path),
+            now = await this.app.vault.read(file);
+          // Putting a parked note back rewrites its `updated:` stamp and front matter order; anything else is left alone.
+          if (now !== text && sameApartFromStamps(now, text)) await this.app.vault.process(file, () => text);
+        }
+      },
+      begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
+      join: tx => {
+        const parkFolder = repo.topicFolder(from, "Unassigned");
+        for (const node of branch) tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        tx.editMap(from, map => {
+          // The transaction hands over Map.md as it reads it at commit: a change made since the checks stops here.
+          assertSource(map);
+          map.nodes = map.nodes.filter(node => !removed.has(node.id));
+          removeTopicRelationsFor(map, removed);
+        });
+      },
+      finish: async entry => {
+        ledgerFor(plugin).push({
+          id,
+          paths: [from, into],
+          entry: { undo: () => entry.undo(), redo: () => entry.redo() }
+        });
+        this.history.push(this.crossMapEntry(id));
+        if (sessionFor(plugin).cancelCut()) this.refreshCutMarks();
+        try {
+          this.adoptSavedMap(await repo.readMap(into));
+        } catch {
+          /* The saved change is reloaded by refreshAfterSavedChange. */
+        }
       }
-      for (const link of payload.relations) {
-        const from = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.from)]),
-          to = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.to)]);
-        if (from && to)
-          relations.push({
-            kind: link.kind,
-            from,
-            to,
-            ...(link.description !== undefined ? { description: link.description } : {})
-          });
+    };
+  }
+  /**
+   * A transaction over two maps that holds no view: the entry outlives the views, so every view of a map is found
+   * through the plugin when it is needed. `verify` runs on the source map after its open view settled any conflict and
+   * before anything is written.
+   */
+  private beginCrossTransaction(sourcePath: string, verify: () => Promise<void>): Transaction {
+    const plugin = this.plugin;
+    return beginTransaction({
+      repo: plugin.repo,
+      rebuildDerivedData: () => plugin.rebuildDerivedData(),
+      onApplied: () => {},
+      checkConflict: async mapPath => {
+        // The source map is judged first, so a cut that cannot go ahead never opens a conflict window in its view.
+        if (mapPath === sourcePath) await verify();
+        for (const view of plugin.views())
+          if (view.path === mapPath && (await view.resolveMapConflict())) await view.persist();
       }
     });
+  }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  private async flushForCrossMap(): Promise<void> {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
+  /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
+  private crossMapEntry(id: string): Action {
+    return {
+      label: t("ui.clipboard_cut_cross_history"),
+      undo: () => this.runCrossMap(id, "undo"),
+      redo: () => this.runCrossMap(id, "redo")
+    };
+  }
+  private async runCrossMap(id: string, direction: "undo" | "redo"): Promise<void> {
+    const result = await ledgerFor(this.plugin).run(id, direction);
+    if (result.ran) {
+      // The other map's view reloads when the write queue ends; this view adopts its own map now.
+      if (this.path && !this.builtIn) this.adoptSavedMap(await this.plugin.repo.readMap(this.path));
+      return;
+    }
+    if (result.reason === "failed" || result.reason === "broken") {
+      if (result.error === undefined) throw new Error(t("ui.cross_map_undo_broken"));
+      if (isTransactionError(result.error, "stale") || isTransactionError(result.error, "guard"))
+        throw new Error(t("ui.cross_map_undo_refused"));
+      // Thrown as it is: a failed rollback keeps its `rollback-failed` kind and its messages (errors cross realms in tests).
+      throw result.error as Error;
+    }
+    // Another view already ran it (or it is gone): nothing to do, and this view's proxy goes away.
+  }
+  /** After this view's history was cleared: puts back a proxy for each cross-map change of this map that is still applied. */
+  private restoreCrossProxies(): void {
+    if (!this.path || this.builtIn) return;
+    for (const item of ledgerFor(this.plugin).entriesFor(this.path))
+      if (item.status === "applied") this.history.push(this.crossMapEntry(item.id));
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   private copyEntry(entry: TransactionEntry): TransactionEntry {
@@ -5843,30 +6054,31 @@ export class VisualAgentMapView extends ItemView {
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       onApplied: (mapPath, map) => {
-        if (mapPath !== this.path) return;
-        const next = clone(map);
-        if (!this.map) {
-          this.map = next;
-          return;
-        }
-        // In place: callers and tests hold references to the open map.
-        const viewport = this.map.viewport;
-        const target = this.map as unknown as Record<string, unknown>;
-        for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
-        for (const [key, value] of Object.entries(next)) {
-          const current = target[key];
-          // Arrays keep their identity too (the node list is held by cards and tests).
-          if (Array.isArray(current) && Array.isArray(value))
-            current.splice(0, current.length, ...(value as unknown[]));
-          else target[key] = value;
-        }
-        this.map.viewport = clone(viewport);
+        if (mapPath === this.path) this.adoptSavedMap(map);
       },
       checkConflict: async mapPath => {
         if (mapPath !== this.path) return;
         if (await this.resolveMapConflict()) await this.persist();
       }
     });
+  }
+  /** Takes `saved` (the map as now stored) as the open map, in place: callers and tests hold references to the open map. */
+  private adoptSavedMap(saved: MapDocument): void {
+    const next = clone(saved);
+    if (!this.map) {
+      this.map = next;
+      return;
+    }
+    const viewport = this.map.viewport;
+    const target = this.map as unknown as Record<string, unknown>;
+    for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
+    for (const [key, value] of Object.entries(next)) {
+      const current = target[key];
+      // Arrays keep their identity too (the node list is held by cards and tests).
+      if (Array.isArray(current) && Array.isArray(value)) current.splice(0, current.length, ...(value as unknown[]));
+      else target[key] = value;
+    }
+    this.map.viewport = clone(viewport);
   }
   /** The change is already saved and in history; a failing reload must not look like the change failed. */
   private async refreshAfterSavedChange(): Promise<void> {
@@ -6129,6 +6341,7 @@ export class VisualAgentMapView extends ItemView {
       disk.viewport = this.map.viewport;
       this.map = disk;
       this.history.clear();
+      this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();

@@ -2304,6 +2304,17 @@ export const en = {
   "ui.clipboard_cut_readonly": "This map is read-only here, so nothing was cut.",
   "ui.clipboard_cut_into_own": "A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.",
   "ui.clipboard_cut_missing": "The cut branches or the target topic are no longer on the map, so nothing was moved.",
+  "ui.clipboard_cut_cross_changed":
+    "The map the branches were cut from has changed since the cut, so nothing was moved. Cut them again.",
+  "ui.clipboard_cut_cross_busy":
+    "The map the branches were cut from has an open conflict window. Resolve it and paste again; nothing was moved.",
+  "ui.clipboard_cut_cross_unsupported":
+    "Branches cannot be moved out of an AIM map or include AIM topics, so nothing was moved.",
+  "ui.clipboard_cut_cross_history": "Move branches from another map",
+  "ui.cross_map_undo_refused":
+    "This change touched two maps, and the notes or maps were changed elsewhere since, so it was not undone or redone. Nothing was changed.",
+  "ui.cross_map_undo_broken":
+    "This change touched two maps and an earlier undo or redo could not be fully restored, so it can no longer be undone or redone.",
   "ui.clipboard_text_too_long": "The pasted text is longer than {0} characters, so nothing was pasted.",
   "ui.clipboard_text_too_many": "Line {0}: the pasted text has more than {1} topics, so nothing was pasted.",
   "ui.clipboard_text_empty_title": "Line {0}: this line has no title text, so nothing was pasted.",

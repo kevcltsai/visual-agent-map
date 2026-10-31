@@ -2152,6 +2152,12 @@ var en = {
   "ui.clipboard_cut_readonly": "This map is read-only here, so nothing was cut.",
   "ui.clipboard_cut_into_own": "A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.",
   "ui.clipboard_cut_missing": "The cut branches or the target topic are no longer on the map, so nothing was moved.",
+  "ui.clipboard_cut_cross_changed": "The map the branches were cut from has changed since the cut, so nothing was moved. Cut them again.",
+  "ui.clipboard_cut_cross_busy": "The map the branches were cut from has an open conflict window. Resolve it and paste again; nothing was moved.",
+  "ui.clipboard_cut_cross_unsupported": "Branches cannot be moved out of an AIM map or include AIM topics, so nothing was moved.",
+  "ui.clipboard_cut_cross_history": "Move branches from another map",
+  "ui.cross_map_undo_refused": "This change touched two maps, and the notes or maps were changed elsewhere since, so it was not undone or redone. Nothing was changed.",
+  "ui.cross_map_undo_broken": "This change touched two maps and an earlier undo or redo could not be fully restored, so it can no longer be undone or redone.",
   "ui.clipboard_text_too_long": "The pasted text is longer than {0} characters, so nothing was pasted.",
   "ui.clipboard_text_too_many": "Line {0}: the pasted text has more than {1} topics, so nothing was pasted.",
   "ui.clipboard_text_empty_title": "Line {0}: this line has no title text, so nothing was pasted.",
@@ -4211,6 +4217,12 @@ var zhCN = {
   "ui.clipboard_cut_readonly": "\u8FD9\u5F20\u56FE\u5728\u8FD9\u91CC\u662F\u53EA\u8BFB\u7684\uFF0C\u6CA1\u6709\u526A\u5207\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_cut_into_own": "\u4E0D\u80FD\u628A\u5206\u652F\u7C98\u8D34\u5230\u5B83\u81EA\u5DF1\u6216\u5B83\u7684\u5B50\u4E3B\u9898\u4E0B\u9762\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_cut_missing": "\u526A\u5207\u7684\u5206\u652F\u6216\u76EE\u6807\u4E3B\u9898\u5DF2\u4E0D\u5728\u56FE\u4E0A\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_cross_changed": "\u526A\u5207\u5206\u652F\u7684\u90A3\u5F20\u56FE\u5728\u526A\u5207\u4E4B\u540E\u5DF2\u7ECF\u53D8\u52A8\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002\u8BF7\u91CD\u65B0\u526A\u5207\u3002",
+  "ui.clipboard_cut_cross_busy": "\u526A\u5207\u5206\u652F\u7684\u90A3\u5F20\u56FE\u6B63\u5F00\u7740\u51B2\u7A81\u7A97\u53E3\u3002\u8BF7\u5148\u5904\u7406\u518D\u7C98\u8D34\uFF1B\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_cross_unsupported": "AIM \u56FE\u7684\u5206\u652F\u6216\u542B AIM \u4E3B\u9898\u7684\u5206\u652F\u4E0D\u80FD\u79FB\u51FA\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_cross_history": "\u4ECE\u53E6\u4E00\u5F20\u56FE\u79FB\u5165\u5206\u652F",
+  "ui.cross_map_undo_refused": "\u6B64\u66F4\u6539\u6D89\u53CA\u4E24\u5F20\u56FE\uFF0C\u4E4B\u540E\u7B14\u8BB0\u6216\u56FE\u53C8\u5728\u5176\u4ED6\u5730\u65B9\u88AB\u66F4\u6539\uFF0C\u6240\u4EE5\u6CA1\u6709\u64A4\u9500\u6216\u91CD\u505A\uFF0C\u4E5F\u6CA1\u6709\u6539\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.cross_map_undo_broken": "\u6B64\u66F4\u6539\u6D89\u53CA\u4E24\u5F20\u56FE\uFF0C\u4E4B\u524D\u7684\u64A4\u9500\u6216\u91CD\u505A\u6CA1\u80FD\u5B8C\u6574\u8FD8\u539F\uFF0C\u6240\u4EE5\u4E0D\u80FD\u518D\u64A4\u9500\u6216\u91CD\u505A\u3002",
   "ui.clipboard_text_too_long": "\u7C98\u8D34\u7684\u6587\u5B57\u8D85\u8FC7 {0} \u4E2A\u5B57\u7B26\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_text_too_many": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u6587\u5B57\u8D85\u8FC7 {1} \u4E2A\u4E3B\u9898\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_text_empty_title": "\u7B2C {0} \u884C\uFF1A\u8FD9\u4E00\u884C\u6CA1\u6709\u6807\u9898\u6587\u5B57\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
@@ -6270,6 +6282,12 @@ var zhTW = {
   "ui.clipboard_cut_readonly": "\u9019\u5F35\u5716\u5728\u9019\u88E1\u662F\u552F\u8B80\u7684\uFF0C\u6C92\u6709\u526A\u4E0B\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_cut_into_own": "\u4E0D\u80FD\u628A\u5206\u652F\u8CBC\u5230\u5B83\u81EA\u5DF1\u6216\u5B83\u7684\u5B50\u4E3B\u984C\u5E95\u4E0B\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_cut_missing": "\u526A\u4E0B\u7684\u5206\u652F\u6216\u76EE\u6A19\u4E3B\u984C\u5DF2\u4E0D\u5728\u5716\u4E0A\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_cross_changed": "\u526A\u4E0B\u5206\u652F\u7684\u90A3\u5F35\u5716\u5728\u526A\u4E0B\u4E4B\u5F8C\u5DF2\u7D93\u8B8A\u52D5\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002\u8ACB\u91CD\u65B0\u526A\u4E0B\u3002",
+  "ui.clipboard_cut_cross_busy": "\u526A\u4E0B\u5206\u652F\u7684\u90A3\u5F35\u5716\u6B63\u958B\u8457\u885D\u7A81\u8996\u7A97\u3002\u8ACB\u5148\u8655\u7406\u518D\u8CBC\u4E0A\uFF1B\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_cross_unsupported": "AIM \u5716\u7684\u5206\u652F\u6216\u542B AIM \u4E3B\u984C\u7684\u5206\u652F\u4E0D\u80FD\u79FB\u51FA\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_cross_history": "\u5F9E\u53E6\u4E00\u5F35\u5716\u79FB\u5165\u5206\u652F",
+  "ui.cross_map_undo_refused": "\u9019\u500B\u8B8A\u66F4\u52D5\u5230\u5169\u5F35\u5716\uFF0C\u4E4B\u5F8C\u7B46\u8A18\u6216\u5716\u53C8\u5728\u5176\u4ED6\u5730\u65B9\u88AB\u66F4\u52D5\uFF0C\u6240\u4EE5\u6C92\u6709\u5FA9\u539F\u6216\u91CD\u505A\uFF0C\u4E5F\u6C92\u6709\u6539\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.cross_map_undo_broken": "\u9019\u500B\u8B8A\u66F4\u52D5\u5230\u5169\u5F35\u5716\uFF0C\u5148\u524D\u7684\u5FA9\u539F\u6216\u91CD\u505A\u6C92\u80FD\u5B8C\u6574\u9084\u539F\uFF0C\u6240\u4EE5\u4E0D\u80FD\u518D\u5FA9\u539F\u6216\u91CD\u505A\u3002",
   "ui.clipboard_text_too_long": "\u8CBC\u4E0A\u7684\u6587\u5B57\u8D85\u904E {0} \u500B\u5B57\u5143\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_text_too_many": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u6587\u5B57\u8D85\u904E {1} \u500B\u4E3B\u984C\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_text_empty_title": "\u7B2C {0} \u884C\uFF1A\u9019\u4E00\u884C\u6C92\u6709\u6A19\u984C\u6587\u5B57\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
@@ -29783,6 +29801,96 @@ function sessionFor(plugin) {
   return session;
 }
 
+// experiences/visual-map/cross-map-history.ts
+var CROSS_MAP_HISTORY_LIMIT = 20;
+var CrossMapLedger = class {
+  constructor() {
+    __publicField(this, "slots", []);
+  }
+  /** Adds an applied change; the oldest is dropped past the limit. Returns false (and adds nothing) for a repeated id. */
+  push(input) {
+    if (this.slots.some((slot) => slot.id === input.id)) return false;
+    this.slots.push({
+      id: input.id,
+      paths: Object.freeze([...new Set(input.paths)]),
+      entry: input.entry,
+      status: "applied",
+      running: false
+    });
+    while (this.slots.length > CROSS_MAP_HISTORY_LIMIT) this.slots.shift();
+    return true;
+  }
+  /** Changes that touched `path`, oldest first, whatever their status. */
+  entriesFor(path) {
+    return this.slots.filter((slot) => slot.paths.includes(path)).map((slot) => ({ id: slot.id, paths: slot.paths, status: slot.status }));
+  }
+  statusOf(id) {
+    var _a2;
+    return (_a2 = this.slots.find((slot) => slot.id === id)) == null ? void 0 : _a2.status;
+  }
+  /** Forgets a change (for instance when a view finds its proxy no longer applies). */
+  forget(id) {
+    const index = this.slots.findIndex((slot) => slot.id === id);
+    if (index >= 0) this.slots.splice(index, 1);
+  }
+  /**
+   * Undo needs `applied` and redo needs `undone`; any other state does nothing. A second call for the same change
+   * while the first is still running does nothing. A `broken` change is refused. A throw whose `kind` is
+   * `rollback-failed` marks the change broken; any other throw leaves the state as it was.
+   */
+  async run(id, direction) {
+    const slot = this.slots.find((candidate) => candidate.id === id);
+    if (!slot) return { ran: false, reason: "unknown" };
+    if (slot.status === "broken") return { ran: false, reason: "broken", status: slot.status };
+    if (slot.running) return { ran: false, reason: "busy", status: slot.status };
+    if (slot.status !== (direction === "undo" ? "applied" : "undone"))
+      return { ran: false, reason: "wrong-state", status: slot.status };
+    slot.running = true;
+    try {
+      await (direction === "undo" ? slot.entry.undo() : slot.entry.redo());
+      slot.status = direction === "undo" ? "undone" : "applied";
+      return { ran: true, status: slot.status };
+    } catch (error) {
+      if ((error == null ? void 0 : error.kind) === "rollback-failed") slot.status = "broken";
+      return { ran: false, reason: slot.status === "broken" ? "broken" : "failed", status: slot.status, error };
+    } finally {
+      slot.running = false;
+    }
+  }
+};
+var ledgers = /* @__PURE__ */ new WeakMap();
+function ledgerFor(plugin) {
+  if (typeof plugin !== "object" || plugin === null) throw new TypeError("ledgerFor needs the plugin object");
+  let ledger = ledgers.get(plugin);
+  if (!ledger) {
+    ledger = new CrossMapLedger();
+    ledgers.set(plugin, ledger);
+  }
+  return ledger;
+}
+function cutSourceProblem(sourceMap, record, found) {
+  const present = new Set(sourceMap.nodes.map((node) => node.id));
+  if (sourceMap.id !== record.sourceMapId || record.nodeIds.every((id) => !present.has(id))) return "gone";
+  if (sourceMap.aim) return "aim";
+  if (!found) return "changed";
+  const ids = new Set(record.nodeIds);
+  if (sourceMap.nodes.some((node) => node.parentId !== null && ids.has(node.parentId) && !ids.has(node.id)))
+    return "changed";
+  if (found.branch.some((node) => node.aimKind !== void 0 || node.aimQuestion !== void 0)) return "aim";
+  return null;
+}
+var noteParts = (text11) => {
+  const found = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text11);
+  if (!found) return null;
+  return { lines: found[1].split("\n").filter((line) => !line.startsWith("updated:")), body: found[2] };
+};
+function sameApartFromStamps(a, b) {
+  const first = noteParts(a), second = noteParts(b);
+  if (!first || !second || first.body !== second.body || first.lines.length !== second.lines.length) return false;
+  const sorted = (lines) => [...lines].sort().join("\n");
+  return sorted(first.lines) === sorted(second.lines);
+}
+
 // experiences/visual-map/outline-import-modal.ts
 var import_obsidian18 = require("obsidian");
 
@@ -41232,6 +41340,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "zoomLabel", null);
     __publicField(this, "refreshTimer", null);
     __publicField(this, "viewportTimer", null);
+    /** True while the Map.md conflict window of this view is open. */
+    __publicField(this, "conflictOpen", false);
     __publicField(this, "hoverTimer", null);
     __publicField(this, "hoverCard", null);
     /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
@@ -41815,6 +41925,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.selected = null;
     this.multiSelected.clear();
     this.history.clear();
+    this.restoreCrossProxies();
     await this.hydrate(isCurrent);
     if (!isCurrent()) return;
     this.render();
@@ -44578,7 +44689,12 @@ ${request.requirements}` : preset.text,
     const structure2 = (map) => JSON.stringify({ ...map, viewport: null });
     if (structure2(disk) === structure2(this.map)) return false;
     const local = clone(this.map);
-    this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
+    this.conflictOpen = true;
+    try {
+      this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
+    } finally {
+      this.conflictOpen = false;
+    }
     this.history.clear();
     return true;
   }
@@ -45536,16 +45652,18 @@ ${request.requirements}` : preset.text,
    * Writes new notes (made by `create`, which pushes each one into `copies` as soon as it exists) together with the
    * Map.md edit as one transaction and one history step. A failure parks the notes in Unassigned (never deletes them).
    */
-  async writeNewBranches(before, target, create) {
+  async writeNewBranches(before, target, create, cross) {
     var _a2;
     const viewport = clone(before.viewport);
     const copies = [], pairs = [], newRelations = [], repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
     let entry;
     try {
+      await (cross == null ? void 0 : cross.snapshot());
       await create(copies, pairs, newRelations);
       if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
-      const tx = this.beginMapTransaction();
+      const tx = cross ? cross.begin() : this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
+      cross == null ? void 0 : cross.join(tx);
       entry = await tx.editMap(this.path, (map) => {
         var _a3, _b2;
         map.viewport = clone(viewport);
@@ -45578,6 +45696,8 @@ ${request.requirements}` : preset.text,
       }).commit();
     } catch (error) {
       this.render();
+      if (cross && !isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {
+      });
       let parkFailure;
       try {
         let parkedAny = false;
@@ -45603,7 +45723,8 @@ ${request.requirements}` : preset.text,
       }
       throw error;
     }
-    this.history.push(this.copyEntry(entry));
+    if (cross) await cross.finish(entry);
+    else this.history.push(this.copyEntry(entry));
     this.multiSelected.clear();
     await this.refreshAfterSavedChange();
     return copies.filter((copy) => {
@@ -45764,7 +45885,7 @@ ${request.requirements}` : preset.text,
    * whitelisted fields make new notes.
    */
   async pasteBranches(payload, raw) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const map = this.map;
     if (!map || this.clipboardReadOnly()) {
       new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
@@ -45787,6 +45908,27 @@ ${request.requirements}` : preset.text,
       sessionFor(this.plugin).cancelCut();
       this.refreshCutMarks();
     }
+    if ((record == null ? void 0 : record.mode) === "cut" && !source && record.sourceMapPath !== this.path) {
+      const accepted = await this.acceptCrossCut(payload, record);
+      if (!accepted) return;
+      tops = await this.copyFromOtherMap(
+        accepted,
+        target,
+        payload,
+        record.nodeIds,
+        this.crossCutOf(payload, record, accepted.branch)
+      );
+      const landed = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => {
+        var _a3;
+        return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
+      });
+      if (landed) {
+        this.selected = landed.id;
+        this.render();
+        this.focusNode(landed);
+      }
+      return;
+    }
     const cross = (record == null ? void 0 : record.mode) === "copy" && !source && record.sourceMapPath !== this.path ? await this.crossSourceOf(payload, record) : null;
     if (cross && record) {
       tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
@@ -45796,7 +45938,7 @@ ${request.requirements}` : preset.text,
         const check = canPasteCut(
           map.nodes,
           roots.map((root) => root.id),
-          (_c = target == null ? void 0 : target.id) != null ? _c : null
+          (_d = target == null ? void 0 : target.id) != null ? _d : null
         );
         if (!check.ok) {
           new import_obsidian31.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
@@ -45805,7 +45947,7 @@ ${request.requirements}` : preset.text,
         await this.moveBranches(roots, target);
         sessionFor(this.plugin).cancelCut();
         this.refreshCutMarks();
-        const moved = (_d = this.map) == null ? void 0 : _d.nodes.find((node) => node.id === roots[0].id);
+        const moved = (_e = this.map) == null ? void 0 : _e.nodes.find((node) => node.id === roots[0].id);
         if (moved) {
           this.selected = moved.id;
           this.render();
@@ -45854,7 +45996,7 @@ ${request.requirements}` : preset.text,
           });
       });
     }
-    const placed = (_e = this.map) == null ? void 0 : _e.nodes.find((node) => {
+    const placed = (_f = this.map) == null ? void 0 : _f.nodes.find((node) => {
       var _a3;
       return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
     });
@@ -45879,35 +46021,173 @@ ${request.requirements}` : preset.text,
    * Duplicates topics of another map under `target` (null = new top-level trees) as one transaction of this map. The
    * source notes are only read; links in the copies are rewritten from the source note's place by writeNewBranches.
    */
-  async copyFromOtherMap(source, target, payload, nodeIds) {
+  async copyFromOtherMap(source, target, payload, nodeIds, cross) {
     if (!this.map) return [];
     const before = clone(this.map);
     if (!this.mergeUnlocked(target ? [target.id] : [])) return [];
     const repo = this.plugin.repo, replacement = /* @__PURE__ */ new Map(), rootOf = /* @__PURE__ */ new Map();
-    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
-      var _a2, _b2, _c, _d;
-      for (const original of source.branch) {
-        const root = source.roots.includes(original) ? original : (_a2 = rootOf.get(original.parentId)) != null ? _a2 : original;
-        rootOf.set(original.id, root);
-        const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
-        replacement.set(original.id, copy.id);
-        copy.parentId = source.roots.includes(original) ? (_b2 = target == null ? void 0 : target.id) != null ? _b2 : null : (_d = (_c = replacement.get(original.parentId)) != null ? _c : target == null ? void 0 : target.id) != null ? _d : null;
-        copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
-        copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
-        copies.push(copy);
-        pairs.push({ from: original.path, to: copy.path });
+    return this.writeNewBranches(
+      before,
+      target,
+      async (copies, pairs, relations) => {
+        var _a2, _b2, _c, _d;
+        for (const original of source.branch) {
+          const root = source.roots.includes(original) ? original : (_a2 = rootOf.get(original.parentId)) != null ? _a2 : original;
+          rootOf.set(original.id, root);
+          const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
+          replacement.set(original.id, copy.id);
+          copy.parentId = source.roots.includes(original) ? (_b2 = target == null ? void 0 : target.id) != null ? _b2 : null : (_d = (_c = replacement.get(original.parentId)) != null ? _c : target == null ? void 0 : target.id) != null ? _d : null;
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
+          copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
+        }
+        for (const link of payload.relations) {
+          const from = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.from)]), to = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.to)]);
+          if (from && to)
+            relations.push({
+              kind: link.kind,
+              from,
+              to,
+              ...link.description !== void 0 ? { description: link.description } : {}
+            });
+        }
+      },
+      cross
+    );
+  }
+  /**
+   * A cut made in another map: decides, before anything is written, whether its branches can still be cut out of the
+   * source map. Returns the branches found there, or null after saying why (the cut mark stays unless the source is
+   * gone, so the paste can be retried).
+   */
+  async acceptCrossCut(payload, record) {
+    const session = sessionFor(this.plugin), from = record.sourceMapPath;
+    const refuse = (key2, drop = false) => {
+      if (drop && session.cancelCut()) this.refreshCutMarks();
+      new import_obsidian31.Notice(t(key2));
+      return null;
+    };
+    if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
+    for (const view of this.plugin.views()) {
+      if (view === this || view.path !== from) continue;
+      if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
+      await view.flushForCrossMap();
+    }
+    let sourceMap;
+    try {
+      sourceMap = await this.plugin.repo.readMap(from);
+    } catch (e) {
+      return refuse("ui.clipboard_cut_missing", true);
+    }
+    const found = resolveCrossSource(payload, record, sourceMap);
+    const problem = cutSourceProblem(sourceMap, record, found);
+    if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
+    if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
+    if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
+    if (found.branch.some((node) => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    return found;
+  }
+  /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
+  crossCutOf(payload, record, branch) {
+    const plugin = this.plugin, repo = plugin.repo, from = record.sourceMapPath, into = this.path, id = crypto.randomUUID(), removed = new Set(branch.map((node) => node.id)), texts2 = /* @__PURE__ */ new Map();
+    const assertSource = (sourceMap) => {
+      const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
+      if (problem)
+        throw new Error(
+          t(
+            problem === "aim" ? "ui.clipboard_cut_cross_unsupported" : problem === "gone" ? "ui.clipboard_cut_missing" : "ui.clipboard_cut_cross_changed"
+          )
+        );
+    };
+    return {
+      snapshot: async () => {
+        for (const node of branch) texts2.set(node.path, await this.app.vault.read(repo.file(node.path)));
+      },
+      restore: async () => {
+        for (const [path, text11] of texts2) {
+          if (!this.app.vault.getAbstractFileByPath(path)) continue;
+          const file = repo.file(path), now = await this.app.vault.read(file);
+          if (now !== text11 && sameApartFromStamps(now, text11)) await this.app.vault.process(file, () => text11);
+        }
+      },
+      begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
+      join: (tx) => {
+        const parkFolder = repo.topicFolder(from, "Unassigned");
+        for (const node of branch) tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        tx.editMap(from, (map) => {
+          assertSource(map);
+          map.nodes = map.nodes.filter((node) => !removed.has(node.id));
+          removeTopicRelationsFor(map, removed);
+        });
+      },
+      finish: async (entry) => {
+        ledgerFor(plugin).push({
+          id,
+          paths: [from, into],
+          entry: { undo: () => entry.undo(), redo: () => entry.redo() }
+        });
+        this.history.push(this.crossMapEntry(id));
+        if (sessionFor(plugin).cancelCut()) this.refreshCutMarks();
+        try {
+          this.adoptSavedMap(await repo.readMap(into));
+        } catch (e) {
+        }
       }
-      for (const link of payload.relations) {
-        const from = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.from)]), to = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.to)]);
-        if (from && to)
-          relations.push({
-            kind: link.kind,
-            from,
-            to,
-            ...link.description !== void 0 ? { description: link.description } : {}
-          });
+    };
+  }
+  /**
+   * A transaction over two maps that holds no view: the entry outlives the views, so every view of a map is found
+   * through the plugin when it is needed. `verify` runs on the source map after its open view settled any conflict and
+   * before anything is written.
+   */
+  beginCrossTransaction(sourcePath, verify) {
+    const plugin = this.plugin;
+    return begin({
+      repo: plugin.repo,
+      rebuildDerivedData: () => plugin.rebuildDerivedData(),
+      onApplied: () => {
+      },
+      checkConflict: async (mapPath) => {
+        if (mapPath === sourcePath) await verify();
+        for (const view of plugin.views())
+          if (view.path === mapPath && await view.resolveMapConflict()) await view.persist();
       }
     });
+  }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  async flushForCrossMap() {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
+  /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
+  crossMapEntry(id) {
+    return {
+      label: t("ui.clipboard_cut_cross_history"),
+      undo: () => this.runCrossMap(id, "undo"),
+      redo: () => this.runCrossMap(id, "redo")
+    };
+  }
+  async runCrossMap(id, direction) {
+    const result = await ledgerFor(this.plugin).run(id, direction);
+    if (result.ran) {
+      if (this.path && !this.builtIn) this.adoptSavedMap(await this.plugin.repo.readMap(this.path));
+      return;
+    }
+    if (result.reason === "failed" || result.reason === "broken") {
+      if (result.error === void 0) throw new Error(t("ui.cross_map_undo_broken"));
+      if (isTransactionError(result.error, "stale") || isTransactionError(result.error, "guard"))
+        throw new Error(t("ui.cross_map_undo_refused"));
+      throw result.error;
+    }
+  }
+  /** After this view's history was cleared: puts back a proxy for each cross-map change of this map that is still applied. */
+  restoreCrossProxies() {
+    if (!this.path || this.builtIn) return;
+    for (const item of ledgerFor(this.plugin).entriesFor(this.path))
+      if (item.status === "applied") this.history.push(this.crossMapEntry(item.id));
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   copyEntry(entry) {
@@ -45937,28 +46217,30 @@ ${request.requirements}` : preset.text,
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       onApplied: (mapPath, map) => {
-        if (mapPath !== this.path) return;
-        const next = clone(map);
-        if (!this.map) {
-          this.map = next;
-          return;
-        }
-        const viewport = this.map.viewport;
-        const target = this.map;
-        for (const key2 of Object.keys(target)) if (!(key2 in next)) delete target[key2];
-        for (const [key2, value] of Object.entries(next)) {
-          const current = target[key2];
-          if (Array.isArray(current) && Array.isArray(value))
-            current.splice(0, current.length, ...value);
-          else target[key2] = value;
-        }
-        this.map.viewport = clone(viewport);
+        if (mapPath === this.path) this.adoptSavedMap(map);
       },
       checkConflict: async (mapPath) => {
         if (mapPath !== this.path) return;
         if (await this.resolveMapConflict()) await this.persist();
       }
     });
+  }
+  /** Takes `saved` (the map as now stored) as the open map, in place: callers and tests hold references to the open map. */
+  adoptSavedMap(saved) {
+    const next = clone(saved);
+    if (!this.map) {
+      this.map = next;
+      return;
+    }
+    const viewport = this.map.viewport;
+    const target = this.map;
+    for (const key2 of Object.keys(target)) if (!(key2 in next)) delete target[key2];
+    for (const [key2, value] of Object.entries(next)) {
+      const current = target[key2];
+      if (Array.isArray(current) && Array.isArray(value)) current.splice(0, current.length, ...value);
+      else target[key2] = value;
+    }
+    this.map.viewport = clone(viewport);
   }
   /** The change is already saved and in history; a failing reload must not look like the change failed. */
   async refreshAfterSavedChange() {
@@ -46184,6 +46466,7 @@ ${request.requirements}` : preset.text,
       disk.viewport = this.map.viewport;
       this.map = disk;
       this.history.clear();
+      this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();

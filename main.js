@@ -918,6 +918,11 @@ var en = {
   "ui.inherited_at_creation": "Follows upper topic",
   "ui.manually_selected": "Manually selected",
   "ui.follow_default_model": "Follow default (now: {0})",
+  "ui.follow_current_model_0": "Follow current model ({0})",
+  "ui.follow_parent_topic_0": "Follow upper topic ({0})",
+  "ui.model_scope": "Apply to",
+  "ui.model_scope_once": "This run only",
+  "ui.model_scope_pin": "Pin to this topic",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",
   "ui.use_this_note": "Use this note",
@@ -970,7 +975,7 @@ var en = {
   "ui.unassigned_0": "Unassigned ({0})",
   "ui.archived_0": "Archived ({0})",
   "ui.selected_0_1_2": "Selected {0}: {1}{2}",
-  "ui.multi_research_keep_topic_models": "Each topic's current model",
+  "ui.multi_research_current_model": "Current model (overridden topics keep their own)",
   "ui.expand_0": "Expand {0}",
   "ui.0_moved": "{0} (moved)",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}; reasoning can be adjusted per topic.",
@@ -3049,6 +3054,11 @@ var zhCN = {
   "ui.inherited_at_creation": "\u8DDF\u968F\u4E0A\u5C42\u8BAE\u9898",
   "ui.manually_selected": "\u624B\u52A8\u6307\u5B9A",
   "ui.follow_default_model": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5F53\u524D\uFF1A{0}\uFF09",
+  "ui.follow_current_model_0": "\u8DDF\u968F\u5F53\u524D\u6A21\u578B\uFF08{0}\uFF09",
+  "ui.follow_parent_topic_0": "\u6CBF\u7528\u4E0A\u5C42\u8BAE\u9898\uFF08{0}\uFF09",
+  "ui.model_scope": "\u5E94\u7528\u8303\u56F4",
+  "ui.model_scope_once": "\u53EA\u7528\u8FD9\u6B21",
+  "ui.model_scope_pin": "\u8FD9\u4E2A\u8BAE\u9898\u56FA\u5B9A\u7528\u5B83",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8BAE\u9898\u7684\u7B14\u8BB0\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u94FE\u63A5\u672A\u5F52\u7C7B\u7B14\u8BB0\u6216\u4ECE\u56FE\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u94FE\u63A5\u7B14\u8BB0",
   "ui.use_this_note": "\u4F7F\u7528\u8FD9\u4EFD\u7B14\u8BB0",
@@ -3101,7 +3111,7 @@ var zhCN = {
   "ui.unassigned_0": "\u672A\u5F52\u7C7B\uFF08{0}\uFF09",
   "ui.archived_0": "\u5F52\u6863\uFF08{0}\uFF09",
   "ui.selected_0_1_2": "\u5DF2\u9009 {0} \u4E2A\uFF1A{1}{2}",
-  "ui.multi_research_keep_topic_models": "\u6CBF\u7528\u5404\u8BAE\u9898\u5F53\u524D\u7684\u6A21\u578B",
+  "ui.multi_research_current_model": "\u5F53\u524D\u6A21\u578B\uFF08\u6709\u8986\u5199\u7684\u8BAE\u9898\u7528\u81EA\u5DF1\u7684\u6A21\u578B\uFF09",
   "ui.expand_0": "\u5C55\u5F00 {0}",
   "ui.0_moved": "{0}\uFF08\u5DF2\u79FB\u52A8\uFF09",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7EA7\u53EF\u4F9D\u8BAE\u9898\u8C03\u6574\u3002",
@@ -5180,6 +5190,11 @@ var zhTW = {
   "ui.inherited_at_creation": "\u8DDF\u96A8\u4E0A\u5C64\u8B70\u984C",
   "ui.manually_selected": "\u624B\u52D5\u6307\u5B9A",
   "ui.follow_default_model": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u76EE\u524D\uFF1A{0}\uFF09",
+  "ui.follow_current_model_0": "\u8DDF\u96A8\u76EE\u524D\u6A21\u578B\uFF08{0}\uFF09",
+  "ui.follow_parent_topic_0": "\u6CBF\u7528\u4E0A\u5C64\u8B70\u984C\uFF08{0}\uFF09",
+  "ui.model_scope": "\u5957\u7528\u7BC4\u570D",
+  "ui.model_scope_once": "\u53EA\u7528\u9019\u6B21",
+  "ui.model_scope_pin": "\u9019\u500B\u8B70\u984C\u56FA\u5B9A\u7528\u5B83",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8B70\u984C\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u9023\u7D50\u7B46\u8A18",
   "ui.use_this_note": "\u4F7F\u7528\u9019\u4EFD\u7B46\u8A18",
@@ -5232,7 +5247,7 @@ var zhTW = {
   "ui.unassigned_0": "\u672A\u6B78\u985E\uFF08{0}\uFF09",
   "ui.archived_0": "\u5C01\u5B58\uFF08{0}\uFF09",
   "ui.selected_0_1_2": "\u5DF2\u9078 {0} \u500B\uFF1A{1}{2}",
-  "ui.multi_research_keep_topic_models": "\u6CBF\u7528\u5404\u8B70\u984C\u76EE\u524D\u7684\u6A21\u578B",
+  "ui.multi_research_current_model": "\u76EE\u524D\u6A21\u578B\uFF08\u8986\u5BEB\u7684\u8B70\u984C\u7528\u81EA\u5DF1\u7684\u6A21\u578B\uFF09",
   "ui.expand_0": "\u5C55\u958B {0}",
   "ui.0_moved": "{0}\uFF08\u5DF2\u79FB\u52D5\uFF09",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7D1A\u53EF\u4F9D\u8B70\u984C\u8ABF\u6574\u3002",
@@ -20808,12 +20823,13 @@ var Repository = class {
   }
   /**
    * What "follow the default" resolves to for a topic: a root follows the workspace model, a child follows its upper
-   * topic (nearest manual ancestor, else the workspace model).
+   * topic (nearest manual ancestor, else the workspace model; `overridden` tells which).
    */
   async followDefaultModel(path, map) {
     const node = map == null ? void 0 : map.nodes.find((item) => item.path === path);
-    if (!(node == null ? void 0 : node.parentId)) return { source: "workspace", model: this.settings.cliModel };
-    return { source: "inherited", model: (await this.effectiveModel(path, void 0, "inherited", map)).model };
+    if (!(node == null ? void 0 : node.parentId)) return { source: "workspace", model: this.settings.cliModel, overridden: false };
+    const effective = await this.effectiveModel(path, void 0, "inherited", map);
+    return { source: "inherited", model: effective.model, overridden: effective.overridden };
   }
   async readNote(path, map) {
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
@@ -31580,6 +31596,10 @@ function modelField(parent, models, defaultLabel, repair) {
         model.createEl("option", { value: id, text: id });
       model.value = id != null ? id : "";
     },
+    setDefaultLabel: (label) => {
+      defaultLabel = label;
+      fill2();
+    },
     dispose
   };
 }
@@ -31738,7 +31758,7 @@ var messageOf = (error) => {
 };
 var OutlineImportModal = class extends import_obsidian18.Modal {
   constructor(app, create, models = { list: () => [], watch: () => () => {
-  } }, templates = [], target = { map: "none" }, initialPlacement = "tree", generator, links = {}, tones = [], defaultStyleLabel = "") {
+  } }, templates = [], target = { map: "none" }, initialPlacement = "tree", generator, links = {}, tones = [], defaultStyleLabel = "", defaultModelLabel) {
     super(app);
     this.create = create;
     this.models = models;
@@ -31748,6 +31768,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     this.links = links;
     this.tones = tones;
     this.defaultStyleLabel = defaultStyleLabel;
+    this.defaultModelLabel = defaultModelLabel;
     __publicField(this, "textarea");
     __publicField(this, "preview");
     __publicField(this, "createButton");
@@ -31766,6 +31787,9 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     __publicField(this, "setMode", () => {
     });
     __publicField(this, "syncResearchOptions", () => {
+    });
+    /** Asks the host what the model menu's default entry means for the current position and shows it. */
+    __publicField(this, "syncModelLabel", () => {
     });
     __publicField(this, "restoreResult", () => {
     });
@@ -31804,10 +31828,29 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     const mode = aiModeField(researchOptions, { initial: "quick" });
     this.mode = mode.value;
     this.setMode = mode.set;
-    const model = modelField(researchOptions, this.models, t("ui.workspace_default"), this.links.repair);
+    const model = modelField(
+      researchOptions,
+      this.models,
+      this.defaultModelLabel ? "" : t("ui.workspace_default"),
+      this.links.repair
+    );
     this.model = model.value;
     this.setModel = model.set;
     this.unwatch = model.dispose;
+    let labelTicket = 0;
+    this.syncModelLabel = () => {
+      if (!this.defaultModelLabel) return;
+      const ticket = ++labelTicket;
+      const placement = this.placementRequest();
+      const answer = this.defaultModelLabel(placement.kind === "under" ? placement.parentId : null);
+      const apply = (label) => {
+        if (ticket === labelTicket) model.setDefaultLabel(label);
+      };
+      if (typeof answer === "string") apply(answer);
+      else answer.then(apply, () => {
+      });
+    };
+    this.syncModelLabel();
     const style = noteStyleField(researchOptions, {
       templates: this.templates,
       tones: this.tones,
@@ -31873,6 +31916,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
         if (!input.checked) return;
         this.placement = option2.kind;
         for (const mark of marks) mark.label.toggleClass("is-checked", mark.kind === this.placement);
+        this.syncModelLabel();
       });
       const text11 = label.createDiv("vam-outline-option-text");
       text11.createSpan({ text: option2.text });
@@ -32023,12 +32067,20 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
           ...tone ? { tone } : {}
         };
       };
-      void generator.generate({ topic: topic.value.trim(), presetText: text11.value }, controller.signal, () => {
-        const snapshot = inputs();
-        this.detached = true;
-        this.close();
-        return snapshot;
-      }).then((markdown) => {
+      const generationModel = () => {
+        const picked = this.shallow.checked ? this.model() : void 0;
+        return picked ? { model: picked } : {};
+      };
+      void generator.generate(
+        { topic: topic.value.trim(), presetText: text11.value, ...generationModel() },
+        controller.signal,
+        () => {
+          const snapshot = inputs();
+          this.detached = true;
+          this.close();
+          return snapshot;
+        }
+      ).then((markdown) => {
         if (this.detached) return;
         if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
         this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
@@ -32664,7 +32716,7 @@ var MultiResearchModal = class extends import_obsidian20.Modal {
           text: t(mode === "quick" ? "ui.quick" : "ui.standard")
         });
     });
-    const model = modelField(this.contentEl, this.models, t("ui.multi_research_keep_topic_models"), this.links.repair);
+    const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
     const style = noteStyleField(this.contentEl, {
       templates: this.templates,
@@ -33823,8 +33875,11 @@ var NextStepModal = class extends import_obsidian24.Modal {
     __publicField(this, "detached", false);
     __publicField(this, "backgroundBegan", false);
     __publicField(this, "runPending", false);
-    /** Model and effort edits wait here; they are saved when a run starts, never when the dialog is cancelled. */
-    __publicField(this, "pendingSettings", {});
+    /**
+     * The model and level menus' state (MS-06): what this run uses once, and what a run start writes to the topic (only
+     * an explicit "follow" or "pin"; never when the dialog is cancelled).
+     */
+    __publicField(this, "modelMenu");
     /** The output language the person picked in this dialog; saved on the map when a run starts. */
     __publicField(this, "manualOutputLanguage");
     __publicField(this, "taskSignal");
@@ -33899,6 +33954,12 @@ var NextStepModal = class extends import_obsidian24.Modal {
     var _a2, _b2;
     return (_b2 = (_a2 = this.requirementsInput) == null ? void 0 : _a2.value.trim()) != null ? _b2 : "";
   }
+  /** This dialog's one-run model choice for a run's options; nothing when the topic's own resolution applies. */
+  runOnceOptions() {
+    var _a2;
+    const runOnce = (_a2 = this.modelMenu) == null ? void 0 : _a2.runOnce();
+    return runOnce ? { runOnce } : {};
+  }
   get background() {
     var _a2, _b2, _c;
     return (_c = (_a2 = this.modelSettings) == null ? void 0 : _a2.background) != null ? _c : (_b2 = this.selectionFlow) == null ? void 0 : _b2.background;
@@ -33954,38 +34015,34 @@ var NextStepModal = class extends import_obsidian24.Modal {
   }
   /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
   async flushSettings() {
-    var _a2, _b2;
-    const patch = this.pendingSettings;
+    var _a2, _b2, _c, _d, _e;
+    const patch = (_b2 = (_a2 = this.modelMenu) == null ? void 0 : _a2.patch()) != null ? _b2 : {};
     if (Object.keys(patch).length && this.modelSettings) {
-      this.pendingSettings = {};
-      try {
-        await this.modelSettings.save(patch);
-      } catch (error) {
-        this.pendingSettings = { ...patch, ...this.pendingSettings };
-        throw error;
-      }
+      await this.modelSettings.save(patch);
+      (_c = this.modelMenu) == null ? void 0 : _c.saved();
     }
     const manual = this.manualOutputLanguage;
-    const remember = (_a2 = this.info) == null ? void 0 : _a2.rememberOutputLanguage;
+    const remember = (_d = this.info) == null ? void 0 : _d.rememberOutputLanguage;
     if (manual !== void 0 && remember) {
       this.manualOutputLanguage = void 0;
       try {
         await remember(manual);
       } catch (error) {
-        (_b2 = this.manualOutputLanguage) != null ? _b2 : this.manualOutputLanguage = manual;
+        (_e = this.manualOutputLanguage) != null ? _e : this.manualOutputLanguage = manual;
         throw error;
       }
     }
   }
+  /**
+   * The model and level menus. A choice here is for this run only unless the scope menu says "pin" (MS-06); only an
+   * explicit "pin", or "follow" on a topic, is written, and only when a run starts (`flushSettings`).
+   */
   renderModelSettings(parent) {
     var _a2, _b2;
     if (!this.modelSettings) return;
     const settings = this.modelSettings;
     const advanced = parent.createEl("details", { cls: "vam-advanced vam-next-model" });
     const advancedValue = advanced.createEl("summary", { text: t("ui.model_and_advanced_settings") }).createSpan({ cls: "vam-next-disclosure-value" });
-    const save = (patch) => {
-      this.pendingSettings = { ...this.pendingSettings, ...patch };
-    };
     const { field: modelLabel, head: modelHead } = linkedField(advanced, t("ui.model"));
     const model = modelLabel.createEl("select");
     model.setAttr("aria-label", t("ui.model"));
@@ -33993,10 +34050,63 @@ var NextStepModal = class extends import_obsidian24.Modal {
     model.value = settings.model;
     const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
     const options = new Set(optionList);
-    const follow = (_a2 = settings.followDefault) != null ? _a2 : { source: "workspace", model: this.plugin.settings.cliModel };
-    const followLabel = () => t("ui.follow_default_model", this.plugin.modelLabel(follow.model));
+    const follow = (_a2 = settings.followDefault) != null ? _a2 : {
+      source: "workspace",
+      model: this.plugin.settings.cliModel,
+      overridden: false
+    };
+    const initial = {
+      model: settings.model,
+      source: settings.modelSource,
+      reasoning: normalizeReasoningLevel(settings.reasoning)
+    };
+    const currentReasoning = () => normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+    let menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
+    let followPicked = false;
+    let scope = "once";
+    const base = () => followPicked ? { model: follow.model, reasoning: currentReasoning() } : initial;
+    const explicit = () => !followPicked && menu !== FOLLOW_DEFAULT_MODEL && !(initial.source === "manual" && menu === initial.model);
+    const differs = () => {
+      const level = normalizeReasoningLevel(settings.reasoning) !== base().reasoning;
+      return followPicked ? level : explicit() || settings.model !== base().model || level;
+    };
+    this.modelMenu = {
+      runOnce: () => {
+        if (!differs() || !followPicked && scope === "pin") return void 0;
+        return { model: settings.model, reasoning: normalizeReasoningLevel(settings.reasoning) };
+      },
+      patch: () => {
+        if (followPicked) return { modelSource: follow.source };
+        if (differs() && scope === "pin")
+          return {
+            model: settings.model,
+            modelSource: "manual",
+            reasoning: normalizeReasoningLevel(settings.reasoning)
+          };
+        return {};
+      },
+      saved: () => {
+        if (followPicked)
+          Object.assign(initial, { model: follow.model, source: follow.source, reasoning: currentReasoning() });
+        else if (differs() && scope === "pin")
+          Object.assign(initial, {
+            model: settings.model,
+            source: "manual",
+            reasoning: normalizeReasoningLevel(settings.reasoning)
+          });
+        else return;
+        menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
+        followPicked = false;
+        scope = "once";
+        refresh();
+      }
+    };
+    const followLabel = () => t(
+      follow.overridden ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
+      this.plugin.modelLabel(follow.model)
+    );
     const syncModels = () => {
-      const chosen = settings.modelSource === "manual" ? model.value : FOLLOW_DEFAULT_MODEL;
+      const chosen = menu;
       if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
       syncModelSelect(
         model,
@@ -34036,51 +34146,28 @@ var NextStepModal = class extends import_obsidian24.Modal {
       inherited: t("ui.inherited_at_creation"),
       manual: t("ui.manually_selected")
     };
-    const modelSummary = advanced.createEl("p", {
-      cls: "vam-hint",
-      text: t(
-        "ui.0_1_reasoning_can_be_adjusted_per_topic",
-        this.plugin.modelLabel(settings.model),
-        sourceLabels[settings.modelSource]
-      )
-    });
-    model.value = settings.modelSource === "manual" ? settings.model : FOLLOW_DEFAULT_MODEL;
+    const summaryText2 = () => t(
+      "ui.0_1_reasoning_can_be_adjusted_per_topic",
+      this.plugin.modelLabel(settings.model),
+      followPicked ? sourceLabels[follow.source] : differs() ? scope === "pin" ? sourceLabels.manual : t("ui.model_scope_once") : sourceLabels[initial.source]
+    );
+    const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: summaryText2() });
+    model.value = menu;
     model.addEventListener("change", () => {
       if (model.value === FOLLOW_DEFAULT_MODEL) {
+        menu = FOLLOW_DEFAULT_MODEL;
+        followPicked = true;
         settings.model = follow.model;
-        settings.modelSource = follow.source;
-        modelSummary.setText(
-          t(
-            "ui.0_1_reasoning_can_be_adjusted_per_topic",
-            this.plugin.modelLabel(settings.model),
-            sourceLabels[settings.modelSource]
-          )
-        );
-        save({ modelSource: settings.modelSource });
-        delete this.pendingSettings.model;
-        delete this.pendingSettings.reasoning;
-        settings.reasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+        settings.reasoning = currentReasoning();
         reasoning.value = settings.reasoning;
-        describeModel();
+        refresh();
         return;
       }
       if (!options.has(model.value)) return;
-      const wasManual = settings.modelSource === "manual";
+      menu = model.value;
+      followPicked = false;
       settings.model = model.value;
-      settings.modelSource = "manual";
-      modelSummary.setText(
-        t(
-          "ui.0_1_reasoning_can_be_adjusted_per_topic",
-          this.plugin.modelLabel(settings.model),
-          sourceLabels[settings.modelSource]
-        )
-      );
-      save({
-        model: settings.model,
-        modelSource: settings.modelSource,
-        ...wasManual ? {} : { reasoning: normalizeReasoningLevel(settings.reasoning) }
-      });
-      describeModel();
+      refresh();
     });
     const reasoningField = advanced.createEl("label", { cls: "vam-field" });
     reasoningField.createSpan({ text: t("ui.reasoning_level") });
@@ -34089,28 +34176,32 @@ var NextStepModal = class extends import_obsidian24.Modal {
     for (const value of ["auto", "low", "medium", "high"])
       reasoning.createEl("option", { value, text: reasoningLabel(value) });
     reasoning.value = normalizeReasoningLevel(settings.reasoning);
-    const describeModel = () => advancedValue.setText(`${this.plugin.modelLabel(settings.model)} \xB7 ${reasoningLabel(settings.reasoning)}`);
-    describeModel();
     reasoning.addEventListener("change", () => {
-      const level = normalizeReasoningLevel(reasoning.value);
-      settings.reasoning = level;
-      if (settings.modelSource !== "manual") {
-        settings.modelSource = "manual";
-        if (!Array.from(model.children).some((option2) => option2.value === settings.model))
-          model.createEl("option", { value: settings.model, text: this.plugin.modelLabel(settings.model) });
-        model.value = settings.model;
-        options.add(settings.model);
-        modelSummary.setText(
-          t(
-            "ui.0_1_reasoning_can_be_adjusted_per_topic",
-            this.plugin.modelLabel(settings.model),
-            sourceLabels[settings.modelSource]
-          )
-        );
-        save({ model: settings.model, modelSource: "manual", reasoning: level });
-      } else save({ reasoning: level });
-      describeModel();
+      settings.reasoning = normalizeReasoningLevel(reasoning.value);
+      refresh();
     });
+    const scopeField = advanced.createEl("label", { cls: "vam-field vam-next-model-scope" });
+    scopeField.createSpan({ text: t("ui.model_scope") });
+    const scopeSelect = scopeField.createEl("select");
+    scopeSelect.setAttr("aria-label", t("ui.model_scope"));
+    scopeSelect.createEl("option", { value: "once", text: t("ui.model_scope_once") });
+    scopeSelect.createEl("option", { value: "pin", text: t("ui.model_scope_pin") });
+    scopeSelect.value = "once";
+    scopeSelect.addEventListener("change", () => {
+      scope = scopeSelect.value === "pin" ? "pin" : "once";
+      refresh();
+    });
+    const refresh = () => {
+      const visible = differs() && !followPicked;
+      if (!visible) {
+        scope = "once";
+        scopeSelect.value = "once";
+      }
+      scopeField.hidden = scopeSelect.hidden = !visible;
+      modelSummary.setText(summaryText2());
+      advancedValue.setText(`${this.plugin.modelLabel(settings.model)} \xB7 ${reasoningLabel(settings.reasoning)}`);
+    };
+    refresh();
     return advanced;
   }
   async run(panel, button, work, needsUsage = true) {
@@ -34516,6 +34607,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
           outputLanguage: languageSelect.value,
           ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
+          ...this.runOnceOptions(),
           ...templateId() ? { detailTemplateId: templateId() } : {},
           ...toneId() ? { toneId: toneId() } : {},
           signal: controller.signal,
@@ -34647,6 +34739,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
       referenceGroups: [],
       outputLanguage: languageSelect.value,
       requirements: this.requirements(),
+      ...this.runOnceOptions(),
       ...aiModeOptions(aiMode.value(), "subtopic"),
       shallowResearch: shallow.checked,
       ...templateId() ? { detailTemplateId: templateId() } : {},
@@ -34705,7 +34798,8 @@ var NextStepModal = class extends import_obsidian24.Modal {
           presetId: presetSelect.value,
           requirements: this.requirements(),
           language: (_b3 = options.outputLanguage) != null ? _b3 : this.plugin.settings.language,
-          limits: bounds
+          limits: bounds,
+          ...this.runOnceOptions()
         };
         await this.rememberMode(mode);
         if (this.dead(controller)) return;
@@ -34819,6 +34913,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
         referenceGroups: (_a3 = selected == null ? void 0 : selected.groups) != null ? _a3 : [],
         outputLanguage: languageSelect.value,
         requirements: this.requirements(),
+        ...this.runOnceOptions(),
         // A synthesis arranges what the topics already hold: Quick policy text, no web (D-2026-10-229).
         researchMode: "local",
         researchDepth: "normal",
@@ -34840,6 +34935,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
       continuesDirections: true,
       outputLanguage: languageSelect.value,
       requirements: this.requirements(),
+      ...this.runOnceOptions(),
       researchMode: "local",
       researchDepth: "normal",
       visualMode: "off",
@@ -44265,8 +44361,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
       this.fieldLinks(),
       this.toneChoices(),
-      this.defaultStyleLabel()
+      this.defaultStyleLabel(),
+      (parentId) => this.outlineModelLabel(parentId)
     ).open();
+  }
+  /**
+   * What the outline window's default model entry means at a position: new topics under a topic with a manual upper
+   * topic follow that model, everything else follows the current model.
+   */
+  async outlineModelLabel(parentId) {
+    var _a2, _b2;
+    const parent = parentId ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === parentId) : void 0;
+    const resolved = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_b2 = this.map) != null ? _b2 : void 0) : { ...this.plugin.currentModelChoice(), origin: "current" };
+    return t(
+      resolved.origin === "override" ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
+      this.plugin.modelLabel(resolved.model)
+    );
   }
   /** The import target a reopened window keeps: its selected topic while that topic is still on the map. */
   reopenedImportTarget(inputs) {
@@ -44290,7 +44400,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
         var _a2, _b2;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const { model, reasoning } = this.plugin.currentModelChoice();
+        const { model, reasoning } = resolveTaskModel({
+          runOnce: request.model ? { model: request.model } : null,
+          current: this.plugin.currentModelChoice()
+        });
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
@@ -44422,6 +44535,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
         var _a2, _b2;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
+        const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
           {
             topic: note.title,
@@ -44429,8 +44543,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
 
 ${request.requirements}` : preset.text,
             language: request.language,
-            model: note.model,
-            reasoning: normalizeReasoningLevel((_b2 = note.reasoning) != null ? _b2 : settings.cliReasoning),
+            model: used.model,
+            reasoning: normalizeReasoningLevel((_b2 = used.reasoning) != null ? _b2 : settings.cliReasoning),
             limits: request.limits
           },
           signal
@@ -45639,7 +45753,8 @@ ${request.requirements}` : preset.text,
     var _a2;
     const placement = (_a2 = request.placement) != null ? _a2 : { kind: "new" };
     if (placement.kind !== "new") return this.importOutlineIntoMap(request, placement);
-    const model = request.shallowResearch && request.model || this.plugin.settings.cliModel;
+    const currentModel = this.plugin.currentModelChoice().model;
+    const model = request.shallowResearch && request.model || currentModel;
     const settings = this.plugin.settings;
     const { template } = resolveTemplate(
       settings.detailTemplates,
@@ -45655,7 +45770,7 @@ ${request.requirements}` : preset.text,
         request.source,
         void 0,
         template,
-        Boolean(request.shallowResearch && request.model && request.model !== settings.cliModel)
+        Boolean(request.shallowResearch && request.model && request.model !== currentModel)
       );
     } catch (error) {
       if (!(error == null ? void 0 : error.mapCreated)) throw error;
@@ -45713,7 +45828,8 @@ ${request.requirements}` : preset.text,
     };
     target();
     const state = {};
-    let model = settings.cliModel;
+    const currentModel = this.plugin.currentModelChoice().model;
+    let model = currentModel;
     let written2 = true;
     try {
       await this.plugin.mutate(async () => {
@@ -45726,7 +45842,7 @@ ${request.requirements}` : preset.text,
           return;
         }
         const { map, path, parent } = current;
-        const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, settings.cliModel) : settings.cliModel;
+        const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
         const result = await addOutlineToMap(
@@ -47126,10 +47242,7 @@ ${request.requirements}` : preset.text,
   async mergeModel(parentId) {
     var _a2, _b2;
     const parent = parentId ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === parentId) : void 0;
-    const current = {
-      model: this.plugin.settings.cliModel,
-      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
-    };
+    const current = this.plugin.currentModelChoice();
     if (!parent) return current;
     const resolved = await this.plugin.repo.resolveTopicModel(parent.path, (_b2 = this.map) != null ? _b2 : void 0);
     return {
@@ -51598,7 +51711,9 @@ ${request.requirements}` : preset.text,
               mapAiMode: options.mapAiMode,
               addCharts: options.mapAiMode !== "quick"
             },
-            accepted
+            accepted,
+            // The dialog's model for this run only; a pinned choice was already saved on the topic.
+            options.runOnce
           );
         },
         (options, direction, found, failed, accepted) => this.proposeChildren(node, options, direction, found, failed, accepted),
@@ -52798,6 +52913,7 @@ ${request.requirements}` : preset.text,
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
+      const used = await this.modelFor(note, parent.path, options == null ? void 0 : options.runOnce);
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
       const outputLanguage2 = (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
       const existing = ((_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === parent.id).map((item) => {
@@ -52824,8 +52940,8 @@ ${request.requirements}` : preset.text,
           },
           note
         ),
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         controller.signal,
         void 0,
         acceptDispatch
@@ -53121,7 +53237,8 @@ ${request.requirements}` : preset.text,
       () => {
         started = true;
         accepted();
-      }
+      },
+      choices.runOnce
     );
     if (!started || !handle) throw new Error(failure != null ? failure : t("ui.shallow_research_did_not_start"));
     await handle.finished;
@@ -53192,15 +53309,14 @@ ${request.requirements}` : preset.text,
           return;
         }
         if (nodes.length < selected.length) new import_obsidian32.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
-        if (request.model)
-          for (const node of nodes)
-            await this.plugin.repo.updateNote(node.path, { model: request.model, modelSource: "manual" });
         this.integrationMode = false;
         this.multiSelected.clear();
         if (!this.closed) this.render();
         const shared2 = {
           referenceGroups: [],
           requirements: request.requirements,
+          // The picked model is for this batch only (D4): it never becomes a topic's own model.
+          ...request.model ? { runOnce: { model: request.model } } : {},
           ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
           ...request.toneId ? { toneId: request.toneId } : {}
         };
@@ -53479,9 +53595,10 @@ ${request.requirements}` : preset.text,
       return;
     }
     const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
+    const used = await this.modelFor(note, node.path, options.runOnce);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path, note.model);
+    const progress = this.startTaskProgress(node.path, used.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -53517,8 +53634,8 @@ ${request.requirements}` : preset.text,
           },
           note
         ),
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         options.signal,
         void 0,
         accepted,
@@ -53555,6 +53672,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    const used = await this.modelFor(note, node.path, options == null ? void 0 : options.runOnce);
     const children = this.map.nodes.filter((item) => item.parentId === node.id);
     if (!children.length && !((_b2 = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length))) {
       const message = t("ui.choose_another_note_source_first");
@@ -53601,7 +53719,7 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path, note.model);
+    const progress = this.startTaskProgress(node.path, used.model);
     let findingsSent = false;
     try {
       const synthesisContext = withThinkingOrigin(
@@ -53633,8 +53751,8 @@ ${request.requirements}` : preset.text,
       );
       const result = await this.plugin.askModel(
         synthesisContext,
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         options == null ? void 0 : options.signal,
         void 0,
         accepted,
@@ -53724,7 +53842,7 @@ ${request.requirements}` : preset.text,
           context: synthesisContext,
           detail: saved.detail,
           formatIssues: issues,
-          model: note.model,
+          model: used.model,
           language: (_g2 = options == null ? void 0 : options.outputLanguage) != null ? _g2 : this.plugin.settings.language,
           template: detailTemplate
         });
@@ -53813,6 +53931,8 @@ ${request.requirements}` : preset.text,
     this.plugin.activeTasks.set(path, controller);
     const runOptions = {
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
+      // The model of this step is the dialog's choice now, not the one the first step was started with.
+      runOnce: options.runOnce,
       signal: controller.signal,
       onProgress: (message) => {
         var _a2;
@@ -53910,16 +54030,19 @@ ${request.requirements}` : preset.text,
     const task = this.synthesisTasks.get(node.path);
     if (!task || task.state !== "failed" && task.state !== "cancelled") return;
     void this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0).then(
-      (note) => this.plugin.confirmAiUsage(note.model, async () => {
-        await this.startSynthesis(
-          node,
-          { ...task.options, continuesDirections: task.step === "draft" },
-          task.step === "directions" ? null : task.direction,
-          (message) => new import_obsidian32.Notice(message),
-          () => {
-          }
-        );
-      })
+      (note) => {
+        var _a3;
+        return this.plugin.confirmAiUsage(((_a3 = task.options.runOnce) == null ? void 0 : _a3.model) || note.model, async () => {
+          await this.startSynthesis(
+            node,
+            { ...task.options, continuesDirections: task.step === "draft" },
+            task.step === "directions" ? null : task.direction,
+            (message) => new import_obsidian32.Notice(message),
+            () => {
+            }
+          );
+        });
+      }
     );
   }
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
@@ -57123,10 +57246,21 @@ ${addition}` : addition });
       language2
     );
   }
-  async runAgent(node, done, failed, overrides, onLaunchAccepted) {
+  /**
+   * The model and reasoning a run really uses: a run-once choice first (never written to the topic), otherwise the
+   * topic's own resolution that `readNote` already did.
+   */
+  async modelFor(note, path, runOnce) {
+    var _a2;
+    if (!(runOnce == null ? void 0 : runOnce.model.trim())) return { model: note.model, reasoning: note.reasoning };
+    const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, (_a2 = this.map) != null ? _a2 : void 0, runOnce);
+    return { model, reasoning };
+  }
+  async runAgent(node, done, failed, overrides, onLaunchAccepted, runOnce) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    const used = await this.modelFor(note, node.path, runOnce);
     if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
@@ -57173,7 +57307,7 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), note.model);
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -57227,8 +57361,8 @@ ${addition}` : addition });
     };
     const completion = this.plugin.askModel(
       context,
-      note.model,
-      note.reasoning,
+      used.model,
+      used.reasoning,
       controller.signal,
       (id) => {
         exchangeId = id;
@@ -57299,7 +57433,7 @@ ${addition}` : addition });
           context,
           detail: saved.detail,
           formatIssues: result.formatIssues,
-          model: note.model,
+          model: used.model,
           language: (_f2 = context.outputLanguage) != null ? _f2 : this.plugin.settings.language,
           template: context.detailTemplate
         });

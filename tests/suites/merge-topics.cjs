@@ -1,6 +1,6 @@
 // Merge topics, Phase 1 selection gestures: the pointer-intent table for the empty canvas.
 const assert = require('node:assert/strict');
-const { test, integrationTest, load, fixture, DEFAULT_SETTINGS } = require('../support.cjs');
+const { test, integrationTest, load, fixture, DEFAULT_SETTINGS, normalizeReasoningLevel } = require('../support.cjs');
 
 const { canvasPointerIntent } = load('experiences/visual-map/canvas-gestures.ts');
 const press = (over = {}) => canvasPointerIntent({ button: 0, integrationMode: false, spaceHeld: false, altKey: false, shiftKey: false, ...over });
@@ -267,7 +267,7 @@ async function heHarness() {
   };
   await add('root'); await add('f1', 'root'); await add('f2', 'root'); await add('x', 'root'); await add('hyp', 'root', true); await add('hyp2', 'root', true);
   let queue = Promise.resolve();
-  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate(work) { queue = queue.then(work); return queue; }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map() };
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate(work) { queue = queue.then(work); return queue; }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map(), currentModelChoice() { return { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }; } };
   const notices = [];
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...heObsidian, Notice: heDom.makeNotice(notices) } }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
   const view = new VisualAgentMapView({ app }, plugin);

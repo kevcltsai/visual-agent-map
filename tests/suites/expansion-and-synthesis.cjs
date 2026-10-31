@@ -1103,9 +1103,9 @@ async function multiResearchHarness(titles, overrides = {}) {
   const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language: overrides.language ?? 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), confirmAiUsage: async (model, run) => { confirms.push(model); await run(); return true; }, ...Object.fromEntries(Object.entries(overrides).filter(([key]) => key !== 'language')) });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } }, Modal: class { constructor(app) { this.app = app; } open() { opened.push(this); } } } });
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
-  view.runAgent = async (child, _done, failed, options, accepted) => {
+  view.runAgent = async (child, _done, failed, options, accepted, runOnce) => {
     const note = await repo.readNote(child.path);
-    runs.push({ title: note.title, options }); plugin.running.add(child.path); accepted();
+    runs.push({ title: note.title, options, runOnce }); plugin.running.add(child.path); accepted();
     const finished = new Promise(resolve => { finish.set(note.title, (message) => { plugin.running.delete(child.path); if (message) failed(message); resolve(); }); options.signal.addEventListener('abort', () => { plugin.running.delete(child.path); resolve(); }, { once: true }); });
     return { finished };
   };
@@ -1245,7 +1245,7 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'stopped');
   assert.equal(toolbar().length, 1);
 });
-integrationTest('multi research with a chosen model saves it on each started topic and confirms usage for it', async () => {
+integrationTest('multi research with a chosen model runs each started topic on it once, saves nothing on the topic and confirms usage for it', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C']);
   h.plugin.running.add(h.nodes[2].path);
   h.view.multiSelected = new Set(h.nodes.map(n => n.id));
@@ -1254,8 +1254,9 @@ integrationTest('multi research with a chosen model saves it on each started top
   assert.deepEqual(plain(h.confirms), ['model-b']);
   for (const node of h.nodes.slice(0, 2)) {
     const note = await h.repo.readNote(node.path);
-    assert.equal(note.model, 'model-b'); assert.equal(note.modelSource, 'manual');
+    assert.notEqual(note.model, 'model-b'); assert.equal(note.modelSource, 'workspace', 'MS-06: the picked model is for this run only, never an override');
   }
+  assert.deepEqual(plain(h.runs.map(run => run.runOnce)), [{ model: 'model-b' }, { model: 'model-b' }]);
   assert.equal((await h.repo.readNote(h.nodes[2].path)).model, h.repo.settings.cliModel, 'a workspace topic follows the current workspace model, not its creation snapshot');
   h.finish.get('A')(); h.finish.get('B')();
 });
@@ -1676,7 +1677,7 @@ integrationTest('shallow research badge in English: running, finished with a fai
   x.h.view.map.nodes = x.h.view.map.nodes.filter(n => n.id !== x.b.id); x.paint();
   assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false, 'failed topic removed from the map');
 });
-integrationTest('retry failed topics selects exactly them, opens the modal and starts only them with the chosen model', async () => {
+integrationTest('retry failed topics selects exactly them, opens the modal and starts only them with the chosen model (for this run only)', async () => {
   const x = await nodeBadgeHarness('en', 'fail'); const h = x.h;
   x.release.get(x.a.id)(); x.release.get(x.b.id)(); x.release.get(x.c.id)(); await until(() => h.plugin.expansionBatches.get(x.parent.path).status === 'completed');
   h.view.notes.set(x.b.id, { title: 'B', status: 'error', summary: '' });
@@ -1685,7 +1686,8 @@ integrationTest('retry failed topics selects exactly them, opens the modal and s
   assert.ok(h.plugin.expansionBatches.has(x.parent.path), 'old state kept until the retry starts');
   h.opened[0].submit({ ...h.request, model: 'model-b' });
   await until(() => h.runs.length === 1); assert.equal(h.runs[0].title, 'B'); assert.deepEqual(plain(h.confirms), ['model-b']);
-  assert.equal((await h.repo.readNote(x.b.path)).model, 'model-b');
+  assert.deepEqual(plain(h.runs[0].runOnce), { model: 'model-b' }, 'MS-06: the retry uses the picked model for this run only');
+  assert.equal((await h.repo.readNote(x.b.path)).modelSource, 'workspace', 'MS-06: and does not turn the topic into an override');
   assert.equal(h.plugin.expansionBatches.has(x.parent.path), false, 'old failure state cleared');
   h.finish.get('B')(); await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
 });

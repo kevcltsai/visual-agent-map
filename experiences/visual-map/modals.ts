@@ -31,7 +31,7 @@ import {
   type TopicInfo,
   type VisualMode
 } from "../../repository";
-import type { AiResult, Suggestion } from "../../ai/types";
+import type { AiResult, ReasoningLevel, Suggestion } from "../../ai/types";
 import {
   limitOutline,
   QUICK_OUTLINE_MAX_LEVELS,
@@ -71,6 +71,16 @@ export interface TaskOptions {
   synthesisTitle?: string;
   /** The synthesis draft step retried after chosen directions; it continues them even when the last draft failed. */
   continuesDirections?: boolean;
+  /**
+   * A model (and effort) picked for this run only. It is never written to the topic; the view resolves it first
+   * (ADR-021). Absent: the topic's own resolution applies.
+   */
+  runOnce?: RunOnceModel;
+}
+/** A model chosen for one run. Absent reasoning means the current model's. */
+export interface RunOnceModel {
+  model: string;
+  reasoning?: ReasoningLevel;
 }
 /**
  * How the view reports a synthesis run to the dialog that started it. While the dialog is open the next stage is
@@ -135,9 +145,10 @@ export interface NextStepSettings extends OutputLanguageMemory, AiModeMemory {
   modelSource: ModelSource;
   /**
    * What "follow the default" means for this topic: a root follows the workspace model, a child follows its upper
-   * topic. `model` is the model that choice would run on now. Absent: the dialog assumes a root and the plugin setting.
+   * topic. `model` is the model that choice would run on now; `overridden` tells whether a manual ancestor supplies it
+   * (the menu then says "upper topic", otherwise "current model"). Absent: the dialog assumes a root and the plugin setting.
    */
-  followDefault?: { source: Exclude<ModelSource, "manual">; model: string };
+  followDefault?: { source: Exclude<ModelSource, "manual">; model: string; overridden?: boolean };
   reasoning: string;
   rules?: string;
   path?: string;
@@ -170,7 +181,14 @@ export interface QuickOutline {
   presets: { id: string; name: string }[];
   /** Generates the outline for this topic; the outline's root is the topic itself. */
   generate: (
-    request: { presetId: string; requirements: string; language: ContentLanguage; limits: OutlineLimits },
+    request: {
+      presetId: string;
+      requirements: string;
+      language: ContentLanguage;
+      limits: OutlineLimits;
+      /** The dialog's one-run model; absent: the topic's own. */
+      runOnce?: RunOnceModel;
+    },
     signal: AbortSignal
   ) => Promise<OutlineNode[]>;
   /** Adds the reviewed outline under this topic. */
@@ -299,8 +317,11 @@ export class NextStepModal extends Modal {
   private detached = false;
   private backgroundBegan = false;
   private runPending = false;
-  /** Model and effort edits wait here; they are saved when a run starts, never when the dialog is cancelled. */
-  private pendingSettings: NotePatch = {};
+  /**
+   * The model and level menus' state (MS-06): what this run uses once, and what a run start writes to the topic (only
+   * an explicit "follow" or "pin"; never when the dialog is cancelled).
+   */
+  private modelMenu?: { runOnce: () => RunOnceModel | undefined; patch: () => NotePatch; saved: () => void };
   /** The output language the person picked in this dialog; saved on the map when a run starts. */
   private manualOutputLanguage?: ContentLanguage;
   constructor(
@@ -420,6 +441,11 @@ export class NextStepModal extends Modal {
   private requirements(): string {
     return this.requirementsInput?.value.trim() ?? "";
   }
+  /** This dialog's one-run model choice for a run's options; nothing when the topic's own resolution applies. */
+  private runOnceOptions(): { runOnce?: RunOnceModel } {
+    const runOnce = this.modelMenu?.runOnce();
+    return runOnce ? { runOnce } : {};
+  }
   private get background(): BackgroundHooks | undefined {
     return this.modelSettings?.background ?? this.selectionFlow?.background;
   }
@@ -469,15 +495,10 @@ export class NextStepModal extends Modal {
   }
   /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
   private async flushSettings(): Promise<void> {
-    const patch = this.pendingSettings;
+    const patch = this.modelMenu?.patch() ?? {};
     if (Object.keys(patch).length && this.modelSettings) {
-      this.pendingSettings = {};
-      try {
-        await this.modelSettings.save(patch);
-      } catch (error) {
-        this.pendingSettings = { ...patch, ...this.pendingSettings };
-        throw error;
-      }
+      await this.modelSettings.save(patch);
+      this.modelMenu?.saved();
     }
     // The output language picked by hand is remembered on the map (never when the dialog is cancelled).
     const manual = this.manualOutputLanguage;
@@ -492,6 +513,10 @@ export class NextStepModal extends Modal {
       }
     }
   }
+  /**
+   * The model and level menus. A choice here is for this run only unless the scope menu says "pin" (MS-06); only an
+   * explicit "pin", or "follow" on a topic, is written, and only when a run starts (`flushSettings`).
+   */
   private renderModelSettings(parent: HTMLElement): HTMLElement | undefined {
     if (!this.modelSettings) return;
     const settings = this.modelSettings;
@@ -499,9 +524,6 @@ export class NextStepModal extends Modal {
     const advancedValue = advanced
       .createEl("summary", { text: t("ui.model_and_advanced_settings") })
       .createSpan({ cls: "vam-next-disclosure-value" });
-    const save = (patch: NotePatch): void => {
-      this.pendingSettings = { ...this.pendingSettings, ...patch };
-    };
     const { field: modelLabel, head: modelHead } = linkedField(advanced, t("ui.model"));
     const model = modelLabel.createEl("select");
     model.setAttr("aria-label", t("ui.model"));
@@ -515,10 +537,69 @@ export class NextStepModal extends Modal {
             .map((value: string) => value.trim())
             .filter(Boolean);
     const options = new Set<string>(optionList);
-    const follow = settings.followDefault ?? { source: "workspace" as const, model: this.plugin.settings.cliModel };
-    const followLabel = (): string => t("ui.follow_default_model", this.plugin.modelLabel(follow.model));
+    const follow = settings.followDefault ?? {
+      source: "workspace" as const,
+      model: this.plugin.settings.cliModel,
+      overridden: false
+    };
+    // What the topic is now. It changes only when a "follow" or a "pin" is saved.
+    const initial = {
+      model: settings.model,
+      source: settings.modelSource,
+      reasoning: normalizeReasoningLevel(settings.reasoning)
+    };
+    const currentReasoning = (): ReasoningLevel => normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+    let menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
+    let followPicked = false;
+    let scope: "once" | "pin" = "once";
+    const base = (): { model: string; reasoning: ReasoningLevel } =>
+      followPicked ? { model: follow.model, reasoning: currentReasoning() } : initial;
+    // A specific model counts as a choice unless it is the override the topic already has.
+    const explicit = (): boolean =>
+      !followPicked && menu !== FOLLOW_DEFAULT_MODEL && !(initial.source === "manual" && menu === initial.model);
+    const differs = (): boolean => {
+      const level = normalizeReasoningLevel(settings.reasoning) !== base().reasoning;
+      return followPicked ? level : explicit() || settings.model !== base().model || level;
+    };
+    this.modelMenu = {
+      runOnce: () => {
+        if (!differs() || (!followPicked && scope === "pin")) return undefined;
+        return { model: settings.model, reasoning: normalizeReasoningLevel(settings.reasoning) };
+      },
+      patch: () => {
+        if (followPicked) return { modelSource: follow.source };
+        if (differs() && scope === "pin")
+          return {
+            model: settings.model,
+            modelSource: "manual",
+            reasoning: normalizeReasoningLevel(settings.reasoning)
+          };
+        return {};
+      },
+      saved: () => {
+        // The written choice is what the topic is now; the next run starts from it.
+        if (followPicked)
+          Object.assign(initial, { model: follow.model, source: follow.source, reasoning: currentReasoning() });
+        else if (differs() && scope === "pin")
+          Object.assign(initial, {
+            model: settings.model,
+            source: "manual" as const,
+            reasoning: normalizeReasoningLevel(settings.reasoning)
+          });
+        else return;
+        menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
+        followPicked = false;
+        scope = "once";
+        refresh();
+      }
+    };
+    const followLabel = (): string =>
+      t(
+        follow.overridden ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
+        this.plugin.modelLabel(follow.model)
+      );
     const syncModels = (): void => {
-      const chosen = settings.modelSource === "manual" ? model.value : FOLLOW_DEFAULT_MODEL;
+      const chosen = menu;
       if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
       syncModelSelect(
         model,
@@ -558,54 +639,37 @@ export class NextStepModal extends Modal {
       inherited: t("ui.inherited_at_creation"),
       manual: t("ui.manually_selected")
     };
-    const modelSummary = advanced.createEl("p", {
-      cls: "vam-hint",
-      text: t(
+    const summaryText = (): string =>
+      t(
         "ui.0_1_reasoning_can_be_adjusted_per_topic",
         this.plugin.modelLabel(settings.model),
-        sourceLabels[settings.modelSource]
-      )
-    });
-    model.value = settings.modelSource === "manual" ? settings.model : FOLLOW_DEFAULT_MODEL;
+        followPicked
+          ? sourceLabels[follow.source]
+          : differs()
+            ? scope === "pin"
+              ? sourceLabels.manual
+              : t("ui.model_scope_once")
+            : sourceLabels[initial.source]
+      );
+    const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: summaryText() });
+    model.value = menu;
     model.addEventListener("change", () => {
       if (model.value === FOLLOW_DEFAULT_MODEL) {
+        menu = FOLLOW_DEFAULT_MODEL;
+        followPicked = true;
+        // Follow pins nothing: a specific model or level picked earlier in this dialog is dropped, and the level shown
+        // goes back to the current setting (what a topic that is not an override runs on).
         settings.model = follow.model;
-        settings.modelSource = follow.source;
-        modelSummary.setText(
-          t(
-            "ui.0_1_reasoning_can_be_adjusted_per_topic",
-            this.plugin.modelLabel(settings.model),
-            sourceLabels[settings.modelSource]
-          )
-        );
-        save({ modelSource: settings.modelSource });
-        // Follow-default pins nothing: a specific model or level picked earlier in this dialog is not written, and the
-        // level shown goes back to the current setting (what a non-override topic runs on).
-        delete this.pendingSettings.model;
-        delete this.pendingSettings.reasoning;
-        settings.reasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+        settings.reasoning = currentReasoning();
         reasoning.value = settings.reasoning;
-        describeModel();
+        refresh();
         return;
       }
       if (!options.has(model.value)) return;
-      const wasManual = settings.modelSource === "manual";
+      menu = model.value;
+      followPicked = false;
       settings.model = model.value;
-      settings.modelSource = "manual";
-      modelSummary.setText(
-        t(
-          "ui.0_1_reasoning_can_be_adjusted_per_topic",
-          this.plugin.modelLabel(settings.model),
-          sourceLabels[settings.modelSource]
-        )
-      );
-      // Becoming an override also stores the level shown here, so a level left in an old note never takes over.
-      save({
-        model: settings.model,
-        modelSource: settings.modelSource,
-        ...(wasManual ? {} : { reasoning: normalizeReasoningLevel(settings.reasoning) })
-      });
-      describeModel();
+      refresh();
     });
     const reasoningField = advanced.createEl("label", { cls: "vam-field" });
     reasoningField.createSpan({ text: t("ui.reasoning_level") });
@@ -614,32 +678,33 @@ export class NextStepModal extends Modal {
     for (const value of ["auto", "low", "medium", "high"])
       reasoning.createEl("option", { value, text: reasoningLabel(value) });
     reasoning.value = normalizeReasoningLevel(settings.reasoning);
-    const describeModel = (): void =>
-      advancedValue.setText(`${this.plugin.modelLabel(settings.model)} · ${reasoningLabel(settings.reasoning)}`);
-    describeModel();
     reasoning.addEventListener("change", () => {
-      const level = normalizeReasoningLevel(reasoning.value);
-      settings.reasoning = level;
-      if (settings.modelSource !== "manual") {
-        // A non-override topic follows the current model's reasoning, so a chosen level would be ignored: store the
-        // whole set as an override instead (the resolved model shown here, manual, and this level).
-        settings.modelSource = "manual";
-        // The model menu must show the stored override too, or it could not be chosen back to follow-default.
-        if (!Array.from(model.children).some(option => (option as HTMLOptionElement).value === settings.model))
-          model.createEl("option", { value: settings.model, text: this.plugin.modelLabel(settings.model) });
-        model.value = settings.model;
-        options.add(settings.model);
-        modelSummary.setText(
-          t(
-            "ui.0_1_reasoning_can_be_adjusted_per_topic",
-            this.plugin.modelLabel(settings.model),
-            sourceLabels[settings.modelSource]
-          )
-        );
-        save({ model: settings.model, modelSource: "manual", reasoning: level });
-      } else save({ reasoning: level });
-      describeModel();
+      settings.reasoning = normalizeReasoningLevel(reasoning.value);
+      refresh();
     });
+    // Offered only when the dialog differs from the topic. "This run only" is the default; pinning is deliberate.
+    const scopeField = advanced.createEl("label", { cls: "vam-field vam-next-model-scope" });
+    scopeField.createSpan({ text: t("ui.model_scope") });
+    const scopeSelect = scopeField.createEl("select");
+    scopeSelect.setAttr("aria-label", t("ui.model_scope"));
+    scopeSelect.createEl("option", { value: "once", text: t("ui.model_scope_once") });
+    scopeSelect.createEl("option", { value: "pin", text: t("ui.model_scope_pin") });
+    scopeSelect.value = "once";
+    scopeSelect.addEventListener("change", () => {
+      scope = scopeSelect.value === "pin" ? "pin" : "once";
+      refresh();
+    });
+    const refresh = (): void => {
+      const visible = differs() && !followPicked;
+      if (!visible) {
+        scope = "once";
+        scopeSelect.value = "once";
+      }
+      scopeField.hidden = scopeSelect.hidden = !visible;
+      modelSummary.setText(summaryText());
+      advancedValue.setText(`${this.plugin.modelLabel(settings.model)} · ${reasoningLabel(settings.reasoning)}`);
+    };
+    refresh();
     return advanced;
   }
   private async run(
@@ -1089,6 +1154,7 @@ export class NextStepModal extends Modal {
           outputLanguage: languageSelect.value as ContentLanguage,
           ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
+          ...this.runOnceOptions(),
           ...(templateId() ? { detailTemplateId: templateId() } : {}),
           ...(toneId() ? { toneId: toneId() } : {}),
           signal: controller.signal,
@@ -1228,6 +1294,7 @@ export class NextStepModal extends Modal {
       referenceGroups: [],
       outputLanguage: languageSelect.value as ContentLanguage,
       requirements: this.requirements(),
+      ...this.runOnceOptions(),
       ...aiModeOptions(aiMode.value(), "subtopic"),
       shallowResearch: shallow.checked,
       ...(templateId() ? { detailTemplateId: templateId() } : {}),
@@ -1281,7 +1348,8 @@ export class NextStepModal extends Modal {
           presetId: presetSelect.value,
           requirements: this.requirements(),
           language: options.outputLanguage ?? this.plugin.settings.language,
-          limits: bounds
+          limits: bounds,
+          ...this.runOnceOptions()
         };
         await this.rememberMode(mode);
         if (this.dead(controller)) return;
@@ -1403,6 +1471,7 @@ export class NextStepModal extends Modal {
         referenceGroups: selected?.groups ?? [],
         outputLanguage: languageSelect.value as ContentLanguage,
         requirements: this.requirements(),
+        ...this.runOnceOptions(),
         // A synthesis arranges what the topics already hold: Quick policy text, no web (D-2026-10-229).
         researchMode: "local",
         researchDepth: "normal",
@@ -1424,6 +1493,7 @@ export class NextStepModal extends Modal {
       continuesDirections: true,
       outputLanguage: languageSelect.value as ContentLanguage,
       requirements: this.requirements(),
+      ...this.runOnceOptions(),
       researchMode: "local",
       researchDepth: "normal",
       visualMode: "off",

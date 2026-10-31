@@ -167,9 +167,11 @@ test('Obsidian 1.13 declarative settings expose workspace recovery and App Serve
   assert.match(definitions, /ui\.installation_guide/);
   assert.match(source, /this\.settingTab\?\.refreshAfterLanguageChange\(\)/);
   assert.match(mapSource, /setAttr\("aria-label", t\("ui\.reasoning_level"\)\)/);
+  // MS-06 replaces MS-04 D1 here: the level menu only changes what this run uses; the topic is written only by "pin".
   const reasoningHandler = mapSource.slice(mapSource.indexOf('reasoning.addEventListener("change"'));
-  assert.match(reasoningHandler.slice(0, 1200), /save\(\{ model: settings\.model, modelSource: "manual", reasoning: level \}\)/, 'a non-override topic stores the whole set as a manual override (MS-04 D1)');
-  assert.match(reasoningHandler.slice(0, 1200), /save\(\{ reasoning: level \}\)/);
+  assert.match(reasoningHandler.slice(0, 400), /settings\.reasoning = normalizeReasoningLevel\(reasoning\.value\);\s*refresh\(\);/);
+  assert.doesNotMatch(reasoningHandler.slice(0, 400), /save\(/, 'a level change writes nothing by itself');
+  assert.match(mapSource, /modelSource: "manual",\s*reasoning: normalizeReasoningLevel\(settings\.reasoning\)/, 'pin stores model, manual and the level shown');
 });
 integrationTest('full rebuild refreshes derived data and open views', async () => {
   const { default: Plugin } = load('main.ts', { obsidian }); let rebuilds = 0, refreshes = 0;

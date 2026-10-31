@@ -570,6 +570,9 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   modelSelect.value = 'model-b'; modelSelect.change(); reasoningSelect.value = 'high'; reasoningSelect.change();
   assert.equal(researchAfterSave, false);
   assert.deepEqual(plain(settingsWrites), [], 'adjusting the model and effort saves nothing yet');
+  // MS-06: the choice is for this run only unless "Pin to this topic" is picked, which is what writes it.
+  const scopeSelect = find(settingsModal.contentEl, item => item['aria-label'] === 'Apply to');
+  scopeSelect.value = 'pin'; scopeSelect.change();
   button(settingsModal.modalEl, 'Confirm research task').click(); await tick();
   assert.deepEqual(plain(settingsWrites), [{ model: 'model-b', modelSource: 'manual', reasoning: 'high' }], 'saved once, when the run starts');
   assert.equal(checkedModels.at(-1), 'model-b');
@@ -647,7 +650,7 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   const model = () => find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model'); assert.equal(model().value, '');
   assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
   models = [{ id: 'm1', label: 'Model One' }, { id: 'm2', label: 'Model Two' }]; changed();
-  assert.deepEqual(plain(model().children.map(c => [c.value, c.text])), [['', "Each topic's current model"], ['m1', 'Model One'], ['m2', 'Model Two']]);
+  assert.deepEqual(plain(model().children.map(c => [c.value, c.text])), [['', 'Current model (overridden topics keep their own)'], ['m1', 'Model One'], ['m2', 'Model Two']]);
   const templateSelect = find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Content template');
   assert.deepEqual(plain(templateSelect.children.map(c => [c.value, c.text])), [['', "Each topic's current template"], ['standard', 'Standard'], ['A', 'Alpha template']]);
   const start = find(modal.modalEl, i => i.tag === 'button' && i.text === 'Start research (2)');

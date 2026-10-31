@@ -15,7 +15,7 @@ export interface MultiResearchRequest {
   /** Search for image references (an override; only meaningful with web search). */
   imageSearch?: boolean;
   requirements: string;
-  /** Model for every started topic (saved on the topic, as single-topic research does); undefined keeps each topic's model. */
+  /** Model for every started topic, for this batch only (never saved on a topic); undefined keeps each topic's model. */
   model?: string;
   /** Content template for every started topic (saved on the topic); undefined keeps each topic's template. */
   detailTemplateId?: string;
@@ -57,7 +57,7 @@ export class MultiResearchModal extends Modal {
           text: t(mode === "quick" ? "ui.quick" : "ui.standard")
         });
     });
-    const model = modelField(this.contentEl, this.models, t("ui.multi_research_keep_topic_models"), this.links.repair);
+    const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
     const style = noteStyleField(this.contentEl, {
       templates: this.templates,

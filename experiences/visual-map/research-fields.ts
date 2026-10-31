@@ -94,7 +94,13 @@ export function modelField(
   models: ModelChoices,
   defaultLabel: string,
   repair?: (model: string | undefined) => void
-): { value: () => string | undefined; set: (id: string | undefined) => void; dispose: () => void } {
+): {
+  value: () => string | undefined;
+  set: (id: string | undefined) => void;
+  /** Changes the text of the first (empty-value) option, e.g. when the position it describes changes. */
+  setDefaultLabel: (label: string) => void;
+  dispose: () => void;
+} {
   const { field, head } = linkedField(parent, t("ui.model"));
   const model = field.createEl("select");
   model.setAttr("aria-label", t("ui.model"));
@@ -116,6 +122,10 @@ export function modelField(
       if (id && !Array.from(model.children).some(option => (option as HTMLOptionElement).value === id))
         model.createEl("option", { value: id, text: id });
       model.value = id ?? "";
+    },
+    setDefaultLabel: label => {
+      defaultLabel = label;
+      fill();
     },
     dispose
   };

@@ -6,11 +6,21 @@ import {
   rememberedOutputLanguage,
   resolveAimContentLanguage
 } from "../aim/content-language";
-import { moveItem, removeItem, resizeKeepRatio, IMAGE_MIN_SIZE, type CanvasItem, type ImageItem } from "./canvas-items";
+import {
+  addImage,
+  moveItem,
+  removeItem,
+  resizeKeepRatio,
+  IMAGE_MIN_SIZE,
+  type CanvasItem,
+  type ImageItem
+} from "./canvas-items";
+import { acceptImage, imageFilesFrom, imageSize, safeImageName, IMAGE_MAX_BYTES } from "./image-input";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
   isTransactionError,
+  type AttachmentPath,
   type Transaction,
   type TransactionEntry
 } from "./map-transaction";
@@ -828,6 +838,8 @@ export class VisualAgentMapView extends ItemView {
   private edgesEl: SVGSVGElement | null = null;
   /** The canvas image that had keyboard focus when a change repainted the canvas; focus goes back to it. */
   private focusItemId: string | null = null;
+  /** Last pointer position over the canvas in client pixels; a pasted picture goes there (D6). */
+  private lastCanvasPointer: { x: number; y: number } | null = null;
   private zoomLabel: HTMLElement | null = null;
   private refreshTimer: number | null = null;
   private viewportTimer: number | null = null;
@@ -4466,23 +4478,26 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
   private async mapChangeSnapshots(
-    change: (map: MapDocument) => void,
+    change: (map: MapDocument, attachment: AttachmentPath) => void,
     rebuildDerivedData = true,
-    created: string[] = []
+    created: string[] = [],
+    attachment?: { name: string; data: ArrayBuffer }
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
+    if (attachment) tx.createAttachment("image", { ...attachment, sourcePath: this.path });
     let before!: MapDocument, after!: MapDocument;
     const viewport = clone(this.map.viewport);
     const opened = this.map;
     try {
       const entry = await tx
-        .editMap(this.path, map => {
+        .editMap(this.path, (map, _resolve, attachmentPath) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
           map.viewport = clone(viewport);
           before = clone(map);
-          change(map);
+          change(map, attachmentPath);
           after = clone(map);
         })
         .commit({ deferRebuild: true });
@@ -5425,6 +5440,163 @@ export class VisualAgentMapView extends ItemView {
   private async resizeCanvasItem(id: string, width: number): Promise<void> {
     await this.changeCanvasItems(id, items => resizeKeepRatio(items, id, width));
   }
+  // ---- Adding free images: drop, paste, "Insert image…" (ticket 30, decisions D5, D6, D11) ---------------------------
+  /** Registers the three entries on the canvas; AIM maps, the built-in sample and topic selection mode get none (D11). */
+  private setupCanvasImageInput(): void {
+    const viewport = this.viewportEl;
+    if (!viewport || !this.canEditCanvasItems()) return;
+    viewport.addEventListener("dragover", event => this.onCanvasDragOver(event));
+    viewport.addEventListener("drop", event => this.onCanvasDrop(event));
+    viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
+    viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
+  }
+  private onCanvasPointerMove(event: { clientX: number; clientY: number }): void {
+    this.lastCanvasPointer = { x: event.clientX, y: event.clientY };
+  }
+  /** A client point in the stage's own units (what `x` and `y` of a canvas item mean). Null when there is no canvas. */
+  private stagePoint(client: { x: number; y: number } | null): { x: number; y: number } | null {
+    const viewport = this.viewportEl,
+      v = this.map?.viewport;
+    if (!viewport || !v) return null;
+    const rect = viewport.getBoundingClientRect(),
+      zoom = v.zoom || 1,
+      inside = client && client.x >= rect.left && client.x <= rect.right && client.y >= rect.top && client.y <= rect.bottom;
+    const local = inside
+      ? { x: client.x - rect.left, y: client.y - rect.top }
+      : { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+    return { x: Math.round((local.x - v.x) / zoom), y: Math.round((local.y - v.y) / zoom) };
+  }
+  private hasFiles(event: DragEvent): boolean {
+    const transfer = event.dataTransfer;
+    return !!transfer && ((transfer.files?.length ?? 0) > 0 || Array.from(transfer.types ?? []).includes("Files"));
+  }
+  private onCanvasDragOver(event: DragEvent): void {
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  }
+  private onCanvasDrop(event: DragEvent): void {
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    // Any file dropped here stays inside the map: the browser must not open or navigate to it.
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from(event.dataTransfer?.files ?? []),
+      images = imageFilesFrom({ files: all });
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    for (const other of all.filter(item => !images.includes(item)))
+      new Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length && point) this.queueCanvasImages(images, point);
+  }
+  private onCanvasContextMenu(event: MouseEvent): void {
+    if (!this.canEditCanvasItems()) return;
+    const target = event.target as Element | null;
+    if (!target?.closest || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(INTERACTIVE_SELECTOR))
+      return;
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    if (!point) return;
+    event.preventDefault();
+    const menu = new Menu();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.canvas_image_insert"))
+        .setIcon("image-plus")
+        .onClick(() => this.openCanvasImagePicker(point))
+    );
+    menu.showAtMouseEvent(event);
+  }
+  /** The system file picker, images only; the chosen files take the same path as a drop. */
+  private openCanvasImagePicker(point: { x: number; y: number }): void {
+    const input = this.contentEl.createEl("input", {
+      cls: "vam-sr-only",
+      attr: { type: "file", accept: "image/*", multiple: "" }
+    });
+    input.addEventListener("change", () => {
+      const chosen = Array.from(input.files ?? []);
+      input.remove();
+      if (chosen.length) this.queueCanvasImages(chosen, point);
+    });
+    input.click();
+  }
+  /**
+   * Paste (D6): called after the private format was ruled out. Image files with no selected topic become free images
+   * at the last pointer position (the viewport centre when there is none). With a selected topic the picture belongs
+   * on the card (ticket 32, P5): nothing is consumed here, so plain text still reaches the clipboard group.
+   * Returns true when it took the event.
+   */
+  private pasteCanvasImages(event: ClipboardEvent): boolean {
+    if (!this.canEditCanvasItems()) return false;
+    const images = imageFilesFrom({ files: Array.from(event.clipboardData?.files ?? []) });
+    if (!images.length) return false;
+    // TODO(P5, ticket 32): a selected topic takes the picture as its card cover instead of a canvas image.
+    if (this.selected || this.multiSelected.size) return false;
+    const point = this.stagePoint(this.lastCanvasPointer);
+    if (!point) return false;
+    event.preventDefault();
+    this.queueCanvasImages(images, point);
+    return true;
+  }
+  /** Fences the gesture on this map and this open of it, then queues the writes. */
+  private queueCanvasImages(files: File[], point: { x: number; y: number }): void {
+    this.enqueue(() => this.insertCanvasImages(files, point));
+  }
+  /**
+   * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
+   * transaction (one undo step per picture). The fence compares the map path and open epoch taken before the read;
+   * a switched or closed map drops the result without writing anything. A refusal or failure is a Notice.
+   */
+  private async insertCanvasImages(files: File[], point: { x: number; y: number }): Promise<void> {
+    if (!this.canEditCanvasItems()) return;
+    const path = this.path,
+      epoch = this.mapOpenEpoch,
+      stale = (): boolean => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    let offset = 0;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data: ArrayBuffer;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch {
+        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const natural = imageSize(data) ?? { width: 240, height: 160 },
+        scale = Math.min(1, 320 / Math.max(natural.width, natural.height)),
+        w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)),
+        h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)),
+        id = `img-${randomUUID().slice(0, 8)}`,
+        x = point.x + offset,
+        y = point.y + offset;
+      try {
+        // Last check before anything is written: from here the transaction owns the file and its rollback.
+        if (stale()) return;
+        this.focusItemId = id;
+        await this.mapChangeSnapshots(
+          (map, attachment) => {
+            map.canvasItems = addImage(map.canvasItems ?? [], { id, path: attachment("image"), x, y, w, h });
+          },
+          false,
+          [],
+          { name, data }
+        );
+        offset += 24;
+      } catch (error) {
+        this.focusItemId = null;
+        new Notice(errorMessage(error));
+      }
+    }
+  }
   /** Removes the reference only; the image file stays in the Vault. */
   private async removeCanvasItem(id: string): Promise<void> {
     this.focusItemId = null;
@@ -5865,8 +6037,9 @@ export class VisualAgentMapView extends ItemView {
     if (!sessionFor(this.plugin).match(vam)) {
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
     }
-    // Without the private format only plain text is left: it becomes an outline under the selected topic.
+    // Without the private format: a picture file (with nothing selected) is a free image, else plain text is an outline.
     if (!vam) {
+      if (this.pasteCanvasImages(event)) return;
       this.pasteText(event, text);
       return;
     }
@@ -7401,6 +7574,7 @@ export class VisualAgentMapView extends ItemView {
       this.fillEmptyMap(this.emptyMapEl);
     }
     this.setupPan();
+    this.setupCanvasImageInput();
     this.applyInitialViewport();
     this.transform();
     this.drawEdges();

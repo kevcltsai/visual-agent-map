@@ -701,6 +701,10 @@ var en = {
   "ui.show_all": "Show all",
   "ui.canvas_images_group": "Canvas images",
   "ui.canvas_image_label": "Image: {0}",
+  "ui.canvas_image_insert": "Insert image\u2026",
+  "ui.canvas_image_refused": "Not added: {0} is not a PNG, JPEG, GIF or WebP image.",
+  "ui.canvas_image_too_large": "Not added: {0} is larger than 10 MB.",
+  "ui.canvas_image_unreadable": "Not added: {0} could not be read.",
   "ui.zoom_level_0_reset": "Zoom {0}, reset to 100%",
   "ui.new_map": "\uFF0B New map",
   "ui.researched": "Researched",
@@ -2804,6 +2808,10 @@ var zhCN = {
   "ui.show_all": "\u663E\u793A\u5168\u90E8",
   "ui.canvas_images_group": "\u753B\u5E03\u56FE\u7247",
   "ui.canvas_image_label": "\u56FE\u7247\uFF1A{0}",
+  "ui.canvas_image_insert": "\u63D2\u5165\u56FE\u7247\u2026",
+  "ui.canvas_image_refused": "\u672A\u52A0\u5165\uFF1A{0} \u4E0D\u662F PNG\u3001JPEG\u3001GIF \u6216 WebP \u56FE\u7247\u3002",
+  "ui.canvas_image_too_large": "\u672A\u52A0\u5165\uFF1A{0} \u8D85\u8FC7 10 MB\u3002",
+  "ui.canvas_image_unreadable": "\u672A\u52A0\u5165\uFF1A\u65E0\u6CD5\u8BFB\u53D6 {0}\u3002",
   "ui.zoom_level_0_reset": "\u5F53\u524D\u7F29\u653E {0}\uFF0C\u6309\u4E00\u4E0B\u91CD\u8BBE\u4E3A 100%",
   "ui.new_map": "\uFF0B \u6DFB\u52A0\u5FC3\u667A\u56FE",
   "ui.researched": "\u5DF2\u7814\u7A76",
@@ -4907,6 +4915,10 @@ var zhTW = {
   "ui.show_all": "\u986F\u793A\u5168\u90E8",
   "ui.canvas_images_group": "\u756B\u5E03\u5716\u7247",
   "ui.canvas_image_label": "\u5716\u7247\uFF1A{0}",
+  "ui.canvas_image_insert": "\u63D2\u5165\u5716\u7247\u2026",
+  "ui.canvas_image_refused": "\u672A\u52A0\u5165\uFF1A{0} \u4E0D\u662F PNG\u3001JPEG\u3001GIF \u6216 WebP \u5716\u7247\u3002",
+  "ui.canvas_image_too_large": "\u672A\u52A0\u5165\uFF1A{0} \u8D85\u904E 10 MB\u3002",
+  "ui.canvas_image_unreadable": "\u672A\u52A0\u5165\uFF1A\u7121\u6CD5\u8B80\u53D6 {0}\u3002",
   "ui.zoom_level_0_reset": "\u76EE\u524D\u7E2E\u653E {0}\uFF0C\u6309\u4E00\u4E0B\u91CD\u8A2D\u70BA 100%",
   "ui.new_map": "\uFF0B \u65B0\u589E\u5FC3\u667A\u5716",
   "ui.researched": "\u5DF2\u7814\u7A76",
@@ -15929,6 +15941,11 @@ function sanitizeCanvasItems(raw) {
   }
   return out;
 }
+function addImage(items, image) {
+  const clean4 = cleanImage({ ...image, kind: "image" });
+  if (!clean4 || items.some((i) => i.kind === "image" && i.id === clean4.id)) return [...items];
+  return [...items, clean4];
+}
 var isImage = (item, id) => item.kind === "image" && item.id === id;
 function moveItem(items, id, dx, dy) {
   if (!finite(dx) || !finite(dy)) return [...items];
@@ -15945,6 +15962,105 @@ function resizeKeepRatio(items, id, width) {
 }
 function removeItem(items, id) {
   return items.filter((item) => !(isRecord(item) && item.id === id));
+}
+
+// experiences/visual-map/image-input.ts
+var IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+var EXTENSION = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp"
+};
+var NAME_LIMIT = 80;
+var asBytes = (bytes) => bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+var startsWith = (b, at, text11) => text11.every((c, i) => b[at + i] === c);
+var ascii = (text11) => Array.from(text11, (ch) => ch.charCodeAt(0));
+function sniffImage(bytes) {
+  const b = asBytes(bytes);
+  if (b.length >= 8 && startsWith(b, 0, [137, 80, 78, 71, 13, 10, 26, 10])) return "image/png";
+  if (b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return "image/jpeg";
+  if (b.length >= 6 && (startsWith(b, 0, ascii("GIF87a")) || startsWith(b, 0, ascii("GIF89a")))) return "image/gif";
+  if (b.length >= 12 && startsWith(b, 0, ascii("RIFF")) && startsWith(b, 8, ascii("WEBP"))) return "image/webp";
+  return null;
+}
+function acceptImage(candidate) {
+  const mime = typeof candidate.mime === "string" ? candidate.mime.trim().toLowerCase() : "";
+  if (!mime.startsWith("image/")) return { ok: false, reason: "not-image-mime" };
+  if (mime.startsWith("image/svg")) return { ok: false, reason: "svg" };
+  const bytes = asBytes(candidate.bytes);
+  const size = Math.max(Number.isFinite(candidate.size) ? candidate.size : 0, bytes.byteLength);
+  if (size > IMAGE_MAX_BYTES) return { ok: false, reason: "too-large" };
+  if (bytes.byteLength === 0) return { ok: false, reason: "empty" };
+  const sniffed = sniffImage(bytes);
+  return sniffed ? { ok: true, mime: sniffed } : { ok: false, reason: "bad-content" };
+}
+function imageFilesFrom(transfer) {
+  const files = transfer == null ? void 0 : transfer.files;
+  if (!files || typeof files.length !== "number") return [];
+  const out = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file && typeof file.type === "string" && file.type.toLowerCase().startsWith("image/")) out.push(file);
+  }
+  return out;
+}
+function safeImageName(name, mime) {
+  var _a2;
+  const extension = EXTENSION[mime];
+  if (!extension) return null;
+  const leaf = (_a2 = String(name != null ? name : "").split(/[\\/]/).pop()) != null ? _a2 : "";
+  const dot = leaf.lastIndexOf(".");
+  const stem = dot > 0 ? leaf.slice(0, dot) : leaf;
+  const cleaned = stem.replace(/[^A-Za-z0-9\-_ .]/g, "_").replace(/\.{2,}/g, ".").replace(/^[ .]+|[ .]+$/g, "").slice(0, NAME_LIMIT).replace(/[ .]+$/g, "");
+  return `${cleaned || "image"}.${extension}`;
+}
+var SIZE_LIMIT = 65535 * 16;
+var sized = (width, height) => Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= SIZE_LIMIT && height <= SIZE_LIMIT ? { width, height } : null;
+function imageSize(bytes) {
+  const b = asBytes(bytes);
+  const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  switch (sniffImage(b)) {
+    case "image/png":
+      return b.length >= 24 ? sized(view.getUint32(16), view.getUint32(20)) : null;
+    case "image/gif":
+      return b.length >= 10 ? sized(view.getUint16(6, true), view.getUint16(8, true)) : null;
+    case "image/jpeg": {
+      let at = 2;
+      while (at + 9 < b.length) {
+        if (b[at] !== 255) {
+          at++;
+          continue;
+        }
+        const marker5 = b[at + 1];
+        if (marker5 === 255) {
+          at++;
+          continue;
+        }
+        if (marker5 === 216 || marker5 >= 208 && marker5 <= 215 || marker5 === 1) {
+          at += 2;
+          continue;
+        }
+        if (marker5 >= 192 && marker5 <= 207 && marker5 !== 196 && marker5 !== 200 && marker5 !== 204)
+          return sized(view.getUint16(at + 7), view.getUint16(at + 5));
+        at += 2 + view.getUint16(at + 2);
+      }
+      return null;
+    }
+    case "image/webp": {
+      if (b.length < 30) return null;
+      const kind = String.fromCharCode(b[12], b[13], b[14], b[15]);
+      if (kind === "VP8X") return sized((b[24] | b[25] << 8 | b[26] << 16) + 1, (b[27] | b[28] << 8 | b[29] << 16) + 1);
+      if (kind === "VP8 ") return sized(view.getUint16(26, true) & 16383, view.getUint16(28, true) & 16383);
+      if (kind === "VP8L") {
+        const bits = view.getUint32(21, true);
+        return sized((bits & 16383) + 1, (bits >> 14 & 16383) + 1);
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
 }
 
 // experiences/visual-map/map-text-language.ts
@@ -32022,7 +32138,7 @@ function exchangeFileStem(title) {
   const stem = Array.from(title, (ch) => ch.charCodeAt(0) < 32 ? " " : ch).join("").replace(FORBIDDEN_NAME, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
   return stem || "map";
 }
-var EXTENSION = { opml: "opml", freemind: "mm" };
+var EXTENSION2 = { opml: "opml", freemind: "mm" };
 async function exportMapExchange(vault, request) {
   const notes = /* @__PURE__ */ new Map();
   for (const [id, note] of request.notes) notes.set(id, { title: note.title, body: note.detail });
@@ -32031,7 +32147,7 @@ async function exportMapExchange(vault, request) {
   const slash = request.mapPath.lastIndexOf("/");
   const folder = slash < 0 ? "" : request.mapPath.slice(0, slash + 1);
   const stem = exchangeFileStem(request.map.title);
-  const extension = EXTENSION[request.format];
+  const extension = EXTENSION2[request.format];
   for (let attempt = 1; attempt <= 1e3; attempt++) {
     const path = `${folder}${stem}${attempt === 1 ? "" : ` ${attempt}`}.${extension}`;
     if (vault.getAbstractFileByPath(path) || await vault.adapter.exists(path)) continue;
@@ -42915,6 +43031,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     __publicField(this, "edgesEl", null);
     /** The canvas image that had keyboard focus when a change repainted the canvas; focus goes back to it. */
     __publicField(this, "focusItemId", null);
+    /** Last pointer position over the canvas in client pixels; a pasted picture goes there (D6). */
+    __publicField(this, "lastCanvasPointer", null);
     __publicField(this, "zoomLabel", null);
     __publicField(this, "refreshTimer", null);
     __publicField(this, "viewportTimer", null);
@@ -46346,18 +46464,19 @@ ${request.requirements}` : preset.text,
     return true;
   }
   /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
-  async mapChangeSnapshots(change, rebuildDerivedData = true, created = []) {
+  async mapChangeSnapshots(change, rebuildDerivedData = true, created = [], attachment) {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    if (attachment) tx.createAttachment("image", { ...attachment, sourcePath: this.path });
     let before, after;
     const viewport = clone(this.map.viewport);
     const opened = this.map;
     try {
-      const entry = await tx.editMap(this.path, (map) => {
+      const entry = await tx.editMap(this.path, (map, _resolve, attachmentPath) => {
         map.viewport = clone(viewport);
         before = clone(map);
-        change(map);
+        change(map, attachmentPath);
         after = clone(map);
       }).commit({ deferRebuild: true });
       this.history.push(entry);
@@ -47201,6 +47320,150 @@ ${request.requirements}` : preset.text,
   async resizeCanvasItem(id, width) {
     await this.changeCanvasItems(id, (items) => resizeKeepRatio(items, id, width));
   }
+  // ---- Adding free images: drop, paste, "Insert image…" (ticket 30, decisions D5, D6, D11) ---------------------------
+  /** Registers the three entries on the canvas; AIM maps, the built-in sample and topic selection mode get none (D11). */
+  setupCanvasImageInput() {
+    const viewport = this.viewportEl;
+    if (!viewport || !this.canEditCanvasItems()) return;
+    viewport.addEventListener("dragover", (event) => this.onCanvasDragOver(event));
+    viewport.addEventListener("drop", (event) => this.onCanvasDrop(event));
+    viewport.addEventListener("contextmenu", (event) => this.onCanvasContextMenu(event));
+    viewport.addEventListener("pointermove", (event) => this.onCanvasPointerMove(event));
+  }
+  onCanvasPointerMove(event) {
+    this.lastCanvasPointer = { x: event.clientX, y: event.clientY };
+  }
+  /** A client point in the stage's own units (what `x` and `y` of a canvas item mean). Null when there is no canvas. */
+  stagePoint(client) {
+    var _a2;
+    const viewport = this.viewportEl, v = (_a2 = this.map) == null ? void 0 : _a2.viewport;
+    if (!viewport || !v) return null;
+    const rect = viewport.getBoundingClientRect(), zoom = v.zoom || 1, inside2 = client && client.x >= rect.left && client.x <= rect.right && client.y >= rect.top && client.y <= rect.bottom;
+    const local = inside2 ? { x: client.x - rect.left, y: client.y - rect.top } : { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+    return { x: Math.round((local.x - v.x) / zoom), y: Math.round((local.y - v.y) / zoom) };
+  }
+  hasFiles(event) {
+    var _a2, _b2, _c;
+    const transfer = event.dataTransfer;
+    return !!transfer && (((_b2 = (_a2 = transfer.files) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0 || Array.from((_c = transfer.types) != null ? _c : []).includes("Files"));
+  }
+  onCanvasDragOver(event) {
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  }
+  onCanvasDrop(event) {
+    var _a2, _b2;
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from((_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.files) != null ? _b2 : []), images = imageFilesFrom({ files: all });
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    for (const other of all.filter((item) => !images.includes(item)))
+      new import_obsidian32.Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length && point) this.queueCanvasImages(images, point);
+  }
+  onCanvasContextMenu(event) {
+    if (!this.canEditCanvasItems()) return;
+    const target = event.target;
+    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(INTERACTIVE_SELECTOR))
+      return;
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    if (!point) return;
+    event.preventDefault();
+    const menu = new import_obsidian32.Menu();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.canvas_image_insert")).setIcon("image-plus").onClick(() => this.openCanvasImagePicker(point))
+    );
+    menu.showAtMouseEvent(event);
+  }
+  /** The system file picker, images only; the chosen files take the same path as a drop. */
+  openCanvasImagePicker(point) {
+    const input = this.contentEl.createEl("input", {
+      cls: "vam-sr-only",
+      attr: { type: "file", accept: "image/*", multiple: "" }
+    });
+    input.addEventListener("change", () => {
+      var _a2;
+      const chosen = Array.from((_a2 = input.files) != null ? _a2 : []);
+      input.remove();
+      if (chosen.length) this.queueCanvasImages(chosen, point);
+    });
+    input.click();
+  }
+  /**
+   * Paste (D6): called after the private format was ruled out. Image files with no selected topic become free images
+   * at the last pointer position (the viewport centre when there is none). With a selected topic the picture belongs
+   * on the card (ticket 32, P5): nothing is consumed here, so plain text still reaches the clipboard group.
+   * Returns true when it took the event.
+   */
+  pasteCanvasImages(event) {
+    var _a2, _b2;
+    if (!this.canEditCanvasItems()) return false;
+    const images = imageFilesFrom({ files: Array.from((_b2 = (_a2 = event.clipboardData) == null ? void 0 : _a2.files) != null ? _b2 : []) });
+    if (!images.length) return false;
+    if (this.selected || this.multiSelected.size) return false;
+    const point = this.stagePoint(this.lastCanvasPointer);
+    if (!point) return false;
+    event.preventDefault();
+    this.queueCanvasImages(images, point);
+    return true;
+  }
+  /** Fences the gesture on this map and this open of it, then queues the writes. */
+  queueCanvasImages(files, point) {
+    this.enqueue(() => this.insertCanvasImages(files, point));
+  }
+  /**
+   * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
+   * transaction (one undo step per picture). The fence compares the map path and open epoch taken before the read;
+   * a switched or closed map drops the result without writing anything. A refusal or failure is a Notice.
+   */
+  async insertCanvasImages(files, point) {
+    var _a2;
+    if (!this.canEditCanvasItems()) return;
+    const path = this.path, epoch = this.mapOpenEpoch, stale = () => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    let offset = 0;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new import_obsidian32.Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch (e) {
+        if (!stale()) new import_obsidian32.Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new import_obsidian32.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
+      try {
+        if (stale()) return;
+        this.focusItemId = id;
+        await this.mapChangeSnapshots(
+          (map, attachment) => {
+            var _a3;
+            map.canvasItems = addImage((_a3 = map.canvasItems) != null ? _a3 : [], { id, path: attachment("image"), x, y, w, h });
+          },
+          false,
+          [],
+          { name, data }
+        );
+        offset += 24;
+      } catch (error) {
+        this.focusItemId = null;
+        new import_obsidian32.Notice(errorMessage(error));
+      }
+    }
+  }
   /** Removes the reference only; the image file stays in the Vault. */
   async removeCanvasItem(id) {
     this.focusItemId = null;
@@ -47591,6 +47854,7 @@ ${request.requirements}` : preset.text,
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
     }
     if (!vam) {
+      if (this.pasteCanvasImages(event)) return;
       this.pasteText(event, text11);
       return;
     }
@@ -49010,6 +49274,7 @@ ${request.requirements}` : preset.text,
       this.fillEmptyMap(this.emptyMapEl);
     }
     this.setupPan();
+    this.setupCanvasImageInput();
     this.applyInitialViewport();
     this.transform();
     this.drawEdges();
@@ -58332,8 +58597,8 @@ async function drawable(bytes, mime) {
   }
   const markup = new TextDecoder().decode(bytes);
   const box = /<svg\b[^>]*\sviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(markup);
-  const sized = /<svg\b[^>]*\swidth\s*=/i.test(markup);
-  const fromBox = !sized && box && Number(box[1]) > 0 && Number(box[2]) > 0;
+  const sized2 = /<svg\b[^>]*\swidth\s*=/i.test(markup);
+  const fromBox = !sized2 && box && Number(box[1]) > 0 && Number(box[2]) > 0;
   return {
     source: image,
     width: fromBox ? Number(box[1]) : image.naturalWidth || 1024,

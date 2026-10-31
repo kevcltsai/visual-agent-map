@@ -41337,7 +41337,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
         var _a2, _b2;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
@@ -41362,7 +41362,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian30.Ite
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -41581,7 +41581,7 @@ ${request.requirements}` : preset.text,
     showWindow({
       review: async (signal, started) => {
         const settings = this.plugin.settings;
-        const model = settings.cliModel;
+        const { model, reasoning } = this.plugin.currentModelChoice();
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
@@ -41608,7 +41608,7 @@ ${request.requirements}` : preset.text,
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, rootQuestion),
                 model,
-                reasoning: normalizeReasoningLevel(settings.cliReasoning)
+                reasoning
               },
               controller.signal
             );
@@ -41735,11 +41735,11 @@ ${request.requirements}` : preset.text,
    */
   prewarmRelevance(mode) {
     var _a2, _b2;
-    const settings = this.plugin.settings;
+    const { model, reasoning } = this.plugin.currentModelChoice();
     (_b2 = (_a2 = this.plugin).prewarmClaudeStep) == null ? void 0 : _b2.call(
       _a2,
-      settings.cliModel,
-      normalizeReasoningLevel(settings.cliReasoning),
+      model,
+      reasoning,
       mode === "recalibrate" ? RELEVANCE_RECALIBRATE_SCHEMA : RELEVANCE_GRADE_SCHEMA
     );
   }
@@ -42060,7 +42060,7 @@ ${request.requirements}` : preset.text,
         });
         this.updateHistoryButtons();
       });
-      const model = settings.cliModel;
+      const { model, reasoning: gradeReasoning } = this.plugin.currentModelChoice();
       if ((_c = (_b2 = this.plugin).usageNoticePending) == null ? void 0 : _c.call(_b2, model)) {
         run.awaitingUsage = true;
         this.refreshRelevance();
@@ -42081,7 +42081,7 @@ ${request.requirements}` : preset.text,
           nodes: basis,
           language: settings.language,
           model,
-          reasoning: normalizeReasoningLevel(settings.cliReasoning),
+          reasoning: gradeReasoning,
           ...pins.length ? { pins } : {}
         };
         const hooks = {
@@ -47835,10 +47835,7 @@ ${request.requirements}` : preset.text,
       ).open();
       return;
     }
-    const model = inheritModel(
-      parent ? (await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).model : void 0,
-      this.plugin.settings.cliModel
-    );
+    const model = parent ? (await this.plugin.repo.resolveTopicModel(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).model : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
       new import_obsidian30.Notice(t("ui.legacy_map_view_only"));
       return;

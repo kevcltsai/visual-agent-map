@@ -81,6 +81,8 @@ function withExpansionCoordinator(plugin) {
   // Background chart jobs belong to the real plugin; the view-level doubles only need the two calls to exist.
   plugin.abortChartJobs ??= () => {}; plugin.addChartsAfterWrite ??= () => {};
   plugin.expansionCoordinator = new ShallowExpansionCoordinator(plugin.activeTasks, plugin.expansionBatches);
+  // The real plugin resolves the current model one way (ADR-021); a double over settings answers the same.
+  plugin.currentModelChoice ??= () => ({ model: plugin.settings.cliModel, reasoning: normalizeReasoningLevel(plugin.settings.cliReasoning) });
   return plugin;
 }
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }

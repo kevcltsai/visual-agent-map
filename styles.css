@@ -85,6 +85,10 @@
 .vam-boundary-label.is-empty { min-width: 28px; min-height: 12px; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
+/* The width handle on a card's right edge (card-resize). Quiet until the card is hovered or focused; the share viewer does not collect these classes. */
+.vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
+.vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
+.vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
 /* Mind-map-only polish (decision 35). None of these starts with a class the share viewer collects (scripts/viewer-css.mjs), so the viewer's stylesheet is unchanged. The parent line is a thin low-saturation line, lighter than the semantic lines; AIM, the sample and skippable edges do not carry the attribute. */
 path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35%, var(--text-muted)); stroke-width: 1.5px; }
 /* An ordinary card's frame was invisible on the dotted canvas: use the hover token, one step deeper on hover. The typed cards' own border rules are more specific and keep winning. :where keeps the specificity of the rules above and below (status, selected, relevance) so they still win. */

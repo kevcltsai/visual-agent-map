@@ -6,6 +6,8 @@ export interface MapNode {
   x: number;
   y: number;
   collapsed: boolean;
+  /** Custom card width in canvas units; absent means the standard CARD_WIDTH. Only 200-560 values other than 280 are stored. */
+  width?: number;
   /** This branch's own arrangement, instead of the map's; only right, left, down and up are stored (decision D9). */
   layout?: { direction: "right" | "left" | "down" | "up" };
   aimKind?: AimNodeKind;
@@ -21,6 +23,18 @@ export interface MapNode {
   aimDismissedQuestionRequestIds?: string[];
 }
 export type AimNodeKind = "topic" | "question" | "answer" | "research" | "synthesis" | "conclusion";
+
+/** Standard card width and the range a user can resize it to, in canvas units. */
+export const CARD_WIDTH = 280;
+export const CARD_WIDTH_MIN = 200;
+export const CARD_WIDTH_MAX = 560;
+export const CARD_WIDTH_STEP = 40;
+
+/** Rounds and clamps a width into the allowed range; undefined for anything that is not a finite number. */
+export function clampCardWidth(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(CARD_WIDTH_MAX, Math.max(CARD_WIDTH_MIN, Math.round(value)));
+}
 
 export function parentIdsForNode(node: MapNode): string[] {
   const convergenceParents = node.aimKind === "question" ? [] : (node.aimConvergesFromNodeIds ?? []);

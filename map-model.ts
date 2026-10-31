@@ -10,6 +10,8 @@ import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 import {
   applyCollapseLevel,
+  CARD_WIDTH,
+  clampCardWidth,
   descendants,
   parentIdsForNode,
   visibleNodes,
@@ -627,6 +629,11 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
       throw new Error("Invalid dismissed AIM question identities.");
     ids.add(n.id);
     n.collapsed = n.collapsed === true;
+    if (n.width !== undefined) {
+      const width = clampCardWidth(n.width);
+      if (width === undefined || width === CARD_WIDTH) delete n.width;
+      else n.width = width;
+    }
     if (
       n.aimKind !== undefined &&
       !["topic", "question", "answer", "research", "synthesis", "conclusion"].includes(n.aimKind)

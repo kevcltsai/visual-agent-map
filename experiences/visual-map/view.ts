@@ -128,6 +128,7 @@ import {
   type TopicRelationKind,
   visibleNodes
 } from "../../map-model";
+import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
 import {
   arrangeMap,
   arrangeNewBranch,
@@ -948,6 +949,8 @@ export class VisualAgentMapView extends ItemView {
   private suppressClickUntil = 0;
   /** Node whose card should hold keyboard focus once the next render finishes. */
   private focusNodeId: string | null = null;
+  /** After a render, the resize handle of this card takes focus back (keyboard resizing rebuilds the canvas). */
+  private focusResizeNodeId: string | null = null;
   /** Space held down: a drag pans the map even while selecting topics. */
   private spaceHeld = false;
   /** The single card in the tab order (roving tabindex); arrows move between the rest. */
@@ -8174,7 +8177,11 @@ export class VisualAgentMapView extends ItemView {
       }, 0);
     }
     const focusedCard = activeDocument.activeElement?.closest<HTMLElement>(".vam-node");
-    if (focusedCard && this.contentEl.contains(focusedCard)) this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
+    if (focusedCard && this.contentEl.contains(focusedCard)) {
+      if (activeDocument.activeElement?.classList.contains("vam-card-resize"))
+        this.focusResizeNodeId ??= focusedCard.dataset.nodeId ?? null;
+      else this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
+    }
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
@@ -8604,6 +8611,17 @@ export class VisualAgentMapView extends ItemView {
       }
       this.focusNodeId = null;
     }
+    if (this.focusResizeNodeId) {
+      this.restoringFocus = true;
+      try {
+        this.stageEl
+          .querySelector<HTMLElement>(`[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .vam-card-resize`)
+          ?.focus({ preventScroll: true });
+      } finally {
+        this.restoringFocus = false;
+      }
+      this.focusResizeNodeId = null;
+    }
     if (!this.map.nodes.length) {
       this.emptyMapEl = this.viewportEl.createDiv("vam-empty");
       this.fillEmptyMap(this.emptyMapEl);
@@ -8708,6 +8726,7 @@ export class VisualAgentMapView extends ItemView {
           : (note?.status ?? "error");
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
+    if (shownNode.width) card.style.width = `${shownNode.width}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
     card.addEventListener("dragover", event => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
@@ -9220,6 +9239,8 @@ export class VisualAgentMapView extends ItemView {
     }
     if (!this.builtIn) this.enableDrag(card, node);
     else card.addClass("is-readonly");
+    if (!this.builtIn && !this.integrationMode && !this.presentation && !this.map?.aim && !node.aimKind)
+      this.attachResizeHandle(card, node);
     card.addEventListener("click", event => {
       if (Date.now() < this.suppressClickUntil) return;
       if ((event.target as Element).closest("button")) return;
@@ -9297,7 +9318,7 @@ export class VisualAgentMapView extends ItemView {
     });
     card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     // Keyboard users reach the hover preview by focusing a card; its tools join the tab order only while it is focused.
-    const toolButtons = (): HTMLButtonElement[] => Array.from(card.querySelectorAll<HTMLButtonElement>("button"));
+    const toolButtons = (): HTMLElement[] => Array.from(card.querySelectorAll<HTMLElement>("button, .vam-card-resize"));
     card.addEventListener("focusin", event => {
       for (const button of toolButtons()) button.tabIndex = 0;
       if (
@@ -15557,6 +15578,110 @@ export class VisualAgentMapView extends ItemView {
   private dragStale(): boolean {
     const origin = this.dragOrigin;
     return !!origin && (!this.map || this.map.id !== origin.id || this.path !== origin.path);
+  }
+  /**
+   * The width handle on a card's right edge, also an ARIA splitter. Dragging changes the width on screen and writes Map.md
+   * once on release (one undo step); the arrow keys step by CARD_WIDTH_STEP, Home/End jump to the limits, Enter or a
+   * double click goes back to the standard width (the field is removed).
+   */
+  private attachResizeHandle(card: HTMLElement, node: MapNode): void {
+    const handle = card.createSpan({
+      cls: "vam-card-resize",
+      attr: {
+        role: "separator",
+        "aria-orientation": "vertical",
+        "aria-label": t("ui.card_resize_label"),
+        "aria-valuemin": String(CARD_WIDTH_MIN),
+        "aria-valuemax": String(CARD_WIDTH_MAX)
+      }
+    });
+    const widthOf = (): number => this.map?.nodes.find(item => item.id === node.id)?.width ?? CARD_WIDTH;
+    const sync = (width: number): void => handle.setAttr("aria-valuenow", String(width));
+    handle.tabIndex = -1;
+    sync(widthOf());
+    const commit = (width: number | undefined): void => {
+      this.focusResizeNodeId = node.id;
+      this.enqueue(() => this.resizeCard(node.id, width));
+    };
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.map) return;
+      // The card's own pointerdown starts a move; the handle only resizes.
+      event.stopPropagation();
+      event.preventDefault();
+      this.clearHoverTimer();
+      this.hoverCard?.remove();
+      this.hoverCard = null;
+      const startX = event.clientX,
+        zoom = this.map.viewport.zoom || 1,
+        from = widthOf();
+      let width = from,
+        done = false;
+      handle.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        width = clampCardWidth(from + (e.clientX - startX) / zoom) ?? from;
+        card.style.width = `${width}px`;
+        sync(width);
+      };
+      const settle = (): void => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        if (from === CARD_WIDTH) card.style.removeProperty("width");
+        else card.style.width = `${from}px`;
+        sync(from);
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        if (width === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(width === CARD_WIDTH ? undefined : width);
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", event => event.stopPropagation());
+    handle.addEventListener("dblclick", event => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (widthOf() !== CARD_WIDTH) commit(undefined);
+    });
+    handle.addEventListener("keydown", event => {
+      const current = widthOf();
+      let next: number | undefined | null = null;
+      if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
+      else if (event.key === "ArrowLeft") next = current - CARD_WIDTH_STEP;
+      else if (event.key === "Home") next = CARD_WIDTH_MIN;
+      else if (event.key === "End") next = CARD_WIDTH_MAX;
+      else if (event.key === "Enter") next = undefined;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      const width = next === undefined ? CARD_WIDTH : (clampCardWidth(next) ?? current);
+      if (width === current) return;
+      commit(width === CARD_WIDTH ? undefined : width);
+    });
+  }
+  /** Sets (or, with undefined, clears) one card's custom width as one undo step. */
+  private async resizeCard(id: string, width: number | undefined): Promise<void> {
+    if (!this.map?.nodes.some(node => node.id === id)) return;
+    await this.mapChange(map => {
+      const node = map.nodes.find(item => item.id === id);
+      if (!node) return;
+      if (width === undefined || width === CARD_WIDTH) delete node.width;
+      else node.width = clampCardWidth(width);
+    }, false);
   }
   private enableDrag(card: HTMLElement, node: MapNode): void {
     card.addEventListener("pointerdown", event => {

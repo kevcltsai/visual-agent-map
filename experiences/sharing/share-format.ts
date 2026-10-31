@@ -2,6 +2,7 @@ import type { MapDocument } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
 import { readTopicColor, type TopicColor } from "../../topic-colors";
+import { CARD_WIDTH, clampCardWidth } from "../../map-graph";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
@@ -82,6 +83,8 @@ export interface ShareNodePayload {
   x: number;
   y: number;
   collapsed: boolean;
+  /** Optional (card-resize): a custom card width, 200-560 and not 280. Absent means the standard width; `version` stays 1. */
+  width?: number;
   status: "idea" | "completed";
   title: string;
   summary: string;
@@ -182,6 +185,8 @@ export function buildSharePayload(
       title: note?.title || fallbackTitle,
       summary: note?.summary ?? ""
     };
+    if (node.width !== undefined && clampCardWidth(node.width) !== undefined && node.width !== CARD_WIDTH)
+      out.width = clampCardWidth(node.width);
     if (note?.relevance) {
       out.tier = note.relevance.tier;
       if (note.relevance.manual) out.manual = true;

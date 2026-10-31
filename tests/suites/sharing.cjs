@@ -403,3 +403,23 @@ test('sharing topic-color: the payload carries only a whitelisted colour id, and
   assert.ok(!format.serializeShareJson(plainPayload).includes('"color"'), 'a map without colours is unchanged');
   assert.ok(format.serializeShareJson(payload).includes('"color":"blue"'));
 });
+
+// card-resize: the payload carries a custom card width only when one is set, same version.
+test('sharing card-width: the payload carries width only for a custom width and the viewer applies it', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  map.nodes[0].width = 400;
+  map.nodes[1].width = 280;
+  map.nodes[2].width = 9999;
+  map.nodes[3].width = 'wide';
+  const payload = format.buildSharePayload(map, notesById, options());
+  assert.equal(payload.version, 1, 'no version bump');
+  const widths = payload.nodes.map(n => ('width' in n ? n.width : null));
+  assert.deepEqual(plain(widths.slice(0, 4)), [400, null, 560, null]);
+  for (const node of payload.nodes.slice(4)) assert.equal('width' in node, false, `${node.id} has no width key`);
+  const plainMap = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.equal(JSON.stringify(plainMap).includes('"width"'), false, 'a map without widths serializes without the key');
+  const viewerSource = fs.readFileSync(path.join(root, 'experiences', 'sharing', 'viewer', 'main.ts'), 'utf8');
+  assert.match(viewerSource, /clampCardWidth\(item\.width\)/);
+  assert.match(viewerSource, /card\.style\.width = `\$\{node\.width\}px`/);
+});

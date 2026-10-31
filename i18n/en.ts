@@ -337,6 +337,7 @@ export const en = {
   "ui.aim_answer_snapshot": "Answer",
   "ui.aim_research_not_generated": "Research subtopics have not been generated for this answer.",
   "ui.aim_retry_subtopics": "Retry subtopic planning",
+  "ui.card_resize_label": "Card width",
   "ui.start_using_vam": "Start using VAM",
   "ui.check_codex": "Check Codex",
   "ui.check_claude_code": "Check Claude Code",

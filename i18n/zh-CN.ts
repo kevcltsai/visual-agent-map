@@ -308,6 +308,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.aim_answer_snapshot": "回答",
   "ui.aim_research_not_generated": "这个回答尚未产生研究子议题。",
   "ui.aim_retry_subtopics": "重新产生子议题",
+  "ui.card_resize_label": "卡片宽度",
   "ui.start_using_vam": "开始使用 VAM",
   "ui.check_codex": "检查 Codex",
   "ui.check_claude_code": "检查 Claude Code",

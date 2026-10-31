@@ -47972,8 +47972,12 @@ ${request.requirements}` : preset.text,
     };
     paint();
   }
-  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
-  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic") {
+  /**
+   * `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out).
+   * `keyboardFocus` also hands DOM focus to the new card; only the name dialog's save asks for it, because other
+   * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
+   */
+  async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic", keyboardFocus = false) {
     var _a2, _b2, _c, _d, _e, _f;
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -47984,7 +47988,7 @@ ${request.requirements}` : preset.text,
         this.app,
         dialogTitle,
         "",
-        (title) => this.enqueue(() => this.addNode(parent, title, true, true, kind))
+        (title) => this.enqueue(() => this.addNode(parent, title, true, true, kind, true))
       ).open();
       return;
     }
@@ -48043,7 +48047,9 @@ ${request.requirements}` : preset.text,
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode((_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node);
+    const placed = (_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node;
+    this.focusNode(placed);
+    if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;

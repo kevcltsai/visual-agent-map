@@ -12,6 +12,8 @@ import {
 } from "../../../i18n";
 import LabelAncestorsZH from "./label-ancestors.zh.md";
 import LabelAncestorsEN from "./label-ancestors.en.md";
+import LabelSummaryDirectionZH from "./label-summary-direction.zh.md";
+import LabelSummaryDirectionEN from "./label-summary-direction.en.md";
 import LabelUserTextZH from "./label-user-text.zh.md";
 import LabelUserTextEN from "./label-user-text.en.md";
 import LabelRulesZH from "./label-rules.zh.md";
@@ -121,6 +123,7 @@ export const LABEL_ANCESTORS: FragmentPair = pair(LabelAncestorsZH, LabelAncesto
 export const LABEL_RULES: FragmentPair = pair(LabelRulesZH, LabelRulesEN);
 export const LABEL_SOURCES: FragmentPair = pair(LabelSourcesZH, LabelSourcesEN);
 export const LABEL_SUMMARY: FragmentPair = pair(LabelSummaryZH, LabelSummaryEN);
+export const LABEL_SUMMARY_DIRECTION: FragmentPair = pair(LabelSummaryDirectionZH, LabelSummaryDirectionEN);
 export const LABEL_USER_TEXT: FragmentPair = pair(LabelUserTextZH, LabelUserTextEN);
 export const LABEL_TASK: FragmentPair = pair(LabelTaskZH, LabelTaskEN);
 export const LABEL_TOPIC: FragmentPair = pair(LabelTopicZH, LabelTopicEN);

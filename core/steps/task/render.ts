@@ -11,6 +11,7 @@ import {
   LABEL_RULES,
   LABEL_SOURCES,
   LABEL_SUMMARY,
+  LABEL_SUMMARY_DIRECTION,
   LABEL_TASK,
   LABEL_TOPIC,
   LABEL_USER_TEXT,
@@ -128,6 +129,9 @@ export function generalTaskPrompt(
     context.workingFindings ? `${inLanguage(LABEL_FINDINGS, language)}:\n${context.workingFindings}` : "",
     context.sourceContext ? `${inLanguage(LABEL_SOURCES, language)}:\n${context.sourceContext}` : "",
     ...(context.userTexts ? [`${inLanguage(LABEL_USER_TEXT, language)}:\n${context.userTexts}`] : []),
+    ...(context.summaryDirections
+      ? [`${inLanguage(LABEL_SUMMARY_DIRECTION, language)}:\n${context.summaryDirections}`]
+      : []),
     `${inLanguage(LABEL_ANCESTORS, language)}:\n${context.ancestors || none}`,
     `${inLanguage(LABEL_TASK, language)}:\n${context.task}`
   ].join("\n\n");

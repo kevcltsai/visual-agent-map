@@ -64,6 +64,17 @@ export interface MapChatUserText {
   /** Topic ids the note is linked to; sent as `linkedTo` with each title taken from the outline (unknown ids are left out). */
   links?: string[];
 }
+/**
+ * A summary bracket (summary-bracket P1): the user's conclusion over neighbouring children of one topic. Read-only context,
+ * sent as `summaries`; its id is not a card id, so no edit action can rewrite or delete it.
+ */
+export interface MapChatSummary {
+  id: string;
+  parentId: string;
+  /** The framed child topic ids (the effective range); titles are taken from the outline, unknown ids are left out. */
+  members: string[];
+  text: string;
+}
 export interface MapChatSnippet {
   path: string;
   text: string;
@@ -89,6 +100,8 @@ export interface MapChatContextInput {
   files: MapChatFile[];
   /** The user's text nodes, read-only; omitted or empty leaves the context exactly as it was. */
   userTexts?: MapChatUserText[];
+  /** The user's summary brackets, read-only; omitted or empty leaves the context exactly as it was. */
+  summaries?: MapChatSummary[];
   activeFile?: MapChatFile | null;
   history: MapChatTurn[];
   /** Question and answer rounds to keep; default {@link MAP_CHAT_DEFAULT_TURNS}. */
@@ -265,6 +278,19 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
           })),
           userTextsNote:
             "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
+        }
+      : {}),
+    ...(input.summaries?.length
+      ? {
+          summaries: input.summaries.map(item => ({
+            id: item.id,
+            parentId: item.parentId,
+            readOnly: true,
+            members: item.members.map(brief).filter(Boolean),
+            text: item.text
+          })),
+          summariesNote:
+            "summaries are conclusions the user wrote over neighbouring child topics (summary brackets). Read them as the user's own words and as the direction of the conclusion; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
         }
       : {}),
     activeFile: active,

@@ -1441,6 +1441,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.synthesize-summary-direction.en": {
+      "builder": "AiTaskService instructions: mode synthesize with summary-bracket conclusion directions (summary-bracket P1, read-only)",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-summary-direction.zh": {
+      "builder": "AiTaskService instructions: mode synthesize with summary-bracket conclusion directions (summary-bracket P1, read-only)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-summary-direction.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize with summary-bracket conclusion directions (summary-bracket P1, read-only)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-local-fast.en": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
       "language": "en",

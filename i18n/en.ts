@@ -2206,6 +2206,13 @@ export const en = {
   "share.viewer_marker_priority_1": "Priority 1",
   "share.viewer_marker_priority_2": "Priority 2",
   "share.viewer_marker_priority_3": "Priority 3",
+  "share.viewer_color_0": "Color: {0}",
+  "share.viewer_color_red": "Red",
+  "share.viewer_color_orange": "Orange",
+  "share.viewer_color_yellow": "Yellow",
+  "share.viewer_color_green": "Green",
+  "share.viewer_color_blue": "Blue",
+  "share.viewer_color_purple": "Purple",
   // Share dialog
   "share.command": "Share this map",
   "share.button": "Share this map",

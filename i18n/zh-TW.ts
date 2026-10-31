@@ -2048,6 +2048,13 @@ export const zhTW: Record<TranslationKey, string> = {
   "share.viewer_marker_priority_1": "優先 1",
   "share.viewer_marker_priority_2": "優先 2",
   "share.viewer_marker_priority_3": "優先 3",
+  "share.viewer_color_0": "顏色：{0}",
+  "share.viewer_color_red": "紅色",
+  "share.viewer_color_orange": "橘色",
+  "share.viewer_color_yellow": "黃色",
+  "share.viewer_color_green": "綠色",
+  "share.viewer_color_blue": "藍色",
+  "share.viewer_color_purple": "紫色",
   // Share dialog
   "share.command": "分享這張心智圖",
   "share.button": "分享這張心智圖",

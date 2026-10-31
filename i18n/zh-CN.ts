@@ -2046,6 +2046,13 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_marker_priority_1": "优先 1",
   "share.viewer_marker_priority_2": "优先 2",
   "share.viewer_marker_priority_3": "优先 3",
+  "share.viewer_color_0": "颜色：{0}",
+  "share.viewer_color_red": "红色",
+  "share.viewer_color_orange": "橙色",
+  "share.viewer_color_yellow": "黄色",
+  "share.viewer_color_green": "绿色",
+  "share.viewer_color_blue": "蓝色",
+  "share.viewer_color_purple": "紫色",
   // Share dialog
   "share.command": "分享这张地图",
   "share.button": "分享这张地图",

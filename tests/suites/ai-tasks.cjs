@@ -275,8 +275,8 @@ integrationTest('a completed but stale answer cannot overwrite an edited note', 
   const after = await repo.readNote(n.path);
   assert.equal(after.detail, 'User edit'); assert.equal(after.status, 'idea'); assert.notEqual(after.summary, 'Stale summary');
 });
-integrationTest('new child topics inherit reasoning without activating legacy rules', async () => {
-  const { repo, app } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
+integrationTest('new child topics follow the resolved reasoning without activating legacy rules (MS-04)', async () => {
+  const { repo, app, contents } = fixture(), parent = await topicNote(repo, 'Parent', 'a');
   await repo.updateNote(parent.path, { rules: 'Use official sources and tables.', reasoning: 'high' });
   const mapPath = 'Agent Workspace/Topics/map-a/Map.md';
   const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [parent], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -287,7 +287,11 @@ integrationTest('new child topics inherit reasoning without activating legacy ru
   await view.addNode(parent, 'Child');
   const child = (await repo.readMap(mapPath)).nodes.at(-1);
   assert.equal((await repo.readNote(child.path)).rules, '');
-  assert.equal((await repo.readNote(child.path)).reasoning, 'high');
+  assert.equal(contents.get(child.path).match(/^reasoning-level:/m), null, 'MS-04: an inherited child is created without reasoning-level');
+  assert.equal((await repo.readNote(child.path)).reasoning, DEFAULT_SETTINGS.cliReasoning, 'MS-04: no manual ancestor, so the child follows the current reasoning');
+  await repo.updateNote(parent.path, { model: 'own', modelSource: 'manual', reasoning: 'high' });
+  const manualChild = (await repo.readMap(mapPath)).nodes.at(-1);
+  assert.equal((await repo.readNote(manualChild.path, await repo.readMap(mapPath))).reasoning, 'high', 'MS-04: a manual parent with high gives its child high');
 });
 integrationTest('AI task timeout override reaches both providers with accurate non-Coffee timeout text', async () => {
   const { AiTaskService } = load('core/ai-task-service.ts');

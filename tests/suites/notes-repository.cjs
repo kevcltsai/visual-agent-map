@@ -1305,13 +1305,16 @@ integrationTest('AI merge: a missing, blank or over-long AI name falls back to t
 });
 integrationTest('AI merge model: the nearest manual parent model is used for the usage notice, the request and the new note; a workspace parent follows the workspace model', async () => {
   const manual = await aiMergeHarness({ parentModel: 'claude:haiku', parentSource: 'manual' });
+  await manual.repo.updateNote(manual.parent.path, { reasoning: 'high' });
   const { task } = await manual.begin('M'); await manual.untilSettled(task);
   assert.deepEqual([manual.usage, manual.asks.map(a => a.model), task.model], [['claude:haiku'], ['claude:haiku'], 'claude:haiku']);
+  assert.equal(manual.asks[0].reasoning, 'high', 'MS-04: the request carries the manual parent reasoning, not the current low');
   const merged = (await manual.repo.readMap(manual.path)).nodes.find(n => n.path.endsWith('M.md'));
   const note = await manual.repo.readNote(merged.path); assert.equal(note.model, 'claude:haiku'); assert.equal(note.modelSource, 'inherited');
   const workspace = await aiMergeHarness();
   const run = await workspace.begin('W'); await workspace.untilSettled(run.task);
   assert.deepEqual([workspace.usage, workspace.asks.map(a => a.model)], [['claude:sonnet'], ['claude:sonnet']]);
+  assert.equal(workspace.asks[0].reasoning, 'low', 'MS-04: a workspace parent uses the current reasoning');
 });
 integrationTest('structure merge also takes the parent-resolved model (manual parent inherits, workspace parent stays workspace)', async () => {
   const h = await mergeHarness({ parentModel: 'claude:haiku', parentSource: 'manual' });

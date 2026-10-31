@@ -14,6 +14,8 @@ export interface ResearchProgress {
   /** Offered while `slow`: replaces the current attempt with a fresh one. */
   resend?: () => void;
   preview?: ResearchPreview;
+  /** The model that runs this task; shown after the stage name. */
+  model?: string;
 }
 export interface ResearchProgressClock {
   now(): number;
@@ -35,9 +37,16 @@ export class ResearchProgressStore {
   private pending = new Map<string, unknown>();
   constructor(private clock: ResearchProgressClock = realClock) {}
 
-  begin(path: string, attemptId: string, now: number): void {
+  begin(path: string, attemptId: string, now: number, model?: string): void {
     this.cancelPending(path);
-    this.entries.set(path, { attemptId, startedAt: now, stage: "waiting", stageAt: now, slow: false });
+    this.entries.set(path, {
+      attemptId,
+      startedAt: now,
+      stage: "waiting",
+      stageAt: now,
+      slow: false,
+      ...(model ? { model } : {})
+    });
     this.notify(path);
   }
   stage(path: string, attemptId: string, stage: ResearchStage, now: number, query?: string): void {

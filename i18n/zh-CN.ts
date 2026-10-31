@@ -1897,6 +1897,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.research_stage_searching_0": "搜索中：{0}",
   "ui.research_stage_reading": "阅读来源",
   "ui.research_stage_writing": "撰写中",
+  "ui.progress_stage_with_model_0_1": "{0}・{1}",
+  "ui.card_model_override_0": "此议题指定的模型：{0}",
   "ui.research_stage_charts": "加入图表中",
   "ui.research_slow_waiting": "响应较慢，仍在等待",
   "ui.research_announcement_0_1": "{0}：{1}",

@@ -80,6 +80,8 @@ export interface Note {
   previewInitialized?: boolean;
   model: string;
   modelSource: ModelSource;
+  /** True when the topic runs on its own model: a manual choice, or one inherited from a manual ancestor (the card shows a tag). */
+  modelOverride?: boolean;
   reasoning?: ReasoningLevel;
   researchMode: ResearchMode;
   visualMode: VisualMode;
@@ -1185,9 +1187,8 @@ export class Repository {
     const modelSource: ModelSource = ["workspace", "inherited", "manual"].includes(source)
       ? (source as ModelSource)
       : "workspace";
-    const { model, reasoning } = this.chooseModel(
-      await this.effectiveModel(path, text(fm.model), modelSource, map, text(fm["reasoning-level"]))
-    );
+    const effective = await this.effectiveModel(path, text(fm.model), modelSource, map, text(fm["reasoning-level"]));
+    const { model, reasoning } = this.chooseModel(effective);
     const state = text(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -1206,6 +1207,7 @@ export class Repository {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
+      ...(effective.overridden ? { modelOverride: true } : {}),
       reasoning,
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",

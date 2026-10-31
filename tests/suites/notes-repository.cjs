@@ -400,16 +400,156 @@ integrationTest('legacy User Notes move to preview without losing either section
   await repo.updateNote(n.path, { preview: '' });
   assert.equal((await repo.readNote(n.path)).preview, '');
 });
-integrationTest('first AI answer seeds summary and image in preview, later answers preserve it including an explicit clear', async () => {
+integrationTest('first AI answer seeds summary and image in preview, later answers follow it until the user clears it', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Preview default');
   assert.equal((await repo.readNote(n.path)).preview, '', 'a new note has no Preview until the first answer');
   await repo.updateNote(n.path, { summary: '簡短結論', detail: '文字\n\n![相關圖片](https://example.com/image.jpg)' });
   assert.equal((await repo.readNote(n.path)).preview, '簡短結論\n\n![相關圖片](https://example.com/image.jpg)');
   await repo.updateNote(n.path, { summary: '第二次結論', detail: '新正文' });
-  assert.match((await repo.readNote(n.path)).preview, /簡短結論/);
+  assert.equal((await repo.readNote(n.path)).preview, '第二次結論', 'a later answer follows the auto-written preview (owner 2026-11-01)');
   await repo.updateNote(n.path, { preview: '' });
   await repo.updateNote(n.path, { summary: '第三次結論' });
   assert.equal((await repo.readNote(n.path)).preview, '');
+});
+integrationTest('第二次研究更新預覽: a later summary replaces the auto-written preview and keeps paragraphs appended after it', async () => {
+  const { repo, contents } = fixture(), n = await topicNote(repo, 'Follow summary');
+  await repo.updateNote(n.path, { summary: '第一次結論', detail: '正文' });
+  assert.match(contents.get(n.path), /preview-auto-hash: v1:[0-9a-f]+/);
+  await repo.updateNote(n.path, { summary: '第二次結論', detail: '新正文' });
+  assert.equal((await repo.readNote(n.path)).preview, '第二次結論');
+  contents.set(n.path, contents.get(n.path).replace('> 第二次結論', '> 第二次結論\n>\n> 我自己補的一段'));
+  await repo.updateNote(n.path, { summary: '第三次結論' });
+  assert.equal((await repo.readNote(n.path)).preview, '第三次結論\n\n我自己補的一段');
+});
+integrationTest('Rewire 形狀舊筆記更新: legacy single-paragraph preview with a User Notes image adopts the new summary once, other legacy shapes stay', async () => {
+  const { repo, contents } = fixture(), n = await topicNote(repo, 'Rewire');
+  await repo.updateNote(n.path, { summary: '舊摘要' });
+  const legacy = () => contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, '');
+  contents.set(n.path, legacy().replace('## Detail', '## User Notes\n\n![[image 2.png]]\n\n## Detail'));
+  assert.doesNotMatch(contents.get(n.path), /preview-auto-hash/);
+  assert.equal((await repo.readNote(n.path)).preview, '舊摘要\n\n![[image 2.png]]');
+  await repo.updateNote(n.path, { summary: '新摘要' });
+  assert.equal((await repo.readNote(n.path)).preview, '新摘要\n\n![[image 2.png]]');
+  assert.match(contents.get(n.path), /preview-auto-hash: v1:[0-9a-f]+/);
+  assert.doesNotMatch(contents.get(n.path), /## User Notes/);
+  const once = contents.get(n.path).replace(/^updated:.*\n/m, '');
+  await repo.updateNote(n.path, { summary: '新摘要' });
+  assert.equal(contents.get(n.path).replace(/^updated:.*\n/m, ''), once, 'running the same summary again changes nothing');
+});
+integrationTest('preview a user edited, cleared or wrote explicitly is kept when a later summary arrives', async () => {
+  const { repo, contents } = fixture(), n = await topicNote(repo, 'Owned preview');
+  await repo.updateNote(n.path, { summary: '自動結論' });
+  contents.set(n.path, contents.get(n.path).replace('> 自動結論', '> 自動結論，我改了一個字'));
+  await repo.updateNote(n.path, { summary: '新結論' });
+  assert.equal((await repo.readNote(n.path)).preview, '自動結論，我改了一個字');
+  contents.set(n.path, contents.get(n.path).replace(/> \[!info\]- 預覽\n> [^\n]*\n/, ''));
+  await repo.updateNote(n.path, { summary: '又一個結論' });
+  assert.equal((await repo.readNote(n.path)).preview, '', 'a cleared preview stays blank for a v1 hash');
+  const m = await topicNote(repo, 'Explicit preview', 'model-a', 'map-b');
+  await repo.updateNote(m.path, { summary: '自動結論' });
+  await repo.updateNote(m.path, { preview: '' });
+  assert.equal((await repo.readNote(m.path)).previewAutoHash, 'manual');
+  await repo.updateNote(m.path, { summary: '新結論' });
+  assert.equal((await repo.readNote(m.path)).preview, '', 'an explicit empty write belongs to the user');
+});
+integrationTest('legacy previews that are multi-line, a list, image-first or empty are kept and marked manual', async () => {
+  const { repo, contents } = fixture();
+  const cases = ['兩行\n第二行', '- 清單一\n\n- 清單二', '![[a.png]]\n\n文字'];
+  for (const [index, written] of cases.entries()) {
+    const n = await topicNote(repo, `Legacy ${index}`, 'model-a', `map-l${index}`);
+    await repo.updateNote(n.path, { preview: written });
+    contents.set(n.path, contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, ''));
+    await repo.updateNote(n.path, { summary: '新摘要' });
+    assert.equal((await repo.readNote(n.path)).preview, written);
+    assert.equal((await repo.readNote(n.path)).previewAutoHash, 'manual');
+  }
+  const empty = await topicNote(repo, 'Legacy empty', 'model-a', 'map-le');
+  await repo.updateNote(empty.path, { summary: '舊摘要' });
+  contents.set(empty.path, contents.get(empty.path).replace(/^preview-auto-hash:.*\n/m, '').replace(/> \[!info\]- 預覽\n> [^\n]*\n\n/, ''));
+  await repo.updateNote(empty.path, { summary: '新摘要' });
+  assert.equal((await repo.readNote(empty.path)).preview, '');
+  assert.equal((await repo.readNote(empty.path)).previewAutoHash, 'manual');
+});
+integrationTest('English notes follow the summary under the Preview heading', async () => {
+  const { repo, contents } = fixture('en'), n = await topicNote(repo, 'English follow');
+  await repo.updateNote(n.path, { summary: 'First conclusion' });
+  await repo.updateNote(n.path, { summary: 'Second conclusion' });
+  assert.match(contents.get(n.path), /> \[!info\]- Preview\n> Second conclusion/);
+  assert.doesNotMatch(contents.get(n.path), /預覽|First conclusion\n>/);
+  assert.equal((await repo.readNote(n.path)).preview, 'Second conclusion');
+});
+integrationTest('undo and redo of a summary change restore the preview text, preview-initialized and preview-auto-hash', async () => {
+  const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo preview');
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
+  view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
+  view.map = map([n]);
+  assert.equal((await repo.readNote(n.path)).previewAutoHash, '');
+  await view.noteChange(n, { summary: '第一次' });
+  const first = await repo.readNote(n.path);
+  assert.equal(first.preview, '第一次');
+  assert.match(first.previewAutoHash, /^v1:/);
+  await view.noteChange(n, { summary: '第二次' });
+  assert.equal((await repo.readNote(n.path)).preview, '第二次');
+  await view.travel(false);
+  const undone = await repo.readNote(n.path);
+  assert.equal(undone.preview, '第一次'); assert.equal(undone.previewAutoHash, first.previewAutoHash);
+  await view.travel(false);
+  const blank = await repo.readNote(n.path);
+  assert.equal(blank.preview, ''); assert.equal(blank.previewInitialized, false); assert.equal(blank.previewAutoHash, '');
+  assert.doesNotMatch(contents.get(n.path), /preview-auto-hash/, 'the key is removed again, not left empty');
+  await view.travel(true); await view.travel(true);
+  const redone = await repo.readNote(n.path);
+  assert.equal(redone.preview, '第二次'); assert.equal(redone.previewInitialized, true); assert.match(redone.previewAutoHash, /^v1:/);
+});
+integrationTest('counterexample: undo of a card summary change on a note with an unmerged User Notes image keeps the image, redo restores summary plus image (packet 1-fix F1)', async () => {
+  const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo usernotes');
+  await repo.updateNote(n.path, { summary: '舊摘要' });
+  contents.set(n.path, contents.get(n.path).replace(/^preview-auto-hash:.*\n/m, '').replace('## Detail', '## User Notes\n\n![[image 2.png]]\n\n## Detail'));
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
+  view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
+  view.map = map([n]);
+  await view.noteChange(n, { summary: '卡片改摘要' });
+  assert.equal((await repo.readNote(n.path)).preview, '卡片改摘要\n\n![[image 2.png]]');
+  await view.travel(false);
+  assert.match((await repo.readNote(n.path)).preview, /!\[\[image 2\.png\]\]/, 'undo must not drop the User Notes image');
+  assert.match(contents.get(n.path), /!\[\[image 2\.png\]\]/);
+  assert.equal((await repo.readNote(n.path)).summary, '舊摘要');
+  await view.travel(true);
+  assert.equal((await repo.readNote(n.path)).preview, '卡片改摘要\n\n![[image 2.png]]');
+});
+integrationTest('counterexample: undo of a card summary change keeps a preview the user edited afterwards, while summary is restored (packet 1-fix M2)', async () => {
+  const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo user edit');
+  await repo.updateNote(n.path, { summary: '第一次' });
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
+  view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
+  view.map = map([n]);
+  await view.noteChange(n, { summary: '第二次' });
+  assert.equal((await repo.readNote(n.path)).preview, '第二次');
+  contents.set(n.path, contents.get(n.path).replace('> 第二次', '> 第二次，我自己改的'));
+  const edited = await repo.readNote(n.path);
+  await view.travel(false);
+  const undone = await repo.readNote(n.path);
+  assert.equal(undone.summary, '第一次');
+  assert.equal(undone.preview, '第二次，我自己改的', 'the user preview survives undo');
+  assert.equal(undone.previewAutoHash, edited.previewAutoHash, 'the hash is left alone with it');
+});
+integrationTest('counterexample: undo of a card summary change keeps a User Notes section added afterwards inside the preview (packet 1-fix2 R2-M1)', async () => {
+  const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Undo new usernotes');
+  await repo.updateNote(n.path, { summary: '第一次' });
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, { repo, rebuildDerivedData: async () => {} });
+  view.refreshCard = () => {}; view.updateHistoryButtons = () => {}; view.render = () => {}; view.hydrate = async () => {};
+  view.map = map([n]);
+  await view.noteChange(n, { summary: '第二次' });
+  contents.set(n.path, contents.get(n.path).replace(/\n*$/, '\n\n## User Notes\n\n後來手加的內容\n'));
+  await view.travel(false);
+  const undone = await repo.readNote(n.path);
+  assert.equal(undone.summary, '第一次');
+  assert.match(undone.preview, /後來手加的內容/, 'the new User Notes text survives undo');
+  assert.match(contents.get(n.path), /後來手加的內容/);
 });
 integrationTest('AI answer cannot replace preview edited while task was running', async () => {
   const { repo } = fixture(), n = await topicNote(repo, 'Manual preview');

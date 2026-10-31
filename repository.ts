@@ -26,6 +26,7 @@ import { fencedLines } from "./ai/markdown-blocks";
 import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
 import { findWikilinks, linkPathOf, rewriteLinkTargets, splitFrontmatter } from "./core/link-rewrite";
 import { rewriteCopiedLinks } from "./core/copy-links";
+import { contentHash } from "./core/map-chat-context";
 import {
   managedHeadingValue,
   managedSectionValue,
@@ -78,6 +79,8 @@ export interface Note {
   preview: string;
   previewSection?: string;
   previewInitialized?: boolean;
+  /** `""` = no `preview-auto-hash` key; `"manual"` = the user owns the preview; `"v1:<hex>"` = hash of the last auto-written text. */
+  previewAutoHash: string;
   model: string;
   modelSource: ModelSource;
   /** True when the topic runs on its own model: a manual choice, or one inherited from a manual ancestor (the card shows a tag). */
@@ -703,6 +706,46 @@ function initialPreview(summary: string, detail: string): string {
   return [summary.trim(), image].filter(Boolean).join("\n\n");
 }
 
+const PREVIEW_MANUAL = "manual";
+const normalizePreviewText = (value: string): string =>
+  value
+    .normalize("NFC")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+const previewHash = (value: string): string => `v1:${contentHash(normalizePreviewText(value))}`;
+const readPreviewAutoHash = (value: unknown): string =>
+  typeof value === "string" && (value === PREVIEW_MANUAL || /^v1:[0-9a-f]{14}$/.test(value)) ? value : "";
+const LEGACY_PREVIEW_BLOCK_START = /^(?:#|>|-|\*|\+|\||<|!|```|\d+[.)])/;
+const LEGACY_PREVIEW_IMAGE = /^!\[[^\]]*\]\(https?:\/\/[^)\s]+\)$/;
+
+/** What a new summary does to the preview: the new preview text (null = leave it) and the hash to store. */
+function followedPreview(
+  current: string,
+  auto: string,
+  hash: string,
+  initialized: boolean
+): { preview: string | null; hash: string } {
+  if (hash === PREVIEW_MANUAL) return { preview: null, hash };
+  const text = isPlaceholder(current) ? "" : normalizePreviewText(current);
+  const paragraphs = text ? text.split("\n\n") : [];
+  const replaceFirst = (count: number): { preview: string; hash: string } => ({
+    preview: [auto, ...paragraphs.slice(count)].join("\n\n"),
+    hash: previewHash(auto)
+  });
+  if (hash) {
+    for (let k = 1; k <= paragraphs.length; k++)
+      if (previewHash(paragraphs.slice(0, k).join("\n\n")) === hash) return replaceFirst(k);
+    return { preview: null, hash };
+  }
+  if (!initialized) return text ? { preview: null, hash: PREVIEW_MANUAL } : replaceFirst(0);
+  const [first, second] = paragraphs;
+  if (!first || first.includes("\n") || LEGACY_PREVIEW_BLOCK_START.test(first))
+    return { preview: null, hash: PREVIEW_MANUAL };
+  return replaceFirst(second !== undefined && LEGACY_PREVIEW_IMAGE.test(second) ? 2 : 1);
+}
+
 function noteBody(
   title: string,
   summary: string,
@@ -1215,6 +1258,7 @@ export class Repository {
       preview: [previewSection(content), section(content, "User Notes")].filter(Boolean).join("\n\n"),
       previewSection: previewSection(content),
       previewInitialized: fm["preview-initialized"] === true,
+      previewAutoHash: readPreviewAutoHash(fm["preview-auto-hash"]),
       model,
       modelSource,
       ...(effective.overridden ? { modelOverride: true } : {}),
@@ -1354,20 +1398,23 @@ export class Repository {
     if (patch.preview !== undefined) {
       body = replaceSection(body, previewHeading(language), patch.preview);
       fm["preview-initialized"] = true;
+      fm["preview-auto-hash"] = PREVIEW_MANUAL;
     } else if (patch.previewSection !== undefined) {
       body = replaceSection(body, previewHeading(language), patch.previewSection);
-    } else if (
-      patch.summary !== undefined &&
-      patch.summary.trim() &&
-      !isPlaceholder(patch.summary) &&
-      fm["preview-initialized"] !== true
-    ) {
-      const preview = previewSection(body).trim();
-      if (!preview || isPlaceholder(preview))
-        body = replaceSection(body, previewHeading(language), initialPreview(patch.summary, section(body, "Detail")));
+    } else if (patch.summary !== undefined && patch.summary.trim() && !isPlaceholder(patch.summary)) {
+      const result = followedPreview(
+        previewSection(body),
+        initialPreview(patch.summary, section(body, "Detail")),
+        readPreviewAutoHash(fm["preview-auto-hash"]),
+        fm["preview-initialized"] === true
+      );
+      if (result.preview !== null) body = replaceSection(body, previewHeading(language), result.preview);
+      fm["preview-auto-hash"] = result.hash;
       fm["preview-initialized"] = true;
     }
     if (patch.previewInitialized !== undefined) fm["preview-initialized"] = patch.previewInitialized;
+    if (patch.previewAutoHash !== undefined)
+      patch.previewAutoHash ? (fm["preview-auto-hash"] = patch.previewAutoHash) : delete fm["preview-auto-hash"];
     body = normalizeBodyOrder(
       body,
       text(fm.title, path.replace(/\.md$/, "")),

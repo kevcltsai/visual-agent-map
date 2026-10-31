@@ -7349,8 +7349,18 @@ export class VisualAgentMapView extends ItemView {
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
     for (const key of Object.keys(patch) as (keyof Note)[]) (before as Record<string, unknown>)[key] = current[key];
+    // A summary can rewrite the preview, so its undo restores the preview text and its bookkeeping too. The text is the
+    // merged preview (callout plus any unmerged legacy User Notes), since the write folds that section into the callout.
+    const followsSummary =
+      patch.summary !== undefined && patch.preview === undefined && patch.previewSection === undefined;
+    if (followsSummary) {
+      before.previewSection = current.preview;
+      before.previewInitialized = current.previewInitialized;
+      before.previewAutoHash = current.previewAutoHash;
+    }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
     await this.plugin.repo.updateNote(node.path, patch);
+    const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
       this.plugin.pendingSuggestions.delete(node.path);
       this.plugin.pendingResearchOptions.delete(node.path);
@@ -7372,7 +7382,20 @@ export class VisualAgentMapView extends ItemView {
     )
       this.plugin.activeTasks?.get(node.path)?.abort();
     this.history.push({
-      undo: () => this.plugin.repo.updateNote(node.path, before),
+      undo: async () => {
+        let restore = before;
+        if (written) {
+          // The preview is put back only while it is still exactly what this change wrote; a later edit of it stays.
+          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+          if (latest.preview !== written.preview || latest.previewAutoHash !== written.previewAutoHash) {
+            restore = { ...before };
+            delete restore.previewSection;
+            delete restore.previewInitialized;
+            delete restore.previewAutoHash;
+          }
+        }
+        await this.plugin.repo.updateNote(node.path, restore);
+      },
       redo: () => this.plugin.repo.updateNote(node.path, patch)
     });
     this.notes.set(node.id, await this.plugin.repo.readNote(node.path, this.map ?? undefined));
@@ -12381,6 +12404,7 @@ export class VisualAgentMapView extends ItemView {
               "newFindings",
               "previewSection",
               "previewInitialized",
+              "previewAutoHash",
               "status",
               "lastError",
               "detailFormatIssues"
@@ -16348,6 +16372,7 @@ export class VisualAgentMapView extends ItemView {
               "newFindings",
               "previewSection",
               "previewInitialized",
+              "previewAutoHash",
               "status",
               "lastError",
               "researchMode"

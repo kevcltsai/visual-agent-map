@@ -173,13 +173,17 @@ integrationTest('a successful AI task immediately updates summary and MD detail'
   assert.match(updated.detail, /Existing detail/);
   assert.doesNotMatch(contents.get(n.path), /## Working Findings/);
   assert.equal(updated.previewInitialized, true);
+  assert.match(updated.previewAutoHash, /^v1:/);
   await view.travel(false);
   const restored = await repo.readNote(n.path);
   assert.equal(restored.status, 'idea');
   assert.equal(restored.previewInitialized, false);
   assert.doesNotMatch(restored.previewSection, /Direct summary/);
+  assert.equal(restored.previewAutoHash, '');
+  assert.doesNotMatch(contents.get(n.path), /preview-auto-hash/);
   await view.travel(true);
   assert.equal((await repo.readNote(n.path)).previewInitialized, true);
+  assert.match((await repo.readNote(n.path)).previewAutoHash, /^v1:/);
 });
 integrationTest('cancelling a node task keeps its earlier Markdown and status', async () => {
   const { repo, app } = fixture(), n = await topicNote(repo, 'Cancel');

@@ -65,6 +65,7 @@ export function builtInSample(language: NoteLanguage, useEmbeddedAssets = true):
     notes.set(node.id, {
       ...note,
       preview: useEmbeddedAssets ? embedAssets(note.preview) : note.preview,
+      previewAutoHash: "",
       detail: useEmbeddedAssets ? embedAssets(note.detail) : note.detail,
       visualReferences: "",
       newFindings: "",

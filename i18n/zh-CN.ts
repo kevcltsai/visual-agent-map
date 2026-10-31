@@ -2037,6 +2037,13 @@ export const zhCN: Record<TranslationKey, string> = {
   "share.viewer_ai_translated_unknown": "由 AI 翻译。",
   "share.viewer_original_text": "原文",
   "share.viewer_image_text_untranslated": "图片里的文字没有翻译。",
+  "share.viewer_markers_0": "标记：{0}",
+  "share.viewer_marker_done": "完成",
+  "share.viewer_marker_warning": "警告",
+  "share.viewer_marker_star": "星标",
+  "share.viewer_marker_priority_1": "优先 1",
+  "share.viewer_marker_priority_2": "优先 2",
+  "share.viewer_marker_priority_3": "优先 3",
   // Share dialog
   "share.command": "分享这张地图",
   "share.button": "分享这张地图",

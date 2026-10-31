@@ -2054,6 +2054,13 @@ var en = {
   "share.viewer_ai_translated_unknown": "Translated by AI.",
   "share.viewer_original_text": "Original",
   "share.viewer_image_text_untranslated": "Text inside images is not translated.",
+  "share.viewer_markers_0": "Markers: {0}",
+  "share.viewer_marker_done": "Done",
+  "share.viewer_marker_warning": "Warning",
+  "share.viewer_marker_star": "Star",
+  "share.viewer_marker_priority_1": "Priority 1",
+  "share.viewer_marker_priority_2": "Priority 2",
+  "share.viewer_marker_priority_3": "Priority 3",
   // Share dialog
   "share.command": "Share this map",
   "share.button": "Share this map",
@@ -4088,6 +4095,13 @@ var zhCN = {
   "share.viewer_ai_translated_unknown": "\u7531 AI \u7FFB\u8BD1\u3002",
   "share.viewer_original_text": "\u539F\u6587",
   "share.viewer_image_text_untranslated": "\u56FE\u7247\u91CC\u7684\u6587\u5B57\u6CA1\u6709\u7FFB\u8BD1\u3002",
+  "share.viewer_markers_0": "\u6807\u8BB0\uFF1A{0}",
+  "share.viewer_marker_done": "\u5B8C\u6210",
+  "share.viewer_marker_warning": "\u8B66\u544A",
+  "share.viewer_marker_star": "\u661F\u6807",
+  "share.viewer_marker_priority_1": "\u4F18\u5148 1",
+  "share.viewer_marker_priority_2": "\u4F18\u5148 2",
+  "share.viewer_marker_priority_3": "\u4F18\u5148 3",
   // Share dialog
   "share.command": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
   "share.button": "\u5206\u4EAB\u8FD9\u5F20\u5730\u56FE",
@@ -6122,6 +6136,13 @@ var zhTW = {
   "share.viewer_ai_translated_unknown": "\u7531 AI \u7FFB\u8B6F\u3002",
   "share.viewer_original_text": "\u539F\u6587",
   "share.viewer_image_text_untranslated": "\u5716\u7247\u88E1\u7684\u6587\u5B57\u6C92\u6709\u7FFB\u8B6F\u3002",
+  "share.viewer_markers_0": "\u6A19\u8A18\uFF1A{0}",
+  "share.viewer_marker_done": "\u5B8C\u6210",
+  "share.viewer_marker_warning": "\u8B66\u544A",
+  "share.viewer_marker_star": "\u661F\u865F",
+  "share.viewer_marker_priority_1": "\u512A\u5148 1",
+  "share.viewer_marker_priority_2": "\u512A\u5148 2",
+  "share.viewer_marker_priority_3": "\u512A\u5148 3",
   // Share dialog
   "share.command": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
   "share.button": "\u5206\u4EAB\u9019\u5F35\u5FC3\u667A\u5716",
@@ -54707,41 +54728,6 @@ var SHARE_VIEWER_UI_EXTRA = {
     }
   }
 };
-var SHARE_MARKER_TEXT = {
-  en: {
-    markerLabel: "Markers: {0}",
-    markerNames: {
-      done: "Done",
-      warning: "Warning",
-      star: "Star",
-      "priority-1": "Priority 1",
-      "priority-2": "Priority 2",
-      "priority-3": "Priority 3"
-    }
-  },
-  "zh-TW": {
-    markerLabel: "\u6A19\u8A18\uFF1A{0}",
-    markerNames: {
-      done: "\u5B8C\u6210",
-      warning: "\u8B66\u544A",
-      star: "\u661F\u865F",
-      "priority-1": "\u512A\u5148 1",
-      "priority-2": "\u512A\u5148 2",
-      "priority-3": "\u512A\u5148 3"
-    }
-  },
-  "zh-CN": {
-    markerLabel: "\u6807\u8BB0\uFF1A{0}",
-    markerNames: {
-      done: "\u5B8C\u6210",
-      warning: "\u8B66\u544A",
-      star: "\u661F\u6807",
-      "priority-1": "\u4F18\u5148 1",
-      "priority-2": "\u4F18\u5148 2",
-      "priority-3": "\u4F18\u5148 3"
-    }
-  }
-};
 
 // experiences/sharing/share-viewer-text.ts
 function shareViewerUiFor(language2) {
@@ -54784,8 +54770,15 @@ function shareViewerUiFor(language2) {
     aiTranslatedUnknown: text11("share.viewer_ai_translated_unknown"),
     originalText: text11("share.viewer_original_text"),
     imageTextUntranslated: text11("share.viewer_image_text_untranslated"),
-    markerLabel: SHARE_MARKER_TEXT[language2].markerLabel,
-    markerNames: { ...SHARE_MARKER_TEXT[language2].markerNames }
+    markerLabel: text11("share.viewer_markers_0"),
+    markerNames: {
+      done: text11("share.viewer_marker_done"),
+      warning: text11("share.viewer_marker_warning"),
+      star: text11("share.viewer_marker_star"),
+      "priority-1": text11("share.viewer_marker_priority_1"),
+      "priority-2": text11("share.viewer_marker_priority_2"),
+      "priority-3": text11("share.viewer_marker_priority_3")
+    }
   };
 }
 var PLUGIN_LANGUAGE_IDS = LANGUAGES.map((item) => item.id);

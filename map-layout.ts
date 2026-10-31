@@ -4,9 +4,14 @@ import { fishbonePositions } from "./layouts/fishbone";
 import { radialPositions } from "./layouts/radial";
 import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
-import { parentIdsForNode, type MapNode } from "./map-graph";
+import { CARD_WIDTH, parentIdsForNode, type MapNode } from "./map-graph";
 
 const WIDTH = 300;
+
+/** How far a card sticks out past the standard width; cards at or under the standard width add nothing. */
+function widthExcess(node: MapNode): number {
+  return Math.max(0, (node.width ?? CARD_WIDTH) - CARD_WIDTH);
+}
 /** Vertical space kept between two stacked cards at the standard spacing, in canvas units. */
 export const LAYOUT_GAP = 24;
 
@@ -151,12 +156,15 @@ function horizontalPositions(input: HorizontalInput): {
   const result = new Map<string, { x: number; y: number }>();
   const sizes = new Map<string, number>();
   const spans = new Map<string, number>();
+  const depths = new Map<string, number>();
+  const byId = new Map<string, MapNode>();
   /** Total height of stacked subtrees, with the fixed gap between neighbours. */
   const stackHeight = (list: MapNode[]) =>
     list.reduce((total, item) => total + sizes.get(item.id)!, 0) + Math.max(0, list.length - 1) * LAYOUT_GAP;
   const measure = (node: MapNode): void => {
     const kids = kidsOf(node);
     const extra = joinsOf(node);
+    byId.set(node.id, node);
     for (const child of [...kids, ...extra]) measure(child);
     sizes.set(node.id, Math.max(heightFor(node), stackHeight(kids), stackHeight(extra)));
     spans.set(node.id, 1 + Math.max(0, ...kids.map(kid => spans.get(kid.id)!)));
@@ -185,7 +193,8 @@ function horizontalPositions(input: HorizontalInput): {
       const last = ys[ys.length - 1] + heightFor(list[list.length - 1]) / 2;
       y = (first + last) / 2 - own / 2;
     }
-    result.set(node.id, { x: left + sign * depth * COLUMN, y: top + y });
+    result.set(node.id, { x: 0, y: top + y });
+    depths.set(node.id, depth);
     return y;
   };
   let offset = 0;
@@ -193,6 +202,19 @@ function horizontalPositions(input: HorizontalInput): {
     measure(root);
     place(root, 0, offset);
     offset += sizes.get(root.id)! + LAYOUT_GAP;
+  }
+  // A wider card pushes the columns after it (right) or itself (left) further out; without custom widths every excess is 0.
+  const widest: number[] = [];
+  for (const [id, depth] of depths) widest[depth] = Math.max(widest[depth] ?? 0, widthExcess(byId.get(id)!));
+  const shiftAt = (depth: number) => {
+    let total = 0;
+    if (sign > 0) for (let k = 0; k < depth; k++) total += widest[k] ?? 0;
+    else for (let k = 1; k <= depth; k++) total += widest[k] ?? 0;
+    return total;
+  };
+  for (const [id, point] of result) {
+    const depth = depths.get(id)!;
+    point.x = left + sign * (depth * COLUMN + shiftAt(depth));
   }
   return { placed: result, sizes };
 }
@@ -207,7 +229,7 @@ function balancedPositions(
   input: HorizontalInput,
   reset: boolean
 ): Map<string, { x: number; y: number }> {
-  const { roots, kidsOf, joinsOf, heightFor, column, gap, left, top } = input;
+  const { roots, kidsOf, joinsOf, heightFor, gap, left, top } = input;
   const sizes = horizontalPositions({ ...input, sign: 1 }).sizes;
   const byId = new Map(nodes.map(node => [node.id, node]));
   const halves = roots.map(root => {
@@ -230,11 +252,8 @@ function balancedPositions(
       }).placed;
     return { root, right: half("right"), left: half("left") };
   });
-  const reach = Math.max(
-    0,
-    ...halves.flatMap(({ left: placed }) => [...placed.values()].map(point => Math.round(-point.x / column)))
-  );
-  const rootX = left + reach * column;
+  const reach = Math.max(0, ...halves.flatMap(({ left: placed }) => [...placed.values()].map(point => -point.x)));
+  const rootX = left + reach;
   const result = new Map<string, { x: number; y: number }>();
   let offset = 0;
   for (const { root, right, left: leftHalf } of halves) {
@@ -485,7 +504,12 @@ export function arrangeNewBranch(
   if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
   if (direction === "balanced")
     return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
-  const placed = positions(fresh, roots, parent.x + signOf(direction) * COLUMN, 0, false, heightOf, layout);
+  // Wide cards need room: a wide parent pushes its children right; wide new children step further left.
+  const startX =
+    signOf(direction) > 0
+      ? parent.x + COLUMN + widthExcess(parent)
+      : parent.x - COLUMN - Math.max(0, ...roots.map(widthExcess));
+  const placed = positions(fresh, roots, startX, 0, false, heightOf, layout);
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;

@@ -565,6 +565,9 @@ var en = {
   "ui.rename_topic": "Rename",
   "ui.paste_outline_add_many": "Paste an outline to add several topics at once",
   "ui.topic_more_options": "More ways to add topics",
+  "ui.topic_cover": "Topic cover",
+  "ui.topic_cover_off": "Turn card cover off",
+  "ui.topic_cover_on": "Turn card cover on",
   "ui.topic_kind_topic": "Topic",
   "ui.topic_kind_atomic": "Atomic knowledge",
   "ui.topic_kind_hypothesis": "Hypothesis",
@@ -699,6 +702,33 @@ var en = {
   "ui.zoom_out": "Zoom out",
   "ui.zoom_in": "Zoom in",
   "ui.show_all": "Show all",
+  "ui.canvas_images_group": "Canvas images",
+  "ui.canvas_image_label": "Image: {0}",
+  "ui.canvas_image_insert": "Insert image\u2026",
+  "ui.canvas_image_refused": "Not added: {0} is not a PNG, JPEG, GIF or WebP image.",
+  "ui.canvas_image_too_large": "Not added: {0} is larger than 10 MB.",
+  "ui.canvas_image_unreadable": "Not added: {0} could not be read.",
+  "ui.canvas_boundaries_group": "Frames",
+  "ui.canvas_boundary_label": "Frame: {0}",
+  "ui.canvas_boundary_default": "Frame",
+  "ui.canvas_boundary_add": "Add frame",
+  "ui.canvas_boundary_name": "Frame label (optional)",
+  "ui.canvas_boundary_edit": "Edit frame label\u2026",
+  "ui.canvas_boundary_remove": "Remove frame",
+  "ui.export_map": "Export map",
+  "ui.export_png_vault": "Save PNG image in the Vault",
+  "ui.export_png_download": "Download PNG image",
+  "ui.export_svg_vault": "Save SVG image in the Vault",
+  "ui.export_svg_download": "Download SVG image",
+  "ui.export_md_vault": "Save Markdown outline in the Vault",
+  "ui.export_md_download": "Download Markdown outline",
+  "ui.export_saved": "Saved {0} in the Vault.",
+  "ui.export_downloaded": "Downloaded {0}.",
+  "ui.export_scaled": "This map is large, so the image was scaled down to fit {0} px.",
+  "ui.export_refused_pixels": "This map is too large to export as an image (over 64 million pixels).",
+  "ui.export_refused_embedded": "The pictures on this map add up to more than 50 MB, so it cannot be exported.",
+  "ui.export_empty": "There is nothing to export.",
+  "ui.export_failed": "Export failed: {0}",
   "ui.zoom_level_0_reset": "Zoom {0}, reset to 100%",
   "ui.new_map": "\uFF0B New map",
   "ui.researched": "Researched",
@@ -2671,6 +2701,9 @@ var zhCN = {
   "ui.rename_topic": "\u91CD\u547D\u540D",
   "ui.paste_outline_add_many": "\u7C98\u8D34\u5927\u7EB2\uFF0C\u4E00\u6B21\u6DFB\u52A0\u591A\u4E2A",
   "ui.topic_more_options": "\u66F4\u591A\u6DFB\u52A0\u8BAE\u9898\u7684\u65B9\u5F0F",
+  "ui.topic_cover": "\u8BAE\u9898\u5C01\u9762",
+  "ui.topic_cover_off": "\u5173\u95ED\u5361\u7247\u5C01\u9762",
+  "ui.topic_cover_on": "\u5F00\u542F\u5361\u7247\u5C01\u9762",
   "ui.topic_kind_topic": "\u4E00\u822C\u8BAE\u9898",
   "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8BC6",
   "ui.topic_kind_hypothesis": "\u5047\u8BBE",
@@ -2805,6 +2838,33 @@ var zhCN = {
   "ui.zoom_out": "\u7F29\u5C0F",
   "ui.zoom_in": "\u653E\u5927",
   "ui.show_all": "\u663E\u793A\u5168\u90E8",
+  "ui.canvas_images_group": "\u753B\u5E03\u56FE\u7247",
+  "ui.canvas_image_label": "\u56FE\u7247\uFF1A{0}",
+  "ui.canvas_image_insert": "\u63D2\u5165\u56FE\u7247\u2026",
+  "ui.canvas_image_refused": "\u672A\u52A0\u5165\uFF1A{0} \u4E0D\u662F PNG\u3001JPEG\u3001GIF \u6216 WebP \u56FE\u7247\u3002",
+  "ui.canvas_image_too_large": "\u672A\u52A0\u5165\uFF1A{0} \u8D85\u8FC7 10 MB\u3002",
+  "ui.canvas_image_unreadable": "\u672A\u52A0\u5165\uFF1A\u65E0\u6CD5\u8BFB\u53D6 {0}\u3002",
+  "ui.canvas_boundaries_group": "\u5916\u6846",
+  "ui.canvas_boundary_label": "\u5916\u6846\uFF1A{0}",
+  "ui.canvas_boundary_default": "\u5916\u6846",
+  "ui.canvas_boundary_add": "\u52A0\u5916\u6846",
+  "ui.canvas_boundary_name": "\u5916\u6846\u6807\u7B7E\uFF08\u53EF\u7559\u7A7A\uFF09",
+  "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6807\u7B7E\u2026",
+  "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
+  "ui.export_map": "\u5BFC\u51FA\u5730\u56FE",
+  "ui.export_png_vault": "\u5C06 PNG \u56FE\u7247\u5B58\u5165 Vault",
+  "ui.export_png_download": "\u4E0B\u8F7D PNG \u56FE\u7247",
+  "ui.export_svg_vault": "\u5C06 SVG \u56FE\u7247\u5B58\u5165 Vault",
+  "ui.export_svg_download": "\u4E0B\u8F7D SVG \u56FE\u7247",
+  "ui.export_md_vault": "\u5C06 Markdown \u5927\u7EB2\u5B58\u5165 Vault",
+  "ui.export_md_download": "\u4E0B\u8F7D Markdown \u5927\u7EB2",
+  "ui.export_saved": "\u5DF2\u5C06 {0} \u5B58\u5165 Vault\u3002",
+  "ui.export_downloaded": "\u5DF2\u4E0B\u8F7D {0}\u3002",
+  "ui.export_scaled": "\u8FD9\u5F20\u5730\u56FE\u5F88\u5927\uFF0C\u56FE\u7247\u5DF2\u7F29\u5C0F\u5230 {0} px \u4EE5\u5185\u3002",
+  "ui.export_refused_pixels": "\u8FD9\u5F20\u5730\u56FE\u592A\u5927\uFF0C\u65E0\u6CD5\u5BFC\u51FA\u4E3A\u56FE\u7247\uFF08\u8D85\u8FC7 6,400 \u4E07\u50CF\u7D20\uFF09\u3002",
+  "ui.export_refused_embedded": "\u5730\u56FE\u4E0A\u7684\u56FE\u7247\u5408\u8BA1\u8D85\u8FC7 50 MB\uFF0C\u65E0\u6CD5\u5BFC\u51FA\u3002",
+  "ui.export_empty": "\u6CA1\u6709\u53EF\u5BFC\u51FA\u7684\u5185\u5BB9\u3002",
+  "ui.export_failed": "\u5BFC\u51FA\u5931\u8D25\uFF1A{0}",
   "ui.zoom_level_0_reset": "\u5F53\u524D\u7F29\u653E {0}\uFF0C\u6309\u4E00\u4E0B\u91CD\u8BBE\u4E3A 100%",
   "ui.new_map": "\uFF0B \u6DFB\u52A0\u5FC3\u667A\u56FE",
   "ui.researched": "\u5DF2\u7814\u7A76",
@@ -4777,6 +4837,9 @@ var zhTW = {
   "ui.rename_topic": "\u91CD\u65B0\u547D\u540D",
   "ui.paste_outline_add_many": "\u8CBC\u4E0A\u5927\u7DB1\uFF0C\u4E00\u6B21\u65B0\u589E\u591A\u500B",
   "ui.topic_more_options": "\u66F4\u591A\u65B0\u589E\u8B70\u984C\u7684\u65B9\u5F0F",
+  "ui.topic_cover": "\u8B70\u984C\u5C01\u9762",
+  "ui.topic_cover_off": "\u95DC\u9589\u5361\u7247\u5C01\u9762",
+  "ui.topic_cover_on": "\u958B\u555F\u5361\u7247\u5C01\u9762",
   "ui.topic_kind_topic": "\u4E00\u822C\u8B70\u984C",
   "ui.topic_kind_atomic": "\u539F\u5B50\u77E5\u8B58",
   "ui.topic_kind_hypothesis": "\u5047\u8A2D",
@@ -4911,6 +4974,33 @@ var zhTW = {
   "ui.zoom_out": "\u7E2E\u5C0F",
   "ui.zoom_in": "\u653E\u5927",
   "ui.show_all": "\u986F\u793A\u5168\u90E8",
+  "ui.canvas_images_group": "\u756B\u5E03\u5716\u7247",
+  "ui.canvas_image_label": "\u5716\u7247\uFF1A{0}",
+  "ui.canvas_image_insert": "\u63D2\u5165\u5716\u7247\u2026",
+  "ui.canvas_image_refused": "\u672A\u52A0\u5165\uFF1A{0} \u4E0D\u662F PNG\u3001JPEG\u3001GIF \u6216 WebP \u5716\u7247\u3002",
+  "ui.canvas_image_too_large": "\u672A\u52A0\u5165\uFF1A{0} \u8D85\u904E 10 MB\u3002",
+  "ui.canvas_image_unreadable": "\u672A\u52A0\u5165\uFF1A\u7121\u6CD5\u8B80\u53D6 {0}\u3002",
+  "ui.canvas_boundaries_group": "\u5916\u6846",
+  "ui.canvas_boundary_label": "\u5916\u6846\uFF1A{0}",
+  "ui.canvas_boundary_default": "\u5916\u6846",
+  "ui.canvas_boundary_add": "\u52A0\u5916\u6846",
+  "ui.canvas_boundary_name": "\u5916\u6846\u6A19\u7C64\uFF08\u53EF\u7559\u7A7A\uFF09",
+  "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6A19\u7C64\u2026",
+  "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
+  "ui.export_map": "\u532F\u51FA\u5FC3\u667A\u5716",
+  "ui.export_png_vault": "\u5C07 PNG \u5716\u7247\u5B58\u9032 Vault",
+  "ui.export_png_download": "\u4E0B\u8F09 PNG \u5716\u7247",
+  "ui.export_svg_vault": "\u5C07 SVG \u5716\u7247\u5B58\u9032 Vault",
+  "ui.export_svg_download": "\u4E0B\u8F09 SVG \u5716\u7247",
+  "ui.export_md_vault": "\u5C07 Markdown \u5927\u7DB1\u5B58\u9032 Vault",
+  "ui.export_md_download": "\u4E0B\u8F09 Markdown \u5927\u7DB1",
+  "ui.export_saved": "\u5DF2\u5C07 {0} \u5B58\u9032 Vault\u3002",
+  "ui.export_downloaded": "\u5DF2\u4E0B\u8F09 {0}\u3002",
+  "ui.export_scaled": "\u9019\u5F35\u5FC3\u667A\u5716\u5F88\u5927\uFF0C\u5716\u7247\u5DF2\u7E2E\u5C0F\u5230 {0} px \u4EE5\u5167\u3002",
+  "ui.export_refused_pixels": "\u9019\u5F35\u5FC3\u667A\u5716\u592A\u5927\uFF0C\u7121\u6CD5\u532F\u51FA\u6210\u5716\u7247\uFF08\u8D85\u904E 6,400 \u842C\u50CF\u7D20\uFF09\u3002",
+  "ui.export_refused_embedded": "\u5FC3\u667A\u5716\u4E0A\u7684\u5716\u7247\u5408\u8A08\u8D85\u904E 50 MB\uFF0C\u7121\u6CD5\u532F\u51FA\u3002",
+  "ui.export_empty": "\u6C92\u6709\u53EF\u532F\u51FA\u7684\u5167\u5BB9\u3002",
+  "ui.export_failed": "\u532F\u51FA\u5931\u6557\uFF1A{0}",
   "ui.zoom_level_0_reset": "\u76EE\u524D\u7E2E\u653E {0}\uFF0C\u6309\u4E00\u4E0B\u91CD\u8A2D\u70BA 100%",
   "ui.new_map": "\uFF0B \u65B0\u589E\u5FC3\u667A\u5716",
   "ui.researched": "\u5DF2\u7814\u7A76",
@@ -6866,8 +6956,8 @@ function naturalSize(svg) {
   const box = ((_a2 = svg.getAttribute("viewBox")) != null ? _a2 : "").trim().split(/[\s,]+/).map(Number);
   if (box.length === 4 && box.every(Number.isFinite) && box[2] > 0 && box[3] > 0)
     return { width: box[2], height: box[3] };
-  const rect = svg.getBoundingClientRect();
-  return { width: rect.width || 300, height: rect.height || 150 };
+  const rect2 = svg.getBoundingClientRect();
+  return { width: rect2.width || 300, height: rect2.height || 150 };
 }
 var MermaidZoomModal = class extends import_obsidian2.Modal {
   constructor(app, source, trigger) {
@@ -6991,8 +7081,8 @@ var MermaidZoomModal = class extends import_obsidian2.Modal {
   }
   local(event) {
     var _a2, _b2, _c;
-    const rect = (_a2 = this.viewport) == null ? void 0 : _a2.getBoundingClientRect();
-    return { x: event.clientX - ((_b2 = rect == null ? void 0 : rect.left) != null ? _b2 : 0), y: event.clientY - ((_c = rect == null ? void 0 : rect.top) != null ? _c : 0) };
+    const rect2 = (_a2 = this.viewport) == null ? void 0 : _a2.getBoundingClientRect();
+    return { x: event.clientX - ((_b2 = rect2 == null ? void 0 : rect2.left) != null ? _b2 : 0), y: event.clientY - ((_c = rect2 == null ? void 0 : rect2.top) != null ? _c : 0) };
   }
   onWheel(event) {
     event.preventDefault();
@@ -15895,6 +15985,433 @@ function resolveAimNoteLanguage(map, uiLanguage) {
   return noteLanguageOf(resolveAimContentLanguage(map, uiLanguage));
 }
 
+// experiences/visual-map/canvas-items.ts
+var IMAGE_MIN_SIZE = 24;
+var ID = /^[A-Za-z0-9_-]{1,64}$/;
+var IMAGE_EXTENSION = /\.(png|jpe?g|gif|webp)$/i;
+var SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+var CONTROL = /[\u0000-\u001f\u007f]/;
+var CONTROL_ALL = /[\u0000-\u001f\u007f]/g;
+var LABEL_LIMIT = 200;
+var MEMBER_LIMIT = 500;
+var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+var finite = (v) => typeof v === "number" && Number.isFinite(v);
+function isSafeImagePath(path) {
+  if (typeof path !== "string" || path.length === 0 || path.length > 1024) return false;
+  if (CONTROL.test(path) || path.includes("\\") || SCHEME.test(path) || path.startsWith("/") || path.startsWith("//"))
+    return false;
+  if (path.split("/").some((part) => part === ".." || part === "." || part === "")) return false;
+  return IMAGE_EXTENSION.test(path);
+}
+function cleanImage(raw) {
+  const { id, path, x, y, w, h } = raw;
+  if (typeof id !== "string" || !ID.test(id) || !isSafeImagePath(path)) return null;
+  if (!finite(x) || !finite(y) || !finite(w) || !finite(h) || w <= 0 || h <= 0) return null;
+  return { id, kind: "image", path, x, y, w, h };
+}
+function cleanBoundary(raw) {
+  const { id, members, label } = raw;
+  if (typeof id !== "string" || !ID.test(id) || !Array.isArray(members) || members.length > MEMBER_LIMIT) return null;
+  if (!members.every((m) => typeof m === "string" && ID.test(m))) return null;
+  const item = { id, kind: "boundary", members: [...new Set(members)] };
+  if (typeof label === "string" && label.trim())
+    item.label = label.replace(CONTROL_ALL, " ").trim().slice(0, LABEL_LIMIT);
+  return item;
+}
+function sanitizeCanvasItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of raw) {
+    if (!isRecord(entry) || typeof entry.kind !== "string") continue;
+    let item;
+    if (entry.kind === "image") item = cleanImage(entry);
+    else if (entry.kind === "boundary") item = cleanBoundary(entry);
+    else item = entry;
+    if (!item) continue;
+    if (item.kind === "image" || item.kind === "boundary") {
+      const id = item.id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+    }
+    out.push(item);
+  }
+  return out;
+}
+function addImage(items, image) {
+  const clean4 = cleanImage({ ...image, kind: "image" });
+  if (!clean4 || items.some((i) => i.kind === "image" && i.id === clean4.id)) return [...items];
+  return [...items, clean4];
+}
+var isImage = (item, id) => item.kind === "image" && item.id === id;
+function moveItem(items, id, dx, dy) {
+  if (!finite(dx) || !finite(dy)) return [...items];
+  return items.map((item) => isImage(item, id) ? { ...item, x: item.x + dx, y: item.y + dy } : item);
+}
+function resizeKeepRatio(items, id, width) {
+  if (!finite(width)) return [...items];
+  return items.map((item) => {
+    if (!isImage(item, id)) return item;
+    const ratio = item.h / item.w;
+    const w = Math.max(width, IMAGE_MIN_SIZE, IMAGE_MIN_SIZE / ratio);
+    return { ...item, w, h: w * ratio };
+  });
+}
+function removeItem(items, id) {
+  return items.filter((item) => !(isRecord(item) && item.id === id));
+}
+function boundaryBounds(nodeIds, rectOf, pad) {
+  const margin = finite(pad) && pad > 0 ? pad : 0;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const id of nodeIds) {
+    const r = rectOf(id);
+    if (!r || !finite(r.x) || !finite(r.y) || !finite(r.w) || !finite(r.h)) continue;
+    left = Math.min(left, r.x);
+    top = Math.min(top, r.y);
+    right = Math.max(right, r.x + r.w);
+    bottom = Math.max(bottom, r.y + r.h);
+  }
+  if (left === Infinity) return null;
+  return { x: left - margin, y: top - margin, w: right - left + margin * 2, h: bottom - top + margin * 2 };
+}
+function pruneBoundaries(items, existingIds) {
+  const alive = new Set(existingIds);
+  return items.filter((item) => item.kind !== "boundary" || item.members.some((m) => alive.has(m)));
+}
+
+// experiences/visual-map/image-input.ts
+var IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+var EXTENSION = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp"
+};
+var NAME_LIMIT = 80;
+var asBytes = (bytes) => bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+var startsWith = (b, at, text11) => text11.every((c, i) => b[at + i] === c);
+var ascii = (text11) => Array.from(text11, (ch) => ch.charCodeAt(0));
+function sniffImage(bytes) {
+  const b = asBytes(bytes);
+  if (b.length >= 8 && startsWith(b, 0, [137, 80, 78, 71, 13, 10, 26, 10])) return "image/png";
+  if (b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return "image/jpeg";
+  if (b.length >= 6 && (startsWith(b, 0, ascii("GIF87a")) || startsWith(b, 0, ascii("GIF89a")))) return "image/gif";
+  if (b.length >= 12 && startsWith(b, 0, ascii("RIFF")) && startsWith(b, 8, ascii("WEBP"))) return "image/webp";
+  return null;
+}
+function acceptImage(candidate) {
+  const mime = typeof candidate.mime === "string" ? candidate.mime.trim().toLowerCase() : "";
+  if (!mime.startsWith("image/")) return { ok: false, reason: "not-image-mime" };
+  if (mime.startsWith("image/svg")) return { ok: false, reason: "svg" };
+  const bytes = asBytes(candidate.bytes);
+  const size = Math.max(Number.isFinite(candidate.size) ? candidate.size : 0, bytes.byteLength);
+  if (size > IMAGE_MAX_BYTES) return { ok: false, reason: "too-large" };
+  if (bytes.byteLength === 0) return { ok: false, reason: "empty" };
+  const sniffed = sniffImage(bytes);
+  return sniffed ? { ok: true, mime: sniffed } : { ok: false, reason: "bad-content" };
+}
+function imageFilesFrom(transfer) {
+  const files = transfer == null ? void 0 : transfer.files;
+  if (!files || typeof files.length !== "number") return [];
+  const out = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file && typeof file.type === "string" && file.type.toLowerCase().startsWith("image/")) out.push(file);
+  }
+  return out;
+}
+function safeImageName(name, mime) {
+  var _a2;
+  const extension = EXTENSION[mime];
+  if (!extension) return null;
+  const leaf = (_a2 = String(name != null ? name : "").split(/[\\/]/).pop()) != null ? _a2 : "";
+  const dot = leaf.lastIndexOf(".");
+  const stem = dot > 0 ? leaf.slice(0, dot) : leaf;
+  const cleaned = stem.replace(/[^A-Za-z0-9\-_ .]/g, "_").replace(/\.{2,}/g, ".").replace(/^[ .]+|[ .]+$/g, "").slice(0, NAME_LIMIT).replace(/[ .]+$/g, "");
+  return `${cleaned || "image"}.${extension}`;
+}
+var SIZE_LIMIT = 65535 * 16;
+var sized = (width, height) => Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= SIZE_LIMIT && height <= SIZE_LIMIT ? { width, height } : null;
+function imageSize(bytes) {
+  const b = asBytes(bytes);
+  const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  switch (sniffImage(b)) {
+    case "image/png":
+      return b.length >= 24 ? sized(view.getUint32(16), view.getUint32(20)) : null;
+    case "image/gif":
+      return b.length >= 10 ? sized(view.getUint16(6, true), view.getUint16(8, true)) : null;
+    case "image/jpeg": {
+      let at = 2;
+      while (at + 9 < b.length) {
+        if (b[at] !== 255) {
+          at++;
+          continue;
+        }
+        const marker5 = b[at + 1];
+        if (marker5 === 255) {
+          at++;
+          continue;
+        }
+        if (marker5 === 216 || marker5 >= 208 && marker5 <= 215 || marker5 === 1) {
+          at += 2;
+          continue;
+        }
+        if (marker5 >= 192 && marker5 <= 207 && marker5 !== 196 && marker5 !== 200 && marker5 !== 204)
+          return sized(view.getUint16(at + 7), view.getUint16(at + 5));
+        at += 2 + view.getUint16(at + 2);
+      }
+      return null;
+    }
+    case "image/webp": {
+      if (b.length < 30) return null;
+      const kind = String.fromCharCode(b[12], b[13], b[14], b[15]);
+      if (kind === "VP8X")
+        return sized((b[24] | b[25] << 8 | b[26] << 16) + 1, (b[27] | b[28] << 8 | b[29] << 16) + 1);
+      if (kind === "VP8 ") return sized(view.getUint16(26, true) & 16383, view.getUint16(28, true) & 16383);
+      if (kind === "VP8L") {
+        const bits = view.getUint32(21, true);
+        return sized((bits & 16383) + 1, (bits >> 14 & 16383) + 1);
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+
+// experiences/visual-map/map-export.ts
+var DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+var COLOR = /^(?:#[0-9a-fA-F]{3,8}|(?:rgb|hsl)a?\(\s*[\d.%\s,/-]+\)|[a-zA-Z]{3,20})$/;
+var PATH_DATA = /^[MmLlHhVvCcSsQqTtAaZz0-9\s,.eE+-]+$/;
+var FONT = "sans-serif";
+var TEXT_LIMIT = 300;
+var num = (value) => typeof value === "number" && Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+var isXmlControl = (ch) => {
+  const code = ch.charCodeAt(0);
+  return code < 32 && code !== 9 && code !== 10 && code !== 13 || code === 65534 || code === 65535;
+};
+var escapeXml = (text11) => Array.from(text11).filter((ch) => !isXmlControl(ch)).join("").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+function color(value, fallback) {
+  return typeof value === "string" && COLOR.test(value.trim()) && !/url|expression|var/i.test(value) ? value.trim() : fallback;
+}
+function normalizeCssColor(value) {
+  if (typeof value !== "string") return "";
+  const text11 = value.trim();
+  if (!text11 || text11 === "transparent") return "";
+  const srgb = /^color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)$/.exec(text11);
+  if (srgb) {
+    const channel = (v) => Math.max(0, Math.min(255, Math.round(Number(v) * 255)));
+    const alpha = srgb[4] === void 0 ? 1 : srgb[4].endsWith("%") ? Number.parseFloat(srgb[4]) / 100 : Number(srgb[4]);
+    if (!Number.isFinite(alpha) || alpha <= 0) return "";
+    const [r, g, b] = [channel(srgb[1]), channel(srgb[2]), channel(srgb[3])];
+    return alpha >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${Math.round(alpha * 1e3) / 1e3})`;
+  }
+  const rgba = /^rgba?\(\s*[\d.]+[\s,]+[\d.]+[\s,]+[\d.]+\s*[,/]\s*0(?:\.0+)?%?\s*\)$/.exec(text11);
+  return rgba ? "" : text11;
+}
+function rect(x, y, w, h) {
+  const [bx, by, bw, bh] = [num(x), num(y), num(w), num(h)];
+  return bx !== null && by !== null && bw !== null && bh !== null && bw > 0 && bh > 0 ? [bx, by, bw, bh] : null;
+}
+function imageElement(image) {
+  if (!image || typeof image.href !== "string" || !DATA_IMAGE.test(image.href)) return "";
+  const box = rect(image.x, image.y, image.w, image.h);
+  const fit = image.fit === "cover" ? "xMidYMid slice" : "none";
+  return box ? `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>` : "";
+}
+function textLines(title) {
+  const raw = Array.isArray(title) ? title : String(title != null ? title : "").split(/\r?\n/);
+  return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT));
+}
+function buildMapSvg(scene) {
+  var _a2, _b2, _c, _d, _e, _f, _g;
+  const width = num(scene == null ? void 0 : scene.width);
+  const height = num(scene == null ? void 0 : scene.height);
+  if (width === null || height === null || width <= 0 || height <= 0) return "";
+  const theme = (_a2 = scene.theme) != null ? _a2 : {};
+  const background = color(theme.background, "#ffffff");
+  const textColor = color(theme.text, "#222222");
+  const strokeColor = color(theme.stroke, "#888888");
+  const cardColor = color(theme.card, "#ffffff");
+  const originX = (_b2 = num(scene.x)) != null ? _b2 : 0;
+  const originY = (_c = num(scene.y)) != null ? _c : 0;
+  const out = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${originX} ${originY} ${width} ${height}">`
+  ];
+  if (typeof scene.title === "string" && scene.title)
+    out.push(`<title>${escapeXml(scene.title.slice(0, TEXT_LIMIT))}</title>`);
+  out.push(`<rect x="${originX}" y="${originY}" width="${width}" height="${height}" fill="${background}"/>`);
+  for (const b of (_d = scene.boundaries) != null ? _d : []) {
+    const box = rect(b == null ? void 0 : b.x, b == null ? void 0 : b.y, b == null ? void 0 : b.w, b == null ? void 0 : b.h);
+    if (!box) continue;
+    const stroke = color(b.stroke, strokeColor);
+    out.push(
+      `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="12" fill="none" stroke="${stroke}" stroke-dasharray="6 4"/>`
+    );
+    if (typeof b.label === "string" && b.label)
+      out.push(
+        `<text x="${box[0] + 8}" y="${box[1] + 16}" font-family="${FONT}" font-size="12" fill="${stroke}">${escapeXml(b.label.slice(0, TEXT_LIMIT))}</text>`
+      );
+    out.push("</g>");
+  }
+  for (const edge of (_e = scene.edges) != null ? _e : []) {
+    if (typeof (edge == null ? void 0 : edge.d) !== "string" || !PATH_DATA.test(edge.d) || edge.d.length > 4e3) continue;
+    out.push(`<path d="${edge.d.trim()}" fill="none" stroke="${color(edge.stroke, strokeColor)}" stroke-width="1.5"/>`);
+  }
+  for (const image of (_f = scene.images) != null ? _f : []) out.push(imageElement(image));
+  for (const card of (_g = scene.cards) != null ? _g : []) {
+    const box = rect(card == null ? void 0 : card.x, card == null ? void 0 : card.y, card == null ? void 0 : card.w, card == null ? void 0 : card.h);
+    if (!box) continue;
+    out.push(
+      `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"/>`
+    );
+    if (card.accent !== void 0)
+      out.push(
+        `<rect x="${box[0]}" y="${box[1] + 14}" width="4" height="${Math.max(1, box[3] - 28)}" rx="2" fill="${color(card.accent, strokeColor)}"/>`
+      );
+    out.push(imageElement(card.cover));
+    const fill2 = color(card.textColor, textColor);
+    const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
+    const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
+    const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / 16) + 1);
+    textLines(card.title).slice(0, fits).forEach((line, i) => {
+      out.push(
+        `<text x="${box[0] + 14}" y="${top + i * 16}" font-family="${FONT}" font-size="13" fill="${fill2}">${escapeXml(line)}</text>`
+      );
+    });
+    out.push("</g>");
+  }
+  out.push("</svg>");
+  return out.filter(Boolean).join("\n");
+}
+function wrapText(text11, maxWidth) {
+  const lines = [];
+  for (const paragraph of String(text11 != null ? text11 : "").split(/\r?\n/)) {
+    let line = "";
+    let used = 0;
+    for (const ch of Array.from(paragraph)) {
+      const w = /[\u1100-\u11ff\u2e80-\ua4cf\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 13 : 7;
+      if (used + w > maxWidth && line) {
+        lines.push(line);
+        line = "";
+        used = 0;
+      }
+      line += ch;
+      used += w;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+var BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function toDataUri(mime, bytes) {
+  var _a2, _b2;
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const parts = [];
+  for (let i = 0; i < data.length; i += 3) {
+    const n = data[i] << 16 | ((_a2 = data[i + 1]) != null ? _a2 : 0) << 8 | ((_b2 = data[i + 2]) != null ? _b2 : 0);
+    parts.push(
+      BASE64[n >> 18 & 63] + BASE64[n >> 12 & 63] + (i + 1 < data.length ? BASE64[n >> 6 & 63] : "=") + (i + 2 < data.length ? BASE64[n & 63] : "=")
+    );
+  }
+  return `data:${mime};base64,${parts.join("")}`;
+}
+function exportFileStem(title) {
+  const stem = String(title != null ? title : "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
+  return stem || "Mind map";
+}
+async function svgToPngBlob(svg, width, height, scale, env) {
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+  const loaded = await env.load(svg);
+  try {
+    const canvas = env.canvas(w, h);
+    if (!canvas.context) throw new Error("canvas");
+    canvas.context.drawImage(loaded.image, 0, 0, w, h);
+    const blob = await canvas.toBlob();
+    if (!blob) throw new Error("png");
+    return blob;
+  } finally {
+    loaded.release();
+  }
+}
+function browserPngEnv(doc, urls) {
+  return {
+    async load(svg) {
+      const url = urls.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+      const image = doc.createEl("img");
+      try {
+        await new Promise((resolve, reject2) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject2(new Error("image"));
+          image.src = url;
+        });
+      } catch (error) {
+        urls.revokeObjectURL(url);
+        throw error;
+      }
+      return { image, release: () => urls.revokeObjectURL(url) };
+    },
+    canvas(width, height) {
+      const canvas = doc.createEl("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      return {
+        context: canvas.getContext("2d"),
+        toBlob: () => new Promise((resolve) => canvas.toBlob(resolve, "image/png"))
+      };
+    }
+  };
+}
+var EXPORT_MAX_EDGE = 8192;
+var EXPORT_MAX_PIXELS = 64e6;
+var EXPORT_MAX_EMBEDDED_BYTES = 50 * 1024 * 1024;
+function embeddedBytes(href) {
+  var _a2;
+  const body = typeof href === "string" ? (_a2 = /^data:[^,]*;base64,(.*)$/.exec(href)) == null ? void 0 : _a2[1] : void 0;
+  return body ? Math.floor(body.length * 3 / 4) : 0;
+}
+function exportLimits(scene) {
+  var _a2, _b2;
+  const width = num(scene == null ? void 0 : scene.width);
+  const height = num(scene == null ? void 0 : scene.height);
+  if (width === null || height === null || width <= 0 || height <= 0) return { action: "refuse", reason: "size" };
+  const images = [...(_a2 = scene.images) != null ? _a2 : [], ...((_b2 = scene.cards) != null ? _b2 : []).map((card) => card == null ? void 0 : card.cover)];
+  const bytes = images.reduce((sum, image) => sum + embeddedBytes(image == null ? void 0 : image.href), 0);
+  if (bytes > EXPORT_MAX_EMBEDDED_BYTES) return { action: "refuse", reason: "embedded" };
+  if (width * height > EXPORT_MAX_PIXELS) return { action: "refuse", reason: "pixels" };
+  const longest = Math.max(width, height);
+  return longest > EXPORT_MAX_EDGE ? { action: "scaleDown", scale: EXPORT_MAX_EDGE / longest } : { action: "ok", scale: 1 };
+}
+function mapOutline(nodes, titleOf) {
+  var _a2;
+  const ids = new Set(nodes.map((n) => n.id));
+  const children = /* @__PURE__ */ new Map();
+  const roots = [];
+  for (const node of nodes) {
+    if (node.parentId && ids.has(node.parentId) && node.parentId !== node.id) {
+      const list = (_a2 = children.get(node.parentId)) != null ? _a2 : [];
+      list.push(node);
+      children.set(node.parentId, list);
+    } else roots.push(node);
+  }
+  const lines = [];
+  const seen = /* @__PURE__ */ new Set();
+  const walk = (node, depth) => {
+    var _a3, _b2;
+    if (seen.has(node.id)) return;
+    seen.add(node.id);
+    const title = String((_a3 = titleOf(node.id)) != null ? _a3 : "").replace(/\s+/g, " ").trim() || node.id;
+    lines.push(`${"  ".repeat(depth)}- ${title}`);
+    for (const child of (_b2 = children.get(node.id)) != null ? _b2 : []) walk(child, depth + 1);
+  };
+  for (const root of roots) walk(root, 0);
+  return lines.join("\n");
+}
+
 // experiences/visual-map/map-text-language.ts
 function mapTextLanguage(language2) {
   return isUiLanguage(language2) ? language2 : uiLocale(void 0);
@@ -17250,6 +17767,11 @@ function parseMap(content, log) {
     delete map.layout;
   else if (map.layout && map.layout.spacing !== void 0 && !isStoredLayoutSpacing(map.layout.spacing))
     delete map.layout.spacing;
+  if (map.canvasItems !== void 0) {
+    const items = sanitizeCanvasItems(map.canvasItems);
+    if (items.length) map.canvasItems = items;
+    else delete map.canvasItems;
+  }
   const ids = /* @__PURE__ */ new Set(), aimQuestionRequests = /* @__PURE__ */ new Set();
   for (const n of map.nodes) {
     if (!n || typeof n.id !== "string" || typeof n.path !== "string" || !n.path.endsWith(".md") || !Number.isFinite(n.x) || !Number.isFinite(n.y) || n.parentId !== null && typeof n.parentId !== "string" || ids.has(n.id))
@@ -18585,80 +19107,22 @@ function branchNoteIds(nodes, id) {
   return [id, ...descendants(nodes, id)];
 }
 
-// experiences/visual-map/topic-kind-shape.ts
-var TOPIC_KIND_SHAPES = {
-  topic: { shape: "rounded", labelKey: "ui.topic_kind_topic" },
-  action: { shape: "rect", labelKey: "ui.topic_kind_action" },
-  atomic: { shape: "ellipse", labelKey: "ui.topic_kind_atomic" },
-  hypothesis: { shape: "diamond", labelKey: "ui.topic_kind_hypothesis" },
-  evidence: { shape: "folded", labelKey: "ui.topic_kind_evidence" },
-  conclusion: { shape: "hexagon", labelKey: "ui.topic_kind_conclusion" }
-};
-var EDGE = 0;
-var FAR = 100;
-var HEXAGON = `25,${EDGE} 75,${EDGE} ${FAR},50 75,${FAR} 25,${FAR} ${EDGE},50`;
-var FOLD_X = 88;
-var FOLD_Y = 24;
-var FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR} ${EDGE},${FAR}`;
-var FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
-var DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
-function hasSvgShape(kind) {
-  const shape = TOPIC_KIND_SHAPES[kind].shape;
-  return shape !== "rounded" && shape !== "rect";
-}
-function renderShapeBackground(card, kind) {
-  const shape = TOPIC_KIND_SHAPES[kind].shape;
-  if (!hasSvgShape(kind)) return void 0;
-  const svg = createSvg("svg");
-  svg.addClass("vam-kind-shape");
-  svg.setAttribute("viewBox", "0 0 100 100");
-  svg.setAttribute("preserveAspectRatio", "none");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("focusable", "false");
-  const outline = createSvg(shape === "ellipse" ? "ellipse" : "polygon");
-  outline.addClass("vam-kind-outline");
-  if (shape === "ellipse") {
-    outline.setAttribute("cx", "50");
-    outline.setAttribute("cy", "50");
-    outline.setAttribute("rx", "50");
-    outline.setAttribute("ry", "50");
-  } else outline.setAttribute("points", shape === "diamond" ? DIAMOND : shape === "hexagon" ? HEXAGON : FOLDED);
-  outline.setAttribute("vector-effect", "non-scaling-stroke");
-  svg.appendChild(outline);
-  if (shape === "folded") {
-    const fold2 = createSvg("polyline");
-    fold2.addClass("vam-kind-fold");
-    fold2.setAttribute("points", FOLD_LINE);
-    fold2.setAttribute("vector-effect", "non-scaling-stroke");
-    svg.appendChild(fold2);
-  }
-  card.appendChild(svg);
-  return svg;
-}
-var FIT = {
-  // Corner on the ellipse needs w^2 + h^2 <= 1.
-  ellipse: { width: 0.7, height: 0.7 },
-  // Corner on the diamond needs w + h <= 1: half the card's width, so the top and bottom padding is half the text each.
-  diamond: { width: 0.5, height: 0.5 },
-  // The hexagon's slanted side needs w + h / 2 <= 1.
-  hexagon: { width: 0.7, height: 0.58 },
-  // The cut corner needs h <= 1 - 4 * (0.94 - 0.88): the top right of the block clears the fold.
-  folded: { width: 0.88, height: 0.74 }
-};
-var SAFETY = 4;
-var BASE_PADDING = { top: 12, right: 14, bottom: 14, left: 14 };
-function shapeInsets(kind, content) {
-  const shape = TOPIC_KIND_SHAPES[kind].shape;
-  if (shape === "rounded" || shape === "rect") return { ...BASE_PADDING };
-  const fit = FIT[shape];
-  const side = content.width * (1 - fit.width) / 2;
-  const vertical = content.height * (1 / fit.height - 1) / 2 + SAFETY;
-  return { top: vertical, right: side, bottom: vertical, left: side };
-}
+// repository.ts
+var import_obsidian12 = require("obsidian");
+var import_node_crypto5 = require("node:crypto");
 
-// experiences/visual-map/view.ts
-var import_node_crypto14 = require("node:crypto");
-var import_obsidian32 = require("obsidian");
+// ai/model-resolution.ts
+var FALLBACK_MODEL = "gpt-5.6-luna";
+function resolveTaskModel(input) {
+  var _a2, _b2, _c, _d, _e, _f;
+  const once = (_b2 = (_a2 = input.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
+  if (once) {
+    return { model: once, reasoning: (_d = (_c = input.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input.current.reasoning, origin: "run-once" };
+  }
+  const own2 = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
+  if (input.override && own2) return { model: own2, reasoning: input.override.reasoning, origin: "override" };
+  return { model: input.current.model, reasoning: input.current.reasoning, origin: "current" };
+}
 
 // ai/markdown-blocks.ts
 function fencedLines(lines) {
@@ -19267,950 +19731,6 @@ ${rules.join("\n")}` : ""
   });
 }
 
-// ai/result-utils.ts
-var SENTENCE_END = /[。！？；!?;]/;
-function truncateSummary(value, limit = 80) {
-  var _a2;
-  const characters = Array.from(value.trim());
-  if (characters.length <= limit) return characters.join("");
-  const floor = Math.floor(limit / 2);
-  for (let index = limit - 1; index >= floor; index--) {
-    const character = characters[index];
-    if (SENTENCE_END.test(character) || character === "." && /\s/.test((_a2 = characters[index + 1]) != null ? _a2 : ""))
-      return characters.slice(0, index + 1).join("");
-  }
-  const window2 = characters.slice(0, limit - 1);
-  let gap = -1;
-  for (let index = window2.length - 1; index >= floor && gap < 0; index--) if (/\s/.test(window2[index])) gap = index;
-  return `${(gap >= 0 ? window2.slice(0, gap) : window2).join("").trimEnd()}\u2026`;
-}
-var LEGACY_SEARCH_FAILURE = /\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i;
-function reportedSearchFailure(result) {
-  if (result.searchStatus !== void 0) return result.searchStatus !== "completed";
-  return LEGACY_SEARCH_FAILURE.test(`${result.summary}
-${result.detail}`);
-}
-function sourceFootnoteDefinition(line) {
-  const match = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/.exec(line);
-  if (!match) return null;
-  const target = match[2].trim();
-  const external = NOTE_LANGUAGES.some(
-    (locale) => target.startsWith(translate(locale, "note.external_source_0", "").trim())
-  );
-  return match[1].startsWith("src-") || /^\[\[[^\]]+\]\]$/.test(target) || external ? { label: match[1], target } : null;
-}
-function textbookDetail(template, leading, sections, footnotes, sourcesIndex) {
-  var _a2;
-  const placeholders = /* @__PURE__ */ new Set([
-    ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
-    "No new content this time",
-    "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
-  ]);
-  if (footnotes.length && sourcesIndex >= 0) {
-    const raw = ((_a2 = sections.get(sourcesIndex)) != null ? _a2 : []).join("\n").trim();
-    const evidence = placeholders.has(raw.replace(/[.。]$/, "")) ? "" : raw;
-    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
-  }
-  const blocks = [leading.join("\n").trim()];
-  template.sections.forEach((section3, index) => {
-    var _a3, _b2;
-    const body = (_b2 = (_a3 = sections.get(index)) == null ? void 0 : _a3.join("\n").trim()) != null ? _b2 : "";
-    if (body && !placeholders.has(body.replace(/[.。]$/, ""))) blocks.push(`### ${section3.name}
-
-${body}`);
-  });
-  if (footnotes.length && sourcesIndex < 0) blocks.push(footnotes.join("\n"));
-  return blocks.filter(Boolean).join("\n\n");
-}
-function normalizeOutputScriptHeadings(detail, output, template, context = {}) {
-  if (context.detailFormat === "adaptive" || context.promptProfile === "aim") return detail;
-  if (!verbatimHeadingLanguage(output) || template && !isBuiltinTemplateId(template.id)) return detail;
-  const note = noteLanguageOf(output);
-  const forms = /* @__PURE__ */ new Map();
-  for (const [, key2] of STANDARD) {
-    const canonical = translate(note, key2);
-    const written2 = translate(output, key2);
-    if (written2 !== canonical) forms.set(written2, canonical);
-  }
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  return lines.map((line, index) => {
-    const heading = code[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line);
-    const canonical = heading ? forms.get(heading[2]) : void 0;
-    return heading && canonical ? `###${heading[1]}${canonical}${heading[3]}` : line;
-  }).join("\n");
-}
-function canonicalDetail(value, language2 = "zh-TW", template = standardTemplate(language2)) {
-  var _a2, _b2;
-  const detail = value.trim();
-  const headings = template.sections.map((section3) => section3.name);
-  const aliases = sectionLookup(template);
-  const sourcesIndex = template.sections.findIndex((section3) => section3.role === "sources");
-  const sections = /* @__PURE__ */ new Map();
-  const leading = [];
-  const footnotes = [];
-  let current = null;
-  const detailLines = detail.split("\n");
-  const code = fencedLines(detailLines);
-  for (const [index, line] of detailLines.entries()) {
-    if (!code[index] && sourceFootnoteDefinition(line)) {
-      footnotes.push(line);
-      continue;
-    }
-    const heading = /^###\s+(.+?)\s*$/.exec(line);
-    const match = heading ? aliases.get(heading[1].toLocaleLowerCase()) : void 0;
-    if (match !== void 0) {
-      current = match;
-      if (!sections.has(match)) sections.set(match, []);
-      continue;
-    }
-    (current === null ? leading : sections.get(current)).push(line);
-  }
-  if (template.id === TEXTBOOK_TEMPLATE_ID) return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
-  if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
-  else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(_a2 = sections.get(0)) != null ? _a2 : []]);
-  if (footnotes.length && sourcesIndex >= 0) {
-    const evidence = ((_b2 = sections.get(sourcesIndex)) != null ? _b2 : []).join("\n").trim();
-    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
-  }
-  const empty = translate(language2, "note.no_new_information");
-  const body = headings.map((heading, index) => {
-    var _a3;
-    return `### ${heading}
-
-${((_a3 = sections.get(index)) == null ? void 0 : _a3.join("\n").trim()) || empty}`;
-  }).join("\n\n");
-  return footnotes.length && sourcesIndex < 0 ? `${body}
-
-${footnotes.join("\n")}` : body;
-}
-function visualReferencesMarkdown(references2 = [], language2 = "zh-TW") {
-  return references2.map((item) => {
-    const title = item.title.trim() || translate(language2, "detail.visual_reference");
-    const imageUrl = item.imageUrl.trim();
-    const sourceUrl = item.sourceUrl.trim();
-    if (!imageUrl || !sourceUrl) return "";
-    const palette = item.palette.map((color) => color.trim()).filter(Boolean).join(" / ");
-    return [
-      `**${title}**`,
-      "",
-      `![${title}](${imageUrl})`,
-      "",
-      translate(language2, "detail.source", sourceUrl),
-      item.description.trim() ? translate(language2, "detail.purpose", item.description.trim()) : "",
-      palette ? translate(language2, "detail.palette", palette) : "",
-      item.formula.trim() ? translate(language2, "detail.reusable_formula", item.formula.trim()) : ""
-    ].filter(Boolean).join("\n");
-  }).filter(Boolean).join("\n\n");
-}
-
-// ai/reference-materials.ts
-async function readMarkdownFile(app, file) {
-  if (file.extension.toLowerCase() !== "md")
-    throw new Error(`Only Markdown can be used as local reference: ${file.path}`);
-  return { path: file.path, content: await app.vault.read(file) };
-}
-function dedupeReferenceGroups(groups) {
-  const seen = /* @__PURE__ */ new Set();
-  return groups.map((group) => ({
-    ...group,
-    documents: group.documents.filter((document2) => {
-      const key2 = document2.key || document2.path;
-      if (seen.has(key2)) return false;
-      seen.add(key2);
-      return true;
-    })
-  }));
-}
-function packReferenceChunks(chunks, characterLimit = 18e3) {
-  const batches = [];
-  let batch = "";
-  for (const chunk of chunks) {
-    if (batch && batch.length + chunk.length > characterLimit) {
-      batches.push(batch);
-      batch = "";
-    }
-    batch += `${batch ? "\n\n" : ""}${chunk}`;
-  }
-  if (batch) batches.push(batch);
-  return batches;
-}
-function referenceBatches(groups, documentLimit = 14e3, batchLimit = 18e3) {
-  var _a2;
-  const chunks = [];
-  let sourceNumber = 0;
-  for (const group of dedupeReferenceGroups(groups))
-    for (const document2 of group.documents) {
-      sourceNumber++;
-      const id = `S${sourceNumber}`;
-      const citation = document2.external ? "external Markdown; cite the exact path as plain text" : "Vault Markdown; cite as an Obsidian wikilink";
-      const pieces = (_a2 = document2.content.match(new RegExp(`[\\s\\S]{1,${documentLimit}}`, "g"))) != null ? _a2 : [""];
-      pieces.forEach(
-        (piece, index) => chunks.push(
-          `[${id}] ${citation}: ${document2.path}${pieces.length > 1 ? ` (part ${index + 1}/${pieces.length})` : ""}
-${piece}`
-        )
-      );
-    }
-  return packReferenceChunks(chunks, batchLimit);
-}
-function referenceCatalog(groups) {
-  const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
-  return documents.map(
-    (document2, index) => `[S${index + 1}] ${document2.external ? "External file (plain path)" : "Vault note (wikilink)"}: ${document2.path}`
-  ).join("\n");
-}
-function resolveWikilinks(text11, documents) {
-  return text11.replace(/\[\[([^\]]+)\]\]/g, (original, target) => {
-    const name = target.split("|")[0].trim();
-    const exact = documents.filter((document2) => document2.path === name);
-    const matches = exact.length ? exact : documents.filter((document2) => {
-      var _a2;
-      const basename2 = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
-      return basename2 === name || basename2.replace(/\.md$/i, "") === name;
-    });
-    if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
-    if (matches.length !== 1 || !matches[0].external) return original;
-    return tNote("note.external_source_0", matches[0].path);
-  });
-}
-function sourceFootnoteLabel(path) {
-  let hash = 2166136261;
-  for (let index = 0; index < path.length; index++) {
-    hash ^= path.charCodeAt(index);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return `src-${hash.toString(36).padStart(7, "0")}`;
-}
-function resolveSummaryReferences(summary, groups) {
-  const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
-  const run = String.raw`\[S\d+\](?:\s*[,，、;；]?\s*\[S\d+\])*`;
-  const stripped = summary.replace(new RegExp(String.raw`[ \t]*[（(]\s*${run}\s*[）)]`, "g"), "").replace(new RegExp(String.raw`[ \t]*${run}`, "g"), "").trim();
-  return resolveWikilinks(stripped, documents);
-}
-var FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
-function footnoteTarget(document2) {
-  var _a2;
-  const basename2 = ((_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path).replace(/\.md$/i, "");
-  return document2.external ? tNote("note.external_source_0", document2.path) : `[[${document2.path}|${basename2}]]`;
-}
-function targetKey(target) {
-  const link = /^\[\[([^\]|]+)/.exec(target);
-  return link ? link[1].trim().replace(/\.md$/i, "") : target;
-}
-function outsideInlineCode(line, edit) {
-  return line.split(/(`+[^`]*`+)/).map((part, index) => index % 2 ? part : edit(part)).join("");
-}
-function sourceDefinitions(detail) {
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const definitions = /* @__PURE__ */ new Map();
-  lines.forEach((line, index) => {
-    const definition = code[index] ? null : sourceFootnoteDefinition(line);
-    if (definition) definitions.set(definition.label, definition.target);
-  });
-  return definitions;
-}
-function footnoteDefinitionLabels(content) {
-  const lines = content.split("\n");
-  const code = fencedLines(lines);
-  const labels = /* @__PURE__ */ new Set();
-  lines.forEach((line, index) => {
-    const match = code[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line);
-    if (match) labels.add(match[1]);
-  });
-  return labels;
-}
-function usesFootnote(content, label) {
-  const lines = content.split("\n");
-  const code = fencedLines(lines);
-  return lines.some(
-    (line, index) => !code[index] && outsideInlineCode(
-      line,
-      (text11) => [...text11.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : ""
-    ).includes("\0")
-  );
-}
-function definesFootnote(content, label) {
-  const lines = content.split("\n");
-  const code = fencedLines(lines);
-  const prefix = `[^${label}]:`;
-  return lines.some((line, index) => !code[index] && line.startsWith(prefix));
-}
-function resolveDetailReferences(detail, groups, previousDetail = "", template) {
-  const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
-  const cited = /* @__PURE__ */ new Map();
-  const source = (line) => {
-    const identified = line.replace(/\[S(\d+)\]/g, (original, number2) => {
-      const document2 = documents[Number(number2) - 1];
-      if (!document2) return tNote("note.source_unconfirmed_0", original);
-      const label = sourceFootnoteLabel(document2.path);
-      cited.set(label, footnoteTarget(document2));
-      return `[^${label}]`;
-    });
-    return documents.length ? resolveWikilinks(identified, documents) : identified;
-  };
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const body = [];
-  const bodyCode = [];
-  const defined = /* @__PURE__ */ new Map();
-  const reserved = /* @__PURE__ */ new Set();
-  const dropped = /* @__PURE__ */ new Set();
-  lines.forEach((line, index) => {
-    if (!code[index]) {
-      const definition = sourceFootnoteDefinition(line);
-      if (definition) {
-        defined.set(definition.label, definition.target);
-        return;
-      }
-      const other = /^\[\^([^\]\s]+)\]:/.exec(line);
-      if (other) reserved.add(other[1]);
-    }
-    body.push(code[index] ? line : outsideInlineCode(line, source));
-    bodyCode.push(code[index]);
-  });
-  const previous = sourceDefinitions(previousDetail);
-  const writerLabels = footnoteDefinitionLabels(previousDetail);
-  const byLabel = new Map(documents.map((document2) => [sourceFootnoteLabel(document2.path), document2]));
-  const targetOf = (label) => {
-    var _a2, _b2;
-    const target = (_b2 = (_a2 = cited.get(label)) != null ? _a2 : defined.get(label)) != null ? _b2 : previous.get(label);
-    if (target) return target;
-    const document2 = byLabel.get(label);
-    if (document2) return footnoteTarget(document2);
-    if (writerLabels.has(label)) return void 0;
-    const owners = documents.filter((candidate) => definesFootnote(candidate.content, label));
-    if (owners.length === 1) return footnoteTarget(owners[0]);
-    if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label))) dropped.add(label);
-    return void 0;
-  };
-  body.forEach((line, index) => {
-    if (bodyCode[index]) return;
-    outsideInlineCode(line, (text12) => {
-      for (const [, label] of text12.matchAll(FOOTNOTE_REFERENCE))
-        if (!label.startsWith("src-") && !targetOf(label) && !dropped.has(label)) reserved.add(label);
-      return text12;
-    });
-  });
-  const numbers = /* @__PURE__ */ new Map();
-  const ordered = [];
-  let next = 0;
-  const number = (target) => {
-    const key2 = targetKey(target);
-    if (!numbers.has(key2)) {
-      do
-        next++;
-      while (reserved.has(String(next)));
-      numbers.set(key2, next);
-      ordered.push(`[^${next}]: ${target}`);
-    }
-    return numbers.get(key2);
-  };
-  const renumbered = body.map(
-    (line, index) => bodyCode[index] ? line : outsideInlineCode(
-      line,
-      (text12) => text12.replace(FOOTNOTE_REFERENCE, (original, label) => {
-        if (reserved.has(label)) return original;
-        const target = targetOf(label);
-        if (target) return `[^${number(target)}]`;
-        if (label.startsWith("src-")) return ` ${tNote("note.source_unconfirmed_0", label)}`;
-        return dropped.has(label) ? "" : original;
-      })
-    )
-  );
-  const compact = renumbered.filter(
-    (line, index) => bodyCode[index] || line.trim() || index === 0 || renumbered[index - 1].trim() || bodyCode[index - 1]
-  );
-  const text11 = compact.join("\n").trimEnd();
-  if (!ordered.length) return text11;
-  const headings = sourcesHeadingKeys(template != null ? template : standardTemplate("en"));
-  const textLines = text11.split("\n");
-  const textCode = fencedLines(textLines);
-  const start = textLines.findIndex((line, index) => {
-    const match = textCode[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    return !!match && headings.has(match[1].toLocaleLowerCase());
-  });
-  if (start < 0) return `${text11}
-
-${ordered.join("\n")}
-`;
-  let end = textLines.findIndex((line, index) => index > start && !textCode[index] && /^###\s+/.test(line));
-  if (end < 0) end = textLines.length;
-  while (end > start + 1 && !textLines[end - 1].trim()) end--;
-  return [
-    ...textLines.slice(0, end),
-    "",
-    ...ordered,
-    ...end < textLines.length && textLines[end].trim() ? [""] : [],
-    ...textLines.slice(end)
-  ].join("\n");
-}
-
-// ai/model-resolution.ts
-var FALLBACK_MODEL = "gpt-5.6-luna";
-function resolveTaskModel(input) {
-  var _a2, _b2, _c, _d, _e, _f;
-  const once = (_b2 = (_a2 = input.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
-  if (once) {
-    return { model: once, reasoning: (_d = (_c = input.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input.current.reasoning, origin: "run-once" };
-  }
-  const own2 = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
-  if (input.override && own2) return { model: own2, reasoning: input.override.reasoning, origin: "override" };
-  return { model: input.current.model, reasoning: input.current.reasoning, origin: "current" };
-}
-
-// ui/modals/name-modal.ts
-var import_obsidian12 = require("obsidian");
-
-// core/title-safety.ts
-function titleProblem(text11) {
-  if (text11.includes("```")) return "fence";
-  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
-  return void 0;
-}
-function sanitizeGeneratedTitle(text11) {
-  let out = text11.replace(/`{3,}/g, "");
-  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
-  return out;
-}
-
-// ui/modals/title-check.ts
-function titleProblemText(text11) {
-  const problem = titleProblem(text11);
-  if (problem === "fence") return t("ui.title_problem_fence");
-  if (problem === "brackets") return t("ui.title_problem_brackets");
-  return "";
-}
-
-// ui/modals/name-modal.ts
-var NameModal = class extends import_obsidian12.Modal {
-  constructor(app, titleText, value, submit) {
-    super(app);
-    this.titleText = titleText;
-    this.value = value;
-    this.submit = submit;
-  }
-  onOpen() {
-    this.titleEl.setText(this.titleText);
-    const input = this.contentEl.createEl("input", { type: "text", value: this.value, cls: "vam-name-input" });
-    input.setAttr("aria-label", this.titleText);
-    const actions = modalActions(this);
-    const status = actionStatus(actions);
-    actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
-    const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
-    const save = () => {
-      const value = input.value.trim();
-      if (!value || titleProblemText(value)) return;
-      this.close();
-      this.submit(value);
-    };
-    const check = () => {
-      const empty = !input.value.trim();
-      const problem = empty ? "" : titleProblemText(input.value);
-      saveButton.disabled = empty || !!problem;
-      status.setText(empty ? t("ui.name_required") : problem);
-    };
-    input.addEventListener("input", check);
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.isComposing) {
-        event.preventDefault();
-        event.stopPropagation();
-        save();
-      }
-    });
-    saveButton.addEventListener("click", save);
-    check();
-    input.focus();
-    input.select();
-  }
-};
-
-// ui/modals/choice-modal.ts
-var import_obsidian13 = require("obsidian");
-var ChoiceModal = class extends import_obsidian13.Modal {
-  constructor(app, titleText, description, choices, dismissed) {
-    super(app);
-    this.titleText = titleText;
-    this.description = description;
-    this.choices = choices;
-    this.dismissed = dismissed;
-    __publicField(this, "chosen", false);
-  }
-  onClose() {
-    var _a2;
-    if (!this.chosen) (_a2 = this.dismissed) == null ? void 0 : _a2.call(this);
-    this.chosen = true;
-  }
-  onOpen() {
-    this.titleEl.setText(this.titleText);
-    this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
-    for (const choice2 of this.choices) {
-      const setting = new import_obsidian13.Setting(this.contentEl);
-      const run = () => {
-        this.chosen = true;
-        this.close();
-        choice2.action();
-      };
-      if (choice2.description)
-        setting.setName(choice2.label).setDesc(choice2.description).addButton((b) => {
-          var _a2;
-          b.setButtonText((_a2 = choice2.buttonLabel) != null ? _a2 : t("ui.select")).onClick(run);
-          if (choice2.warning) b.setDestructive();
-        });
-      else
-        setting.addButton((b) => {
-          b.setButtonText(choice2.label).onClick(run);
-          if (choice2.warning) b.setDestructive();
-        });
-    }
-    const cancel = modalActions(this).createEl("button", { text: t("ui.cancel") });
-    cancel.addEventListener("click", () => this.close());
-    cancel.focus();
-    window.setTimeout(() => cancel.focus(), 0);
-  }
-};
-
-// layouts/navigation.ts
-var ARROWS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-function neighborKey(direction, key2, side) {
-  if (!ARROWS.includes(key2)) return null;
-  if (direction === "balanced" && side === "root") {
-    if (key2 === "ArrowLeft") return "child-left";
-    if (key2 === "ArrowRight") return "child-right";
-    return key2 === "ArrowUp" ? "sibling-" : "sibling+";
-  }
-  if (direction === "balanced") direction = side === "left" ? "left" : "right";
-  if (direction === "down" || direction === "up") {
-    if (key2 === "ArrowLeft") return "sibling-";
-    if (key2 === "ArrowRight") return "sibling+";
-    const towardsChild = direction === "down" ? "ArrowDown" : "ArrowUp";
-    return key2 === towardsChild ? "child" : "parent";
-  }
-  const left = direction === "left";
-  if (key2 === (left ? "ArrowRight" : "ArrowLeft")) return "parent";
-  if (key2 === (left ? "ArrowLeft" : "ArrowRight")) return "child";
-  return key2 === "ArrowUp" ? "sibling-" : "sibling+";
-}
-
-// ai/mermaid-safety.ts
-var DIAGRAM_TYPES = [
-  "sequenceDiagram",
-  "classDiagram",
-  "classDiagram-v2",
-  "stateDiagram",
-  "stateDiagram-v2",
-  "erDiagram",
-  "journey",
-  "gantt",
-  "pie",
-  "quadrantChart",
-  "requirementDiagram",
-  "gitGraph",
-  "C4Context",
-  "C4Container",
-  "C4Component",
-  "C4Dynamic",
-  "C4Deployment",
-  "mindmap",
-  "timeline",
-  "sankey-beta",
-  "xychart-beta",
-  "block-beta",
-  "packet-beta",
-  "kanban",
-  "architecture-beta",
-  "radar-beta",
-  "treemap-beta",
-  "venn-beta",
-  "ishikawa",
-  "ishikawa-beta"
-];
-var FLOWCHART_HEADER = /^(?:flowchart|graph)(?:\s+(?:LR|RL|TD|TB|BT))?\s*;?\s*$/i;
-var TYPE_HEADER = new RegExp(`^(?:${DIAGRAM_TYPES.map((t2) => t2.replace(/[-]/g, "\\-")).join("|")})(?![\\w-])`);
-var allowedHeader = (header) => FLOWCHART_HEADER.test(header) || TYPE_HEADER.test(header);
-var UNSAFE_LINE = [
-  // A directive starts a line or follows a `;` statement separator.
-  /(?:^|;)\s*(?:click|call|href|link|links|style|classDef|class|linkStyle|interpolate)\b/i,
-  /%%\s*\{/,
-  // init or config directive
-  /<\s*\/?\s*[a-z!?]/i,
-  // HTML tag, comment or processing instruction
-  /\b[a-z][a-z0-9+.-]*:\/\//i,
-  // URL with a scheme
-  /\b(?:javascript|vbscript|data|mailto|file):/i,
-  /\bwww\./i,
-  /:::/,
-  // class shorthand
-  /@\{/,
-  // shape/image/icon metadata
-  /\b(?:fa|fab|fas|far|img):/i,
-  /!\[/,
-  // Markdown image
-  /(?:^|;)\s*(?:callback|cssClass)\b/i,
-  // class diagram callbacks and CSS classes
-  /(?:^|;)\s*(?:properties|details)\b[^:]*:/i,
-  // sequence actor menus (they carry links)
-  /::icon\s*\(/i,
-  // mindmap icon (Font Awesome is not loaded in Obsidian)
-  /\$(?:link|sprite|tags)\b/i,
-  // C4 links, sprites and tags
-  /\b(?:Update(?:Element|Rel|Boundary)Style|UpdateLayoutConfig|Add(?:Element|Rel|Boundary)Tag)\s*\(/,
-  // C4 styling
-  /\]\s*(?:radius|color|stroke-color|stroke-width)\s*:/i
-  // quadrantChart point styling
-];
-var CLASS_ANNOTATION = /<<[A-Za-z][A-Za-z0-9_]*>>/g;
-var CLASS_DECLARATION = /^class\s+[A-Za-z_][A-Za-z0-9_-]*(?:~[A-Za-z0-9_, ]*~)?(?=\s*(?:\{|\["[^"\]]*"\])?\s*$)/;
-var FENCE = /^(`{3,}|~{3,})(.*)$/;
-var PREFIX = /^(?:[ \t]+|>|(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t]))/;
-function core(line) {
-  let rest = line;
-  for (let match = PREFIX.exec(rest); match; match = PREFIX.exec(rest)) rest = rest.slice(match[0].length);
-  return rest;
-}
-function fenceOf(line) {
-  const fence = FENCE.exec(core(line));
-  return fence && !(fence[1][0] === "`" && fence[2].includes("`")) ? fence : null;
-}
-function unsafeMermaid(body) {
-  const lines = body.map((line) => line.trim()).filter(Boolean);
-  if (!lines.length) return false;
-  if (lines[0] === "---") return true;
-  const header = lines.find((line) => !line.startsWith("%%"));
-  if (!header || !allowedHeader(header)) return true;
-  const classDiagram = /^classDiagram(?:-v2)?(?![\w-])/.test(header);
-  return lines.some((line) => {
-    const text11 = classDiagram ? line.replace(CLASS_ANNOTATION, " ").replace(CLASS_DECLARATION, "C") : line;
-    return UNSAFE_LINE.some((pattern) => pattern.test(text11));
-  });
-}
-function neutralizeUnsafeMermaid(markdown) {
-  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  lines.forEach((line, index) => {
-    const fence = fenceOf(line);
-    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
-    const body = [];
-    for (let next = index + 1; next < lines.length; next++) {
-      const content = core(lines[next]);
-      const close = FENCE.exec(content);
-      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
-      body.push(content);
-    }
-    if (unsafeMermaid(body)) lines[index] = line.replace(/mermaid/i, "text");
-  });
-  return lines.join("\n");
-}
-
-// core/steps/chart/insert.ts
-var CHART_SHAPES = [
-  "stages",
-  "hierarchy",
-  "comparison",
-  "proportion",
-  "interaction",
-  "states",
-  "process"
-];
-function numberTokens(text11) {
-  const s = text11.normalize("NFKC"), out = [];
-  const re = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
-  let m;
-  while (m = re.exec(s)) {
-    const p = m.index > 0 ? s[m.index - 1] : "", pp = m.index > 1 ? s[m.index - 2] : "";
-    if (/[A-Za-z_]/.test(p)) continue;
-    if (p === "-" && /[A-Za-z]/.test(pp)) continue;
-    out.push(m[0].replace(/,/g, ""));
-  }
-  return out;
-}
-function noteNumbers(detail) {
-  let t2 = detail.replace(/\r\n/g, "\n");
-  t2 = t2.replace(/^[ \t]*(`{3,}|~{3,})[ \t]*mermaid[^\n]*\n[\s\S]*?\n[ \t]*\1[ \t]*$/gm, "");
-  t2 = t2.replace(/\]\([^)]*\)/g, "]").replace(/https?:\/\/\S+/g, "").replace(/\[\^[^\]]*\]/g, "").replace(/<!--[\s\S]*?-->/g, "");
-  return new Set(numberTokens(t2));
-}
-function existingDiagrams(detail) {
-  var _a2;
-  const lines = detail.replace(/\r\n/g, "\n").split("\n"), types = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\s*(`{3,}|~{3,})\s*mermaid\b/.test(lines[i])) {
-      let j = i + 1;
-      while (j < lines.length && !lines[j].trim()) j++;
-      types.push(((_a2 = lines[j]) != null ? _a2 : "").trim().split(/\s+/)[0] || "?");
-    }
-  }
-  return { count: types.length, types };
-}
-function fenceMask(lines) {
-  const mask = new Array(lines.length).fill(false);
-  let open = null;
-  lines.forEach((l, i) => {
-    const m = /^\s*(`{3,}|~{3,})/.exec(l);
-    if (open) {
-      mask[i] = true;
-      if (m && m[1][0] === open[0] && m[1].length >= open.length && l.trim() === m[1]) open = null;
-    } else if (m) {
-      mask[i] = true;
-      open = m[1];
-    }
-  });
-  return mask;
-}
-function blockOf(lines, mask, idx) {
-  let a = idx, b = idx;
-  while (a > 0 && lines[a - 1].trim() && !mask[a - 1]) a--;
-  while (b < lines.length - 1 && lines[b + 1].trim() && !mask[b + 1]) b++;
-  return [a, b];
-}
-var BAD_LINE = /^\s*(>|#{1,6}\s|[-*+]\s|\d+[.)]\s|\$\$|<|\[\^|```|~~~)/;
-function anchorCheck(lines, mask, anchor) {
-  const hits = [], a = anchor.trim();
-  lines.forEach((l, i) => {
-    if (!mask[i] && l.trim() === a) hits.push(i);
-  });
-  if (hits.length === 0) return { code: "anchor_missing" };
-  if (hits.length > 1) return { code: "anchor_not_unique" };
-  const block = blockOf(lines, mask, hits[0]);
-  const blk = lines.slice(block[0], block[1] + 1);
-  if (blk.some((l) => BAD_LINE.test(l))) return { code: "anchor_bad_block", block };
-  const tableLines = blk.filter((l) => /^\s*\|/.test(l)).length;
-  if (tableLines !== 0 && tableLines !== blk.length) return { code: "anchor_bad_block", block };
-  return { code: null, block };
-}
-var SEQ_ALIAS = /^(\s*(?:participant|actor)\s+\S+\s+as\s+)"([^"]+)"(\s*)$/;
-var SEQ_MESSAGE = /^(\s*[^:\n]*?(?:-->>|->>|--x|-x|--\)|-\)|-->|->)[^:\n]*:\s*)"([^"]+)"(\s*)$/;
-var SEQ_NOTE = /^(\s*note\s+(?:left of|right of|over)\s+[^:]+:\s*)"([^"]+)"(\s*)$/i;
-function stripSequenceQuotes(body) {
-  const lines = body.split("\n");
-  const first = lines.find((l) => l.trim() !== "");
-  if (first === void 0 || !/^\s*sequenceDiagram\b/.test(first)) return body;
-  return lines.map((line) => {
-    for (const re of [SEQ_ALIAS, SEQ_NOTE, SEQ_MESSAGE]) {
-      const m = re.exec(line);
-      if (m) return m[1] + m[2] + m[3];
-    }
-    return line;
-  }).join("\n");
-}
-function normBody(body) {
-  return stripSequenceQuotes(body.replace(/\r\n/g, "\n").trim());
-}
-async function applyCharts(detail, charts, options) {
-  if (charts.length > options.remaining) return { ok: false, code: "over_cap", index: 0 };
-  const lines = detail.split("\n"), mask = fenceMask(lines), noteNums = noteNumbers(detail);
-  const used = /* @__PURE__ */ new Set(), items = [];
-  for (let index = 0; index < charts.length; index++) {
-    const chart = charts[index], body = normBody(chart.mermaid);
-    const fail2 = (code) => ({ ok: false, code, index });
-    const nonBlank = body.split("\n").filter((l) => l.trim()).length;
-    if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail2("bad_body");
-    const fence = "```mermaid\n" + body + "\n```";
-    if (neutralizeUnsafeMermaid(fence) !== fence) return fail2("unsafe_or_header");
-    if (options.parses) {
-      let ok = true;
-      try {
-        ok = await options.parses(body);
-      } catch (e) {
-        ok = false;
-      }
-      if (!ok) return fail2("unparsable");
-    }
-    const tokens2 = numberTokens(body.replace(/^\s*\S+/, ""));
-    if (tokens2.some((n) => !noteNums.has(n))) return fail2("number_not_in_note");
-    const anchor = anchorCheck(lines, mask, chart.anchor);
-    if (anchor.code) return fail2(anchor.code);
-    const block = anchor.block;
-    const key2 = block.join("-");
-    if (used.has(key2)) return fail2("anchor_shared");
-    used.add(key2);
-    items.push({ body, block });
-  }
-  const out = [...lines];
-  for (const item of [...items].sort((a, b) => b.block[1] - a.block[1])) {
-    const end = item.block[1];
-    const cr = lines[end].endsWith("\r") ? "\r" : "";
-    const segment = ["", "```mermaid", ...item.body.split("\n"), "```"];
-    const next = lines[end + 1];
-    if (next !== void 0 && next.trim() !== "") segment.push("");
-    out.splice(end + 1, 0, ...segment.map((line) => line + cr));
-  }
-  const final = out.join("\n");
-  if (neutralizeUnsafeMermaid(detail) === detail && neutralizeUnsafeMermaid(final) !== final)
-    return { ok: false, code: "unsafe_or_header", index: 0 };
-  return { ok: true, detail: final };
-}
-
-// core/steps/task/merge-check.ts
-var UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
-var HEADING = /^(#{1,6})[ \t]+\S/;
-function withoutUpdateLog(text11, logHeadings) {
-  const names3 = new Set(logHeadings.map((name) => name.trim().toLocaleLowerCase()).filter(Boolean));
-  const isLog = (line) => {
-    const match = UPDATE_LOG_HEADING.exec(line);
-    if (match) return match;
-    const heading = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(line);
-    return heading && names3.has(heading[2].trim().toLocaleLowerCase()) ? heading : null;
-  };
-  const lines = text11.replace(/\r\n/g, "\n").split("\n"), kept = [];
-  let skipping = 0;
-  for (const line of lines) {
-    const heading = HEADING.exec(line);
-    if (skipping && heading && heading[1].length <= skipping) skipping = 0;
-    if (!skipping) {
-      const log = isLog(line);
-      if (log) {
-        skipping = log[1].length;
-        continue;
-      }
-      kept.push(line);
-    }
-  }
-  return kept.join("\n");
-}
-function withoutListMarkers(text11) {
-  return text11.replace(/^([ \t]*(?:>[ \t]*)*(?:#{1,6}[ \t]+)?(?:[-*+][ \t]+)?)\d+[.)、．][ \t]+/gm, "$1");
-}
-function normalNumber(token) {
-  const value = Number(token);
-  return Number.isFinite(value) && token.length < 16 ? String(value) : token;
-}
-function numbersOf(texts2, logHeadings) {
-  const out = /* @__PURE__ */ new Set();
-  for (const text11 of texts2) {
-    const body = withoutListMarkers(withoutUpdateLog(text11, logHeadings)).replace(/!?\[\[[^\]]*\]\]/g, "");
-    for (const token of noteNumbers(body)) out.add(normalNumber(token));
-  }
-  return out;
-}
-function decoded(value) {
-  try {
-    return decodeURIComponent(value);
-  } catch (e) {
-    return value;
-  }
-}
-function linksOf(texts2) {
-  const out = /* @__PURE__ */ new Map();
-  const add = (kind, raw) => {
-    const shown = raw.trim().replace(/[.,;:!?*_'"]+$/, "");
-    const key2 = decoded(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
-    if (key2) out.set(`${kind}${key2}`, shown);
-  };
-  for (const text11 of texts2) {
-    for (const match of text11.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) add("", match[0]);
-    for (const match of text11.matchAll(/!?\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g)) add("wiki:", match[1]);
-    for (const match of text11.matchAll(/\]\(\s*<?([^)\s>]+)/g)) {
-      const target = match[1];
-      if (/^(?:https?:|mailto:|#)/i.test(target)) continue;
-      add("link:", target);
-    }
-  }
-  return out;
-}
-function checkMergePreservation(input) {
-  var _a2, _b2, _c, _d;
-  const logs = (_a2 = input.logHeadings) != null ? _a2 : [];
-  const missing = [], added = [];
-  const sourceNumbers = numbersOf(input.sourceTexts, logs), mergedNumbers = numbersOf(input.mergedTexts, logs), allowed = numbersOf((_b2 = input.allowedTexts) != null ? _b2 : [], logs);
-  for (const token of sourceNumbers) if (!mergedNumbers.has(token)) missing.push(token);
-  for (const token of mergedNumbers) if (!sourceNumbers.has(token) && !allowed.has(token)) added.push(token);
-  const sourceLinks = linksOf([...input.sourceTexts, ...(_c = input.sourceLinkTexts) != null ? _c : []]), mergedLinks = linksOf([...input.mergedTexts, ...(_d = input.mergedLinkTexts) != null ? _d : []]);
-  for (const [key2, shown] of sourceLinks) if (!mergedLinks.has(key2)) missing.push(shown);
-  return { ok: !missing.length && !added.length, missing, added };
-}
-function findingList(items, none, limit = 30) {
-  if (!items.length) return none;
-  const lines = items.slice(0, limit).map((item) => `- ${item}`);
-  if (items.length > limit) lines.push(`- \u2026 (+${items.length - limit})`);
-  return lines.join("\n");
-}
-
-// core/steps/task/carry-sources.ts
-var HEADING_KEY = "note.earlier_research_sources";
-var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
-var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
-function outsideCode(text11) {
-  const lines = text11.replace(/\r\n/g, "\n").split("\n");
-  const code = fencedLines(lines);
-  return lines.filter((_, index) => !code[index]);
-}
-function keysOf(text11) {
-  return [...linksOf([text11]).keys()];
-}
-function plainLine(line) {
-  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
-  return `- ${stripped}`;
-}
-function linkTokens(line, wanted) {
-  const out = [];
-  for (const match of line.matchAll(TOKEN)) {
-    const token = match[0];
-    if (!wanted(keysOf(token))) continue;
-    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
-    else out.push(token.replace(/^!/, ""));
-  }
-  return out;
-}
-function carriedSourceLines(previousTexts, nextTexts) {
-  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
-  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
-  if (!missing.size) return [];
-  const covered = /* @__PURE__ */ new Set();
-  const lines = [];
-  const add = (line) => {
-    if (line.trim() && !lines.includes(line)) lines.push(line);
-  };
-  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
-  for (const line of previousTexts.flatMap(outsideCode)) {
-    const keys = keysOf(line);
-    if (!open(keys)) continue;
-    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
-    if (definition) add(`- ${definition[1].trim()}`);
-    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
-    else add(plainLine(line));
-    for (const key2 of keys) covered.add(key2);
-  }
-  return lines;
-}
-function carryForwardSources(detail, previousTexts, nextTexts, language2, template) {
-  const carried = carriedSourceLines(previousTexts, nextTexts);
-  if (!carried.length) return detail;
-  const heading = translateNote(language2, HEADING_KEY);
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
-  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
-  const keys = sourcesHeadingKeys(template);
-  const start = lines.findIndex((line, index) => {
-    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    return !!match && keys.has(match[1].toLocaleLowerCase());
-  });
-  if (start < 0) return `${detail.trimEnd()}
-
-### ${heading}
-
-${carried.join("\n")}
-`;
-  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
-}
-function insertAfterBlock(lines, code, start, add, stop, separate = false) {
-  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
-  if (end < 0) end = lines.length;
-  while (end > start + 1 && !lines[end - 1].trim()) end--;
-  return [
-    ...lines.slice(0, end),
-    ...separate ? [""] : [],
-    ...add,
-    ...end < lines.length && lines[end].trim() ? [""] : [],
-    ...lines.slice(end)
-  ].join("\n");
-}
-
-// repository.ts
-var import_obsidian14 = require("obsidian");
-var import_node_crypto5 = require("node:crypto");
-
 // core/map-chat-layout.ts
 var MAP_CHAT_WIDTH_DEFAULT = 340;
 var MAP_CHAT_WIDTH_MIN = 280;
@@ -20687,7 +20207,7 @@ function aliasFallback(mapPath) {
 function frontmatter(content) {
   var _a2, _b2;
   const yaml = (_a2 = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)) == null ? void 0 : _a2[1];
-  return yaml ? (_b2 = (0, import_obsidian14.parseYaml)(yaml)) != null ? _b2 : {} : {};
+  return yaml ? (_b2 = (0, import_obsidian12.parseYaml)(yaml)) != null ? _b2 : {} : {};
 }
 function setFrontmatterKeys(content, values) {
   var _a2;
@@ -21153,21 +20673,21 @@ var Repository = class {
   }
   file(path) {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof import_obsidian14.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
+    if (!(file instanceof import_obsidian12.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
     return file;
   }
   hasNote(path) {
-    return this.app.vault.getAbstractFileByPath(path) instanceof import_obsidian14.TFile;
+    return this.app.vault.getAbstractFileByPath(path) instanceof import_obsidian12.TFile;
   }
   async folder(path) {
     let current = "";
-    for (const part of (0, import_obsidian14.normalizePath)(path).split("/").filter(Boolean)) {
+    for (const part of (0, import_obsidian12.normalizePath)(path).split("/").filter(Boolean)) {
       current = current ? `${current}/${part}` : part;
       if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
     }
   }
   workspaceExists() {
-    return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian14.TFolder;
+    return this.app.vault.getAbstractFileByPath(this.settings.workspaceFolder) instanceof import_obsidian12.TFolder;
   }
   async workspaceCandidates() {
     var _a2;
@@ -21194,7 +20714,7 @@ var Repository = class {
     await this.folder(this.settings.aimFolder);
   }
   unique(folder, name, avoid) {
-    const base = (0, import_obsidian14.normalizePath)(`${folder}/${safeName(name)}`);
+    const base = (0, import_obsidian12.normalizePath)(`${folder}/${safeName(name)}`);
     let path = `${base}.md`, number = 2;
     while ((avoid == null ? void 0 : avoid.has(path)) || this.pathTaken(path)) path = `${base} ${number++}.md`;
     return path;
@@ -21207,14 +20727,14 @@ var Repository = class {
   foldedSibling(path, exclude) {
     var _a2, _b2;
     const folder = this.app.vault.getAbstractFileByPath(parentPath(path));
-    if (!(folder instanceof import_obsidian14.TFolder)) return null;
+    if (!(folder instanceof import_obsidian12.TFolder)) return null;
     const wanted = foldEntryName((_a2 = path.split("/").at(-1)) != null ? _a2 : path, /\.md$/i.test(path));
     return (_b2 = folder.children.find(
-      (child) => child.path !== exclude && foldEntryName(child.name, child instanceof import_obsidian14.TFile) === wanted
+      (child) => child.path !== exclude && foldEntryName(child.name, child instanceof import_obsidian12.TFile) === wanted
     )) != null ? _b2 : null;
   }
   uniqueFolder(folder, name) {
-    const base = (0, import_obsidian14.normalizePath)(`${folder}/${safeName(name)}`);
+    const base = (0, import_obsidian12.normalizePath)(`${folder}/${safeName(name)}`);
     let path = base, number = 2;
     while (this.app.vault.getAbstractFileByPath(path) || this.foldedSibling(path, "")) path = `${base} ${number++}`;
     return path;
@@ -21451,7 +20971,7 @@ var Repository = class {
         textLanguage
       );
       return `---
-${(0, import_obsidian14.stringifyYaml)(fm)}---
+${(0, import_obsidian12.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, language2)}`;
     });
   }
@@ -21486,7 +21006,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
       folder,
       title,
       `---
-${(0, import_obsidian14.stringifyYaml)(metadata)}---
+${(0, import_obsidian12.stringifyYaml)(metadata)}---
 ${noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLanguage), this.noteLanguage, "", "", placeholder(this.noteLanguage), (_d = initial.detail) != null ? _d : "", "", "", origin)}`,
       onCreate
     );
@@ -21520,7 +21040,7 @@ ${noteBody(title, (_c = initial.summary) != null ? _c : placeholder(this.noteLan
       throw new Error("A reserved note must use a valid identity inside this map's Notes folder.");
     const existing = this.app.vault.getAbstractFileByPath(path);
     if (existing) {
-      if (existing instanceof import_obsidian14.TFile) {
+      if (existing instanceof import_obsidian12.TFile) {
         const fm = frontmatter(await this.app.vault.read(existing));
         if (marker2(fm["agent-map-node"]) && text5(fm["node-id"]) === id)
           return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -21549,7 +21069,7 @@ ${originMarkdown(initial.thinkingOrigin)}` : "";
     await this.app.vault.create(
       path,
       `---
-${(0, import_obsidian14.stringifyYaml)(metadata)}---
+${(0, import_obsidian12.stringifyYaml)(metadata)}---
 ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != null ? _d : "", "", placeholder(textLanguage), (_e = initial.detail) != null ? _e : "", "", "", origin)}`
     );
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
@@ -21571,7 +21091,7 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
     metadata.title = title;
     const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
     const created = await this.createUniqueNote(folder, title, `---
-${(0, import_obsidian14.stringifyYaml)(metadata)}---
+${(0, import_obsidian12.stringifyYaml)(metadata)}---
 ${body}`);
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
   }
@@ -21860,7 +21380,7 @@ ${body}`);
     for (const { file, map } of await this.readableMaps()) {
       let changed = false;
       for (const node of [...map.nodes]) {
-        if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian14.TFile) continue;
+        if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian12.TFile) continue;
         const matches = (_d = candidates.get(node.id)) != null ? _d : [];
         if (matches.length !== 1) continue;
         const oldPath = node.path;
@@ -21884,9 +21404,9 @@ ${body}`);
     const broken = [];
     for (const containerPath of managedMapContainers(this.settings)) {
       const root = this.app.vault.getAbstractFileByPath(containerPath);
-      if (!(root instanceof import_obsidian14.TFolder)) continue;
+      if (!(root instanceof import_obsidian12.TFolder)) continue;
       for (const child of root.children) {
-        if (!(child instanceof import_obsidian14.TFolder) || this.app.vault.getAbstractFileByPath(`${child.path}/Map.md`)) continue;
+        if (!(child instanceof import_obsidian12.TFolder) || this.app.vault.getAbstractFileByPath(`${child.path}/Map.md`)) continue;
         const prefix = `${child.path}/Notes/`;
         const noteCount = this.app.vault.getMarkdownFiles().filter((file) => file.path.startsWith(prefix)).length;
         broken.push({ title: child.name, root: child.path, noteCount });
@@ -21929,12 +21449,12 @@ ${body}`);
       if (id) byId.set(id, file.path);
     }
     for (const node of [...map.nodes])
-      if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian14.TFile) && byId.has(node.id))
+      if (!(this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian12.TFile) && byId.has(node.id))
         rebaseMapNotePaths(map, moveNotePath(node.path, byId.get(node.id)));
     await this.moveExact(sourcePath, target);
     await this.saveMap(target, map);
     for (const node of map.nodes)
-      if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian14.TFile)
+      if (this.app.vault.getAbstractFileByPath(node.path) instanceof import_obsidian12.TFile)
         await this.setLifecycle(node.path, map.id, map.id, "active");
     await this.rebuildDerivedData();
     return target;
@@ -21958,7 +21478,7 @@ ${body}`);
   }
   async moveUnique(path, folder) {
     await this.folder(folder);
-    const file = this.file(path), desired = (0, import_obsidian14.normalizePath)(`${folder}/${baseName(path)}`);
+    const file = this.file(path), desired = (0, import_obsidian12.normalizePath)(`${folder}/${baseName(path)}`);
     const target = this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, file.basename) : desired;
     await this.relocate(file, target);
     await this.replaceSourcePath(path, target);
@@ -21973,7 +21493,7 @@ ${body}`);
   }
   async renameNote(path, title, exactTarget) {
     await this.updateNote(path, { title });
-    const folder = parentPath(path), desired = exactTarget != null ? exactTarget : (0, import_obsidian14.normalizePath)(`${folder}/${safeName(title)}.md`);
+    const folder = parentPath(path), desired = exactTarget != null ? exactTarget : (0, import_obsidian12.normalizePath)(`${folder}/${safeName(title)}.md`);
     if (desired === path) return path;
     const target = exactTarget != null ? exactTarget : this.app.vault.getAbstractFileByPath(desired) ? this.unique(folder, title) : desired;
     await this.relocate(this.file(path), target);
@@ -21997,13 +21517,13 @@ ${body}`);
     }
     const moves = /* @__PURE__ */ new Map();
     const collect = (entry) => {
-      if (entry instanceof import_obsidian14.TFile) moves.set(entry.path, `${target}${entry.path.slice(item.path.length)}`);
-      else for (const child of entry.children) if (child instanceof import_obsidian14.TFile || child instanceof import_obsidian14.TFolder) collect(child);
+      if (entry instanceof import_obsidian12.TFile) moves.set(entry.path, `${target}${entry.path.slice(item.path.length)}`);
+      else for (const child of entry.children) if (child instanceof import_obsidian12.TFile || child instanceof import_obsidian12.TFolder) collect(child);
     };
     collect(item);
     const plan = await this.planLinkRewrites(item, moves, resolvedLinks);
     if (plan.foreign > 0) {
-      new import_obsidian14.Notice(translate(this.settings.language, "ui.move_links_dialog_notice_0", plan.foreign));
+      new import_obsidian12.Notice(translate(this.settings.language, "ui.move_links_dialog_notice_0", plan.foreign));
       await this.app.fileManager.renameFile(item, target);
       return;
     }
@@ -22014,7 +21534,7 @@ ${body}`);
     try {
       for (const edit of plan.edits) {
         const path = (_a2 = moves.get(edit.path)) != null ? _a2 : edit.path, file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof import_obsidian14.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
+        if (!(file instanceof import_obsidian12.TFile)) throw new Error(`${this.message("error.file_not_found")}: ${path}`);
         await this.app.vault.process(file, (current) => {
           if (current !== edit.before)
             throw new Error(translate(this.settings.language, "error.move_links_note_changed_0", path));
@@ -22026,7 +21546,7 @@ ${body}`);
       try {
         for (const entry of written2.reverse()) {
           const file = this.app.vault.getAbstractFileByPath(entry.path);
-          if (file instanceof import_obsidian14.TFile)
+          if (file instanceof import_obsidian12.TFile)
             await this.app.vault.process(file, (current) => current === entry.after ? entry.before : current);
         }
         const moved = this.app.vault.getAbstractFileByPath(target);
@@ -22063,11 +21583,11 @@ ${body}`);
       if (!Object.keys(targets).some((path) => moves.has(path))) continue;
       const linker = this.app.vault.getAbstractFileByPath(linkerPath);
       if (!linker) continue;
-      if (linker instanceof import_obsidian14.TFile && linker.extension === "md" && await owned(linker))
+      if (linker instanceof import_obsidian12.TFile && linker.extension === "md" && await owned(linker))
         candidates.set(linkerPath, linker);
       else foreign.add(linkerPath);
     }
-    const needles = item instanceof import_obsidian14.TFolder ? [`${item.path}/`] : [item.path.replace(/\.md$/i, ""), item.basename];
+    const needles = item instanceof import_obsidian12.TFolder ? [`${item.path}/`] : [item.path.replace(/\.md$/i, ""), item.basename];
     for (const file of await this.markedFiles("agent-map-node")) {
       if (candidates.has(file.path) || foreign.has(file.path)) continue;
       const text11 = await this.app.vault.cachedRead(file);
@@ -22126,7 +21646,7 @@ ${body}`);
       let changed = false;
       for (const node of map.nodes) {
         const file = this.app.vault.getAbstractFileByPath(node.path);
-        if (!(file instanceof import_obsidian14.TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
+        if (!(file instanceof import_obsidian12.TFile) || !/^新的子議題(?: \d+)*$/.test(file.basename)) continue;
         const note = await this.readNote(node.path);
         if (!note.title.trim() || safeName(note.title) === file.basename) continue;
         const oldPath = node.path, newPath = await this.renameNote(oldPath, note.title);
@@ -22174,7 +21694,7 @@ ${body}`);
     const nodeFiles = new Map((await this.markedFiles("agent-map-node")).map((file) => [file.path, file]));
     for (const path of ownership2.keys()) {
       const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof import_obsidian14.TFile) nodeFiles.set(path, file);
+      if (file instanceof import_obsidian12.TFile) nodeFiles.set(path, file);
     }
     for (const file of nodeFiles.values()) {
       if (!inScope(file.path)) continue;
@@ -22254,7 +21774,7 @@ ${body}`);
       textLanguage
     );
     return `---
-${(0, import_obsidian14.stringifyYaml)(fm)}---
+${(0, import_obsidian12.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, language2)}`;
   }
   async ensureNodePresentation() {
@@ -22266,7 +21786,7 @@ ${withReferenceLinks(body, fm, language2)}`;
         if (!marker2(current["agent-map-node"]) || !ensureNoteCssClass(current)) return content;
         const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "");
         return `---
-${(0, import_obsidian14.stringifyYaml)(current)}---
+${(0, import_obsidian12.stringifyYaml)(current)}---
 ${body}`;
       });
     }
@@ -22274,11 +21794,11 @@ ${body}`;
   async createMap(title, nodes = [], onRootCreated, aim, outputLanguage2) {
     const container = aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
     await this.folder(container);
-    const preferredRoot = (0, import_obsidian14.normalizePath)(`${container}/${safeName(title)}`);
+    const preferredRoot = (0, import_obsidian12.normalizePath)(`${container}/${safeName(title)}`);
     const preferredFolder = this.app.vault.getAbstractFileByPath(preferredRoot);
-    const recoverEmptyAimFolder = !!(aim == null ? void 0 : aim.creationId) && preferredFolder instanceof import_obsidian14.TFolder && preferredFolder.children.length === 0;
+    const recoverEmptyAimFolder = !!(aim == null ? void 0 : aim.creationId) && preferredFolder instanceof import_obsidian12.TFolder && preferredFolder.children.length === 0;
     const root = recoverEmptyAimFolder ? preferredRoot : this.uniqueFolder(container, title);
-    const folder = recoverEmptyAimFolder && preferredFolder instanceof import_obsidian14.TFolder ? preferredFolder : await this.app.vault.createFolder(root);
+    const folder = recoverEmptyAimFolder && preferredFolder instanceof import_obsidian12.TFolder ? preferredFolder : await this.app.vault.createFolder(root);
     onRootCreated == null ? void 0 : onRootCreated(folder);
     if (!(aim == null ? void 0 : aim.creationId)) await this.ensureTopicFolders(root);
     const path = `${root}/Map.md`;
@@ -22313,13 +21833,13 @@ ${body}`;
    */
   async changeMapFolder(key2, path, busy = () => false, onProgress) {
     var _a2;
-    const next = (0, import_obsidian14.normalizePath)(path), current = this.settings[key2];
+    const next = (0, import_obsidian12.normalizePath)(path), current = this.settings[key2];
     if (next === current) return /* @__PURE__ */ new Map();
     const problem = this.mapFolderProblem(key2, next);
     if (problem) throw new Error(this.message(problem));
     const old = this.app.vault.getAbstractFileByPath(current);
     let mapping = /* @__PURE__ */ new Map();
-    if (old instanceof import_obsidian14.TFolder) {
+    if (old instanceof import_obsidian12.TFolder) {
       const moves = [];
       for (const file of await this.mapFiles()) {
         const root = parentPath(file.path);
@@ -22331,7 +21851,7 @@ ${body}`;
           throw new Error(this.message("error.map_folder_unreadable"));
         }
         if (hasActiveAimAttempt(map) || busy(file.path)) throw new Error(this.message("error.organize_aim_busy"));
-        const toRoot = (0, import_obsidian14.normalizePath)(`${next}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
+        const toRoot = (0, import_obsidian12.normalizePath)(`${next}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
         if (this.app.vault.getAbstractFileByPath(toRoot)) throw new Error(this.message("error.map_folder_exists"));
         moves.push({ mapPath: file.path, title: map.title, kind: map.aim ? "aim" : "mind", fromRoot: root, toRoot });
       }
@@ -22341,7 +21861,7 @@ ${body}`;
       }
       mapping = await this.runTopicMoves(moves, [next], onProgress);
       const left = this.app.vault.getAbstractFileByPath(current);
-      if (left instanceof import_obsidian14.TFolder && left.children.length === 0) {
+      if (left instanceof import_obsidian12.TFolder && left.children.length === 0) {
         try {
           await this.app.fileManager.trashFile(left);
         } catch (e) {
@@ -22381,7 +21901,7 @@ ${body}`;
     const empty = [];
     for (const path of this.legacyCleanupFolders()) {
       const folder = this.app.vault.getAbstractFileByPath(path);
-      if (!(folder instanceof import_obsidian14.TFolder) || !folder.children.every((child) => moving.has(child.path))) continue;
+      if (!(folder instanceof import_obsidian12.TFolder) || !folder.children.every((child) => moving.has(child.path))) continue;
       if (await this.emptyOnDisk(path, moving)) empty.push(path);
     }
     return empty;
@@ -22392,7 +21912,7 @@ ${body}`;
     for (const path of this.legacyCleanupFolders()) {
       if (this.disposed) break;
       const folder = this.app.vault.getAbstractFileByPath(path);
-      if (!(folder instanceof import_obsidian14.TFolder) || folder.children.length) continue;
+      if (!(folder instanceof import_obsidian12.TFolder) || folder.children.length) continue;
       if (!await this.emptyOnDisk(path)) continue;
       try {
         await this.app.fileManager.trashFile(folder);
@@ -22424,7 +21944,7 @@ ${body}`;
       if (hasActiveAimAttempt(map)) plan.busy.push(map.title);
       const container = map.aim ? this.settings.aimFolder : this.settings.mindMapsFolder;
       if (container === this.settings.topicsFolder) continue;
-      const base = (0, import_obsidian14.normalizePath)(`${container}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
+      const base = (0, import_obsidian12.normalizePath)(`${container}/${(_a2 = root.split("/").at(-1)) != null ? _a2 : safeName(map.title)}`);
       let toRoot = base, number = 2;
       while (this.app.vault.getAbstractFileByPath(toRoot) || reserved.has(toRoot)) toRoot = `${base} ${number++}`;
       reserved.add(toRoot);
@@ -22470,7 +21990,7 @@ ${body}`;
         const originalMap = await this.app.vault.read(this.file(move.mapPath));
         const newMapPath = await this.renameTopic(move.mapPath, move.title, move.toRoot, { rebuild: false });
         const journal = [];
-        if (!(this.app.vault.getAbstractFileByPath(move.toRoot) instanceof import_obsidian14.TFolder) || !(this.app.vault.getAbstractFileByPath(newMapPath) instanceof import_obsidian14.TFile))
+        if (!(this.app.vault.getAbstractFileByPath(move.toRoot) instanceof import_obsidian12.TFolder) || !(this.app.vault.getAbstractFileByPath(newMapPath) instanceof import_obsidian12.TFile))
           throw new Error(this.message("error.move_not_applied"));
         done.push({ move, newMapPath, originalMap, journal });
         mapping.set(move.mapPath, newMapPath);
@@ -22484,7 +22004,7 @@ ${body}`;
         try {
           for (const prior of [...journal].reverse()) {
             const file = this.app.vault.getAbstractFileByPath(prior.path);
-            if (file instanceof import_obsidian14.TFile) await this.app.vault.modify(file, prior.content);
+            if (file instanceof import_obsidian12.TFile) await this.app.vault.modify(file, prior.content);
           }
           await this.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
           await this.app.vault.modify(this.file(`${move.fromRoot}/Map.md`), originalMap);
@@ -22533,9 +22053,9 @@ ${body}`;
   }
   async renameTopic(mapPath, title, targetRoot, options = {}) {
     const file = this.file(mapPath), root = file.parent;
-    if (!(root instanceof import_obsidian14.TFolder) || !(isManagedMapPath(this.settings, mapPath) || this.pendingContainers.some((c) => mapPath.startsWith(`${c}/`))))
+    if (!(root instanceof import_obsidian12.TFolder) || !(isManagedMapPath(this.settings, mapPath) || this.pendingContainers.some((c) => mapPath.startsWith(`${c}/`))))
       throw new Error(this.message("error.legacy_map_view_only"));
-    const desired = targetRoot ? (0, import_obsidian14.normalizePath)(targetRoot) : (0, import_obsidian14.normalizePath)(`${parentPath(root.path)}/${safeName(title)}`);
+    const desired = targetRoot ? (0, import_obsidian12.normalizePath)(targetRoot) : (0, import_obsidian12.normalizePath)(`${parentPath(root.path)}/${safeName(title)}`);
     if (desired !== root.path && (this.app.vault.getAbstractFileByPath(desired) || !targetRoot && this.foldedSibling(desired, root.path)))
       throw new Error(this.message("error.topic_folder_exists"));
     const originalRoot = root.path;
@@ -22555,7 +22075,7 @@ ${body}`;
       if (desired !== originalRoot) {
         await this.relocate(root, desired);
         moved = true;
-        if (!(this.app.vault.getAbstractFileByPath(desired) instanceof import_obsidian14.TFolder))
+        if (!(this.app.vault.getAbstractFileByPath(desired) instanceof import_obsidian12.TFolder))
           throw new Error(this.message("error.move_not_applied"));
       }
       const map = await this.readMap(next);
@@ -22569,10 +22089,10 @@ ${body}`;
       if (moved) {
         try {
           const movedRoot = this.app.vault.getAbstractFileByPath(desired);
-          if (!(movedRoot instanceof import_obsidian14.TFolder)) throw new Error("Renamed topic folder was not found for rollback.");
+          if (!(movedRoot instanceof import_obsidian12.TFolder)) throw new Error("Renamed topic folder was not found for rollback.");
           await this.relocate(movedRoot, originalRoot);
           const restoredMap = this.app.vault.getAbstractFileByPath(originalMapPath);
-          if (!(restoredMap instanceof import_obsidian14.TFile))
+          if (!(restoredMap instanceof import_obsidian12.TFile))
             throw new Error("Original Map.md was not found after restoring the topic folder.");
           await this.app.vault.modify(restoredMap, originalContent);
           this.noteRestoredMap(originalMapPath, originalContent);
@@ -22583,7 +22103,7 @@ ${body}`;
             `Topic rename failed (${originalMessage}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}).`
           );
         }
-      } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof import_obsidian14.TFile) {
+      } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof import_obsidian12.TFile) {
         await this.app.vault.modify(this.file(originalMapPath), originalContent);
         this.noteRestoredMap(originalMapPath, originalContent);
         await rebuild2();
@@ -22594,6 +22114,1079 @@ ${body}`;
   async migrate() {
   }
 };
+
+// experiences/visual-map/card-cover.ts
+var COVER_KEY = "topic-cover";
+var IMAGE_EXTENSION2 = /\.(?:png|jpe?g|gif|webp)$/i;
+var SCHEME2 = /^[a-z][a-z0-9+.-]*:/i;
+function linkpathOf(raw) {
+  let value = raw;
+  while (Array.isArray(value)) value = value[0];
+  if (typeof value !== "string") return null;
+  const wiki = /^\s*!?\[\[([^\]]*)\]\]\s*$/.exec(value);
+  const inner = (wiki ? wiki[1] : value).split("|")[0].split("#")[0].trim();
+  if (!inner || SCHEME2.test(inner) || inner.startsWith("//")) return null;
+  return inner;
+}
+function localImage(raw, resolve) {
+  const linkpath = linkpathOf(raw);
+  if (!linkpath) return null;
+  const file = resolve(linkpath);
+  const path = file && typeof file.path === "string" ? file.path : null;
+  return path && IMAGE_EXTENSION2.test(path) ? path : null;
+}
+function resolveCover(cache, resolve) {
+  var _a2, _b2;
+  const declared = (_a2 = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a2[COVER_KEY];
+  if (typeof declared === "string" && declared.trim().toLowerCase() === "none") return { off: true };
+  if (declared !== void 0 && declared !== null) {
+    const path = localImage(declared, resolve);
+    if (path) return { path };
+  }
+  for (const embed of (_b2 = cache == null ? void 0 : cache.embeds) != null ? _b2 : []) {
+    const path = localImage(embed == null ? void 0 : embed.link, resolve);
+    if (path) return { path };
+  }
+  return null;
+}
+function safeLink(link) {
+  return link.replace(/[[\]|\r\n]/g, " ").trim();
+}
+function withCover(content, link) {
+  const safe = safeLink(link);
+  return safe ? setFrontmatterKeys(content, { [COVER_KEY]: `[[${safe}]]` }) : content;
+}
+function withCoverOff(content) {
+  return setFrontmatterKeys(content, { [COVER_KEY]: "none" });
+}
+function withoutCover(content) {
+  return setFrontmatterKeys(content, { [COVER_KEY]: null });
+}
+function appendImageEmbed(content, link) {
+  const safe = safeLink(link);
+  if (!safe) return content;
+  const embed = `![[${safe}]]`;
+  const heading = /^## User Notes[ \t]*$/m.exec(content);
+  if (!heading) return `${content.replace(/\s+$/, "")}
+
+## User Notes
+
+${embed}
+`;
+  const from = heading.index + heading[0].length;
+  const next = /^## /m.exec(content.slice(from));
+  const end = next ? from + next.index : content.length;
+  const at = from + content.slice(from, end).replace(/\s+$/, "").length;
+  const tail = content.slice(at);
+  return `${content.slice(0, at)}
+
+${embed}${tail.includes("\n") ? tail : `${tail}
+`}`;
+}
+
+// experiences/visual-map/topic-kind-shape.ts
+var TOPIC_KIND_SHAPES = {
+  topic: { shape: "rounded", labelKey: "ui.topic_kind_topic" },
+  action: { shape: "rect", labelKey: "ui.topic_kind_action" },
+  atomic: { shape: "ellipse", labelKey: "ui.topic_kind_atomic" },
+  hypothesis: { shape: "diamond", labelKey: "ui.topic_kind_hypothesis" },
+  evidence: { shape: "folded", labelKey: "ui.topic_kind_evidence" },
+  conclusion: { shape: "hexagon", labelKey: "ui.topic_kind_conclusion" }
+};
+var EDGE = 0;
+var FAR = 100;
+var HEXAGON = `25,${EDGE} 75,${EDGE} ${FAR},50 75,${FAR} 25,${FAR} ${EDGE},50`;
+var FOLD_X = 88;
+var FOLD_Y = 24;
+var FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR} ${EDGE},${FAR}`;
+var FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
+var DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
+function hasSvgShape(kind) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  return shape !== "rounded" && shape !== "rect";
+}
+function renderShapeBackground(card, kind) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  if (!hasSvgShape(kind)) return void 0;
+  const svg = createSvg("svg");
+  svg.addClass("vam-kind-shape");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const outline = createSvg(shape === "ellipse" ? "ellipse" : "polygon");
+  outline.addClass("vam-kind-outline");
+  if (shape === "ellipse") {
+    outline.setAttribute("cx", "50");
+    outline.setAttribute("cy", "50");
+    outline.setAttribute("rx", "50");
+    outline.setAttribute("ry", "50");
+  } else outline.setAttribute("points", shape === "diamond" ? DIAMOND : shape === "hexagon" ? HEXAGON : FOLDED);
+  outline.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(outline);
+  if (shape === "folded") {
+    const fold2 = createSvg("polyline");
+    fold2.addClass("vam-kind-fold");
+    fold2.setAttribute("points", FOLD_LINE);
+    fold2.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(fold2);
+  }
+  card.appendChild(svg);
+  return svg;
+}
+var FIT = {
+  // Corner on the ellipse needs w^2 + h^2 <= 1.
+  ellipse: { width: 0.7, height: 0.7 },
+  // Corner on the diamond needs w + h <= 1: half the card's width, so the top and bottom padding is half the text each.
+  diamond: { width: 0.5, height: 0.5 },
+  // The hexagon's slanted side needs w + h / 2 <= 1.
+  hexagon: { width: 0.7, height: 0.58 },
+  // The cut corner needs h <= 1 - 4 * (0.94 - 0.88): the top right of the block clears the fold.
+  folded: { width: 0.88, height: 0.74 }
+};
+var SAFETY = 4;
+var BASE_PADDING = { top: 12, right: 14, bottom: 14, left: 14 };
+function shapeInsets(kind, content) {
+  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  if (shape === "rounded" || shape === "rect") return { ...BASE_PADDING };
+  const fit = FIT[shape];
+  const side = content.width * (1 - fit.width) / 2;
+  const vertical = content.height * (1 / fit.height - 1) / 2 + SAFETY;
+  return { top: vertical, right: side, bottom: vertical, left: side };
+}
+
+// experiences/visual-map/view.ts
+var import_node_crypto14 = require("node:crypto");
+var import_obsidian32 = require("obsidian");
+
+// ai/result-utils.ts
+var SENTENCE_END = /[。！？；!?;]/;
+function truncateSummary(value, limit = 80) {
+  var _a2;
+  const characters = Array.from(value.trim());
+  if (characters.length <= limit) return characters.join("");
+  const floor = Math.floor(limit / 2);
+  for (let index = limit - 1; index >= floor; index--) {
+    const character = characters[index];
+    if (SENTENCE_END.test(character) || character === "." && /\s/.test((_a2 = characters[index + 1]) != null ? _a2 : ""))
+      return characters.slice(0, index + 1).join("");
+  }
+  const window2 = characters.slice(0, limit - 1);
+  let gap = -1;
+  for (let index = window2.length - 1; index >= floor && gap < 0; index--) if (/\s/.test(window2[index])) gap = index;
+  return `${(gap >= 0 ? window2.slice(0, gap) : window2).join("").trimEnd()}\u2026`;
+}
+var LEGACY_SEARCH_FAILURE = /\bresearch status\s*:\s*(?:not searched|search failed|unavailable)\b/i;
+function reportedSearchFailure(result) {
+  if (result.searchStatus !== void 0) return result.searchStatus !== "completed";
+  return LEGACY_SEARCH_FAILURE.test(`${result.summary}
+${result.detail}`);
+}
+function sourceFootnoteDefinition(line) {
+  const match = /^\[\^([^\]\s]+)\]:[ \t]*(.*)$/.exec(line);
+  if (!match) return null;
+  const target = match[2].trim();
+  const external = NOTE_LANGUAGES.some(
+    (locale) => target.startsWith(translate(locale, "note.external_source_0", "").trim())
+  );
+  return match[1].startsWith("src-") || /^\[\[[^\]]+\]\]$/.test(target) || external ? { label: match[1], target } : null;
+}
+function textbookDetail(template, leading, sections, footnotes, sourcesIndex) {
+  var _a2;
+  const placeholders = /* @__PURE__ */ new Set([
+    ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+    "No new content this time",
+    "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
+  ]);
+  if (footnotes.length && sourcesIndex >= 0) {
+    const raw = ((_a2 = sections.get(sourcesIndex)) != null ? _a2 : []).join("\n").trim();
+    const evidence = placeholders.has(raw.replace(/[.。]$/, "")) ? "" : raw;
+    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
+  }
+  const blocks = [leading.join("\n").trim()];
+  template.sections.forEach((section3, index) => {
+    var _a3, _b2;
+    const body = (_b2 = (_a3 = sections.get(index)) == null ? void 0 : _a3.join("\n").trim()) != null ? _b2 : "";
+    if (body && !placeholders.has(body.replace(/[.。]$/, ""))) blocks.push(`### ${section3.name}
+
+${body}`);
+  });
+  if (footnotes.length && sourcesIndex < 0) blocks.push(footnotes.join("\n"));
+  return blocks.filter(Boolean).join("\n\n");
+}
+function normalizeOutputScriptHeadings(detail, output, template, context = {}) {
+  if (context.detailFormat === "adaptive" || context.promptProfile === "aim") return detail;
+  if (!verbatimHeadingLanguage(output) || template && !isBuiltinTemplateId(template.id)) return detail;
+  const note = noteLanguageOf(output);
+  const forms = /* @__PURE__ */ new Map();
+  for (const [, key2] of STANDARD) {
+    const canonical = translate(note, key2);
+    const written2 = translate(output, key2);
+    if (written2 !== canonical) forms.set(written2, canonical);
+  }
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  return lines.map((line, index) => {
+    const heading = code[index] ? null : /^###([ \t]+)(.+?)([ \t]*)$/.exec(line);
+    const canonical = heading ? forms.get(heading[2]) : void 0;
+    return heading && canonical ? `###${heading[1]}${canonical}${heading[3]}` : line;
+  }).join("\n");
+}
+function canonicalDetail(value, language2 = "zh-TW", template = standardTemplate(language2)) {
+  var _a2, _b2;
+  const detail = value.trim();
+  const headings = template.sections.map((section3) => section3.name);
+  const aliases = sectionLookup(template);
+  const sourcesIndex = template.sections.findIndex((section3) => section3.role === "sources");
+  const sections = /* @__PURE__ */ new Map();
+  const leading = [];
+  const footnotes = [];
+  let current = null;
+  const detailLines = detail.split("\n");
+  const code = fencedLines(detailLines);
+  for (const [index, line] of detailLines.entries()) {
+    if (!code[index] && sourceFootnoteDefinition(line)) {
+      footnotes.push(line);
+      continue;
+    }
+    const heading = /^###\s+(.+?)\s*$/.exec(line);
+    const match = heading ? aliases.get(heading[1].toLocaleLowerCase()) : void 0;
+    if (match !== void 0) {
+      current = match;
+      if (!sections.has(match)) sections.set(match, []);
+      continue;
+    }
+    (current === null ? leading : sections.get(current)).push(line);
+  }
+  if (template.id === TEXTBOOK_TEMPLATE_ID) return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
+  if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
+  else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(_a2 = sections.get(0)) != null ? _a2 : []]);
+  if (footnotes.length && sourcesIndex >= 0) {
+    const evidence = ((_b2 = sections.get(sourcesIndex)) != null ? _b2 : []).join("\n").trim();
+    sections.set(sourcesIndex, [[evidence, footnotes.join("\n")].filter(Boolean).join("\n\n")]);
+  }
+  const empty = translate(language2, "note.no_new_information");
+  const body = headings.map((heading, index) => {
+    var _a3;
+    return `### ${heading}
+
+${((_a3 = sections.get(index)) == null ? void 0 : _a3.join("\n").trim()) || empty}`;
+  }).join("\n\n");
+  return footnotes.length && sourcesIndex < 0 ? `${body}
+
+${footnotes.join("\n")}` : body;
+}
+function visualReferencesMarkdown(references2 = [], language2 = "zh-TW") {
+  return references2.map((item) => {
+    const title = item.title.trim() || translate(language2, "detail.visual_reference");
+    const imageUrl = item.imageUrl.trim();
+    const sourceUrl = item.sourceUrl.trim();
+    if (!imageUrl || !sourceUrl) return "";
+    const palette = item.palette.map((color2) => color2.trim()).filter(Boolean).join(" / ");
+    return [
+      `**${title}**`,
+      "",
+      `![${title}](${imageUrl})`,
+      "",
+      translate(language2, "detail.source", sourceUrl),
+      item.description.trim() ? translate(language2, "detail.purpose", item.description.trim()) : "",
+      palette ? translate(language2, "detail.palette", palette) : "",
+      item.formula.trim() ? translate(language2, "detail.reusable_formula", item.formula.trim()) : ""
+    ].filter(Boolean).join("\n");
+  }).filter(Boolean).join("\n\n");
+}
+
+// ai/reference-materials.ts
+async function readMarkdownFile(app, file) {
+  if (file.extension.toLowerCase() !== "md")
+    throw new Error(`Only Markdown can be used as local reference: ${file.path}`);
+  return { path: file.path, content: await app.vault.read(file) };
+}
+function dedupeReferenceGroups(groups) {
+  const seen = /* @__PURE__ */ new Set();
+  return groups.map((group) => ({
+    ...group,
+    documents: group.documents.filter((document2) => {
+      const key2 = document2.key || document2.path;
+      if (seen.has(key2)) return false;
+      seen.add(key2);
+      return true;
+    })
+  }));
+}
+function packReferenceChunks(chunks, characterLimit = 18e3) {
+  const batches = [];
+  let batch = "";
+  for (const chunk of chunks) {
+    if (batch && batch.length + chunk.length > characterLimit) {
+      batches.push(batch);
+      batch = "";
+    }
+    batch += `${batch ? "\n\n" : ""}${chunk}`;
+  }
+  if (batch) batches.push(batch);
+  return batches;
+}
+function referenceBatches(groups, documentLimit = 14e3, batchLimit = 18e3) {
+  var _a2;
+  const chunks = [];
+  let sourceNumber = 0;
+  for (const group of dedupeReferenceGroups(groups))
+    for (const document2 of group.documents) {
+      sourceNumber++;
+      const id = `S${sourceNumber}`;
+      const citation = document2.external ? "external Markdown; cite the exact path as plain text" : "Vault Markdown; cite as an Obsidian wikilink";
+      const pieces = (_a2 = document2.content.match(new RegExp(`[\\s\\S]{1,${documentLimit}}`, "g"))) != null ? _a2 : [""];
+      pieces.forEach(
+        (piece, index) => chunks.push(
+          `[${id}] ${citation}: ${document2.path}${pieces.length > 1 ? ` (part ${index + 1}/${pieces.length})` : ""}
+${piece}`
+        )
+      );
+    }
+  return packReferenceChunks(chunks, batchLimit);
+}
+function referenceCatalog(groups) {
+  const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
+  return documents.map(
+    (document2, index) => `[S${index + 1}] ${document2.external ? "External file (plain path)" : "Vault note (wikilink)"}: ${document2.path}`
+  ).join("\n");
+}
+function resolveWikilinks(text11, documents) {
+  return text11.replace(/\[\[([^\]]+)\]\]/g, (original, target) => {
+    const name = target.split("|")[0].trim();
+    const exact = documents.filter((document2) => document2.path === name);
+    const matches = exact.length ? exact : documents.filter((document2) => {
+      var _a2;
+      const basename2 = (_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path;
+      return basename2 === name || basename2.replace(/\.md$/i, "") === name;
+    });
+    if (matches.length > 1) return tNote("note.source_unconfirmed_0", name);
+    if (matches.length !== 1 || !matches[0].external) return original;
+    return tNote("note.external_source_0", matches[0].path);
+  });
+}
+function sourceFootnoteLabel(path) {
+  let hash = 2166136261;
+  for (let index = 0; index < path.length; index++) {
+    hash ^= path.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return `src-${hash.toString(36).padStart(7, "0")}`;
+}
+function resolveSummaryReferences(summary, groups) {
+  const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
+  const run = String.raw`\[S\d+\](?:\s*[,，、;；]?\s*\[S\d+\])*`;
+  const stripped = summary.replace(new RegExp(String.raw`[ \t]*[（(]\s*${run}\s*[）)]`, "g"), "").replace(new RegExp(String.raw`[ \t]*${run}`, "g"), "").trim();
+  return resolveWikilinks(stripped, documents);
+}
+var FOOTNOTE_REFERENCE = /\[\^([^\]\s]+)\](?!\()/g;
+function footnoteTarget(document2) {
+  var _a2;
+  const basename2 = ((_a2 = document2.path.split("/").pop()) != null ? _a2 : document2.path).replace(/\.md$/i, "");
+  return document2.external ? tNote("note.external_source_0", document2.path) : `[[${document2.path}|${basename2}]]`;
+}
+function targetKey(target) {
+  const link = /^\[\[([^\]|]+)/.exec(target);
+  return link ? link[1].trim().replace(/\.md$/i, "") : target;
+}
+function outsideInlineCode(line, edit) {
+  return line.split(/(`+[^`]*`+)/).map((part, index) => index % 2 ? part : edit(part)).join("");
+}
+function sourceDefinitions(detail) {
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const definitions = /* @__PURE__ */ new Map();
+  lines.forEach((line, index) => {
+    const definition = code[index] ? null : sourceFootnoteDefinition(line);
+    if (definition) definitions.set(definition.label, definition.target);
+  });
+  return definitions;
+}
+function footnoteDefinitionLabels(content) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const labels = /* @__PURE__ */ new Set();
+  lines.forEach((line, index) => {
+    const match = code[index] ? null : /^\[\^([^\]\s]+)\]:/.exec(line);
+    if (match) labels.add(match[1]);
+  });
+  return labels;
+}
+function usesFootnote(content, label) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  return lines.some(
+    (line, index) => !code[index] && outsideInlineCode(
+      line,
+      (text11) => [...text11.matchAll(FOOTNOTE_REFERENCE)].some((match) => match[1] === label) ? "\0" : ""
+    ).includes("\0")
+  );
+}
+function definesFootnote(content, label) {
+  const lines = content.split("\n");
+  const code = fencedLines(lines);
+  const prefix = `[^${label}]:`;
+  return lines.some((line, index) => !code[index] && line.startsWith(prefix));
+}
+function resolveDetailReferences(detail, groups, previousDetail = "", template) {
+  const documents = dedupeReferenceGroups(groups).flatMap((group) => group.documents);
+  const cited = /* @__PURE__ */ new Map();
+  const source = (line) => {
+    const identified = line.replace(/\[S(\d+)\]/g, (original, number2) => {
+      const document2 = documents[Number(number2) - 1];
+      if (!document2) return tNote("note.source_unconfirmed_0", original);
+      const label = sourceFootnoteLabel(document2.path);
+      cited.set(label, footnoteTarget(document2));
+      return `[^${label}]`;
+    });
+    return documents.length ? resolveWikilinks(identified, documents) : identified;
+  };
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const body = [];
+  const bodyCode = [];
+  const defined = /* @__PURE__ */ new Map();
+  const reserved = /* @__PURE__ */ new Set();
+  const dropped = /* @__PURE__ */ new Set();
+  lines.forEach((line, index) => {
+    if (!code[index]) {
+      const definition = sourceFootnoteDefinition(line);
+      if (definition) {
+        defined.set(definition.label, definition.target);
+        return;
+      }
+      const other = /^\[\^([^\]\s]+)\]:/.exec(line);
+      if (other) reserved.add(other[1]);
+    }
+    body.push(code[index] ? line : outsideInlineCode(line, source));
+    bodyCode.push(code[index]);
+  });
+  const previous = sourceDefinitions(previousDetail);
+  const writerLabels = footnoteDefinitionLabels(previousDetail);
+  const byLabel = new Map(documents.map((document2) => [sourceFootnoteLabel(document2.path), document2]));
+  const targetOf = (label) => {
+    var _a2, _b2;
+    const target = (_b2 = (_a2 = cited.get(label)) != null ? _a2 : defined.get(label)) != null ? _b2 : previous.get(label);
+    if (target) return target;
+    const document2 = byLabel.get(label);
+    if (document2) return footnoteTarget(document2);
+    if (writerLabels.has(label)) return void 0;
+    const owners = documents.filter((candidate) => definesFootnote(candidate.content, label));
+    if (owners.length === 1) return footnoteTarget(owners[0]);
+    if (owners.length > 1 || documents.some((candidate) => usesFootnote(candidate.content, label))) dropped.add(label);
+    return void 0;
+  };
+  body.forEach((line, index) => {
+    if (bodyCode[index]) return;
+    outsideInlineCode(line, (text12) => {
+      for (const [, label] of text12.matchAll(FOOTNOTE_REFERENCE))
+        if (!label.startsWith("src-") && !targetOf(label) && !dropped.has(label)) reserved.add(label);
+      return text12;
+    });
+  });
+  const numbers = /* @__PURE__ */ new Map();
+  const ordered = [];
+  let next = 0;
+  const number = (target) => {
+    const key2 = targetKey(target);
+    if (!numbers.has(key2)) {
+      do
+        next++;
+      while (reserved.has(String(next)));
+      numbers.set(key2, next);
+      ordered.push(`[^${next}]: ${target}`);
+    }
+    return numbers.get(key2);
+  };
+  const renumbered = body.map(
+    (line, index) => bodyCode[index] ? line : outsideInlineCode(
+      line,
+      (text12) => text12.replace(FOOTNOTE_REFERENCE, (original, label) => {
+        if (reserved.has(label)) return original;
+        const target = targetOf(label);
+        if (target) return `[^${number(target)}]`;
+        if (label.startsWith("src-")) return ` ${tNote("note.source_unconfirmed_0", label)}`;
+        return dropped.has(label) ? "" : original;
+      })
+    )
+  );
+  const compact = renumbered.filter(
+    (line, index) => bodyCode[index] || line.trim() || index === 0 || renumbered[index - 1].trim() || bodyCode[index - 1]
+  );
+  const text11 = compact.join("\n").trimEnd();
+  if (!ordered.length) return text11;
+  const headings = sourcesHeadingKeys(template != null ? template : standardTemplate("en"));
+  const textLines2 = text11.split("\n");
+  const textCode = fencedLines(textLines2);
+  const start = textLines2.findIndex((line, index) => {
+    const match = textCode[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && headings.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${text11}
+
+${ordered.join("\n")}
+`;
+  let end = textLines2.findIndex((line, index) => index > start && !textCode[index] && /^###\s+/.test(line));
+  if (end < 0) end = textLines2.length;
+  while (end > start + 1 && !textLines2[end - 1].trim()) end--;
+  return [
+    ...textLines2.slice(0, end),
+    "",
+    ...ordered,
+    ...end < textLines2.length && textLines2[end].trim() ? [""] : [],
+    ...textLines2.slice(end)
+  ].join("\n");
+}
+
+// ui/modals/name-modal.ts
+var import_obsidian13 = require("obsidian");
+
+// core/title-safety.ts
+function titleProblem(text11) {
+  if (text11.includes("```")) return "fence";
+  if (text11.includes("[[") || text11.includes("]]")) return "brackets";
+  return void 0;
+}
+function sanitizeGeneratedTitle(text11) {
+  let out = text11.replace(/`{3,}/g, "");
+  while (out.includes("[[") || out.includes("]]")) out = out.replace(/\[\[/g, "[").replace(/\]\]/g, "]");
+  return out;
+}
+
+// ui/modals/title-check.ts
+function titleProblemText(text11) {
+  const problem = titleProblem(text11);
+  if (problem === "fence") return t("ui.title_problem_fence");
+  if (problem === "brackets") return t("ui.title_problem_brackets");
+  return "";
+}
+
+// ui/modals/name-modal.ts
+var NameModal = class extends import_obsidian13.Modal {
+  constructor(app, titleText, value, submit, options = {}) {
+    super(app);
+    this.titleText = titleText;
+    this.value = value;
+    this.submit = submit;
+    this.options = options;
+  }
+  onOpen() {
+    this.titleEl.setText(this.titleText);
+    const input = this.contentEl.createEl("input", { type: "text", value: this.value, cls: "vam-name-input" });
+    input.setAttr("aria-label", this.titleText);
+    const actions = modalActions(this);
+    const status = actionStatus(actions);
+    actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
+    const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
+    const save = () => {
+      const value = input.value.trim();
+      if (this.options.allowEmpty ? !!value && !!titleProblemText(value) : !value || !!titleProblemText(value)) return;
+      this.close();
+      this.submit(value);
+    };
+    const check = () => {
+      const empty = !input.value.trim();
+      const problem = empty ? "" : titleProblemText(input.value);
+      const blankOk = empty && !!this.options.allowEmpty;
+      saveButton.disabled = empty && !blankOk || !!problem;
+      status.setText(empty && !blankOk ? t("ui.name_required") : problem);
+    };
+    input.addEventListener("input", check);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        save();
+      }
+    });
+    saveButton.addEventListener("click", save);
+    check();
+    input.focus();
+    input.select();
+  }
+};
+
+// ui/modals/choice-modal.ts
+var import_obsidian14 = require("obsidian");
+var ChoiceModal = class extends import_obsidian14.Modal {
+  constructor(app, titleText, description, choices, dismissed) {
+    super(app);
+    this.titleText = titleText;
+    this.description = description;
+    this.choices = choices;
+    this.dismissed = dismissed;
+    __publicField(this, "chosen", false);
+  }
+  onClose() {
+    var _a2;
+    if (!this.chosen) (_a2 = this.dismissed) == null ? void 0 : _a2.call(this);
+    this.chosen = true;
+  }
+  onOpen() {
+    this.titleEl.setText(this.titleText);
+    this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
+    for (const choice2 of this.choices) {
+      const setting = new import_obsidian14.Setting(this.contentEl);
+      const run = () => {
+        this.chosen = true;
+        this.close();
+        choice2.action();
+      };
+      if (choice2.description)
+        setting.setName(choice2.label).setDesc(choice2.description).addButton((b) => {
+          var _a2;
+          b.setButtonText((_a2 = choice2.buttonLabel) != null ? _a2 : t("ui.select")).onClick(run);
+          if (choice2.warning) b.setDestructive();
+        });
+      else
+        setting.addButton((b) => {
+          b.setButtonText(choice2.label).onClick(run);
+          if (choice2.warning) b.setDestructive();
+        });
+    }
+    const cancel = modalActions(this).createEl("button", { text: t("ui.cancel") });
+    cancel.addEventListener("click", () => this.close());
+    cancel.focus();
+    window.setTimeout(() => cancel.focus(), 0);
+  }
+};
+
+// layouts/navigation.ts
+var ARROWS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+function neighborKey(direction, key2, side) {
+  if (!ARROWS.includes(key2)) return null;
+  if (direction === "balanced" && side === "root") {
+    if (key2 === "ArrowLeft") return "child-left";
+    if (key2 === "ArrowRight") return "child-right";
+    return key2 === "ArrowUp" ? "sibling-" : "sibling+";
+  }
+  if (direction === "balanced") direction = side === "left" ? "left" : "right";
+  if (direction === "down" || direction === "up") {
+    if (key2 === "ArrowLeft") return "sibling-";
+    if (key2 === "ArrowRight") return "sibling+";
+    const towardsChild = direction === "down" ? "ArrowDown" : "ArrowUp";
+    return key2 === towardsChild ? "child" : "parent";
+  }
+  const left = direction === "left";
+  if (key2 === (left ? "ArrowRight" : "ArrowLeft")) return "parent";
+  if (key2 === (left ? "ArrowLeft" : "ArrowRight")) return "child";
+  return key2 === "ArrowUp" ? "sibling-" : "sibling+";
+}
+
+// ai/mermaid-safety.ts
+var DIAGRAM_TYPES = [
+  "sequenceDiagram",
+  "classDiagram",
+  "classDiagram-v2",
+  "stateDiagram",
+  "stateDiagram-v2",
+  "erDiagram",
+  "journey",
+  "gantt",
+  "pie",
+  "quadrantChart",
+  "requirementDiagram",
+  "gitGraph",
+  "C4Context",
+  "C4Container",
+  "C4Component",
+  "C4Dynamic",
+  "C4Deployment",
+  "mindmap",
+  "timeline",
+  "sankey-beta",
+  "xychart-beta",
+  "block-beta",
+  "packet-beta",
+  "kanban",
+  "architecture-beta",
+  "radar-beta",
+  "treemap-beta",
+  "venn-beta",
+  "ishikawa",
+  "ishikawa-beta"
+];
+var FLOWCHART_HEADER = /^(?:flowchart|graph)(?:\s+(?:LR|RL|TD|TB|BT))?\s*;?\s*$/i;
+var TYPE_HEADER = new RegExp(`^(?:${DIAGRAM_TYPES.map((t2) => t2.replace(/[-]/g, "\\-")).join("|")})(?![\\w-])`);
+var allowedHeader = (header) => FLOWCHART_HEADER.test(header) || TYPE_HEADER.test(header);
+var UNSAFE_LINE = [
+  // A directive starts a line or follows a `;` statement separator.
+  /(?:^|;)\s*(?:click|call|href|link|links|style|classDef|class|linkStyle|interpolate)\b/i,
+  /%%\s*\{/,
+  // init or config directive
+  /<\s*\/?\s*[a-z!?]/i,
+  // HTML tag, comment or processing instruction
+  /\b[a-z][a-z0-9+.-]*:\/\//i,
+  // URL with a scheme
+  /\b(?:javascript|vbscript|data|mailto|file):/i,
+  /\bwww\./i,
+  /:::/,
+  // class shorthand
+  /@\{/,
+  // shape/image/icon metadata
+  /\b(?:fa|fab|fas|far|img):/i,
+  /!\[/,
+  // Markdown image
+  /(?:^|;)\s*(?:callback|cssClass)\b/i,
+  // class diagram callbacks and CSS classes
+  /(?:^|;)\s*(?:properties|details)\b[^:]*:/i,
+  // sequence actor menus (they carry links)
+  /::icon\s*\(/i,
+  // mindmap icon (Font Awesome is not loaded in Obsidian)
+  /\$(?:link|sprite|tags)\b/i,
+  // C4 links, sprites and tags
+  /\b(?:Update(?:Element|Rel|Boundary)Style|UpdateLayoutConfig|Add(?:Element|Rel|Boundary)Tag)\s*\(/,
+  // C4 styling
+  /\]\s*(?:radius|color|stroke-color|stroke-width)\s*:/i
+  // quadrantChart point styling
+];
+var CLASS_ANNOTATION = /<<[A-Za-z][A-Za-z0-9_]*>>/g;
+var CLASS_DECLARATION = /^class\s+[A-Za-z_][A-Za-z0-9_-]*(?:~[A-Za-z0-9_, ]*~)?(?=\s*(?:\{|\["[^"\]]*"\])?\s*$)/;
+var FENCE = /^(`{3,}|~{3,})(.*)$/;
+var PREFIX = /^(?:[ \t]+|>|(?:[-*+]|\d+[.)])(?=[ \t])|\[[ xX]\](?=[ \t]))/;
+function core(line) {
+  let rest = line;
+  for (let match = PREFIX.exec(rest); match; match = PREFIX.exec(rest)) rest = rest.slice(match[0].length);
+  return rest;
+}
+function fenceOf(line) {
+  const fence = FENCE.exec(core(line));
+  return fence && !(fence[1][0] === "`" && fence[2].includes("`")) ? fence : null;
+}
+function unsafeMermaid(body) {
+  const lines = body.map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return false;
+  if (lines[0] === "---") return true;
+  const header = lines.find((line) => !line.startsWith("%%"));
+  if (!header || !allowedHeader(header)) return true;
+  const classDiagram = /^classDiagram(?:-v2)?(?![\w-])/.test(header);
+  return lines.some((line) => {
+    const text11 = classDiagram ? line.replace(CLASS_ANNOTATION, " ").replace(CLASS_DECLARATION, "C") : line;
+    return UNSAFE_LINE.some((pattern) => pattern.test(text11));
+  });
+}
+function neutralizeUnsafeMermaid(markdown) {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  lines.forEach((line, index) => {
+    const fence = fenceOf(line);
+    if (!fence || !/^mermaid\b/i.test(fence[2].trim())) return;
+    const body = [];
+    for (let next = index + 1; next < lines.length; next++) {
+      const content = core(lines[next]);
+      const close = FENCE.exec(content);
+      if (close && close[1][0] === fence[1][0] && close[1].length >= fence[1].length && !close[2].trim()) break;
+      body.push(content);
+    }
+    if (unsafeMermaid(body)) lines[index] = line.replace(/mermaid/i, "text");
+  });
+  return lines.join("\n");
+}
+
+// core/steps/chart/insert.ts
+var CHART_SHAPES = [
+  "stages",
+  "hierarchy",
+  "comparison",
+  "proportion",
+  "interaction",
+  "states",
+  "process"
+];
+function numberTokens(text11) {
+  const s = text11.normalize("NFKC"), out = [];
+  const re = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g;
+  let m;
+  while (m = re.exec(s)) {
+    const p = m.index > 0 ? s[m.index - 1] : "", pp = m.index > 1 ? s[m.index - 2] : "";
+    if (/[A-Za-z_]/.test(p)) continue;
+    if (p === "-" && /[A-Za-z]/.test(pp)) continue;
+    out.push(m[0].replace(/,/g, ""));
+  }
+  return out;
+}
+function noteNumbers(detail) {
+  let t2 = detail.replace(/\r\n/g, "\n");
+  t2 = t2.replace(/^[ \t]*(`{3,}|~{3,})[ \t]*mermaid[^\n]*\n[\s\S]*?\n[ \t]*\1[ \t]*$/gm, "");
+  t2 = t2.replace(/\]\([^)]*\)/g, "]").replace(/https?:\/\/\S+/g, "").replace(/\[\^[^\]]*\]/g, "").replace(/<!--[\s\S]*?-->/g, "");
+  return new Set(numberTokens(t2));
+}
+function existingDiagrams(detail) {
+  var _a2;
+  const lines = detail.replace(/\r\n/g, "\n").split("\n"), types = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*(`{3,}|~{3,})\s*mermaid\b/.test(lines[i])) {
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      types.push(((_a2 = lines[j]) != null ? _a2 : "").trim().split(/\s+/)[0] || "?");
+    }
+  }
+  return { count: types.length, types };
+}
+function fenceMask(lines) {
+  const mask = new Array(lines.length).fill(false);
+  let open = null;
+  lines.forEach((l, i) => {
+    const m = /^\s*(`{3,}|~{3,})/.exec(l);
+    if (open) {
+      mask[i] = true;
+      if (m && m[1][0] === open[0] && m[1].length >= open.length && l.trim() === m[1]) open = null;
+    } else if (m) {
+      mask[i] = true;
+      open = m[1];
+    }
+  });
+  return mask;
+}
+function blockOf(lines, mask, idx) {
+  let a = idx, b = idx;
+  while (a > 0 && lines[a - 1].trim() && !mask[a - 1]) a--;
+  while (b < lines.length - 1 && lines[b + 1].trim() && !mask[b + 1]) b++;
+  return [a, b];
+}
+var BAD_LINE = /^\s*(>|#{1,6}\s|[-*+]\s|\d+[.)]\s|\$\$|<|\[\^|```|~~~)/;
+function anchorCheck(lines, mask, anchor) {
+  const hits = [], a = anchor.trim();
+  lines.forEach((l, i) => {
+    if (!mask[i] && l.trim() === a) hits.push(i);
+  });
+  if (hits.length === 0) return { code: "anchor_missing" };
+  if (hits.length > 1) return { code: "anchor_not_unique" };
+  const block = blockOf(lines, mask, hits[0]);
+  const blk = lines.slice(block[0], block[1] + 1);
+  if (blk.some((l) => BAD_LINE.test(l))) return { code: "anchor_bad_block", block };
+  const tableLines = blk.filter((l) => /^\s*\|/.test(l)).length;
+  if (tableLines !== 0 && tableLines !== blk.length) return { code: "anchor_bad_block", block };
+  return { code: null, block };
+}
+var SEQ_ALIAS = /^(\s*(?:participant|actor)\s+\S+\s+as\s+)"([^"]+)"(\s*)$/;
+var SEQ_MESSAGE = /^(\s*[^:\n]*?(?:-->>|->>|--x|-x|--\)|-\)|-->|->)[^:\n]*:\s*)"([^"]+)"(\s*)$/;
+var SEQ_NOTE = /^(\s*note\s+(?:left of|right of|over)\s+[^:]+:\s*)"([^"]+)"(\s*)$/i;
+function stripSequenceQuotes(body) {
+  const lines = body.split("\n");
+  const first = lines.find((l) => l.trim() !== "");
+  if (first === void 0 || !/^\s*sequenceDiagram\b/.test(first)) return body;
+  return lines.map((line) => {
+    for (const re of [SEQ_ALIAS, SEQ_NOTE, SEQ_MESSAGE]) {
+      const m = re.exec(line);
+      if (m) return m[1] + m[2] + m[3];
+    }
+    return line;
+  }).join("\n");
+}
+function normBody(body) {
+  return stripSequenceQuotes(body.replace(/\r\n/g, "\n").trim());
+}
+async function applyCharts(detail, charts, options) {
+  if (charts.length > options.remaining) return { ok: false, code: "over_cap", index: 0 };
+  const lines = detail.split("\n"), mask = fenceMask(lines), noteNums = noteNumbers(detail);
+  const used = /* @__PURE__ */ new Set(), items = [];
+  for (let index = 0; index < charts.length; index++) {
+    const chart = charts[index], body = normBody(chart.mermaid);
+    const fail2 = (code) => ({ ok: false, code, index });
+    const nonBlank = body.split("\n").filter((l) => l.trim()).length;
+    if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail2("bad_body");
+    const fence = "```mermaid\n" + body + "\n```";
+    if (neutralizeUnsafeMermaid(fence) !== fence) return fail2("unsafe_or_header");
+    if (options.parses) {
+      let ok = true;
+      try {
+        ok = await options.parses(body);
+      } catch (e) {
+        ok = false;
+      }
+      if (!ok) return fail2("unparsable");
+    }
+    const tokens2 = numberTokens(body.replace(/^\s*\S+/, ""));
+    if (tokens2.some((n) => !noteNums.has(n))) return fail2("number_not_in_note");
+    const anchor = anchorCheck(lines, mask, chart.anchor);
+    if (anchor.code) return fail2(anchor.code);
+    const block = anchor.block;
+    const key2 = block.join("-");
+    if (used.has(key2)) return fail2("anchor_shared");
+    used.add(key2);
+    items.push({ body, block });
+  }
+  const out = [...lines];
+  for (const item of [...items].sort((a, b) => b.block[1] - a.block[1])) {
+    const end = item.block[1];
+    const cr = lines[end].endsWith("\r") ? "\r" : "";
+    const segment = ["", "```mermaid", ...item.body.split("\n"), "```"];
+    const next = lines[end + 1];
+    if (next !== void 0 && next.trim() !== "") segment.push("");
+    out.splice(end + 1, 0, ...segment.map((line) => line + cr));
+  }
+  const final = out.join("\n");
+  if (neutralizeUnsafeMermaid(detail) === detail && neutralizeUnsafeMermaid(final) !== final)
+    return { ok: false, code: "unsafe_or_header", index: 0 };
+  return { ok: true, detail: final };
+}
+
+// core/steps/task/merge-check.ts
+var UPDATE_LOG_HEADING = /^(#{1,6})[ \t]+.*(?:更新紀錄|更新记录|Update log)/i;
+var HEADING = /^(#{1,6})[ \t]+\S/;
+function withoutUpdateLog(text11, logHeadings) {
+  const names3 = new Set(logHeadings.map((name) => name.trim().toLocaleLowerCase()).filter(Boolean));
+  const isLog = (line) => {
+    const match = UPDATE_LOG_HEADING.exec(line);
+    if (match) return match;
+    const heading = /^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(line);
+    return heading && names3.has(heading[2].trim().toLocaleLowerCase()) ? heading : null;
+  };
+  const lines = text11.replace(/\r\n/g, "\n").split("\n"), kept = [];
+  let skipping = 0;
+  for (const line of lines) {
+    const heading = HEADING.exec(line);
+    if (skipping && heading && heading[1].length <= skipping) skipping = 0;
+    if (!skipping) {
+      const log = isLog(line);
+      if (log) {
+        skipping = log[1].length;
+        continue;
+      }
+      kept.push(line);
+    }
+  }
+  return kept.join("\n");
+}
+function withoutListMarkers(text11) {
+  return text11.replace(/^([ \t]*(?:>[ \t]*)*(?:#{1,6}[ \t]+)?(?:[-*+][ \t]+)?)\d+[.)、．][ \t]+/gm, "$1");
+}
+function normalNumber(token) {
+  const value = Number(token);
+  return Number.isFinite(value) && token.length < 16 ? String(value) : token;
+}
+function numbersOf(texts2, logHeadings) {
+  const out = /* @__PURE__ */ new Set();
+  for (const text11 of texts2) {
+    const body = withoutListMarkers(withoutUpdateLog(text11, logHeadings)).replace(/!?\[\[[^\]]*\]\]/g, "");
+    for (const token of noteNumbers(body)) out.add(normalNumber(token));
+  }
+  return out;
+}
+function decoded(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (e) {
+    return value;
+  }
+}
+function linksOf(texts2) {
+  const out = /* @__PURE__ */ new Map();
+  const add = (kind, raw) => {
+    const shown = raw.trim().replace(/[.,;:!?*_'"]+$/, "");
+    const key2 = decoded(shown).toLowerCase().replace(/\/+$/, "").replace(/\.md$/, "");
+    if (key2) out.set(`${kind}${key2}`, shown);
+  };
+  for (const text11 of texts2) {
+    for (const match of text11.matchAll(/https?:\/\/[^\s<>"'`)\]]+/g)) add("", match[0]);
+    for (const match of text11.matchAll(/!?\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g)) add("wiki:", match[1]);
+    for (const match of text11.matchAll(/\]\(\s*<?([^)\s>]+)/g)) {
+      const target = match[1];
+      if (/^(?:https?:|mailto:|#)/i.test(target)) continue;
+      add("link:", target);
+    }
+  }
+  return out;
+}
+function checkMergePreservation(input) {
+  var _a2, _b2, _c, _d;
+  const logs = (_a2 = input.logHeadings) != null ? _a2 : [];
+  const missing = [], added = [];
+  const sourceNumbers = numbersOf(input.sourceTexts, logs), mergedNumbers = numbersOf(input.mergedTexts, logs), allowed = numbersOf((_b2 = input.allowedTexts) != null ? _b2 : [], logs);
+  for (const token of sourceNumbers) if (!mergedNumbers.has(token)) missing.push(token);
+  for (const token of mergedNumbers) if (!sourceNumbers.has(token) && !allowed.has(token)) added.push(token);
+  const sourceLinks = linksOf([...input.sourceTexts, ...(_c = input.sourceLinkTexts) != null ? _c : []]), mergedLinks = linksOf([...input.mergedTexts, ...(_d = input.mergedLinkTexts) != null ? _d : []]);
+  for (const [key2, shown] of sourceLinks) if (!mergedLinks.has(key2)) missing.push(shown);
+  return { ok: !missing.length && !added.length, missing, added };
+}
+function findingList(items, none, limit = 30) {
+  if (!items.length) return none;
+  const lines = items.slice(0, limit).map((item) => `- ${item}`);
+  if (items.length > limit) lines.push(`- \u2026 (+${items.length - limit})`);
+  return lines.join("\n");
+}
+
+// core/steps/task/carry-sources.ts
+var HEADING_KEY = "note.earlier_research_sources";
+var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
+var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
+function outsideCode(text11) {
+  const lines = text11.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  return lines.filter((_, index) => !code[index]);
+}
+function keysOf(text11) {
+  return [...linksOf([text11]).keys()];
+}
+function plainLine(line) {
+  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  return `- ${stripped}`;
+}
+function linkTokens(line, wanted) {
+  const out = [];
+  for (const match of line.matchAll(TOKEN)) {
+    const token = match[0];
+    if (!wanted(keysOf(token))) continue;
+    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
+    else out.push(token.replace(/^!/, ""));
+  }
+  return out;
+}
+function carriedSourceLines(previousTexts, nextTexts) {
+  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
+  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
+  if (!missing.size) return [];
+  const covered = /* @__PURE__ */ new Set();
+  const lines = [];
+  const add = (line) => {
+    if (line.trim() && !lines.includes(line)) lines.push(line);
+  };
+  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
+  for (const line of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line);
+    if (!open(keys)) continue;
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    if (definition) add(`- ${definition[1].trim()}`);
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
+    else add(plainLine(line));
+    for (const key2 of keys) covered.add(key2);
+  }
+  return lines;
+}
+function carryForwardSources(detail, previousTexts, nextTexts, language2, template) {
+  const carried = carriedSourceLines(previousTexts, nextTexts);
+  if (!carried.length) return detail;
+  const heading = translateNote(language2, HEADING_KEY);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
+  const keys = sourcesHeadingKeys(template);
+  const start = lines.findIndex((line, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && keys.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${detail.trimEnd()}
+
+### ${heading}
+
+${carried.join("\n")}
+`;
+  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
+}
+function insertAfterBlock(lines, code, start, add, stop, separate = false) {
+  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  if (end < 0) end = lines.length;
+  while (end > start + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    ...separate ? [""] : [],
+    ...add,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
+}
 
 // experiences/visual-map/note-style.ts
 var NOTE_STYLE_PRESETS = [
@@ -22973,7 +23566,7 @@ var ALNUM = /[\p{L}\p{N}]/u;
 var HTTP_URL = /^https?:\/\/[^\s<>]+$/i;
 var BARE_URL = /https?:\/\/[^\s<>]+/iy;
 var TRAILING = `.,;:!?'"*_~]`;
-var SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+var SCHEME3 = /^[a-z][a-z0-9+.-]*:/i;
 var INVISIBLE = /[\s\u200b-\u200d\u2060\ufeff\u00ad]/g;
 var MAX_REPLY_CHARS = 5e4;
 var MAX_REPLY_NODES = 2e3;
@@ -23146,7 +23739,7 @@ function parseInline(src, depth = 0, links = true, ends) {
     }
     if (ch === "[") {
       const wiki = wikiAt(src, at);
-      if (wiki && SCHEME.test(wiki.target)) {
+      if (wiki && SCHEME3.test(wiki.target)) {
         buf += src.slice(at, wiki.end);
         at = wiki.end;
         continue;
@@ -23496,8 +24089,8 @@ function settledLine(line) {
   }
 }
 var STAGE_ORDER = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
-var LABEL_LIMIT = 40;
-var clip = (value, limit = LABEL_LIMIT) => {
+var LABEL_LIMIT2 = 40;
+var clip = (value, limit = LABEL_LIMIT2) => {
   const text11 = value.replace(/\s+/g, " ").trim();
   const characters = [...text11];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
@@ -23824,9 +24417,9 @@ var MapChatPanel = class {
   /** Whether the point is over the panel (or over its button while it is collapsed). */
   hitTest(clientX, clientY) {
     if (!this.built) return false;
-    const rect = this.el.getBoundingClientRect();
-    if (!rect.width && !rect.height) return false;
-    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+    const rect2 = this.el.getBoundingClientRect();
+    if (!rect2.width && !rect2.height) return false;
+    return clientX >= rect2.left && clientX <= rect2.right && clientY >= rect2.top && clientY <= rect2.bottom;
   }
   setDropHighlight(on) {
     if (this.built) this.el.toggleClass("is-drop", on);
@@ -28370,9 +28963,9 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
   if (strictGapAudit && (!["user_condition", "external_evidence"].includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
     throw new Error("AIM research-gap audit returned an invalid structured classification.");
   }
-  const isRecord3 = (value) => typeof value === "object" && value !== null;
+  const isRecord4 = (value) => typeof value === "object" && value !== null;
   const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(
-    (item) => isRecord3(item) && typeof item.title === "string" && typeof item.task === "string"
+    (item) => isRecord4(item) && typeof item.title === "string" && typeof item.task === "string"
   ).map((item) => ({
     title: String(item.title).trim(),
     task: String(item.task).trim(),
@@ -28380,13 +28973,13 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
     parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : ""
   })).filter((item) => item.title) : [];
   const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter(
-    (item) => isRecord3(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
+    (item) => isRecord4(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
   ).map((item) => ({
     title: typeof item.title === "string" ? item.title.trim() : translateNote(language2, "note.visual_reference"),
     imageUrl: String(item.imageUrl).trim(),
     sourceUrl: String(item.sourceUrl).trim(),
     description: typeof item.description === "string" ? item.description.trim() : "",
-    palette: Array.isArray(item.palette) ? item.palette.map(String).map((color) => color.trim()).filter(Boolean).slice(0, 8) : [],
+    palette: Array.isArray(item.palette) ? item.palette.map(String).map((color2) => color2.trim()).filter(Boolean).slice(0, 8) : [],
     formula: typeof item.formula === "string" ? item.formula.trim() : ""
   })).filter((item) => /^https?:\/\//i.test(item.imageUrl) && /^https?:\/\//i.test(item.sourceUrl)).slice(0, 6) : [];
   const searchStatus = webResearch && SEARCH_STATUSES.includes(parsed.searchStatus) ? parsed.searchStatus : void 0;
@@ -30387,7 +30980,7 @@ var RELATION_KIND_RECORD = {
   prerequisite: true
 };
 var RELATION_KINDS = Object.keys(RELATION_KIND_RECORD);
-var isRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var own = (record, key2) => Object.prototype.hasOwnProperty.call(record, key2) ? record[key2] : void 0;
 var fail = (reason) => ({ ok: false, reason });
 var startsWithFrontmatter = (body) => /^---[ \t]*(?:\r?\n|$)/.test(body.replace(/^\uFEFF/, ""));
@@ -30401,7 +30994,7 @@ function parseClipboard(raw) {
     } catch (e) {
       return fail("bad-json");
     }
-    if (!isRecord(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
+    if (!isRecord2(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
     if (own(data, "version") !== CLIPBOARD_VERSION) return fail("version");
     const clipId = own(data, "clipId");
     if (typeof clipId !== "string" || !CLIP_ID.test(clipId)) return fail("bad-clip-id");
@@ -30411,7 +31004,7 @@ function parseClipboard(raw) {
     const nodes = [];
     const seen = /* @__PURE__ */ new Set();
     for (const item of rawNodes) {
-      if (!isRecord(item)) return fail("bad-nodes");
+      if (!isRecord2(item)) return fail("bad-nodes");
       const id = own(item, "id");
       if (typeof id !== "string" || !NODE_ID.test(id) || seen.has(id)) return fail("bad-id");
       const parent = own(item, "parent");
@@ -30441,7 +31034,7 @@ function parseClipboard(raw) {
     const pairs = /* @__PURE__ */ new Set();
     let droppedRelations = 0;
     for (const item of list) {
-      if (!isRecord(item)) {
+      if (!isRecord2(item)) {
         droppedRelations++;
         continue;
       }
@@ -32058,7 +32651,7 @@ function exchangeFileStem(title) {
   const stem = Array.from(title, (ch) => ch.charCodeAt(0) < 32 ? " " : ch).join("").replace(FORBIDDEN_NAME, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
   return stem || "map";
 }
-var EXTENSION = { opml: "opml", freemind: "mm" };
+var EXTENSION2 = { opml: "opml", freemind: "mm" };
 async function exportMapExchange(vault, request) {
   const notes = /* @__PURE__ */ new Map();
   for (const [id, note] of request.notes) notes.set(id, { title: note.title, body: note.detail });
@@ -32067,7 +32660,7 @@ async function exportMapExchange(vault, request) {
   const slash = request.mapPath.lastIndexOf("/");
   const folder = slash < 0 ? "" : request.mapPath.slice(0, slash + 1);
   const stem = exchangeFileStem(request.map.title);
-  const extension = EXTENSION[request.format];
+  const extension = EXTENSION2[request.format];
   for (let attempt = 1; attempt <= 1e3; attempt++) {
     const path = `${folder}${stem}${attempt === 1 ? "" : ` ${attempt}`}.${extension}`;
     if (vault.getAbstractFileByPath(path) || await vault.adapter.exists(path)) continue;
@@ -32448,7 +33041,7 @@ var ReferencePicker = class {
 var import_obsidian22 = require("obsidian");
 
 // ai-exchange-log.ts
-function isRecord2(value) {
+function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isUnknownArray(value) {
@@ -32467,12 +33060,12 @@ function promptMetrics(entry) {
   if (!prompt && entry.request) {
     try {
       const parsed = JSON.parse(entry.request);
-      const parsedRecord = isRecord2(parsed) ? parsed : void 0;
+      const parsedRecord = isRecord3(parsed) ? parsed : void 0;
       const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
-      const request = isRecord2(requestValue) ? requestValue : void 0;
+      const request = isRecord3(requestValue) ? requestValue : void 0;
       if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
       else if (request && isUnknownArray(request.input)) {
-        prompt = request.input.map((item) => isRecord2(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
+        prompt = request.input.map((item) => isRecord3(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
       }
     } catch (e) {
     }
@@ -32538,7 +33131,7 @@ var AiExchangeLog = class {
         const entry = item;
         return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
           (key2) => typeof entry[key2] === "string"
-        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord2(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
+        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord3(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
       });
       if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
       this.entries = entries.slice(-this.limit);
@@ -42773,6 +43366,7 @@ var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
 var cardCutLabels = /* @__PURE__ */ new WeakMap();
+var cardCovers = /* @__PURE__ */ new WeakMap();
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
@@ -42812,6 +43406,7 @@ function depthOf(nodes, id) {
   for (let node = byId.get(id); (node == null ? void 0 : node.parentId) && depth < nodes.length; node = byId.get(node.parentId)) depth++;
   return depth;
 }
+var BOUNDARY_PAD = 16;
 var boxOf = (card) => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -42993,6 +43588,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     __publicField(this, "viewportEl", null);
     __publicField(this, "stageEl", null);
     __publicField(this, "edgesEl", null);
+    /** The canvas image that had keyboard focus when a change repainted the canvas; focus goes back to it. */
+    __publicField(this, "focusItemId", null);
+    /** Last pointer position over the canvas in client pixels; a pasted picture goes there (D6). */
+    __publicField(this, "lastCanvasPointer", null);
     __publicField(this, "zoomLabel", null);
     __publicField(this, "refreshTimer", null);
     __publicField(this, "viewportTimer", null);
@@ -43068,6 +43667,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight));
     });
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
+    /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
+    __publicField(this, "coverObserver", null);
     __publicField(this, "selectionBarEl", null);
     __publicField(this, "hintEl", null);
     /** While a card renders, its buttons stay out of the tab order until that card is focused. */
@@ -43173,6 +43774,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       var _a2;
       return (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
     }));
+    const cache = this.app.metadataCache;
+    if (typeof (cache == null ? void 0 : cache.on) === "function")
+      this.registerEvent(
+        cache.on("changed", (file) => {
+          if (this.closed || this.builtIn || !this.map) return;
+          const node = this.map.nodes.find((item) => item.path === file.path);
+          const card = node ? this.cardEls.get(node.id) : void 0;
+          if (card && node) this.paintCover(card, node.path);
+        })
+      );
   }
   async onOpen() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
@@ -43301,6 +43912,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   async onClose() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     this.closed = true;
+    this.releaseCovers();
     (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
     this.unbindClipboard = null;
     this.renderAfterDrag = false;
@@ -44722,8 +45334,8 @@ ${request.requirements}` : preset.text,
       item.setTitle(t("ui.relevance_clear")).setIcon("x").onClick(() => this.setManualRelevance(node, null));
       (_b2 = (_a3 = item.dom) == null ? void 0 : _a3.setAttribute) == null ? void 0 : _b2.call(_a3, "title", t("ui.relevance_clear_hint"));
     });
-    const rect = anchor.getBoundingClientRect();
-    menu.showAtPosition({ x: rect.left, y: rect.bottom });
+    const rect2 = anchor.getBoundingClientRect();
+    menu.showAtPosition({ x: rect2.left, y: rect2.bottom });
   }
   /** The gradable cards whose tier the learner set by hand (pinned), in map order, from the notes this view holds. */
   relevancePinList() {
@@ -44974,6 +45586,32 @@ ${request.requirements}` : preset.text,
           (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => this.enqueue(() => this.addNode(null, void 0, true, true, kind)))
         );
     menu.showAtMouseEvent(event);
+  }
+  /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
+  topicCoverOff(node) {
+    var _a2, _b2;
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    const value = file instanceof import_obsidian32.TFile ? (_b2 = (_a2 = this.app.metadataCache.getFileCache(file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["topic-cover"] : null;
+    return typeof value === "string" && value.trim().toLowerCase() === "none";
+  }
+  /**
+   * Turns a topic's card cover off (`topic-cover: none`) or back on (the key is removed) in one undoable step: the note
+   * rewrite and Map.md (viewport only). Undo writes the old note text back, so the frontmatter is identical to before.
+   */
+  async changeTopicCover(node) {
+    if (!this.map || !this.markersEditable(node)) return null;
+    const off = this.topicCoverOff(node);
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof import_obsidian32.TFile)) throw new Error(path);
+      await this.app.vault.process(file, (content) => off ? withoutCover(content) : withCoverOff(content));
+    }).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return entry;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   openKindMenu(event, pick) {
@@ -46446,18 +47084,19 @@ ${request.requirements}` : preset.text,
     return true;
   }
   /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
-  async mapChangeSnapshots(change, rebuildDerivedData = true, created = []) {
+  async mapChangeSnapshots(change, rebuildDerivedData = true, created = [], attachment) {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    if (attachment) tx.createAttachment("image", { ...attachment, sourcePath: this.path });
     let before, after;
     const viewport = clone(this.map.viewport);
     const opened = this.map;
     try {
-      const entry = await tx.editMap(this.path, (map) => {
+      const entry = await tx.editMap(this.path, (map, _resolve, attachmentPath) => {
         map.viewport = clone(viewport);
         before = clone(map);
-        change(map);
+        change(map, attachmentPath);
         after = clone(map);
       }).commit({ deferRebuild: true });
       this.history.push(entry);
@@ -47156,6 +47795,535 @@ ${request.requirements}` : preset.text,
       hooks.dismissed
     ).open();
   }
+  /** Free images only change on a map the user may edit: not AIM, not the built-in sample, not while picking topics. */
+  canEditCanvasItems() {
+    var _a2;
+    return !this.builtIn && !this.integrationMode && !((_a2 = this.map) == null ? void 0 : _a2.aim);
+  }
+  /**
+   * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
+   * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
+   */
+  renderCanvasItems() {
+    var _a2, _b2, _c, _d;
+    const stage = this.stageEl, items = (_a2 = this.map) == null ? void 0 : _a2.canvasItems;
+    if (!stage || !(items == null ? void 0 : items.length)) return;
+    const editable = this.canEditCanvasItems();
+    const layer = items.some((item) => item.kind === "image") ? stage.createDiv("vam-canvas-items") : null;
+    layer == null ? void 0 : layer.setAttr("role", "group");
+    layer == null ? void 0 : layer.setAttr("aria-label", t("ui.canvas_images_group"));
+    for (const item of items) {
+      if (item.kind !== "image" || !layer) continue;
+      const image = item, name = (_b2 = image.path.split("/").pop()) != null ? _b2 : image.path, label = t("ui.canvas_image_label", name), el = layer.createDiv("vam-canvas-image");
+      el.dataset.itemId = image.id;
+      el.setAttr("role", "img");
+      el.setAttr("aria-label", label);
+      el.tabIndex = 0;
+      el.style.left = `${image.x}px`;
+      el.style.top = `${image.y}px`;
+      el.style.width = `${image.w}px`;
+      el.style.height = `${image.h}px`;
+      const file = this.app.vault.getAbstractFileByPath(image.path);
+      const source = file instanceof import_obsidian32.TFile ? (_d = (_c = this.app.vault).getResourcePath) == null ? void 0 : _d.call(_c, file) : void 0;
+      const placeholder2 = () => {
+        el.empty();
+        el.addClass("is-missing");
+        el.createSpan({ text: name });
+      };
+      if (!source) placeholder2();
+      else {
+        const img = el.createEl("img", { attr: { src: source, alt: "", draggable: "false" } });
+        img.addEventListener("error", placeholder2);
+      }
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      if (!editable) continue;
+      const handle = el.createDiv("vam-canvas-image-handle");
+      handle.setAttr("aria-hidden", "true");
+      this.enableCanvasItemDrag(el, handle, image);
+      el.addEventListener("keydown", (event) => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.enqueue(() => this.removeCanvasItem(image.id));
+      });
+      if (this.focusItemId === image.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+    this.renderBoundaries(stage, items, editable);
+    this.focusItemId = null;
+  }
+  /**
+   * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
+   * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
+   * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
+   * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
+   */
+  renderBoundaries(stage, items, editable) {
+    var _a2;
+    const boundaries = items.filter((item) => item.kind === "boundary");
+    if (!boundaries.length) return;
+    const rectOf = (id) => {
+      const card = this.cardEls.get(id);
+      if (!card) return null;
+      const box = boxOf(card);
+      return { x: box.x, y: box.y, w: box.width, h: box.height };
+    };
+    let layer = null;
+    for (const boundary of boundaries) {
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      if (!box) continue;
+      if (!layer) {
+        layer = stage.createDiv("vam-boundaries");
+        layer.setAttr("role", "group");
+        layer.setAttr("aria-label", t("ui.canvas_boundaries_group"));
+      }
+      const label = (_a2 = boundary.label) != null ? _a2 : "", el = layer.createDiv("vam-boundary");
+      el.dataset.itemId = boundary.id;
+      el.setAttr("role", "group");
+      el.setAttr("aria-label", label ? t("ui.canvas_boundary_label", label) : t("ui.canvas_boundary_default"));
+      el.tabIndex = 0;
+      el.style.left = `${box.x}px`;
+      el.style.top = `${box.y}px`;
+      el.style.width = `${box.w}px`;
+      el.style.height = `${box.h}px`;
+      const chip = el.createSpan({ cls: "vam-boundary-label", text: label });
+      if (!label) chip.addClass("is-empty");
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      chip.addEventListener("pointerdown", (event) => {
+        if (event.button === 0) el.focus({ preventScroll: true });
+      });
+      if (!editable) continue;
+      chip.addEventListener("dblclick", (event) => {
+        event.stopPropagation();
+        this.editBoundaryLabel(boundary.id);
+      });
+      chip.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new import_obsidian32.Menu();
+        menu.addItem(
+          (item) => item.setTitle(t("ui.canvas_boundary_edit")).setIcon("pencil").onClick(() => this.editBoundaryLabel(boundary.id))
+        );
+        menu.addItem(
+          (item) => item.setTitle(t("ui.canvas_boundary_remove")).setIcon("trash").onClick(() => this.enqueue(() => this.removeCanvasItem(boundary.id)))
+        );
+        menu.showAtMouseEvent(event);
+      });
+      el.addEventListener("keydown", (event) => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (!event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeCanvasItem(boundary.id));
+        } else if (!event.shiftKey && (event.key === "Enter" || event.key === "F2")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.editBoundaryLabel(boundary.id);
+        }
+      });
+      if (this.focusItemId === boundary.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+  }
+  /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
+  editBoundaryLabel(id) {
+    var _a2, _b2, _c;
+    const current = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "boundary" && item.id === id
+    );
+    if (!current || !this.canEditCanvasItems()) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      (_c = current.label) != null ? _c : "",
+      (label) => {
+        this.focusItemId = id;
+        this.enqueue(() => this.renameBoundary(id, label));
+      },
+      { allowEmpty: true }
+    ).open();
+  }
+  /** Sets or clears (blank) a frame's label. */
+  async renameBoundary(id, label) {
+    const text11 = label.trim();
+    await this.changeCanvasItems(
+      id,
+      (items) => items.map((item) => {
+        if (item.kind !== "boundary" || item.id !== id) return item;
+        const { label: _old, ...rest } = item;
+        return text11 ? { ...rest, label: text11 } : rest;
+      })
+    );
+  }
+  /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
+  async addBoundary(ids, label) {
+    if (!this.map || this.builtIn || this.map.aim) return null;
+    const known = new Set(this.map.nodes.map((node) => node.id)), members = [...new Set(ids)].filter((id2) => known.has(id2));
+    if (!members.length) return null;
+    const id = `frame-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, text11 = label.trim();
+    this.focusItemId = id;
+    const frame = { id, kind: "boundary", members, ...text11 ? { label: text11 } : {} };
+    await this.mapChange((map) => {
+      var _a2;
+      const alive = map.nodes.map((node) => node.id);
+      map.canvasItems = [...pruneBoundaries((_a2 = map.canvasItems) != null ? _a2 : [], alive), frame];
+    }, false);
+    return id;
+  }
+  /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
+  openAddBoundary() {
+    const ids = [...this.multiSelected];
+    if (!this.map || this.builtIn || this.map.aim || !ids.length) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      "",
+      (label) => this.enqueue(async () => void await this.addBoundary(ids, label)),
+      { allowEmpty: true }
+    ).open();
+  }
+  /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
+  enableCanvasItemDrag(el, handle, image) {
+    const begin2 = (event, resize) => {
+      var _a2;
+      if (event.button !== 0 || !this.map) return;
+      event.stopPropagation();
+      event.preventDefault();
+      el.focus({ preventScroll: true });
+      const start = { x: event.clientX, y: event.clientY }, zoom = this.map.viewport.zoom || 1, from = { x: image.x, y: image.y, w: image.w, h: image.h };
+      let dx = 0, dy = 0, width = from.w, done = false;
+      (_a2 = el.setPointerCapture) == null ? void 0 : _a2.call(el, event.pointerId);
+      const move = (e) => {
+        dx = (e.clientX - start.x) / zoom;
+        dy = (e.clientY - start.y) / zoom;
+        if (resize) {
+          const ratio = from.h / from.w;
+          width = Math.max(from.w + dx, IMAGE_MIN_SIZE, IMAGE_MIN_SIZE / ratio);
+          el.style.width = `${width}px`;
+          el.style.height = `${width * ratio}px`;
+        } else {
+          el.style.left = `${from.x + dx}px`;
+          el.style.top = `${from.y + dy}px`;
+        }
+      };
+      const settle = () => {
+        done = true;
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        el.removeEventListener("pointercancel", cancel);
+        el.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = () => {
+        el.style.left = `${from.x}px`;
+        el.style.top = `${from.y}px`;
+        el.style.width = `${from.w}px`;
+        el.style.height = `${from.h}px`;
+      };
+      const up = () => {
+        if (done) return;
+        settle();
+        this.focusItemId = image.id;
+        if (resize && Math.abs(width - from.w) >= 1) this.enqueue(() => this.resizeCanvasItem(image.id, width));
+        else if (!resize && Math.hypot(dx, dy) >= 1)
+          this.enqueue(() => this.moveCanvasItem(image.id, Math.round(dx), Math.round(dy)));
+        else restore();
+      };
+      const cancel = () => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", cancel);
+      el.addEventListener("lostpointercapture", cancel);
+    };
+    el.addEventListener("pointerdown", (event) => {
+      if (event.target === handle) return;
+      begin2(event, false);
+    });
+    handle.addEventListener("pointerdown", (event) => begin2(event, true));
+  }
+  /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
+  async changeCanvasItems(id, change) {
+    var _a2;
+    if (!this.map || !this.canEditCanvasItems()) return;
+    if (!((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.id === id))) return;
+    await this.mapChange((map) => {
+      var _a3;
+      const next = pruneBoundaries(
+        change((_a3 = map.canvasItems) != null ? _a3 : []),
+        map.nodes.map((node) => node.id)
+      );
+      if (next.length) map.canvasItems = next;
+      else delete map.canvasItems;
+    }, false);
+  }
+  /** Moves a free image by (dx, dy) in map units. */
+  async moveCanvasItem(id, dx, dy) {
+    await this.changeCanvasItems(id, (items) => moveItem(items, id, dx, dy));
+  }
+  /** Resizes a free image to `width`, keeping its ratio. */
+  async resizeCanvasItem(id, width) {
+    await this.changeCanvasItems(id, (items) => resizeKeepRatio(items, id, width));
+  }
+  // ---- Adding free images: drop, paste, "Insert image…" (ticket 30, decisions D5, D6, D11) ---------------------------
+  /** Registers the three entries on the canvas; AIM maps, the built-in sample and topic selection mode get none (D11). */
+  setupCanvasImageInput() {
+    const viewport = this.viewportEl;
+    if (!viewport || !this.canEditCanvasItems()) return;
+    viewport.addEventListener("dragover", (event) => this.onCanvasDragOver(event));
+    viewport.addEventListener("dragleave", (event) => this.onCanvasDragLeave(event));
+    viewport.addEventListener("drop", (event) => this.onCanvasDrop(event));
+    viewport.addEventListener("contextmenu", (event) => this.onCanvasContextMenu(event));
+    viewport.addEventListener("pointermove", (event) => this.onCanvasPointerMove(event));
+  }
+  onCanvasPointerMove(event) {
+    this.lastCanvasPointer = { x: event.clientX, y: event.clientY };
+  }
+  /** A client point in the stage's own units (what `x` and `y` of a canvas item mean). Null when there is no canvas. */
+  stagePoint(client) {
+    var _a2;
+    const viewport = this.viewportEl, v = (_a2 = this.map) == null ? void 0 : _a2.viewport;
+    if (!viewport || !v) return null;
+    const rect2 = viewport.getBoundingClientRect(), zoom = v.zoom || 1, inside2 = client && client.x >= rect2.left && client.x <= rect2.right && client.y >= rect2.top && client.y <= rect2.bottom;
+    const local = inside2 ? { x: client.x - rect2.left, y: client.y - rect2.top } : { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+    return { x: Math.round((local.x - v.x) / zoom), y: Math.round((local.y - v.y) / zoom) };
+  }
+  hasFiles(event) {
+    var _a2, _b2, _c;
+    const transfer = event.dataTransfer;
+    return !!transfer && (((_b2 = (_a2 = transfer.files) == null ? void 0 : _a2.length) != null ? _b2 : 0) > 0 || Array.from((_c = transfer.types) != null ? _c : []).includes("Files"));
+  }
+  onCanvasDragOver(event) {
+    var _a2;
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.addClass("is-image-drop");
+  }
+  /** The dashed canvas hint goes away when the drag leaves the canvas (not when it only moves onto a child). */
+  onCanvasDragLeave(event) {
+    var _a2, _b2;
+    const into = event.relatedTarget;
+    if (into && ((_a2 = this.viewportEl) == null ? void 0 : _a2.contains(into))) return;
+    (_b2 = this.viewportEl) == null ? void 0 : _b2.removeClass("is-image-drop");
+  }
+  onCanvasDrop(event) {
+    var _a2, _b2, _c;
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.removeClass("is-image-drop");
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from((_c = (_b2 = event.dataTransfer) == null ? void 0 : _b2.files) != null ? _c : []), images = imageFilesFrom({ files: all });
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    for (const other of all.filter((item) => !images.includes(item)))
+      new import_obsidian32.Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length && point) this.queueCanvasImages(images, point);
+  }
+  // ---- Pictures on a card: drop and paste (ticket 32, decisions D5, D6) --------------------------------------------
+  /** A card takes a dropped picture only on an ordinary editable map (the same rule as the panel's cover switch). */
+  cardAcceptsImages(node) {
+    return this.canEditCanvasItems() && this.markersEditable(node);
+  }
+  onCardDragOver(event, card, node) {
+    var _a2;
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    (_a2 = this.viewportEl) == null ? void 0 : _a2.removeClass("is-image-drop");
+    card.addClass("is-drop-target");
+  }
+  onCardDragLeave(event, card) {
+    const into = event.relatedTarget;
+    if (into && card.contains(into)) return;
+    card.removeClass("is-drop-target");
+  }
+  onCardDrop(event, card, node) {
+    var _a2, _b2;
+    card.removeClass("is-drop-target");
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from((_b2 = (_a2 = event.dataTransfer) == null ? void 0 : _a2.files) != null ? _b2 : []), images = imageFilesFrom({ files: all });
+    for (const other of all.filter((item) => !images.includes(item)))
+      new import_obsidian32.Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+  }
+  /**
+   * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
+   * `## User Notes` section (created when missing) and the first picture also becomes `topic-cover`. One transaction
+   * per picture (attachment, note rewrite and Map.md together), so one undo step each. Undo writes the old note text
+   * back and keeps the file; redo writes the same text again. A switched or closed map drops the result unwritten.
+   */
+  async attachCardImages(node, files) {
+    if (!this.map || !this.cardAcceptsImages(node)) return;
+    const mapPath = this.path, epoch = this.mapOpenEpoch, stale = () => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    let first = true;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new import_obsidian32.Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch (e) {
+        if (!stale()) new import_obsidian32.Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new import_obsidian32.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const setCover = first;
+      try {
+        if (stale() || !this.map) return;
+        const viewport = clone(this.map.viewport);
+        const entry = await this.beginMapTransaction().createAttachment("image", { name, data, sourcePath: node.path }).rewriteNote(node.path, async (target, attachment) => {
+          const note = this.app.vault.getAbstractFileByPath(target);
+          if (!(note instanceof import_obsidian32.TFile)) throw new Error(target);
+          const link = attachment("image");
+          await this.app.vault.process(note, (content) => {
+            const withEmbed = appendImageEmbed(content, link);
+            return setCover ? withCover(withEmbed, link) : withEmbed;
+          });
+        }).editMap(this.path, (map) => {
+          map.viewport = clone(viewport);
+        }).commit({ deferRebuild: true, label: t("ui.topic_cover") });
+        this.history.push(entry);
+        first = false;
+        await this.refreshAfterSavedChange();
+      } catch (error) {
+        new import_obsidian32.Notice(errorMessage(error));
+      }
+    }
+  }
+  onCanvasContextMenu(event) {
+    if (!this.canEditCanvasItems()) return;
+    const target = event.target;
+    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))
+      return;
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    if (!point) return;
+    event.preventDefault();
+    const menu = new import_obsidian32.Menu();
+    menu.addItem(
+      (item) => item.setTitle(t("ui.canvas_image_insert")).setIcon("image-plus").onClick(() => this.openCanvasImagePicker(point))
+    );
+    menu.showAtMouseEvent(event);
+  }
+  /** The system file picker, images only; the chosen files take the same path as a drop. */
+  openCanvasImagePicker(point) {
+    const input = this.contentEl.createEl("input", {
+      cls: "vam-sr-only",
+      attr: { type: "file", accept: "image/*", multiple: "" }
+    });
+    input.addEventListener("change", () => {
+      var _a2;
+      const chosen = Array.from((_a2 = input.files) != null ? _a2 : []);
+      input.remove();
+      if (chosen.length) this.queueCanvasImages(chosen, point);
+    });
+    input.click();
+  }
+  /**
+   * Paste (D6): called after the private format was ruled out. Image files with no selected topic become free images
+   * at the last pointer position (the viewport centre when there is none). With a selected topic the picture belongs
+   * on the card (ticket 32, P5): nothing is consumed here, so plain text still reaches the clipboard group.
+   * Returns true when it took the event.
+   */
+  pasteCanvasImages(event) {
+    var _a2, _b2, _c, _d;
+    if (!this.canEditCanvasItems()) return false;
+    const images = imageFilesFrom({ files: Array.from((_b2 = (_a2 = event.clipboardData) == null ? void 0 : _a2.files) != null ? _b2 : []) });
+    if (!images.length) return false;
+    const target = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === this.selected);
+    if (target && this.cardAcceptsImages(target) && !((_d = event.clipboardData) == null ? void 0 : _d.getData("text/plain"))) {
+      event.preventDefault();
+      this.enqueue(() => this.attachCardImages(target, images));
+      return true;
+    }
+    if (this.selected || this.multiSelected.size) return false;
+    const point = this.stagePoint(this.lastCanvasPointer);
+    if (!point) return false;
+    event.preventDefault();
+    this.queueCanvasImages(images, point);
+    return true;
+  }
+  /** Fences the gesture on this map and this open of it, then queues the writes. */
+  queueCanvasImages(files, point) {
+    this.enqueue(() => this.insertCanvasImages(files, point));
+  }
+  /**
+   * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
+   * transaction (one undo step per picture). The fence compares the map path and open epoch taken before the read;
+   * a switched or closed map drops the result without writing anything. A refusal or failure is a Notice.
+   */
+  async insertCanvasImages(files, point) {
+    var _a2;
+    if (!this.canEditCanvasItems()) return;
+    const path = this.path, epoch = this.mapOpenEpoch, stale = () => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    let offset = 0;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new import_obsidian32.Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch (e) {
+        if (!stale()) new import_obsidian32.Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new import_obsidian32.Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
+      try {
+        if (stale()) return;
+        this.focusItemId = id;
+        await this.mapChangeSnapshots(
+          (map, attachment) => {
+            var _a3;
+            map.canvasItems = addImage((_a3 = map.canvasItems) != null ? _a3 : [], { id, path: attachment("image"), x, y, w, h });
+          },
+          false,
+          [],
+          { name, data }
+        );
+        offset += 24;
+      } catch (error) {
+        this.focusItemId = null;
+        new import_obsidian32.Notice(errorMessage(error));
+      }
+    }
+  }
+  /** Removes the reference only; the image file stays in the Vault. */
+  async removeCanvasItem(id) {
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, (items) => removeItem(items, id));
+  }
   async removeSelected() {
     var _a2;
     if (!this.map) return;
@@ -47541,6 +48709,7 @@ ${request.requirements}` : preset.text,
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
     }
     if (!vam) {
+      if (this.pasteCanvasImages(event)) return;
       this.pasteText(event, text11);
       return;
     }
@@ -48208,6 +49377,257 @@ ${request.requirements}` : preset.text,
       }
     }
   }
+  /** The header's export button (AIM, the built-in sample and integration mode included, decision D11). */
+  addExportButton(parent) {
+    return this.iconButton(parent, "download", t("ui.export_map"), (event) => this.openExportMenu(event));
+  }
+  openExportMenu(event) {
+    const menu = new import_obsidian32.Menu();
+    const add = (title, icon, format, target) => {
+      menu.addItem(
+        (item) => item.setTitle(title).setIcon(icon).onClick(() => void this.exportMap(format, target))
+      );
+    };
+    add(t("ui.export_png_vault"), "image-down", "png", "vault");
+    add(t("ui.export_png_download"), "download", "png", "download");
+    add(t("ui.export_svg_vault"), "image-down", "svg", "vault");
+    add(t("ui.export_svg_download"), "download", "svg", "download");
+    add(t("ui.export_md_vault"), "file-down", "md", "vault");
+    add(t("ui.export_md_download"), "download", "md", "download");
+    menu.showAtMouseEvent(event);
+  }
+  /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
+  exportCoverPath(notePath) {
+    const file = this.app.vault.getAbstractFileByPath(notePath);
+    if (!(file instanceof import_obsidian32.TFile)) return null;
+    const cover = resolveCover(
+      this.app.metadataCache.getFileCache(file),
+      (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
+    );
+    return cover && "path" in cover ? cover.path : null;
+  }
+  /**
+   * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
+   * read from the drawn DOM, so every layout is followed without a second layout engine; colours come from computed
+   * styles; covers and free pictures are read with `readBinary` and embedded as data URIs. `isCurrent` is checked
+   * after every await. Returns null when the view moved on, `{ empty }` for nothing to draw, `{ refuse }` when the
+   * pictures alone are over the limit (read no further).
+   */
+  async collectExportScene(isCurrent) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    const map = this.map;
+    if (!map) return null;
+    const win = window;
+    const computed = (el, pseudo) => win.getComputedStyle(el, pseudo);
+    const colorOf = (value) => normalizeCssColor(value) || void 0;
+    let embedded = 0;
+    const loaded = /* @__PURE__ */ new Map();
+    const imageHref = async (path) => {
+      var _a3, _b3;
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof import_obsidian32.TFile)) return null;
+      if (!loaded.has(path)) {
+        const data = await this.app.vault.readBinary(file);
+        const mime = sniffImage(data);
+        loaded.set(path, mime ? toDataUri(mime, data) : null);
+        sizes.set(path, mime ? data.byteLength : 0);
+      }
+      embedded += (_a3 = sizes.get(path)) != null ? _a3 : 0;
+      return embedded > EXPORT_MAX_EMBEDDED_BYTES ? false : (_b3 = loaded.get(path)) != null ? _b3 : null;
+    };
+    const sizes = /* @__PURE__ */ new Map();
+    const cards = [];
+    const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const grow = (x, y, w, h) => {
+      bounds.minX = Math.min(bounds.minX, x);
+      bounds.minY = Math.min(bounds.minY, y);
+      bounds.maxX = Math.max(bounds.maxX, x + w);
+      bounds.maxY = Math.max(bounds.maxY, y + h);
+    };
+    for (const [id, card] of this.cardEls) {
+      const node = map.nodes.find((item2) => item2.id === id);
+      if (!node) continue;
+      const box = boxOf(card);
+      grow(box.x, box.y, box.width, box.height);
+      const style = computed(card);
+      const titleEl = card.querySelector(".vam-card-title");
+      const title = ((_c = (_b2 = titleEl == null ? void 0 : titleEl.textContent) != null ? _b2 : (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _c : "").trim();
+      const item = {
+        x: box.x,
+        y: box.y,
+        w: box.width,
+        h: box.height,
+        title: wrapText(title, box.width - 28),
+        fill: colorOf(style.backgroundColor),
+        stroke: colorOf(style.borderTopColor),
+        textColor: colorOf(titleEl ? computed(titleEl).color : void 0),
+        accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : void 0
+      };
+      const frame = card.querySelector(".vam-card-cover");
+      const coverPath = frame ? this.exportCoverPath(node.path) : null;
+      if (frame && coverPath) {
+        const href = await imageHref(coverPath);
+        if (!isCurrent()) return null;
+        if (href === false) return { refuse: "embedded" };
+        if (href)
+          item.cover = {
+            x: box.x + frame.offsetLeft,
+            y: box.y + frame.offsetTop,
+            w: frame.offsetWidth,
+            h: frame.offsetHeight,
+            href,
+            fit: "cover"
+          };
+      }
+      cards.push(item);
+    }
+    const images = [];
+    for (const item of (_d = map.canvasItems) != null ? _d : []) {
+      if (item.kind !== "image") continue;
+      const image = item;
+      const href = await imageHref(image.path);
+      if (!isCurrent()) return null;
+      if (href === false) return { refuse: "embedded" };
+      if (!href) continue;
+      grow(image.x, image.y, image.w, image.h);
+      images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
+    }
+    const boundaries = [];
+    for (const item of (_e = map.canvasItems) != null ? _e : []) {
+      if (item.kind !== "boundary") continue;
+      const frame = item;
+      const box = boundaryBounds(
+        frame.members,
+        (id) => {
+          const card = this.cardEls.get(id);
+          if (!card) return null;
+          const b = boxOf(card);
+          return { x: b.x, y: b.y, w: b.width, h: b.height };
+        },
+        BOUNDARY_PAD
+      );
+      if (!box) continue;
+      grow(box.x, box.y, box.w, box.h);
+      boundaries.push({
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        ...frame.label ? { label: frame.label } : {},
+        stroke: colorOf(computed((_f = this.viewportEl) != null ? _f : this.contentEl).getPropertyValue("--text-muted"))
+      });
+    }
+    const edges = [];
+    for (const el of Array.from((_h = (_g = this.edgesEl) == null ? void 0 : _g.children) != null ? _h : [])) {
+      if (((_i = el.tagName) == null ? void 0 : _i.toLowerCase()) !== "path") continue;
+      const d = el.getAttribute("d");
+      const style = computed(el);
+      const stroke = colorOf(style.stroke);
+      if (!d || !stroke || stroke === "none" || style.display === "none") continue;
+      edges.push({ d, stroke });
+      try {
+        const bbox = (_j = el.getBBox) == null ? void 0 : _j.call(el);
+        if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
+      } catch (e) {
+      }
+    }
+    if (!cards.length && !images.length) return { refuse: "empty" };
+    const margin = 24;
+    const root = computed((_k = this.viewportEl) != null ? _k : this.contentEl);
+    const variable = (name) => colorOf(root.getPropertyValue(name));
+    const scene = {
+      x: bounds.minX - margin,
+      y: bounds.minY - margin,
+      width: bounds.maxX - bounds.minX + margin * 2,
+      height: bounds.maxY - bounds.minY + margin * 2,
+      title: map.title,
+      theme: {
+        background: variable("--background-primary"),
+        text: variable("--text-normal"),
+        stroke: variable("--background-modifier-border"),
+        card: variable("--background-primary")
+      },
+      boundaries,
+      edges,
+      cards,
+      images
+    };
+    return { scene };
+  }
+  async pngBlob(svg, width, height, scale) {
+    return svgToPngBlob(svg, width, height, scale, browserPngEnv(activeDocument, window.URL));
+  }
+  /** A download through a blob URL; the URL is released shortly after the click. */
+  downloadBlob(blob, name) {
+    const url = window.URL.createObjectURL(blob);
+    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name } });
+    link.click();
+    link.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1e3);
+  }
+  /**
+   * Exports the map as PNG, SVG or a Markdown outline, saved next to the other attachments of Map.md or downloaded.
+   * An export is not a map edit: no transaction, no undo step. A result that is ready after the view closed or moved
+   * to another map is thrown away (nothing written, nothing said).
+   */
+  async exportMap(format, target) {
+    const map = this.map;
+    if (!map) return;
+    const mapPath = this.path, epoch = this.mapOpenEpoch, isCurrent = () => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
+    try {
+      let blob;
+      if (format === "md") {
+        const outline = mapOutline(map.nodes, (id) => {
+          var _a2, _b2;
+          return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : "";
+        });
+        blob = new Blob([`${outline}
+`], { type: "text/markdown;charset=utf-8" });
+      } else {
+        const got = await this.collectExportScene(isCurrent);
+        if (!got || !isCurrent()) return;
+        if (got.refuse) {
+          new import_obsidian32.Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
+          return;
+        }
+        const limit = exportLimits(got.scene);
+        if (limit.action === "refuse") {
+          new import_obsidian32.Notice(
+            t(
+              limit.reason === "embedded" ? "ui.export_refused_embedded" : limit.reason === "pixels" ? "ui.export_refused_pixels" : "ui.export_empty"
+            )
+          );
+          return;
+        }
+        const svg = buildMapSvg(got.scene);
+        if (format === "svg") blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        else {
+          const { width, height } = got.scene;
+          let scale = 1;
+          if (limit.action === "scaleDown") {
+            scale = limit.scale;
+            new import_obsidian32.Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
+          } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS)
+            scale = 2;
+          blob = await this.pngBlob(svg, width, height, scale);
+          if (!isCurrent()) return;
+        }
+      }
+      const name = `${exportFileStem(map.title)}.${format}`;
+      if (target === "download") {
+        this.downloadBlob(blob, name);
+        new import_obsidian32.Notice(t("ui.export_downloaded", name));
+        return;
+      }
+      const data = await blob.arrayBuffer();
+      const destination = await this.app.fileManager.getAvailablePathForAttachment(name, mapPath);
+      if (!isCurrent()) return;
+      await this.app.vault.createBinary(destination, data);
+      new import_obsidian32.Notice(t("ui.export_saved", destination));
+    } catch (error) {
+      if (isCurrent()) new import_obsidian32.Notice(t("ui.export_failed", errorMessage(error)));
+    }
+  }
   openMapActions() {
     const choices = [];
     if (this.map) {
@@ -48584,6 +50004,7 @@ ${request.requirements}` : preset.text,
           this.showSampleTour = true;
           this.render();
         });
+      if (this.map) this.addExportButton(headerActions);
     } else if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
       newMap.createSpan({ text: t("ui.new_map") });
@@ -48604,6 +50025,7 @@ ${request.requirements}` : preset.text,
       this.updateHistoryButtons();
       if (!this.map.aim)
         this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
+      this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
     const selectedNode = (_j = this.map) == null ? void 0 : _j.nodes.find((node) => node.id === this.selected);
@@ -48926,6 +50348,7 @@ ${request.requirements}` : preset.text,
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
+    this.releaseCovers();
     this.cardEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
@@ -48945,6 +50368,7 @@ ${request.requirements}` : preset.text,
       this.renderingCard = false;
     }
     this.renderAimPendingCards(shown);
+    this.renderCanvasItems();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
@@ -48959,6 +50383,7 @@ ${request.requirements}` : preset.text,
       this.fillEmptyMap(this.emptyMapEl);
     }
     this.setupPan();
+    this.setupCanvasImageInput();
     this.applyInitialViewport();
     this.transform();
     this.drawEdges();
@@ -49044,6 +50469,9 @@ ${request.requirements}` : preset.text,
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
+    card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
+    card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
+    card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
     this.labelCard(card, (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
     if (this.integrationMode) {
@@ -49319,6 +50747,7 @@ ${request.requirements}` : preset.text,
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
+    if (note && !this.builtIn) this.paintCover(card, node.path);
     const title = card.createEl("h3", { text: (_I = note == null ? void 0 : note.title) != null ? _I : node.path, cls: "vam-card-title" });
     title.setAttr("title", (_J = note == null ? void 0 : note.title) != null ? _J : node.path);
     title.setAttr("dir", "auto");
@@ -49632,8 +51061,8 @@ ${request.requirements}` : preset.text,
   moveKeyboardFocus(target) {
     var _a2, _b2, _c, _d, _e;
     const card = (_b2 = this.cardEls.get(target.id)) != null ? _b2 : (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(target.id)}"]`);
-    const view = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect(), rect = card == null ? void 0 : card.getBoundingClientRect();
-    if (view && rect && (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom))
+    const view = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect(), rect2 = card == null ? void 0 : card.getBoundingClientRect();
+    if (view && rect2 && (rect2.left < view.left || rect2.right > view.right || rect2.top < view.top || rect2.bottom > view.bottom))
       this.focusNode(target, false);
     if (this.builtIn) {
       this.focusNodeId = target.id;
@@ -49768,6 +51197,69 @@ ${request.requirements}` : preset.text,
   markersText(markers) {
     return markers.length ? t("share.viewer_markers_0", markers.map((id) => t(markerLabelKey(id))).join(t("ui.list_separator"))) : "";
   }
+  /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
+  releaseCovers() {
+    var _a2;
+    (_a2 = this.coverObserver) == null ? void 0 : _a2.disconnect();
+    this.coverObserver = null;
+  }
+  /**
+   * Puts a fixed-height cover frame before the card's title when the note's metadata names a local image (frontmatter
+   * `topic-cover`, else the first embed). Reads only the metadata cache, never the network or the note body. A missing,
+   * remote or unreadable cover adds nothing. The image gets its `src` when the frame scrolls into view. Safe to call again.
+   */
+  paintCover(card, notePath) {
+    var _a2, _b2, _c, _d;
+    const old = cardCovers.get(card);
+    if (old) {
+      (_a2 = this.coverObserver) == null ? void 0 : _a2.unobserve(old.img);
+      old.frame.remove();
+      cardCovers.delete(card);
+    }
+    let source;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(notePath);
+      if (!(file instanceof import_obsidian32.TFile)) return;
+      const cover = resolveCover(
+        this.app.metadataCache.getFileCache(file),
+        (link) => this.app.metadataCache.getFirstLinkpathDest(link, notePath)
+      );
+      if (!cover || !("path" in cover)) return;
+      const image = this.app.vault.getAbstractFileByPath(cover.path);
+      source = image instanceof import_obsidian32.TFile ? (_c = (_b2 = this.app.vault).getResourcePath) == null ? void 0 : _c.call(_b2, image) : void 0;
+    } catch (e) {
+      return;
+    }
+    if (!source) return;
+    const frame = createDiv({ cls: "vam-card-cover" });
+    const img = frame.createEl("img", {
+      attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async" }
+    });
+    img.addEventListener("error", () => {
+      var _a3;
+      (_a3 = this.coverObserver) == null ? void 0 : _a3.unobserve(img);
+      frame.remove();
+      cardCovers.delete(card);
+    });
+    cardCovers.set(card, { frame, img });
+    const title = card.querySelector(".vam-card-title");
+    card.insertBefore(frame, title);
+    if (typeof IntersectionObserver !== "function") {
+      img.setAttr("src", source);
+      return;
+    }
+    (_d = this.coverObserver) != null ? _d : this.coverObserver = new IntersectionObserver((entries) => {
+      var _a3;
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const target = entry.target;
+        const real = target.getAttribute("data-src");
+        if (real) target.setAttr("src", real);
+        (_a3 = this.coverObserver) == null ? void 0 : _a3.unobserve(target);
+      }
+    });
+    this.coverObserver.observe(img);
+  }
   /**
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
    * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
@@ -49843,7 +51335,7 @@ ${request.requirements}` : preset.text,
       const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
       named = stripped === named ? named.replace(previous, "") : stripped;
     }
-    const id = aim ? void 0 : TOPIC_COLORS.find((color) => color === (note == null ? void 0 : note.color));
+    const id = aim ? void 0 : TOPIC_COLORS.find((color2) => color2 === (note == null ? void 0 : note.color));
     if (id) {
       const text11 = t("share.viewer_color_0", t(colorLabelKey(id)));
       card.dataset.topicColor = id;
@@ -50014,16 +51506,16 @@ ${request.requirements}` : preset.text,
     }
     const content = preview.createDiv("vam-hover-markdown");
     void import_obsidian32.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
-    const host = workspace.getBoundingClientRect(), rect = card.getBoundingClientRect();
+    const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
     preview.style.width = `${width}px`;
-    let left = rect.right - host.left + 12;
-    if (left + width > host.width - 12) left = rect.left - host.left - width - 12;
+    let left = rect2.right - host.left + 12;
+    if (left + width > host.width - 12) left = rect2.left - host.left - width - 12;
     const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
     const maxTop = Math.max(12, host.height - visibleHeight - 12);
     preview.style.left = `${Math.max(12, Math.min(left, Math.max(12, host.width - width - 12)))}px`;
-    preview.style.top = `${Math.max(12, Math.min(rect.top - host.top, maxTop))}px`;
+    preview.style.top = `${Math.max(12, Math.min(rect2.top - host.top, maxTop))}px`;
   }
   refreshCard(node, redrawEdges = true) {
     var _a2, _b2, _c, _d;
@@ -50361,6 +51853,7 @@ ${request.requirements}` : preset.text,
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
     if (note) this.renderColorSection(panel, node);
+    if (note) this.renderCoverSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -51039,6 +52532,29 @@ ${request.requirements}` : preset.text,
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
+  /** The card cover switch of the topic panel: one `aria-pressed` button, pressed while the cover is turned off. */
+  renderCoverSection(panel, node) {
+    if (!this.markersEditable(node)) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-cover-section");
+    section3.createEl("strong", { text: t("ui.topic_cover"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section3.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_cover"));
+    let off = this.topicCoverOff(node);
+    const paint = (focus = false) => {
+      group.empty();
+      const choice2 = this.button(group, t("ui.topic_cover_off"), () => {
+        this.enqueue(async () => {
+          if (await this.changeTopicCover(node)) off = !off;
+          paint(true);
+        });
+      });
+      choice2.setAttr("aria-pressed", String(off));
+      if (off) choice2.addClass("is-pressed");
+      if (focus) choice2.focus();
+    };
+    paint();
+  }
   /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
   renderColorSection(panel, node) {
     if (!this.markersEditable(node)) return;
@@ -51050,9 +52566,9 @@ ${request.requirements}` : preset.text,
     const choices = [null, ...TOPIC_COLORS];
     const current = () => {
       var _a2;
-      return (_a2 = TOPIC_COLORS.find((color) => {
+      return (_a2 = TOPIC_COLORS.find((color2) => {
         var _a3;
-        return color === ((_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.color);
+        return color2 === ((_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.color);
       })) != null ? _a2 : null;
     };
     const paint = (focusId) => {
@@ -51100,7 +52616,7 @@ ${request.requirements}` : preset.text,
    * in one undoable step. Only the notes whose colour really changes are written; Map.md changes only its viewport. A
    * child never inherits: a branch is just several writes in the same transaction.
    */
-  async changeTopicColor(node, color, branch = false) {
+  async changeTopicColor(node, color2, branch = false) {
     if (!this.map || !this.markersEditable(node)) return;
     const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
     const targets = ids.map((id) => this.map.nodes.find((item) => item.id === id)).filter((item) => !!item && !item.aimKind && !!this.notes.get(item.id)).filter((item) => {
@@ -51108,13 +52624,13 @@ ${request.requirements}` : preset.text,
       return ((_a2 = TOPIC_COLORS.find((id) => {
         var _a3;
         return id === ((_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.color);
-      })) != null ? _a2 : null) !== color;
+      })) != null ? _a2 : null) !== color2;
     });
     if (!targets.length) return;
     const viewport = clone(this.map.viewport);
     let transaction = this.beginMapTransaction();
     for (const target of targets)
-      transaction = transaction.rewriteNote(target.path, (path) => this.plugin.repo.writeTopicColor(path, color));
+      transaction = transaction.rewriteNote(target.path, (path) => this.plugin.repo.writeTopicColor(path, color2));
     const entry = await transaction.editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_color") });
@@ -51943,7 +53459,7 @@ ${request.requirements}` : preset.text,
     );
   }
   renderSelectionBar(workspace) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const selection = workspace.createDiv("vam-selection-bar");
     const names3 = [...this.multiSelected].map((id) => {
       var _a3;
@@ -51970,13 +53486,15 @@ ${request.requirements}` : preset.text,
       !this.multiSelected.size
     );
     this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+    if (!((_a2 = this.map) == null ? void 0 : _a2.aim) && !this.builtIn)
+      this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
-    if (!((_a2 = this.map) == null ? void 0 : _a2.aim) && !this.builtIn) {
+    if (!((_b2 = this.map) == null ? void 0 : _b2.aim) && !this.builtIn) {
       const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
@@ -51984,8 +53502,8 @@ ${request.requirements}` : preset.text,
         merge.setAttr("title", t(check.reason));
       }
     }
-    if (!((_b2 = this.map) == null ? void 0 : _b2.aim)) {
-      const running = ((_c = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _c.status) === "running";
+    if (!((_c = this.map) == null ? void 0 : _c.aim)) {
+      const running = ((_d = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _d.status) === "running";
       const research = this.button(
         selection,
         t("ui.multi_research"),
@@ -53251,10 +54769,10 @@ ${note.detail.trim()}` : "",
       (event) => {
         event.preventDefault();
         this.markCanvasHintSeen();
-        const rect = viewport.getBoundingClientRect();
+        const rect2 = viewport.getBoundingClientRect();
         this.zoomBy(Math.exp(-event.deltaY * (event.deltaMode === 0 ? 2e-3 : 0.04)), {
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top
+          x: event.clientX - rect2.left,
+          y: event.clientY - rect2.top
         });
       },
       { passive: false }
@@ -56736,8 +58254,8 @@ function buildSharePayload(map, notesById, options) {
     }
     const markers = readTopicMarkers({ "topic-markers": note == null ? void 0 : note.markers });
     if (markers.length) out.markers = markers;
-    const color = readTopicColor({ "topic-color": note == null ? void 0 : note.color });
-    if (color) out.color = color;
+    const color2 = readTopicColor({ "topic-color": note == null ? void 0 : note.color });
+    if (color2) out.color = color2;
     if (options.includeDetail) {
       if ((_d = note == null ? void 0 : note.detailHtml) == null ? void 0 : _d.trim()) out.detailHtml = note.detailHtml;
     }
@@ -58282,7 +59800,7 @@ function shareViewerUiExtras(languages) {
 
 // experiences/sharing/viewer-bundle.generated.ts
 var SHARE_VIEWER_JS = '(()=>{function Ve(t){var n;let r=t.aimKind==="question"?[]:(n=t.aimConvergesFromNodeIds)!=null?n:[];return[...t.parentId?[t.parentId]:[],...r.filter(s=>s!==t.parentId)]}function fe(t,r){let n=new Set,s=[r];for(;s.length;){let i=s.pop();for(let l of t)l.parentId===i&&l.id!==r&&!n.has(l.id)&&(n.add(l.id),s.push(l.id))}return n}function me(t,r){let n=new Map(t.map(l=>[l.id,l])),s=l=>{let u=0,a=new Set([l.id]);for(let m=l.parentId;m&&n.has(m)&&!a.has(m);m=n.get(m).parentId)a.add(m),u++;return u},i=new Set(t.map(l=>l.parentId).filter(l=>!!l&&n.has(l)));for(let l of t)i.has(l.id)&&(l.collapsed=r===null?!1:s(l)>=r)}function ge(t){if(t>150)return"right";if(t<-150)return"left"}function Ye(t,r,n,s={left:0,right:0}){let i={...s},l=new Map;for(let u of t){let a=i.left<i.right?"left":"right";l.set(u.id,a),i[a]+=r(u)+n}return l}function We(t,r,n,s){let i=t.map(s),l={left:0,right:0};t.forEach((a,m)=>{let g=i[m];g&&(l[g]+=r(a)+n)});let u=Ye(t.filter((a,m)=>!i[m]),r,n,l);return new Map(t.map((a,m)=>{var g;return[a.id,(g=i[m])!=null?g:u.get(a.id)]}))}function Kn(t){return t==="right"||t==="left"||t==="down"||t==="up"}function Xe(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function Gt(t){if(!(t!=null&&t.parentId))return;let r=t.layout;if(!r||typeof r!="object"||Array.isArray(r))return;let n=r.direction;return Kn(n)?n:void 0}function Ge(t){let{width:r,column:n,mapDirection:s,engine:i}=t,l=(u,a)=>{var w,U;let m=[],g=(b,f)=>{for(let L of[...t.kidsOf(b),...t.joinsOf(b)])Gt(L)?m.push({node:L,root:f}):g(L,f)};for(let b of u)g(b,b);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!m.length)return i(a,p);let h=a==="down"||a==="up",M=m.map(({node:b,root:f})=>{let L=l([b],Gt(b)),P=1/0,x=-1/0,D=1/0,H=-1/0,T=new Map,$=E=>{T.set(E.id,E);for(let S of[...t.kidsOf(E),...t.joinsOf(E)])$(S)};$(b);for(let[E,S]of L)P=Math.min(P,S.x),x=Math.max(x,S.x+r),D=Math.min(D,S.y),H=Math.max(H,S.y+t.heightFor(T.get(E)));let v=Math.max(1,Math.ceil((x-P+n-r)/n));return{node:b,root:f,placed:L,minX:P,maxX:x,minY:D,maxY:H,slots:v}}),A=new Map(M.map(b=>[b.node.id,b])),z=b=>{let f=A.get(b.id);return!f||!h?[]:Array.from({length:f.slots},(L,P)=>({id:`${b.id}\\0pad${P}`}))},R=new Set,N=i(a,{roots:u,kidsOf:b=>{if(!A.has(b.id))return t.kidsOf(b);let f=z(b);for(let L of f)R.add(L.id);return f},joinsOf:b=>A.has(b.id)?[]:t.joinsOf(b),heightFor:b=>{if(R.has(b.id))return 0;let f=A.get(b.id);return f&&!h?f.maxY-f.minY:t.heightFor(b)}}),O=new Map;for(let[b,f]of N)!R.has(b)&&!A.has(b)&&O.set(b,f);for(let b of M){let f=N.get(b.node.id),L,P;h?(L=f.x+n/2-(b.minX+b.maxX)/2,P=a==="down"?f.y-b.minY:f.y+t.heightFor(b.node)-b.maxY):(L=a==="right"||a==="balanced"&&f.x>=((U=(w=N.get(b.root.id))==null?void 0:w.x)!=null?U:f.x)?f.x-b.minX:f.x+r-b.maxX,P=f.y-b.minY);for(let[x,D]of b.placed)O.set(x,{x:D.x+L,y:D.y+P})}return O};return l(t.roots,s)}var qe=1/Math.tan(Math.PI/3);function Ze(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:l,column:u,gap:a,left:m,top:g}=t,p=u-l,h=C=>[...n(C),...s(C)],M=r.map(C=>{let N=new Map,O=T=>T.reduce(($,v)=>$+N.get(v.id),0)+Math.max(0,T.length-1)*a,w=T=>{let $=h(T);for(let v of $)w(v);N.set(T.id,Math.max(i(T),O($)))},U=(T,$,v,E)=>{let S=h(T),K=v+(N.get(T.id)-O(S))/2,Y=S.map(et=>{let Z=U(et,$+1,K,E);return K+=N.get(et.id)+a,Z}),st=i(T),q=Y.length?(Y[0]+Y[Y.length-1])/2:v+N.get(T.id)/2;return E.push({id:T.id,x:-$*u,centre:q,height:st}),q},b=h(C).map((T,$)=>{let v=$%2===0?1:-1,E=h(T);for(let rt of E)w(rt);let S=[],K=a;for(let rt of E){let ht=S.length,dt=U(rt,0,K,S)*qe-p;for(let F=ht;F<S.length;F++)S[F].x+=dt-l;K+=N.get(rt.id)+a}let Y=Math.max(u,K),st=Y*qe,q=i(T),et=[-l/2,...S.map(rt=>rt.x)],Z=[l/2,st,...S.map(rt=>rt.x+l)];return{topic:T,side:v,length:Y,height:q,cards:S,minX:Math.min(...et),maxX:Math.max(...Z)}}),f=i(C),L=[{id:C.id,x:0,y:-f/2,height:f}],P={above:-p,below:-p};for(let T of b){let $=T.side===1?"above":"below",v=P[$]-T.maxX,E=-T.side*T.length;L.push({id:T.topic.id,x:v-l/2,y:E-T.side*(T.height/2)-T.height/2,height:T.height});for(let S of T.cards)L.push({id:S.id,x:v+S.x,y:E+T.side*S.centre-S.height/2,height:S.height});P[$]=v+T.minX-p}let x=Math.min(...L.map(T=>T.x)),D=Math.min(...L.map(T=>T.y)),H=Math.max(...L.map(T=>T.y+T.height));return{out:L,minX:x,minY:D,maxY:H}}),A=new Map,z=m+Math.max(0,...M.map(C=>-C.minX)),R=g;for(let C of M){for(let N of C.out)A.set(N.id,{x:z+N.x,y:R+N.y-C.minY});R+=C.maxY-C.minY+a}return A}var Vn=Math.PI*2,Yn=6,Wn=60;function Xn(t,r,n,s){let i=[...t.values()].sort((u,a)=>u.y-a.y),l=new Set;for(let u=0;u<i.length;u++){let a=i[u];for(let m=u+1;m<i.length;m++){let g=i[m];if(g.y>=a.y+a.height+n)break;s&&s.checks++,Math.abs(a.x-g.x)<r&&a.y<g.y+g.height+n&&l.add(Math.max(a.depth,g.depth))}}return l}function Qe(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:l,column:u,gap:a,left:m,top:g}=t,p=new Map,h=g;for(let M of r){let A=[],z=new Map,R=v=>[...n(v),...s(v)],C=v=>{let E=R(v),S=E.length?E.reduce((K,Y)=>K+C(Y),0):1;return z.set(v.id,S),S};C(M);let N=(v,E,S,K)=>{A.push({id:v.id,depth:E,angle:(S+K)/2,height:i(v)});let Y=S,st=(K-S)/z.get(v.id);for(let q of R(v)){let et=st*z.get(q.id);N(q,E+1,Y,Y+et),Y+=et}};N(M,0,0,Vn);let O=Math.max(...A.map(v=>v.depth)),w=Array.from({length:O+1},(v,E)=>E*u),U=()=>{let v=[];return w.forEach((E,S)=>v.push(S?Math.max(E,v[S-1]+u):0)),new Map(A.map(E=>{let S=v[E.depth];return[E.id,{x:Math.round(S*Math.sin(E.angle)-l/2),y:Math.round(-S*Math.cos(E.angle)-E.height/2),depth:E.depth,height:E.height}]}))},b=u/Yn,f=()=>(t.stats&&t.stats.rounds++,Xn(U(),l,a,t.stats)),L=b,P=f(),x=w.slice();for(let v=0;P.size&&v<Wn;v++){x=w.slice();for(let E of P)w[E]+=L;L*=2,P=f()}if(!P.size&&x.some((v,E)=>w[E]-v>b)){let v=w.slice();for(;v.some((E,S)=>E-x[S]>b);){let E=v.map((S,K)=>(S+x[K])/2);w.splice(0,w.length,...E),f().size?x=E:v=E}w.splice(0,w.length,...v)}let D=U(),H=Math.min(...[...D.values()].map(v=>v.x)),T=Math.min(...[...D.values()].map(v=>v.y)),$=Math.max(...[...D.values()].map(v=>v.y+v.height));for(let[v,E]of D)p.set(v,{x:Math.round(m)+E.x-H,y:h+E.y-T});h+=$-T+a}return p}function qt(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,column:l,rowGap:u,flip:a,left:m,top:g}=t,p=new Map,h=new Map,M=x=>x.reduce((D,H)=>D+p.get(H.id),0),A=x=>{let D=n(x),H=s(x);for(let T of[...D,...H])A(T);p.set(x.id,Math.max(l,M(D),M(H))),h.set(x.id,1+Math.max(0,...D.map(T=>h.get(T.id))))},z=new Map,R=new Map,C=(x,D,H)=>{let T=n(x),$=s(x),v=p.get(x.id),E=(st,q)=>{let et=H+(v-M(st))/2;return st.map(Z=>{C(Z,q,et);let rt=z.get(Z.id);return et+=p.get(Z.id),rt})},S=E(T,D+1),K=E($,D+h.get(x.id)),Y=S.length?S:K;R.set(x.id,D),z.set(x.id,Y.length?(Y[0]+Y[Y.length-1])/2:H)},N=m,O=[],w=x=>{O.push(x);for(let D of[...n(x),...s(x)])w(D)};for(let x of r)A(x),C(x,0,N),N+=p.get(x.id),w(x);let U=Math.max(0,...R.values()),b=Array.from({length:U+1},()=>0);for(let x of O)b[R.get(x.id)]=Math.max(b[R.get(x.id)],i(x));let f=[],L=g;for(let x=0;x<=U;x++){let D=a?U-x:x;f[D]=L,L+=b[D]+u}let P=new Map;for(let x of O){let D=R.get(x.id),H=a?f[D]+b[D]-i(x):f[D];P.set(x.id,{x:z.get(x.id),y:H})}return P}function Je(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:l,column:u,gap:a,left:m,top:g}=t,p=new Map,h=g;for(let M of r){let A=new Map,z=w=>{A.set(w.id,i(w));for(let U of[...n(w),...s(w)])z(U)};z(M);let R=[{id:M.id,x:m,y:0}],C=m+u;[...n(M),...s(M)].forEach((w,U)=>{let b=qt({roots:[w],kidsOf:n,joinsOf:s,heightFor:i,column:u,rowGap:u-l,flip:U%2===1,left:C,top:0}),f=b.get(w.id).y,L=C;for(let[P,x]of b)R.push({id:P,x:x.x,y:x.y-f}),L=Math.max(L,x.x);C=L+u});let N=Math.min(...R.map(w=>w.y)),O=Math.max(...R.map(w=>w.y+A.get(w.id)));for(let w of R)p.set(w.id,{x:w.x,y:h+w.y-N});h+=O-N+a}return p}var zt=300,Gn=24,qn={compact:{column:330,gap:12},standard:{column:360,gap:Gn},spacious:{column:420,gap:48}};function Zn(t){return t==="compact"||t==="spacious"}var Qn=180;function Jn(t){let r=typeof t=="string"?t:t.direction,n=typeof t=="string"?void 0:t.spacing;return{direction:r,...qn[Zn(n)?n:"standard"]}}var tr=t=>t==="left"?-1:1;var er=(t,r)=>{let n=t==null?void 0:t(r);return n!==void 0&&Number.isFinite(n)&&n>0?n:Qn};function nr(t,r){var m,g;let n=new Map(t.map(p=>[p.id,p])),s=new Map,i=new Map,l=(p,h,M)=>{var A;return p.set(h,[...(A=p.get(h))!=null?A:[],M])};for(let p of t){if(!p.parentId)continue;let h=p.aimKind!=="question"&&((m=p.aimConvergesFromNodeIds)!=null&&m.length)?Ve(p).map(A=>n.get(A)):[],M=(g=h[0])==null?void 0:g.parentId;M&&n.has(M)&&h.every(A=>A&&A.parentId===M)?l(i,M,p):l(s,p.parentId,p)}return{kidsOf:p=>{var h;return r&&p.collapsed?[]:(h=s.get(p.id))!=null?h:[]},joinsOf:p=>{var h;return r&&p.collapsed?[]:((h=i.get(p.id))!=null?h:[]).filter(M=>{var A;return!(r&&((A=n.get(M.parentId))!=null&&A.collapsed))})}}}function he(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,column:l,gap:u,sign:a,left:m,top:g}=t,p=new Map,h=new Map,M=new Map,A=N=>N.reduce((O,w)=>O+h.get(w.id),0)+Math.max(0,N.length-1)*u,z=N=>{let O=n(N),w=s(N);for(let U of[...O,...w])z(U);h.set(N.id,Math.max(i(N),A(O),A(w))),M.set(N.id,1+Math.max(0,...O.map(U=>M.get(U.id))))},R=(N,O,w)=>{let U=n(N),b=s(N),f=h.get(N.id),L=(v,E)=>{let S=w+(f-A(v))/2;return v.map(K=>{let Y=R(K,E,S);return S+=h.get(K.id)+u,Y})},P=L(U,O+1),x=L(b,O+M.get(N.id)),D=P.length?U:b,H=P.length?P:x,T=i(N),$=w+(f-T)/2;if(H.length){let v=H[0]+i(D[0])/2,E=H[H.length-1]+i(D[D.length-1])/2;$=(v+E)/2-T/2}return p.set(N.id,{x:m+a*O*l,y:g+$}),$},C=0;for(let N of r)z(N),R(N,0,C),C+=h.get(N.id)+u;return{placed:p,sizes:h}}function rr(t,r,n){let{roots:s,kidsOf:i,joinsOf:l,heightFor:u,column:a,gap:m,left:g,top:p}=r,h=he({...r,sign:1}).sizes,M=new Map(t.map(O=>[O.id,O])),A=s.map(O=>{var f;let w=(f=M.get(O.id))!=null?f:O,U=We(i(O),L=>h.get(L.id),m,L=>{var P;return n?void 0:ge(((P=M.get(L.id))!=null?P:L).x-w.x)}),b=L=>he({...r,roots:[O],kidsOf:P=>P.id===O.id?i(P).filter(x=>U.get(x.id)===L):i(P),joinsOf:P=>P.id===O.id&&L==="left"?[]:l(P),sign:L==="left"?-1:1,left:0,top:0}).placed;return{root:O,right:b("right"),left:b("left")}}),z=Math.max(0,...A.flatMap(({left:O})=>[...O.values()].map(w=>Math.round(-w.x/a)))),R=g+z*a,C=new Map,N=0;for(let{root:O,right:w,left:U}of A){let b=H=>H.get(O.id).y+u(O)/2,f=Math.max(b(w),b(U)),L=[];for(let H of[{placed:w,isLeft:!1},{placed:U,isLeft:!0}]){let{placed:T,isLeft:$}=H,v=f-b(T);for(let[E,S]of T)$&&E===O.id||L.push([E,{x:R+S.x,y:S.y+v}])}let P=H=>u(M.get(H)),x=Math.min(...L.map(([,H])=>H.y)),D=Math.max(...L.map(([H,T])=>T.y+P(H)));for(let[H,T]of L)C.set(H,{x:T.x,y:p+N+T.y-x});N+=D-x+m}return C}function or(t,r,n,s,i=!1,l,u="right",a=!1){let{direction:m,column:g,gap:p}=Jn(u),{kidsOf:h,joinsOf:M}=nr(t,i),A=C=>er(l,C.id),z=(C,N)=>{if(C==="down"||C==="up")return qt({...N,column:g,rowGap:g-zt,flip:C==="up",left:n,top:s});let O={...N,column:g,gap:p,left:n,top:s};if(C==="radial")return Qe({...O,width:zt});if(C==="timeline")return Je({...O,width:zt});if(C==="fishbone")return Ze({...O,width:zt});let w={...O,sign:tr(C)};return C==="balanced"?rr(t,w,a):he(w).placed},R={roots:r,kidsOf:h,joinsOf:M,heightFor:A};return Xe(m)&&t.some(C=>Gt(C))?Ge({...R,width:zt,column:g,mapDirection:m,engine:z}):z(m,R)}function tn(t,r,n,s="right",i={}){let l=r!=null&&r.size?t.filter(m=>!r.has(m.id)):t,u=l.filter(m=>!m.parentId),a=or(l,u,80,80,!0,n,s,i.reset===!0);return t.map(m=>({...m,...a.get(m.id)}))}function en(t,r){return!r||!(r.bottom>r.top)?0:Math.max(0,Math.ceil(r.bottom-t))+8}function nn(t,r,n,s){let i=t.zoom;return{zoom:i,x:n.width/2-r.x*i,y:s+(n.height-s)/2-r.y*i}}function rn(t,r,n,s=1.2){let i=Math.max(1,r.height-n),l=t.maxX-t.minX,u=t.maxY-t.minY,a=Math.max(.25,Math.min(s,(r.width-80)/l,(i-80)/u));return{zoom:a,x:(r.width-l*a)/2-t.minX*a,y:n+(i-u*a)/2-t.minY*a}}var Zt={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function ye(t){let r=3735928559,n=1103547991;for(let s=0;s<t.length;s++){let i=t.charCodeAt(s);r=Math.imul(r^i,2654435761),n=Math.imul(n^i,1597334677)}return r=Math.imul(r^r>>>16,2246822507)^Math.imul(n^n>>>13,3266489909),n=Math.imul(n^n>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),(4294967296*(2097151&n)+(r>>>0)).toString(36)}var xt="\\u27E6",Mt="\\u27E7",Ut=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,an=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),be=new Set(["pre","script","style","textarea","template","noscript"]),ir=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),sr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),ar=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,lr=/\\p{L}/u,Bt=t=>t.localName.toLowerCase(),ln=t=>{var r;return((r=t.getAttribute("class"))!=null?r:"").split(/\\s+/).filter(Boolean)},Qt=t=>Array.from(t.childNodes).filter(r=>r.nodeType===1);function cn(t){for(let r of Qt(t))if(an.has(Bt(r))||be.has(Bt(r))||cn(r))return!0;return!1}function dn(t){let r=Bt(t);return be.has(r)?"skip":ir.has(r)||t.getAttribute("translate")==="no"||ln(t).some(n=>sr.has(n))?"atom":an.has(r)||cn(t)?"block":"inline"}function cr(t,r){return t.replace(ar,n=>(r.push({literal:n,atom:!0}),`${xt}${r.length}/${Mt}`))}function dr(t,r){let n="",s=i=>{var u;if(i.nodeType===3){n+=cr((u=i.nodeValue)!=null?u:"",r);return}if(i.nodeType!==1){r.push({node:i,atom:!0}),n+=`${xt}${r.length}/${Mt}`;return}let l=i;if(dn(l)==="inline"){r.push({node:l,atom:!1});let a=r.length;n+=`${xt}${a}${Mt}`;for(let m of Array.from(l.childNodes))s(m);n+=`${xt}/${a}${Mt}`;return}r.push({node:l,atom:!0}),n+=`${xt}${r.length}/${Mt}`};for(let i of t)s(i);return n}function on(t){return lr.test(t.replace(Ut,""))}function un(t){let r=[],n=u=>{let a=u.getAttribute("alt");a&&on(a)&&r.push({index:r.length,kind:"attribute",text:a.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},s=u=>{for(let a of Qt(u)){let m=Bt(a);be.has(m)||m==="svg"||(m==="img"?n(a):s(a))}},i=u=>{if(!u.length)return;let a=[],m=dr(u,a),g=m.trim();if(!g||!on(g)||m.includes("\\u27E6\\u27E6"))return;let p=m.replace(Ut,"");if(p.includes(xt)||p.includes(Mt))return;let h=m.slice(0,m.length-m.trimStart().length),M=m.slice(m.trimEnd().length);r.push({index:r.length,kind:"run",text:g,nodes:u,lead:h,trail:M,parts:a})},l=u=>{let a=[];for(let m of Array.from(u.childNodes)){if(m.nodeType===3){a.push(m);continue}if(m.nodeType!==1){i(a),a=[];continue}let g=m,p=dn(g);p==="atom"||p==="inline"?a.push(g):(i(a),a=[],p==="block"&&l(g))}i(a)};return s(t),l(t),{units:r}}var sn=t=>[...t.matchAll(Ut)].map(r=>r[0]);function ur(t,r){if(!r.trim())return!1;let n=sn(t),s=sn(r);if(n.length!==s.length||n.some((l,u)=>l!==s[u]))return!1;let i=r.replace(Ut,"");return!i.includes(xt)&&!i.includes(Mt)}function pr(t,r,n){var m;let s=[],i=[],l=g=>{let p=i[i.length-1];p?p.appendChild(g):s.push(g)},u=g=>{g&&l(n.createTextNode(g))};u(t.lead);let a=0;for(let g of r.matchAll(Ut)){u(r.slice(a,g.index)),a=((m=g.index)!=null?m:0)+g[0].length;let p=t.parts[Number(g[2])-1];if(g[1]==="/")i.pop();else if(g[3]==="/")p.literal!==void 0?u(p.literal):p.node&&l(p.node.cloneNode(!0));else if(p.node){let h=p.node.cloneNode(!1);l(h),i.push(h)}}return u(r.slice(a)),u(t.trail),s}function pn(t,r){var i,l,u;let n={applied:0,kept:0},s=[...t.units.filter(a=>a.kind==="attribute"),...t.units.filter(a=>a.kind==="run")];for(let a of s){let m=r(a);if(m===void 0||!ur(a.text,m)){n.kept++;continue}if(a.kind==="attribute"){(l=a.element)==null||l.setAttribute((i=a.attribute)!=null?i:"alt",m.trim()),n.applied++;continue}let g=a.nodes[0],p=g==null?void 0:g.parentNode,h=g==null?void 0:g.ownerDocument;if(!g||!p||!h){n.kept++;continue}for(let M of pr(a,m,h))p.insertBefore(M,g);for(let M of a.nodes)(u=M.parentNode)==null||u.removeChild(M);n.applied++}return n}function fn(t){let r=[],n=s=>{for(let i of Qt(s))Bt(i)==="svg"?r.push(i):n(i)};return n(t),r}function mn(t,r){let n=[],s=i=>{for(let l of Qt(i))ln(l).includes(r)&&n.push(l),s(l)};return s(t),n}var gn="vam-mermaid-slot",Jt=1,hn=3,yn=t=>{let r=t;return!!r&&(Array.isArray(r.detailSegments)||Array.isArray(r.detailDiagrams))},fr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),mr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function gr(t){var r,n;return t.nodeType===hn?fr((r=t.nodeValue)!=null?r:""):t.nodeType!==Jt?`\\0${t.nodeType}:${(n=t.nodeValue)!=null?n:""}\\0`:bn(t)}function bn(t){let r=t.localName.toLowerCase(),n=t.getAttributeNames().sort().map(s=>{var i;return` ${s}="${mr((i=t.getAttribute(s))!=null?i:"")}"`}).join("");return`<${r}${n}>${hr(t)}</${r}>`}function hr(t){return Array.from(t.childNodes).map(gr).join("")}function yr(t){let r=[],n=s=>{if(r.push(s),s.nodeType===Jt)for(let i of Array.from(s.childNodes))n(i)};return n(t),r}function br(t,r){var s;let n=fn(t);for(let i of n){let l=r();l.setAttribute("class",gn),(s=i.parentNode)==null||s.replaceChild(l,i)}return{root:t,svgs:n,extraction:un(t)}}function xr(t){let r=t.units.map(n=>`${n.kind}\\0${n.text}`).join("");return`${t.units.length}.${ye(r)}`}var Mr=t=>ye(bn(t));function Tr(t,r){if(!Array.isArray(r))return!1;let n=yr(t);for(let s of r){if(!Array.isArray(s)||s.length!==2)return!1;let[i,l]=s;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=n.length)return!1;let u=n[i];if(typeof l=="string"){if(u.nodeType!==hn)return!1;u.nodeValue=l}else if(l&&typeof l=="object"&&!Array.isArray(l)){if(u.nodeType!==Jt)return!1;for(let[a,m]of Object.entries(l))if(m===null)u.removeAttribute(a);else if(typeof m=="string")u.setAttribute(a,m);else return!1}else return!1}return!0}function vr(t,r,n){if(!t||typeof t!="object")return null;let s=t;if(typeof s.svg=="string"){let i=n(s.svg),l=Array.from(i.childNodes).filter(u=>u.nodeType===Jt);return l.length===1&&l[0].localName.toLowerCase()==="svg"?l[0]:null}if(typeof s.check=="string"&&s.check===Mr(r)){let i=r.cloneNode(!0);return Tr(i,s.patch)?i:null}return null}function xn(t,r,n){var m,g;let s={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:l}=br(t,n.createSlot),u=r.detailSegments;if(u!==void 0||r.detailCheck!==void 0)if(Array.isArray(u)&&u.length===l.units.length&&r.detailCheck===xr(l)){let p=pn(l,M=>{let A=u[M.index];return typeof A=="string"?A:void 0}),h=u.filter(M=>typeof M!="string").length;if(s.applied=p.applied,s.kept=Math.max(0,p.kept-h),n.afterText&&!n.afterText(t))return s.fallback=!0,s}else s.fallback=!0;let a=mn(t,gn);a.length!==i.length&&(s.fallback=!0);for(let[p,h]of a.entries()){let M=i[p];if(!M)break;let A=(m=r.detailDiagrams)==null?void 0:m[p],z=M;if(A){let R=null;try{R=vr(A,M,n.parse)}catch{R=null}R?z=R:s.diagramsKept++}(g=h.parentNode)==null||g.replaceChild(z,h)}return s}function gt(t,r,n){let s=t.createElement(r);return n&&(s.className=n),s}function wr(t,r){var u;let n=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),s=(u=n==null?void 0:n[1])!=null?u:t,[i,l=""]=r.imageSource.split("{0}");return[i,s,l]}function Er(t,r,n){let[s,i,l]=wr(r,n),u=gt(t,"span");u.className="vam-image-source";let a=gt(t,"a");return a.setAttribute("href",r),a.setAttribute("target","_blank"),a.setAttribute("rel","noopener noreferrer"),a.textContent=i,u.append(t.createTextNode(s),a,t.createTextNode(l)),u}function xe(t,r,n,s,i){Mn(t,r,new DOMParser().parseFromString(n,"text/html").body,s,i)}function Mn(t,r,n,s,i){var u,a,m,g;for(let p of Array.from(n.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(n.querySelectorAll("*")))for(let h of p.getAttributeNames()){let M=(u=p.getAttribute(h))!=null?u:"",A=h.toLowerCase();(A.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(A)&&/^\\s*(javascript|vbscript):/i.test(M))&&p.removeAttribute(h)}let l=()=>{let p=gt(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(n.querySelectorAll("img"))){let h=(a=p.getAttribute("src"))!=null?a:"";if(h.startsWith("vam-asset:")){let M=s[h.slice(10)];typeof M=="string"&&M.startsWith("data:image/")?p.setAttribute("src",M):p.replaceWith(l())}else if(/^https?:\\/\\//i.test(h)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let M=p.closest("a");(M!=null?M:p).after(Er(t,h,i))}else/^data:image\\//i.test(h)||p.replaceWith(l())}for(let p of Array.from(n.querySelectorAll("a"))){let h=(m=p.getAttribute("href"))!=null?m:"";/^(https?:|mailto:)/i.test(h)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):h.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(n.querySelectorAll("table"))){if((g=p.parentElement)!=null&&g.classList.contains("vam-table-scroll"))continue;let h=gt(t,"div");h.className="vam-table-scroll",p.replaceWith(h),h.append(p)}r.append(...Array.from(n.childNodes).map(p=>t.importNode(p,!0)))}function Tn(t,r,n,s,i,l){let u=a=>new DOMParser().parseFromString(a,"text/html").body;try{let a=u(n);xn(a,s,{parse:u,createSlot:()=>gt(t,"div")}),Mn(t,r,a,i,l)}catch{r.replaceChildren(),xe(t,r,n,i,l)}}function vn(t,r,n,s){let i=Math.max(60,Math.abs(n-t)/2);return`M ${t} ${r} C ${t+i} ${r}, ${n-i} ${s}, ${n} ${s}`}var Me=["red","orange","yellow","green","blue","purple"];function wn(t){let r=t["topic-color"];return Me.find(n=>n===r)}var Ar=["done","warning","star","priority-1","priority-2","priority-3"];var kr={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3"};function En(t){let r=t["topic-markers"];return Array.isArray(r)?Ar.filter(n=>r.includes(n)):[]}function An(t){return kr[t]}var Nr=(t,r)=>t.toLowerCase()===r.toLowerCase(),te=(t,r)=>t.find(n=>Nr(n,r));function Lr(t,r){if(typeof t!="string"||!t.trim())return;let n=te(r,t.trim());if(n)return n;let s=t.trim().toLowerCase().split(/[-_]/),i=s[0];if(i==="zh"){let u=s.slice(1).some(a=>a==="hant"||a==="tw"||a==="hk"||a==="mo")?"TW":"CN";return te(r,`${i}-${u}`)}return r.find(l=>l.toLowerCase().split(/[-_]/)[0]===i)}function kn(t){let{languages:r}=t,n=r[0];if(typeof t.stored=="string"){let s=te(r,t.stored);if(s)return s}if(typeof t.defaultLanguage=="string"){let s=te(r,t.defaultLanguage);if(s)return s}for(let s of t.browser){let i=Lr(s,r);if(i)return i}return n}function Nn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Sr="https://github.com/kevcltsai/visual-agent-map?ref=share",Or="und",ee="http://www.w3.org/2000/svg",Ln="vam-share-panel-width",Sn="vam-share-outline-open",Cr="(max-width: 600px)",Ir=300,Te=240,Rr=.25,Pr=2,_r=280,Dr=4,Hr={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},zr={core:"target",support:"library",side:"skip"},On=t=>t==="core"||t==="support"||t==="side",Tt=(t,r)=>t.replace("{0}",String(r));function Ee(t,r){var s;let n=(s=t.getElementById(r))==null?void 0:s.textContent;if(n)try{return JSON.parse(n)}catch{return}}function Cn(t){let r={...Zt};if(t&&typeof t=="object")for(let i of Object.keys(r)){let l=t[i];typeof l=="string"&&(r[i]=l)}let n=t&&typeof t=="object"?t.markerNames:void 0;if(n&&typeof n=="object"){r.markerNames={...Zt.markerNames};for(let i of Object.keys(r.markerNames)){let l=n[i];typeof l=="string"&&l.trim()&&(r.markerNames[i]=l)}}let s=t&&typeof t=="object"?t.colorNames:void 0;if(r.colorNames={...Zt.colorNames},s&&typeof s=="object")for(let i of Me){let l=s[i];typeof l=="string"&&l.trim()&&(r.colorNames[i]=l)}return r}function Br(t){let r=Ee(t,"vam-ui"),n=new Map,s={};if(r&&typeof r=="object"){if(r.uiByLanguage&&typeof r.uiByLanguage=="object")for(let[i,l]of Object.entries(r.uiByLanguage))n.set(i,Cn(l));if(r.languageNames&&typeof r.languageNames=="object")for(let[i,l]of Object.entries(r.languageNames))typeof l=="string"&&l&&(s[i]=l)}return{sets:n,names:s}}var ct=t=>typeof t=="string"&&t.trim()!=="";function ve(t){try{return window.localStorage.getItem(t)}catch{return null}}function we(t,r){try{window.localStorage.setItem(t,r)}catch{}}var pt=()=>window.matchMedia(Cr).matches;function In(t){var Ue,$e,je,Fe;let r=Cn(Ee(t,"vam-ui")),n=r;t.documentElement.lang=n.lang;let s=t.getElementById("vam-app"),i=Ee(t,"vam-map");if(!s)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){s.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let l=i.assets&&typeof i.assets=="object"?i.assets:{},u=new Map,a=[];for(let e of i.nodes)!e||typeof e.id!="string"||u.has(e.id)||(u.set(e.id,e),a.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed}));let m=new Map(a.map(e=>[e.id,e]));for(let e of a)e.parentId&&(!m.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let g=new Map;for(let e of a)e.parentId&&g.set(e.parentId,[...(Ue=g.get(e.parentId))!=null?Ue:[],e]);let p=Br(t),h=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(ct))):[],M=Nn(($e=i.source)==null?void 0:$e.mapId),A=h.length>=2,z=A?h[0]:"",R=z;if(A){let e=[];try{e=Array.from((je=window.navigator.languages)!=null?je:[window.navigator.language]).filter(ct)}catch{}R=kn({languages:h,stored:M?ve(M):null,defaultLanguage:ct(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let C=e=>{var o;return(o=p.sets.get(e))!=null?o:r},N=A&&z===Or,O=()=>A&&R!==z;A&&(n=C(R),t.documentElement.lang=R);let w=e=>{var c;let o=O()?(c=e.translations)==null?void 0:c[R]:void 0;return!o||typeof o!="object"?e:{title:ct(o.title)?o.title:e.title,summary:ct(o.summary)?o.summary:e.summary,reason:ct(o.reason)?o.reason:e.reason,detailHtml:ct(o.detailHtml)?o.detailHtml:e.detailHtml,...yn(o)&&ct(e.detailHtml)?{compact:o,detailHtml:e.detailHtml}:{}}},U=()=>{var d;let e=O()?(d=i.translations)==null?void 0:d[R]:void 0,o=ct(e==null?void 0:e.title)?e.title:i.title,c=ct(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof o=="string"&&o.trim()||n.untitledMap,goal:typeof c=="string"?c.trim():""}},b=(e,o)=>{var c;try{let d=new Intl.DisplayNames([o!=null?o:e],{type:"language"}).of(e);if(d&&d!==e)return d}catch{}return(c=p.names[e])!=null?c:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),o=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};o(),e.addEventListener("change",o)}catch{}let f=(e,o,c)=>{let d=gt(t,e);return o&&(d.className=o),c!==void 0&&(d.textContent=c),d},L=e=>{let o=t.createElementNS(ee,"svg");o.setAttribute("class","svg-icon"),o.setAttribute("viewBox","0 0 24 24"),o.setAttribute("aria-hidden","true");for(let c of Hr[e]){let[d,...y]=c.split("|"),k=t.createElementNS(ee,d);for(let I of y)k.setAttribute(I.slice(0,I.indexOf("=")),I.slice(I.indexOf("=")+1));o.append(k)}return o},P=(e,o,c,d)=>{let y=f("button",c,o);return y.type="button",y.addEventListener("click",k=>{k.stopPropagation(),d()}),e.append(y),y},x=(e,o,c,d)=>{let y=f("button");return y.type="button",y.setAttribute("aria-label",c),y.title=c,y.append(L(o)),y.addEventListener("click",k=>{k.stopPropagation(),d()}),e.append(y),y},D=e=>e==="core"?n.tierCore:e==="support"?n.tierSupport:n.tierSide,H=e=>En({"topic-markers":e.markers}),T=()=>/^(zh|ja)/.test(n.lang),$=(e,o)=>{if(!o.length)return e;let c=o.map(d=>n.markerNames[d]).join(T()?"\\u3001":", ");return`${e}${T()?"\\uFF0C":", "}${Tt(n.markerLabel,c)}`},v=e=>wn({"topic-color":e.color}),E=e=>{let o=f("span","vam-markers");for(let c of e){let d=f("span","vam-marker",An(c));d.dataset.marker=c,d.setAttribute("aria-hidden","true"),o.append(d)}return o},S=(e,o)=>{let c=f("span","vam-relevance-tag");c.dataset.tier=e,o&&(c.title=o);let d=f("span","vam-relevance-icon");return d.append(L(zr[e])),c.append(d,f("span",void 0,D(e))),c};s.className="vam-app";let K=f("div","vam-toolbar"),Y=f("h1","vam-map-switcher"),st=f("span","vam-shared");K.append(Y,st);let q=x(K,"list","",()=>Nt(Q.hidden,!0));K.prepend(q),q.setAttribute("aria-controls","vam-outline");let et=f("div","vam-toolbar-actions"),Z=f("select","vam-language");if(A){for(let e of h){let o=f("option",void 0,(Fe=p.names[e])!=null?Fe:b(e));o.value=e,N&&e===z&&(o.dataset.original="1"),Z.append(o)}Z.value=R,et.append(Z)}let rt=f("span","vam-made-with"),ht=f("a","vam-install");ht.href=Sr,ht.target="_blank",ht.rel="noopener noreferrer",et.append(rt,ht),K.append(et);let vt=f("div","vam-translate-note");vt.hidden=!0;let dt=f("div","vam-workspace"),F=f("div","vam-viewport"),wt=f("div","vam-stage");wt.setAttribute("role","tree");let Lt=t.createElementNS(ee,"svg");Lt.setAttribute("class","vam-edges"),Lt.setAttribute("aria-hidden","true"),wt.append(Lt),F.append(wt);let $t=f("div","vam-canvas-overlay"),Et=f("div","vam-map-tools"),St=f("span","vam-goal"),Ae=f("span","vam-goal-text");St.append(L("target"),Ae);let ke=f("span","vam-canvas-hint"),ft=f("div","vam-zoom-controls"),Rn=x(ft,"minus","",()=>It(1/1.2)),Ot=f("button","vam-zoom","100%");Ot.type="button",Ot.addEventListener("click",e=>{e.stopPropagation(),It(1/j.zoom)}),ft.append(Ot);let Pn=x(ft,"plus","",()=>It(1.2)),_n=x(ft,"max","",()=>Rt()),ut=f("button","vam-layout-button");ut.type="button",ut.setAttribute("aria-haspopup","menu"),ut.setAttribute("aria-expanded","false"),ft.append(ut);let nt=f("div","vam-layout-menu");nt.setAttribute("role","menu"),nt.hidden=!0,ft.append(nt),$t.append(Et,ke,ft);let V=f("aside","vam-inspector");V.hidden=!0;let Q=f("nav","vam-outline");Q.id="vam-outline";let Ct=f("div","vam-outline-tree");Ct.setAttribute("role","tree"),Q.append(Ct),dt.append(Q,F,$t,V),s.replaceChildren(...A?[K,vt,dt]:[K,dt]);let j={x:0,y:0,zoom:1},J=null,ne=!1,jt=Number(ve(Ln))||Ir,X=new Map,Dn=()=>{let e=new Set,o=(c,d)=>{var y;for(let k of(y=g.get(c.id))!=null?y:[])d&&e.add(k.id),o(k,d||k.collapsed)};for(let c of a)c.parentId||o(c,c.collapsed);return e},Ne=e=>{var c,d;let o=0;for(let y=e.parentId;y&&!(++o>a.length);y=(d=(c=m.get(y))==null?void 0:c.parentId)!=null?d:null);return o},Le=()=>en(F.getBoundingClientRect().top,Et.hidden?void 0:Et.getBoundingClientRect());function mt(){wt.style.transform=`translate(${j.x}px, ${j.y}px) scale(${j.zoom})`;let e=`${Math.round(j.zoom*100)}%`;Ot.textContent=e,Ot.setAttribute("aria-label",Tt(n.zoomReset,e))}function It(e,o){let c=o!=null?o:{x:F.clientWidth/2,y:F.clientHeight/2},d=Math.min(Pr,Math.max(Rr,j.zoom*e)),y=d/j.zoom;j={x:c.x-(c.x-j.x)*y,y:c.y-(c.y-j.y)*y,zoom:d},mt()}let re=!1;function Rt(){if(!X.size)return;if(!F.clientWidth||!F.clientHeight){re=!0;return}let e=1/0,o=1/0,c=-1/0,d=-1/0;for(let y of X.values())e=Math.min(e,y.offsetLeft),o=Math.min(o,y.offsetTop),c=Math.max(c,y.offsetLeft+(y.offsetWidth||_r)),d=Math.max(d,y.offsetTop+y.offsetHeight);j=rn({minX:e,minY:o,maxX:c,maxY:d},{width:F.clientWidth,height:F.clientHeight},Le()),mt()}function Se(e){let o=X.get(e);o&&(j=nn(j,{x:o.offsetLeft+o.offsetWidth/2,y:o.offsetTop+o.offsetHeight/2},{width:F.clientWidth,height:F.clientHeight},Le()),mt())}function At(){var e;Lt.replaceChildren();for(let o of a){let c=o.parentId?X.get(o.parentId):void 0,d=X.get(o.id);if(!c||!d)continue;let y=t.createElementNS(ee,"path");y.setAttribute("d",vn(c.offsetLeft+c.offsetWidth,c.offsetTop+c.offsetHeight/2,d.offsetLeft,d.offsetTop+d.offsetHeight/2)),y.setAttribute("class",((e=u.get(o.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Lt.append(y)}}let oe=0,Oe=()=>{oe||(oe=window.requestAnimationFrame(()=>{oe=0,At()}))},ie=e=>{let o=X.get(e),c=m.get(e);!o||!c||(o.style.left=`${c.x}px`,o.style.top=`${c.y}px`)};function se(){var o,c;for(let d of X.values())d.remove();X.clear();let e=Dn();for(let d of a){if(e.has(d.id))continue;let y=u.get(d.id),k=w(y),I=fe(a,d.id).size,B=On(y.tier)?y.tier:void 0,_=f("div",`vam-node${d.id===J?" is-selected":""}`);_.dataset.nodeId=d.id,_.dataset.status=y.status==="completed"?"completed":"idea",B&&(_.dataset.relevance=B),_.tabIndex=0,_.setAttribute("role","treeitem"),_.setAttribute("aria-level",String(Ne(d)+1)),_.setAttribute("aria-selected",String(d.id===J));let at=H(y),lt=v(y);lt&&(_.dataset.topicColor=lt);let tt=$(String((o=k.title)!=null?o:""),at);_.setAttribute("aria-label",lt?`${tt}${T()?"\\uFF0C":", "}${Tt(n.colorLabel,n.colorNames[lt])}`:tt),I&&_.setAttribute("aria-expanded",String(!d.collapsed));let G=f("div","vam-node-header");_.append(G),y.status!=="completed"&&G.append(f("span","vam-status vam-status-idea",n.toResearch)),B&&G.append(S(B,typeof k.reason=="string"?k.reason:void 0)),at.length&&G.append(E(at));let Ke=f("div","vam-node-tools");if(_.append(Ke),I){let it=d.collapsed?Tt(n.expandCount,I):n.collapse,pe=P(G,it,"vam-collapse-button",()=>{d.collapsed=!d.collapsed,Pt(d.id,!0)});pe.setAttribute("aria-expanded",String(!d.collapsed)),pe.setAttribute("aria-label",it),pe.title=it}P(Ke,n.detailsButton,void 0,()=>kt(d.id)),_.append(f("h3","vam-card-title",String((c=k.title)!=null?c:""))),typeof k.summary=="string"&&k.summary.trim()&&_.append(f("p","vam-card-summary",k.summary)),_.addEventListener("click",()=>{ne||kt(d.id)}),_.addEventListener("keydown",it=>{it.target===_&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),kt(d.id)):I&&it.key===(d.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),d.collapsed=!d.collapsed,Pt(d.id)))}),_.addEventListener("pointerdown",it=>Hn(it,d,_)),wt.append(_),X.set(d.id,_),ie(d.id)}}function Ft(){tn(a,void 0,o=>{var c;return(c=X.get(o))==null?void 0:c.offsetHeight}).forEach((o,c)=>{a[c].x=o.x,a[c].y=o.y});for(let o of X.keys())ie(o)}function Pt(e,o=!1){var y;let c=e?(y=X.get(e))==null?void 0:y.getBoundingClientRect():void 0;se(),Ft(),At();let d=e?X.get(e):void 0;if(d){if(c){let I=d.getBoundingClientRect();j={...j,x:j.x+c.left-I.left,y:j.y+c.top-I.top},mt()}let k=o?d.querySelector(".vam-collapse-button"):null;(k!=null?k:d).focus({preventScroll:!0})}}function Hn(e,o,c){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let d=e.clientX,y=e.clientY,k=o.x,I=o.y,B=!1,_=lt=>{let tt=lt.clientX-d,G=lt.clientY-y;if(!B){if(Math.hypot(tt,G)<=Dr)return;B=!0,c.classList.add("is-dragging"),c.setPointerCapture(lt.pointerId)}o.x=k+tt/j.zoom,o.y=I+G/j.zoom,ie(o.id),Oe()},at=()=>{c.removeEventListener("pointermove",_),c.removeEventListener("pointerup",at),c.removeEventListener("pointercancel",at),c.classList.remove("is-dragging"),B&&(ne=!0,window.setTimeout(()=>ne=!1,0))};c.addEventListener("pointermove",_),c.addEventListener("pointerup",at),c.addEventListener("pointercancel",at)}let ae=e=>Math.round(Math.min(Math.max(Te,e),Math.max(Te,dt.clientWidth*.7)));function Kt(){let e=pt();if(V.hidden||e){V.style.removeProperty("width"),$t.style.removeProperty("right");return}let o=ae(jt);V.style.width=`${o}px`,$t.style.right=`${o}px`,W.setAttribute("aria-valuenow",String(o)),W.setAttribute("aria-valuemax",String(ae(1/0)))}let W=f("div","vam-inspector-resizer");W.setAttribute("role","separator"),W.setAttribute("aria-orientation","vertical"),W.setAttribute("aria-label",n.resizePanel),W.setAttribute("aria-valuemin",String(Te)),W.tabIndex=0;let Vt=(e,o)=>{jt=ae(e),Kt(),o&&we(Ln,String(jt))};W.addEventListener("pointerdown",e=>{e.preventDefault();let o=e.clientX,c=V.offsetWidth;W.setPointerCapture(e.pointerId),W.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let d=k=>Vt(c+o-k.clientX,!1),y=()=>{W.removeEventListener("pointermove",d),W.removeEventListener("pointerup",y),W.removeEventListener("pointercancel",y),W.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),Vt(jt,!0)};W.addEventListener("pointermove",d),W.addEventListener("pointerup",y),W.addEventListener("pointercancel",y)}),W.addEventListener("keydown",e=>{let o=e.shiftKey?48:16;if(e.key==="ArrowLeft")Vt(V.offsetWidth+o,!0);else if(e.key==="ArrowRight")Vt(V.offsetWidth-o,!0);else return;e.preventDefault()});let le=pt();window.addEventListener("resize",()=>{Kt(),mt(),pt()!==le&&(le=pt(),Nt(le?!1:Pe(),!1))});function ce(){J=null;for(let e of X.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");V.hidden=!0,dt.classList.remove("has-inspector"),V.replaceChildren(),Kt(),bt()}function kt(e){var _,at,lt;let o=m.get(e),c=u.get(e);if(!o||!c)return;let d={...c,...w(c)};J=e;for(let[tt,G]of X)G.classList.toggle("is-selected",tt===e),G.setAttribute("aria-selected",String(tt===e));V.replaceChildren(W);let y=f("div","vam-inspector-heading");y.append(f("strong",void 0,n.topicDetails)),P(y,n.close,void 0,ce),V.append(y,f("h3",void 0,String((_=d.title)!=null?_:"")));let k=On(d.tier)?d.tier:void 0;if(k){let tt=f("div","vam-inspector-why");tt.append(S(k));let G=typeof d.reason=="string"&&d.reason.trim()?d.reason:d.manual?n.manualReason:"";G&&tt.append(f("span",void 0,G)),V.append(tt)}typeof d.summary=="string"&&d.summary.trim()&&V.append(f("p","vam-sample-summary",d.summary));let I=f("div","vam-sample-detail");typeof d.detailHtml=="string"&&d.detailHtml.trim()?d.compact?Tn(t,I,d.detailHtml,d.compact,l,n):xe(t,I,d.detailHtml,l,n):I.append(f("p","vam-inspector-empty",n.noContent)),V.append(I);let B=(at=g.get(e))!=null?at:[];if(B.length){let tt=f("div","vam-subtopics");tt.append(f("strong",void 0,n.subtopics));for(let G of B)P(tt,String((lt=w(u.get(G.id)).title)!=null?lt:""),void 0,()=>{o.collapsed&&(o.collapsed=!1,Pt(o.id)),kt(G.id),Se(G.id)});V.append(tt)}V.hidden=!1,dt.classList.add("has-inspector"),Kt(),V.scrollTop=0,bt(),_e()}let de=e=>{me(a,e),Pt(),Rt()},_t=e=>{nt.hidden||(nt.hidden=!0,ut.setAttribute("aria-expanded","false"),e&&ut.focus())};function zn(){nt.replaceChildren();let e=[{label:n.collapseAll,run:()=>de(0)},{label:n.expandAll,run:()=>de(null)},...[1,2,3].map(o=>({label:Tt(n.expandToLevel,o),run:()=>de(o)})),null,{label:n.autoLayout,run:()=>{Ft(),At()}}];for(let o of e){if(!o){nt.append(f("hr"));continue}let c=f("button",void 0,o.label);c.type="button",c.setAttribute("role","menuitem"),c.addEventListener("click",d=>{d.stopPropagation(),_t(!0),o.run()}),nt.append(c)}}let Ce=()=>Array.from(nt.querySelectorAll("button"));ut.addEventListener("click",e=>{var o;if(e.stopPropagation(),!nt.hidden)return _t(!0);nt.hidden=!1,ut.setAttribute("aria-expanded","true"),(o=Ce()[0])==null||o.focus()}),nt.addEventListener("keydown",e=>{let o=Ce(),c=o.indexOf(t.activeElement);if(e.key==="ArrowDown")o[(c+1)%o.length].focus();else if(e.key==="ArrowUp")o[(c-1+o.length)%o.length].focus();else if(e.key==="Home")o[0].focus();else if(e.key==="End")o[o.length-1].focus();else return e.key==="Tab"?_t(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!nt.hidden&&!ft.contains(e.target)&&_t(!1);let o=e.target;pt()&&!Q.hidden&&!Q.contains(o)&&!q.contains(o)&&Nt(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!nt.hidden)_t(!0);else if(pt()&&!Q.hidden)Nt(!1,!1),q.focus();else if(!V.hidden){let o=J?X.get(J):void 0;ce(),o==null||o.focus({preventScroll:!0})}}});function Ie(){let e=U();if(t.title=e.title,Y.textContent=e.title,wt.setAttribute("aria-label",e.title),st.textContent=n.readOnly,rt.textContent=n.madeWithVam,ht.textContent=n.install,Z.setAttribute("aria-label",n.language),Z.title=n.language,N)for(let c of Array.from(Z.options))c.dataset.original&&(c.textContent=n.originalText);e.goal?(Ae.textContent=Tt(n.goal,e.goal),St.title=e.goal,St.parentElement||Et.append(St),Et.hidden=!1):(St.remove(),Et.hidden=!0),ke.textContent=n.hint;let o=(c,d)=>{c.setAttribute("aria-label",d),c.title=d};if(o(Rn,n.zoomOut),o(Pn,n.zoomIn),o(_n,n.showAll),ut.textContent=n.layout,V.setAttribute("aria-label",n.topicDetails),Q.setAttribute("aria-label",n.outline),Ct.setAttribute("aria-label",n.outline),o(q,n.outline),W.setAttribute("aria-label",n.resizePanel),zn(),O()){let c=N?n.aiTranslatedUnknown:Tt(n.aiTranslated,b(z,R));vt.textContent=`${c} ${n.imageTextUntranslated}`,vt.hidden=!1}else vt.hidden=!0;mt()}function Bn(e){if(e===R||!h.includes(e))return;R=e,n=C(e),M&&we(M,e),t.documentElement.lang=e;let o=V.scrollTop;Ie(),se(),At(),He(),J!==null&&m.has(J)&&!V.hidden&&(kt(J),V.scrollTop=o),Oe()}Z.addEventListener("change",()=>Bn(Z.value));let Yt=[],Re=e=>{var o;Yt.push(e);for(let c of(o=g.get(e.id))!=null?o:[])Re(c)};for(let e of a)e.parentId||Re(e);let Dt=new Set,yt=new Map,Wt=null;function Pe(){return ve(Sn)!=="0"}function Nt(e,o){Q.hidden=!e,dt.classList.toggle("has-outline",e),q.setAttribute("aria-expanded",String(e)),o&&!pt()&&we(Sn,e?"1":"0")}let Un=()=>Yt.filter(e=>{var o;return!((o=yt.get(e.id))!=null&&o.hidden)});function bt(){var c,d,y;let e=[];for(let k of Yt){let I=yt.get(k.id);if(!I)continue;let B=!1;for(let _=k.parentId;_&&!B;_=(d=(c=m.get(_))==null?void 0:c.parentId)!=null?d:null)B=Dt.has(_);I.hidden=B,B||e.push(k),g.has(k.id)&&I.setAttribute("aria-expanded",String(!Dt.has(k.id))),k.id===J?I.setAttribute("aria-current","true"):I.removeAttribute("aria-current")}let o=(y=e.find(k=>k.id===Wt))!=null?y:e[0];for(let[k,I]of yt)I.tabIndex=k===(o==null?void 0:o.id)?0:-1}function _e(){let e=J?yt.get(J):void 0;!e||e.hidden||!Q.clientHeight||(e.offsetTop<Q.scrollTop?Q.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>Q.scrollTop+Q.clientHeight&&(Q.scrollTop=e.offsetTop+e.offsetHeight-Q.clientHeight))}function ue(e){Dt.delete(e)||Dt.add(e),bt()}function $n(e){var o;Wt=e,bt(),(o=yt.get(e))==null||o.focus()}function jn(){for(let[e,o]of X)o.classList.toggle("is-selected",e===J),o.setAttribute("aria-selected",String(e===J))}function De(e){var y,k,I;let o=m.get(e);if(!o)return;let c=!1,d=0;for(let B=o.parentId;B&&d++<=a.length;B=(k=(y=m.get(B))==null?void 0:y.parentId)!=null?k:null){let _=m.get(B);_!=null&&_.collapsed&&(_.collapsed=!1,c=!0)}J=e,c&&Pt(),Se(e),V.hidden?jn():kt(e),bt(),_e(),pt()&&Nt(!1,!1),(I=X.get(e))==null||I.focus({preventScroll:!0})}function Fn(e,o){var B;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let c=Un(),d=c.indexOf(o),y=(B=g.get(o.id))!=null?B:[],k=Dt.has(o.id),I;switch(e.key){case"ArrowDown":I=c[d+1];break;case"ArrowUp":I=c[d-1];break;case"Home":I=c[0];break;case"End":I=c[c.length-1];break;case"ArrowRight":y.length&&k?ue(o.id):I=y[0];break;case"ArrowLeft":y.length&&!k?ue(o.id):I=o.parentId?m.get(o.parentId):void 0;break;case"Enter":case" ":De(o.id);break;default:return}e.preventDefault(),I&&$n(I.id)}function He(){var e;Ct.replaceChildren(),yt.clear();for(let o of Yt){let c=String((e=w(u.get(o.id)).title)!=null?e:""),d=f("div","vam-outline-item");d.dataset.outlineId=o.id,d.setAttribute("role","treeitem");let y=Ne(o)+1;d.setAttribute("aria-level",String(y)),d.style.setProperty("--depth",String(y-1));let k=f("span","vam-outline-twist");g.has(o.id)&&(k.append(L("chevron")),k.addEventListener("click",_=>{_.stopPropagation(),ue(o.id)}));let I=f("span","vam-outline-title",c);I.title=c,d.append(k,I);let B=H(u.get(o.id));B.length&&(d.append(E(B)),d.setAttribute("aria-label",$(c,B))),d.addEventListener("click",()=>De(o.id)),d.addEventListener("keydown",_=>Fn(_,o)),d.addEventListener("focus",()=>{Wt!==o.id&&(Wt=o.id,bt())}),Ct.append(d),yt.set(o.id,d)}bt()}let ot=new Map,Ht=0,Xt=!1;F.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(F.setPointerCapture(e.pointerId),ot.set(e.pointerId,{x:e.clientX,y:e.clientY}),F.classList.add("is-panning"),ot.size===1&&(Xt=!1),ot.size===2)){let[o,c]=Array.from(ot.values());Ht=Math.hypot(o.x-c.x,o.y-c.y)}}),F.addEventListener("pointermove",e=>{let o=ot.get(e.pointerId);if(!o)return;if(ot.set(e.pointerId,{x:e.clientX,y:e.clientY}),ot.size===2&&Ht){let[y,k]=Array.from(ot.values()),I=Math.hypot(y.x-k.x,y.y-k.y),B=F.getBoundingClientRect();It(I/Ht,{x:(y.x+k.x)/2-B.left,y:(y.y+k.y)/2-B.top}),Ht=I,Xt=!0;return}let c=e.clientX-o.x,d=e.clientY-o.y;Xt||(Xt=Math.abs(c)+Math.abs(d)>0),j={...j,x:j.x+c,y:j.y+d},mt()});let ze=e=>{ot.delete(e.pointerId)&&(ot.size<2&&(Ht=0),ot.size||(F.classList.remove("is-panning"),!Xt&&e.type==="pointerup"&&!V.hidden&&ce()))};F.addEventListener("pointerup",ze),F.addEventListener("pointercancel",ze),F.addEventListener("wheel",e=>{e.preventDefault();let o=F.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?It(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-o.left,y:e.clientY-o.top}):(j={...j,x:j.x-e.deltaX,y:j.y-e.deltaY},mt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{re&&(re=!1,Rt())}).observe(F),Ie(),He(),Nt(pt()?!1:Pe(),!1),me(a,1),se(),Ft(),At(),Rt();let Be=t.fonts;Be&&Be.ready.then(()=>{J!==null||ot.size||(Ft(),At(),Rt())})}In(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }\n.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n.vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }\n.vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
@@ -58366,8 +59884,8 @@ async function drawable(bytes, mime) {
   }
   const markup = new TextDecoder().decode(bytes);
   const box = /<svg\b[^>]*\sviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(markup);
-  const sized = /<svg\b[^>]*\swidth\s*=/i.test(markup);
-  const fromBox = !sized && box && Number(box[1]) > 0 && Number(box[2]) > 0;
+  const sized2 = /<svg\b[^>]*\swidth\s*=/i.test(markup);
+  const fromBox = !sized2 && box && Number(box[1]) > 0 && Number(box[2]) > 0;
   return {
     source: image,
     width: fromBox ? Number(box[1]) : image.naturalWidth || 1024,
@@ -61021,20 +62539,20 @@ var ImageTranslateAction = class extends import_obsidian38.Component {
         if (again) current = again;
       }
       const image2 = current;
-      const rect = image2.getBoundingClientRect();
+      const rect2 = image2.getBoundingClientRect();
       const pane = (_a2 = image2.closest(".view-content")) == null ? void 0 : _a2.getBoundingClientRect();
-      const visible = image2.isConnected && rect.width > 0 && rect.height > 0;
+      const visible = image2.isConnected && rect2.width > 0 && rect2.height > 0;
       halo.toggleClass("is-hidden", !visible);
       if (visible) {
-        halo.style.left = `${rect.left}px`;
-        halo.style.top = `${rect.top}px`;
-        halo.style.width = `${rect.width}px`;
-        halo.style.height = `${rect.height}px`;
+        halo.style.left = `${rect2.left}px`;
+        halo.style.top = `${rect2.top}px`;
+        halo.style.width = `${rect2.width}px`;
+        halo.style.height = `${rect2.height}px`;
         const clip4 = pane ? [
-          Math.max(-6, pane.top - rect.top),
-          Math.max(-6, rect.right - pane.right),
-          Math.max(-6, rect.bottom - pane.bottom),
-          Math.max(-6, pane.left - rect.left)
+          Math.max(-6, pane.top - rect2.top),
+          Math.max(-6, rect2.right - pane.right),
+          Math.max(-6, rect2.bottom - pane.bottom),
+          Math.max(-6, pane.left - rect2.left)
         ] : [-6, -6, -6, -6];
         halo.style.clipPath = `inset(${clip4.map((value) => `${value}px`).join(" ")})`;
       }
@@ -61053,13 +62571,13 @@ var ImageTranslateAction = class extends import_obsidian38.Component {
     if (!view.file) return;
     this.hide();
     this.target = { view, path: view.file.path, image, token };
-    const rect = image.getBoundingClientRect();
+    const rect2 = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
     (0, import_obsidian38.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
-    this.place(pill, rect.right - 8, rect.top + 8, "right");
+    this.place(pill, rect2.right - 8, rect2.top + 8, "right");
   }
   hide() {
     var _a2, _b2;
@@ -61498,8 +63016,8 @@ var MarkdownSelectionAi = class extends import_obsidian39.Component {
     const rects = range == null ? void 0 : range.getClientRects();
     const editorSelection = view.containerEl.querySelector(".cm-selectionBackground");
     const rangeRect = (rects == null ? void 0 : rects.length) ? rects[rects.length - 1] : range == null ? void 0 : range.getBoundingClientRect();
-    const rect = rangeRect && (rangeRect.width || rangeRect.height) ? rangeRect : editorSelection == null ? void 0 : editorSelection.getBoundingClientRect();
-    if (!text11 || !rect || !rect.width && !rect.height) {
+    const rect2 = rangeRect && (rangeRect.width || rangeRect.height) ? rangeRect : editorSelection == null ? void 0 : editorSelection.getBoundingClientRect();
+    if (!text11 || !rect2 || !rect2.width && !rect2.height) {
       this.hideLauncher();
       return;
     }
@@ -61511,12 +63029,12 @@ var MarkdownSelectionAi = class extends import_obsidian39.Component {
       const start = from + selected.indexOf(text11);
       if (markdown.slice(start, start + text11.length) === text11) matchAt = start;
     }
-    this.snapshot = { view, path: view.file.path, text: text11, markdown, matchAt, rect };
+    this.snapshot = { view, path: view.file.path, text: text11, markdown, matchAt, rect: rect2 };
     const launcher = this.launcher;
     if (!launcher || !showLauncher) return;
     launcher.hidden = false;
-    const left = Math.max(8, Math.min(rect.right, window.innerWidth - 120));
-    const top = rect.bottom + 6 + 42 < window.innerHeight ? rect.bottom + 6 : Math.max(8, rect.top - 42);
+    const left = Math.max(8, Math.min(rect2.right, window.innerWidth - 120));
+    const top = rect2.bottom + 6 + 42 < window.innerHeight ? rect2.bottom + 6 : Math.max(8, rect2.top - 42);
     launcher.style.left = `${left}px`;
     launcher.style.top = `${top}px`;
   }
@@ -61651,14 +63169,14 @@ var SelectionAiPanel = class extends import_obsidian39.Component {
   reposition() {
     var _a2, _b2, _c, _d, _e;
     if (!this.isOpen) return;
-    const rect = this.snapshot.rect;
+    const rect2 = this.snapshot.rect;
     const width = Math.min(480, window.innerWidth - 24);
     this.modalEl.style.width = `${width}px`;
-    this.modalEl.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+    this.modalEl.style.left = `${Math.max(12, Math.min(rect2.left, window.innerWidth - width - 12))}px`;
     const header = (_c = (_b2 = (_a2 = this.titleEl) == null ? void 0 : _a2.parentElement) == null ? void 0 : _b2.offsetHeight) != null ? _c : 0;
     const natural = header + ((_e = (_d = this.contentEl) == null ? void 0 : _d.scrollHeight) != null ? _e : this.modalEl.scrollHeight);
     const height = Math.min(natural, window.innerHeight - 24);
-    const top = Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12));
+    const top = Math.max(12, Math.min(rect2.bottom + 8, window.innerHeight - height - 12));
     this.modalEl.style.top = `${top}px`;
     this.modalEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
   }

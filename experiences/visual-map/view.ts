@@ -6,10 +6,43 @@ import {
   rememberedOutputLanguage,
   resolveAimContentLanguage
 } from "../aim/content-language";
+import {
+  addImage,
+  boundaryBounds,
+  moveItem,
+  pruneBoundaries,
+  removeItem,
+  resizeKeepRatio,
+  IMAGE_MIN_SIZE,
+  type BoundaryItem,
+  type CanvasItem,
+  type ImageItem
+} from "./canvas-items";
+import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
+import {
+  EXPORT_MAX_EDGE,
+  EXPORT_MAX_EMBEDDED_BYTES,
+  EXPORT_MAX_PIXELS,
+  browserPngEnv,
+  buildMapSvg,
+  exportFileStem,
+  exportLimits,
+  mapOutline,
+  normalizeCssColor,
+  svgToPngBlob,
+  toDataUri,
+  wrapText,
+  type MapScene,
+  type SceneBoundary,
+  type SceneCard,
+  type SceneEdge,
+  type SceneImage
+} from "./map-export";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
   isTransactionError,
+  type AttachmentPath,
   type Transaction,
   type TransactionEntry
 } from "./map-transaction";
@@ -26,6 +59,7 @@ import {
 } from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
+import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -493,6 +527,8 @@ const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The extra accessible-name part of a card that is waiting to be moved by a paste ("cut"). */
 const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
+/** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
+const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -542,6 +578,7 @@ function depthOf(nodes: MapNode[], id: string): number {
   for (let node = byId.get(id); node?.parentId && depth < nodes.length; node = byId.get(node.parentId)) depth++;
   return depth;
 }
+const BOUNDARY_PAD = 16;
 const boxOf = (card: HTMLElement): CardBox => ({
   x: card.offsetLeft,
   y: card.offsetTop,
@@ -832,6 +869,10 @@ export class VisualAgentMapView extends ItemView {
   private viewportEl: HTMLElement | null = null;
   private stageEl: HTMLElement | null = null;
   private edgesEl: SVGSVGElement | null = null;
+  /** The canvas image that had keyboard focus when a change repainted the canvas; focus goes back to it. */
+  private focusItemId: string | null = null;
+  /** Last pointer position over the canvas in client pixels; a pasted picture goes there (D6). */
+  private lastCanvasPointer: { x: number; y: number } | null = null;
   private zoomLabel: HTMLElement | null = null;
   private refreshTimer: number | null = null;
   private viewportTimer: number | null = null;
@@ -905,6 +946,8 @@ export class VisualAgentMapView extends ItemView {
   private cardHeightOf = (id: string): number | undefined =>
     this.cardEls.get(id)?.offsetHeight || medianHeight([...this.cardEls.values()].map(card => card.offsetHeight));
   private cardChecks = new Map<string, HTMLInputElement>();
+  /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
+  private coverObserver: IntersectionObserver | null = null;
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
   /** While a card renders, its buttons stay out of the tab order until that card is focused. */
@@ -1006,6 +1049,17 @@ export class VisualAgentMapView extends ItemView {
     this.registerEvent(workspace.on("layout-change", () => this.chat?.refreshNote()));
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
     this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
+    // A note whose image or `topic-cover` just changed redraws only its own cover.
+    const cache = this.app.metadataCache;
+    if (typeof cache?.on === "function")
+      this.registerEvent(
+        cache.on("changed", file => {
+          if (this.closed || this.builtIn || !this.map) return;
+          const node = this.map.nodes.find(item => item.path === file.path);
+          const card = node ? this.cardEls.get(node.id) : undefined;
+          if (card && node) this.paintCover(card, node.path);
+        })
+      );
   }
   async onOpen(): Promise<void> {
     this.closed = false;
@@ -1151,6 +1205,7 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
     this.renderAfterDrag = false;
@@ -2925,6 +2980,35 @@ export class VisualAgentMapView extends ItemView {
         );
     menu.showAtMouseEvent(event);
   }
+  /** True when the topic note's frontmatter has `topic-cover: none` (read from the metadata cache only). */
+  private topicCoverOff(node: MapNode): boolean {
+    const file = this.app.vault.getAbstractFileByPath(node.path);
+    const value: unknown =
+      file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter?.["topic-cover"] : null;
+    return typeof value === "string" && value.trim().toLowerCase() === "none";
+  }
+  /**
+   * Turns a topic's card cover off (`topic-cover: none`) or back on (the key is removed) in one undoable step: the note
+   * rewrite and Map.md (viewport only). Undo writes the old note text back, so the frontmatter is identical to before.
+   */
+  private async changeTopicCover(node: MapNode): Promise<TransactionEntry | null> {
+    if (!this.map || !this.markersEditable(node)) return null;
+    const off = this.topicCoverOff(node);
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error(path);
+        await this.app.vault.process(file, content => (off ? withoutCover(content) : withCoverOff(content)));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return entry;
+  }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
     const menu = new Menu();
@@ -4496,23 +4580,26 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
   private async mapChangeSnapshots(
-    change: (map: MapDocument) => void,
+    change: (map: MapDocument, attachment: AttachmentPath) => void,
     rebuildDerivedData = true,
-    created: string[] = []
+    created: string[] = [],
+    attachment?: { name: string; data: ArrayBuffer }
   ): Promise<{ before: MapDocument; after: MapDocument } | null> {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
+    // The file is stored (or an identical one reused) inside this step; a failed step trashes only a file it created.
+    if (attachment) tx.createAttachment("image", { ...attachment, sourcePath: this.path });
     let before!: MapDocument, after!: MapDocument;
     const viewport = clone(this.map.viewport);
     const opened = this.map;
     try {
       const entry = await tx
-        .editMap(this.path, map => {
+        .editMap(this.path, (map, _resolve, attachmentPath) => {
           // Map.md on disk may hold an older viewport: the edit starts from the one on screen, as the in-memory edit did.
           map.viewport = clone(viewport);
           before = clone(map);
-          change(map);
+          change(map, attachmentPath);
           after = clone(map);
         })
         .commit({ deferRebuild: true });
@@ -5306,6 +5393,571 @@ export class VisualAgentMapView extends ItemView {
       hooks.dismissed
     ).open();
   }
+  /** Free images only change on a map the user may edit: not AIM, not the built-in sample, not while picking topics. */
+  private canEditCanvasItems(): boolean {
+    return !this.builtIn && !this.integrationMode && !this.map?.aim;
+  }
+  /**
+   * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
+   * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
+   */
+  private renderCanvasItems(): void {
+    const stage = this.stageEl,
+      items = this.map?.canvasItems;
+    if (!stage || !items?.length) return;
+    const editable = this.canEditCanvasItems();
+    const layer = items.some(item => item.kind === "image") ? stage.createDiv("vam-canvas-items") : null;
+    layer?.setAttr("role", "group");
+    layer?.setAttr("aria-label", t("ui.canvas_images_group"));
+    for (const item of items) {
+      if (item.kind !== "image" || !layer) continue;
+      const image = item as ImageItem,
+        name = image.path.split("/").pop() ?? image.path,
+        label = t("ui.canvas_image_label", name),
+        el = layer.createDiv("vam-canvas-image");
+      el.dataset.itemId = image.id;
+      el.setAttr("role", "img");
+      el.setAttr("aria-label", label);
+      el.tabIndex = 0;
+      el.style.left = `${image.x}px`;
+      el.style.top = `${image.y}px`;
+      el.style.width = `${image.w}px`;
+      el.style.height = `${image.h}px`;
+      const file = this.app.vault.getAbstractFileByPath(image.path);
+      const source = file instanceof TFile ? this.app.vault.getResourcePath?.(file) : undefined;
+      const placeholder = (): void => {
+        el.empty();
+        el.addClass("is-missing");
+        el.createSpan({ text: name });
+      };
+      if (!source) placeholder();
+      else {
+        const img = el.createEl("img", { attr: { src: source, alt: "", draggable: "false" } });
+        img.addEventListener("error", placeholder);
+      }
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      if (!editable) continue;
+      const handle = el.createDiv("vam-canvas-image-handle");
+      handle.setAttr("aria-hidden", "true");
+      this.enableCanvasItemDrag(el, handle, image);
+      el.addEventListener("keydown", event => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.enqueue(() => this.removeCanvasItem(image.id));
+      });
+      if (this.focusItemId === image.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+    this.renderBoundaries(stage, items, editable);
+    this.focusItemId = null;
+  }
+  /**
+   * Frames (ticket 43). Each frame is measured from the cards drawn right now (`boundaryBounds` over `cardEls`), so a new
+   * layout or a moved card is followed without writing anything; a frame whose members are all absent is not drawn (D8).
+   * The layer comes after the image layer, so Tab reaches the frames last, and is painted behind the images (CSS z-index).
+   * The label is text only. Only the label chip takes the pointer; the frame area stays click-through.
+   */
+  private renderBoundaries(stage: HTMLElement, items: readonly CanvasItem[], editable: boolean): void {
+    const boundaries = items.filter((item): item is BoundaryItem => item.kind === "boundary");
+    if (!boundaries.length) return;
+    const rectOf = (id: string): { x: number; y: number; w: number; h: number } | null => {
+      const card = this.cardEls.get(id);
+      if (!card) return null;
+      const box = boxOf(card);
+      return { x: box.x, y: box.y, w: box.width, h: box.height };
+    };
+    let layer: HTMLElement | null = null;
+    for (const boundary of boundaries) {
+      const box = boundaryBounds(boundary.members, rectOf, BOUNDARY_PAD);
+      if (!box) continue;
+      if (!layer) {
+        layer = stage.createDiv("vam-boundaries");
+        layer.setAttr("role", "group");
+        layer.setAttr("aria-label", t("ui.canvas_boundaries_group"));
+      }
+      const label = boundary.label ?? "",
+        el = layer.createDiv("vam-boundary");
+      el.dataset.itemId = boundary.id;
+      el.setAttr("role", "group");
+      el.setAttr("aria-label", label ? t("ui.canvas_boundary_label", label) : t("ui.canvas_boundary_default"));
+      el.tabIndex = 0;
+      el.style.left = `${box.x}px`;
+      el.style.top = `${box.y}px`;
+      el.style.width = `${box.w}px`;
+      el.style.height = `${box.h}px`;
+      const chip = el.createSpan({ cls: "vam-boundary-label", text: label });
+      if (!label) chip.addClass("is-empty");
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      chip.addEventListener("pointerdown", event => {
+        if (event.button === 0) el.focus({ preventScroll: true });
+      });
+      if (!editable) continue;
+      chip.addEventListener("dblclick", event => {
+        event.stopPropagation();
+        this.editBoundaryLabel(boundary.id);
+      });
+      chip.addEventListener("contextmenu", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new Menu();
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.canvas_boundary_edit"))
+            .setIcon("pencil")
+            .onClick(() => this.editBoundaryLabel(boundary.id))
+        );
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.canvas_boundary_remove"))
+            .setIcon("trash")
+            .onClick(() => this.enqueue(() => this.removeCanvasItem(boundary.id)))
+        );
+        menu.showAtMouseEvent(event);
+      });
+      el.addEventListener("keydown", event => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (!event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeCanvasItem(boundary.id));
+        } else if (!event.shiftKey && (event.key === "Enter" || event.key === "F2")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.editBoundaryLabel(boundary.id);
+        }
+      });
+      if (this.focusItemId === boundary.id) {
+        this.focusItemId = null;
+        el.focus({ preventScroll: true });
+      }
+    }
+  }
+  /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
+  private editBoundaryLabel(id: string): void {
+    const current = (this.map?.canvasItems ?? []).find(
+      (item): item is BoundaryItem => item.kind === "boundary" && (item as BoundaryItem).id === id
+    );
+    if (!current || !this.canEditCanvasItems()) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      current.label ?? "",
+      label => {
+        this.focusItemId = id;
+        this.enqueue(() => this.renameBoundary(id, label));
+      },
+      { allowEmpty: true }
+    ).open();
+  }
+  /** Sets or clears (blank) a frame's label. */
+  private async renameBoundary(id: string, label: string): Promise<void> {
+    const text = label.trim();
+    await this.changeCanvasItems(id, items =>
+      items.map(item => {
+        if (item.kind !== "boundary" || (item as BoundaryItem).id !== id) return item;
+        const { label: _old, ...rest } = item as BoundaryItem;
+        return text ? { ...rest, label: text } : rest;
+      })
+    );
+  }
+  /** Frames the given topics (ids that are cards of this map, deduplicated) with an optional label; one undo step. Returns the new id. */
+  private async addBoundary(ids: readonly string[], label: string): Promise<string | null> {
+    if (!this.map || this.builtIn || this.map.aim) return null;
+    const known = new Set(this.map.nodes.map(node => node.id)),
+      members = [...new Set(ids)].filter(id => known.has(id));
+    if (!members.length) return null;
+    const id = `frame-${randomUUID().slice(0, 8)}`,
+      text = label.trim();
+    this.focusItemId = id;
+    const frame: BoundaryItem = { id, kind: "boundary", members, ...(text ? { label: text } : {}) };
+    await this.mapChange(map => {
+      const alive = map.nodes.map(node => node.id);
+      map.canvasItems = [...pruneBoundaries(map.canvasItems ?? [], alive), frame];
+    }, false);
+    return id;
+  }
+  /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
+  private openAddBoundary(): void {
+    const ids = [...this.multiSelected];
+    if (!this.map || this.builtIn || this.map.aim || !ids.length) return;
+    new NameModal(
+      this.app,
+      t("ui.canvas_boundary_name"),
+      "",
+      label => this.enqueue(async () => void (await this.addBoundary(ids, label))),
+      { allowEmpty: true }
+    ).open();
+  }
+  /** One gesture, one pointerup, one undo step: the image follows the pointer on screen and Map.md is written on release. */
+  private enableCanvasItemDrag(el: HTMLElement, handle: HTMLElement, image: ImageItem): void {
+    const begin = (event: PointerEvent, resize: boolean): void => {
+      if (event.button !== 0 || !this.map) return;
+      event.stopPropagation();
+      event.preventDefault();
+      el.focus({ preventScroll: true });
+      const start = { x: event.clientX, y: event.clientY },
+        zoom = this.map.viewport.zoom || 1,
+        from = { x: image.x, y: image.y, w: image.w, h: image.h };
+      let dx = 0,
+        dy = 0,
+        width = from.w,
+        done = false;
+      el.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        dx = (e.clientX - start.x) / zoom;
+        dy = (e.clientY - start.y) / zoom;
+        if (resize) {
+          const ratio = from.h / from.w;
+          width = Math.max(from.w + dx, IMAGE_MIN_SIZE, IMAGE_MIN_SIZE / ratio);
+          el.style.width = `${width}px`;
+          el.style.height = `${width * ratio}px`;
+        } else {
+          el.style.left = `${from.x + dx}px`;
+          el.style.top = `${from.y + dy}px`;
+        }
+      };
+      const settle = (): void => {
+        done = true;
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        el.removeEventListener("pointercancel", cancel);
+        el.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        el.style.left = `${from.x}px`;
+        el.style.top = `${from.y}px`;
+        el.style.width = `${from.w}px`;
+        el.style.height = `${from.h}px`;
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        this.focusItemId = image.id;
+        if (resize && Math.abs(width - from.w) >= 1) this.enqueue(() => this.resizeCanvasItem(image.id, width));
+        else if (!resize && Math.hypot(dx, dy) >= 1)
+          this.enqueue(() => this.moveCanvasItem(image.id, Math.round(dx), Math.round(dy)));
+        else restore();
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", cancel);
+      el.addEventListener("lostpointercapture", cancel);
+    };
+    el.addEventListener("pointerdown", event => {
+      if (event.target === handle) return;
+      begin(event, false);
+    });
+    handle.addEventListener("pointerdown", event => begin(event, true));
+  }
+  /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
+  private async changeCanvasItems(id: string, change: (items: readonly CanvasItem[]) => CanvasItem[]): Promise<void> {
+    if (!this.map || !this.canEditCanvasItems()) return;
+    if (!this.map.canvasItems?.some(item => (item as { id?: unknown }).id === id)) return;
+    await this.mapChange(map => {
+      // An empty frame (every member gone) is cleared with the next canvas write, so an undo of a topic removal still finds it.
+      const next = pruneBoundaries(
+        change(map.canvasItems ?? []),
+        map.nodes.map(node => node.id)
+      );
+      if (next.length) map.canvasItems = next;
+      else delete map.canvasItems;
+    }, false);
+  }
+  /** Moves a free image by (dx, dy) in map units. */
+  private async moveCanvasItem(id: string, dx: number, dy: number): Promise<void> {
+    await this.changeCanvasItems(id, items => moveItem(items, id, dx, dy));
+  }
+  /** Resizes a free image to `width`, keeping its ratio. */
+  private async resizeCanvasItem(id: string, width: number): Promise<void> {
+    await this.changeCanvasItems(id, items => resizeKeepRatio(items, id, width));
+  }
+  // ---- Adding free images: drop, paste, "Insert image…" (ticket 30, decisions D5, D6, D11) ---------------------------
+  /** Registers the three entries on the canvas; AIM maps, the built-in sample and topic selection mode get none (D11). */
+  private setupCanvasImageInput(): void {
+    const viewport = this.viewportEl;
+    if (!viewport || !this.canEditCanvasItems()) return;
+    viewport.addEventListener("dragover", event => this.onCanvasDragOver(event));
+    viewport.addEventListener("dragleave", event => this.onCanvasDragLeave(event));
+    viewport.addEventListener("drop", event => this.onCanvasDrop(event));
+    viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
+    viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
+  }
+  private onCanvasPointerMove(event: { clientX: number; clientY: number }): void {
+    this.lastCanvasPointer = { x: event.clientX, y: event.clientY };
+  }
+  /** A client point in the stage's own units (what `x` and `y` of a canvas item mean). Null when there is no canvas. */
+  private stagePoint(client: { x: number; y: number } | null): { x: number; y: number } | null {
+    const viewport = this.viewportEl,
+      v = this.map?.viewport;
+    if (!viewport || !v) return null;
+    const rect = viewport.getBoundingClientRect(),
+      zoom = v.zoom || 1,
+      inside =
+        client && client.x >= rect.left && client.x <= rect.right && client.y >= rect.top && client.y <= rect.bottom;
+    const local = inside
+      ? { x: client.x - rect.left, y: client.y - rect.top }
+      : { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+    return { x: Math.round((local.x - v.x) / zoom), y: Math.round((local.y - v.y) / zoom) };
+  }
+  private hasFiles(event: DragEvent): boolean {
+    const transfer = event.dataTransfer;
+    return !!transfer && ((transfer.files?.length ?? 0) > 0 || Array.from(transfer.types ?? []).includes("Files"));
+  }
+  private onCanvasDragOver(event: DragEvent): void {
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    this.viewportEl?.addClass("is-image-drop");
+  }
+  /** The dashed canvas hint goes away when the drag leaves the canvas (not when it only moves onto a child). */
+  private onCanvasDragLeave(event: DragEvent): void {
+    const into = event.relatedTarget as Node | null;
+    if (into && this.viewportEl?.contains(into)) return;
+    this.viewportEl?.removeClass("is-image-drop");
+  }
+  private onCanvasDrop(event: DragEvent): void {
+    this.viewportEl?.removeClass("is-image-drop");
+    if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
+    // Any file dropped here stays inside the map: the browser must not open or navigate to it.
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from(event.dataTransfer?.files ?? []),
+      images = imageFilesFrom({ files: all });
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    for (const other of all.filter(item => !images.includes(item)))
+      new Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length && point) this.queueCanvasImages(images, point);
+  }
+  // ---- Pictures on a card: drop and paste (ticket 32, decisions D5, D6) --------------------------------------------
+  /** A card takes a dropped picture only on an ordinary editable map (the same rule as the panel's cover switch). */
+  private cardAcceptsImages(node: MapNode): boolean {
+    return this.canEditCanvasItems() && this.markersEditable(node);
+  }
+  private onCardDragOver(event: DragEvent, card: HTMLElement, node: MapNode): void {
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    event.preventDefault();
+    // The card owns this drag: the canvas hint steps aside and its handler does not also take the file.
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    this.viewportEl?.removeClass("is-image-drop");
+    card.addClass("is-drop-target");
+  }
+  private onCardDragLeave(event: DragEvent, card: HTMLElement): void {
+    const into = event.relatedTarget as Node | null;
+    if (into && card.contains(into)) return;
+    card.removeClass("is-drop-target");
+  }
+  private onCardDrop(event: DragEvent, card: HTMLElement, node: MapNode): void {
+    card.removeClass("is-drop-target");
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from(event.dataTransfer?.files ?? []),
+      images = imageFilesFrom({ files: all });
+    for (const other of all.filter(item => !images.includes(item)))
+      new Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+  }
+  /**
+   * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
+   * `## User Notes` section (created when missing) and the first picture also becomes `topic-cover`. One transaction
+   * per picture (attachment, note rewrite and Map.md together), so one undo step each. Undo writes the old note text
+   * back and keeps the file; redo writes the same text again. A switched or closed map drops the result unwritten.
+   */
+  private async attachCardImages(node: MapNode, files: File[]): Promise<void> {
+    if (!this.map || !this.cardAcceptsImages(node)) return;
+    const mapPath = this.path,
+      epoch = this.mapOpenEpoch,
+      stale = (): boolean => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    let first = true;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data: ArrayBuffer;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch {
+        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const setCover = first;
+      try {
+        // Last check before anything is written: from here the transaction owns the file and its rollback.
+        if (stale() || !this.map) return;
+        const viewport = clone(this.map.viewport);
+        const entry = await this.beginMapTransaction()
+          .createAttachment("image", { name, data, sourcePath: node.path })
+          .rewriteNote(node.path, async (target, attachment) => {
+            const note = this.app.vault.getAbstractFileByPath(target);
+            if (!(note instanceof TFile)) throw new Error(target);
+            const link = attachment("image");
+            await this.app.vault.process(note, content => {
+              const withEmbed = appendImageEmbed(content, link);
+              return setCover ? withCover(withEmbed, link) : withEmbed;
+            });
+          })
+          .editMap(this.path, map => {
+            map.viewport = clone(viewport);
+          })
+          .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+        this.history.push(entry);
+        first = false;
+        await this.refreshAfterSavedChange();
+      } catch (error) {
+        new Notice(errorMessage(error));
+      }
+    }
+  }
+  private onCanvasContextMenu(event: MouseEvent): void {
+    if (!this.canEditCanvasItems()) return;
+    const target = event.target as Element | null;
+    if (
+      !target?.closest ||
+      target.closest(".vam-node") ||
+      target.closest(".vam-canvas-image") ||
+      target.closest(".vam-boundary-label") ||
+      target.closest(INTERACTIVE_SELECTOR)
+    )
+      return;
+    const point = this.stagePoint({ x: event.clientX, y: event.clientY });
+    if (!point) return;
+    event.preventDefault();
+    const menu = new Menu();
+    menu.addItem(item =>
+      item
+        .setTitle(t("ui.canvas_image_insert"))
+        .setIcon("image-plus")
+        .onClick(() => this.openCanvasImagePicker(point))
+    );
+    menu.showAtMouseEvent(event);
+  }
+  /** The system file picker, images only; the chosen files take the same path as a drop. */
+  private openCanvasImagePicker(point: { x: number; y: number }): void {
+    const input = this.contentEl.createEl("input", {
+      cls: "vam-sr-only",
+      attr: { type: "file", accept: "image/*", multiple: "" }
+    });
+    input.addEventListener("change", () => {
+      const chosen = Array.from(input.files ?? []);
+      input.remove();
+      if (chosen.length) this.queueCanvasImages(chosen, point);
+    });
+    input.click();
+  }
+  /**
+   * Paste (D6): called after the private format was ruled out. Image files with no selected topic become free images
+   * at the last pointer position (the viewport centre when there is none). With a selected topic the picture belongs
+   * on the card (ticket 32, P5): nothing is consumed here, so plain text still reaches the clipboard group.
+   * Returns true when it took the event.
+   */
+  private pasteCanvasImages(event: ClipboardEvent): boolean {
+    if (!this.canEditCanvasItems()) return false;
+    const images = imageFilesFrom({ files: Array.from(event.clipboardData?.files ?? []) });
+    if (!images.length) return false;
+    // A selected topic (the one the panel shows) takes the picture on its card; other selections leave it alone.
+    // Clipboard text next to the picture (a spreadsheet range, say) still goes to the outline in the clipboard group.
+    const target = this.map?.nodes.find(item => item.id === this.selected);
+    if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
+      event.preventDefault();
+      this.enqueue(() => this.attachCardImages(target, images));
+      return true;
+    }
+    if (this.selected || this.multiSelected.size) return false;
+    const point = this.stagePoint(this.lastCanvasPointer);
+    if (!point) return false;
+    event.preventDefault();
+    this.queueCanvasImages(images, point);
+    return true;
+  }
+  /** Fences the gesture on this map and this open of it, then queues the writes. */
+  private queueCanvasImages(files: File[], point: { x: number; y: number }): void {
+    this.enqueue(() => this.insertCanvasImages(files, point));
+  }
+  /**
+   * Reads each file, lets `acceptImage` decide, and only then writes: the attachment and the new canvas item in one
+   * transaction (one undo step per picture). The fence compares the map path and open epoch taken before the read;
+   * a switched or closed map drops the result without writing anything. A refusal or failure is a Notice.
+   */
+  private async insertCanvasImages(files: File[], point: { x: number; y: number }): Promise<void> {
+    if (!this.canEditCanvasItems()) return;
+    const path = this.path,
+      epoch = this.mapOpenEpoch,
+      stale = (): boolean => this.closed || this.path !== path || this.mapOpenEpoch !== epoch || !this.map;
+    let offset = 0;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data: ArrayBuffer;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch {
+        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const natural = imageSize(data) ?? { width: 240, height: 160 },
+        scale = Math.min(1, 320 / Math.max(natural.width, natural.height)),
+        w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)),
+        h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)),
+        id = `img-${randomUUID().slice(0, 8)}`,
+        x = point.x + offset,
+        y = point.y + offset;
+      try {
+        // Last check before anything is written: from here the transaction owns the file and its rollback.
+        if (stale()) return;
+        this.focusItemId = id;
+        await this.mapChangeSnapshots(
+          (map, attachment) => {
+            map.canvasItems = addImage(map.canvasItems ?? [], { id, path: attachment("image"), x, y, w, h });
+          },
+          false,
+          [],
+          { name, data }
+        );
+        offset += 24;
+      } catch (error) {
+        this.focusItemId = null;
+        new Notice(errorMessage(error));
+      }
+    }
+  }
+  /** Removes the reference only; the image file stays in the Vault. */
+  private async removeCanvasItem(id: string): Promise<void> {
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, items => removeItem(items, id));
+  }
   private async removeSelected(): Promise<void> {
     if (!this.map) return;
     const before = clone(this.map),
@@ -5741,8 +6393,9 @@ export class VisualAgentMapView extends ItemView {
     if (!sessionFor(this.plugin).match(vam)) {
       if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
     }
-    // Without the private format only plain text is left: it becomes an outline under the selected topic.
+    // Without the private format: a picture file (with nothing selected) is a free image, else plain text is an outline.
     if (!vam) {
+      if (this.pasteCanvasImages(event)) return;
       this.pasteText(event, text);
       return;
     }
@@ -6495,6 +7148,264 @@ export class VisualAgentMapView extends ItemView {
       }
     }
   }
+  /** The header's export button (AIM, the built-in sample and integration mode included, decision D11). */
+  private addExportButton(parent: HTMLElement): HTMLButtonElement {
+    return this.iconButton(parent, "download", t("ui.export_map"), event => this.openExportMenu(event));
+  }
+  private openExportMenu(event: MouseEvent): void {
+    const menu = new Menu();
+    const add = (title: string, icon: string, format: "png" | "svg" | "md", target: "vault" | "download"): void => {
+      menu.addItem(item =>
+        item
+          .setTitle(title)
+          .setIcon(icon)
+          .onClick(() => void this.exportMap(format, target))
+      );
+    };
+    add(t("ui.export_png_vault"), "image-down", "png", "vault");
+    add(t("ui.export_png_download"), "download", "png", "download");
+    add(t("ui.export_svg_vault"), "image-down", "svg", "vault");
+    add(t("ui.export_svg_download"), "download", "svg", "download");
+    add(t("ui.export_md_vault"), "file-down", "md", "vault");
+    add(t("ui.export_md_download"), "download", "md", "download");
+    menu.showAtMouseEvent(event);
+  }
+  /** The cover image file of a topic, resolved from the metadata cache exactly as the card resolves it. */
+  private exportCoverPath(notePath: string): string | null {
+    const file = this.app.vault.getAbstractFileByPath(notePath);
+    if (!(file instanceof TFile)) return null;
+    const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+      this.app.metadataCache.getFirstLinkpathDest(link, notePath)
+    );
+    return cover && "path" in cover ? cover.path : null;
+  }
+  /**
+   * The map as the screen shows it (decision D9): card rectangles and edge paths (the fishbone spine included) are
+   * read from the drawn DOM, so every layout is followed without a second layout engine; colours come from computed
+   * styles; covers and free pictures are read with `readBinary` and embedded as data URIs. `isCurrent` is checked
+   * after every await. Returns null when the view moved on, `{ empty }` for nothing to draw, `{ refuse }` when the
+   * pictures alone are over the limit (read no further).
+   */
+  private async collectExportScene(
+    isCurrent: () => boolean
+  ): Promise<{ scene: MapScene; refuse?: undefined } | { scene?: undefined; refuse: "embedded" | "empty" } | null> {
+    const map = this.map;
+    if (!map) return null;
+    const win = window;
+    const computed = (el: Element, pseudo?: string): CSSStyleDeclaration => win.getComputedStyle(el, pseudo);
+    const colorOf = (value: unknown): string | undefined => normalizeCssColor(value) || undefined;
+    let embedded = 0;
+    const loaded = new Map<string, string | null>();
+    const imageHref = async (path: string): Promise<string | null | false> => {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) return null;
+      if (!loaded.has(path)) {
+        const data = await this.app.vault.readBinary(file);
+        const mime = sniffImage(data);
+        loaded.set(path, mime ? toDataUri(mime, data) : null);
+        sizes.set(path, mime ? data.byteLength : 0);
+      }
+      embedded += sizes.get(path) ?? 0;
+      return embedded > EXPORT_MAX_EMBEDDED_BYTES ? false : (loaded.get(path) ?? null);
+    };
+    const sizes = new Map<string, number>();
+    const cards: SceneCard[] = [];
+    const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    const grow = (x: number, y: number, w: number, h: number): void => {
+      bounds.minX = Math.min(bounds.minX, x);
+      bounds.minY = Math.min(bounds.minY, y);
+      bounds.maxX = Math.max(bounds.maxX, x + w);
+      bounds.maxY = Math.max(bounds.maxY, y + h);
+    };
+    for (const [id, card] of this.cardEls) {
+      const node = map.nodes.find(item => item.id === id);
+      if (!node) continue;
+      const box = boxOf(card);
+      grow(box.x, box.y, box.width, box.height);
+      const style = computed(card);
+      const titleEl = card.querySelector<HTMLElement>(".vam-card-title");
+      const title = (titleEl?.textContent ?? this.notes.get(id)?.title ?? "").trim();
+      const item: SceneCard = {
+        x: box.x,
+        y: box.y,
+        w: box.width,
+        h: box.height,
+        title: wrapText(title, box.width - 28),
+        fill: colorOf(style.backgroundColor),
+        stroke: colorOf(style.borderTopColor),
+        textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
+        accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
+      };
+      const frame = card.querySelector<HTMLElement>(".vam-card-cover");
+      const coverPath = frame ? this.exportCoverPath(node.path) : null;
+      if (frame && coverPath) {
+        const href = await imageHref(coverPath);
+        if (!isCurrent()) return null;
+        if (href === false) return { refuse: "embedded" };
+        if (href)
+          item.cover = {
+            x: box.x + frame.offsetLeft,
+            y: box.y + frame.offsetTop,
+            w: frame.offsetWidth,
+            h: frame.offsetHeight,
+            href,
+            fit: "cover"
+          };
+      }
+      cards.push(item);
+    }
+    const images: SceneImage[] = [];
+    for (const item of map.canvasItems ?? []) {
+      if (item.kind !== "image") continue;
+      const image = item as ImageItem;
+      const href = await imageHref(image.path);
+      if (!isCurrent()) return null;
+      if (href === false) return { refuse: "embedded" };
+      if (!href) continue;
+      grow(image.x, image.y, image.w, image.h);
+      images.push({ x: image.x, y: image.y, w: image.w, h: image.h, href, fit: "fill" });
+    }
+    // Frames as drawn on screen: measured from the same cards, so they follow the layout; a frame with no card is left out.
+    const boundaries: SceneBoundary[] = [];
+    for (const item of map.canvasItems ?? []) {
+      if (item.kind !== "boundary") continue;
+      const frame = item as BoundaryItem;
+      const box = boundaryBounds(
+        frame.members,
+        id => {
+          const card = this.cardEls.get(id);
+          if (!card) return null;
+          const b = boxOf(card);
+          return { x: b.x, y: b.y, w: b.width, h: b.height };
+        },
+        BOUNDARY_PAD
+      );
+      if (!box) continue;
+      grow(box.x, box.y, box.w, box.h);
+      boundaries.push({
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        ...(frame.label ? { label: frame.label } : {}),
+        stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted"))
+      });
+    }
+    const edges: SceneEdge[] = [];
+    for (const el of Array.from(this.edgesEl?.children ?? [])) {
+      if (el.tagName?.toLowerCase() !== "path") continue;
+      const d = el.getAttribute("d");
+      const style = computed(el);
+      const stroke = colorOf(style.stroke);
+      if (!d || !stroke || stroke === "none" || style.display === "none") continue;
+      edges.push({ d, stroke });
+      try {
+        const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();
+        if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
+      } catch {
+        // A path that cannot be measured is still drawn; it only does not widen the picture.
+      }
+    }
+    if (!cards.length && !images.length) return { refuse: "empty" };
+    const margin = 24;
+    const root = computed(this.viewportEl ?? this.contentEl);
+    const variable = (name: string): string | undefined => colorOf(root.getPropertyValue(name));
+    const scene: MapScene = {
+      x: bounds.minX - margin,
+      y: bounds.minY - margin,
+      width: bounds.maxX - bounds.minX + margin * 2,
+      height: bounds.maxY - bounds.minY + margin * 2,
+      title: map.title,
+      theme: {
+        background: variable("--background-primary"),
+        text: variable("--text-normal"),
+        stroke: variable("--background-modifier-border"),
+        card: variable("--background-primary")
+      },
+      boundaries,
+      edges,
+      cards,
+      images
+    };
+    return { scene };
+  }
+  private async pngBlob(svg: string, width: number, height: number, scale: number): Promise<Blob> {
+    return svgToPngBlob(svg, width, height, scale, browserPngEnv(activeDocument, window.URL));
+  }
+  /** A download through a blob URL; the URL is released shortly after the click. */
+  private downloadBlob(blob: Blob, name: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = this.contentEl.createEl("a", { cls: "vam-sr-only", attr: { href: url, download: name } });
+    link.click();
+    link.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  }
+  /**
+   * Exports the map as PNG, SVG or a Markdown outline, saved next to the other attachments of Map.md or downloaded.
+   * An export is not a map edit: no transaction, no undo step. A result that is ready after the view closed or moved
+   * to another map is thrown away (nothing written, nothing said).
+   */
+  private async exportMap(format: "png" | "svg" | "md", target: "vault" | "download"): Promise<void> {
+    const map = this.map;
+    if (!map) return;
+    const mapPath = this.path,
+      epoch = this.mapOpenEpoch,
+      isCurrent = (): boolean => !this.closed && this.path === mapPath && this.mapOpenEpoch === epoch && !!this.map;
+    try {
+      let blob: Blob;
+      if (format === "md") {
+        const outline = mapOutline(map.nodes, id => this.notes.get(id)?.title ?? "");
+        blob = new Blob([`${outline}\n`], { type: "text/markdown;charset=utf-8" });
+      } else {
+        const got = await this.collectExportScene(isCurrent);
+        if (!got || !isCurrent()) return;
+        if (got.refuse) {
+          new Notice(t(got.refuse === "empty" ? "ui.export_empty" : "ui.export_refused_embedded"));
+          return;
+        }
+        const limit = exportLimits(got.scene);
+        if (limit.action === "refuse") {
+          new Notice(
+            t(
+              limit.reason === "embedded"
+                ? "ui.export_refused_embedded"
+                : limit.reason === "pixels"
+                  ? "ui.export_refused_pixels"
+                  : "ui.export_empty"
+            )
+          );
+          return;
+        }
+        const svg = buildMapSvg(got.scene);
+        if (format === "svg") blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+        else {
+          const { width, height } = got.scene;
+          let scale = 1;
+          if (limit.action === "scaleDown") {
+            scale = limit.scale;
+            new Notice(t("ui.export_scaled", String(EXPORT_MAX_EDGE)));
+          } else if (Math.max(width, height) * 2 <= EXPORT_MAX_EDGE && width * height * 4 <= EXPORT_MAX_PIXELS)
+            scale = 2;
+          blob = await this.pngBlob(svg, width, height, scale);
+          if (!isCurrent()) return;
+        }
+      }
+      const name = `${exportFileStem(map.title)}.${format}`;
+      if (target === "download") {
+        this.downloadBlob(blob, name);
+        new Notice(t("ui.export_downloaded", name));
+        return;
+      }
+      const data = await blob.arrayBuffer();
+      const destination = await this.app.fileManager.getAvailablePathForAttachment(name, mapPath);
+      // Last check before anything is written.
+      if (!isCurrent()) return;
+      await this.app.vault.createBinary(destination, data);
+      new Notice(t("ui.export_saved", destination));
+    } catch (error) {
+      if (isCurrent()) new Notice(t("ui.export_failed", errorMessage(error)));
+    }
+  }
   private openMapActions(): void {
     const choices: { label: string; description?: string; buttonLabel?: string; action: () => void }[] = [];
     if (this.map) {
@@ -6873,6 +7784,7 @@ export class VisualAgentMapView extends ItemView {
           this.showSampleTour = true;
           this.render();
         });
+      if (this.map) this.addExportButton(headerActions);
     } else if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
       newMap.createSpan({ text: t("ui.new_map") });
@@ -6893,6 +7805,7 @@ export class VisualAgentMapView extends ItemView {
       this.updateHistoryButtons();
       if (!this.map.aim)
         this.iconButton(headerActions, "share-2", t("share.button"), () => this.plugin.openShare(this));
+      this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
     const selectedNode = this.map?.nodes.find(node => node.id === this.selected);
@@ -7241,6 +8154,7 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
     this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
+    this.releaseCovers();
     this.cardEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
@@ -7260,6 +8174,7 @@ export class VisualAgentMapView extends ItemView {
       this.renderingCard = false;
     }
     this.renderAimPendingCards(shown);
+    this.renderCanvasItems();
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
@@ -7276,6 +8191,7 @@ export class VisualAgentMapView extends ItemView {
       this.fillEmptyMap(this.emptyMapEl);
     }
     this.setupPan();
+    this.setupCanvasImageInput();
     this.applyInitialViewport();
     this.transform();
     this.drawEdges();
@@ -7373,6 +8289,9 @@ export class VisualAgentMapView extends ItemView {
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
+    card.addEventListener("dragover", event => this.onCardDragOver(event, card, node));
+    card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
+    card.addEventListener("drop", event => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
     this.labelCard(card, note?.title ?? t("ui.note_missing"));
     if (this.integrationMode) {
@@ -7707,6 +8626,8 @@ export class VisualAgentMapView extends ItemView {
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
+    // The cover frame sits above the title; it adds nothing when the topic has no local image.
+    if (note && !this.builtIn) this.paintCover(card, node.path);
     const title = card.createEl("h3", { text: note?.title ?? node.path, cls: "vam-card-title" });
     title.setAttr("title", note?.title ?? node.path);
     title.setAttr("dir", "auto");
@@ -8193,6 +9114,65 @@ export class VisualAgentMapView extends ItemView {
     return markers.length
       ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
       : "";
+  }
+  /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
+  private releaseCovers(): void {
+    this.coverObserver?.disconnect();
+    this.coverObserver = null;
+  }
+  /**
+   * Puts a fixed-height cover frame before the card's title when the note's metadata names a local image (frontmatter
+   * `topic-cover`, else the first embed). Reads only the metadata cache, never the network or the note body. A missing,
+   * remote or unreadable cover adds nothing. The image gets its `src` when the frame scrolls into view. Safe to call again.
+   */
+  private paintCover(card: HTMLElement, notePath: string): void {
+    const old = cardCovers.get(card);
+    if (old) {
+      this.coverObserver?.unobserve(old.img);
+      old.frame.remove();
+      cardCovers.delete(card);
+    }
+    let source: string | undefined;
+    try {
+      const file = this.app.vault.getAbstractFileByPath(notePath);
+      if (!(file instanceof TFile)) return;
+      const cover = resolveCover(this.app.metadataCache.getFileCache(file), link =>
+        this.app.metadataCache.getFirstLinkpathDest(link, notePath)
+      );
+      if (!cover || !("path" in cover)) return;
+      const image = this.app.vault.getAbstractFileByPath(cover.path);
+      source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
+    } catch {
+      return;
+    }
+    if (!source) return;
+    const frame = createDiv({ cls: "vam-card-cover" });
+    const img = frame.createEl("img", {
+      attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async" }
+    });
+    // A file that cannot be decoded just loses its frame; the card keeps its layout of text only.
+    img.addEventListener("error", () => {
+      this.coverObserver?.unobserve(img);
+      frame.remove();
+      cardCovers.delete(card);
+    });
+    cardCovers.set(card, { frame, img });
+    const title = card.querySelector<HTMLElement>(".vam-card-title");
+    card.insertBefore(frame, title);
+    if (typeof IntersectionObserver !== "function") {
+      img.setAttr("src", source);
+      return;
+    }
+    this.coverObserver ??= new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const target = entry.target as HTMLImageElement;
+        const real = target.getAttribute("data-src");
+        if (real) target.setAttr("src", real);
+        this.coverObserver?.unobserve(target);
+      }
+    });
+    this.coverObserver.observe(img);
   }
   /**
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
@@ -8834,6 +9814,7 @@ export class VisualAgentMapView extends ItemView {
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
     if (note) this.renderColorSection(panel, node);
+    if (note) this.renderCoverSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
@@ -9552,6 +10533,30 @@ export class VisualAgentMapView extends ItemView {
       .commit({ deferRebuild: true, label: t("ui.topic_markers") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
+  }
+  /** The card cover switch of the topic panel: one `aria-pressed` button, pressed while the cover is turned off. */
+  private renderCoverSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-cover-section");
+    section.createEl("strong", { text: t("ui.topic_cover"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_cover"));
+    // The metadata cache may lag behind the write, so the state after a click is tracked here.
+    let off = this.topicCoverOff(node);
+    const paint = (focus = false): void => {
+      group.empty();
+      const choice = this.button(group, t("ui.topic_cover_off"), () => {
+        this.enqueue(async () => {
+          if (await this.changeTopicCover(node)) off = !off;
+          paint(true);
+        });
+      });
+      choice.setAttr("aria-pressed", String(off));
+      if (off) choice.addClass("is-pressed");
+      if (focus) choice.focus();
+    };
+    paint();
   }
   /** The colour menu of the topic panel: None and six named colours as a radiogroup, plus a button that gives the branch the same colour. */
   private renderColorSection(panel: HTMLElement, node: MapNode): void {
@@ -10552,6 +11557,9 @@ export class VisualAgentMapView extends ItemView {
       !this.multiSelected.size
     );
     this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+    // Frames are added from here (the only multi-selection surface); AIM maps and the built-in sample get no entry (D11).
+    if (!this.map?.aim && !this.builtIn)
+      this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;

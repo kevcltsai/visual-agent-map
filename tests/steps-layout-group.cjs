@@ -574,6 +574,33 @@ test('R-1b: radial rings are at least a column apart and the cards of one depth 
   for (const [key, list] of rings) assert.ok(Math.max(...list) - Math.min(...list) <= 2, `${key} on one ring`);
 });
 
+test('R-5: radial growth takes a number of rounds that is logarithmic in the card count, not linear (ticket 38 perf)', () => {
+  const radial = load('layouts/radial.ts');
+  // One root, 20 topics, `per` details each, no height data (every card the same height), as in the P4 measurement.
+  const run = per => {
+    const tree = { id: 'root', kids: [] };
+    let count = 1;
+    for (let i = 0; i < 20; i++) {
+      const topic = { id: `t${i}`, kids: [] };
+      for (let k = 0; k < per; k++) { topic.kids.push({ id: `t${i}-${k}`, kids: [] }); count++; }
+      tree.kids.push(topic);
+      count++;
+    }
+    const stats = { rounds: 0, checks: 0 };
+    const placed = radial.radialPositions({ roots: [tree], kidsOf: item => item.kids, joinsOf: () => [], heightFor: () => 110, width: WIDTH, column: 380, gap: 24, left: 80, top: 80, stats });
+    return { count, stats, placed };
+  };
+  for (const per of [12, 24, 48]) {
+    const { count, stats, placed } = run(per);
+    assert.equal(placed.size, count);
+    assert.ok(stats.rounds > 0 && stats.checks > 0, 'the engine reports the work it did');
+    // The old fixed-step loop needed about 0.8 rounds per card (384 at 501 cards); doubling steps need about 18.
+    assert.ok(stats.rounds <= 12 * Math.log2(count), `${count} cards took ${stats.rounds} rounds`);
+    // The padded pair check stays far below comparing every pair in every round.
+    assert.ok(stats.checks <= (count * count * stats.rounds) / 20, `${count} cards made ${stats.checks} checks`);
+  }
+});
+
 test('R-2: the angle of a branch is proportional to its leaf count, clockwise from straight up', () => {
   for (const spacing of SPACINGS)
     for (const name of ['wide', 'sample', 'sized']) {

@@ -14,13 +14,37 @@ export interface RadialInput<T extends { id: string }> {
   gap: number;
   left: number;
   top: number;
+  /** Optional counters, filled in when given (used by tests to check the work done). */
+  stats?: { rounds: number; checks: number };
 }
 
 const TAU = Math.PI * 2;
 /** How much a ring grows each time cards on it (or on the ring below) still touch, as a share of the column. */
 const GROW = 6;
-/** Upper bound on growth rounds, so a degenerate input can never loop forever. */
-const MAX_ROUNDS = 4000;
+/** Upper bound on growth rounds, so a degenerate input can never loop forever (steps double, so this is huge). */
+const MAX_ROUNDS = 60;
+
+type Placed = { x: number; y: number; depth: number; height: number };
+
+/**
+ * The depths that have a card touching another card (padded by `gap`). Cards are sorted by top edge and each one is
+ * only compared with the cards whose top lies inside its own padded height, so a round costs about n log n plus the
+ * pairs that really share a band, not every pair.
+ */
+function touching(placed: Map<string, Placed>, width: number, gap: number, stats?: { checks: number }): Set<number> {
+  const list = [...placed.values()].sort((a, b) => a.y - b.y);
+  const depths = new Set<number>();
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j];
+      if (b.y >= a.y + a.height + gap) break;
+      if (stats) stats.checks++;
+      if (Math.abs(a.x - b.x) < width && a.y < b.y + b.height + gap) depths.add(Math.max(a.depth, b.depth));
+    }
+  }
+  return depths;
+}
 
 interface Spot {
   id: string;
@@ -66,7 +90,7 @@ export function radialPositions<T extends { id: string }>(
     spread(root, 0, 0, TAU);
     const deepest = Math.max(...spots.map(spot => spot.depth));
     const base = Array.from({ length: deepest + 1 }, (_, depth) => depth * column);
-    const place = (): Map<string, { x: number; y: number; depth: number; height: number }> => {
+    const place = (): Map<string, Placed> => {
       const radii: number[] = [];
       base.forEach((value, depth) => radii.push(depth ? Math.max(value, radii[depth - 1] + column) : 0));
       return new Map(
@@ -84,21 +108,33 @@ export function radialPositions<T extends { id: string }>(
         })
       );
     };
-    let placed = place();
-    for (let round = 0; round < MAX_ROUNDS; round++) {
-      const list = [...placed.values()];
-      const grow = new Set<number>();
-      for (let i = 0; i < list.length; i++)
-        for (let j = i + 1; j < list.length; j++) {
-          const a = list[i],
-            b = list[j];
-          if (Math.abs(a.x - b.x) < width && a.y < b.y + b.height + gap && b.y < a.y + a.height + gap)
-            grow.add(Math.max(a.depth, b.depth));
-        }
-      if (!grow.size) break;
-      for (const depth of grow) base[depth] += column / GROW;
-      placed = place();
+    // Grow the touching rings by a step that doubles until nothing touches, then bisect back between the last two
+    // states, so rounds are about log(size) rather than size and the rings end within one small step of tight.
+    const fine = column / GROW;
+    const clash = (): Set<number> => {
+      if (input.stats) input.stats.rounds++;
+      return touching(place(), width, gap, input.stats);
+    };
+    let step = fine;
+    let touched = clash();
+    let low = base.slice();
+    for (let round = 0; touched.size && round < MAX_ROUNDS; round++) {
+      low = base.slice();
+      for (const depth of touched) base[depth] += step;
+      step *= 2;
+      touched = clash();
     }
+    if (!touched.size && low.some((value, depth) => base[depth] - value > fine)) {
+      let high = base.slice();
+      while (high.some((value, depth) => value - low[depth] > fine)) {
+        const mid = high.map((value, depth) => (value + low[depth]) / 2);
+        base.splice(0, base.length, ...mid);
+        if (clash().size) low = mid;
+        else high = mid;
+      }
+      base.splice(0, base.length, ...high);
+    }
+    const placed = place();
     const minX = Math.min(...[...placed.values()].map(point => point.x));
     const minY = Math.min(...[...placed.values()].map(point => point.y));
     const maxY = Math.max(...[...placed.values()].map(point => point.y + point.height));

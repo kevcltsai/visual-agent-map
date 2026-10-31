@@ -44223,6 +44223,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
     __publicField(this, "pendingTextEditId", null);
     __publicField(this, "editingTextId", null);
+    /** Detaches the open text editor without saving and returns its draft, so a repaint can reopen it (null when none is open). */
+    __publicField(this, "suspendTextEdit", null);
+    /** Draft carried across a repaint; renderTextNodes reopens the editor with it. */
+    __publicField(this, "textEditDraft", null);
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
     /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
     __publicField(this, "mapSearch", null);
@@ -48862,6 +48866,7 @@ ${request.requirements}` : preset.text,
    */
   renderTextNodes(stage, items) {
     var _a2, _b2;
+    if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (!this.map) return;
     const { attached } = treeTextNodes(
       items,
@@ -48869,7 +48874,10 @@ ${request.requirements}` : preset.text,
     );
     const attachedIds = new Set(attached.map((text11) => text11.id));
     const texts2 = items.filter((item) => item.kind === "text");
-    if (!texts2.length) return;
+    if (!texts2.length) {
+      this.textEditDraft = null;
+      return;
+    }
     const editable = this.canEditText();
     const layer = stage.createDiv("vam-text-nodes");
     layer.setAttr("role", "group");
@@ -48924,7 +48932,12 @@ ${request.requirements}` : preset.text,
     const wanted = (_a2 = this.pendingTextEditId) != null ? _a2 : this.focusItemId;
     const pending2 = this.pendingTextEditId;
     this.pendingTextEditId = null;
-    if (pending2 && this.textEls.has(pending2)) {
+    const draft = this.textEditDraft;
+    this.textEditDraft = null;
+    if (draft && !pending2 && this.textEls.has(draft.id)) {
+      this.focusItemId = null;
+      this.startTextEdit(draft.id, draft.value);
+    } else if (pending2 && this.textEls.has(pending2)) {
       this.focusItemId = null;
       this.startTextEdit(pending2);
     } else if (wanted && this.textEls.has(wanted)) {
@@ -48933,7 +48946,7 @@ ${request.requirements}` : preset.text,
     }
   }
   /** Swaps the node's text for a textarea: Cmd/Ctrl+Enter or leaving it saves, Esc cancels, an empty text removes the node. */
-  startTextEdit(id) {
+  startTextEdit(id, draft) {
     var _a2, _b2, _c;
     const el = this.textEls.get(id);
     const text11 = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find((item) => item.kind === "text" && item.id === id);
@@ -48945,13 +48958,20 @@ ${request.requirements}` : preset.text,
       cls: "vam-text-node-input",
       attr: { rows: "4", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
     });
-    input.value = text11.text;
+    input.value = draft != null ? draft : text11.text;
     let done = false;
     const close = () => {
       done = true;
       this.editingTextId = null;
+      this.suspendTextEdit = null;
       input.remove();
       body == null ? void 0 : body.removeClass("vam-sr-only");
+    };
+    this.suspendTextEdit = () => {
+      done = true;
+      this.editingTextId = null;
+      this.suspendTextEdit = null;
+      return { id, value: input.value };
     };
     const commit = () => {
       if (done) return;
@@ -49016,6 +49036,7 @@ ${request.requirements}` : preset.text,
       const child = this.map.nodes.find((node) => !before.has(node.id));
       if (!child) return;
       await this.noteChange(child, { summary: text11.text });
+      this.focusNodeId = child.id;
       await this.mapChange((map) => {
         var _a3;
         map.canvasItems = removeTextNode((_a3 = map.canvasItems) != null ? _a3 : [], id);
@@ -49032,6 +49053,7 @@ ${request.requirements}` : preset.text,
       this.selected = child.id;
       (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.text_node_promoted"));
     } finally {
+      this.focusNodeId = null;
       this.history.collapseSince(historyMark);
       this.updateHistoryButtons();
     }
@@ -51226,6 +51248,7 @@ ${request.requirements}` : preset.text,
     this.emptyMapEl = null;
     this.aimProgressEls.clear();
     (_b2 = this.dragCleanup) == null ? void 0 : _b2.call(this);
+    if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (this.closed) return;
     this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn, this);
     if (this.hoverTimer !== null) {

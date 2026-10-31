@@ -979,6 +979,10 @@ export class VisualAgentMapView extends ItemView {
   /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
   private pendingTextEditId: string | null = null;
   private editingTextId: string | null = null;
+  /** Detaches the open text editor without saving and returns its draft, so a repaint can reopen it (null when none is open). */
+  private suspendTextEdit: (() => { id: string; value: string }) | null = null;
+  /** Draft carried across a repaint; renderTextNodes reopens the editor with it. */
+  private textEditDraft: { id: string; value: string } | null = null;
   private isTextId(id: string): boolean {
     return (
       id.startsWith("txt-") ||
@@ -5944,6 +5948,7 @@ export class VisualAgentMapView extends ItemView {
    * textarea, so nothing the user writes is ever parsed as markup.
    */
   private renderTextNodes(stage: HTMLElement, items: readonly CanvasItem[]): void {
+    if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (!this.map) return;
     const { attached } = treeTextNodes(
       items,
@@ -5951,7 +5956,10 @@ export class VisualAgentMapView extends ItemView {
     );
     const attachedIds = new Set(attached.map(text => text.id));
     const texts = items.filter((item): item is TextItem => item.kind === "text");
-    if (!texts.length) return;
+    if (!texts.length) {
+      this.textEditDraft = null;
+      return;
+    }
     const editable = this.canEditText();
     const layer = stage.createDiv("vam-text-nodes");
     layer.setAttr("role", "group");
@@ -6007,7 +6015,12 @@ export class VisualAgentMapView extends ItemView {
     const wanted = this.pendingTextEditId ?? this.focusItemId;
     const pending = this.pendingTextEditId;
     this.pendingTextEditId = null;
-    if (pending && this.textEls.has(pending)) {
+    const draft = this.textEditDraft;
+    this.textEditDraft = null;
+    if (draft && !pending && this.textEls.has(draft.id)) {
+      this.focusItemId = null;
+      this.startTextEdit(draft.id, draft.value);
+    } else if (pending && this.textEls.has(pending)) {
       this.focusItemId = null;
       this.startTextEdit(pending);
     } else if (wanted && this.textEls.has(wanted)) {
@@ -6016,7 +6029,7 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   /** Swaps the node's text for a textarea: Cmd/Ctrl+Enter or leaving it saves, Esc cancels, an empty text removes the node. */
-  private startTextEdit(id: string): void {
+  private startTextEdit(id: string, draft?: string): void {
     const el = this.textEls.get(id);
     const text = (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
     if (!el || !text || !this.canEditText() || this.editingTextId) return;
@@ -6027,13 +6040,20 @@ export class VisualAgentMapView extends ItemView {
       cls: "vam-text-node-input",
       attr: { rows: "4", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.text_node_edit_label") }
     });
-    input.value = text.text;
+    input.value = draft ?? text.text;
     let done = false;
     const close = (): void => {
       done = true;
       this.editingTextId = null;
+      this.suspendTextEdit = null;
       input.remove();
       body?.removeClass("vam-sr-only");
+    };
+    this.suspendTextEdit = () => {
+      done = true;
+      this.editingTextId = null;
+      this.suspendTextEdit = null;
+      return { id, value: input.value };
     };
     const commit = (): void => {
       if (done) return;
@@ -6099,6 +6119,8 @@ export class VisualAgentMapView extends ItemView {
       const child = this.map.nodes.find(node => !before.has(node.id));
       if (!child) return;
       await this.noteChange(child, { summary: text.text });
+      // The text node (and its focus) is gone after this repaint: focus lands on the new card, not on body.
+      this.focusNodeId = child.id;
       await this.mapChange(map => {
         map.canvasItems = removeTextNode(map.canvasItems ?? [], id);
         if (!map.canvasItems.length) delete map.canvasItems;
@@ -6114,6 +6136,7 @@ export class VisualAgentMapView extends ItemView {
       this.selected = child.id;
       this.announcer?.setText(t("ui.text_node_promoted"));
     } finally {
+      this.focusNodeId = null;
       this.history.collapseSince(historyMark);
       this.updateHistoryButtons();
     }
@@ -8492,6 +8515,8 @@ export class VisualAgentMapView extends ItemView {
     this.aimProgressEls.clear();
     // The dragged card is about to be replaced, so its pointer events would never arrive and the drag would stay "on".
     this.dragCleanup?.();
+    // A repaint replaces the text editor's textarea: keep what was typed and reopen it afterwards (not a blur commit).
+    if (this.suspendTextEdit) this.textEditDraft = this.suspendTextEdit();
     if (this.closed) return;
     this.plugin.syncOutline(this.builtIn ? null : this.map, this.notes, this.builtIn, this);
     if (this.hoverTimer !== null) {

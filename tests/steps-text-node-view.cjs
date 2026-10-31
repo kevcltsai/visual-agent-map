@@ -178,3 +178,19 @@ test('presentation order lists a text node among its parent children', async () 
   const order = plain(h.view.presentationOrder());
   assert.deepEqual(order, [h.root.id, h.child.id, 't1']);
 });
+
+test('a render after add (file event, derived data) keeps the new text node in edit with focus on the textarea', async () => {
+  const h = await harness();
+  h.view.addTextNodeUnder(h.root);
+  await h.settle();
+  const area = () => find(h.textEl(h.view.map.canvasItems[0].id), i => i.tag === 'textarea');
+  assert.ok(area(), 'editor open after add');
+  assert.ok(h.view.editingTextId, 'editing');
+  area().value = 'draft kept';
+  h.view.render(); // the later render that used to remove the textarea
+  h.view.render();
+  assert.ok(area(), 'editor still open after later renders');
+  assert.equal(area().value, 'draft kept');
+  assert.equal(h.view.editingTextId, h.view.map.canvasItems[0].id);
+  assert.equal((await h.onDisk())[0].text, 'Text', 'no blur commit wrote the draft early');
+});

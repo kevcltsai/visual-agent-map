@@ -352,3 +352,15 @@ test('36: addNode with focus=false (AI suggestion, outline import, map chat) doe
   await tick(); assert.equal(h.map().nodes.length, 5);
   assert.equal(make.last, last, 'focus unchanged'); assert.deepEqual(h.cameraMoves, [], 'camera unchanged');
 });
+
+test('36 R1 F1: the structure review "strengthen" apply adds the card without taking DOM focus (its dialog stays open)', async () => {
+  const h = await harness(); realAdd(h);
+  const last = make.last;
+  const leaf = h.card('leaf'); h.view.contentEl.ownerDocument = { activeElement: leaf };
+  const ok = await h.view.applyStructureSuggestion({ kind: 'strengthen', targetId: h.ids.leaf, title: 'Reinforce', reason: 'Thin.', basis: {} }, 'Reinforce', () => null);
+  await tick(); await tick();
+  assert.equal(ok, true); assert.equal(h.map().nodes.length, 5, 'the card was added');
+  assert.equal(make.last, last, 'no card took DOM focus');
+  assert.equal(h.view.contentEl.ownerDocument.activeElement, leaf, 'activeElement unchanged');
+  assert.equal(h.cameraMoves.length, 1, 'the camera still moved to the new card');
+});

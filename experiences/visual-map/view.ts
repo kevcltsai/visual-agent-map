@@ -59,6 +59,7 @@ import {
   wrapText,
   type MapScene,
   type SceneBoundary,
+  type SceneSummary,
   type SceneCard,
   type SceneEdge,
   type SceneImage
@@ -8768,6 +8769,41 @@ export class VisualAgentMapView extends ItemView {
         stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted"))
       });
     }
+    // Summary brackets as drawn (summary-bracket): the brace path and the text wrapped to its box width, beside the tip.
+    const summaryScenes: SceneSummary[] = [];
+    for (const item of map.canvasItems ?? []) {
+      if (item.kind !== "summary") continue;
+      const summary = item as SummaryItem;
+      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes));
+      if (!geometry?.ok) continue;
+      const lines = wrapText(summary.text, 200 - 12);
+      grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
+      // Make room for the text beside the brace tip.
+      const across = geometry.side === "right" || geometry.side === "left";
+      grow(
+        geometry.side === "left"
+          ? geometry.label.x - 200
+          : geometry.side === "right"
+            ? geometry.label.x
+            : geometry.label.x - 100,
+        across
+          ? geometry.label.y - lines.length * 9
+          : geometry.side === "up"
+            ? geometry.label.y - lines.length * 17
+            : geometry.label.y,
+        200,
+        across ? lines.length * 18 : lines.length * 17
+      );
+      summaryScenes.push({
+        d: geometry.path,
+        x: geometry.label.x,
+        y: geometry.label.y,
+        side: geometry.side,
+        text: lines,
+        stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted")),
+        textColor: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-normal"))
+      });
+    }
     const edges: SceneEdge[] = [];
     for (const el of Array.from(this.edgesEl?.children ?? [])) {
       if (el.tagName?.toLowerCase() !== "path") continue;
@@ -8805,6 +8841,7 @@ export class VisualAgentMapView extends ItemView {
       },
       boundaries,
       edges,
+      summaries: summaryScenes,
       cards,
       images
     };

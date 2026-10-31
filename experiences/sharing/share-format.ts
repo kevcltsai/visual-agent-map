@@ -3,6 +3,8 @@ import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
 import { readTopicColor, type TopicColor } from "../../topic-colors";
 import { CARD_WIDTH, clampCardWidth } from "../../map-graph";
+import { layoutDirectionFor } from "../../layouts/compose";
+import { layoutOf } from "../../map-layout";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
@@ -115,6 +117,19 @@ export interface ShareTextNodePayload {
   links?: string[];
 }
 
+/**
+ * Optional (summary-bracket): a curly brace around a run of sibling subtrees, with the user's conclusion text beyond it.
+ * `members` is the whole run (first to last sibling, in order); the card heights are only known on the page, so the viewer
+ * draws the brace from the cards it lays out. `side` is the side of the run the brace stands on. `text` is plain text, never HTML.
+ */
+export interface ShareSummaryPayload {
+  id: string;
+  parentId: string;
+  members: string[];
+  side: "right" | "left" | "down" | "up";
+  text: string;
+}
+
 export interface SharePayload {
   format: typeof SHARE_FORMAT;
   version: typeof SHARE_VERSION;
@@ -127,6 +142,8 @@ export interface SharePayload {
   nodes: ShareNodePayload[];
   /** Optional (tree-text-node): present only when the map has text nodes; absent keeps older files byte-identical. `version` stays 1. */
   textNodes?: ShareTextNodePayload[];
+  /** Optional (summary-bracket): present only when the map has a drawable bracket; absent keeps older files byte-identical. `version` stays 1. */
+  summaries?: ShareSummaryPayload[];
   assets: Record<string, string>;
   /** Optional (D-2026-10-116). Language id of the original text; any registry language, so it may lie outside the six. */
   contentLanguage?: string;
@@ -206,6 +223,42 @@ function shareTextNodes(map: MapDocument): ShareTextNodePayload[] {
   return out;
 }
 
+/**
+ * The map's summary brackets for the payload. A bracket whose run is gone, whose text is empty or whose arrangement
+ * cannot draw it (radial, timeline, fishbone, or a balanced run on both halves) is left out; the map itself keeps it.
+ */
+function shareSummaries(map: MapDocument): ShareSummaryPayload[] {
+  const out: ShareSummaryPayload[] = [];
+  const seen = new Set<string>();
+  const byId = new Map(map.nodes.map(node => [node.id, node]));
+  for (const item of map.canvasItems ?? []) {
+    const raw = item as unknown as Record<string, unknown>;
+    if (raw.kind !== "summary" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (typeof raw.text !== "string" || typeof raw.parentId !== "string" || !Array.isArray(raw.members)) continue;
+    const text = raw.text.trim().slice(0, SHARE_TEXT_LIMIT);
+    const parent = byId.get(raw.parentId);
+    if (!text || !parent) continue;
+    const picked = new Set(raw.members.filter((id): id is string => typeof id === "string"));
+    const siblings = map.nodes.filter(node => node.parentId === parent.id);
+    const at = siblings.flatMap((node, index) => (picked.has(node.id) ? [index] : []));
+    if (!at.length) continue;
+    const range = siblings.slice(at[0], at[at.length - 1] + 1);
+    const direction = layoutDirectionFor(map.nodes, range[0].id, layoutOf(map).direction);
+    let side: ShareSummaryPayload["side"];
+    if (direction === "balanced") {
+      const middle = parent.x + (parent.width ?? CARD_WIDTH) / 2;
+      const halves = new Set(range.map(node => (node.x + (node.width ?? CARD_WIDTH) / 2 < middle ? "left" : "right")));
+      if (halves.size !== 1) continue;
+      side = halves.has("left") ? "left" : "right";
+    } else if (direction === "right" || direction === "left" || direction === "down" || direction === "up")
+      side = direction;
+    else continue;
+    seen.add(raw.id);
+    out.push({ id: raw.id, parentId: parent.id, members: range.map(node => node.id), side, text });
+  }
+  return out;
+}
+
 /** Builds the share payload. Throws ShareError for AIM maps, which cannot be shared. */
 export function buildSharePayload(
   map: MapDocument,
@@ -246,6 +299,7 @@ export function buildSharePayload(
   });
   const goal = optionalText(options.goal);
   const textNodes = shareTextNodes(map);
+  const summaries = shareSummaries(map);
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -257,6 +311,7 @@ export function buildSharePayload(
     viewport: { x: map.viewport.x, y: map.viewport.y, zoom: map.viewport.zoom },
     nodes,
     ...(textNodes.length ? { textNodes } : {}),
+    ...(summaries.length ? { summaries } : {}),
     assets: options.includeImages ? { ...options.assets } : {}
   };
 }

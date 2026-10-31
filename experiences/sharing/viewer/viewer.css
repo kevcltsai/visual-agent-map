@@ -170,3 +170,12 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .vam-text-edge { opacity: 0.8; }
 .vam-text-link { stroke-dasharray: 5 4; opacity: 0.8; }
+.vam-summaries, .vam-summary { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; }
+.vam-summary-brace { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }
+.vam-summary-brace path { stroke: var(--text-muted); stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.vam-summary-text { position: absolute; box-sizing: border-box; width: 200px; padding: 2px 6px; color: var(--text-normal); font-size: 0.85em; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vam-summary.is-side-right .vam-summary-text { transform: translate(0, -50%); }
+.vam-summary.is-side-left .vam-summary-text { transform: translate(-100%, -50%); text-align: right; }
+.vam-summary.is-side-down .vam-summary-text { transform: translate(-50%, 0); text-align: center; }
+.vam-summary.is-side-up .vam-summary-text { transform: translate(-50%, -100%); text-align: center; }
+@media (max-width: 700px) { .vam-summary-text { width: 150px; } }

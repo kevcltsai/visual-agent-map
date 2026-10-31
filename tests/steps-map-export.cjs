@@ -82,3 +82,23 @@ test('UI batch 5 G-3: the PNG plumbing makes detached img and canvas elements wi
   assert.equal(await canvas.toBlob(), 'blob');
   assert.deepEqual(made.map(el => [el.tag, el.width]), [['img', 0], ['canvas', 4]]);
 });
+
+test('summary-bracket: a bracket is a path and escaped text lines; hostile path data and text stay inert', () => {
+  const svg = ex.buildMapSvg({
+    ...base,
+    summaries: [
+      { d: 'M 10 0 Q 10 12 22 12 L 30 12', x: 40, y: 60, side: 'right', text: ['<script>alert(1)</script>', 'two'], stroke: '#888' },
+      { d: 'M 0 0 L url(javascript:1)', x: 1, y: 1, side: 'left', text: 'dropped' },
+      { d: 'M 0 0 L 5 5', x: Infinity, y: 1, side: 'down', text: 'dropped too' }
+    ]
+  });
+  assertSafe(svg);
+  assert.equal((svg.match(/<path /g) ?? []).length, 1);
+  assert.match(svg, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.match(svg, /text-anchor="start"/);
+  assert.ok(!svg.includes('dropped'));
+  const left = ex.buildMapSvg({ ...base, summaries: [{ d: 'M 0 0 L 5 5', x: 50, y: 50, side: 'left', text: 'a' }, { d: 'M 0 0 L 5 5', x: 50, y: 50, side: 'down', text: 'b' }] });
+  assert.match(left, /text-anchor="end"/);
+  assert.match(left, /text-anchor="middle"/);
+  assert.equal(ex.buildMapSvg(base), ex.buildMapSvg({ ...base, summaries: [] }), 'no summaries leaves the bytes unchanged');
+});

@@ -495,3 +495,56 @@ test('sharing text-nodes: links appear only when live, dangling and duplicate id
   assert.ok(start > 0 && block.includes('vam-text-link'));
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment/.test(block));
 });
+
+// summary-bracket (P3): brackets travel as an optional `summaries` list; the card heights are known only on the page.
+test('sharing summaries: no bracket means no key and unchanged bytes; a bracket carries its whole run, side and plain text', () => {
+  const { notesById } = cleanedNotes();
+  const before = format.serializeShareJson(format.buildSharePayload(fixtureMap(), notesById, options()));
+  assert.ok(!before.includes('summaries'));
+  const map = fixtureMap();
+  const root = map.nodes.find(node => !node.parentId);
+  const kids = map.nodes.filter(node => node.parentId === root.id);
+  assert.ok(kids.length >= 3);
+  const evil = '</script><img src=x onerror=alert(1)>';
+  map.canvasItems = [
+    { id: 's1', kind: 'summary', parentId: root.id, members: [kids[0].id, kids[2].id], text: ` ${evil} ` },
+    { id: 's2', kind: 'summary', parentId: root.id, members: ['gone'], text: 'dangling' },
+    { id: 's3', kind: 'summary', parentId: 'gone', members: [kids[0].id], text: 'no parent' },
+    { id: 's4', kind: 'summary', parentId: root.id, members: [kids[0].id], text: '   ' },
+    { id: 's5', kind: 'summary', parentId: root.id, members: [kids[1].id], text: 5 },
+    { id: 's1', kind: 'summary', parentId: root.id, members: [kids[1].id], text: 'duplicate id' }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options());
+  assert.equal(payload.version, 1);
+  assert.equal(payload.summaries.length, 1);
+  assert.deepEqual(plain(payload.summaries[0]), { id: 's1', parentId: root.id, members: [kids[0].id, kids[1].id, kids[2].id], side: 'right', text: evil });
+  const json = format.serializeShareJson(payload);
+  assert.ok(!json.includes('<'), 'every < is escaped in the JSON block');
+  assert.equal(JSON.parse(json).summaries[0].text, evil);
+  // Structure-only shares keep the user's own text, like text nodes.
+  assert.equal(format.buildSharePayload(map, notesById, options({ includeDetail: false })).summaries.length, 1);
+  // Other canvas items alone leave the bytes unchanged.
+  const other = fixtureMap();
+  other.canvasItems = [{ id: 'img', kind: 'image', path: 'a.png', x: 0, y: 0, w: 10, h: 10 }];
+  assert.equal(format.serializeShareJson(format.buildSharePayload(other, notesById, options())), before);
+});
+
+test('sharing summaries: left/down/up carry their side; radial, timeline, fishbone and a balanced run on both halves are left out of the file', () => {
+  const { notesById } = cleanedNotes();
+  const build = (direction, edit) => {
+    const map = fixtureMap();
+    const root = map.nodes.find(node => !node.parentId);
+    const kids = map.nodes.filter(node => node.parentId === root.id);
+    map.layout = { direction };
+    if (edit) edit(root, kids);
+    map.canvasItems = [{ id: 's1', kind: 'summary', parentId: root.id, members: [kids[0].id, kids[1].id], text: 'conclusion' }];
+    return format.buildSharePayload(map, notesById, options()).summaries?.[0]?.side ?? null;
+  };
+  assert.equal(build('left'), 'left');
+  assert.equal(build('down'), 'down');
+  assert.equal(build('up'), 'up');
+  for (const direction of ['radial', 'timeline', 'fishbone']) assert.equal(build(direction), null, direction);
+  assert.equal(build('balanced', (root, kids) => { root.x = 1000; kids[0].x = 1400; kids[1].x = 1400; }), 'right');
+  assert.equal(build('balanced', (root, kids) => { root.x = 1000; kids[0].x = 600; kids[1].x = 600; }), 'left');
+  assert.equal(build('balanced', (root, kids) => { root.x = 1000; kids[0].x = 600; kids[1].x = 1400; }), null);
+});

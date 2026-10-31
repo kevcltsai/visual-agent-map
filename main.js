@@ -49144,7 +49144,7 @@ ${request.requirements}` : preset.text,
    * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
    * its own descendants; the moved branches are laid out once, in the same entry.
    */
-  async moveBranches(roots, target) {
+  async moveBranches(roots, target, clearSelection = true) {
     if (!this.map) return;
     if (!this.mergeUnlocked([...target ? [target.id] : [], ...roots.map((root) => root.id)])) return;
     this.assertAimReferencesRemain(this.map, new Set(roots.map((root) => root.id)), true);
@@ -49168,7 +49168,7 @@ ${request.requirements}` : preset.text,
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id), this.cardHeightOf, layoutOf(map));
       }
     });
-    this.multiSelected.clear();
+    if (clearSelection) this.multiSelected.clear();
     this.render();
   }
   assertAimReferencesRemain(map, ids, moving = false, removableQuestionNodeIds = /* @__PURE__ */ new Set()) {
@@ -57674,6 +57674,32 @@ ${addition}` : addition });
         if (member) groupOrigins.set(id, { x: member.x, y: member.y });
       }
       let delta = { x: 0, y: 0 };
+      const zoom0 = this.map.viewport.zoom;
+      const rect0 = typeof card.getBoundingClientRect === "function" ? card.getBoundingClientRect() : null;
+      const grab = rect0 ? { x: (start.x - rect0.left) / zoom0, y: (start.y - rect0.top) / zoom0 } : { x: 0, y: 0 };
+      let hover = null;
+      let hoverEl = null;
+      const setHover = (next) => {
+        var _a3;
+        hover = next;
+        const el = next && !next.invalid ? (_a3 = this.cardEls.get(next.node.id)) != null ? _a3 : null : null;
+        if (el === hoverEl) return;
+        hoverEl == null ? void 0 : hoverEl.classList.remove("is-reparent-target");
+        el == null ? void 0 : el.classList.add("is-reparent-target");
+        hoverEl = el;
+      };
+      const targetAt = (e) => {
+        if (!this.canSelectTopics() || !this.map) return null;
+        const self = this.map.nodes.find((item) => item.id === node.id);
+        const roots = group ? this.selectedRoots() : self ? [self] : [];
+        const z = this.map.viewport.zoom;
+        return this.reparentTargetAt(
+          origin.x + grab.x + (e.clientX - start.x) / z,
+          origin.y + grab.y + (e.clientY - start.y) / z,
+          roots,
+          node.id
+        );
+      };
       const edges = group ? null : this.dragEdges(node.id, card);
       const groupEdges = group ? this.groupDragEdges(group) : null;
       const placeGroup = (dx, dy) => {
@@ -57716,11 +57742,13 @@ ${addition}` : addition });
         if (selecting) {
           travelled || (travelled = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
           if (!group || !travelled || this.relevanceSortOn()) return;
-          if (locked || timelineBlocked) {
+          setHover(locked || overChat ? null : targetAt(e));
+          if (locked || timelineBlocked && !hover) {
             if (!warned) new import_obsidian32.Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
             warned = true;
             return;
           }
+          if (timelineBlocked) return;
           const zoom = this.map.viewport.zoom;
           delta = { x: (e.clientX - start.x) / zoom, y: (e.clientY - start.y) / zoom };
           (_c2 = this.dragFrame) != null ? _c2 : this.dragFrame = window.requestAnimationFrame(paint);
@@ -57733,6 +57761,7 @@ ${addition}` : addition });
           warned = true;
         }
         if (!moved || locked) return;
+        setHover(overChat ? null : targetAt(e));
         position = {
           x: origin.x + (e.clientX - start.x) / this.map.viewport.zoom,
           y: origin.y + (e.clientY - start.y) / this.map.viewport.zoom
@@ -57741,6 +57770,7 @@ ${addition}` : addition });
       };
       const settle = () => {
         var _a3;
+        setHover(null);
         (_a3 = this.chat) == null ? void 0 : _a3.setDropHighlight(false);
         this.dragging = false;
         this.dragOrigin = null;
@@ -57754,9 +57784,10 @@ ${addition}` : addition });
       };
       const finish = (e) => {
         const stale = this.dragStale();
+        const landed = hover;
         settle();
         try {
-          if (!stale) drop(e);
+          if (!stale) drop(e, landed);
         } finally {
           if (this.renderAfterDrag && !this.dragging) {
             this.renderAfterDrag = false;
@@ -57764,8 +57795,8 @@ ${addition}` : addition });
           }
         }
       };
-      const drop = (e) => {
-        var _a3, _b3;
+      const drop = (e, landed) => {
+        var _a3, _b3, _c2;
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         const putBack = () => {
@@ -57789,7 +57820,17 @@ ${addition}` : addition });
         }
         if (selecting) {
           if (!group) return;
-          if (locked || timelineBlocked || this.relevanceSortOn()) {
+          if (this.relevanceSortOn()) {
+            putBack();
+            return;
+          }
+          if (landed) {
+            putBack();
+            if (landed.invalid) new import_obsidian32.Notice(t("ui.circular_links_are_not_allowed"));
+            else this.enqueue(() => this.moveBranches(this.selectedRoots(), landed.node));
+            return;
+          }
+          if (locked || timelineBlocked) {
             putBack();
             return;
           }
@@ -57808,6 +57849,11 @@ ${addition}` : addition });
           return;
         }
         if (moved && locked) {
+        } else if (moved && landed) {
+          putBack();
+          const dragged = (_c2 = this.map) == null ? void 0 : _c2.nodes.find((item) => item.id === node.id);
+          if (landed.invalid) new import_obsidian32.Notice(t("ui.circular_links_are_not_allowed"));
+          else if (dragged) this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
           this.enqueue(
@@ -57852,6 +57898,28 @@ ${addition}` : addition });
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
     });
+  }
+  /**
+   * The card under a dragged branch's pointer (map coordinates) that may become its parent, or null when the pointer is
+   * over empty space, the dragged card itself (single drag) or the parent every dragged branch already has. A card
+   * inside the dragged branches (or a picked card of a group) is returned with `invalid`: it would make a loop.
+   */
+  reparentTargetAt(px, py, roots, selfId) {
+    var _a2, _b2;
+    const nodes = (_a2 = this.map) == null ? void 0 : _a2.nodes;
+    if (!nodes || !roots.length) return null;
+    let found = null;
+    for (const [id, el] of this.cardEls) {
+      if (px < el.offsetLeft || px >= el.offsetLeft + el.offsetWidth) continue;
+      if (py < el.offsetTop || py >= el.offsetTop + el.offsetHeight) continue;
+      found = (_b2 = nodes.find((item) => item.id === id)) != null ? _b2 : found;
+    }
+    if (!found) return null;
+    if (found.id === selfId) return null;
+    const target = found;
+    if (roots.every((root) => root.parentId === target.id)) return null;
+    const inside2 = roots.some((root) => root.id === target.id || descendants(nodes, root.id).has(target.id));
+    return { node: target, invalid: inside2 || !roots.every((root) => canParent(nodes, root.id, target.id)) };
   }
   /** The picked cards that move together when one of them is dragged in selection mode, by id. */
   groupDragMembers(node, card) {

@@ -1,18 +1,35 @@
 import { parentIdsForNode, type MapNode } from "./map-graph";
 
-const COLUMN = 360;
 const WIDTH = 300;
-/** Vertical space kept between two stacked cards, in canvas units. */
+/** Vertical space kept between two stacked cards at the standard spacing, in canvas units. */
 export const LAYOUT_GAP = 24;
+
+/** How tightly cards are packed: column distance and the gap between stacked cards, in canvas units. */
+export type LayoutSpacing = "compact" | "standard" | "spacious";
+
+const SPACING: Record<LayoutSpacing, { column: number; gap: number }> = {
+  compact: { column: 330, gap: 12 },
+  standard: { column: 360, gap: LAYOUT_GAP },
+  spacious: { column: 420, gap: 48 }
+};
+
+/** The spacings a map file may store; "standard" is the default and is never written. */
+export function isStoredLayoutSpacing(value: unknown): value is "compact" | "spacious" {
+  return value === "compact" || value === "spacious";
+}
 /** Card height assumed when the rendered height is unknown (not yet rendered or hidden). */
 export const DEFAULT_CARD_HEIGHT = 180;
 
 /** Which way a map's branches grow from their root: "right" (the original layout) or "left" (the root on the right). */
 export type LayoutDirection = "right" | "left";
 
-/** A map's stored layout choice; absent means "right". */
+/** Every arrangement the data format can name; engines other than right and left arrive one packet at a time. */
+export type LayoutKind = LayoutDirection | "down" | "up" | "balanced" | "radial" | "timeline" | "fishbone";
+
+/** A map's stored layout choice; absent means "right" at standard spacing. */
 export interface MapLayout {
-  direction: LayoutDirection;
+  direction: LayoutKind;
+  spacing?: LayoutSpacing;
 }
 
 export function isLayoutDirection(value: unknown): value is LayoutDirection {
@@ -26,8 +43,22 @@ export function layoutDirectionOf(map: { layout?: MapLayout; aim?: unknown } | n
   return isLayoutDirection(direction) ? direction : "right";
 }
 
+/** The full layout choice of a map (direction and spacing). AIM maps always grow to the right at standard spacing. */
+export function layoutOf(map: { layout?: MapLayout; aim?: unknown } | null | undefined): MapLayout {
+  const direction = layoutDirectionOf(map);
+  const spacing = map && !map.aim ? map.layout?.spacing : undefined;
+  return isStoredLayoutSpacing(spacing) ? { direction, spacing } : { direction };
+}
+
+/** Direction, column distance and card gap an arrange call works with; a bare direction string means standard spacing. */
+function resolveLayout(layout: LayoutDirection | MapLayout): { direction: LayoutKind; column: number; gap: number } {
+  const direction = typeof layout === "string" ? layout : layout.direction;
+  const spacing = typeof layout === "string" ? undefined : layout.spacing;
+  return { direction, ...SPACING[isStoredLayoutSpacing(spacing) ? spacing : "standard"] };
+}
+
 /** +1 when columns grow to the right, -1 when they grow to the left. */
-const signOf = (direction: LayoutDirection): number => (direction === "left" ? -1 : 1);
+const signOf = (direction: LayoutKind): number => (direction === "left" ? -1 : 1);
 
 /** Rendered card height in canvas units, or undefined when unknown. */
 export type HeightOf = (id: string) => number | undefined;
@@ -52,8 +83,9 @@ function positions(
   top: number,
   folded = false,
   heightOf?: HeightOf,
-  direction: LayoutDirection = "right"
+  layout: LayoutDirection | MapLayout = "right"
 ): Map<string, { x: number; y: number }> {
+  const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const sign = signOf(direction);
   const ids = new Map(nodes.map(node => [node.id, node]));
   const children = new Map<string, MapNode[]>();
@@ -132,11 +164,11 @@ export function arrangeMap(
   nodes: MapNode[],
   hidden?: Set<string>,
   heightOf?: HeightOf,
-  direction: LayoutDirection = "right"
+  layout: LayoutDirection | MapLayout = "right"
 ): MapNode[] {
   const laidOut = hidden?.size ? nodes.filter(node => !hidden.has(node.id)) : nodes;
   const roots = laidOut.filter(node => !node.parentId);
-  const placed = positions(laidOut, roots, 80, 80, true, heightOf, direction);
+  const placed = positions(laidOut, roots, 80, 80, true, heightOf, layout);
   return nodes.map(node => ({ ...node, ...placed.get(node.id) }));
 }
 
@@ -147,13 +179,14 @@ export function arrangeNewBranch(
   heightOf?: HeightOf,
   /** The new branch's top edge starts at or below this y (before collision avoidance); undefined keeps the centred start. */
   minTop?: number,
-  direction: LayoutDirection = "right"
+  layout: LayoutDirection | MapLayout = "right"
 ): MapNode[] {
+  const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const parent = nodes.find(node => node.id === parentId);
   if (!parent || !newIds.size) return nodes;
   const fresh = nodes.filter(node => newIds.has(node.id));
   const roots = fresh.filter(node => node.parentId === parentId);
-  const placed = positions(fresh, roots, parent.x + signOf(direction) * COLUMN, 0, false, heightOf, direction);
+  const placed = positions(fresh, roots, parent.x + signOf(direction) * COLUMN, 0, false, heightOf, layout);
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
   let offset = parent.y + cardHeight(heightOf, parent.id) / 2 - center;
@@ -186,8 +219,9 @@ export function arrangeNewTree(
   rootId: string,
   newIds: Set<string>,
   heightOf?: HeightOf,
-  direction: LayoutDirection = "right"
+  layout: LayoutDirection | MapLayout = "right"
 ): MapNode[] {
+  const { gap: LAYOUT_GAP } = resolveLayout(layout);
   const root = nodes.find(node => node.id === rootId);
   if (!root || !newIds.has(rootId)) return nodes;
   const fixed = nodes.filter(node => !newIds.has(node.id));
@@ -201,7 +235,7 @@ export function arrangeNewTree(
     top,
     false,
     heightOf,
-    direction
+    layout
   );
   return nodes.map(node => {
     const point = placed.get(node.id);

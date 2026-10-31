@@ -3,7 +3,7 @@ import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
-import type { MapLayout } from "./map-layout";
+import { isLayoutDirection, isStoredLayoutSpacing, type MapLayout } from "./map-layout";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 import {
@@ -593,9 +593,11 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
     (!map.layout ||
       typeof map.layout !== "object" ||
       Array.isArray(map.layout) ||
-      (map.layout.direction !== "right" && map.layout.direction !== "left"))
+      !isLayoutDirection(map.layout.direction))
   )
     delete map.layout;
+  else if (map.layout && map.layout.spacing !== undefined && !isStoredLayoutSpacing(map.layout.spacing))
+    delete map.layout.spacing;
   const ids = new Set<string>(),
     aimQuestionRequests = new Set<string>();
   for (const n of map.nodes) {

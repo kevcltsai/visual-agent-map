@@ -11871,7 +11871,8 @@ export class VisualAgentMapView extends ItemView {
    */
   private otherProviderTarget(nodes: MapNode[]): string | null {
     if (!nodes.length) return null;
-    const available = this.plugin.availableModels();
+    // Test doubles of older suites have no model list; a missing one means there is no other provider to offer.
+    const available = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : [];
     const targets = new Set<string | null>();
     for (const node of nodes) {
       const note = this.notes.get(node.id);

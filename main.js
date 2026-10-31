@@ -17718,6 +17718,7 @@ function begin(deps) {
       }
     };
     const stale = async (direction) => {
+      var _a2;
       const fail2 = () => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
@@ -17729,6 +17730,7 @@ function begin(deps) {
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
         if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail2();
+        if (await ((_a2 = repo.coordinatesChangedOutside) == null ? void 0 : _a2.call(repo, record.mapPath))) fail2();
       }
       if (direction === "redo") {
         for (const item of attachments) if (!exists(item.path)) fail2();
@@ -21085,12 +21087,18 @@ function guardWrites(target, writes, disposed, message) {
     }
   });
 }
+function coordinatePrint(map) {
+  const nodes = [...map.nodes].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  return JSON.stringify(nodes.map((node) => [node.id, node.x, node.y]));
+}
 var Repository = class {
   constructor(app, settings) {
     this.settings = settings;
     __publicField(this, "app");
     /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
     __publicField(this, "disposed", false);
+    /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
+    __publicField(this, "writtenCoordinates", /* @__PURE__ */ new Map());
     /** Containers that temporarily count as managed while a folder-setting change moves topics into them. */
     __publicField(this, "pendingContainers", []);
     /** Called once per vault-wide scan that skipped unreadable maps. */
@@ -21711,6 +21719,24 @@ ${body}`);
       parseMap(content);
       return writeMapContent(content, map);
     });
+    this.writtenCoordinates.set(path, coordinatePrint(map));
+  }
+  /**
+   * True when Map.md's node coordinates are not the ones this plugin last wrote there (something else moved a node).
+   * A map this plugin has not written since it started has nothing to compare with, so it is never reported.
+   * Viewport is not part of the comparison.
+   */
+  async coordinatesChangedOutside(path) {
+    const written2 = this.writtenCoordinates.get(path);
+    return written2 !== void 0 && coordinatePrint(await this.readMap(path)) !== written2;
+  }
+  /** Records the coordinates of a Map.md text this plugin put back byte for byte (rollbacks). */
+  noteRestoredMap(path, text11) {
+    try {
+      this.writtenCoordinates.set(path, coordinatePrint(parseMap(text11)));
+    } catch (e) {
+      this.writtenCoordinates.delete(path);
+    }
   }
   /**
    * Read-modify-write on the current file content in one vault.process call, so a caller holding an older copy of
@@ -21725,6 +21751,7 @@ ${body}`);
       updated = map;
       return writeMapContent(content, map);
     });
+    this.writtenCoordinates.set(path, coordinatePrint(updated));
     return updated;
   }
   /**
@@ -22431,6 +22458,7 @@ ${body}`;
           }
           await this.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
           await this.app.vault.modify(this.file(`${move.fromRoot}/Map.md`), originalMap);
+          this.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);
         } catch (rollbackError) {
           rollbackErrors.push(
             `${move.fromRoot}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
@@ -22517,6 +22545,7 @@ ${body}`;
           if (!(restoredMap instanceof import_obsidian14.TFile))
             throw new Error("Original Map.md was not found after restoring the topic folder.");
           await this.app.vault.modify(restoredMap, originalContent);
+          this.noteRestoredMap(originalMapPath, originalContent);
           await rebuild2();
         } catch (rollbackError) {
           const originalMessage = error instanceof Error ? error.message : String(error);
@@ -22526,6 +22555,7 @@ ${body}`;
         }
       } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof import_obsidian14.TFile) {
         await this.app.vault.modify(this.file(originalMapPath), originalContent);
+        this.noteRestoredMap(originalMapPath, originalContent);
         await rebuild2();
       }
       throw error;

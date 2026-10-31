@@ -928,10 +928,18 @@ function guardWrites<T extends object>(target: T, writes: Set<string>, disposed:
   });
 }
 
+/** Node id, x and y of every node, sorted by id: the part of a Map.md that a drag or a layout changes (viewport left out). */
+export function coordinatePrint(map: MapDocument): string {
+  const nodes = [...map.nodes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return JSON.stringify(nodes.map(node => [node.id, node.x, node.y]));
+}
+
 export class Repository {
   readonly app: App;
   /** Set when the plugin unloads: from then on no Repository write point does anything (in-flight work stops at its next write). */
   private disposed = false;
+  /** Per Map.md path: the node coordinates of the last text this plugin wrote there (memory only; see {@link coordinatesChangedOutside}). */
+  private readonly writtenCoordinates = new Map<string, string>();
 
   constructor(
     app: App,
@@ -1673,6 +1681,26 @@ export class Repository {
       parseMap(content);
       return writeMapContent(content, map);
     });
+    this.writtenCoordinates.set(path, coordinatePrint(map));
+  }
+
+  /**
+   * True when Map.md's node coordinates are not the ones this plugin last wrote there (something else moved a node).
+   * A map this plugin has not written since it started has nothing to compare with, so it is never reported.
+   * Viewport is not part of the comparison.
+   */
+  async coordinatesChangedOutside(path: string): Promise<boolean> {
+    const written = this.writtenCoordinates.get(path);
+    return written !== undefined && coordinatePrint(await this.readMap(path)) !== written;
+  }
+
+  /** Records the coordinates of a Map.md text this plugin put back byte for byte (rollbacks). */
+  private noteRestoredMap(path: string, text: string): void {
+    try {
+      this.writtenCoordinates.set(path, coordinatePrint(parseMap(text)));
+    } catch {
+      this.writtenCoordinates.delete(path);
+    }
   }
 
   /**
@@ -1688,6 +1716,7 @@ export class Repository {
       updated = map;
       return writeMapContent(content, map);
     });
+    this.writtenCoordinates.set(path, coordinatePrint(updated!));
     return updated!;
   }
 
@@ -2513,6 +2542,7 @@ export class Repository {
           }
           await this.renameTopic(newMapPath, move.title, move.fromRoot, { rebuild: false });
           await this.app.vault.modify(this.file(`${move.fromRoot}/Map.md`), originalMap);
+          this.noteRestoredMap(`${move.fromRoot}/Map.md`, originalMap);
         } catch (rollbackError) {
           rollbackErrors.push(
             `${move.fromRoot}: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`
@@ -2620,6 +2650,7 @@ export class Repository {
           if (!(restoredMap instanceof TFile))
             throw new Error("Original Map.md was not found after restoring the topic folder.");
           await this.app.vault.modify(restoredMap, originalContent);
+          this.noteRestoredMap(originalMapPath, originalContent);
           await rebuild();
         } catch (rollbackError) {
           const originalMessage = error instanceof Error ? error.message : String(error);
@@ -2630,6 +2661,7 @@ export class Repository {
       } else if (this.app.vault.getAbstractFileByPath(originalMapPath) instanceof TFile) {
         // A same-folder rename can still fail after the Map.md update; restore its exact source.
         await this.app.vault.modify(this.file(originalMapPath), originalContent);
+        this.noteRestoredMap(originalMapPath, originalContent);
         await rebuild();
       }
       throw error;

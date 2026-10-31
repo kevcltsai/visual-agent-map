@@ -16,7 +16,16 @@ export interface Lifecycle {
 export interface TransactionDeps {
   repo: Pick<
     Repository,
-    "readNote" | "readMap" | "saveMap" | "moveUnique" | "moveExact" | "setLifecycle" | "unique" | "app" | "file"
+    | "readNote"
+    | "readMap"
+    | "saveMap"
+    | "coordinatesChangedOutside"
+    | "moveUnique"
+    | "moveExact"
+    | "setLifecycle"
+    | "unique"
+    | "app"
+    | "file"
   >;
   rebuildDerivedData: () => Promise<void>;
   /** Called once per edited map after commit, undo and redo, with the map as now stored. */
@@ -348,6 +357,8 @@ export function begin(deps: TransactionDeps): Transaction {
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
         if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
+        // Positions are not content, but a node moved by something other than this plugin must not be overwritten.
+        if (await repo.coordinatesChangedOutside?.(record.mapPath)) fail();
       }
       // Redo links the same files again; it never recreates one.
       if (direction === "redo") for (const item of attachments) if (!exists(item.path)) fail();

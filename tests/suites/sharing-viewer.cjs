@@ -69,7 +69,7 @@ test('sharing viewer: the edge curve is the plugin\'s edgePathData', () => {
 test('sharing viewer: the bundle is built from the plugin\'s own layout and nothing from Obsidian', () => {
   const result = buildSync({ entryPoints: [path.join(root, 'experiences/sharing/viewer/index.ts')], platform: 'browser', format: 'iife', metafile: true, external: [] });
   const inputs = Object.keys(result.metafile.inputs).map(file => path.relative(root, path.resolve(process.cwd(), file)).split(path.sep).join('/')).sort();
-  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'map-graph.ts', 'map-layout.ts', 'topic-markers.ts']);
+  assert.deepEqual(inputs, ['experiences/sharing/share-translate-compact.ts', 'experiences/sharing/share-translate-plan.ts', 'experiences/sharing/share-translate-segments.ts', 'experiences/sharing/share-viewer-ui.ts', 'experiences/sharing/viewer/detail.ts', 'experiences/sharing/viewer/dom.ts', 'experiences/sharing/viewer/edge-path.ts', 'experiences/sharing/viewer/index.ts', 'experiences/sharing/viewer/language.ts', 'experiences/sharing/viewer/main.ts', 'experiences/visual-map/viewport-inset.ts', 'layouts/balanced.ts', 'layouts/compose.ts', 'layouts/fishbone.ts', 'layouts/radial.ts', 'layouts/timeline.ts', 'layouts/vertical.ts', 'map-graph.ts', 'map-layout.ts', 'topic-colors.ts', 'topic-markers.ts']);
   const graph = load('map-graph.ts');
   const model = load('map-model.ts');
   const node = { id: 'a', path: 'a', parentId: 'p', x: 0, y: 0, collapsed: false, aimKind: 'answer', aimConvergesFromNodeIds: ['p', 'q'] };
@@ -179,7 +179,7 @@ test('sharing viewer: interface text exists in all three languages and the Engli
     const ui = text.shareViewerUiFor(lang);
     assert.equal(ui.lang, lang);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort());
-    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${lang}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource']) assert.match(ui[key], /\{0\}/, `${lang}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -307,7 +307,7 @@ test('sharing viewer language: interface text for ja, ko and es is complete and 
     const ui = dictionaries.SHARE_VIEWER_UI_EXTRA[code];
     assert.equal(ui.lang, code);
     assert.deepEqual(Object.keys(ui).sort(), Object.keys(english).sort(), code);
-    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
+    for (const [key, value] of Object.entries(ui).flatMap(([k, v]) => k === 'markerNames' || k === 'colorNames' ? Object.entries(v).map(([id, name]) => [`${k}.${id}`, name]) : [[k, v]])) assert.ok(typeof value === 'string' && value.trim(), `${code}.${key}`);
     for (const key of ['goal', 'expandToLevel', 'zoomReset', 'expandCount', 'imageSource', 'aiTranslated']) assert.match(ui[key], /\{0\}/, `${code}.${key}`);
     assert.ok(!/\{[1-9]\}/.test(JSON.stringify(ui)));
   }
@@ -947,6 +947,89 @@ test('sharing viewer markers: cards and outline show aria-hidden symbols and a n
     assert.ok(!/標記/.test(report.otherLabel ?? ''), 'no marker text without markers');
     assert.equal(report.images, 0, 'a hostile id is never turned into markup');
     assert.notEqual(report.title, '1');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer topic-color: colour text exists in every language, names and the "colour: {0}" label', () => {
+  const colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+  const everyUi = [...LANGUAGES.map(lang => text.shareViewerUiFor(lang)), ...Object.values(dictionaries.SHARE_VIEWER_UI_EXTRA)];
+  assert.equal(everyUi.length, 6);
+  for (const ui of everyUi) {
+    assert.match(ui.colorLabel, /\{0\}/, `${ui.lang}.colorLabel`);
+    assert.deepEqual(Object.keys(ui.colorNames).sort(), [...colors].sort(), ui.lang);
+    for (const id of colors) assert.ok(ui.colorNames[id].trim(), `${ui.lang}.${id}`);
+  }
+  assert.equal(text.shareViewerUiFor('zh-TW').colorLabel, '顏色：{0}');
+  assert.equal(text.shareViewerUiFor('zh-TW').colorNames.red, '紅色');
+  assert.equal(text.shareViewerUiFor('en').colorNames.blue, 'Blue');
+});
+
+test('sharing viewer topic-color: a card carries data-topic-color and a named label, and a hostile or malformed value draws nothing (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-topic-color-'));
+  try {
+    const data = payload();
+    data.nodes[0].color = 'red';
+    data.nodes[0].markers = ['done'];
+    data.nodes[1].color = 'red; background:url(x)';
+    data.nodes[2].color = 'Blue';
+    data.nodes[3].color = ['green'];
+    data.nodes[4].color = '<img src=x onerror="document.title=1">';
+    const out = path.join(directory, 'color.html');
+    fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('zh-TW')));
+    const ids = data.nodes.slice(0, 5).map(n => n.id);
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`(() => {
+        const card = id => document.querySelector('[data-node-id="' + id + '"]');
+        return {
+          cards: ${JSON.stringify(ids)}.map(id => ({ color: card(id)?.dataset.topicColor ?? null, label: card(id)?.getAttribute('aria-label') ?? null, style: card(id)?.getAttribute('style') })),
+          images: document.querySelectorAll('img[src="x"]').length, title: document.title
+        };
+      })()`);
+    });
+    assert.equal(report.cards[0].color, 'red');
+    assert.match(report.cards[0].label, /顏色：紅色/);
+    assert.match(report.cards[0].label, /標記：完成/, 'colour and markers both stay in the name');
+    for (const card of report.cards.slice(1)) {
+      assert.equal(card.color, null, 'a value off the whitelist sets no attribute');
+      assert.ok(!/顏色/.test(card.label ?? ''), 'no colour text without a colour');
+      assert.ok(!/url\(x\)/.test(card.style ?? ''), 'a hostile value never reaches style');
+    }
+    assert.equal(report.images, 0);
+    assert.notEqual(report.title, '1');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer topic-color contrast: card text on every colour meets WCAG AA in light and dark (headless Chrome; the colour rules come from styles.css)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-topic-color-contrast-'));
+  try {
+    const data = payload();
+    ['red', 'orange', 'yellow', 'green', 'blue', 'purple'].forEach((color, i) => { data.nodes[i].color = color; });
+    const out = path.join(directory, 'color.html');
+    fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('en')));
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 120000, async send => {
+      const { evaluate, reload } = pageTools(send);
+      const measure = async scheme => {
+        await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
+        await reload();
+        const colored = await evaluate(`Array.from(document.querySelectorAll('.vam-node[data-topic-color]')).filter(e => e.getClientRects().length).map(e => e.dataset.topicColor)`);
+        return { colored, ratios: await evaluate(CONTRAST_PROBE) };
+      };
+      return { light: await measure('light'), dark: await measure('dark') };
+    });
+    for (const scheme of ['light', 'dark']) {
+      const { colored, ratios } = report[scheme];
+      assert.ok(colored.length >= 3, `${scheme}: coloured cards are shown (${colored.join(',')})`);
+      for (const name of ['cardTitle', 'cardSummary', 'collapse']) assert.ok(ratios[name] >= 4.5, `${scheme}: ${name} contrast ${ratios[name]} must be >= 4.5`);
+    }
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }

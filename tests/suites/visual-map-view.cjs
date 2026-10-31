@@ -963,7 +963,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderMarkerSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -1633,18 +1633,18 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   view.autoLayout(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutDirectionOf\(map\)\);/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
+  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\);/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
 });
-integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the two directions and Auto layout', () => {
+integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the eight arrangements, a separator, the three spacings and Auto layout', () => {
   const menus = [];
   class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, setChecked(value) { this.checked = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } }
   const { view } = selectionView(load, {}, { ...obsidian, Menu });
-  const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayoutDirection = direction => calls.push(direction);
+  const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayout = patch => calls.push(patch.direction ?? patch.spacing);
   view.openLayoutMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Auto layout']);
-  assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, undefined], 'the current direction is checked');
+  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, false, false, false, false, false, false, false, true, false, undefined], 'the current direction and spacing are checked');
   menus[0].items.filter(item => !item.separator).forEach(item => item.click());
-  assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'arrange']);
+  assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone', 'compact', 'standard', 'spacious', 'arrange']);
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.layout'), '排版'); assert.equal(translate('en', 'ui.layout'), 'Layout');
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-layout-button::after \{ content: "▾" \/ "";/, 'the menu caret is decoration, not part of the name');
@@ -3232,9 +3232,9 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Parent topic'], 'the marker section sits after the relations (ticket 33)');
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Color', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Parent topic'], 'no strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Color', 'Parent topic'], 'no strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
   const css = heCss();
@@ -3509,4 +3509,161 @@ integrationTest('topic-markers: a toggle is one transaction; one undo restores t
   await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
   await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
   assert.equal(pushed.length, 3); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
+});
+// ---- topic colour (ticket 37, P2b) ----
+const tcLabel = card => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
+integrationTest('topic-color: a card carries data-topic-color and "Color: Red" in its accessible name; no colour, a hostile value and an AIM card add nothing', () => {
+  const notes = heNotes([['fact', { color: 'red' }], ['hyp', { color: 'red; background:url(x)' }], ['other', {}]]);
+  const red = tmRender({ notes }, 'fact');
+  assert.equal(red.card.dataset.topicColor, 'red'); assert.match(tcLabel(red.card).text, /^FACT, Researched, Color: Red$/); assert.equal(red.card.attrs['aria-labelledby'], tcLabel(red.card).id);
+  for (const id of ['hyp', 'other']) {
+    const shown = tmRender({ notes }, id);
+    assert.equal('topicColor' in shown.card.dataset, false, id); assert.doesNotMatch(tcLabel(shown.card).text, /Color/, id);
+    assert.match(tcLabel(shown.card).text, new RegExp('^' + id.toUpperCase() + ', Researched'), 'a card without a valid colour keeps its old name'); assert.equal((tcLabel(shown.card).text.match(/,/g) ?? []).length, 1, id);
+  }
+  const aim = tmRender({ aim: true, topics: [{ ...node('fact'), aimKind: 'research' }], notes }, 'fact');
+  assert.equal('topicColor' in aim.card.dataset, false, 'an AIM card has its own look and shows no topic colour'); assert.doesNotMatch(tcLabel(aim.card).text, /Color/);
+});
+integrationTest('topic-color: the colour name sits with the marker and model parts without duplicating or disturbing them, on first draw and after every refresh', () => {
+  const f = heFixture({ notes: heNotes([['fact', { markers: ['done'], color: 'blue' }], ['hyp', {}], ['other', {}]]) });
+  f.view.plugin.modelLabel = model => `M:${model}`;
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+  const node = f.view.map.nodes[0], card = f.view.stageEl.children[0], note = f.view.notes.get('fact');
+  f.view.stageEl.querySelector = () => card; f.view.drawEdges = () => {};
+  const count = (text, re) => (text.match(re) ?? []).length;
+  const check = (want, why) => {
+    const text = tcLabel(card).text;
+    for (const [name, re, n] of [['Markers', /Markers:/g, want.markers], ['Color', /Color:/g, want.color], ['Model', /Model set/g, want.model]]) assert.equal(count(text, re), n, `${why}: ${name} once or not at all in "${text}"`);
+    assert.equal(card.dataset.topicColor, want.attr, why);
+  };
+  check({ markers: 1, color: 1, model: 0, attr: 'blue' }, 'first draw');
+  note.modelOverride = true; note.model = 'gpt-x';
+  f.view.refreshCard(node, false); check({ markers: 1, color: 1, model: 1, attr: 'blue' }, 'model added');
+  f.view.refreshCard(node, false); check({ markers: 1, color: 1, model: 1, attr: 'blue' }, 'refresh again');
+  note.color = 'green'; f.view.refreshCard(node, false); check({ markers: 1, color: 1, model: 1, attr: 'green' }, 'colour changed');
+  assert.match(tcLabel(card).text, /Color: Green/); assert.doesNotMatch(tcLabel(card).text, /Blue/);
+  note.markers = ['star']; note.modelOverride = false; f.view.refreshCard(node, false);
+  check({ markers: 1, color: 1, model: 0, attr: 'green' }, 'marker changed, model removed'); assert.doesNotMatch(tcLabel(card).text, /Done/);
+  note.color = undefined; f.view.refreshCard(node, false);
+  check({ markers: 1, color: 0, model: 0, attr: undefined }, 'colour cleared'); assert.equal('topicColor' in card.dataset, false); assert.equal('colorText' in card.dataset, false);
+  note.color = 'purple'; f.view.refreshCard(node, false); check({ markers: 1, color: 1, model: 0, attr: 'purple' }, 'colour added later');
+  const spans = dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
+  assert.equal(spans.length, 1, 'one label element, replaced in place');
+});
+integrationTest('topic-color: the sample, an AIM map and select mode have no colour menu and refuse a change', async () => {
+  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+    const { view, writes } = heFixture(options);
+    if (options.integration) view.integrationMode = true;
+    const panel = dom.element('panel'); view.renderColorSection(panel, view.map.nodes[2]);
+    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
+    view.beginMapTransaction = () => assert.fail('no transaction');
+    await view.changeTopicColor(view.map.nodes[2], 'red', true);
+    assert.deepEqual(writes, []);
+  }
+});
+integrationTest('topic-color: the menu is a radiogroup of None and six named colours with aria-checked, and a branch button; choosing writes that colour for this topic only', async () => {
+  const { view } = heFixture({ topics: [node('fact'), { ...node('kid'), parentId: 'fact' }], notes: heNotes([['fact', {}], ['kid', {}]]) });
+  view.enqueue = work => work();
+  const calls = [];
+  view.changeTopicColor = async (node, color, branch) => { calls.push([node.id, color ?? null, !!branch]); const note = view.notes.get(node.id); note.color = color ?? undefined; };
+  const panel = dom.element('panel'); view.renderColorSection(panel, view.map.nodes[0]);
+  const group = () => dom.find(panel, c => c.attrs.role === 'radiogroup');
+  assert.equal(group().attrs['aria-label'], 'Color');
+  const radios = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs.role === 'radio');
+  assert.deepEqual(radios().map(r => r.text), ['None', 'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple'], 'every swatch has a text name');
+  assert.deepEqual(radios().map(r => r.attrs['aria-checked']), ['true', 'false', 'false', 'false', 'false', 'false', 'false']);
+  const swatches = dom.findAll(group(), c => c.attrs['aria-hidden'] === 'true' && c.dataset.topicColorSwatch);
+  assert.deepEqual(swatches.map(s => s.dataset.topicColorSwatch), ['red', 'orange', 'yellow', 'green', 'blue', 'purple']);
+  radios()[2].click(); await dom.tick();
+  assert.deepEqual(calls, [['fact', 'orange', false]]);
+  assert.deepEqual(radios().map(r => r.attrs['aria-checked']), ['false', 'false', 'true', 'false', 'false', 'false', 'false'], 'repainted with the new choice');
+  assert.equal(radios().filter(r => r.attrs.tabIndex === '0' || r.tabIndex === 0).length <= 1, true);
+  radios()[0].click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', null, false]);
+  const apply = dom.button(panel, 'Apply to whole branch'); assert.ok(apply);
+  const leaf = dom.element('leaf'); view.renderColorSection(leaf, view.map.nodes[1]); assert.equal(dom.button(leaf, 'Apply to whole branch').disabled, true, 'a leaf has no branch to apply to');
+  radios()[3].click(); await dom.tick(); apply.click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', 'yellow', true], 'the branch button applies the colour chosen now');
+});
+integrationTest('topic-color: opening and redrawing a map of legacy notes (no topic-color key) writes nothing: every file is byte-identical and neither writeTopicColor nor vault.process runs', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-legacy/Map.md';
+  const doc = { id: 'map-legacy', title: 'legacy', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-legacy');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
+  const kid = await repo.createNote('Kid', 'gpt-6-luna', doc, MAP, 'workspace');
+  kid.parentId = root.id; doc.nodes.push(root, kid); await repo.saveMap(MAP, doc);
+  for (const n of [root, kid]) assert.doesNotMatch(contents.get(n.path), /topic-color/, 'the fixture is a legacy-format note');
+  const before = new Map(contents);
+  const writes = [], processed = [];
+  const originalColor = repo.writeTopicColor.bind(repo), originalProcess = repo.app.vault.process.bind(repo.app.vault);
+  repo.writeTopicColor = async (...args) => { writes.push(args); return originalColor(...args); };
+  repo.app.vault.process = async (...args) => { processed.push(args[0]?.path); return originalProcess(...args); };
+  const { view } = heFixture({ topics: [root] });
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  for (const n of view.map.nodes) view.notes.set(n.id, { ...await repo.readNote(n.path, view.map), status: 'completed' }); // status only keeps the DOM stand-in simple; the files are untouched
+  view.stageEl = hePatch(dom.element('stage')); view.cardEls = new Map(); view.drawEdges = () => {};
+  for (const n of view.map.nodes) view.renderNode(n);
+  const cards = view.stageEl.children.slice();
+  for (const n of view.map.nodes) { view.stageEl.querySelector = () => cards[view.map.nodes.indexOf(n)]; view.refreshCard(n, false); }
+  assert.equal(cards.length, 2); for (const card of cards) assert.equal('topicColor' in card.dataset, false, 'a legacy card shows no colour');
+  for (const n of view.map.nodes) assert.equal(view.notes.get(n.id).color, undefined);
+  assert.deepEqual([...contents.keys()].sort(), [...before.keys()].sort(), 'no file appeared or vanished');
+  for (const [path, text] of before) assert.equal(contents.get(path), text, `${path} is byte-identical`);
+  assert.deepEqual(writes, [], 'writeTopicColor was not called'); assert.deepEqual(processed, [], 'vault.process was not called');
+});
+integrationTest('topic-color: applying to a branch is one transaction that writes only the notes that change, folded descendants included; one undo restores all, redo reapplies; siblings and other keys stay put', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-c/Map.md';
+  const doc = { id: 'map-c', title: 'c', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-c');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
+  const child = await repo.createNote('Child', 'gpt-6-luna', doc, MAP, 'workspace');
+  const grand = await repo.createNote('Grand', 'gpt-6-luna', doc, MAP, 'workspace');
+  const same = await repo.createNote('Same', 'gpt-6-luna', doc, MAP, 'workspace');
+  const sibling = await repo.createNote('Sibling', 'gpt-6-luna', doc, MAP, 'workspace');
+  child.parentId = root.id; child.collapsed = true; grand.parentId = child.id; same.parentId = root.id;
+  doc.nodes.push(root, child, grand, same, sibling); await repo.saveMap(MAP, doc);
+  await repo.writeTopicColor(same.path, 'red');
+  const { view } = heFixture({ topics: [root] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  await view.refreshAfterSavedChange();
+  const writes = []; const original = repo.writeTopicColor.bind(repo);
+  repo.writeTopicColor = async (p, id) => { writes.push(p); return original(p, id); };
+  const snapshot = () => Object.fromEntries([root, child, grand, same, sibling].map(n => [n.path, contents.get(n.path)]));
+  const before = snapshot(), mapBefore = contents.get(MAP);
+  const rootNode = view.map.nodes.find(n => n.id === root.id);
+  await view.changeTopicColor(rootNode, 'red', true);
+  assert.equal(pushed.length, 1, 'one history entry for the whole branch');
+  assert.deepEqual([...writes].sort(), [root.path, child.path, grand.path].sort(), 'the topic and its descendants (folded one included) that changed; the already-red one and the sibling are not written');
+  for (const n of [root, child, grand, same]) assert.equal(view.notes.get(n.id).color, 'red', n.path);
+  assert.equal(view.notes.get(sibling.id).color, undefined); assert.equal(contents.get(sibling.path), before[sibling.path]);
+  assert.equal(contents.get(same.path), before[same.path], 'a note that already had the colour is byte-identical');
+  assert.equal(contents.get(MAP), mapBefore, 'Map.md is not changed by a colour');
+  await pushed[0].undo();
+  assert.deepEqual(snapshot(), before, 'one undo gives back every note byte for byte');
+  await pushed[0].redo();
+  for (const n of [root, child, grand]) assert.match(contents.get(n.path), /^topic-color: "?red"?$/m);
+  await pushed[0].undo();
+  await view.refreshAfterSavedChange();
+  writes.length = 0;
+  await view.changeTopicColor(view.map.nodes.find(n => n.id === root.id), 'red', false);
+  assert.deepEqual(writes, [root.path], 'a single topic does not touch its children (no inheritance)');
+  assert.equal(view.notes.get(child.id).color, undefined);
+  writes.length = 0; const count = pushed.length;
+  await view.changeTopicColor(view.map.nodes.find(n => n.id === root.id), 'red', false);
+  assert.deepEqual(writes, [], 'choosing the colour it already has writes nothing'); assert.equal(pushed.length, count, 'and adds no history entry');
+  await view.changeTopicColor(view.map.nodes.find(n => n.id === root.id), null, false);
+  assert.doesNotMatch(contents.get(root.path), /topic-color/, 'clearing removes the key');
 });

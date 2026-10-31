@@ -7,6 +7,7 @@ import { isCompactEntry } from "../share-translate-compact";
 import { fillDetail, fillTranslatedDetail } from "./detail";
 import { edgePathData } from "./edge-path";
 import { createViewerElement } from "./dom";
+import { readTopicColor, TOPIC_COLORS, type TopicColor } from "../../../topic-colors";
 import { markerSymbol, readTopicMarkers, type TopicMarker } from "../../../topic-markers";
 import { pickShareLanguage, shareLanguageKey } from "./language";
 
@@ -80,6 +81,13 @@ function uiFrom(raw: unknown): ShareViewerUi {
       if (typeof value === "string" && value.trim()) ui.markerNames[id] = value;
     }
   }
+  const colors = raw && typeof raw === "object" ? (raw as Record<string, unknown>).colorNames : undefined;
+  ui.colorNames = { ...SHARE_VIEWER_UI_DEFAULT.colorNames };
+  if (colors && typeof colors === "object")
+    for (const id of TOPIC_COLORS) {
+      const value = (colors as Record<string, unknown>)[id];
+      if (typeof value === "string" && value.trim()) ui.colorNames[id] = value;
+    }
   return ui;
 }
 
@@ -293,6 +301,9 @@ export function startViewer(doc: Document): void {
     return `${title}${cjk() ? "，" : ", "}${fill(ui.markerLabel, names)}`;
   };
   /** The symbols are decoration (aria-hidden); the names reach assistive technology through the label of the topic. */
+  /** The colour of a topic: the whitelist is applied again here, so a hand-edited file cannot inject anything. */
+  const colorOf = (item: ShareNodePayload): TopicColor | undefined => readTopicColor({ "topic-color": item.color });
+
   const markerRow = (markers: TopicMarker[]): HTMLElement => {
     const row = make("span", "vam-markers");
     for (const id of markers) {
@@ -522,7 +533,13 @@ export function startViewer(doc: Document): void {
       card.setAttribute("aria-level", String(depthOf(node) + 1));
       card.setAttribute("aria-selected", String(node.id === selected));
       const markers = markersOf(item);
-      card.setAttribute("aria-label", nameWithMarkers(String(shown.title ?? ""), markers));
+      const color = colorOf(item);
+      if (color) card.dataset.topicColor = color;
+      const markedName = nameWithMarkers(String(shown.title ?? ""), markers);
+      card.setAttribute(
+        "aria-label",
+        color ? `${markedName}${cjk() ? "，" : ", "}${fill(ui.colorLabel, ui.colorNames[color])}` : markedName
+      );
       if (count) card.setAttribute("aria-expanded", String(!node.collapsed));
       const header = make("div", "vam-node-header");
       card.append(header);

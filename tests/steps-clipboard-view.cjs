@@ -21,7 +21,7 @@ const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, a
   setPointerCapture() {}, focus() { this.focused++; }, remove() { this.removed = true; }, getBoundingClientRect() { return { left: 0, right: 10, top: 0, bottom: 10 }; },
   querySelector() { return null; }, querySelectorAll() { return []; }, replaceWith() {} });
 
-async function harness({ aim = false } = {}) {
+async function harness({ aim = false, layout = null } = {}) {
   const { repo, app, contents } = fixture('en');
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings; app.scope = { appScope: true };
@@ -36,6 +36,7 @@ async function harness({ aim = false } = {}) {
   await add('root', 'Root'); await add('leaf', 'Leaf', 'root', { detail: 'Leaf detail text' }); await add('branch', 'Branch', 'root'); await add('kid', 'Kid', 'branch');
   await add('other', 'Other');
   if (aim) mapDoc.aim = { version: 1 };
+  if (layout) mapDoc.layout = layout;
   await app.vault.create(MAP, core.serializeMap(mapDoc));
   await repo.rebuildDerivedData();
   const notices = [];
@@ -148,6 +149,18 @@ test('P4 paste: the same map under the selected card duplicates the notes with t
   assert.equal((await h.saved()).nodes.length, 6);
   await h.view.travel(false); await tick();
   assert.equal(h.map().nodes.length, 5, 'undo takes the copy off the map');
+});
+
+test('P4 paste: in a down map the pasted branch goes below its parent, not to its right (layout-clipboard-final-merge-layoutOf)', async () => {
+  const h = await harness({ layout: { direction: 'down' } });
+  copyOf(h, ['leaf']);
+  const raw = h.lastRaw;
+  h.view.selected = h.ids.other; h.view.multiSelected.clear();
+  pasteOf(h, { [MIME]: raw });
+  await until(() => h.map().nodes.length === 6); await tick(); await tick();
+  const added = h.map().nodes.find(n => !Object.values(h.ids).includes(n.id));
+  const parent = h.map().nodes.find(n => n.id === h.ids.other);
+  assert.ok(added.y - parent.y > 100, 'a row below the parent, not beside it');
 });
 
 test('P4 paste: with no selection the branch becomes new top-level trees below the existing ones', async () => {

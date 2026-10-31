@@ -48,7 +48,7 @@ test('an accepted file reaches the new-map flow with its topics and the file nam
   assert.equal(await io.importExchangeFile(h, file('plan.opml', opml('<outline text="Root"><outline text="Kid"/></outline>'))), true);
   assert.equal(h.calls.length, 1);
   const request = h.calls[0];
-  assert.equal(request.source, 'plan.opml'); assert.equal(request.shallowResearch, false); assert.equal(request.placement, undefined);
+  assert.deepEqual(plain(request.source), { file: 'plan.opml' }); assert.equal(request.shallowResearch, false); assert.equal(request.placement, undefined);
   assert.deepEqual(request.nodes.map(n => [n.title, n.parent]), [['Root', null], ['Kid', 0]]);
   assert.equal(notices.length, 0);
 });

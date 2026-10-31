@@ -1,6 +1,7 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
+import { readTopicColor, type TopicColor } from "./topic-colors";
 import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
 import {
@@ -104,6 +105,8 @@ export interface Note {
   hypothesisStrength?: HypothesisStrength;
   /** From `topic-markers` frontmatter, whitelisted ids only; absent when there are none. */
   markers?: TopicMarker[];
+  /** From `topic-color` frontmatter, a whitelisted id only; absent when there is none. */
+  color?: TopicColor;
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
@@ -1217,6 +1220,7 @@ export class Repository {
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
       ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
+      ...(readTopicColor(fm) ? { color: readTopicColor(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
@@ -1555,6 +1559,14 @@ export class Repository {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
     );
+  }
+
+  /**
+   * Sets `topic-color` to one id, or removes the key for null. An unreadable old value is overwritten because the choice
+   * is explicit; no other key changes and `updated` is not bumped.
+   */
+  async writeTopicColor(path: string, id: TopicColor | null): Promise<void> {
+    await this.app.vault.process(this.file(path), content => setFrontmatterKeys(content, { "topic-color": id }));
   }
 
   /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */

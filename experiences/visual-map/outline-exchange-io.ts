@@ -67,7 +67,7 @@ export async function importExchangeFile(
   const parsed = parseOutlineExchange(text, { fileName: file.name });
   if (!parsed.ok) return refuse(exchangeRefusal(parsed.reason, parsed.line));
   try {
-    await host.importOutline({ nodes: parsed.nodes, source: file.name, shallowResearch: false });
+    await host.importOutline({ nodes: parsed.nodes, source: { file: file.name }, shallowResearch: false });
   } catch (error) {
     new Notice(messageOf(error));
     return false;

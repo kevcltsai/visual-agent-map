@@ -121,6 +121,23 @@ test('P5 text paste: with nothing selected the text becomes a new top-level tree
   assert.equal(fresh.find(n => titleOf(h, n) === 'Child').parentId, top.id);
 });
 
+test('F3 (D5) an unreadable private payload falls back to the plain text beside it; with no text the notice stays', async () => {
+  const h = await harness();
+  h.view.selected = null; h.view.multiSelected.clear();
+  const before = h.map().nodes.length;
+  const event = pasteOf(h, { 'application/x-vam-branch': '{not json', 'text/plain': 'Fallback\n\tKid' });
+  assert.equal(event.defaultPrevented, true);
+  await until(() => h.map().nodes.length === before + 2); await settled(h);
+  const top = names(h).find(n => titleOf(h, n) === 'Fallback');
+  assert.equal(top.parentId, null);
+  assert.equal(names(h).find(n => titleOf(h, n) === 'Kid').parentId, top.id);
+  const count = h.map().nodes.length, notices = h.notices.length;
+  pasteOf(h, { 'application/x-vam-branch': '{not json' });
+  await settled(h);
+  assert.equal(h.map().nodes.length, count, 'no text: nothing is written');
+  assert.equal(h.notices.length, notices + 1, 'no text: the invalid-payload notice');
+});
+
 test('P5 text paste: one line makes one topic', async () => {
   const h = await harness();
   h.view.selected = h.ids.root;

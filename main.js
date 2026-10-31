@@ -13484,6 +13484,8 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
         topicEdited: "true",
         model: edit.model,
         reasoning: edit.reasoning,
+        modelPicked: "false",
+        reasoningPicked: "false",
         hostCount: String((_e = (_d = edit.guests) == null ? void 0 : _d.hostCount) != null ? _e : 2),
         custom: (_g = (_f = edit.guests) == null ? void 0 : _f.customPrompt) != null ? _g : "",
         customization: JSON.stringify((_i = (_h = edit.guests) == null ? void 0 : _h.customization) != null ? _i : defaultCustomization(edit.language)),
@@ -13845,16 +13847,15 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       styleSelect.value = selected;
     };
     refreshStyleChoices(selectedStyleId);
-    const manualChoice = (chosenModel, chosenReasoning) => {
-      const current = this.plugin.currentModelChoice();
-      const kept = chosenModel === current.model && chosenReasoning === current.reasoning;
-      return kept ? { model: "", reasoning: "" } : { model: chosenModel, reasoning: chosenReasoning };
-    };
+    const manualChoice = (chosenModel, chosenReasoning) => ({
+      model: this.homeForm.modelPicked === "true" ? chosenModel : "",
+      reasoning: this.homeForm.reasoningPicked === "true" ? chosenReasoning : ""
+    });
     const snapshotForm = () => {
       this.homeForm = {
         ...this.homeForm,
         topic: topic.value,
-        // Only a hand-picked choice is remembered; one equal to the current model follows it when the form is rebuilt.
+        // Only a choice the user made (change event) is remembered; an untouched one follows the current model or the edited table.
         ...manualChoice(model.value, reasoning.value),
         styleId: styleSelect.value,
         styleName: styleNameInput.value,
@@ -14049,11 +14050,15 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       snapshotForm();
     });
     model.addEventListener("change", () => {
+      this.homeForm.modelPicked = "true";
       setReasoning();
       updateAdvancedSummary();
       snapshotForm();
     });
-    reasoning.addEventListener("change", snapshotForm);
+    reasoning.addEventListener("change", () => {
+      this.homeForm.reasoningPicked = "true";
+      snapshotForm();
+    });
     hostCount.addEventListener("change", () => {
       hostRisk.toggleClass("is-hidden", Number(hostCount.value) <= 2);
       updateAdvancedSummary();

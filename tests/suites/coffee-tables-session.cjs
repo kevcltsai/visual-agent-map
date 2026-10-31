@@ -615,7 +615,11 @@ integrationTest('Coffee Tables new table defaults to the current model and reaso
   let current = { model: 'cur', reasoning: 'medium' };
   const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'old', cliReasoning: 'low' }, currentModelChoice: () => current, coffeeReasoningEfforts: () => ['low', 'medium', 'high'], refreshCoffeeModels: async () => ['old', 'cur', 'opus'], confirmAiUsage: async (_model, run) => run() }, ['old', 'cur', 'opus']);
   const first = await homeSelects(plugin); assert.equal(first.selects[0].value, 'cur'); assert.equal(first.selects[1].value, 'medium');
-  first.view.homeForm = { model: 'opus', reasoning: 'high' }; first.view.homeForm = {};
+  first.selects[0].value = 'opus'; first.selects[0].change(); first.selects[1].value = 'high'; first.selects[1].change();
+  assert.equal(first.view.homeForm.model, 'opus', 'the previous table really carried opus');
+  const saved = []; first.view.store.save = async session => { saved.push(session); }; first.view.attach = () => {};
+  coffeeFind(first.view.contentEl, e => e.tag === 'button' && e.text === 'Open table').click(); await until(() => saved.length === 1);
+  assert.equal(saved[0].model, 'opus'); assert.equal(Object.keys(first.view.homeForm).length, 0, 'opening the table clears the form');
   const second = await homeSelects(plugin); assert.equal(second.selects[0].value, 'cur', 'a previous table with opus does not carry over');
   current = { model: 'old', reasoning: 'low' };
   const third = await homeSelects(plugin); assert.equal(third.selects[0].value, 'old'); assert.equal(third.selects[1].value, 'low');
@@ -631,6 +635,26 @@ integrationTest('Coffee Tables home form does not freeze the current model: only
   selects = await render(); assert.equal(selects[0].value, 'next', 'untouched form follows the new current model');
   selects[0].value = 'opus'; selects[0].change(); selects[1].change();
   selects = await render(); assert.equal(selects[0].value, 'opus', 'a hand-picked different model is kept when the form is rebuilt');
+});
+integrationTest('Coffee Tables home form: a picked model or reasoning survives rebuilds even when it equals the current one; untouched follows current', async () => {
+  let current = { model: 'cur', reasoning: 'medium' };
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'cur', cliReasoning: 'medium' }, currentModelChoice: () => current, coffeeReasoningEfforts: () => ['low', 'medium', 'high'], refreshCoffeeModels: async () => ['cur', 'next', 'opus'], confirmAiUsage: async (_model, run) => run() }, ['cur', 'next', 'opus']);
+  const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
+  const mk = () => { const view = new CoffeeTablesView({ app: {} }, plugin); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] }; return view; };
+  const render = async view => { view.contentEl = coffeeElement('root'); await view.home(view.homeEdit ?? undefined); const selects = []; const visit = node => { if (node.tag === 'select') selects.push(node); node.children.forEach(visit); }; visit(view.contentEl); await until(() => !selects[0].disabled); return selects; };
+  // New table: picking the current model is still a pick.
+  const fresh = mk(); let selects = await render(fresh); selects[0].value = 'cur'; selects[0].change(); selects[1].value = 'medium'; selects[1].change();
+  current = { model: 'next', reasoning: 'low' }; selects = await render(fresh);
+  assert.equal(selects[0].value, 'cur', 'a picked model equal to the then-current one is kept'); assert.equal(selects[1].value, 'medium');
+  // New table never touched follows the current model.
+  const untouched = mk(); selects = await render(untouched); assert.equal(selects[0].value, 'next'); current = { model: 'cur', reasoning: 'medium' }; selects = await render(untouched); assert.equal(selects[0].value, 'cur');
+  // Edit mode: the old table used opus; choosing the current model survives a rebuild.
+  const edited = mk(); const old = { ...coffeeSession(), model: 'opus', reasoning: 'high' };
+  edited.contentEl = coffeeElement('root'); await edited.home(old); let editSelects = []; const visit = node => { if (node.tag === 'select') editSelects.push(node); node.children.forEach(visit); }; visit(edited.contentEl); await until(() => !editSelects[0].disabled);
+  assert.equal(editSelects[0].value, 'opus');
+  editSelects[0].value = 'cur'; editSelects[0].change();
+  edited.contentEl = coffeeElement('root'); await edited.home(); editSelects = []; visit(edited.contentEl); await until(() => !editSelects[0].disabled);
+  assert.equal(editSelects[0].value, 'cur', 'the user pick over the edited table model survives the rebuild');
 });
 integrationTest('Coffee Tables summary confirmation shows the model label, not the raw id', async () => {
   const modals = []; class Modal { constructor() { this.contentEl = coffeeElement('content'); } open() { modals.push(this); this.onOpen?.(); } close() { this.onClose?.(); } }

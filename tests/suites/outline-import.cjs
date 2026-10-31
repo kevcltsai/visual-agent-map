@@ -312,6 +312,24 @@ integrationTest('importOutline creates the map, opens it, and starts shallow res
   for (const node of map.nodes) assert.equal((await repo.readNote(node.path)).model, 'model-x');
 });
 
+integrationTest('importOutline with research: a model equal to cliModel stays workspace; a different one marks only the top-level topic manual', async () => {
+  const { repo, app } = fixture('en');
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-5.6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_model, run) => { await run(); return true; } };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const opened = [];
+  const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
+  view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };
+  view.startShallowResearch = async () => {};
+  const nodes = api.parseOutline('# R\n## A\n### B').nodes;
+  const notesOf = async path => { const map = await repo.readMap(path); return Promise.all(map.nodes.map(async item => ({ parentId: item.parentId, note: await repo.readNote(item.path, map) }))); };
+  await view.importOutline({ nodes, source: null, shallowResearch: true, model: 'gpt-5.6-luna' });
+  const same = await notesOf(opened[0]);
+  assert.equal(same.find(item => item.parentId === null).note.modelSource, 'workspace');
+  for (const item of same) assert.equal(item.note.model, 'gpt-5.6-luna');
+  await view.importOutline({ nodes, source: null, shallowResearch: true, model: 'gpt-x' });
+  const other = await notesOf(opened[1]);
+  for (const item of other) { assert.equal(item.note.modelSource, item.parentId === null ? 'manual' : 'inherited'); assert.equal(item.note.model, 'gpt-x'); }
+});
 integrationTest('importOutline writes Reference Links (parent, children, map) into every new note', async () => {
   const { repo, app } = fixture('en');
   const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };

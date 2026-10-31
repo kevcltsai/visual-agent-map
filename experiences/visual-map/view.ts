@@ -15836,7 +15836,8 @@ export class VisualAgentMapView extends ItemView {
     return {
       update: (dx, dy) => {
         for (const { id, boxes } of spines) {
-          const move = (item: string, box: CardBox): CardBox => (group.has(item) ? (shifted(item, dx, dy) ?? box) : box);
+          const move = (item: string, box: CardBox): CardBox =>
+            group.has(item) ? (shifted(item, dx, dy) ?? box) : box;
           this.placeSpine(id, undefined, {
             head: move(id, boxes.head),
             topics: boxes.topics.map(topic => ({ id: topic.id, box: move(topic.id, topic.box) }))

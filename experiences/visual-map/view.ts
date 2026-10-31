@@ -960,8 +960,8 @@ export class VisualAgentMapView extends ItemView {
     });
     // Copy and paste of branches: on the document, popout windows included (decision #29, evidence/clipboard-mime.md).
     this.bindClipboard();
-    this.register(() => this.unbindClipboard?.());
-    this.register(this.contentEl.onWindowMigrated?.(() => this.bindClipboard()) ?? (() => {}));
+    // The listener belongs to the element (it goes away with it); a move to another window binds the new document.
+    this.contentEl.onWindowMigrated?.(() => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", event => {
       // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
@@ -1070,6 +1070,8 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.unbindClipboard?.();
+    this.unbindClipboard = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
     this.announcer = null;
@@ -5466,7 +5468,8 @@ export class VisualAgentMapView extends ItemView {
   private unbindClipboard: (() => void) | null = null;
   private bindClipboard(): void {
     this.unbindClipboard?.();
-    const doc: Document = this.contentEl.doc ?? document;
+    const doc: Document | undefined = this.contentEl.doc ?? this.contentEl.ownerDocument;
+    if (!doc?.addEventListener) return;
     const copy = (event: Event): void => this.onClipboardEvent("copy", event as ClipboardEvent);
     const paste = (event: Event): void => this.onClipboardEvent("paste", event as ClipboardEvent);
     doc.addEventListener("copy", copy);

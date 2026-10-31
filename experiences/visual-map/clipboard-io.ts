@@ -11,7 +11,13 @@ export interface ClipboardDataLike {
   setData(type: string, value: string): void;
 }
 
-const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditable=false]), .vam-map-chat";
+const EDITABLE = [
+  "input",
+  "textarea",
+  "select",
+  "[contenteditable]:not([contenteditable=false])",
+  ".vam-map-chat"
+].join(",");
 
 /**
  * True only when `target` is an element inside `root` (the view's content element) that is not a text control or the

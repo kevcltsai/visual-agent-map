@@ -29421,7 +29421,13 @@ function buildClipboardPayload(input) {
 
 // experiences/visual-map/clipboard-io.ts
 var CLIPBOARD_MIME = "application/x-vam-branch";
-var EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditable=false]), .vam-map-chat";
+var EDITABLE = [
+  "input",
+  "textarea",
+  "select",
+  "[contenteditable]:not([contenteditable=false])",
+  ".vam-map-chat"
+].join(",");
 function inClipboardScope(target, root) {
   const element = target;
   if (!element || typeof element.closest !== "function") return false;
@@ -41179,7 +41185,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     }));
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -41205,12 +41211,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       this.spaceHeld = false;
     });
     this.bindClipboard();
-    this.register(() => {
-      var _a3;
-      return (_a3 = this.unbindClipboard) == null ? void 0 : _a3.call(this);
-    });
-    this.register((_o = (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard())) != null ? _o : () => {
-    });
+    (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
@@ -41308,13 +41309,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     this.closed = true;
+    (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
+    this.unbindClipboard = null;
     this.renderAfterDrag = false;
-    (_a2 = this.announcer) == null ? void 0 : _a2.remove();
+    (_b2 = this.announcer) == null ? void 0 : _b2.remove();
     this.announcer = null;
     this.announcedStages.clear();
-    (_b2 = this.unsubscribeResearch) == null ? void 0 : _b2.call(this);
+    (_c = this.unsubscribeResearch) == null ? void 0 : _c.call(this);
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -41325,10 +41328,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.abortMapChat();
-    (_c = this.chat) == null ? void 0 : _c.dispose();
-    (_d = this.relevancePanelCleanup) == null ? void 0 : _d.call(this);
+    (_d = this.chat) == null ? void 0 : _d.dispose();
+    (_e = this.relevancePanelCleanup) == null ? void 0 : _e.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_f = (_e = this.plugin).releaseWarmClaude) == null ? void 0 : _f.call(_e);
+    if (this.relevancePanelOpen) (_g = (_f = this.plugin).releaseWarmClaude) == null ? void 0 : _g.call(_f);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -41348,8 +41351,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_g = this.hoverCard) == null ? void 0 : _g.remove();
-    (_h = this.dragCleanup) == null ? void 0 : _h.call(this);
+    (_h = this.hoverCard) == null ? void 0 : _h.remove();
+    (_i = this.dragCleanup) == null ? void 0 : _i.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -45373,7 +45376,8 @@ ${request.requirements}` : preset.text,
   bindClipboard() {
     var _a2, _b2;
     (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
-    const doc = (_b2 = this.contentEl.doc) != null ? _b2 : document;
+    const doc = (_b2 = this.contentEl.doc) != null ? _b2 : this.contentEl.ownerDocument;
+    if (!(doc == null ? void 0 : doc.addEventListener)) return;
     const copy = (event) => this.onClipboardEvent("copy", event);
     const paste = (event) => this.onClipboardEvent("paste", event);
     doc.addEventListener("copy", copy);

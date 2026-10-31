@@ -1,6 +1,7 @@
 import { titleProblem } from "../../core/title-safety";
 import type { MapDocument, MapNode } from "../../map-model";
 import type { Repository } from "../../repository";
+import { normalizeReasoningLevel } from "../../ai/task-policy";
 import { randomUUID } from "node:crypto";
 import { noteLanguageOf, translate, type ContentLanguage } from "../../i18n";
 import { chooseAimContentLanguage } from "./content-language";
@@ -14,7 +15,8 @@ export interface AimStartInput {
   outcomeExpectation?: AimOutcomeExpectation;
   requestId?: string;
   model?: string;
-  reasoning?: "low" | "medium" | "high";
+  /** `auto` is accepted from the start dialog but never written into the AIM map data. */
+  reasoning?: "auto" | "low" | "medium" | "high";
   minimumAnswersBeforeConclusion?: number;
   /** Unattended runs ask everything in the intake and never wait for the user afterwards. */
   interaction?: "unattended" | "interactive";
@@ -83,35 +85,42 @@ export async function createAimMap(
   let draft = map.aim.rootDraft;
   if (!draft && !map.nodes.some(node => node.aimKind === "topic")) {
     const notePath = repository.unique(repository.topicFolder(mapPath, "Notes"), topic);
-    const configuredReasoning = input.reasoning ?? repository.settings.cliReasoning;
-    const reasoning: "low" | "medium" | "high" =
-      configuredReasoning === "medium" || configuredReasoning === "high" ? configuredReasoning : "low";
+    const chosenReasoning = normalizeReasoningLevel(input.reasoning ?? repository.settings.cliReasoning);
     draft = {
       nodeId: randomUUID(),
       notePath,
       title: topic,
       context: rootContext,
       model: input.model ?? model,
-      reasoning
+      // Never "auto": the map data only knows low/medium/high, so an auto choice is left out of the draft.
+      ...(chosenReasoning === "auto" ? {} : { reasoning: chosenReasoning })
     };
     map.aim.rootDraft = draft;
     map.aim.contentLanguage ??= noteLanguage;
     await repository.saveMap(mapPath, map);
   }
   if (draft) {
+    const noteModel = draft.model ?? model;
+    const noteReasoning = normalizeReasoningLevel(
+      draft.reasoning ?? input.reasoning ?? repository.settings.cliReasoning
+    );
+    // The root follows the workspace only when both the model and the reasoning equal the current ones; otherwise the
+    // person's choice is kept as a manual override.
+    const followsCurrent =
+      noteModel === repository.settings.cliModel &&
+      noteReasoning === normalizeReasoningLevel(repository.settings.cliReasoning);
     await repository.createNoteAt(
       draft.title,
-      draft.model ?? model,
+      noteModel,
       map,
       mapPath,
-      // A model picked in the start dialog that differs from the workspace default is the owner's choice: keep it.
-      (draft.model ?? model) === repository.settings.cliModel ? "workspace" : "manual",
+      followsCurrent ? "workspace" : "manual",
       draft.notePath,
       draft.nodeId,
       {
         summary: draft.title,
         detail: draft.context ? `${translate(noteLanguage, "note.aim_user_context")}\n\n${draft.context}` : "",
-        reasoning: draft.reasoning ?? input.reasoning ?? "low",
+        reasoning: noteReasoning,
         contentLanguage: noteLanguage
       }
     );

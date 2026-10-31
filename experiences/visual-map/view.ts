@@ -17,7 +17,7 @@ import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/backgro
 import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
-import { relationLabelPoint, relationPathData, type RelationBox } from "./relation-geometry";
+import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -80,7 +80,9 @@ import {
   arrangeNewTree,
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
-  medianHeight
+  layoutDirectionOf,
+  medianHeight,
+  type LayoutDirection
 } from "../../map-layout";
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
@@ -2778,7 +2780,9 @@ export class VisualAgentMapView extends ItemView {
         map.nodes,
         parent.id,
         new Set([node.id, ...descendants(map.nodes, node.id)]),
-        this.cardHeightOf
+        this.cardHeightOf,
+        undefined,
+        layoutDirectionOf(map)
       );
     });
   }
@@ -2823,7 +2827,7 @@ export class VisualAgentMapView extends ItemView {
       if (changed) {
         await this.mapChange(map => {
           applyCollapseLevel(map.nodes, shownLevels);
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         });
         if (this.history.undoEntry) this.history.undoEntry.label = t("ui.collapse_levels");
         this.updateHistoryButtons();
@@ -2834,9 +2838,21 @@ export class VisualAgentMapView extends ItemView {
   private autoLayout(): void {
     this.enqueue(() =>
       this.mapChange(map => {
-        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
       }, false)
     );
+  }
+  /** Stores the map's layout direction ("right" removes the field) and re-arranges the whole map in one undo step. */
+  private setLayoutDirection(direction: LayoutDirection): void {
+    this.enqueue(async () => {
+      if (!this.map || this.map.aim || this.builtIn) return;
+      await this.mapChange(map => {
+        if (direction === "right") delete map.layout;
+        else map.layout = { direction };
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, direction);
+      }, false);
+      this.fit();
+    });
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
   private openLayoutMenu(event: MouseEvent): void {
@@ -2854,6 +2870,22 @@ export class VisualAgentMapView extends ItemView {
           .onClick(() => this.collapseTo(choice.levels))
       );
     menu.addSeparator();
+    // An AIM map and the built-in sample always grow to the right.
+    if (this.map && !this.map.aim && !this.builtIn) {
+      const current = layoutDirectionOf(this.map);
+      const directions: { direction: LayoutDirection; title: string; icon: string }[] = [
+        { direction: "right", title: t("ui.layout_direction_right"), icon: "arrow-right" },
+        { direction: "left", title: t("ui.layout_direction_left"), icon: "arrow-left" }
+      ];
+      for (const choice of directions)
+        menu.addItem(item =>
+          item
+            .setTitle(choice.title)
+            .setIcon(choice.icon)
+            .setChecked(choice.direction === current)
+            .onClick(() => this.setLayoutDirection(choice.direction))
+        );
+    }
     menu.addItem(item =>
       item
         .setTitle(t("ui.auto_layout"))
@@ -3063,10 +3095,17 @@ export class VisualAgentMapView extends ItemView {
               const outlineTop = next.nodes.find(node => node.id === top.id)!;
               if (owner) {
                 owner.collapsed = false;
-                next.nodes = arrangeNewBranch(next.nodes, owner.id, ids, this.cardHeightOf);
+                next.nodes = arrangeNewBranch(
+                  next.nodes,
+                  owner.id,
+                  ids,
+                  this.cardHeightOf,
+                  undefined,
+                  layoutDirectionOf(next)
+                );
               } else {
                 outlineTop.parentId = null;
-                next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf);
+                next.nodes = arrangeNewTree(next.nodes, top.id, ids, this.cardHeightOf, layoutDirectionOf(next));
               }
               after = clone(next);
             })
@@ -4333,7 +4372,14 @@ export class VisualAgentMapView extends ItemView {
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
           if (adopter) adopter.collapsed = false;
-          map.nodes = arrangeNewBranch(map.nodes, adopterId, adopted, this.cardHeightOf);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            adopterId,
+            adopted,
+            this.cardHeightOf,
+            undefined,
+            layoutDirectionOf(map)
+          );
         }
         this.removeAimReferences(map, ids, prior.nodes);
       })
@@ -4815,7 +4861,15 @@ export class VisualAgentMapView extends ItemView {
             }
           map.nodes = map.nodes.flatMap(item => (item.id === first.id ? [merged] : ids.has(item.id) ? [] : [item]));
           this.takeRetargetDrops(retargetTopicRelations(map, ids, merged.id));
-          if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, merged.id, adopted, this.cardHeightOf);
+          if (adopted.size)
+            map.nodes = arrangeNewBranch(
+              map.nodes,
+              merged.id,
+              adopted,
+              this.cardHeightOf,
+              undefined,
+              layoutDirectionOf(map)
+            );
         })
         .commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -4916,7 +4970,15 @@ export class VisualAgentMapView extends ItemView {
             }
           map.nodes = map.nodes.filter(item => !ids.has(item.id));
           this.takeRetargetDrops(retargetTopicRelations(map, ids, target.id));
-          if (adopted.size) map.nodes = arrangeNewBranch(map.nodes, target.id, adopted, this.cardHeightOf);
+          if (adopted.size)
+            map.nodes = arrangeNewBranch(
+              map.nodes,
+              target.id,
+              adopted,
+              this.cardHeightOf,
+              undefined,
+              layoutDirectionOf(map)
+            );
         })
         .commit({ label: t("ui.merge_topics_history") });
     } catch (error) {
@@ -5134,7 +5196,7 @@ export class VisualAgentMapView extends ItemView {
       }
       map.nodes.find(node => node.id === target.id)!.collapsed = false;
       // One layout for the moved branches under the target, in the same history entry as the move.
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf);
+      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutDirectionOf(map));
     });
     this.multiSelected.clear();
     this.render();
@@ -5266,7 +5328,14 @@ export class VisualAgentMapView extends ItemView {
           if (!found) throw new Error(t("ui.outline_import_selected_missing"));
           map.nodes.push(...copies);
           found.collapsed = false;
-          map.nodes = arrangeNewBranch(map.nodes, target.id, new Set(copies.map(copy => copy.id)), this.cardHeightOf);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            target.id,
+            new Set(copies.map(copy => copy.id)),
+            this.cardHeightOf,
+            undefined,
+            layoutDirectionOf(map)
+          );
         })
         .commit();
     } catch (error) {
@@ -6752,7 +6821,7 @@ export class VisualAgentMapView extends ItemView {
             this.mapChange(map => {
               const n = map.nodes.find(n => n.id === node.id)!;
               n.collapsed = !n.collapsed;
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
             })
           )
       );
@@ -7128,7 +7197,7 @@ export class VisualAgentMapView extends ItemView {
     const nodes = superseded.size ? shown.filter(node => !superseded.has(node.id)) : shown;
     // A view only: these copies carry display positions and must never be written back to the map.
     return this.relevanceSortOn()
-      ? relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, superseded)
+      ? relevanceDisplayNodes(nodes, id => this.notes.get(id)?.relevance?.tier, superseded, layoutDirectionOf(this.map))
       : nodes;
   }
   /** Arrow keys walk the tree: left to the parent, right to the first child, up/down among siblings. */
@@ -7141,8 +7210,11 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) return undefined;
     const shown = this.canvasNodes();
     const byY = (a: MapNode, b: MapNode): number => a.y - b.y || a.x - b.x;
-    if (key === "ArrowLeft") return shown.find(item => item.id === node.parentId);
-    if (key === "ArrowRight") return shown.filter(item => item.parentId === node.id).sort(byY)[0];
+    // The parent is on the left in a right map and on the right in a left map.
+    const left = layoutDirectionOf(this.map) === "left";
+    if (key === (left ? "ArrowRight" : "ArrowLeft")) return shown.find(item => item.id === node.parentId);
+    if (key === (left ? "ArrowLeft" : "ArrowRight"))
+      return shown.filter(item => item.parentId === node.id).sort(byY)[0];
     const siblings = shown.filter(item => (item.parentId ?? null) === (node.parentId ?? null)).sort(byY);
     const index = siblings.findIndex(item => item.id === node.id);
     return siblings[index + (key === "ArrowUp" ? -1 : 1)];
@@ -7837,8 +7909,15 @@ export class VisualAgentMapView extends ItemView {
           const parent = parentId ? map.nodes.find(n => n.id === parentId) : undefined;
           if (parent) {
             parent.collapsed = false;
-            map.nodes = arrangeNewBranch(map.nodes, parent.id, branch, this.cardHeightOf);
-          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf);
+            map.nodes = arrangeNewBranch(
+              map.nodes,
+              parent.id,
+              branch,
+              this.cardHeightOf,
+              undefined,
+              layoutDirectionOf(map)
+            );
+          } else map.nodes = arrangeNewTree(map.nodes, node.id, branch, this.cardHeightOf, layoutDirectionOf(map));
         });
       });
     };
@@ -8564,7 +8643,14 @@ export class VisualAgentMapView extends ItemView {
           const minTop = siblings.length
             ? Math.max(...siblings.map(n => n.y + (this.cardHeightOf(n.id) ?? DEFAULT_CARD_HEIGHT))) + LAYOUT_GAP
             : undefined;
-          map.nodes = arrangeNewBranch(map.nodes, owner.id, new Set([node.id]), this.cardHeightOf, minTop);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            owner.id,
+            new Set([node.id]),
+            this.cardHeightOf,
+            minTop,
+            layoutDirectionOf(map)
+          );
         } else if (!parent) {
           const roots = map.nodes.filter(n => n.id !== node.id && !n.parentId);
           if (roots.length)
@@ -8864,7 +8950,14 @@ export class VisualAgentMapView extends ItemView {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       if (newNodes.length)
         await this.mapChange(map => {
-          map.nodes = arrangeNewBranch(map.nodes, parent.id, new Set(newNodes.map(node => node.id)), this.cardHeightOf);
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            parent.id,
+            new Set(newNodes.map(node => node.id)),
+            this.cardHeightOf,
+            undefined,
+            layoutDirectionOf(map)
+          );
         }, false);
       if (newNodes.length) this.frameBranch([parent.id, ...newNodes.map(node => node.id)]);
       if (created) await this.plugin.rebuildDerivedData();
@@ -8919,7 +9012,14 @@ export class VisualAgentMapView extends ItemView {
         );
         if (!untouched.size) return;
         const current = this.map.nodes;
-        const arranged = arrangeNewBranch(current, parent.id, untouched, this.cardHeightOf);
+        const arranged = arrangeNewBranch(
+          current,
+          parent.id,
+          untouched,
+          this.cardHeightOf,
+          undefined,
+          layoutDirectionOf(this.map)
+        );
         const target = new Map<string, { x: number; y: number }>();
         arranged.forEach((n, index) => {
           if (untouched.has(n.id) && (n.x !== current[index].x || n.y !== current[index].y))
@@ -11870,7 +11970,7 @@ export class VisualAgentMapView extends ItemView {
             // The layout measures the cards, so the held repaint comes first.
             this.flushChatRender();
             await this.mapChange(map => {
-              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+              map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
             }, false);
             const nodes = this.map?.nodes ?? [];
             const fresh = run.created.map(id => nodes.find(node => node.id === id)).filter((n): n is MapNode => !!n);
@@ -11967,7 +12067,7 @@ export class VisualAgentMapView extends ItemView {
       if (done.has(top.id)) continue;
       if (!top.parentId) {
         const ids = subtree(top.id);
-        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf);
+        placed = arrangeNewTree(placed, top.id, ids, this.cardHeightOf, layoutDirectionOf(this.map));
         for (const id of ids) done.add(id);
         continue;
       }
@@ -11975,7 +12075,7 @@ export class VisualAgentMapView extends ItemView {
       const siblings = tops.filter(other => other.parentId === top.parentId);
       const ids = new Set<string>();
       for (const sibling of siblings) for (const id of subtree(sibling.id)) ids.add(id);
-      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf);
+      placed = arrangeNewBranch(placed, top.parentId, ids, this.cardHeightOf, undefined, layoutDirectionOf(this.map));
       for (const id of ids) done.add(id);
     }
     return placed;
@@ -12144,7 +12244,7 @@ export class VisualAgentMapView extends ItemView {
         await this.mapChange(map => {
           const target = map.nodes.find(item => item.id === node.id);
           if (target) target.collapsed = collapsed;
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         });
         return done;
       }
@@ -12152,7 +12252,7 @@ export class VisualAgentMapView extends ItemView {
         // The layout measures the cards, so a held repaint comes first.
         this.flushChatRender();
         await this.mapChange(map => {
-          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf);
+          map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutDirectionOf(map));
         }, false);
         return done;
       case "focus_topic": {
@@ -12944,6 +13044,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private dragEdges(id: string, card: HTMLElement): { update: (x: number, y: number) => void } {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
+    const direction = layoutDirectionOf(this.map);
     const touching: {
       key: string;
       dragIsParent: boolean;
@@ -12985,7 +13086,15 @@ export class VisualAgentMapView extends ItemView {
           // A background synchronize may redraw the edges mid-drag; always move the current path elements.
           const path = this.edgeEls.get(edge.key);
           if (!path) continue;
-          if (edge.dragIsParent)
+          if (direction !== "right") {
+            const mine = { x, y, ...size };
+            path.setAttribute(
+              "d",
+              edge.dragIsParent
+                ? treeEdgePathData(mine, edge.far, direction)
+                : treeEdgePathData(edge.far, mine, direction)
+            );
+          } else if (edge.dragIsParent)
             path.setAttribute(
               "d",
               edgePathData(x + size.width, y + size.height / 2, edge.far.x, edge.far.y + edge.far.height / 2)
@@ -13007,6 +13116,7 @@ export class VisualAgentMapView extends ItemView {
     const related = new Set(
       this.relationsEnabled() ? (this.map.topicRelations ?? []).map(r => relationPairKey(r.from, r.to)) : []
     );
+    const direction = layoutDirectionOf(this.map);
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -13017,12 +13127,14 @@ export class VisualAgentMapView extends ItemView {
         const path = createSvg("path");
         path.setAttribute(
           "d",
-          edgePathData(
-            parent.offsetLeft + parent.offsetWidth,
-            parent.offsetTop + parent.offsetHeight / 2,
-            child.offsetLeft,
-            child.offsetTop + child.offsetHeight / 2
-          )
+          direction === "right"
+            ? edgePathData(
+                parent.offsetLeft + parent.offsetWidth,
+                parent.offsetTop + parent.offsetHeight / 2,
+                child.offsetLeft,
+                child.offsetTop + child.offsetHeight / 2
+              )
+            : treeEdgePathData(boxOf(parent), boxOf(child), direction)
         );
         path.addClass("vam-edge");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");

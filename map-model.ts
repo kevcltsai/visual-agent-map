@@ -3,6 +3,7 @@ import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
+import type { MapLayout } from "./map-layout";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 import {
@@ -30,6 +31,8 @@ export interface MapDocument {
   outputLanguage?: ContentLanguage;
   /** The AI mode (Quick or Standard) last used to run a research or expansion in this map; the dialogs' default. Unknown values are ignored (dropped on read). */
   aiMode?: MapAiMode;
+  /** How the map is laid out; absent means "right". Unknown values are ignored (dropped on read). */
+  layout?: MapLayout;
   detailTemplateId?: string;
   /** Default tone preset id for the map; absent = academic. */
   toneId?: string;
@@ -585,6 +588,14 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
   if (map.toneId !== undefined && typeof map.toneId !== "string") delete map.toneId;
   if (map.outputLanguage !== undefined && !isContentLanguage(map.outputLanguage)) delete map.outputLanguage;
   if (map.aiMode !== undefined && !isMapAiMode(map.aiMode)) delete map.aiMode;
+  if (
+    map.layout !== undefined &&
+    (!map.layout ||
+      typeof map.layout !== "object" ||
+      Array.isArray(map.layout) ||
+      (map.layout.direction !== "right" && map.layout.direction !== "left"))
+  )
+    delete map.layout;
   const ids = new Set<string>(),
     aimQuestionRequests = new Set<string>();
   for (const n of map.nodes) {

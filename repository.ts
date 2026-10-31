@@ -1677,11 +1677,23 @@ export class Repository {
 
   async saveMap(path: string, map: MapDocument): Promise<void> {
     this.stampAimContentLanguage(map);
+    let print = "";
     await this.app.vault.process(this.file(path), content => {
-      parseMap(content);
-      return writeMapContent(content, map);
+      const text = writeMapContent(content, map);
+      print = this.printAfterWrite(path, coordinatePrint(parseMap(content)), coordinatePrint(map));
+      return text;
     });
-    this.writtenCoordinates.set(path, coordinatePrint(map));
+    this.writtenCoordinates.set(path, print);
+  }
+
+  /**
+   * The signature to remember after a write. When the file's coordinates were not the ones this plugin last wrote
+   * (something else moved a node) and this write only carries them through unchanged, the old signature stays, so a
+   * background write cannot make the outside change look like the plugin's own.
+   */
+  private printAfterWrite(path: string, before: string, after: string): string {
+    const recorded = this.writtenCoordinates.get(path);
+    return recorded !== undefined && before !== recorded && after === before ? recorded : after;
   }
 
   /**
@@ -1709,14 +1721,18 @@ export class Repository {
    */
   async updateMap(path: string, change: (map: MapDocument) => void): Promise<MapDocument> {
     let updated: MapDocument | undefined;
+    let print = "";
     await this.app.vault.process(this.file(path), content => {
       const map = parseMap(content);
+      const before = coordinatePrint(map);
       change(map);
       this.stampAimContentLanguage(map);
       updated = map;
-      return writeMapContent(content, map);
+      const text = writeMapContent(content, map);
+      print = this.printAfterWrite(path, before, coordinatePrint(map));
+      return text;
     });
-    this.writtenCoordinates.set(path, coordinatePrint(updated!));
+    this.writtenCoordinates.set(path, print);
     return updated!;
   }
 

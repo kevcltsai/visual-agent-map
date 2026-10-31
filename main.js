@@ -17718,7 +17718,6 @@ function begin(deps) {
       }
     };
     const stale = async (direction) => {
-      var _a2;
       const fail2 = () => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
@@ -17730,7 +17729,7 @@ function begin(deps) {
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
         if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail2();
-        if (await ((_a2 = repo.coordinatesChangedOutside) == null ? void 0 : _a2.call(repo, record.mapPath))) fail2();
+        if (await repo.coordinatesChangedOutside(record.mapPath)) fail2();
       }
       if (direction === "redo") {
         for (const item of attachments) if (!exists(item.path)) fail2();
@@ -21715,11 +21714,22 @@ ${body}`);
   }
   async saveMap(path, map) {
     this.stampAimContentLanguage(map);
+    let print = "";
     await this.app.vault.process(this.file(path), (content) => {
-      parseMap(content);
-      return writeMapContent(content, map);
+      const text11 = writeMapContent(content, map);
+      print = this.printAfterWrite(path, coordinatePrint(parseMap(content)), coordinatePrint(map));
+      return text11;
     });
-    this.writtenCoordinates.set(path, coordinatePrint(map));
+    this.writtenCoordinates.set(path, print);
+  }
+  /**
+   * The signature to remember after a write. When the file's coordinates were not the ones this plugin last wrote
+   * (something else moved a node) and this write only carries them through unchanged, the old signature stays, so a
+   * background write cannot make the outside change look like the plugin's own.
+   */
+  printAfterWrite(path, before, after) {
+    const recorded = this.writtenCoordinates.get(path);
+    return recorded !== void 0 && before !== recorded && after === before ? recorded : after;
   }
   /**
    * True when Map.md's node coordinates are not the ones this plugin last wrote there (something else moved a node).
@@ -21744,14 +21754,18 @@ ${body}`);
    */
   async updateMap(path, change) {
     let updated;
+    let print = "";
     await this.app.vault.process(this.file(path), (content) => {
       const map = parseMap(content);
+      const before = coordinatePrint(map);
       change(map);
       this.stampAimContentLanguage(map);
       updated = map;
-      return writeMapContent(content, map);
+      const text11 = writeMapContent(content, map);
+      print = this.printAfterWrite(path, before, coordinatePrint(map));
+      return text11;
     });
-    this.writtenCoordinates.set(path, coordinatePrint(updated));
+    this.writtenCoordinates.set(path, print);
     return updated;
   }
   /**

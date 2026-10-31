@@ -358,7 +358,7 @@ export function begin(deps: TransactionDeps): Transaction {
         const expected = direction === "undo" ? record.after : record.before;
         if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
         // Positions are not content, but a node moved by something other than this plugin must not be overwritten.
-        if (await repo.coordinatesChangedOutside?.(record.mapPath)) fail();
+        if (await repo.coordinatesChangedOutside(record.mapPath)) fail();
       }
       // Redo links the same files again; it never recreates one.
       if (direction === "redo") for (const item of attachments) if (!exists(item.path)) fail();

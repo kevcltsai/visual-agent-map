@@ -253,3 +253,34 @@ test('F3 7: a map this plugin has not written since it started is never refused 
   assert.equal(await h.repo.coordinatesChangedOutside(MAP_A), true);
   assert.equal(await fresh.coordinatesChangedOutside(MAP_A), false);
 });
+test('F3 8: outside coordinate change, then a background updateMap that only changes state: undo is still refused', async () => {
+  const h = await harness();
+  await cutAndPaste(h);
+  await outside(h, MAP_A, doc => { doc.nodes[0].x += 7; });
+  await h.repo.updateMap(MAP_A, map => { map.title = 'renamed in the background'; });
+  assert.equal(await h.repo.coordinatesChangedOutside(MAP_A), true);
+  const all = everything(h);
+  const error = await rejection(h.viewB.travel(false));
+  assert.match(error.message, /touched two maps/);
+  assertSameFiles(everything(h), all, 'nothing changed');
+});
+test('F3 9: outside coordinate change, then a background saveMap of the map as read: undo is still refused', async () => {
+  const h = await harness();
+  await cutAndPaste(h);
+  await outside(h, MAP_B, doc => { doc.nodes[0].y += 7; });
+  const doc = await h.repo.readMap(MAP_B);
+  doc.title = 'saved in the background';
+  await h.repo.saveMap(MAP_B, doc);
+  assert.equal(await h.repo.coordinatesChangedOutside(MAP_B), true);
+  await h.viewB.synchronize();
+  await refused(h);
+});
+test('F3 10: outside coordinate change, then the plugin itself moves a node: the plugin write is the new baseline', async () => {
+  const h = await harness();
+  await cutAndPaste(h);
+  await outside(h, MAP_A, doc => { doc.nodes[0].x += 7; });
+  await h.repo.updateMap(MAP_A, map => { map.nodes[0].x += 5; });
+  assert.equal(await h.repo.coordinatesChangedOutside(MAP_A), false);
+  await h.viewB.travel(false);
+  assert.equal(await idsOn(h, MAP_A), [h.ids.top, h.ids.p, h.ids.q].sort().join());
+});

@@ -2052,6 +2052,8 @@ export const en = {
   "ui.research_stage_searching_0": "Searching: {0}",
   "ui.research_stage_reading": "Reading sources",
   "ui.research_stage_writing": "Writing",
+  "ui.progress_stage_with_model_0_1": "{0} ({1})",
+  "ui.card_model_override_0": "Model set for this topic: {0}",
   "ui.research_stage_charts": "Adding diagrams",
   "ui.research_slow_waiting": "Responding slowly, still waiting",
   "ui.research_announcement_0_1": "{0}: {1}",

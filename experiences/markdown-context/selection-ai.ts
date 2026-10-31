@@ -23,6 +23,8 @@ interface SelectionSnapshot {
 
 interface SelectionAiOptions {
   model: () => string;
+  /** The label shown for a model id (absent: the id itself). */
+  modelLabel?: (model: string) => string;
   /** True while the current model cannot draw images (a Claude model): the translate popover then says so beforehand. */
   imageNeedsCodex?: () => boolean;
   /** Show the selection button and open the panel on image clicks; the command opens the panel either way. */
@@ -284,6 +286,7 @@ export class MarkdownSelectionAi extends Component {
       this.app,
       snapshot,
       this.options.model,
+      this.options.modelLabel ?? (model => model),
       this.options.language(snapshot.text),
       this.options.translateTarget?.() ?? this.options.language(snapshot.text),
       this.options.run
@@ -322,6 +325,7 @@ class SelectionAiPanel extends Component {
     private readonly app: App,
     private readonly snapshot: SelectionSnapshot,
     private readonly modelOf: () => string,
+    private readonly modelLabel: (model: string) => string,
     private readonly language: string,
     private readonly translateTarget: string,
     private readonly run: SelectionAiOptions["run"]
@@ -593,9 +597,11 @@ class SelectionAiPanel extends Component {
     this.previewChild = null;
     this.preview.empty();
     this.setBusy(trigger);
-    status.setText(t("ui.context_ai_running_0", label));
     // Read the current model when this run starts, so a switch while the panel stays open applies to the next run.
     const model = this.modelOf();
+    const withModel = (text: string): string => t("ui.progress_stage_with_model_0_1", text, this.modelLabel(model));
+    const running = (): string => withModel(t("ui.context_ai_running_0", label));
+    status.setText(running());
     try {
       const at = this.snapshot.matchAt;
       const context =
@@ -614,7 +620,7 @@ class SelectionAiPanel extends Component {
       let result: string;
       let insertAfter = false;
       if (plan.action === "image_search") {
-        status.setText(t("ui.context_ai_searching_images"));
+        status.setText(withModel(t("ui.context_ai_searching_images")));
         const search = prepareStep(imageSearchStep, { query: plan.query || prompt });
         const found = search.parse(await this.run(search, model, controller.signal, undefined, true));
         if (controller.signal.aborted || !this.isOpen) return;
@@ -650,7 +656,7 @@ class SelectionAiPanel extends Component {
             const choice = new AbortController();
             this.controller = choice;
             this.setBusy(choose);
-            status.setText(t("ui.context_ai_generating"));
+            status.setText(withModel(t("ui.context_ai_generating")));
             void this.imageDraft(candidate, plan.captionInstruction, choice.signal, model)
               .then(draft => {
                 if (this.controller === choice && !choice.signal.aborted && this.isOpen) {
@@ -680,7 +686,7 @@ class SelectionAiPanel extends Component {
         result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal, model);
         if (controller.signal.aborted || !this.isOpen) return;
       } else {
-        status.setText(t("ui.context_ai_running_0", label));
+        status.setText(running());
         const request = prepareStep(transformStep, {
           instruction: plan.instruction || prompt,
           selected: this.snapshot.text,

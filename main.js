@@ -1915,6 +1915,8 @@ var en = {
   "ui.research_stage_searching_0": "Searching: {0}",
   "ui.research_stage_reading": "Reading sources",
   "ui.research_stage_writing": "Writing",
+  "ui.progress_stage_with_model_0_1": "{0} ({1})",
+  "ui.card_model_override_0": "Model set for this topic: {0}",
   "ui.research_stage_charts": "Adding diagrams",
   "ui.research_slow_waiting": "Responding slowly, still waiting",
   "ui.research_announcement_0_1": "{0}: {1}",
@@ -3958,6 +3960,8 @@ var zhCN = {
   "ui.research_stage_searching_0": "\u641C\u7D22\u4E2D\uFF1A{0}",
   "ui.research_stage_reading": "\u9605\u8BFB\u6765\u6E90",
   "ui.research_stage_writing": "\u64B0\u5199\u4E2D",
+  "ui.progress_stage_with_model_0_1": "{0}\u30FB{1}",
+  "ui.card_model_override_0": "\u6B64\u8BAE\u9898\u6307\u5B9A\u7684\u6A21\u578B\uFF1A{0}",
   "ui.research_stage_charts": "\u52A0\u5165\u56FE\u8868\u4E2D",
   "ui.research_slow_waiting": "\u54CD\u5E94\u8F83\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
   "ui.research_announcement_0_1": "{0}\uFF1A{1}",
@@ -6001,6 +6005,8 @@ var zhTW = {
   "ui.research_stage_searching_0": "\u641C\u5C0B\u4E2D\uFF1A{0}",
   "ui.research_stage_reading": "\u95B1\u8B80\u4F86\u6E90",
   "ui.research_stage_writing": "\u64B0\u5BEB\u4E2D",
+  "ui.progress_stage_with_model_0_1": "{0}\u30FB{1}",
+  "ui.card_model_override_0": "\u6B64\u8B70\u984C\u6307\u5B9A\u7684\u6A21\u578B\uFF1A{0}",
   "ui.research_stage_charts": "\u52A0\u5165\u5716\u8868\u4E2D",
   "ui.research_slow_waiting": "\u56DE\u61C9\u8F03\u6162\uFF0C\u4ECD\u5728\u7B49\u5F85",
   "ui.research_announcement_0_1": "{0}\uFF1A{1}",
@@ -20296,9 +20302,8 @@ var Repository = class {
     const normalized = status === "review" || status === "accepted" ? "completed" : status;
     const source = text5(fm["model-source"], "workspace");
     const modelSource = ["workspace", "inherited", "manual"].includes(source) ? source : "workspace";
-    const { model, reasoning } = this.chooseModel(
-      await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]))
-    );
+    const effective = await this.effectiveModel(path, text5(fm.model), modelSource, map, text5(fm["reasoning-level"]));
+    const { model, reasoning } = this.chooseModel(effective);
     const state = text5(
       fm["topic-state"],
       path.includes("/Archive/") ? "archived" : path.includes("/Unassigned/") ? "unassigned" : "active"
@@ -20317,6 +20322,7 @@ var Repository = class {
       previewInitialized: fm["preview-initialized"] === true,
       model,
       modelSource,
+      ...effective.overridden ? { modelOverride: true } : {},
       reasoning,
       researchMode: fm["research-mode"] === "research" ? "research" : "local",
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
@@ -22526,6 +22532,8 @@ var MapChatPanel = class {
     __publicField(this, "frame", null);
     /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
     __publicField(this, "stage", null);
+    /** The label of the model the running turn was sent with (read once when the turn begins, so a switch mid-turn does not change it). */
+    __publicField(this, "stageModel", "");
     /** The stage line inside the AI bubble, with the two texts that change. */
     __publicField(this, "stageEls", null);
     /** The slow notice of the running turn (no model event for a long while) and what its button does. Null when not shown. */
@@ -22805,6 +22813,7 @@ var MapChatPanel = class {
     this.messages.push(user, assistant);
     this.busy = true;
     this.stage = { kind: stage, since: this.clockNow() };
+    this.stageModel = this.currentModelLabel();
     this.slow = null;
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
@@ -22860,8 +22869,15 @@ ${typed}` : draft;
     this.paintStage();
     this.speakStage();
   }
+  currentModelLabel() {
+    var _a2, _b2;
+    const model = this.host.model();
+    return (_b2 = (_a2 = this.host.modelChoices().find((choice2) => choice2.value === model)) == null ? void 0 : _a2.label) != null ? _b2 : model;
+  }
+  /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   stageLabel(kind) {
-    return t(`ui.map_chat_stage_${kind}`);
+    const name = t(`ui.map_chat_stage_${kind}`);
+    return kind === "applying" || !this.stageModel ? name : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
   elapsedText() {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1e3)) : 0;
@@ -40535,6 +40551,7 @@ var MERGE_DONE_NOTICE_MS = 15e3;
 var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
+var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
@@ -40824,6 +40841,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimProgress", null);
     /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
     __publicField(this, "aimProgressEls", /* @__PURE__ */ new Map());
+    /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
+    __publicField(this, "aimBranchModels", /* @__PURE__ */ new Map());
+    __publicField(this, "aimBranchModelPending", /* @__PURE__ */ new Set());
     __publicField(this, "aimProgressTimer", null);
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
@@ -43691,6 +43711,7 @@ ${request.requirements}` : preset.text,
   onAimProgress(event) {
     var _a2;
     if (this.closed || event.mapPath !== this.path) return;
+    this.ensureAimBranchModel(event.branchId);
     let structural = false;
     if (event.kind === "plan") {
       this.aimProgress = {
@@ -43740,6 +43761,7 @@ ${request.requirements}` : preset.text,
   }
   stopAimProgress() {
     this.aimProgress = null;
+    this.aimBranchModels.clear();
     this.aimProgressEls.clear();
     if (this.aimProgressTimer !== null) window.clearInterval(this.aimProgressTimer);
     if (this.aimProgressRenderTimer !== null) window.clearTimeout(this.aimProgressRenderTimer);
@@ -43756,6 +43778,22 @@ ${request.requirements}` : preset.text,
       Math.round((Date.now() - ((_a2 = target.startedAt) != null ? _a2 : Date.now())) / 1e3)
     );
   }
+  /** The branch root topic's resolved model, read once per branch (the cache answers every later event and tick). */
+  ensureAimBranchModel(branchId) {
+    var _a2, _b2, _c, _d, _e, _f;
+    if (this.aimBranchModels.has(branchId) || this.aimBranchModelPending.has(branchId)) return;
+    const branches = (_c = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.aim) == null ? void 0 : _b2.branches) != null ? _c : [];
+    let root = branches.find((item) => item.id === branchId);
+    for (let depth = 0; (root == null ? void 0 : root.parentBranchId) && depth < branches.length; depth++)
+      root = (_d = branches.find((item) => item.id === (root == null ? void 0 : root.parentBranchId))) != null ? _d : root;
+    const node = root && ((_e = this.map) == null ? void 0 : _e.nodes.find((item) => item.id === root.questionNodeId));
+    if (!node) return;
+    this.aimBranchModelPending.add(branchId);
+    void this.plugin.repo.resolveTopicModel(node.path, (_f = this.map) != null ? _f : void 0).then((resolved) => {
+      if (!this.closed && this.aimProgress) this.aimBranchModels.set(branchId, resolved.model);
+    }).catch(() => {
+    }).finally(() => this.aimBranchModelPending.delete(branchId));
+  }
   aimStageText() {
     var _a2;
     const progress = this.aimProgress;
@@ -43768,7 +43806,9 @@ ${request.requirements}` : preset.text,
       targets.filter((item) => item.state === "done" || item.state === "skipped").length,
       targets.length
     ) : t((_a2 = AIM_STAGE_KEYS[progress.stage]) != null ? _a2 : "ui.aim_stage_research");
-    return t("ui.aim_stage_with_elapsed_0_1", stage, clock);
+    const model = this.aimBranchModels.get(progress.branchId);
+    const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
+    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   paintAimProgress() {
@@ -43837,6 +43877,10 @@ ${request.requirements}` : preset.text,
     return progress ? [progress.stage, (_a2 = progress.query) != null ? _a2 : "", progress.slow ? 1 : 0, progress.resend ? 1 : 0].join("|") : "";
   }
   researchStageText(progress) {
+    const stage = this.researchStageName(progress);
+    return progress.model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model)) : stage;
+  }
+  researchStageName(progress) {
     switch (progress.stage) {
       case "searching":
         return progress.query ? t("ui.research_stage_searching_0", progress.query) : t("ui.research_stage_searching");
@@ -43879,12 +43923,12 @@ ${request.requirements}` : preset.text,
    * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
    * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
    */
-  startTaskProgress(key2) {
+  startTaskProgress(key2, model) {
     const progress = this.plugin.researchProgress;
     if (!progress || progress.get(key2)) return { end: () => {
     } };
     let attempt = "starting";
-    progress.begin(key2, attempt, Date.now());
+    progress.begin(key2, attempt, Date.now(), model);
     return {
       observer: {
         onAttempt: (id) => {
@@ -44306,7 +44350,7 @@ ${request.requirements}` : preset.text,
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   async runMergeDraft(task) {
     const language2 = this.plugin.settings.language;
-    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath));
+    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
     try {
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
@@ -46239,6 +46283,7 @@ ${request.requirements}` : preset.text,
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header, node.id);
+    this.paintModelTag(card, header, note);
     const errorDetails = [];
     if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
       const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
@@ -46846,6 +46891,36 @@ ${request.requirements}` : preset.text,
     return markers.length ? t("share.viewer_markers_0", markers.map((id) => t(markerLabelKey(id))).join(t("ui.list_separator"))) : "";
   }
   /**
+   * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
+   * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
+   */
+  paintModelTag(card, header, note) {
+    var _a2, _b2;
+    const old = cardModelTags.get(header);
+    cardModelTags.delete(header);
+    const previous = (_a2 = card.dataset.modelText) != null ? _a2 : "";
+    let named = (_b2 = cardLabels.get(card)) == null ? void 0 : _b2.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (note == null ? void 0 : note.modelOverride) {
+      const label = this.plugin.modelLabel(note.model), text11 = t("ui.card_model_override_0", label), tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
+      tag.setAttr("aria-hidden", "true");
+      tag.setAttr("title", text11);
+      const row = cardMarkerRows.get(card);
+      if (old) old.replaceWith(tag);
+      else if (row && row.parentElement === header) row.after(tag);
+      cardModelTags.set(header, tag);
+      card.dataset.modelText = text11;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text11));
+    } else {
+      old == null ? void 0 : old.remove();
+      delete card.dataset.modelText;
+      if (named) this.labelCard(card, named);
+    }
+  }
+  /**
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
@@ -47057,7 +47132,10 @@ ${request.requirements}` : preset.text,
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
-    if (header) this.paintCardMarkers(card, header, node.id);
+    if (header) {
+      this.paintCardMarkers(card, header, node.id);
+      this.paintModelTag(card, header, note);
+    }
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
@@ -48913,7 +48991,7 @@ ${request.requirements}` : preset.text,
     const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -49033,7 +49111,7 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     let findingsSent = false;
     try {
       const synthesisContext = withThinkingOrigin(
@@ -49519,7 +49597,7 @@ ${request.requirements}` : preset.text,
       this.integrationTask = task;
       own = task;
       this.render();
-      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
+      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
       progress = taskProgress;
       const language2 = this.plugin.settings.language;
       const result = await this.plugin.askModel(
@@ -49696,7 +49774,7 @@ ${note.detail.trim()}` : "",
     };
     this.integrationTask = task;
     this.render();
-    const progress = this.startTaskProgress(this.taskProgressKey("integration"));
+    const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
     const model = chosen.model;
     const language2 = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId);
@@ -52544,7 +52622,7 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now());
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), note.model);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -57098,9 +57176,16 @@ var ResearchProgressStore = class {
     __publicField(this, "lastNotified", /* @__PURE__ */ new Map());
     __publicField(this, "pending", /* @__PURE__ */ new Map());
   }
-  begin(path, attemptId, now) {
+  begin(path, attemptId, now, model) {
     this.cancelPending(path);
-    this.entries.set(path, { attemptId, startedAt: now, stage: "waiting", stageAt: now, slow: false });
+    this.entries.set(path, {
+      attemptId,
+      startedAt: now,
+      stage: "waiting",
+      stageAt: now,
+      slow: false,
+      ...model ? { model } : {}
+    });
     this.notify(path);
   }
   stage(path, attemptId, stage, now, query) {
@@ -58277,7 +58362,7 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
     return true;
   }
   openForCurrentSelection() {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const snapshot = this.snapshot;
     if (!snapshot) return;
     this.hideLauncher();
@@ -58286,19 +58371,21 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
       this.app,
       snapshot,
       this.options.model,
+      (_b2 = this.options.modelLabel) != null ? _b2 : (model) => model,
       this.options.language(snapshot.text),
-      (_d = (_c = (_b2 = this.options).translateTarget) == null ? void 0 : _c.call(_b2)) != null ? _d : this.options.language(snapshot.text),
+      (_e = (_d = (_c = this.options).translateTarget) == null ? void 0 : _d.call(_c)) != null ? _e : this.options.language(snapshot.text),
       this.options.run
     );
     this.panel.open();
   }
 };
 var SelectionAiPanel = class extends import_obsidian38.Component {
-  constructor(app, snapshot, modelOf, language2, translateTarget, run) {
+  constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run) {
     super();
     this.app = app;
     this.snapshot = snapshot;
     this.modelOf = modelOf;
+    this.modelLabel = modelLabel;
     this.language = language2;
     this.translateTarget = translateTarget;
     this.run = run;
@@ -58561,8 +58648,10 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     this.previewChild = null;
     this.preview.empty();
     this.setBusy(trigger);
-    status.setText(t("ui.context_ai_running_0", label));
     const model = this.modelOf();
+    const withModel = (text11) => t("ui.progress_stage_with_model_0_1", text11, this.modelLabel(model));
+    const running = () => withModel(t("ui.context_ai_running_0", label));
+    status.setText(running());
     try {
       const at = this.snapshot.matchAt;
       const context = at >= 0 ? this.snapshot.markdown.slice(Math.max(0, at - 600), at + this.snapshot.text.length + 600) : "";
@@ -58580,7 +58669,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
       let result;
       let insertAfter = false;
       if (plan.action === "image_search") {
-        status.setText(t("ui.context_ai_searching_images"));
+        status.setText(withModel(t("ui.context_ai_searching_images")));
         const search = prepareStep(imageSearchStep, { query: plan.query || prompt });
         const found = search.parse(await this.run(search, model, controller.signal, void 0, true));
         if (controller.signal.aborted || !this.isOpen) return;
@@ -58616,7 +58705,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
             const choice2 = new AbortController();
             this.controller = choice2;
             this.setBusy(choose);
-            status.setText(t("ui.context_ai_generating"));
+            status.setText(withModel(t("ui.context_ai_generating")));
             void this.imageDraft(candidate, plan.captionInstruction, choice2.signal, model).then((draft) => {
               if (this.controller === choice2 && !choice2.signal.aborted && this.isOpen) {
                 output.value = draft;
@@ -58643,7 +58732,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
         result = await this.imageDraft(candidates[0], plan.captionInstruction, controller.signal, model);
         if (controller.signal.aborted || !this.isOpen) return;
       } else {
-        status.setText(t("ui.context_ai_running_0", label));
+        status.setText(running());
         const request = prepareStep(transformStep, {
           instruction: plan.instruction || prompt,
           selected: this.snapshot.text,
@@ -59102,6 +59191,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
+      modelLabel: (model) => this.modelLabel(model),
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: (selected) => languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
         kind: "selection",
@@ -60275,7 +60365,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.chartJobs.set(job.path, controller);
     const progressId = `charts-${++this.chartProgressSeq}`;
     this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
     this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async () => {

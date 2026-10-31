@@ -124,6 +124,21 @@ integrationTest('the "no conclusion yet" placeholder in a task prompt follows th
     assert.match(seen.ancestors, expected); assert.doesNotMatch(seen.ancestors, absent);
   }
 });
+integrationTest('counterexample: an ordinary research run starts its progress entry with the model that askModel runs (MS-08 F1)', async () => {
+  const { repo, app } = fixture(), n = await topicNote(repo, 'Progress model', 'a');
+  await repo.updateNote(n.path, { prompt: 'Research this' });
+  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [n], viewport: { x: 0, y: 0, zoom: 1 } };
+  await app.vault.create(mapPath, core.serializeMap(mapDoc));
+  const { VisualAgentMapView } = load('main.ts', { obsidian }); let view, askedModel; const begun = [];
+  const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), pendingSuggestions: new Map(),
+    researchProgress: { begin: (...args) => begun.push(args), newAttempt() {}, stage() {}, preview() {}, markSlow() {}, end() {}, get: () => undefined },
+    askModel: async (_context, model) => { askedModel = model; const error = new Error('stop'); error.name = 'AbortError'; throw error; }, mutate: async work => work(), views: () => [view] };
+  view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
+  try { await view.runAgent(n, undefined, undefined, { task: 'Research it' }); } catch { /* the model call is the stop point */ }
+  assert.ok(askedModel, 'the model was asked with a model id');
+  assert.equal(begun.length, 1);
+  assert.equal(begun[0][3], askedModel, 'begin carries the model askModel runs');
+});
 integrationTest('a successful AI task immediately updates summary and MD detail', async () => {
   const { repo, app, contents } = fixture(), n = await topicNote(repo, 'Direct write', 'a');
   await repo.updateNote(n.path, { prompt: 'Research this', rules: 'Use a comparison table.', detail: 'Existing detail', newFindings: 'Legacy finding', sourcePaths: ['Other.md'] });

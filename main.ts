@@ -472,6 +472,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
+      modelLabel: model => this.modelLabel(model),
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: selected =>
         languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
@@ -1756,7 +1757,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.chartJobs.set(job.path, controller);
     const progressId = `charts-${++this.chartProgressSeq}`;
     this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
     this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async (): Promise<void> => {

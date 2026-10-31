@@ -336,6 +336,8 @@ export class MapChatPanel {
   private frame: { cancel: () => void } | null = null;
   /** The progress stage of the running turn and when it started (the seconds count from there). Null when nothing runs. */
   private stage: { kind: MapChatStage; since: number } | null = null;
+  /** The label of the model the running turn was sent with (read once when the turn begins, so a switch mid-turn does not change it). */
+  private stageModel = "";
   /** The stage line inside the AI bubble, with the two texts that change. */
   private stageEls: { box: HTMLElement; label: HTMLElement; elapsed: HTMLElement; slow: HTMLElement | null } | null =
     null;
@@ -634,6 +636,7 @@ export class MapChatPanel {
     this.messages.push(user, assistant);
     this.busy = true;
     this.stage = { kind: stage, since: this.clockNow() };
+    this.stageModel = this.currentModelLabel();
     this.slow = null;
     if (this.built && !keepDraft) this.inputEl.value = "";
     this.renderLog(true);
@@ -689,8 +692,16 @@ export class MapChatPanel {
     this.paintStage();
     this.speakStage();
   }
+  private currentModelLabel(): string {
+    const model = this.host.model();
+    return this.host.modelChoices().find(choice => choice.value === model)?.label ?? model;
+  }
+  /** The stage name, with the model that does the work after it; applying a plan is local work and names none. */
   private stageLabel(kind: MapChatStage): string {
-    return t(`ui.map_chat_stage_${kind}`);
+    const name = t(`ui.map_chat_stage_${kind}`);
+    return kind === "applying" || !this.stageModel
+      ? name
+      : t("ui.progress_stage_with_model_0_1", name, this.stageModel);
   }
   private elapsedText(): string {
     const seconds = this.stage ? Math.max(0, Math.round((this.clockNow() - this.stage.since) / 1000)) : 0;

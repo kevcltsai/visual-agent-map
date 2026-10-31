@@ -13348,7 +13348,7 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     if (!engine || engine.busy) return;
     const confirmed = await new CoffeeSummaryConfirmModal(
       this.app,
-      engine.session.model,
+      this.plugin.modelLabel(engine.session.model),
       this.plugin.settings.language
     ).confirm();
     if (!confirmed || this.engine !== engine || engine.busy || this.closed) return;
@@ -13605,7 +13605,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     };
     const setReasoning = () => {
       var _a3, _b3, _c2;
-      const selected = reasoning.value || this.homeForm.reasoning || (edit == null ? void 0 : edit.reasoning) || this.plugin.settings.cliReasoning;
+      const selected = reasoning.value || this.homeForm.reasoning || (edit == null ? void 0 : edit.reasoning) || this.plugin.currentModelChoice().reasoning;
       const status = (_c2 = (_b3 = (_a3 = this.plugin).modelDiscoveryState) == null ? void 0 : _b3.call(_a3, providerForModel(model.value)).status) != null ? _c2 : "ready";
       const state = reasoningChoiceState(selected, this.plugin.coffeeReasoningEfforts(model.value), status);
       reasoning.empty();
@@ -13615,7 +13615,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       reasoning.value = state.selected;
     };
     const setModels = (available) => {
-      const selected = model.value || this.homeForm.model || (edit == null ? void 0 : edit.model) || this.plugin.settings.cliModel;
+      const selected = model.value || this.homeForm.model || (edit == null ? void 0 : edit.model) || this.plugin.currentModelChoice().model;
       if (!model.value && selected) {
         model.add(new Option(this.plugin.modelLabel(selected), selected));
         model.value = selected;
@@ -13845,12 +13845,17 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       styleSelect.value = selected;
     };
     refreshStyleChoices(selectedStyleId);
+    const manualChoice = (chosenModel, chosenReasoning) => {
+      const current = this.plugin.currentModelChoice();
+      const kept = chosenModel === current.model && chosenReasoning === current.reasoning;
+      return kept ? { model: "", reasoning: "" } : { model: chosenModel, reasoning: chosenReasoning };
+    };
     const snapshotForm = () => {
       this.homeForm = {
         ...this.homeForm,
         topic: topic.value,
-        model: model.value,
-        reasoning: reasoning.value,
+        // Only a hand-picked choice is remembered; one equal to the current model follows it when the form is rebuilt.
+        ...manualChoice(model.value, reasoning.value),
         styleId: styleSelect.value,
         styleName: styleNameInput.value,
         stylePrompt: stylePrompt.value,
@@ -57891,6 +57896,7 @@ async function receiveVisualMapHandoff(artifact, options) {
       const map = await options.repo.readMap(targetPath);
       const model = typeof ((_b2 = artifact.metadata) == null ? void 0 : _b2.model) === "string" ? artifact.metadata.model : options.defaultModel();
       const reasoning = normalizeReasoningLevel((_c = artifact.metadata) == null ? void 0 : _c.reasoning);
+      const current = options.currentModel();
       const links = artifact.sources.filter((source) => source.path).map((source) => `[[${source.path}|${source.label}]]`);
       const statement = "Simulated / unverified thinking source; not an adopted user conclusion.";
       const detail = [artifact.content, statement, ...links].map(originMarkdown).join("\n\n");
@@ -57915,7 +57921,8 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
         model,
         map,
         targetPath,
-        "manual",
+        // The root follows the workspace only when both the model and the reasoning equal the current ones.
+        model === current.model && reasoning === normalizeReasoningLevel(current.reasoning) ? "workspace" : "manual",
         { detail, thinkingOrigin: origin, reasoning },
         record
       );
@@ -59451,6 +59458,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
         (artifact, beforeWrite) => receiveVisualMapHandoff(artifact, {
           repo: this.repo,
           defaultModel: () => this.settings.cliModel,
+          currentModel: () => this.currentModelChoice(),
           exists: (path) => !!this.app.vault.getAbstractFileByPath(path),
           mutate: (work) => this.mutate(work),
           navigate: (path) => this.activateView(path),

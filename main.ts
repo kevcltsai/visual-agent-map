@@ -558,6 +558,7 @@ export default class VisualAgentMapPlugin extends Plugin {
         receiveVisualMapHandoff(artifact, {
           repo: this.repo,
           defaultModel: () => this.settings.cliModel,
+          currentModel: () => this.currentModelChoice(),
           exists: path => !!this.app.vault.getAbstractFileByPath(path),
           mutate: work => this.mutate(work),
           navigate: path => this.activateView(path),

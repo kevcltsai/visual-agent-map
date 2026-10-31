@@ -75,7 +75,7 @@ integrationTest('Coffee reframing checks Markdown/sidecar changes and busy state
 integrationTest('Visual Map handoff separates synchronization/navigation failure from durable completion', async () => {
   const {receiveVisualMapHandoff}=load('experiences/visual-map/handoff.ts',{obsidian});const {repo,files}=fixture('en');let navigations=0;
   const artifact={version:1,id:'operation',kind:'question',title:'Question',content:'Context',sourceSnapshot:'Idea',origin:{experience:'coffee-tables'},sources:[]};
-  const result=await receiveVisualMapHandoff(artifact,{repo,defaultModel:()=> 'm',exists:p=>files.has(p),mutate:async work=>{await work();throw Error('sync failed');},navigate:async()=>{navigations++;throw Error('open failed');}});
+  const result=await receiveVisualMapHandoff(artifact,{repo,defaultModel:()=> 'm',currentModel:()=>({model:'m',reasoning:'auto'}),exists:p=>files.has(p),mutate:async work=>{await work();throw Error('sync failed');},navigate:async()=>{navigations++;throw Error('open failed');}});
   assert.match(result.navigationError,/sync failed/);assert.match(result.navigationError,/open failed/);assert.ok(files.has(result.targetPath));assert.equal((await repo.readMap(result.targetPath)).nodes.length,1);assert.equal(navigations,1);
 });
 integrationTest('Visual Map handoff exposes exact partial paths at every persistence stage', async () => {
@@ -86,7 +86,7 @@ integrationTest('Visual Map handoff exposes exact partial paths at every persist
     if(stage==='map'||stage==='note'){const fn=app.vault.create;app.vault.create=async(p,s)=>{if(stage==='map'?p.endsWith('/Map.md'):p.includes('/Notes/'))throw Error(stage+' failed');return fn(p,s);};}
     if(stage==='saveMap')repo.saveMap=async()=>{throw Error('save failed');};
     const artifact={version:1,id:stage,kind:'question',title:'Question',content:'Context',origin:{experience:'coffee-tables'},sources:[]};
-    await assert.rejects(receiveVisualMapHandoff(artifact,{repo,defaultModel:()=> 'm',exists:p=>files.has(p),mutate:work=>work(),navigate:async()=>{throw Error('should not navigate');}}),e=>{assert.equal(e.name,'HandoffWriteError');assert.ok(e.paths.length>=1);assert.ok(e.paths.every(p=>files.has(p)));return true;});
+    await assert.rejects(receiveVisualMapHandoff(artifact,{repo,defaultModel:()=> 'm',currentModel:()=>({model:'m',reasoning:'auto'}),exists:p=>files.has(p),mutate:work=>work(),navigate:async()=>{throw Error('should not navigate');}}),e=>{assert.equal(e.name,'HandoffWriteError');assert.ok(e.paths.length>=1);assert.ok(e.paths.every(p=>files.has(p)));return true;});
   }
 });
 integrationTest('Coffee handoff partial writes disable creation; saved navigation failures retry only opening', async () => {
@@ -252,7 +252,7 @@ integrationTest('Guided proposals fence Thinking Origin at publication and after
 // MS-07 P7a (decision #14 D2, plan D8): the handoff root follows the workspace only when model and reasoning both equal the current ones.
 const handoffArtifact = metadata => ({ version: 1, id: 'op', kind: 'question', title: 'Question', content: 'Context', origin: { experience: 'coffee-tables' }, sources: [], metadata });
 const handoffRoot = async (metadata, current) => {
-  const { receiveVisualMapHandoff } = load('experiences/visual-map/handoff.ts', { obsidian }); const { repo, files, contents } = fixture('en');
+  const { receiveVisualMapHandoff } = load('experiences/visual-map/handoff.ts', { obsidian }); const { repo, files, contents } = fixture('en'); repo.settings.cliModel = current.model; repo.settings.cliReasoning = current.reasoning;
   const result = await receiveVisualMapHandoff(handoffArtifact(metadata), { repo, defaultModel: () => current.model, currentModel: () => current, exists: p => files.has(p), mutate: work => work(), navigate: async () => {} });
   const path = (await repo.readMap(result.targetPath)).nodes[0].path; const note = await repo.readNote(path);
   return { note, raw: contents.get(path) };
@@ -268,6 +268,6 @@ integrationTest('Visual Map handoff: the same model with a different reasoning i
 integrationTest('Visual Map handoff: a different model is a manual root; no table model falls back to the current one as workspace', async () => {
   const other = await handoffRoot({ model: 'opus', reasoning: 'medium' }, { model: 'cur', reasoning: 'medium' });
   assert.equal(other.note.modelSource, 'manual'); assert.equal(other.note.model, 'opus');
-  const none = await handoffRoot({}, { model: 'cur', reasoning: 'auto' });
+  const none = await handoffRoot({}, { model: 'cur', reasoning: 'low' });
   assert.equal(none.note.modelSource, 'workspace'); assert.equal(none.note.model, 'cur');
 });

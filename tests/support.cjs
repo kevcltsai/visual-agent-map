@@ -182,7 +182,7 @@ async function reframingModalFixture(insightId) {
   const {default:Plugin}=load('main.ts',{obsidian});const plugin=new Plugin(); plugin.app=app;plugin.repo=repo;plugin.coffeeStorage=store;plugin.settings.language='en';withCoffeeModelDiscovery(plugin,['test-model']); plugin.confirmAiUsage=async (_m,run)=>{await run();return true;}; plugin.register=()=>{};
   const opened=[];plugin.activateView=async p=>{opened.push(p);};plugin.openResearchMap=async p=>{opened.push(p);};plugin.mutate=async work=>work();
   const {receiveVisualMapHandoff}=load('experiences/visual-map/handoff.ts',{obsidian});
-  plugin.core.experiences.register('visual-map',(artifact,beforeWrite)=>receiveVisualMapHandoff(artifact,{repo,defaultModel:()=>plugin.settings.cliModel,exists:p=>!!app.vault.getAbstractFileByPath(p),mutate:work=>plugin.mutate(work),navigate:p=>plugin.activateView(p),beforeWrite}));
+  plugin.core.experiences.register('visual-map',(artifact,beforeWrite)=>receiveVisualMapHandoff(artifact,{repo,defaultModel:()=>plugin.settings.cliModel,currentModel:()=>({model:plugin.settings.cliModel,reasoning:plugin.settings.cliReasoning}),exists:p=>!!app.vault.getAbstractFileByPath(p),mutate:work=>plugin.mutate(work),navigate:p=>plugin.activateView(p),beforeWrite}));
   const modals=[];class Modal {constructor(){this.titleEl=coffeeElement('title');this.contentEl=coffeeElement('content');}open(){modals.push(this);this.onOpen?.();}close(){this.didClose=true;this.onClose?.();}}
   const dom=require('./support-dom.cjs'), notices=[], Notice=dom.makeNotice(notices);
   const handoff=load('experiences/coffee-tables/handoff-modal.ts',{obsidian:{...obsidian,Modal,Notice}},{createFragment:dom.createFragment});

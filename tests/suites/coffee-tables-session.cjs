@@ -393,7 +393,7 @@ integrationTest('Coffee Tables puts saved-draft recovery in the pinned room tool
 });
 integrationTest('Coffee Tables home form keeps discovered model and reasoning choices and disables start during discovery', async () => {
   const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
-  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low' }, coffeeReasoningEfforts: model => model === 'm' ? ['low'] : ['medium', 'high'], refreshCoffeeModels: async () => ['m', 'codex-other'], confirmAiUsage: async (_model, run) => run() }, ['m', 'codex-other']);
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low' }, currentModelChoice: () => ({ model: 'm', reasoning: 'low' }), coffeeReasoningEfforts: model => model === 'm' ? ['low'] : ['medium', 'high'], refreshCoffeeModels: async () => ['m', 'codex-other'], confirmAiUsage: async (_model, run) => run() }, ['m', 'codex-other']);
   const view = new CoffeeTablesView({ app: {} }, plugin); view.contentEl = coffeeElement('root'); view.store = { cleanupEmptyTopicFolders: async () => {}, list: () => [] }; await view.home();
   const selects = []; const visit = node => { if (node.tag === 'select') selects.push(node); node.children.forEach(visit); }; visit(view.contentEl);
   await until(() => !selects[0].disabled); assert.deepEqual(selects[0].children.map(option => option.value), ['m', 'codex-other']);
@@ -420,7 +420,7 @@ integrationTest('Coffee Tables historical preview cancels a pending generating-r
   const { CoffeeTablesView } = load('experiences/coffee-tables/view.ts', { obsidian });
   let delayedRoom = deferred(); const completed = { ...coffeeSession(), id: 'done', topic: 'History topic', status: 'completed', transcriptMarkdown: '', rounds: [], observerNotes: [] };
   const generating = { ...coffeeSession(), id: 'running', topic: 'Running topic', status: 'generating', transcriptMarkdown: '', rounds: [], observerNotes: [] };
-  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', workspaceFolder: 'workspace' }, coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'], confirmAiUsage: async (_model, run) => run(), coffeeManager: { get: id => id === generating.id ? { busy: true, session: generating } : undefined } }, ['m']);
+  const plugin = withCoffeeModelDiscovery({ settings: { language: 'en', cliModel: 'm', cliReasoning: 'low', workspaceFolder: 'workspace' }, currentModelChoice: () => ({ model: 'm', reasoning: 'low' }), coffeeReasoningEfforts: () => ['low'], refreshCoffeeModels: async () => ['m'], confirmAiUsage: async (_model, run) => run(), coffeeManager: { get: id => id === generating.id ? { busy: true, session: generating } : undefined } }, ['m']);
   const view = new CoffeeTablesView({ app: { workspace: { requestSaveLayout() {} } } }, plugin); view.contentEl = coffeeElement('root');
   view.store = { cleanupEmptyTopicFolders: async () => {}, recoverPendingCreates: async () => {}, list: () => [{ path: 'running.md', extension: 'md', basename: 'Running topic', stat: { ctime: 1, mtime: 1 } }, { path: 'done.md', extension: 'md', basename: 'History topic', stat: { ctime: 1, mtime: 1 } }], inspectReadOnly: async path => path === 'done.md' ? completed : generating, load: () => delayedRoom.promise };
   const attached = []; view.attach = session => attached.push(session.id); await view.home();

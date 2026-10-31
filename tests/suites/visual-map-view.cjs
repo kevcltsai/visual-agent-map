@@ -963,7 +963,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderAddSubtopic() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },

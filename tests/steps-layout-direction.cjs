@@ -160,7 +160,7 @@ const doc = extra => ({ version: 1, id: 'm', title: 'M', nodes: [node('a')], vie
 test('L6: parseMap keeps a valid layout through a round trip and drops an invalid one', () => {
   const kept = core.parseMap(core.serializeMap(doc({ layout: { direction: 'left' } })));
   assert.deepEqual(JSON.parse(JSON.stringify(kept.layout)), { direction: 'left' });
-  for (const value of ['left', { direction: 'down' }, {}, 3, null, [], { direction: 5 }]) {
+  for (const value of ['left', { direction: 'sideways' }, {}, 3, null, [], { direction: 5 }]) {
     const parsed = core.parseMap(core.serializeMap(doc({ layout: value })));
     assert.equal('layout' in parsed, false, JSON.stringify(value));
   }

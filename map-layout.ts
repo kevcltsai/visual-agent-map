@@ -1,3 +1,4 @@
+import { verticalPositions } from "./layouts/vertical";
 import { parentIdsForNode, type MapNode } from "./map-graph";
 
 const WIDTH = 300;
@@ -32,6 +33,11 @@ export interface MapLayout {
   spacing?: LayoutSpacing;
 }
 
+/** The arrangements whose engines exist, so a map file may store them; each engine packet adds its own value. */
+export function isLayoutKind(value: unknown): value is "right" | "left" | "down" | "up" {
+  return value === "right" || value === "left" || value === "down" || value === "up";
+}
+
 export function isLayoutDirection(value: unknown): value is LayoutDirection {
   return value === "right" || value === "left";
 }
@@ -45,7 +51,8 @@ export function layoutDirectionOf(map: { layout?: MapLayout; aim?: unknown } | n
 
 /** The full layout choice of a map (direction and spacing). AIM maps always grow to the right at standard spacing. */
 export function layoutOf(map: { layout?: MapLayout; aim?: unknown } | null | undefined): MapLayout {
-  const direction = layoutDirectionOf(map);
+  const stored = map && !map.aim ? map.layout?.direction : undefined;
+  const direction: LayoutKind = isLayoutKind(stored) ? stored : "right";
   const spacing = map && !map.aim ? map.layout?.spacing : undefined;
   return isStoredLayoutSpacing(spacing) ? { direction, spacing } : { direction };
 }
@@ -56,6 +63,8 @@ function resolveLayout(layout: LayoutDirection | MapLayout): { direction: Layout
   const spacing = typeof layout === "string" ? undefined : layout.spacing;
   return { direction, ...SPACING[isStoredLayoutSpacing(spacing) ? spacing : "standard"] };
 }
+
+const isVertical = (direction: LayoutKind): boolean => direction === "down" || direction === "up";
 
 /** +1 when columns grow to the right, -1 when they grow to the left. */
 const signOf = (direction: LayoutKind): number => (direction === "left" ? -1 : 1);
@@ -111,6 +120,18 @@ function positions(
       ? []
       : (joins.get(node.id) ?? []).filter(join => !(folded && ids.get(join.parentId!)?.collapsed));
   const heightFor = (node: MapNode) => cardHeight(heightOf, node.id);
+  if (isVertical(direction))
+    return verticalPositions({
+      roots,
+      kidsOf,
+      joinsOf,
+      heightFor,
+      column: COLUMN,
+      rowGap: COLUMN - WIDTH,
+      flip: direction === "up",
+      left,
+      top
+    });
   const sizes = new Map<string, number>();
   const spans = new Map<string, number>();
   /** Total height of stacked subtrees, with the fixed gap between neighbours. */
@@ -172,6 +193,54 @@ export function arrangeMap(
   return nodes.map(node => ({ ...node, ...placed.get(node.id) }));
 }
 
+/** A new branch in a down or up map: one row below (above) the parent, centred under it, sliding along x past older cards. */
+function arrangeVerticalBranch(
+  nodes: MapNode[],
+  parent: MapNode,
+  fresh: MapNode[],
+  roots: MapNode[],
+  newIds: Set<string>,
+  heightOf: HeightOf | undefined,
+  layout: LayoutDirection | MapLayout
+): MapNode[] {
+  const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
+  const placed = positions(fresh, roots, 0, 0, false, heightOf, layout);
+  const rootCentres = roots.map(root => placed.get(root.id)!.x + WIDTH / 2);
+  const middle = rootCentres.length ? (Math.min(...rootCentres) + Math.max(...rootCentres)) / 2 : WIDTH / 2;
+  let shiftX = parent.x + WIDTH / 2 - middle;
+  // Row 0 of the branch is the roots; they start one row gap below the parent's bottom edge (above its top edge for up).
+  const rowGap = COLUMN - WIDTH;
+  const rootTop = Math.min(...roots.map(root => placed.get(root.id)!.y));
+  const rootBottom = Math.max(...roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id)));
+  const shiftY =
+    direction === "up" ? parent.y - rowGap - rootBottom : parent.y + cardHeight(heightOf, parent.id) + rowGap - rootTop;
+  const fixed = nodes.filter(node => !newIds.has(node.id));
+  for (;;) {
+    let next = shiftX;
+    for (const [id, point] of placed) {
+      const own = cardHeight(heightOf, id);
+      const topY = point.y + shiftY;
+      for (const node of fixed) {
+        const other = cardHeight(heightOf, node.id);
+        const x = point.x + shiftX;
+        if (
+          x < node.x + WIDTH + LAYOUT_GAP &&
+          node.x < x + WIDTH + LAYOUT_GAP &&
+          topY < node.y + other + LAYOUT_GAP &&
+          node.y < topY + own + LAYOUT_GAP
+        )
+          next = Math.max(next, node.x + WIDTH + LAYOUT_GAP - point.x);
+      }
+    }
+    if (next === shiftX) break;
+    shiftX = next;
+  }
+  return nodes.map(node => {
+    const point = placed.get(node.id);
+    return point ? { ...node, x: Math.round(point.x + shiftX), y: Math.round(point.y + shiftY) } : node;
+  });
+}
+
 export function arrangeNewBranch(
   nodes: MapNode[],
   parentId: string,
@@ -186,6 +255,7 @@ export function arrangeNewBranch(
   if (!parent || !newIds.size) return nodes;
   const fresh = nodes.filter(node => newIds.has(node.id));
   const roots = fresh.filter(node => node.parentId === parentId);
+  if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
   const placed = positions(fresh, roots, parent.x + signOf(direction) * COLUMN, 0, false, heightOf, layout);
   const centers = roots.map(root => placed.get(root.id)!.y + cardHeight(heightOf, root.id) / 2);
   const center = centers.length ? (Math.min(...centers) + Math.max(...centers)) / 2 : 0;
@@ -221,11 +291,35 @@ export function arrangeNewTree(
   heightOf?: HeightOf,
   layout: LayoutDirection | MapLayout = "right"
 ): MapNode[] {
-  const { gap: LAYOUT_GAP } = resolveLayout(layout);
+  const { direction, column: COLUMN, gap: LAYOUT_GAP } = resolveLayout(layout);
   const root = nodes.find(node => node.id === rootId);
   if (!root || !newIds.has(rootId)) return nodes;
   const fixed = nodes.filter(node => !newIds.has(node.id));
   const fixedRoots = fixed.filter(node => !node.parentId);
+  if (isVertical(direction)) {
+    // A new top-level tree goes to the right of every existing card, on the root row.
+    const anchors = fixedRoots.length ? fixedRoots : fixed;
+    const x = fixed.length ? Math.max(...fixed.map(node => node.x)) + COLUMN : 80;
+    const placed = positions(
+      nodes.filter(node => newIds.has(node.id)),
+      [root],
+      x,
+      0,
+      false,
+      heightOf,
+      layout
+    );
+    const rootPoint = placed.get(rootId)!;
+    const rowTop = anchors.length ? Math.min(...anchors.map(node => node.y)) : 80;
+    const rowBottom = anchors.length
+      ? Math.max(...anchors.map(node => node.y + cardHeight(heightOf, node.id)))
+      : 80 + cardHeight(heightOf, rootId);
+    const shiftY = direction === "up" ? rowBottom - (rootPoint.y + cardHeight(heightOf, rootId)) : rowTop - rootPoint.y;
+    return nodes.map(node => {
+      const point = placed.get(node.id);
+      return point ? { ...node, x: Math.round(point.x), y: Math.round(point.y + shiftY) } : node;
+    });
+  }
   const left = Math.min(...(fixedRoots.length ? fixedRoots : fixed).map(node => node.x), fixed.length ? Infinity : 80);
   const top = fixed.length ? Math.max(...fixed.map(node => node.y + cardHeight(heightOf, node.id))) + LAYOUT_GAP : 80;
   const placed = positions(

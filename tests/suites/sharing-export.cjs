@@ -614,3 +614,16 @@ test('share exporter assemble: a note\'s markers reach the payload node, a note 
   assert.equal('markers' in result.payload.nodes[1], false);
   assert.equal(result.payload.version, 1);
 });
+
+// Ticket 37 P3: the exporter hands the note's colour to the payload.
+test('share exporter topic-color: a note\'s colour reaches the payload node, a note without colour adds no key', () => {
+  class FileSystemAdapter { getBasePath() { return '/Users/me/Vault'; } }
+  const module = load('experiences/sharing/share-exporter.ts', { obsidian: { ...obsidian, FileSystemAdapter, Component: class { load() {} unload() {} addChild() {} removeChild() {} } } });
+  const map = { id: 'map-1', title: 'Map', outputLanguage: 'en', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [{ id: 'a', path: 'Folder/A.md', parentId: null, x: 0, y: 0, collapsed: false }, { id: 'b', path: 'Folder/B.md', parentId: 'a', x: 0, y: 0, collapsed: false }] };
+  const notes = new Map([['a', { title: 'A', summary: 'S', status: 'idea', model: '', color: 'green' }], ['b', { title: 'B', summary: 'S', status: 'idea', model: '' }]]);
+  const exporter = new module.ShareExporter({ vault: { adapter: new FileSystemAdapter(), getName: () => 'V' } }, { map, notes, mapPath: 'Folder/Map.md' }, { vamVersion: '1', language: 'en' });
+  const result = exporter.assemble({ includeDetail: false, includeImages: false });
+  assert.equal(result.payload.nodes[0].color, 'green');
+  assert.equal('color' in result.payload.nodes[1], false);
+  assert.equal(result.payload.version, 1);
+});

@@ -1431,3 +1431,23 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-map-chat button.vam-map-chat-empty-map[hidden] { display: none; }
 /* The model a card runs on when it is not the current model (MS-08): muted small text. */
 .vam-node-model-tag { display: inline-flex; align-items: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; color: var(--text-muted); }
+
+/* Topic colour (ticket 37): a light tint of the card fill and a 4px stripe, on top of the type's own shape; the border, dashes and outline keep their meaning.
+   Card rules start with .vam-node (the share viewer collects them); menu swatches start with .vam-topic-modal (it does not). */
+.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }
+.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }
+[data-topic-kind="atomic"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="hypothesis"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="evidence"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="conclusion"].vam-node[data-topic-color]:not([data-aim-kind])::before, [data-topic-kind="action"].vam-node[data-topic-color]:not([data-aim-kind])::before { left: 8px; top: 28%; bottom: 28%; }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="red"] { background: color-mix(in srgb, var(--color-red) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="orange"] { background: color-mix(in srgb, var(--color-orange) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="yellow"] { background: color-mix(in srgb, var(--color-yellow) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="green"] { background: color-mix(in srgb, var(--color-green) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="blue"] { background: color-mix(in srgb, var(--color-blue) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch[data-topic-color-swatch="purple"] { background: color-mix(in srgb, var(--color-purple) 60%, var(--text-normal)); }
+.vam-topic-modal .vam-color-swatch { flex: none; width: 14px; height: 14px; border: 1px solid var(--background-modifier-border); border-radius: 50%; }
+.vam-topic-modal .vam-color-section > button { margin-top: 8px; }
+.vam-topic-modal .vam-topic-colors button[aria-checked="true"], .vam-topic-modal .vam-topic-colors button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }

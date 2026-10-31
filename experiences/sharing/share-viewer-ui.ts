@@ -1,3 +1,4 @@
+import type { TopicColor } from "../../topic-colors";
 import type { TopicMarker } from "../../topic-markers";
 
 /**
@@ -60,6 +61,10 @@ export interface ShareViewerUi {
   markerLabel: string;
   /** The name of each topic marker, read by screen readers instead of the symbol. */
   markerNames: Record<TopicMarker, string>;
+  /** Accessible-name part of a topic that has a colour; `{0}` is the colour name (ticket 37). */
+  colorLabel: string;
+  /** The name of each topic colour, so colour is never the only cue. */
+  colorNames: Record<TopicColor, string>;
 }
 
 /**
@@ -118,5 +123,7 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
     "priority-1": "Priority 1",
     "priority-2": "Priority 2",
     "priority-3": "Priority 3"
-  }
+  },
+  colorLabel: "Color: {0}",
+  colorNames: { red: "Red", orange: "Orange", yellow: "Yellow", green: "Green", blue: "Blue", purple: "Purple" }
 };

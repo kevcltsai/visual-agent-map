@@ -54,7 +54,9 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       "priority-1": "優先度 1",
       "priority-2": "優先度 2",
       "priority-3": "優先度 3"
-    }
+    },
+    colorLabel: "色：{0}",
+    colorNames: { red: "赤", orange: "オレンジ", yellow: "黄", green: "緑", blue: "青", purple: "紫" }
   },
   ko: {
     lang: "ko",
@@ -102,7 +104,9 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       "priority-1": "우선순위 1",
       "priority-2": "우선순위 2",
       "priority-3": "우선순위 3"
-    }
+    },
+    colorLabel: "색상: {0}",
+    colorNames: { red: "빨강", orange: "주황", yellow: "노랑", green: "초록", blue: "파랑", purple: "보라" }
   },
   es: {
     lang: "es",
@@ -150,6 +154,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       "priority-1": "Prioridad 1",
       "priority-2": "Prioridad 2",
       "priority-3": "Prioridad 3"
-    }
+    },
+    colorLabel: "Color: {0}",
+    colorNames: { red: "Rojo", orange: "Naranja", yellow: "Amarillo", green: "Verde", blue: "Azul", purple: "Morado" }
   }
 };

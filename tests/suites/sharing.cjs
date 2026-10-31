@@ -384,3 +384,22 @@ test('sharing markers: the payload carries only whitelisted marker ids in fixed 
   assert.equal('markers' in notList.nodes.find(n => n.id === 'rich'), false, 'a non-list value reads as nothing');
   assert.ok(format.serializeShareJson(payload).includes('"markers":["done","star","priority-3"]'));
 });
+
+// Ticket 37 P3: topic colour in the share payload. Optional field, same version, whitelist only.
+test('sharing topic-color: the payload carries only a whitelisted colour id, and no key when there is none', () => {
+  const { notesById } = cleanedNotes();
+  const first = Object.keys(notesById)[0];
+  const colored = { ...notesById, rich: { ...notesById.rich, color: 'blue' }, [first]: { ...notesById[first], color: 'Red' } };
+  const payload = format.buildSharePayload(fixtureMap(), colored, options());
+  assert.equal(payload.version, 1, 'no version bump');
+  assert.equal(payload.nodes.find(n => n.id === 'rich').color, 'blue');
+  for (const bad of ['Red', ['red'], 3, null, 'red; background:url(x)', '<img src=x onerror=alert(1)>', {}, '']) {
+    const p = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, color: bad } }, options());
+    assert.equal('color' in p.nodes.find(n => n.id === 'rich'), false, `${JSON.stringify(bad)} is dropped`);
+    assert.ok(!JSON.stringify(p).includes('onerror'), 'unknown values never reach the file');
+  }
+  for (const node of payload.nodes.filter(n => n.id !== 'rich')) assert.equal('color' in node, false, `${node.id} has no color key`);
+  const plainPayload = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.ok(!format.serializeShareJson(plainPayload).includes('"color"'), 'a map without colours is unchanged');
+  assert.ok(format.serializeShareJson(payload).includes('"color":"blue"'));
+});

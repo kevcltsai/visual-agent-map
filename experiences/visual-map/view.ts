@@ -8831,13 +8831,18 @@ export class VisualAgentMapView extends ItemView {
     };
     paint();
   }
-  /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
+  /**
+   * `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out).
+   * `keyboardFocus` also hands DOM focus to the new card; only the name dialog's save asks for it, because other
+   * callers (the structure review dialog stays open) must not pull focus out from under their own UI.
+   */
   private async addNode(
     parentNode: MapNode | null,
     suggestedTitle?: string,
     rebuildDerivedData = true,
     focus = true,
-    kind: TopicKind = "topic"
+    kind: TopicKind = "topic",
+    keyboardFocus = false
   ): Promise<void> {
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
@@ -8850,7 +8855,7 @@ export class VisualAgentMapView extends ItemView {
           ? t("ui.new_subtopic")
           : t("ui.my_core_topic");
       new NameModal(this.app, dialogTitle, "", title =>
-        this.enqueue(() => this.addNode(parent, title, true, true, kind))
+        this.enqueue(() => this.addNode(parent, title, true, true, kind, true))
       ).open();
       return;
     }
@@ -8916,7 +8921,10 @@ export class VisualAgentMapView extends ItemView {
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode(this.map?.nodes.find(n => n.id === node.id) ?? node);
+    const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
+    this.focusNode(placed);
+    // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
+    if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   private async proposeChildren(
     parent: MapNode,

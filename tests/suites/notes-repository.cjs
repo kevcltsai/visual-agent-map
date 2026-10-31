@@ -1896,3 +1896,33 @@ integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values,
   assert.equal(/topic-markers/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
   assert.equal(updatedLine(), before, 'updated is not changed');
 });
+integrationTest('topic-color: readNote reads only an exact whitelisted string and a note without a colour has no color field', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  assert.equal('color' in (await repo.readNote(n.path)), false, 'no color key when none is set');
+  const withValue = value => contents.set(n.path, contents.get(n.path).replace(/^topic-color:.*\n(  - .*\n)*/m, '').replace('---\n', `---\ntopic-color: ${value}\n`));
+  for (const bad of ['Red', '["red"]', '3', '"red; background:url(x)"', '"<img onerror>"', '{}', '[red, blue]']) {
+    withValue(bad);
+    assert.equal('color' in (await repo.readNote(n.path)), false, `${bad} reads as no colour`);
+  }
+  withValue('purple');
+  assert.equal((await repo.readNote(n.path)).color, 'purple');
+});
+integrationTest('topic-color: writeTopicColor sets, overwrites an unknown old value, removes the key on null, keeps other lines and leaves updated alone', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  const updatedLine = () => contents.get(n.path).match(/^updated:.*$/m)?.[0];
+  const original = contents.get(n.path);
+  const before = updatedLine();
+  await repo.writeTopicColor(n.path, 'blue');
+  assert.equal((await repo.readNote(n.path)).color, 'blue');
+  assert.equal(updatedLine(), before, 'updated is not bumped');
+  contents.set(n.path, contents.get(n.path).replace(/^topic-color:.*$/m, 'topic-color: Mystery'));
+  await repo.writeTopicColor(n.path, 'green');
+  assert.equal((await repo.readNote(n.path)).color, 'green');
+  assert.doesNotMatch(contents.get(n.path), /Mystery/, 'an explicit choice overwrites the unreadable value');
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\n'));
+  await repo.writeTopicColor(n.path, null);
+  assert.doesNotMatch(contents.get(n.path), /topic-color/, 'the key is removed');
+  assert.match(contents.get(n.path), /custom: retain me/);
+  assert.equal('color' in (await repo.readNote(n.path)), false);
+  assert.equal(contents.get(n.path), original.replace('---\n', '---\ncustom: retain me\n'), 'everything else is byte-identical');
+});

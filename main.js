@@ -19195,6 +19195,15 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
 
 // repository.ts
 var import_obsidian14 = require("obsidian");
+
+// topic-colors.ts
+var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
+function readTopicColor(fm) {
+  const raw = fm["topic-color"];
+  return TOPIC_COLORS.find((id) => id === raw);
+}
+
+// repository.ts
 var import_node_crypto5 = require("node:crypto");
 
 // core/map-chat-layout.ts
@@ -20327,6 +20336,7 @@ var Repository = class {
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
       ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
       ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
+      ...readTopicColor(fm) ? { color: readTopicColor(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       lastError: text5(fm["last-error"]),
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
@@ -20606,6 +20616,13 @@ ${body}`);
       this.file(path),
       (content) => setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
     );
+  }
+  /**
+   * Sets `topic-color` to one id, or removes the key for null. An unreadable old value is overwritten because the choice
+   * is explicit; no other key changes and `updated` is not bumped.
+   */
+  async writeTopicColor(path, id) {
+    await this.app.vault.process(this.file(path), (content) => setFrontmatterKeys(content, { "topic-color": id }));
   }
   /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */
   async writeHypothesisStrength(path, strength) {

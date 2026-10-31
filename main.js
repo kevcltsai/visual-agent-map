@@ -19046,6 +19046,27 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
 
 // repository.ts
 var import_obsidian13 = require("obsidian");
+
+// topic-markers.ts
+var TOPIC_MARKERS = ["done", "warning", "star", "priority-1", "priority-2", "priority-3"];
+var PRIORITIES = ["priority-1", "priority-2", "priority-3"];
+function readTopicMarkers(fm) {
+  const raw = fm["topic-markers"];
+  if (!Array.isArray(raw)) return [];
+  return TOPIC_MARKERS.filter((id) => raw.includes(id));
+}
+function toggleTopicMarker(raw, id) {
+  const current = Array.isArray(raw) ? raw.filter((v) => typeof v === "string") : [];
+  let next;
+  if (current.includes(id)) next = current.filter((v) => v !== id);
+  else {
+    next = PRIORITIES.includes(id) ? current.filter((v) => !PRIORITIES.includes(v)) : current.slice();
+    next.push(id);
+  }
+  return next.length ? next : null;
+}
+
+// repository.ts
 var import_node_crypto4 = require("node:crypto");
 
 // core/map-chat-layout.ts
@@ -20177,6 +20198,7 @@ var Repository = class {
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
       ...readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {},
+      ...readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {},
       detailFormatIssues: Array.isArray(fm["detail-format-issues"]) ? fm["detail-format-issues"].filter((v) => typeof v === "string") : [],
       lastError: text5(fm["last-error"]),
       status: ["idea", "running", "completed", "error"].includes(normalized) ? normalized : "idea",
@@ -20445,6 +20467,16 @@ ${body}`);
     await this.app.vault.process(
       this.file(path),
       (content) => setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
+  }
+  /**
+   * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
+   * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
+   */
+  async writeTopicMarkers(path, id) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
     );
   }
   /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */

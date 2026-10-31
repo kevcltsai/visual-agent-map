@@ -963,7 +963,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -2051,7 +2051,7 @@ function heFixture(options = {}) {
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
   plugin.currentModelChoice = () => ({ model: plugin.settings.cliModel, reasoning: plugin.settings.cliReasoning });
   const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.app = {}; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
+  view.app = { vault: { getAbstractFileByPath: () => null }, metadataCache: { getFileCache: () => null } }; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
   view.notes = options.notes ?? heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}]]);
   return { VisualAgentMapView, view, doc, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
 }
@@ -3232,9 +3232,9 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Color', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37)');
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Color', 'Topic cover', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the cover switch after the colour (decision 0.28-triage#36)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Color', 'Parent topic'], 'no strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Color', 'Topic cover', 'Parent topic'], 'no strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
   const css = heCss();

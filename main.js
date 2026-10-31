@@ -31003,6 +31003,10 @@ function modelField(parent, models, defaultLabel, repair) {
         model.createEl("option", { value: id, text: id });
       model.value = id != null ? id : "";
     },
+    setDefaultLabel: (label) => {
+      defaultLabel = label;
+      fill2();
+    },
     dispose
   };
 }
@@ -31161,7 +31165,7 @@ var messageOf = (error) => {
 };
 var OutlineImportModal = class extends import_obsidian18.Modal {
   constructor(app, create, models = { list: () => [], watch: () => () => {
-  } }, templates = [], target = { map: "none" }, initialPlacement = "tree", generator, links = {}, tones = [], defaultStyleLabel = "") {
+  } }, templates = [], target = { map: "none" }, initialPlacement = "tree", generator, links = {}, tones = [], defaultStyleLabel = "", defaultModelLabel) {
     super(app);
     this.create = create;
     this.models = models;
@@ -31171,6 +31175,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     this.links = links;
     this.tones = tones;
     this.defaultStyleLabel = defaultStyleLabel;
+    this.defaultModelLabel = defaultModelLabel;
     __publicField(this, "textarea");
     __publicField(this, "preview");
     __publicField(this, "createButton");
@@ -31189,6 +31194,9 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     __publicField(this, "setMode", () => {
     });
     __publicField(this, "syncResearchOptions", () => {
+    });
+    /** Asks the host what the model menu's default entry means for the current position and shows it. */
+    __publicField(this, "syncModelLabel", () => {
     });
     __publicField(this, "restoreResult", () => {
     });
@@ -31227,10 +31235,29 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     const mode = aiModeField(researchOptions, { initial: "quick" });
     this.mode = mode.value;
     this.setMode = mode.set;
-    const model = modelField(researchOptions, this.models, t("ui.workspace_default"), this.links.repair);
+    const model = modelField(
+      researchOptions,
+      this.models,
+      this.defaultModelLabel ? "" : t("ui.workspace_default"),
+      this.links.repair
+    );
     this.model = model.value;
     this.setModel = model.set;
     this.unwatch = model.dispose;
+    let labelTicket = 0;
+    this.syncModelLabel = () => {
+      if (!this.defaultModelLabel) return;
+      const ticket = ++labelTicket;
+      const placement = this.placementRequest();
+      const answer = this.defaultModelLabel(placement.kind === "under" ? placement.parentId : null);
+      const apply = (label) => {
+        if (ticket === labelTicket) model.setDefaultLabel(label);
+      };
+      if (typeof answer === "string") apply(answer);
+      else answer.then(apply, () => {
+      });
+    };
+    this.syncModelLabel();
     const style = noteStyleField(researchOptions, {
       templates: this.templates,
       tones: this.tones,
@@ -31296,6 +31323,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
         if (!input.checked) return;
         this.placement = option2.kind;
         for (const mark of marks) mark.label.toggleClass("is-checked", mark.kind === this.placement);
+        this.syncModelLabel();
       });
       const text11 = label.createDiv("vam-outline-option-text");
       text11.createSpan({ text: option2.text });
@@ -31446,12 +31474,20 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
           ...tone ? { tone } : {}
         };
       };
-      void generator.generate({ topic: topic.value.trim(), presetText: text11.value }, controller.signal, () => {
-        const snapshot = inputs();
-        this.detached = true;
-        this.close();
-        return snapshot;
-      }).then((markdown) => {
+      const generationModel = () => {
+        const picked = this.shallow.checked ? this.model() : void 0;
+        return picked ? { model: picked } : {};
+      };
+      void generator.generate(
+        { topic: topic.value.trim(), presetText: text11.value, ...generationModel() },
+        controller.signal,
+        () => {
+          const snapshot = inputs();
+          this.detached = true;
+          this.close();
+          return snapshot;
+        }
+      ).then((markdown) => {
         if (this.detached) return;
         if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));
         this.textarea.value = sanitizeOutlineDraft(markdown).trimEnd();
@@ -43713,8 +43749,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
       this.fieldLinks(),
       this.toneChoices(),
-      this.defaultStyleLabel()
+      this.defaultStyleLabel(),
+      (parentId) => this.outlineModelLabel(parentId)
     ).open();
+  }
+  /**
+   * What the outline window's default model entry means at a position: new topics under a topic with a manual upper
+   * topic follow that model, everything else follows the current model.
+   */
+  async outlineModelLabel(parentId) {
+    var _a2, _b2;
+    const parent = parentId ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === parentId) : void 0;
+    const resolved = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_b2 = this.map) != null ? _b2 : void 0) : { ...this.plugin.currentModelChoice(), origin: "current" };
+    return t(
+      resolved.origin === "override" ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
+      this.plugin.modelLabel(resolved.model)
+    );
   }
   /** The import target a reopened window keeps: its selected topic while that topic is still on the map. */
   reopenedImportTarget(inputs) {
@@ -43738,7 +43788,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
         var _a2, _b2;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const { model, reasoning } = this.plugin.currentModelChoice();
+        const { model, reasoning } = resolveTaskModel({
+          runOnce: request.model ? { model: request.model } : null,
+          current: this.plugin.currentModelChoice()
+        });
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
@@ -45062,7 +45115,8 @@ ${request.requirements}` : preset.text,
     var _a2;
     const placement = (_a2 = request.placement) != null ? _a2 : { kind: "new" };
     if (placement.kind !== "new") return this.importOutlineIntoMap(request, placement);
-    const model = request.shallowResearch && request.model || this.plugin.settings.cliModel;
+    const currentModel = this.plugin.currentModelChoice().model;
+    const model = request.shallowResearch && request.model || currentModel;
     const settings = this.plugin.settings;
     const { template } = resolveTemplate(
       settings.detailTemplates,
@@ -45078,7 +45132,7 @@ ${request.requirements}` : preset.text,
         request.source,
         void 0,
         template,
-        Boolean(request.shallowResearch && request.model && request.model !== settings.cliModel)
+        Boolean(request.shallowResearch && request.model && request.model !== currentModel)
       );
     } catch (error) {
       if (!(error == null ? void 0 : error.mapCreated)) throw error;
@@ -45136,7 +45190,8 @@ ${request.requirements}` : preset.text,
     };
     target();
     const state = {};
-    let model = settings.cliModel;
+    const currentModel = this.plugin.currentModelChoice().model;
+    let model = currentModel;
     let written2 = true;
     try {
       await this.plugin.mutate(async () => {
@@ -45149,7 +45204,7 @@ ${request.requirements}` : preset.text,
           return;
         }
         const { map, path, parent } = current;
-        const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, settings.cliModel) : settings.cliModel;
+        const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
         const result = await addOutlineToMap(
@@ -46548,10 +46603,7 @@ ${request.requirements}` : preset.text,
   async mergeModel(parentId) {
     var _a2, _b2;
     const parent = parentId ? (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === parentId) : void 0;
-    const current = {
-      model: this.plugin.settings.cliModel,
-      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
-    };
+    const current = this.plugin.currentModelChoice();
     if (!parent) return current;
     const resolved = await this.plugin.repo.resolveTopicModel(parent.path, (_b2 = this.map) != null ? _b2 : void 0);
     return {

@@ -53,7 +53,7 @@ import {
 } from "obsidian";
 import { readMarkdownFile, type ReferenceGroup } from "../../ai/reference-materials";
 import { providerForModel } from "../../ai/providers/provider";
-import { FALLBACK_MODEL, type ModelChoice } from "../../ai/model-resolution";
+import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/model-resolution";
 import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
@@ -1617,8 +1617,23 @@ export class VisualAgentMapView extends ItemView {
       this.outlineGenerator(prefill ? prefill.inputs.topic : target.selected?.title, prefill),
       this.fieldLinks(),
       this.toneChoices(),
-      this.defaultStyleLabel()
+      this.defaultStyleLabel(),
+      parentId => this.outlineModelLabel(parentId)
     ).open();
+  }
+  /**
+   * What the outline window's default model entry means at a position: new topics under a topic with a manual upper
+   * topic follow that model, everything else follows the current model.
+   */
+  private async outlineModelLabel(parentId: string | null): Promise<string> {
+    const parent = parentId ? this.map?.nodes.find(node => node.id === parentId) : undefined;
+    const resolved = parent
+      ? await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined)
+      : { ...this.plugin.currentModelChoice(), origin: "current" as const };
+    return t(
+      resolved.origin === "override" ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
+      this.plugin.modelLabel(resolved.model)
+    );
   }
   /** The import target a reopened window keeps: its selected topic while that topic is still on the map. */
   private reopenedImportTarget(inputs: OutlineDraftInputs): OutlineImportTarget {
@@ -1642,7 +1657,11 @@ export class VisualAgentMapView extends ItemView {
       generate: async (request, signal, started) => {
         if (this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
-        const { model, reasoning } = this.plugin.currentModelChoice();
+        // The model menu's pick is for this generation only; the reasoning is the current model's (D5).
+        const { model, reasoning } = resolveTaskModel({
+          runOnce: request.model ? { model: request.model } : null,
+          current: this.plugin.currentModelChoice()
+        });
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -3062,7 +3081,8 @@ export class VisualAgentMapView extends ItemView {
     const placement = request.placement ?? { kind: "new" };
     if (placement.kind !== "new") return this.importOutlineIntoMap(request, placement);
     // A model chosen for the shallow research becomes the new topics' model, so later work on them uses it too.
-    const model = (request.shallowResearch && request.model) || this.plugin.settings.cliModel;
+    const currentModel = this.plugin.currentModelChoice().model;
+    const model = (request.shallowResearch && request.model) || currentModel;
     const settings = this.plugin.settings;
     const { template } = resolveTemplate(
       settings.detailTemplates,
@@ -3078,7 +3098,7 @@ export class VisualAgentMapView extends ItemView {
         request.source,
         undefined,
         template,
-        Boolean(request.shallowResearch && request.model && request.model !== settings.cliModel)
+        Boolean(request.shallowResearch && request.model && request.model !== currentModel)
       );
     } catch (error) {
       // Once the map folder exists the import window must close, so a retry cannot create a second map.
@@ -3148,7 +3168,8 @@ export class VisualAgentMapView extends ItemView {
       result?: Awaited<ReturnType<typeof addOutlineToMap>>;
       saveFailed?: boolean;
     } = {};
-    let model = settings.cliModel;
+    const currentModel = this.plugin.currentModelChoice().model;
+    let model = currentModel;
     let written = true;
     try {
       await this.plugin.mutate(async () => {
@@ -3162,8 +3183,8 @@ export class VisualAgentMapView extends ItemView {
         const { map, path, parent } = current;
         // A model chosen for the shallow research becomes the new topics' model; otherwise they inherit like new children.
         const baseModel = parent
-          ? inheritModel((await repo.readNote(parent.path, map)).model, settings.cliModel)
-          : settings.cliModel;
+          ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel)
+          : currentModel;
         model = (request.shallowResearch && request.model) || baseModel;
         // A template chosen here is recorded on each new topic: an import never changes this map's default.
         const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
@@ -4655,10 +4676,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async mergeModel(parentId: string | null): Promise<ModelChoice> {
     const parent = parentId ? this.map?.nodes.find(node => node.id === parentId) : undefined;
-    const current: ModelChoice = {
-      model: this.plugin.settings.cliModel,
-      reasoning: normalizeReasoningLevel(this.plugin.settings.cliReasoning)
-    };
+    const current: ModelChoice = this.plugin.currentModelChoice();
     if (!parent) return current;
     const resolved = await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined);
     return {

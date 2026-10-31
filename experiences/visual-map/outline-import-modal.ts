@@ -99,7 +99,12 @@ export interface OutlineGenerator {
    * promise is no longer read.
    */
   generate: (
-    request: { topic: string; presetText: string },
+    request: {
+      topic: string;
+      presetText: string;
+      /** The model picked in the research options (used for this generation only); absent: the current model. */
+      model?: string;
+    },
     signal: AbortSignal,
     started: () => OutlineDraftInputs
   ) => Promise<string>;
@@ -124,6 +129,8 @@ export class OutlineImportModal extends Modal {
   private setStyle: (template: string | undefined, tone: string | undefined) => void = () => {};
   private setMode: (mode: MapAiMode) => void = () => {};
   private syncResearchOptions: () => void = () => {};
+  /** Asks the host what the model menu's default entry means for the current position and shows it. */
+  private syncModelLabel: () => void = () => {};
   private restoreResult: () => void = () => {};
   /** AI generation started and this window hid itself; closing no longer stops it (the status bar has Stop). */
   private detached = false;
@@ -142,7 +149,12 @@ export class OutlineImportModal extends Modal {
     private generator?: OutlineGenerator,
     private links: FieldLinks = {},
     private tones: { id: string; name: string }[] = [],
-    private defaultStyleLabel = ""
+    private defaultStyleLabel = "",
+    /**
+     * The text of the model menu's default entry for a position: "Follow current model (X)" or, under a topic that
+     * has a manual upper topic, "Follow upper topic (X)". `parentId` is the topic the outline goes under, else null.
+     */
+    private defaultModelLabel?: (parentId: string | null) => string | Promise<string>
   ) {
     super(app);
     // The outline always joins the open map (a new map starts from + New mind map); without a selection it becomes a new tree.
@@ -181,10 +193,29 @@ export class OutlineImportModal extends Modal {
     const mode = aiModeField(researchOptions, { initial: "quick" });
     this.mode = mode.value;
     this.setMode = mode.set;
-    const model = modelField(researchOptions, this.models, t("ui.workspace_default"), this.links.repair);
+    const model = modelField(
+      researchOptions,
+      this.models,
+      this.defaultModelLabel ? "" : t("ui.workspace_default"),
+      this.links.repair
+    );
     this.model = model.value;
     this.setModel = model.set;
     this.unwatch = model.dispose;
+    let labelTicket = 0;
+    this.syncModelLabel = () => {
+      if (!this.defaultModelLabel) return;
+      const ticket = ++labelTicket;
+      const placement = this.placementRequest();
+      const answer = this.defaultModelLabel(placement.kind === "under" ? placement.parentId : null);
+      // An answer that arrives after a newer position was asked for is stale.
+      const apply = (label: string): void => {
+        if (ticket === labelTicket) model.setDefaultLabel(label);
+      };
+      if (typeof answer === "string") apply(answer);
+      else answer.then(apply, () => {});
+    };
+    this.syncModelLabel();
     const style = noteStyleField(researchOptions, {
       templates: this.templates,
       tones: this.tones,
@@ -260,6 +291,7 @@ export class OutlineImportModal extends Modal {
         if (!input.checked) return;
         this.placement = option.kind;
         for (const mark of marks) mark.label.toggleClass("is-checked", mark.kind === this.placement);
+        this.syncModelLabel();
       });
       const text = label.createDiv("vam-outline-option-text");
       text.createSpan({ text: option.text });
@@ -408,15 +440,24 @@ export class OutlineImportModal extends Modal {
           ...(tone ? { tone } : {})
         };
       };
+      // The model menu counts only while it shows (the research option is on); a hidden pick is not used.
+      const generationModel = (): { model?: string } => {
+        const picked = this.shallow.checked ? this.model() : undefined;
+        return picked ? { model: picked } : {};
+      };
       // Unsaved edits in the preset box are used for this run only.
       void generator
-        .generate({ topic: topic.value.trim(), presetText: text.value }, controller.signal, () => {
-          // AI started: hide this window; the host owns the run from here (Stop is on its status bar).
-          const snapshot = inputs();
-          this.detached = true;
-          this.close();
-          return snapshot;
-        })
+        .generate(
+          { topic: topic.value.trim(), presetText: text.value, ...generationModel() },
+          controller.signal,
+          () => {
+            // AI started: hide this window; the host owns the run from here (Stop is on its status bar).
+            const snapshot = inputs();
+            this.detached = true;
+            this.close();
+            return snapshot;
+          }
+        )
         .then(markdown => {
           if (this.detached) return;
           if (controller.signal.aborted) throw new Error(t("ui.outline_ai_stopped"));

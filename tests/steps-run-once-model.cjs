@@ -5,6 +5,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until } = require('./support.cjs');
+const dom = require('./support-dom.cjs');
 
 const MAP = 'Agent Workspace/Topics/map-a/Map.md';
 const frontmatterOf = text => text.match(/^---\r?\n([\s\S]*?)\r?\n---/)[1];
@@ -113,4 +114,80 @@ test('the stale check still compares the note itself: a run-once model does not 
   assert.equal(done.length, 1);
 });
 
-module.exports = { harness, research, modelLines, MAP };
+
+// ---- P6c: the outline import window --------------------------------------------------------------------------------
+const modalFor = (over = {}) => {
+  const Modal = dom.makeModal();
+  const mod = load('experiences/visual-map/outline-import-modal.ts', { obsidian: { ...obsidian, Modal, Notice: class {} } });
+  const requests = [], created = [], labels = [];
+  const generator = { presets: { settings: { language: 'en', promptPresets: [] }, async saveSettings() {} }, initialTopic: 'Sleep', generate: async (request, _signal, started) => { requests.push(request); started(); return '# Sleep\n## A\n'; } };
+  const modal = new mod.OutlineImportModal({}, async request => { created.push(request); },
+    { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, [], { map: 'editable', selected: { id: 'n1', title: 'Sleep' } }, 'tree', generator, {}, [], '',
+    over.defaultModelLabel ?? (async parentId => { labels.push(parentId); return parentId ? 'Follow upper topic (gpt-x)' : 'Follow current model (cur)'; }));
+  modal.open();
+  const model = () => dom.find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model');
+  const radio = value => dom.find(modal.contentEl, i => i.tag === 'input' && i.type === 'radio' && i.value === value);
+  const choose = value => { radio(value).checked = true; radio(value).fire('change'); };
+  return { modal, model, choose, labels, requests, created };
+};
+test('counterexample 6: the default model label follows the import position and target, live', async () => {
+  const m = modalFor();
+  await dom.tick();
+  assert.equal(m.model().children[0].text, 'Follow current model (cur)');
+  m.choose('under'); await dom.tick();
+  assert.equal(m.model().children[0].text, 'Follow upper topic (gpt-x)', 'a topic with a manual upper topic shows its model');
+  m.choose('tree'); await dom.tick();
+  assert.equal(m.model().children[0].text, 'Follow current model (cur)');
+  assert.deepEqual(m.labels, [null, 'n1', null], 'the host is asked with the parent topic, or null for a new tree');
+  assert.equal(m.model().children[0].value, '', 'the default entry still means "no pick"');
+});
+test('a slow label answer for an earlier position never overwrites the latest one', async () => {
+  const waits = new Map();
+  const m = modalFor({ defaultModelLabel: parentId => new Promise(resolve => waits.set(parentId, () => resolve(parentId ? 'under' : 'tree'))) });
+  m.choose('under'); await dom.tick();
+  waits.get('n1')(); waits.get(null)(); await dom.tick();
+  assert.equal(m.model().children[0].text, 'under', 'the answer for the last position wins, whatever order they arrive in');
+});
+test('AI outline generation gets the picked model only when the research option shows it; no pick leaves the request model-free', async () => {
+  const m = modalFor();
+  const generate = () => dom.button(dom.find(m.modal.contentEl, i => i.tag === 'details' && dom.hasCls(i, 'vam-outline-ai')), 'Generate outline');
+  generate().click(); await dom.tick();
+  assert.equal('model' in m.requests[0], false);
+  const picked = modalFor();
+  picked.model().value = 'm1'; picked.model().fire('change');
+  const gen = () => dom.button(dom.find(picked.modal.contentEl, i => i.tag === 'details' && dom.hasCls(i, 'vam-outline-ai')), 'Generate outline');
+  gen().click(); await dom.tick();
+  assert.equal('model' in picked.requests[0], false, 'research option unchecked: the hidden menu is not used');
+  const shown = modalFor();
+  dom.find(shown.modal.contentEl, i => i.type === 'checkbox' && dom.hasCls(i.parent ?? {}, 'vam-outline-check')).checked = true;
+  shown.model().value = 'm1'; shown.model().fire('change');
+  dom.button(dom.find(shown.modal.contentEl, i => i.tag === 'details' && dom.hasCls(i, 'vam-outline-ai')), 'Generate outline').click(); await dom.tick();
+  assert.equal(shown.requests[0].model, 'm1');
+});
+test('the view generator runs the picked model once with the current reasoning and asks usage for it; without a pick the current model', async () => {
+  const h = await harness([['Old root', 'parent-model', 'manual', 'high']]);
+  const calls = [];
+  h.host.outlineGeneration = { generate: async request => { calls.push(request); return { markdown: '# T\n', nodes: [] }; } };
+  h.host.currentModelChoice = () => ({ model: 'cur-x', reasoning: 'medium' });
+  const inputs = () => ({ topic: 'T', presetId: 'p', presetText: 'p', placement: 'tree', target: { map: 'editable' }, shallow: false, mode: 'quick' });
+  const generator = h.view.outlineGenerator('T');
+  await generator.generate({ topic: 'T', presetText: 'p', model: 'm1' }, new AbortController().signal, inputs);
+  await generator.generate({ topic: 'T', presetText: 'p' }, new AbortController().signal, inputs);
+  assert.deepEqual(calls.map(c => [c.model, c.reasoning]), [['m1', 'medium'], ['cur-x', 'medium']]);
+  assert.deepEqual(h.confirms, ['m1', 'cur-x']);
+  assert.equal(h.repo.settings.cliModel, 'gpt-6-luna', 'nothing is saved');
+});
+test('the host default label: the current model unless the target topic resolves to an override', async () => {
+  const h = await harness([['Manual root', 'gpt-x', 'manual', 'high'], ['Plain root', 'gpt-6-luna', 'workspace']]);
+  h.host.modelLabel = id => `L:${id}`;
+  h.host.settings.cliModel = 'cur-x';
+  h.host.currentModelChoice = () => ({ model: 'cur-x', reasoning: 'low' });
+  assert.equal(await h.view.outlineModelLabel(null), 'Follow current model (L:cur-x)');
+  assert.equal(await h.view.outlineModelLabel(h.nodes[0].id), 'Follow upper topic (L:gpt-x)');
+  assert.equal(await h.view.outlineModelLabel(h.nodes[1].id), 'Follow current model (L:cur-x)');
+});
+test('merging with no upper topic uses the current model choice, not a direct read of the settings', async () => {
+  const h = await harness([['Root', 'gpt-6-luna', 'workspace']]);
+  h.host.currentModelChoice = () => ({ model: 'cur-x', reasoning: 'high' });
+  assert.deepEqual({ ...await h.view.mergeModel(null) }, { model: 'cur-x', reasoning: 'high' });
+});

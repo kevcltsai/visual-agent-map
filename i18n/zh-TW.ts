@@ -771,6 +771,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.merging": "合併中…",
   "ui.merge_bar_title": "合併中：",
   "ui.merge_locked": "合併中，完成後再操作",
+  "ui.group_drag_timeline_top_level": "時間軸的第一層議題用拖曳排序，不能整組移動；取消勾選第一層議題後再拖",
   "ui.merge_done_0": "已合併成「{0}」，可復原",
   "ui.move_links_dialog_notice_0":
     "你有 {0} 篇其他筆記連到這張卡；Obsidian 可能會詢問是否更新連結，建議選「更新」，連結才不會失效。",

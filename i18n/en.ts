@@ -827,6 +827,8 @@ export const en = {
   "ui.merging": "Merging…",
   "ui.merge_bar_title": "Merging:",
   "ui.merge_locked": "Merging; try again when it finishes",
+  "ui.group_drag_timeline_top_level":
+    "First-level topics in a timeline are reordered by dragging and cannot move as a group; uncheck them and drag again",
   "ui.merge_done_0": "Merged into “{0}”. You can undo.",
   "ui.move_links_dialog_notice_0":
     "{0} of your other notes link to this card. Obsidian may ask whether to update links; choose Update so they keep working.",

@@ -845,6 +845,7 @@ var en = {
   "ui.merging": "Merging\u2026",
   "ui.merge_bar_title": "Merging:",
   "ui.merge_locked": "Merging; try again when it finishes",
+  "ui.group_drag_timeline_top_level": "First-level topics in a timeline are reordered by dragging and cannot move as a group; uncheck them and drag again",
   "ui.merge_done_0": "Merged into \u201C{0}\u201D. You can undo.",
   "ui.move_links_dialog_notice_0": "{0} of your other notes link to this card. Obsidian may ask whether to update links; choose Update so they keep working.",
   "ui.merge_check_warning_0": "{0} item(s) of source content may be missing or changed in the merge.",
@@ -2995,6 +2996,7 @@ var zhCN = {
   "ui.merging": "\u5408\u5E76\u4E2D\u2026",
   "ui.merge_bar_title": "\u5408\u5E76\u4E2D\uFF1A",
   "ui.merge_locked": "\u5408\u5E76\u4E2D\uFF0C\u5B8C\u6210\u540E\u518D\u64CD\u4F5C",
+  "ui.group_drag_timeline_top_level": "\u65F6\u95F4\u8F74\u7684\u7B2C\u4E00\u5C42\u8BAE\u9898\u7528\u62D6\u62FD\u6392\u5E8F\uFF0C\u4E0D\u80FD\u6574\u7EC4\u79FB\u52A8\uFF1B\u53D6\u6D88\u52FE\u9009\u7B2C\u4E00\u5C42\u8BAE\u9898\u540E\u518D\u62D6",
   "ui.merge_done_0": "\u5DF2\u5408\u5E76\u6210\u201C{0}\u201D\uFF0C\u53EF\u64A4\u9500",
   "ui.move_links_dialog_notice_0": "\u4F60\u6709 {0} \u7BC7\u5176\u4ED6\u7B14\u8BB0\u8FDE\u5230\u8FD9\u5F20\u5361\uFF1BObsidian \u53EF\u80FD\u4F1A\u8BE2\u95EE\u662F\u5426\u66F4\u65B0\u94FE\u63A5\uFF0C\u5EFA\u8BAE\u9009\u201C\u66F4\u65B0\u201D\uFF0C\u94FE\u63A5\u624D\u4E0D\u4F1A\u5931\u6548\u3002",
   "ui.merge_check_warning_0": "\u5408\u5E76\u540E\u6709 {0} \u9879\u6765\u6E90\u5185\u5BB9\u53EF\u80FD\u9057\u6F0F",
@@ -5145,6 +5147,7 @@ var zhTW = {
   "ui.merging": "\u5408\u4F75\u4E2D\u2026",
   "ui.merge_bar_title": "\u5408\u4F75\u4E2D\uFF1A",
   "ui.merge_locked": "\u5408\u4F75\u4E2D\uFF0C\u5B8C\u6210\u5F8C\u518D\u64CD\u4F5C",
+  "ui.group_drag_timeline_top_level": "\u6642\u9593\u8EF8\u7684\u7B2C\u4E00\u5C64\u8B70\u984C\u7528\u62D6\u66F3\u6392\u5E8F\uFF0C\u4E0D\u80FD\u6574\u7D44\u79FB\u52D5\uFF1B\u53D6\u6D88\u52FE\u9078\u7B2C\u4E00\u5C64\u8B70\u984C\u5F8C\u518D\u62D6",
   "ui.merge_done_0": "\u5DF2\u5408\u4F75\u6210\u300C{0}\u300D\uFF0C\u53EF\u5FA9\u539F",
   "ui.move_links_dialog_notice_0": "\u4F60\u6709 {0} \u7BC7\u5176\u4ED6\u7B46\u8A18\u9023\u5230\u9019\u5F35\u5361\uFF1BObsidian \u53EF\u80FD\u6703\u8A62\u554F\u662F\u5426\u66F4\u65B0\u9023\u7D50\uFF0C\u5EFA\u8B70\u9078\u300C\u66F4\u65B0\u300D\uFF0C\u9023\u7D50\u624D\u4E0D\u6703\u5931\u6548\u3002",
   "ui.merge_check_warning_0": "\u5408\u4F75\u5F8C\u6709 {0} \u9805\u4F86\u6E90\u5167\u5BB9\u53EF\u80FD\u907A\u6F0F",
@@ -57490,7 +57493,7 @@ ${addition}` : addition });
   }
   enableDrag(card, node) {
     card.addEventListener("pointerdown", (event) => {
-      var _a2, _b2;
+      var _a2, _b2, _c;
       if (event.target.closest("button") || event.button !== 0 || !this.map) return;
       const selecting = this.integrationMode;
       this.clearHoverTimer();
@@ -57503,19 +57506,46 @@ ${addition}` : addition });
       this.dragOrigin = { id: this.map.id, path: this.path };
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y };
       let position = { ...origin }, moved = false, travelled = false;
-      const edges = this.dragEdges(node.id, card);
+      const group = selecting && this.multiSelected.has(node.id) ? this.groupDragMembers(node, card) : null;
+      const groupOrigins = /* @__PURE__ */ new Map();
+      for (const id of (_c = group == null ? void 0 : group.keys()) != null ? _c : []) {
+        const member = this.map.nodes.find((item) => item.id === id);
+        if (member) groupOrigins.set(id, { x: member.x, y: member.y });
+      }
+      let delta = { x: 0, y: 0 };
+      const edges = group ? null : this.dragEdges(node.id, card);
+      const groupEdges = group ? this.groupDragEdges(group) : null;
+      const placeGroup = (dx, dy) => {
+        for (const [id, el] of group != null ? group : []) {
+          const from = groupOrigins.get(id);
+          if (!from) continue;
+          el.style.left = `${from.x + dx}px`;
+          el.style.top = `${from.y + dy}px`;
+        }
+        groupEdges == null ? void 0 : groupEdges.update(dx, dy);
+      };
       card.setPointerCapture(event.pointerId);
       const paint = () => {
         this.dragFrame = null;
+        if (group) {
+          placeGroup(delta.x, delta.y);
+          return;
+        }
         card.style.left = `${position.x}px`;
         card.style.top = `${position.y}px`;
-        edges.update(position.x, position.y);
+        edges == null ? void 0 : edges.update(position.x, position.y);
       };
-      const locked = this.isMerging(node.id);
+      const locked = group ? [...group.keys()].some((id) => this.isMerging(id)) : this.isMerging(node.id);
+      const timelineBlocked = !!group && !this.map.aim && layoutOf(this.map).direction === "timeline" && [...group.keys()].some((id) => {
+        var _a3, _b3, _c2;
+        const parentId = (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === id)) == null ? void 0 : _b3.parentId;
+        const parent = parentId ? (_c2 = this.map) == null ? void 0 : _c2.nodes.find((item) => item.id === parentId) : void 0;
+        return !!parent && !parent.parentId;
+      });
       let warned = false;
       let overChat = false;
       const move = (e) => {
-        var _a3, _b3, _c;
+        var _a3, _b3, _c2, _d;
         if (this.dragStale()) {
           this.endStaleDrag();
           return;
@@ -57524,6 +57554,15 @@ ${addition}` : addition });
         (_b3 = this.chat) == null ? void 0 : _b3.setDropHighlight(overChat);
         if (selecting) {
           travelled || (travelled = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
+          if (!group || !travelled || this.relevanceSortOn()) return;
+          if (locked || timelineBlocked) {
+            if (!warned) new import_obsidian32.Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
+            warned = true;
+            return;
+          }
+          const zoom = this.map.viewport.zoom;
+          delta = { x: (e.clientX - start.x) / zoom, y: (e.clientY - start.y) / zoom };
+          (_c2 = this.dragFrame) != null ? _c2 : this.dragFrame = window.requestAnimationFrame(paint);
           return;
         }
         if (this.relevanceSortOn()) return;
@@ -57537,7 +57576,7 @@ ${addition}` : addition });
           x: origin.x + (e.clientX - start.x) / this.map.viewport.zoom,
           y: origin.y + (e.clientY - start.y) / this.map.viewport.zoom
         };
-        (_c = this.dragFrame) != null ? _c : this.dragFrame = window.requestAnimationFrame(paint);
+        (_d = this.dragFrame) != null ? _d : this.dragFrame = window.requestAnimationFrame(paint);
       };
       const settle = () => {
         var _a3;
@@ -57568,20 +57607,45 @@ ${addition}` : addition });
         var _a3, _b3;
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
-        if (e.type === "pointercancel" || e.type === "lostpointercapture") {
+        const putBack = () => {
+          if (group) {
+            placeGroup(0, 0);
+            return;
+          }
           card.style.left = `${origin.x}px`;
           card.style.top = `${origin.y}px`;
-          edges.update(origin.x, origin.y);
+          edges == null ? void 0 : edges.update(origin.x, origin.y);
+        };
+        if (e.type === "pointercancel" || e.type === "lostpointercapture") {
+          putBack();
           return;
         }
         if (overChat) {
-          card.style.left = `${origin.x}px`;
-          card.style.top = `${origin.y}px`;
-          edges.update(origin.x, origin.y);
-          if ((_a3 = this.map) == null ? void 0 : _a3.nodes.some((item) => item.id === node.id)) (_b3 = this.chat) == null ? void 0 : _b3.addTopicReference(node.id);
+          putBack();
+          const ids = group ? [...group.keys()] : [node.id];
+          for (const id of ids) if ((_a3 = this.map) == null ? void 0 : _a3.nodes.some((item) => item.id === id)) (_b3 = this.chat) == null ? void 0 : _b3.addTopicReference(id);
           return;
         }
-        if (selecting) return;
+        if (selecting) {
+          if (!group) return;
+          if (locked || timelineBlocked || this.relevanceSortOn()) {
+            putBack();
+            return;
+          }
+          placeGroup(delta.x, delta.y);
+          const { x: dx, y: dy } = delta;
+          this.enqueue(
+            () => this.mapChange((map) => {
+              for (const [id, from] of groupOrigins) {
+                const current = map.nodes.find((n) => n.id === id);
+                if (!current) continue;
+                current.x = Math.round(from.x + dx);
+                current.y = Math.round(from.y + dy);
+              }
+            })
+          );
+          return;
+        }
         if (moved && locked) {
         } else if (moved) {
           paint();
@@ -57627,6 +57691,94 @@ ${addition}` : addition });
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
     });
+  }
+  /** The picked cards that move together when one of them is dragged in selection mode, by id. */
+  groupDragMembers(node, card) {
+    var _a2, _b2;
+    const members = /* @__PURE__ */ new Map();
+    for (const id of this.multiSelected) {
+      const el = id === node.id ? (_a2 = this.cardEls.get(id)) != null ? _a2 : card : this.cardEls.get(id);
+      if (el && ((_b2 = this.map) == null ? void 0 : _b2.nodes.some((item) => item.id === id))) members.set(id, el);
+    }
+    return members;
+  }
+  /**
+   * The edges touching a group of cards that move by the same offset. An edge with both ends in the group moves
+   * with both; an edge with one end in the group keeps the other end where it was measured.
+   */
+  groupDragEdges(group) {
+    var _a2, _b2, _c;
+    const nodes = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes) != null ? _b2 : [];
+    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction);
+    const base = /* @__PURE__ */ new Map();
+    for (const [id, el] of group) base.set(id, boxOf(el));
+    const boxFor = (id) => {
+      const known = base.get(id);
+      if (known) return known;
+      const el = this.cardEls.get(id);
+      return el ? boxOf(el) : void 0;
+    };
+    const shifted = (id, dx, dy) => {
+      const box = boxFor(id);
+      return box && group.has(id) ? { ...box, x: box.x + dx, y: box.y + dy } : box;
+    };
+    const tree = [];
+    for (const key2 of this.edgeEls.keys()) {
+      const [parentId, childId] = key2.split("\0");
+      if (!group.has(parentId) && !group.has(childId)) continue;
+      if (!boxFor(parentId) || !boxFor(childId)) continue;
+      tree.push({ key: key2, parentId, childId, direction: directionOf(parentId), depth: depthOf(nodes, childId) });
+    }
+    const linked = [];
+    for (const key2 of this.relationEls.keys()) {
+      const [fromId, toId] = key2.split("\0");
+      if (!group.has(fromId) && !group.has(toId)) continue;
+      if (boxFor(fromId) && boxFor(toId)) linked.push({ key: key2, fromId, toId });
+    }
+    const spineIds = /* @__PURE__ */ new Set();
+    for (const id of group.keys()) {
+      const parentId = (_c = nodes.find((item) => item.id === id)) == null ? void 0 : _c.parentId;
+      if (this.spineEls.has(id)) spineIds.add(id);
+      else if (parentId && this.spineEls.has(parentId)) spineIds.add(parentId);
+    }
+    const spines = [...spineIds].flatMap((id) => {
+      const boxes = this.spineBoxes(id);
+      return boxes ? [{ id, boxes }] : [];
+    });
+    return {
+      update: (dx, dy) => {
+        var _a3, _b3;
+        for (const { id, boxes } of spines) {
+          const move = (item, box) => {
+            var _a4;
+            return group.has(item) ? (_a4 = shifted(item, dx, dy)) != null ? _a4 : box : box;
+          };
+          this.placeSpine(id, void 0, {
+            head: move(id, boxes.head),
+            topics: boxes.topics.map((topic) => ({ id: topic.id, box: move(topic.id, topic.box) }))
+          });
+        }
+        for (const link of linked) {
+          const path = this.relationEls.get(link.key);
+          const from = shifted(link.fromId, dx, dy), to = shifted(link.toId, dx, dy);
+          if (!path || !from || !to) continue;
+          const d = relationPathData(from, to);
+          path.setAttribute("d", d);
+          (_a3 = this.relationHitEls.get(link.key)) == null ? void 0 : _a3.setAttribute("d", d);
+          (_b3 = this.relationGapEls.get(link.key)) == null ? void 0 : _b3.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+        }
+        for (const edge of tree) {
+          const path = this.edgeEls.get(edge.key);
+          const parent = shifted(edge.parentId, dx, dy), child = shifted(edge.childId, dx, dy);
+          if (!path || !parent || !child) continue;
+          path.setAttribute(
+            "d",
+            edge.direction !== "right" ? treeEdgePathData(parent, child, edge.direction, edge.depth) : edgePathData(parent.x + parent.width, parent.y + parent.height / 2, child.x, child.y + child.height / 2)
+          );
+        }
+      }
+    };
   }
   /** The map changed under a running drag: end it without writing anything, then run the repaint that waited for it. */
   endStaleDrag() {

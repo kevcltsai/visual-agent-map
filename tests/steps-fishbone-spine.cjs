@@ -128,3 +128,45 @@ test('S-8: dragging a first-level topic or the head recomputes the spine', async
   h.view.dragEdges(h.named('Root').id, { offsetWidth: 300, offsetHeight: 180 }).update(1100, 500);
   assert.equal(key().attrs.d, geometry.fishboneSpinePathData(box(1100, 500), [box(600, 0), box(300, 700)]), 'head dragged (cards still at start positions)');
 });
+
+test('S-9: dragging the head or a first-level topic reads no card layout and calls canvasNodes() 0 times during update', async () => {
+  const h = await harness([['Root', null, 1000, 400], ['A', 'Root', 600, 0], ['B', 'Root', 300, 700]], FISH);
+  h.place('Root', 1000, 400); h.place('A', 600, 0); h.place('B', 300, 700);
+  h.view.drawEdges();
+  const spine = () => h.view.spineEls.get(h.named('Root').id);
+  let reads = 0;
+  for (const card of h.view.cardEls.values()) {
+    for (const key of ['offsetLeft', 'offsetTop', 'offsetWidth', 'offsetHeight']) {
+      const value = card[key];
+      Object.defineProperty(card, key, { get() { reads++; return value; } });
+    }
+  }
+  const original = h.view.canvasNodes.bind(h.view);
+  let calls = 0;
+  h.view.canvasNodes = () => { calls++; return original(); };
+  const drag = h.view.dragEdges(h.named('B').id, { offsetWidth: 300, offsetHeight: 180 });
+  calls = 0; reads = 0;
+  drag.update(100, 700);
+  drag.update(50, 650);
+  assert.equal(calls, 0, 'topic drag: canvasNodes() calls during update');
+  assert.equal(reads, 0, 'topic drag: card layout reads during update');
+  assert.equal(spine().attrs.d, geometry.fishboneSpinePathData(box(1000, 400), [box(600, 0), box(50, 650)]));
+  const headDrag = h.view.dragEdges(h.named('Root').id, { offsetWidth: 300, offsetHeight: 180 });
+  calls = 0; reads = 0;
+  headDrag.update(1100, 500);
+  assert.equal(calls, 0, 'head drag: canvasNodes() calls during update');
+  assert.equal(reads, 0, 'head drag: card layout reads during update');
+  assert.equal(spine().attrs.d, geometry.fishboneSpinePathData(box(1100, 500), [box(600, 0), box(300, 700)]));
+});
+
+test('S-10: dragging a card of a map laid out to the right builds no spine cache and never calls canvasNodes()', async () => {
+  const h = await harness([['Root', null, 1000, 400], ['A', 'Root', 1360, 0], ['A1', 'A', 1720, 0]]);
+  h.place('Root', 1000, 400); h.place('A', 1360, 0); h.place('A1', 1720, 0);
+  h.view.drawEdges();
+  let calls = 0;
+  const original = h.view.canvasNodes.bind(h.view);
+  h.view.canvasNodes = () => { calls++; return original(); };
+  const drag = h.view.dragEdges(h.named('A').id, { offsetWidth: 300, offsetHeight: 180 });
+  drag.update(1400, 50);
+  assert.equal(calls, 0);
+});

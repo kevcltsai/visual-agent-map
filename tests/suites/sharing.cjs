@@ -368,3 +368,19 @@ test('sharing: leak categories have localized labels in every language', () => {
   }
 });
 
+
+// Ticket 33 P4: topic markers in the share payload. Optional field, same version, whitelist only.
+test('sharing markers: the payload carries only whitelisted marker ids in fixed order, and no key when there are none', () => {
+  const { notesById } = cleanedNotes();
+  const hostile = ['star', 'done', 'done', 'Done', '<img src=x onerror=alert(1)>', 3, null, { id: 'done' }, 'priority-3', 'future-x'];
+  const withMarkers = { ...notesById, rich: { ...notesById.rich, markers: hostile }, [Object.keys(notesById)[0]]: { ...notesById[Object.keys(notesById)[0]], markers: [] } };
+  const payload = format.buildSharePayload(fixtureMap(), withMarkers, options());
+  assert.equal(payload.version, 1, 'no version bump');
+  const rich = payload.nodes.find(n => n.id === 'rich');
+  assert.deepEqual(plain(rich.markers), ['done', 'star', 'priority-3']);
+  assert.ok(!JSON.stringify(payload).includes('onerror'), 'unknown values never reach the file');
+  for (const node of payload.nodes.filter(n => n.id !== 'rich')) assert.equal('markers' in node, false, `${node.id} has no markers key`);
+  const notList = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, markers: 'done' } }, options());
+  assert.equal('markers' in notList.nodes.find(n => n.id === 'rich'), false, 'a non-list value reads as nothing');
+  assert.ok(format.serializeShareJson(payload).includes('"markers":["done","star","priority-3"]'));
+});

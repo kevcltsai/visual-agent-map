@@ -18,6 +18,7 @@ import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
+import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -458,6 +459,8 @@ let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The extra accessible-name part of a card that is waiting to be moved by a paste ("cut"). */
 const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
+/** The marker row drawn in each card header, so a refresh can replace it. */
+const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
@@ -7076,6 +7079,8 @@ export class VisualAgentMapView extends ItemView {
       const named = cardLabels.get(card)?.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
+    this.paintCardMarkers(card, header, node.id);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -7730,6 +7735,51 @@ export class VisualAgentMapView extends ItemView {
   private hypothesisTagText(strength: HypothesisStrength): string {
     return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
   }
+  /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
+  private markersOf(id: string): TopicMarker[] {
+    const raw = this.notes.get(id)?.markers;
+    return raw ? TOPIC_MARKERS.filter(marker => raw.includes(marker)) : [];
+  }
+  /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
+  private markersText(markers: readonly TopicMarker[]): string {
+    return markers.length
+      ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
+      : "";
+  }
+  /**
+   * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
+   * name. Safe to call again: the old symbols and the old name part are replaced.
+   */
+  private paintCardMarkers(card: HTMLElement, header: HTMLElement, id: string): void {
+    const old = cardMarkerRows.get(card);
+    cardMarkerRows.delete(card);
+    const markers = this.markersOf(id),
+      text = this.markersText(markers),
+      previous = card.dataset.markerText ?? "";
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (markers.length) {
+      // After the type tag on a first draw; a redraw puts the new row where the old one was.
+      const kindTag = old ? null : header.querySelector(".vam-hypothesis-tag");
+      const row = header.createSpan("vam-card-markers vam-hypothesis-tag");
+      if (old) old.replaceWith(row);
+      else if (kindTag) kindTag.after(row);
+      row.setAttr("aria-hidden", "true");
+      cardMarkerRows.set(card, row);
+      for (const marker of markers) {
+        const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker) });
+        mark.dataset.marker = marker;
+      }
+      card.dataset.markerText = text;
+    } else {
+      old?.remove();
+      delete card.dataset.markerText;
+    }
+    if (named) this.labelCard(card, text ? t("ui.topic_card_label_0_1", named, text) : named);
+  }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   private labelCard(card: HTMLElement, text: string): void {
     let label = cardLabels.get(card);
@@ -7955,6 +8005,7 @@ export class VisualAgentMapView extends ItemView {
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    if (header) this.paintCardMarkers(card, header, node.id);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -8261,6 +8312,7 @@ export class VisualAgentMapView extends ItemView {
     if (mode !== "structure") return;
     // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
+    if (note) this.renderMarkerSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
@@ -8875,6 +8927,51 @@ export class VisualAgentMapView extends ItemView {
       svg.appendChild(line);
     }
     parent.insertBefore(svg, null);
+  }
+  /** Markers can be edited only on an ordinary editable map: not the sample, an AIM map or the select mode. */
+  private markersEditable(node: MapNode): boolean {
+    return this.relationsEnabled() && !node.aimKind && !this.integrationMode;
+  }
+  /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
+  private renderMarkerSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-marker-section");
+    section.createEl("strong", { text: t("ui.topic_markers"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_markers"));
+    const paint = (focusId?: TopicMarker): void => {
+      group.empty();
+      const active = this.markersOf(node.id);
+      for (const id of TOPIC_MARKERS) {
+        const choice = this.button(group, t(markerLabelKey(id)), () => {
+          this.enqueue(async () => {
+            await this.changeTopicMarker(node, id);
+            paint(id);
+          });
+        });
+        choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+        const on = active.includes(id);
+        choice.setAttr("aria-pressed", String(on));
+        if (on) choice.addClass("is-pressed");
+        // Repainting replaced the button; keep the keyboard focus on the one just toggled.
+        if (id === focusId) choice.focus();
+      }
+    };
+    paint();
+  }
+  /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
+  private async changeTopicMarker(node: MapNode, id: TopicMarker): Promise<void> {
+    if (!this.map || !this.markersEditable(node)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, path => this.plugin.repo.writeTopicMarkers(path, id))
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_markers") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   private renderHypothesisSection(panel: HTMLElement, node: MapNode, close?: () => void): void {

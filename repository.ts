@@ -1,6 +1,7 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
+import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
 import {
   isNoteLanguage,
@@ -99,6 +100,8 @@ export interface Note {
   topicKind?: Exclude<TopicKind, "topic">;
   /** From `hypothesis-strength`; set only for a hypothesis (missing or invalid reads as weak). */
   hypothesisStrength?: HypothesisStrength;
+  /** From `topic-markers` frontmatter, whitelisted ids only; absent when there are none. */
+  markers?: TopicMarker[];
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
@@ -1211,6 +1214,7 @@ export class Repository {
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
+      ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
@@ -1538,6 +1542,16 @@ export class Repository {
   async writeTopicKind(path: string, kind: TopicKind): Promise<void> {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-kind": kind === "topic" ? null : kind })
+    );
+  }
+
+  /**
+   * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
+   * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
+   */
+  async writeTopicMarkers(path: string, id: TopicMarker): Promise<void> {
+    await this.app.vault.process(this.file(path), content =>
+      setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
     );
   }
 

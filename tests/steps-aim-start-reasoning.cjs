@@ -65,3 +65,32 @@ test('AIM start dialog: reasoning menu offers auto first and preselects the curr
   assert.deepEqual(plain(reasoning.children.map(o => o.value)), ['auto', 'low', 'medium', 'high']);
   assert.equal(reasoning.value, 'auto');
 });
+
+// MS-07 P7b (plan D9): a resume compares the draft with the current model and reasoning at the moment of resuming.
+const crashedStart = async (repo, extra) => {
+  const realCreateNoteAt = repo.createNoteAt.bind(repo);
+  repo.createNoteAt = async () => { throw new Error('crash before note'); };
+  await assert.rejects(createAimMap(repo, 'cur-model', start(extra)), /crash before note/);
+  repo.createNoteAt = realCreateNoteAt;
+};
+test('AIM resume: a draft equal to the current model and reasoning at resume time becomes a workspace root with no reasoning-level', async () => {
+  const { repo, contents } = setup('medium');
+  await crashedStart(repo, { reasoning: 'medium' });
+  const created = await createAimMap(repo, 'cur-model', start({ reasoning: 'medium' }));
+  assert.equal((await repo.readNote(created.root.path)).modelSource, 'workspace'); assert.equal(rawLevel(contents, created.root.path), undefined);
+});
+test('AIM resume: a draft with another model or another reasoning becomes a manual root', async () => {
+  for (const [extra, label] of [[{ model: 'gpt-x', reasoning: 'medium' }, 'model'], [{ reasoning: 'high' }, 'reasoning']]) {
+    const { repo } = setup('medium');
+    await crashedStart(repo, extra);
+    const created = await createAimMap(repo, 'cur-model', start(extra));
+    assert.equal((await repo.readNote(created.root.path)).modelSource, 'manual', label);
+  }
+});
+test('AIM resume: the current model is read when resuming, so a switch between start and resume makes the root manual', async () => {
+  const { repo } = setup('medium');
+  await crashedStart(repo, { reasoning: 'medium' });
+  repo.settings.cliModel = 'switched-model';
+  const created = await createAimMap(repo, 'switched-model', start({ reasoning: 'medium' }));
+  assert.equal((await repo.readNote(created.root.path)).modelSource, 'manual');
+});

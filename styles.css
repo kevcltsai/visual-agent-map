@@ -1462,3 +1462,5 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-topic-modal .vam-color-swatch { flex: none; width: 14px; height: 14px; border: 1px solid var(--background-modifier-border); border-radius: 50%; }
 .vam-topic-modal .vam-color-section > button { margin-top: 8px; }
 .vam-topic-modal .vam-topic-colors button[aria-checked="true"], .vam-topic-modal .vam-topic-colors button[aria-checked="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
+.vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
+.vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }

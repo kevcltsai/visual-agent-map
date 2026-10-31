@@ -37,7 +37,7 @@ import {
 } from "./relation-geometry";
 import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
-import { resolveCover, withCoverOff, withoutCover } from "./card-cover";
+import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -5502,6 +5502,7 @@ export class VisualAgentMapView extends ItemView {
     const viewport = this.viewportEl;
     if (!viewport || !this.canEditCanvasItems()) return;
     viewport.addEventListener("dragover", event => this.onCanvasDragOver(event));
+    viewport.addEventListener("dragleave", event => this.onCanvasDragLeave(event));
     viewport.addEventListener("drop", event => this.onCanvasDrop(event));
     viewport.addEventListener("contextmenu", event => this.onCanvasContextMenu(event));
     viewport.addEventListener("pointermove", event => this.onCanvasPointerMove(event));
@@ -5531,8 +5532,16 @@ export class VisualAgentMapView extends ItemView {
     if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    this.viewportEl?.addClass("is-image-drop");
+  }
+  /** The dashed canvas hint goes away when the drag leaves the canvas (not when it only moves onto a child). */
+  private onCanvasDragLeave(event: DragEvent): void {
+    const into = event.relatedTarget as Node | null;
+    if (into && this.viewportEl?.contains(into)) return;
+    this.viewportEl?.removeClass("is-image-drop");
   }
   private onCanvasDrop(event: DragEvent): void {
+    this.viewportEl?.removeClass("is-image-drop");
     if (!this.canEditCanvasItems() || !this.hasFiles(event)) return;
     // Any file dropped here stays inside the map: the browser must not open or navigate to it.
     event.preventDefault();
@@ -5543,6 +5552,97 @@ export class VisualAgentMapView extends ItemView {
     for (const other of all.filter(item => !images.includes(item)))
       new Notice(t("ui.canvas_image_refused", other.name || "?"));
     if (images.length && point) this.queueCanvasImages(images, point);
+  }
+  // ---- Pictures on a card: drop and paste (ticket 32, decisions D5, D6) --------------------------------------------
+  /** A card takes a dropped picture only on an ordinary editable map (the same rule as the panel's cover switch). */
+  private cardAcceptsImages(node: MapNode): boolean {
+    return this.canEditCanvasItems() && this.markersEditable(node);
+  }
+  private onCardDragOver(event: DragEvent, card: HTMLElement, node: MapNode): void {
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    event.preventDefault();
+    // The card owns this drag: the canvas hint steps aside and its handler does not also take the file.
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    this.viewportEl?.removeClass("is-image-drop");
+    card.addClass("is-drop-target");
+  }
+  private onCardDragLeave(event: DragEvent, card: HTMLElement): void {
+    const into = event.relatedTarget as Node | null;
+    if (into && card.contains(into)) return;
+    card.removeClass("is-drop-target");
+  }
+  private onCardDrop(event: DragEvent, card: HTMLElement, node: MapNode): void {
+    card.removeClass("is-drop-target");
+    if (!this.cardAcceptsImages(node) || !this.hasFiles(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const all = Array.from(event.dataTransfer?.files ?? []),
+      images = imageFilesFrom({ files: all });
+    for (const other of all.filter(item => !images.includes(item)))
+      new Notice(t("ui.canvas_image_refused", other.name || "?"));
+    if (images.length) this.enqueue(() => this.attachCardImages(node, images));
+  }
+  /**
+   * Puts each picture on a topic's card: the file is stored beside the note, `![[…]]` is appended to the note's
+   * `## User Notes` section (created when missing) and the first picture also becomes `topic-cover`. One transaction
+   * per picture (attachment, note rewrite and Map.md together), so one undo step each. Undo writes the old note text
+   * back and keeps the file; redo writes the same text again. A switched or closed map drops the result unwritten.
+   */
+  private async attachCardImages(node: MapNode, files: File[]): Promise<void> {
+    if (!this.map || !this.cardAcceptsImages(node)) return;
+    const mapPath = this.path,
+      epoch = this.mapOpenEpoch,
+      stale = (): boolean => this.closed || this.path !== mapPath || this.mapOpenEpoch !== epoch || !this.map;
+    let first = true;
+    for (const file of files) {
+      const label = file.name || "?";
+      let data: ArrayBuffer;
+      try {
+        if (file.size > IMAGE_MAX_BYTES) {
+          new Notice(t("ui.canvas_image_too_large", label));
+          continue;
+        }
+        data = await file.arrayBuffer();
+      } catch {
+        if (!stale()) new Notice(t("ui.canvas_image_unreadable", label));
+        continue;
+      }
+      if (stale()) return;
+      const accepted = acceptImage({ mime: file.type, size: file.size, bytes: data });
+      if (!accepted.ok) {
+        new Notice(t(accepted.reason === "too-large" ? "ui.canvas_image_too_large" : "ui.canvas_image_refused", label));
+        continue;
+      }
+      const name = safeImageName(file.name, accepted.mime);
+      if (!name) continue;
+      const setCover = first;
+      try {
+        // Last check before anything is written: from here the transaction owns the file and its rollback.
+        if (stale() || !this.map) return;
+        const viewport = clone(this.map.viewport);
+        const entry = await this.beginMapTransaction()
+          .createAttachment("image", { name, data, sourcePath: node.path })
+          .rewriteNote(node.path, async (target, attachment) => {
+            const note = this.app.vault.getAbstractFileByPath(target);
+            if (!(note instanceof TFile)) throw new Error(target);
+            const link = attachment("image");
+            await this.app.vault.process(note, content => {
+              const withEmbed = appendImageEmbed(content, link);
+              return setCover ? withCover(withEmbed, link) : withEmbed;
+            });
+          })
+          .editMap(this.path, map => {
+            map.viewport = clone(viewport);
+          })
+          .commit({ deferRebuild: true, label: t("ui.topic_cover") });
+        this.history.push(entry);
+        first = false;
+        await this.refreshAfterSavedChange();
+      } catch (error) {
+        new Notice(errorMessage(error));
+      }
+    }
   }
   private onCanvasContextMenu(event: MouseEvent): void {
     if (!this.canEditCanvasItems()) return;
@@ -5589,7 +5689,14 @@ export class VisualAgentMapView extends ItemView {
     if (!this.canEditCanvasItems()) return false;
     const images = imageFilesFrom({ files: Array.from(event.clipboardData?.files ?? []) });
     if (!images.length) return false;
-    // TODO(P5, ticket 32): a selected topic takes the picture as its card cover instead of a canvas image.
+    // A selected topic (the one the panel shows) takes the picture on its card; other selections leave it alone.
+    // Clipboard text next to the picture (a spreadsheet range, say) still goes to the outline in the clipboard group.
+    const target = this.map?.nodes.find(item => item.id === this.selected);
+    if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
+      event.preventDefault();
+      this.enqueue(() => this.attachCardImages(target, images));
+      return true;
+    }
     if (this.selected || this.multiSelected.size) return false;
     const point = this.stagePoint(this.lastCanvasPointer);
     if (!point) return false;
@@ -7735,6 +7842,9 @@ export class VisualAgentMapView extends ItemView {
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
+    card.addEventListener("dragover", event => this.onCardDragOver(event, card, node));
+    card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
+    card.addEventListener("drop", event => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
     this.labelCard(card, note?.title ?? t("ui.note_missing"));
     if (this.integrationMode) {

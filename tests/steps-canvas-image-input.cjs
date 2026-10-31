@@ -261,18 +261,22 @@ test('D6: image file without a selected topic becomes a canvas image at the last
   assert.deepEqual([items[1].x, items[1].y], [25, 10]);
 });
 
-test('D6: image file with a selected topic is left for the card flow (P5) and no canvas image is made; text still reaches the outline', async () => {
+test('D6: image file with a selected topic goes to the card (P5), not the canvas; text next to it still reaches the outline', async () => {
   const h = await harness();
   h.view.selected = h.root.id;
   const imageOnly = clipboardEvent({}, [file(png())]);
   h.view.onClipboardEvent('paste', imageOnly);
   await h.settle();
-  assert.equal(h.counts.createBinary, 0);
-  assert.equal(await h.onDisk(), undefined);
+  assert.equal(h.counts.createBinary, 1, 'the picture is stored once, for the card');
+  assert.equal(await h.onDisk(), undefined, 'no canvas image is made');
+  assert.match(h.contents.get(h.root.path), /!\[\[Media\/pic\.png\]\]/);
+  const stored = h.counts.createBinary;
   const texts = [];
   h.view.pasteText = (event, text) => texts.push(text);
   h.view.onClipboardEvent('paste', clipboardEvent({ 'text/plain': 'Alpha\n  Beta' }, [file(png())]));
   assert.deepEqual(texts, ['Alpha\n  Beta'], 'the clipboard group keeps plain text');
+  await h.settle();
+  assert.equal(h.counts.createBinary, stored, 'text plus picture writes no file');
 });
 
 test('D6: text only goes to the clipboard group', async () => {

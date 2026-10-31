@@ -74,3 +74,22 @@ export function withCoverOff(content: string): string {
 export function withoutCover(content: string): string {
   return setFrontmatterKeys(content, { [COVER_KEY]: null });
 }
+
+/**
+ * Appends `![[link]]` at the end of the note's `## User Notes` section (before the next `## ` heading), or adds that
+ * section at the end of the note when there is none. Everything else stays as written.
+ */
+export function appendImageEmbed(content: string, link: string): string {
+  const safe = safeLink(link);
+  if (!safe) return content;
+  const embed = `![[${safe}]]`;
+  const heading = /^## User Notes[ \t]*$/m.exec(content);
+  if (!heading) return `${content.replace(/\s+$/, "")}\n\n## User Notes\n\n${embed}\n`;
+  const from = heading.index + heading[0].length;
+  const next = /^## /m.exec(content.slice(from));
+  const end = next ? from + next.index : content.length;
+  const at = from + content.slice(from, end).replace(/\s+$/, "").length;
+  const tail = content.slice(at);
+  // The section may end the file without a final line break.
+  return `${content.slice(0, at)}\n\n${embed}${tail.includes("\n") ? tail : `${tail}\n`}`;
+}

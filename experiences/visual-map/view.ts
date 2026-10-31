@@ -1786,13 +1786,14 @@ export class VisualAgentMapView extends ItemView {
       generate: async (request, signal): Promise<OutlineNode[]> => {
         const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
+        const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
           {
             topic: note.title,
             presetText: request.requirements ? `${preset.text}\n\n${request.requirements}` : preset.text,
             language: request.language,
-            model: note.model,
-            reasoning: normalizeReasoningLevel(note.reasoning ?? settings.cliReasoning),
+            model: used.model,
+            reasoning: normalizeReasoningLevel(used.reasoning ?? settings.cliReasoning),
             limits: request.limits
           },
           signal
@@ -8653,7 +8654,9 @@ export class VisualAgentMapView extends ItemView {
               mapAiMode: options.mapAiMode,
               addCharts: options.mapAiMode !== "quick"
             },
-            accepted
+            accepted,
+            // The dialog's model for this run only; a pinned choice was already saved on the topic.
+            options.runOnce
           );
         },
         (options, direction, found, failed, accepted) =>

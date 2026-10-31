@@ -880,6 +880,11 @@ export const en = {
   "ui.inherited_at_creation": "Follows upper topic",
   "ui.manually_selected": "Manually selected",
   "ui.follow_default_model": "Follow default (now: {0})",
+  "ui.follow_current_model_0": "Follow current model ({0})",
+  "ui.follow_parent_topic_0": "Follow upper topic ({0})",
+  "ui.model_scope": "Apply to",
+  "ui.model_scope_once": "This run only",
+  "ui.model_scope_pin": "Pin to this topic",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem":
     "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",

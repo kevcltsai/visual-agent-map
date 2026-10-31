@@ -888,6 +888,11 @@ var en = {
   "ui.inherited_at_creation": "Follows upper topic",
   "ui.manually_selected": "Manually selected",
   "ui.follow_default_model": "Follow default (now: {0})",
+  "ui.follow_current_model_0": "Follow current model ({0})",
+  "ui.follow_parent_topic_0": "Follow upper topic ({0})",
+  "ui.model_scope": "Apply to",
+  "ui.model_scope_once": "This run only",
+  "ui.model_scope_pin": "Pin to this topic",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "This node's note is missing. Relink an unassigned note or remove it from the map.",
   "ui.relink_note": "Relink note",
   "ui.use_this_note": "Use this note",
@@ -2989,6 +2994,11 @@ var zhCN = {
   "ui.inherited_at_creation": "\u8DDF\u968F\u4E0A\u5C42\u8BAE\u9898",
   "ui.manually_selected": "\u624B\u52A8\u6307\u5B9A",
   "ui.follow_default_model": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5F53\u524D\uFF1A{0}\uFF09",
+  "ui.follow_current_model_0": "\u8DDF\u968F\u5F53\u524D\u6A21\u578B\uFF08{0}\uFF09",
+  "ui.follow_parent_topic_0": "\u6CBF\u7528\u4E0A\u5C42\u8BAE\u9898\uFF08{0}\uFF09",
+  "ui.model_scope": "\u5E94\u7528\u8303\u56F4",
+  "ui.model_scope_once": "\u53EA\u7528\u8FD9\u6B21",
+  "ui.model_scope_pin": "\u8FD9\u4E2A\u8BAE\u9898\u56FA\u5B9A\u7528\u5B83",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8BAE\u9898\u7684\u7B14\u8BB0\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u94FE\u63A5\u672A\u5F52\u7C7B\u7B14\u8BB0\u6216\u4ECE\u56FE\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u94FE\u63A5\u7B14\u8BB0",
   "ui.use_this_note": "\u4F7F\u7528\u8FD9\u4EFD\u7B14\u8BB0",
@@ -5090,6 +5100,11 @@ var zhTW = {
   "ui.inherited_at_creation": "\u8DDF\u96A8\u4E0A\u5C64\u8B70\u984C",
   "ui.manually_selected": "\u624B\u52D5\u6307\u5B9A",
   "ui.follow_default_model": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u76EE\u524D\uFF1A{0}\uFF09",
+  "ui.follow_current_model_0": "\u8DDF\u96A8\u76EE\u524D\u6A21\u578B\uFF08{0}\uFF09",
+  "ui.follow_parent_topic_0": "\u6CBF\u7528\u4E0A\u5C64\u8B70\u984C\uFF08{0}\uFF09",
+  "ui.model_scope": "\u5957\u7528\u7BC4\u570D",
+  "ui.model_scope_once": "\u53EA\u7528\u9019\u6B21",
+  "ui.model_scope_pin": "\u9019\u500B\u8B70\u984C\u56FA\u5B9A\u7528\u5B83",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem": "\u6B64\u8B70\u984C\u7684\u7B46\u8A18\u4E0D\u5B58\u5728\uFF0C\u53EF\u91CD\u65B0\u9023\u7D50\u672A\u6B78\u985E\u7B46\u8A18\u6216\u5F9E\u5716\u4E2D\u79FB\u9664\u3002",
   "ui.relink_note": "\u91CD\u65B0\u9023\u7D50\u7B46\u8A18",
   "ui.use_this_note": "\u4F7F\u7528\u9019\u4EFD\u7B46\u8A18",
@@ -21288,12 +21303,13 @@ var Repository = class {
   }
   /**
    * What "follow the default" resolves to for a topic: a root follows the workspace model, a child follows its upper
-   * topic (nearest manual ancestor, else the workspace model).
+   * topic (nearest manual ancestor, else the workspace model; `overridden` tells which).
    */
   async followDefaultModel(path, map) {
     const node = map == null ? void 0 : map.nodes.find((item) => item.path === path);
-    if (!(node == null ? void 0 : node.parentId)) return { source: "workspace", model: this.settings.cliModel };
-    return { source: "inherited", model: (await this.effectiveModel(path, void 0, "inherited", map)).model };
+    if (!(node == null ? void 0 : node.parentId)) return { source: "workspace", model: this.settings.cliModel, overridden: false };
+    const effective = await this.effectiveModel(path, void 0, "inherited", map);
+    return { source: "inherited", model: effective.model, overridden: effective.overridden };
   }
   async readNote(path, map) {
     const file = this.file(path), content = decodeCalloutSections(upgradeLegacyAimText(await this.app.vault.read(file))), fm = frontmatter(content);
@@ -33230,8 +33246,11 @@ var NextStepModal = class extends import_obsidian24.Modal {
     __publicField(this, "detached", false);
     __publicField(this, "backgroundBegan", false);
     __publicField(this, "runPending", false);
-    /** Model and effort edits wait here; they are saved when a run starts, never when the dialog is cancelled. */
-    __publicField(this, "pendingSettings", {});
+    /**
+     * The model and level menus' state (MS-06): what this run uses once, and what a run start writes to the topic (only
+     * an explicit "follow" or "pin"; never when the dialog is cancelled).
+     */
+    __publicField(this, "modelMenu");
     /** The output language the person picked in this dialog; saved on the map when a run starts. */
     __publicField(this, "manualOutputLanguage");
     __publicField(this, "taskSignal");
@@ -33306,6 +33325,12 @@ var NextStepModal = class extends import_obsidian24.Modal {
     var _a2, _b2;
     return (_b2 = (_a2 = this.requirementsInput) == null ? void 0 : _a2.value.trim()) != null ? _b2 : "";
   }
+  /** This dialog's one-run model choice for a run's options; nothing when the topic's own resolution applies. */
+  runOnceOptions() {
+    var _a2;
+    const runOnce = (_a2 = this.modelMenu) == null ? void 0 : _a2.runOnce();
+    return runOnce ? { runOnce } : {};
+  }
   get background() {
     var _a2, _b2, _c;
     return (_c = (_a2 = this.modelSettings) == null ? void 0 : _a2.background) != null ? _c : (_b2 = this.selectionFlow) == null ? void 0 : _b2.background;
@@ -33361,38 +33386,34 @@ var NextStepModal = class extends import_obsidian24.Modal {
   }
   /** Saves the model and effort chosen in this dialog, once, at the moment a run actually starts. */
   async flushSettings() {
-    var _a2, _b2;
-    const patch = this.pendingSettings;
+    var _a2, _b2, _c, _d, _e;
+    const patch = (_b2 = (_a2 = this.modelMenu) == null ? void 0 : _a2.patch()) != null ? _b2 : {};
     if (Object.keys(patch).length && this.modelSettings) {
-      this.pendingSettings = {};
-      try {
-        await this.modelSettings.save(patch);
-      } catch (error) {
-        this.pendingSettings = { ...patch, ...this.pendingSettings };
-        throw error;
-      }
+      await this.modelSettings.save(patch);
+      (_c = this.modelMenu) == null ? void 0 : _c.saved();
     }
     const manual = this.manualOutputLanguage;
-    const remember = (_a2 = this.info) == null ? void 0 : _a2.rememberOutputLanguage;
+    const remember = (_d = this.info) == null ? void 0 : _d.rememberOutputLanguage;
     if (manual !== void 0 && remember) {
       this.manualOutputLanguage = void 0;
       try {
         await remember(manual);
       } catch (error) {
-        (_b2 = this.manualOutputLanguage) != null ? _b2 : this.manualOutputLanguage = manual;
+        (_e = this.manualOutputLanguage) != null ? _e : this.manualOutputLanguage = manual;
         throw error;
       }
     }
   }
+  /**
+   * The model and level menus. A choice here is for this run only unless the scope menu says "pin" (MS-06); only an
+   * explicit "pin", or "follow" on a topic, is written, and only when a run starts (`flushSettings`).
+   */
   renderModelSettings(parent) {
     var _a2, _b2;
     if (!this.modelSettings) return;
     const settings = this.modelSettings;
     const advanced = parent.createEl("details", { cls: "vam-advanced vam-next-model" });
     const advancedValue = advanced.createEl("summary", { text: t("ui.model_and_advanced_settings") }).createSpan({ cls: "vam-next-disclosure-value" });
-    const save = (patch) => {
-      this.pendingSettings = { ...this.pendingSettings, ...patch };
-    };
     const { field: modelLabel, head: modelHead } = linkedField(advanced, t("ui.model"));
     const model = modelLabel.createEl("select");
     model.setAttr("aria-label", t("ui.model"));
@@ -33400,10 +33421,63 @@ var NextStepModal = class extends import_obsidian24.Modal {
     model.value = settings.model;
     const optionList = typeof this.plugin.availableModels === "function" ? this.plugin.availableModels() : this.plugin.settings.models.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
     const options = new Set(optionList);
-    const follow = (_a2 = settings.followDefault) != null ? _a2 : { source: "workspace", model: this.plugin.settings.cliModel };
-    const followLabel = () => t("ui.follow_default_model", this.plugin.modelLabel(follow.model));
+    const follow = (_a2 = settings.followDefault) != null ? _a2 : {
+      source: "workspace",
+      model: this.plugin.settings.cliModel,
+      overridden: false
+    };
+    const initial = {
+      model: settings.model,
+      source: settings.modelSource,
+      reasoning: normalizeReasoningLevel(settings.reasoning)
+    };
+    const currentReasoning = () => normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+    let menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
+    let followPicked = false;
+    let scope = "once";
+    const base = () => followPicked ? { model: follow.model, reasoning: currentReasoning() } : initial;
+    const explicit = () => !followPicked && menu !== FOLLOW_DEFAULT_MODEL && !(initial.source === "manual" && menu === initial.model);
+    const differs = () => {
+      const level = normalizeReasoningLevel(settings.reasoning) !== base().reasoning;
+      return followPicked ? level : explicit() || settings.model !== base().model || level;
+    };
+    this.modelMenu = {
+      runOnce: () => {
+        if (!differs() || !followPicked && scope === "pin") return void 0;
+        return { model: settings.model, reasoning: normalizeReasoningLevel(settings.reasoning) };
+      },
+      patch: () => {
+        if (followPicked) return { modelSource: follow.source };
+        if (differs() && scope === "pin")
+          return {
+            model: settings.model,
+            modelSource: "manual",
+            reasoning: normalizeReasoningLevel(settings.reasoning)
+          };
+        return {};
+      },
+      saved: () => {
+        if (followPicked)
+          Object.assign(initial, { model: follow.model, source: follow.source, reasoning: currentReasoning() });
+        else if (differs() && scope === "pin")
+          Object.assign(initial, {
+            model: settings.model,
+            source: "manual",
+            reasoning: normalizeReasoningLevel(settings.reasoning)
+          });
+        else return;
+        menu = initial.source === "manual" ? initial.model : FOLLOW_DEFAULT_MODEL;
+        followPicked = false;
+        scope = "once";
+        refresh();
+      }
+    };
+    const followLabel = () => t(
+      follow.overridden ? "ui.follow_parent_topic_0" : "ui.follow_current_model_0",
+      this.plugin.modelLabel(follow.model)
+    );
     const syncModels = () => {
-      const chosen = settings.modelSource === "manual" ? model.value : FOLLOW_DEFAULT_MODEL;
+      const chosen = menu;
       if (chosen === FOLLOW_DEFAULT_MODEL) model.value = "";
       syncModelSelect(
         model,
@@ -33443,51 +33517,28 @@ var NextStepModal = class extends import_obsidian24.Modal {
       inherited: t("ui.inherited_at_creation"),
       manual: t("ui.manually_selected")
     };
-    const modelSummary = advanced.createEl("p", {
-      cls: "vam-hint",
-      text: t(
-        "ui.0_1_reasoning_can_be_adjusted_per_topic",
-        this.plugin.modelLabel(settings.model),
-        sourceLabels[settings.modelSource]
-      )
-    });
-    model.value = settings.modelSource === "manual" ? settings.model : FOLLOW_DEFAULT_MODEL;
+    const summaryText2 = () => t(
+      "ui.0_1_reasoning_can_be_adjusted_per_topic",
+      this.plugin.modelLabel(settings.model),
+      followPicked ? sourceLabels[follow.source] : differs() ? scope === "pin" ? sourceLabels.manual : t("ui.model_scope_once") : sourceLabels[initial.source]
+    );
+    const modelSummary = advanced.createEl("p", { cls: "vam-hint", text: summaryText2() });
+    model.value = menu;
     model.addEventListener("change", () => {
       if (model.value === FOLLOW_DEFAULT_MODEL) {
+        menu = FOLLOW_DEFAULT_MODEL;
+        followPicked = true;
         settings.model = follow.model;
-        settings.modelSource = follow.source;
-        modelSummary.setText(
-          t(
-            "ui.0_1_reasoning_can_be_adjusted_per_topic",
-            this.plugin.modelLabel(settings.model),
-            sourceLabels[settings.modelSource]
-          )
-        );
-        save({ modelSource: settings.modelSource });
-        delete this.pendingSettings.model;
-        delete this.pendingSettings.reasoning;
-        settings.reasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+        settings.reasoning = currentReasoning();
         reasoning.value = settings.reasoning;
-        describeModel();
+        refresh();
         return;
       }
       if (!options.has(model.value)) return;
-      const wasManual = settings.modelSource === "manual";
+      menu = model.value;
+      followPicked = false;
       settings.model = model.value;
-      settings.modelSource = "manual";
-      modelSummary.setText(
-        t(
-          "ui.0_1_reasoning_can_be_adjusted_per_topic",
-          this.plugin.modelLabel(settings.model),
-          sourceLabels[settings.modelSource]
-        )
-      );
-      save({
-        model: settings.model,
-        modelSource: settings.modelSource,
-        ...wasManual ? {} : { reasoning: normalizeReasoningLevel(settings.reasoning) }
-      });
-      describeModel();
+      refresh();
     });
     const reasoningField = advanced.createEl("label", { cls: "vam-field" });
     reasoningField.createSpan({ text: t("ui.reasoning_level") });
@@ -33496,28 +33547,32 @@ var NextStepModal = class extends import_obsidian24.Modal {
     for (const value of ["auto", "low", "medium", "high"])
       reasoning.createEl("option", { value, text: reasoningLabel(value) });
     reasoning.value = normalizeReasoningLevel(settings.reasoning);
-    const describeModel = () => advancedValue.setText(`${this.plugin.modelLabel(settings.model)} \xB7 ${reasoningLabel(settings.reasoning)}`);
-    describeModel();
     reasoning.addEventListener("change", () => {
-      const level = normalizeReasoningLevel(reasoning.value);
-      settings.reasoning = level;
-      if (settings.modelSource !== "manual") {
-        settings.modelSource = "manual";
-        if (!Array.from(model.children).some((option2) => option2.value === settings.model))
-          model.createEl("option", { value: settings.model, text: this.plugin.modelLabel(settings.model) });
-        model.value = settings.model;
-        options.add(settings.model);
-        modelSummary.setText(
-          t(
-            "ui.0_1_reasoning_can_be_adjusted_per_topic",
-            this.plugin.modelLabel(settings.model),
-            sourceLabels[settings.modelSource]
-          )
-        );
-        save({ model: settings.model, modelSource: "manual", reasoning: level });
-      } else save({ reasoning: level });
-      describeModel();
+      settings.reasoning = normalizeReasoningLevel(reasoning.value);
+      refresh();
     });
+    const scopeField = advanced.createEl("label", { cls: "vam-field vam-next-model-scope" });
+    scopeField.createSpan({ text: t("ui.model_scope") });
+    const scopeSelect = scopeField.createEl("select");
+    scopeSelect.setAttr("aria-label", t("ui.model_scope"));
+    scopeSelect.createEl("option", { value: "once", text: t("ui.model_scope_once") });
+    scopeSelect.createEl("option", { value: "pin", text: t("ui.model_scope_pin") });
+    scopeSelect.value = "once";
+    scopeSelect.addEventListener("change", () => {
+      scope = scopeSelect.value === "pin" ? "pin" : "once";
+      refresh();
+    });
+    const refresh = () => {
+      const visible = differs() && !followPicked;
+      if (!visible) {
+        scope = "once";
+        scopeSelect.value = "once";
+      }
+      scopeField.hidden = scopeSelect.hidden = !visible;
+      modelSummary.setText(summaryText2());
+      advancedValue.setText(`${this.plugin.modelLabel(settings.model)} \xB7 ${reasoningLabel(settings.reasoning)}`);
+    };
+    refresh();
     return advanced;
   }
   async run(panel, button, work, needsUsage = true) {
@@ -33923,6 +33978,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
           outputLanguage: languageSelect.value,
           ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
+          ...this.runOnceOptions(),
           ...templateId() ? { detailTemplateId: templateId() } : {},
           ...toneId() ? { toneId: toneId() } : {},
           signal: controller.signal,
@@ -34054,6 +34110,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
       referenceGroups: [],
       outputLanguage: languageSelect.value,
       requirements: this.requirements(),
+      ...this.runOnceOptions(),
       ...aiModeOptions(aiMode.value(), "subtopic"),
       shallowResearch: shallow.checked,
       ...templateId() ? { detailTemplateId: templateId() } : {},
@@ -34112,7 +34169,8 @@ var NextStepModal = class extends import_obsidian24.Modal {
           presetId: presetSelect.value,
           requirements: this.requirements(),
           language: (_b3 = options.outputLanguage) != null ? _b3 : this.plugin.settings.language,
-          limits: bounds
+          limits: bounds,
+          ...this.runOnceOptions()
         };
         await this.rememberMode(mode);
         if (this.dead(controller)) return;
@@ -34226,6 +34284,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
         referenceGroups: (_a3 = selected == null ? void 0 : selected.groups) != null ? _a3 : [],
         outputLanguage: languageSelect.value,
         requirements: this.requirements(),
+        ...this.runOnceOptions(),
         // A synthesis arranges what the topics already hold: Quick policy text, no web (D-2026-10-229).
         researchMode: "local",
         researchDepth: "normal",
@@ -34247,6 +34306,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
       continuesDirections: true,
       outputLanguage: languageSelect.value,
       requirements: this.requirements(),
+      ...this.runOnceOptions(),
       researchMode: "local",
       researchDepth: "normal",
       visualMode: "off",
@@ -43810,6 +43870,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
         var _a2, _b2;
         const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
         const { preset } = resolvePreset(settings.promptPresets, "outline", request.presetId, request.language);
+        const used = await this.modelFor(note, node.path, request.runOnce);
         const result = await this.plugin.outlineGeneration.generate(
           {
             topic: note.title,
@@ -43817,8 +43878,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
 
 ${request.requirements}` : preset.text,
             language: request.language,
-            model: note.model,
-            reasoning: normalizeReasoningLevel((_b2 = note.reasoning) != null ? _b2 : settings.cliReasoning),
+            model: used.model,
+            reasoning: normalizeReasoningLevel((_b2 = used.reasoning) != null ? _b2 : settings.cliReasoning),
             limits: request.limits
           },
           signal
@@ -50106,7 +50167,9 @@ ${request.requirements}` : preset.text,
               mapAiMode: options.mapAiMode,
               addCharts: options.mapAiMode !== "quick"
             },
-            accepted
+            accepted,
+            // The dialog's model for this run only; a pinned choice was already saved on the topic.
+            options.runOnce
           );
         },
         (options, direction, found, failed, accepted) => this.proposeChildren(node, options, direction, found, failed, accepted),

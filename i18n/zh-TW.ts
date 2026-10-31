@@ -819,6 +819,11 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.inherited_at_creation": "跟隨上層議題",
   "ui.manually_selected": "手動指定",
   "ui.follow_default_model": "跟隨預設（目前：{0}）",
+  "ui.follow_current_model_0": "跟隨目前模型（{0}）",
+  "ui.follow_parent_topic_0": "沿用上層議題（{0}）",
+  "ui.model_scope": "套用範圍",
+  "ui.model_scope_once": "只用這次",
+  "ui.model_scope_pin": "這個議題固定用它",
   "ui.this_node_s_note_is_missing_relink_an_unassigned_note_or_rem":
     "此議題的筆記不存在，可重新連結未歸類筆記或從圖中移除。",
   "ui.relink_note": "重新連結筆記",

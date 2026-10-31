@@ -453,6 +453,7 @@ test('P7 counter-example 6a: both views press undo one after the other: it runs 
   assert.equal(h.ledger.entriesFor(MAP_A)[0].status, 'undone');
   assert.equal(await idsOn(h, MAP_A), [h.ids.top, h.ids.p, h.ids.q].sort().join());
   assert.equal(h.viewA.history.canUndo, false, 'the proxy of A is gone');
+  assert.equal(h.viewA.history.canRedo, false, 'and it did not move to the redo stack');
 });
 
 test('P7 counter-example 6b: both views press undo at the same moment: it runs once', async () => {
@@ -524,4 +525,48 @@ test('P7 pure checks: what stops a cut at the source, and what counts as the sam
   assert.equal(sameApartFromStamps(note(['a: 1']), note(['a: 2'])), false);
   assert.equal(sameApartFromStamps(note(['a: 1'], 'one'), note(['a: 1'], 'two')), false);
   assert.equal(sameApartFromStamps('no front matter', 'no front matter'), false);
+});
+
+test('P7 counter-example M1a: a list item moved to another key is not "only a stamp": the snapshot is not written over it', () => {
+  const note = lines => `---\n${lines.join('\n')}\n---\ntext\n`;
+  const snapshot = note(['aliases:', '  - Alpha', 'tags:', '  - beta', 'updated: 1']);
+  assert.equal(sameApartFromStamps(note(['aliases:', '  - beta', 'tags:', '  - Alpha', 'updated: 2']), snapshot), false, 'block lists swapped');
+  assert.equal(sameApartFromStamps(note(['aliases: [Alpha]', 'tags: [beta]']), note(['aliases: [beta]', 'tags: [Alpha]'])), false, 'flow lists swapped');
+  assert.equal(sameApartFromStamps(note(['aliases:', '- Alpha', 'tags:', '- beta']), note(['aliases:', '- beta', 'tags:', '- Alpha'])), false, 'unindented items swapped');
+});
+
+test('P7 counter-example M1b: only `updated` and the order of the keys differ (lists stay under their keys): the snapshot is written back', () => {
+  const note = lines => `---\n${lines.join('\n')}\n---\ntext\n`;
+  assert.equal(sameApartFromStamps(
+    note(['tags:', '  - beta', 'aliases:', '  - Alpha', 'updated: 2']),
+    note(['aliases:', '  - Alpha', 'updated: 1', 'tags:', '  - beta'])), true);
+});
+
+test('P7 counter-example M1c: a note is edited between the restore\'s read and its write: the edit is kept', async () => {
+  const h = await harness();
+  const raw = cutInA(h, ['p']);
+  let armed = false, hits = 0;
+  // The restore runs when A changed after the early check (as in 2c); arm just before that change.
+  h.viewB.resolveMapConflict = async () => { await lateChild(h); await h.repo.rebuildDerivedData(); armed = true; return false; };
+  // A read made by the restore shows the note with another stamp, the way a restore that read first would see it
+  // (other readers, such as the rollback's own checks, see the file as it is).
+  const read = h.app.vault.read.bind(h.app.vault);
+  h.app.vault.read = async file => {
+    const fromRestore = new Error().stack.includes('restore'), text = await read(file);
+    return armed && fromRestore && (file.path === h.paths.p || file.path === h.paths.q) ? text.replace(/^---\n/, '---\nupdated: drifted\n') : text;
+  };
+  // Every original path the restore writes sees a text someone else changed just before the write.
+  const process = h.app.vault.process.bind(h.app.vault);
+  h.app.vault.process = (file, work) => {
+    const fromRestore = new Error().stack.includes('restore');
+    return process(file, current => {
+    if (!armed || !fromRestore || (file.path !== h.paths.p && file.path !== h.paths.q)) return work(current);
+    hits++;
+    return work(`${current}\nEdited at the last moment.\n`);
+    });
+  };
+  await pasteIntoB(h, raw);
+  assert.match(h.errors[0]?.message ?? '', /changed since the cut/);
+  assert.ok(hits >= 2, 'the restore wrote both notes through vault.process');
+  for (const path of [h.paths.p, h.paths.q]) assert.ok(h.contents.get(path)?.includes('Edited at the last moment.'), `${path} keeps the late edit`);
 });

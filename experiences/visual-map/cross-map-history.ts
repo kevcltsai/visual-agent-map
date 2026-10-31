@@ -141,19 +141,31 @@ export function cutSourceProblem(
   return null;
 }
 
-const noteParts = (text: string): { lines: string[]; body: string } | null => {
+const noteParts = (text: string): { blocks: string[]; body: string } | null => {
   const found = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
   if (!found) return null;
-  return { lines: found[1].split("\n").filter(line => !line.startsWith("updated:")), body: found[2] };
+  // A key and the lines under it (indented lines, `- ` list items, a flow list continued on the next line) are one block,
+  // so a list item that moved to another key changes two blocks. The `updated` key is the only one left out.
+  const blocks: string[][] = [];
+  for (const line of found[1].split("\n")) {
+    const continued = blocks.length > 0 && /^(\s|-(\s|$))/.test(line);
+    if (continued) blocks[blocks.length - 1].push(line);
+    else blocks.push([line]);
+  }
+  return {
+    blocks: blocks.filter(lines => !/^updated\s*:/.test(lines[0])).map(lines => lines.join("\n")),
+    body: found[2]
+  };
 };
 /**
- * True when two texts of one note differ only in the `updated:` stamp and in the order of the front matter lines: what
- * putting a parked note back leaves behind. Any other difference (a changed value or body) is false.
+ * True when two texts of one note differ only in the `updated:` stamp and in the order of the front matter keys: what
+ * putting a parked note back leaves behind. Each key keeps its whole value (a list stays under its own key); any other
+ * difference (a changed value, a moved list item, the body) is false.
  */
 export function sameApartFromStamps(a: string, b: string): boolean {
   const first = noteParts(a),
     second = noteParts(b);
-  if (!first || !second || first.body !== second.body || first.lines.length !== second.lines.length) return false;
-  const sorted = (lines: string[]): string => [...lines].sort().join("\n");
-  return sorted(first.lines) === sorted(second.lines);
+  if (!first || !second || first.body !== second.body || first.blocks.length !== second.blocks.length) return false;
+  const sorted = (blocks: string[]): string => [...blocks].sort().join("\n\u0000");
+  return sorted(first.blocks) === sorted(second.blocks);
 }

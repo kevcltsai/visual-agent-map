@@ -5,7 +5,23 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
+const nodePath = require('node:path');
+const vm = require('node:vm');
+const { buildSync } = require('./build.cjs');
 const { element, tick } = dom;
+
+// One bundle that holds the view, the session and the ledger, so the test reads the same module state the view uses
+// (a separate load of that module would get its own, empty WeakMap: a check on it would always see "no cut"). Same sandbox as support.cjs's load().
+function loadWithState(overrides, windowValues) {
+  const root = nodePath.resolve(__dirname, '..');
+  const contents = "export * from './main'; export { sessionFor } from './experiences/visual-map/clipboard-session';";
+  const code = buildSync({ stdin: { contents, resolveDir: root, loader: 'ts', sourcefile: 'cut-entry.ts' }, external: ['obsidian', 'node:*'] }).outputFiles[0].text;
+  const module = { exports: {} };
+  const ob = { Component: class {}, MarkdownRenderChild: class {}, ...overrides.obsidian };
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => (name === 'obsidian' ? ob : require(name)), console, TextDecoder, TextEncoder, Blob, crypto: require('node:crypto').webcrypto, process, AbortController, document: windowValues.document, createSvg: windowValues.createSvg,
+    Option: class { constructor(text, value) { this.tag = 'option'; this.text = text; this.value = value; this.cls = ''; this.children = []; this.attrs = {}; } }, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
+  return module.exports;
+}
 
 const MAP = 'Agent Workspace/Topics/map-p/Map.md';
 const MIME = 'application/x-vam-branch';
@@ -39,7 +55,8 @@ async function harness({ aim = false } = {}) {
   await repo.rebuildDerivedData();
   const notices = [];
   const Notice = dom.makeNotice(notices);
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment });
+  const bundle = loadWithState({ obsidian: { ...obsidian, Notice, Modal: dom.makeModal(), setTooltip() {} } }, { createFragment: dom.createFragment });
+  const { VisualAgentMapView } = bundle;
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: async work => { await work(); await view.hydrate(); }
@@ -54,7 +71,7 @@ async function harness({ aim = false } = {}) {
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   view.render = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
   await view.hydrate(); view.render();
-  return { repo, app, contents, view, plugin, ids, notices, map: () => view.map, saved: () => repo.readMap(MAP), notes: () => view.notes, history: () => view.history.past.length };
+  return { repo, app, contents, view, plugin, sessionFor: bundle.sessionFor, ids, notices, map: () => view.map, saved: () => repo.readMap(MAP), notes: () => view.notes, history: () => view.history.past.length };
 }
 
 const card = { inside: true, closest: () => null };
@@ -76,7 +93,6 @@ const copyOf = (h, ids, target = card) => {
   return event;
 };
 const pasteOf = (h, data, target = card) => { const event = clipboardEvent(target, data); h.view.onClipboardEvent('paste', event); return event; };
-const clipboardSession = load('experiences/visual-map/clipboard-session.ts', { obsidian });
 const clipboardModule = load('experiences/visual-map/clipboard.ts', { obsidian });
 const parse = text => JSON.parse(JSON.stringify(clipboardModule.parseClipboard(text)));
 const files = h => [...h.contents.keys()].filter(p => p.endsWith('.md')).sort();
@@ -229,4 +245,4 @@ test('P5 cut: when the source changed after the cut, the paste moves nothing and
   assert.deepEqual(marked(h), []);
 });
 
-function sessionOf(h) { return clipboardSession.sessionFor(h.plugin); }
+function sessionOf(h) { return h.sessionFor(h.plugin); }

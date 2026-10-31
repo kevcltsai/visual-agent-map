@@ -5938,10 +5938,11 @@ export class VisualAgentMapView extends ItemView {
       restore: async () => {
         for (const [path, text] of texts) {
           if (!this.app.vault.getAbstractFileByPath(path)) continue;
-          const file = repo.file(path),
-            now = await this.app.vault.read(file);
           // Putting a parked note back rewrites its `updated:` stamp and front matter order; anything else is left alone.
-          if (now !== text && sameApartFromStamps(now, text)) await this.app.vault.process(file, () => text);
+          // The check runs on the text `process` hands over, so an edit made after any earlier read is never overwritten.
+          await this.app.vault.process(repo.file(path), current =>
+            current !== text && sameApartFromStamps(current, text) ? text : current
+          );
         }
       },
       begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
@@ -6019,7 +6020,17 @@ export class VisualAgentMapView extends ItemView {
       // Thrown as it is: a failed rollback keeps its `rollback-failed` kind and its messages (errors cross realms in tests).
       throw result.error as Error;
     }
-    // Another view already ran it (or it is gone): nothing to do, and this view's proxy goes away.
+    // Another view already ran it (or it is gone): nothing to do, and this view's proxy goes away. `travel` has already
+    // moved the proxy to the other stack; take it out of that one too, so it cannot be pressed again.
+    if (result.reason === "wrong-state" || result.reason === "unknown") {
+      const mark = this.history.mark();
+      if (direction === "undo") {
+        this.history.redo();
+        this.history.discardSince(mark);
+      } else {
+        this.history.discardSince({ ...mark, length: mark.length - 1 });
+      }
+    }
   }
   /** After this view's history was cleared: puts back a proxy for each cross-map change of this map that is still applied. */
   private restoreCrossProxies(): void {

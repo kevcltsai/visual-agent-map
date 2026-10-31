@@ -29882,13 +29882,22 @@ function cutSourceProblem(sourceMap, record, found) {
 var noteParts = (text11) => {
   const found = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text11);
   if (!found) return null;
-  return { lines: found[1].split("\n").filter((line) => !line.startsWith("updated:")), body: found[2] };
+  const blocks = [];
+  for (const line of found[1].split("\n")) {
+    const continued = blocks.length > 0 && /^(\s|-(\s|$))/.test(line);
+    if (continued) blocks[blocks.length - 1].push(line);
+    else blocks.push([line]);
+  }
+  return {
+    blocks: blocks.filter((lines) => !/^updated\s*:/.test(lines[0])).map((lines) => lines.join("\n")),
+    body: found[2]
+  };
 };
 function sameApartFromStamps(a, b) {
   const first = noteParts(a), second = noteParts(b);
-  if (!first || !second || first.body !== second.body || first.lines.length !== second.lines.length) return false;
-  const sorted = (lines) => [...lines].sort().join("\n");
-  return sorted(first.lines) === sorted(second.lines);
+  if (!first || !second || first.body !== second.body || first.blocks.length !== second.blocks.length) return false;
+  const sorted = (blocks) => [...blocks].sort().join("\n\0");
+  return sorted(first.blocks) === sorted(second.blocks);
 }
 
 // experiences/visual-map/outline-import-modal.ts
@@ -46107,8 +46116,10 @@ ${request.requirements}` : preset.text,
       restore: async () => {
         for (const [path, text11] of texts2) {
           if (!this.app.vault.getAbstractFileByPath(path)) continue;
-          const file = repo.file(path), now = await this.app.vault.read(file);
-          if (now !== text11 && sameApartFromStamps(now, text11)) await this.app.vault.process(file, () => text11);
+          await this.app.vault.process(
+            repo.file(path),
+            (current) => current !== text11 && sameApartFromStamps(current, text11) ? text11 : current
+          );
         }
       },
       begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
@@ -46181,6 +46192,15 @@ ${request.requirements}` : preset.text,
       if (isTransactionError(result.error, "stale") || isTransactionError(result.error, "guard"))
         throw new Error(t("ui.cross_map_undo_refused"));
       throw result.error;
+    }
+    if (result.reason === "wrong-state" || result.reason === "unknown") {
+      const mark = this.history.mark();
+      if (direction === "undo") {
+        this.history.redo();
+        this.history.discardSince(mark);
+      } else {
+        this.history.discardSince({ ...mark, length: mark.length - 1 });
+      }
     }
   }
   /** After this view's history was cleared: puts back a proxy for each cross-map change of this map that is still applied. */

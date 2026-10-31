@@ -46906,7 +46906,7 @@ ${request.requirements}` : preset.text,
     }
     if (note == null ? void 0 : note.modelOverride) {
       const label = this.plugin.modelLabel(note.model), text11 = t("ui.card_model_override_0", label), tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
-      tag.setAttr("aria-label", text11);
+      tag.setAttr("aria-hidden", "true");
       tag.setAttr("title", text11);
       const row = cardMarkerRows.get(card);
       if (old) old.replaceWith(tag);

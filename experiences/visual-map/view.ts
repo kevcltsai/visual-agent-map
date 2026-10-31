@@ -7428,7 +7428,8 @@ export class VisualAgentMapView extends ItemView {
       const label = this.plugin.modelLabel(note.model),
         text = t("ui.card_model_override_0", label),
         tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
-      tag.setAttr("aria-label", text);
+      // The card name already carries the text, so the tag itself is hidden from screen readers (no second reading).
+      tag.setAttr("aria-hidden", "true");
       tag.setAttr("title", text);
       // In place on a redraw; otherwise right after the marker row (painted first), so renderNode and refreshCard agree.
       const row = cardMarkerRows.get(card);

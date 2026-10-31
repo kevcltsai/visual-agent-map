@@ -39,7 +39,9 @@ test('an override card shows the tag with the model label, an accessible name an
   assert.equal(tags(header).length, 1);
   assert.equal(tag.tag, 'span');
   assert.equal(tag.text, 'L:gpt-x');
-  assert.equal(tag.attrs['aria-label'], t('ui.card_model_override_0', 'L:gpt-x'));
+  // The card name carries the override text; the tag is hidden so a screen reader does not read it twice.
+  assert.equal(tag.attrs['aria-hidden'], 'true');
+  assert.equal(tag.attrs['aria-label'], undefined);
   assert.equal(tag.attrs.title, t('ui.card_model_override_0', 'L:gpt-x'));
 });
 

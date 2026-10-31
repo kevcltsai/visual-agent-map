@@ -485,6 +485,15 @@ export function startViewer(doc: Document): void {
       maxX = Math.max(maxX, card.offsetLeft + (card.offsetWidth || CARD_WIDTH));
       maxY = Math.max(maxY, card.offsetTop + card.offsetHeight);
     }
+    // Free text blocks count too (canvas-text-node decision #8); attached ones follow their topic.
+    for (const text of texts) {
+      const el = text.parentId ? undefined : textEls.get(text.id);
+      if (!el) continue;
+      minX = Math.min(minX, el.offsetLeft);
+      minY = Math.min(minY, el.offsetTop);
+      maxX = Math.max(maxX, el.offsetLeft + (el.offsetWidth || 300));
+      maxY = Math.max(maxY, el.offsetTop + (el.offsetHeight || 60));
+    }
     view = fitViewport(
       { minX, minY, maxX, maxY },
       { width: viewport.clientWidth, height: viewport.clientHeight },

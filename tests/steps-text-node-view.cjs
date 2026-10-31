@@ -29,7 +29,7 @@ async function harness(build) {
   let pending = Promise.resolve();
   const notices = [], menus = [];
   const Menu = class { constructor() { this.items = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } showAtPosition() { return this; } showAtMouseEvent() { return this; } };
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Menu } }, { createFragment: dom.createFragment, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => (pending = Promise.resolve().then(work))
@@ -384,6 +384,39 @@ test('canvas-text-node: link mode with the keyboard (Enter on a focused card) an
   await h.view.changeCanvasItems('f1', items => items.filter(i => i.id !== 'f1'));
   h.view.render();
   assert.equal(h.view.linkingTextId, null);
+});
+
+test('canvas-text-node: clicking the empty viewport (not the 1px stage) cancels link mode; a card click still links', async () => {
+  const h = await harness(() => [free()]);
+  const past = h.view.history.past.length;
+  const viewport = element('div');
+  h.view.viewportEl = viewport;
+  h.view.startLinking('f1');
+  viewport.fire('click', { target: viewport });
+  await h.settle();
+  assert.equal(h.view.linkingTextId, null);
+  assert.ok(!h.view.stageEl.hasClass('is-linking'));
+  assert.match(h.view.announcer.text, /cancel/i);
+  assert.deepEqual(viewport.listeners.click, [], 'the viewport listener is removed with the mode');
+  h.view.startLinking('f1');
+  clickCard(h, h.child.id);
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].links, [h.child.id]);
+  assert.equal(h.view.history.past.length, past + 1);
+});
+
+test('canvas-text-node: fit (Show all) includes free text blocks, not folded or attached ones', async () => {
+  const h = await harness(() => [free({ x: 1500, y: 40 })]);
+  h.view.viewportEl = { clientWidth: 1000, clientHeight: 600 };
+  h.view.canvasNodes = () => h.view.map.nodes;
+  h.view.transform = () => {}; h.view.saveViewport = () => {}; h.view.canvasInset = () => 0;
+  h.view.fit();
+  const withFree = h.view.map.viewport.zoom;
+  assert.ok(withFree < 1000 / 1800 + 1e-9, `zoom ${withFree} leaves room for the block at x=1500..1800`);
+  await h.view.changeCanvasItems('f1', items => items.filter(i => i.id !== 'f1'));
+  h.view.render();
+  h.view.fit();
+  assert.ok(h.view.map.viewport.zoom > withFree, 'without the block the fit is closer');
 });
 
 test('canvas-text-node: unlink menu lists linked cards, removing one is one undo step; a dangling link is not counted', async () => {

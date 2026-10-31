@@ -6214,6 +6214,12 @@ export class VisualAgentMapView extends ItemView {
         this.finishLinking(cardId);
       }
     };
+    // The stage is 1px; a click on the empty canvas lands on the viewport, so that cancels too.
+    const viewport = this.viewportEl;
+    const blank = (event: Event): void => {
+      if (event.target === viewport) this.cancelLinking(true);
+    };
+    viewport?.addEventListener("click", blank, true);
     stage.addEventListener("pointerdown", down, true);
     stage.addEventListener("click", click, true);
     stage.addEventListener("keydown", key, true);
@@ -6221,6 +6227,7 @@ export class VisualAgentMapView extends ItemView {
       stage.removeEventListener("pointerdown", down, true);
       stage.removeEventListener("click", click, true);
       stage.removeEventListener("keydown", key, true);
+      viewport?.removeEventListener("click", blank, true);
       stage.removeClass("is-linking");
       this.endLinkListeners = null;
     };
@@ -14076,16 +14083,24 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
-    const minX = Math.min(...nodes.map(n => n.x)),
-      maxX = Math.max(...nodes.map(n => n.x + 280));
-    const minY = Math.min(...nodes.map(n => n.y)),
-      maxY = Math.max(
-        ...nodes.map(
-          n =>
-            n.y +
-            (this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180)
-        )
-      );
+    // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
+    const boxes = nodes.map(n => ({
+      x: n.x,
+      y: n.y,
+      w: 280,
+      h: this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180
+    }));
+    for (const item of this.map.canvasItems ?? []) {
+      if (item.kind !== "text") continue;
+      const text = item as TextItem;
+      const el = this.textEls.get(text.id);
+      if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
+      boxes.push({ x: text.x, y: text.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+    }
+    const minX = Math.min(...boxes.map(b => b.x)),
+      maxX = Math.max(...boxes.map(b => b.x + b.w));
+    const minY = Math.min(...boxes.map(b => b.y)),
+      maxY = Math.max(...boxes.map(b => b.y + b.h));
     this.map.viewport = fitViewport(
       { minX, minY, maxX, maxY },
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },

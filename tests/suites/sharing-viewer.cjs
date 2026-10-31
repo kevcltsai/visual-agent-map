@@ -426,6 +426,36 @@ test('sharing viewer language: a plain file shows exactly the P1 page (same DOM 
   }
 });
 
+test('sharing viewer fit: the first view and Show all include a free text block far from every topic (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-fit-'));
+  try {
+    const data = payload();
+    data.textNodes = [{ id: 'far', text: 'Far away note', x: 1200, y: 900 }];
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'fit.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      const inside = () => evaluate(`(() => { const e = document.querySelector('.vam-text-node.is-free'); const v = document.querySelector('.vam-viewport').getBoundingClientRect(); if (!e) return null; const r = e.getBoundingClientRect(); return r.left >= v.left - 1 && r.top >= v.top - 1 && r.right <= v.right + 1 && r.bottom <= v.bottom + 1; })()`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const first = await inside();
+      await evaluate(`document.querySelector('.vam-viewport').dispatchEvent(new WheelEvent('wheel', { deltaY: -2000, clientX: 10, clientY: 10, cancelable: true }))`);
+      const zoomed = await inside();
+      await evaluate(`document.querySelector('button[aria-label="Show all"], button[title="Show all"]')?.click()`);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return { first, zoomed, again: await inside() };
+    });
+    assert.equal(report.first, true, 'the first view shows the free block');
+    assert.equal(report.again, true, 'Show all brings the free block back into view');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
 test('sharing viewer collapse: the fold button is always visible and works by mouse and keyboard, then pan and zoom still work (headless Chrome)', async t => {
   const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
   const chrome = candidates.find(file => fs.existsSync(file));

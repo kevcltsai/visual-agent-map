@@ -878,7 +878,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.unassigned_0": "未归类（{0}）",
   "ui.archived_0": "归档（{0}）",
   "ui.selected_0_1_2": "已选 {0} 个：{1}{2}",
-  "ui.multi_research_keep_topic_models": "沿用各议题当前的模型",
+  "ui.multi_research_current_model": "当前模型（有覆写的议题用自己的模型）",
   "ui.expand_0": "展开 {0}",
   "ui.0_moved": "{0}（已移动）",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} · {1}；推理等级可依议题调整。",

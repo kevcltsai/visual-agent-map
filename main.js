@@ -940,7 +940,7 @@ var en = {
   "ui.unassigned_0": "Unassigned ({0})",
   "ui.archived_0": "Archived ({0})",
   "ui.selected_0_1_2": "Selected {0}: {1}{2}",
-  "ui.multi_research_keep_topic_models": "Each topic's current model",
+  "ui.multi_research_current_model": "Current model (overridden topics keep their own)",
   "ui.expand_0": "Expand {0}",
   "ui.0_moved": "{0} (moved)",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}; reasoning can be adjusted per topic.",
@@ -3041,7 +3041,7 @@ var zhCN = {
   "ui.unassigned_0": "\u672A\u5F52\u7C7B\uFF08{0}\uFF09",
   "ui.archived_0": "\u5F52\u6863\uFF08{0}\uFF09",
   "ui.selected_0_1_2": "\u5DF2\u9009 {0} \u4E2A\uFF1A{1}{2}",
-  "ui.multi_research_keep_topic_models": "\u6CBF\u7528\u5404\u8BAE\u9898\u5F53\u524D\u7684\u6A21\u578B",
+  "ui.multi_research_current_model": "\u5F53\u524D\u6A21\u578B\uFF08\u6709\u8986\u5199\u7684\u8BAE\u9898\u7528\u81EA\u5DF1\u7684\u6A21\u578B\uFF09",
   "ui.expand_0": "\u5C55\u5F00 {0}",
   "ui.0_moved": "{0}\uFF08\u5DF2\u79FB\u52A8\uFF09",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7EA7\u53EF\u4F9D\u8BAE\u9898\u8C03\u6574\u3002",
@@ -5142,7 +5142,7 @@ var zhTW = {
   "ui.unassigned_0": "\u672A\u6B78\u985E\uFF08{0}\uFF09",
   "ui.archived_0": "\u5C01\u5B58\uFF08{0}\uFF09",
   "ui.selected_0_1_2": "\u5DF2\u9078 {0} \u500B\uFF1A{1}{2}",
-  "ui.multi_research_keep_topic_models": "\u6CBF\u7528\u5404\u8B70\u984C\u76EE\u524D\u7684\u6A21\u578B",
+  "ui.multi_research_current_model": "\u76EE\u524D\u6A21\u578B\uFF08\u8986\u5BEB\u7684\u8B70\u984C\u7528\u81EA\u5DF1\u7684\u6A21\u578B\uFF09",
   "ui.expand_0": "\u5C55\u958B {0}",
   "ui.0_moved": "{0}\uFF08\u5DF2\u79FB\u52D5\uFF09",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} \xB7 {1}\uFF1B\u63A8\u7406\u7B49\u7D1A\u53EF\u4F9D\u8B70\u984C\u8ABF\u6574\u3002",
@@ -32071,7 +32071,7 @@ var MultiResearchModal = class extends import_obsidian20.Modal {
           text: t(mode === "quick" ? "ui.quick" : "ui.standard")
         });
     });
-    const model = modelField(this.contentEl, this.models, t("ui.multi_research_keep_topic_models"), this.links.repair);
+    const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
     const style = noteStyleField(this.contentEl, {
       templates: this.templates,
@@ -51282,6 +51282,7 @@ ${request.requirements}` : preset.text,
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
+      const used = await this.modelFor(note, parent.path, options == null ? void 0 : options.runOnce);
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
       const outputLanguage2 = (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
       const existing = ((_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === parent.id).map((item) => {
@@ -51308,8 +51309,8 @@ ${request.requirements}` : preset.text,
           },
           note
         ),
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         controller.signal,
         void 0,
         acceptDispatch
@@ -51605,7 +51606,8 @@ ${request.requirements}` : preset.text,
       () => {
         started = true;
         accepted();
-      }
+      },
+      choices.runOnce
     );
     if (!started || !handle) throw new Error(failure != null ? failure : t("ui.shallow_research_did_not_start"));
     await handle.finished;
@@ -51676,15 +51678,14 @@ ${request.requirements}` : preset.text,
           return;
         }
         if (nodes.length < selected.length) new import_obsidian32.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
-        if (request.model)
-          for (const node of nodes)
-            await this.plugin.repo.updateNote(node.path, { model: request.model, modelSource: "manual" });
         this.integrationMode = false;
         this.multiSelected.clear();
         if (!this.closed) this.render();
         const shared2 = {
           referenceGroups: [],
           requirements: request.requirements,
+          // The picked model is for this batch only (D4): it never becomes a topic's own model.
+          ...request.model ? { runOnce: { model: request.model } } : {},
           ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
           ...request.toneId ? { toneId: request.toneId } : {}
         };
@@ -51961,9 +51962,10 @@ ${request.requirements}` : preset.text,
       return;
     }
     const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
+    const used = await this.modelFor(note, node.path, options.runOnce);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path, note.model);
+    const progress = this.startTaskProgress(node.path, used.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -51999,8 +52001,8 @@ ${request.requirements}` : preset.text,
           },
           note
         ),
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         options.signal,
         void 0,
         accepted,
@@ -52037,6 +52039,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    const used = await this.modelFor(note, node.path, options == null ? void 0 : options.runOnce);
     const children = this.map.nodes.filter((item) => item.parentId === node.id);
     if (!children.length && !((_b2 = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length))) {
       const message = t("ui.choose_another_note_source_first");
@@ -52083,7 +52086,7 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path, note.model);
+    const progress = this.startTaskProgress(node.path, used.model);
     let findingsSent = false;
     try {
       const synthesisContext = withThinkingOrigin(
@@ -52115,8 +52118,8 @@ ${request.requirements}` : preset.text,
       );
       const result = await this.plugin.askModel(
         synthesisContext,
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         options == null ? void 0 : options.signal,
         void 0,
         accepted,
@@ -52206,7 +52209,7 @@ ${request.requirements}` : preset.text,
           context: synthesisContext,
           detail: saved.detail,
           formatIssues: issues,
-          model: note.model,
+          model: used.model,
           language: (_g2 = options == null ? void 0 : options.outputLanguage) != null ? _g2 : this.plugin.settings.language,
           template: detailTemplate
         });
@@ -52295,6 +52298,8 @@ ${request.requirements}` : preset.text,
     this.plugin.activeTasks.set(path, controller);
     const runOptions = {
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
+      // The model of this step is the dialog's choice now, not the one the first step was started with.
+      runOnce: options.runOnce,
       signal: controller.signal,
       onProgress: (message) => {
         var _a2;
@@ -52392,16 +52397,19 @@ ${request.requirements}` : preset.text,
     const task = this.synthesisTasks.get(node.path);
     if (!task || task.state !== "failed" && task.state !== "cancelled") return;
     void this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0).then(
-      (note) => this.plugin.confirmAiUsage(note.model, async () => {
-        await this.startSynthesis(
-          node,
-          { ...task.options, continuesDirections: task.step === "draft" },
-          task.step === "directions" ? null : task.direction,
-          (message) => new import_obsidian32.Notice(message),
-          () => {
-          }
-        );
-      })
+      (note) => {
+        var _a3;
+        return this.plugin.confirmAiUsage(((_a3 = task.options.runOnce) == null ? void 0 : _a3.model) || note.model, async () => {
+          await this.startSynthesis(
+            node,
+            { ...task.options, continuesDirections: task.step === "draft" },
+            task.step === "directions" ? null : task.direction,
+            (message) => new import_obsidian32.Notice(message),
+            () => {
+            }
+          );
+        });
+      }
     );
   }
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
@@ -55605,10 +55613,21 @@ ${addition}` : addition });
       language2
     );
   }
-  async runAgent(node, done, failed, overrides, onLaunchAccepted) {
+  /**
+   * The model and reasoning a run really uses: a run-once choice first (never written to the topic), otherwise the
+   * topic's own resolution that `readNote` already did.
+   */
+  async modelFor(note, path, runOnce) {
+    var _a2;
+    if (!(runOnce == null ? void 0 : runOnce.model.trim())) return { model: note.model, reasoning: note.reasoning };
+    const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, (_a2 = this.map) != null ? _a2 : void 0, runOnce);
+    return { model, reasoning };
+  }
+  async runAgent(node, done, failed, overrides, onLaunchAccepted, runOnce) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    const used = await this.modelFor(note, node.path, runOnce);
     if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
@@ -55655,7 +55674,7 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), note.model);
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -55709,8 +55728,8 @@ ${addition}` : addition });
     };
     const completion = this.plugin.askModel(
       context,
-      note.model,
-      note.reasoning,
+      used.model,
+      used.reasoning,
       controller.signal,
       (id) => {
         exchangeId = id;
@@ -55781,7 +55800,7 @@ ${addition}` : addition });
           context,
           detail: saved.detail,
           formatIssues: result.formatIssues,
-          model: note.model,
+          model: used.model,
           language: (_f2 = context.outputLanguage) != null ? _f2 : this.plugin.settings.language,
           template: context.detailTemplate
         });

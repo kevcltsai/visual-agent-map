@@ -880,7 +880,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.unassigned_0": "未歸類（{0}）",
   "ui.archived_0": "封存（{0}）",
   "ui.selected_0_1_2": "已選 {0} 個：{1}{2}",
-  "ui.multi_research_keep_topic_models": "沿用各議題目前的模型",
+  "ui.multi_research_current_model": "目前模型（覆寫的議題用自己的模型）",
   "ui.expand_0": "展開 {0}",
   "ui.0_moved": "{0}（已移動）",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} · {1}；推理等級可依議題調整。",

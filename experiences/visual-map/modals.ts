@@ -31,7 +31,7 @@ import {
   type TopicInfo,
   type VisualMode
 } from "../../repository";
-import type { AiResult, Suggestion } from "../../ai/types";
+import type { AiResult, ReasoningLevel, Suggestion } from "../../ai/types";
 import {
   limitOutline,
   QUICK_OUTLINE_MAX_LEVELS,
@@ -71,6 +71,16 @@ export interface TaskOptions {
   synthesisTitle?: string;
   /** The synthesis draft step retried after chosen directions; it continues them even when the last draft failed. */
   continuesDirections?: boolean;
+  /**
+   * A model (and effort) picked for this run only. It is never written to the topic; the view resolves it first
+   * (ADR-021). Absent: the topic's own resolution applies.
+   */
+  runOnce?: RunOnceModel;
+}
+/** A model chosen for one run. Absent reasoning means the current model's. */
+export interface RunOnceModel {
+  model: string;
+  reasoning?: ReasoningLevel;
 }
 /**
  * How the view reports a synthesis run to the dialog that started it. While the dialog is open the next stage is

@@ -146,7 +146,7 @@ import {
   resolveToneText
 } from "../../ai/prompt-presets";
 import { matchPreset, NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
-import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
+import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import { previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
 import {
@@ -312,6 +312,7 @@ import {
 
 import {
   TaskOptions,
+  type RunOnceModel,
   imageReferencesFromMarkdown,
   PartialChildBatchError,
   AgentTaskHandle,
@@ -9910,6 +9911,7 @@ export class VisualAgentMapView extends ItemView {
     this.render();
     try {
       const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
+      const used = await this.modelFor(note, parent.path, options?.runOnce);
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
       const outputLanguage = options?.outputLanguage ?? this.plugin.settings.language;
       const existing =
@@ -9940,8 +9942,8 @@ export class VisualAgentMapView extends ItemView {
           },
           note
         ),
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         controller.signal,
         undefined,
         acceptDispatch
@@ -10261,7 +10263,8 @@ export class VisualAgentMapView extends ItemView {
       () => {
         started = true;
         accepted();
-      }
+      },
+      choices.runOnce
     );
     if (!started || !handle) throw new Error(failure ?? t("ui.shallow_research_did_not_start"));
     await handle.finished;
@@ -10346,9 +10349,6 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         if (nodes.length < selected.length) new Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
-        if (request.model)
-          for (const node of nodes)
-            await this.plugin.repo.updateNote(node.path, { model: request.model, modelSource: "manual" });
         // The batch runs in the background: leave selection mode so the selection bar gets out of the way.
         this.integrationMode = false;
         this.multiSelected.clear();
@@ -10356,6 +10356,8 @@ export class VisualAgentMapView extends ItemView {
         const shared = {
           referenceGroups: [],
           requirements: request.requirements,
+          // The picked model is for this batch only (D4): it never becomes a topic's own model.
+          ...(request.model ? { runOnce: { model: request.model } } : {}),
           ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
           ...(request.toneId ? { toneId: request.toneId } : {})
         };
@@ -10642,9 +10644,10 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+    const used = await this.modelFor(note, node.path, options.runOnce);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path, note.model);
+    const progress = this.startTaskProgress(node.path, used.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -10681,8 +10684,8 @@ export class VisualAgentMapView extends ItemView {
           },
           note
         ),
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         options.signal,
         undefined,
         accepted,
@@ -10725,6 +10728,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+    const used = await this.modelFor(note, node.path, options?.runOnce);
     const children = this.map.nodes.filter(item => item.parentId === node.id);
     if (!children.length && !options?.referenceGroups?.some(group => group.documents.length)) {
       const message = t("ui.choose_another_note_source_first");
@@ -10775,7 +10779,7 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path, note.model);
+    const progress = this.startTaskProgress(node.path, used.model);
     // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
     try {
@@ -10808,8 +10812,8 @@ export class VisualAgentMapView extends ItemView {
       );
       const result = await this.plugin.askModel(
         synthesisContext,
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         options?.signal,
         undefined,
         accepted,
@@ -10917,7 +10921,7 @@ export class VisualAgentMapView extends ItemView {
             context: synthesisContext,
             detail: saved.detail,
             formatIssues: issues,
-            model: note.model,
+            model: used.model,
             language: options?.outputLanguage ?? this.plugin.settings.language,
             template: detailTemplate
           });
@@ -11027,6 +11031,8 @@ export class VisualAgentMapView extends ItemView {
       ...(step === "draft"
         ? { ...task.options, requirements: options.requirements || task.options.requirements }
         : options),
+      // The model of this step is the dialog's choice now, not the one the first step was started with.
+      runOnce: options.runOnce,
       signal: controller.signal,
       onProgress: message => {
         task.progress = message;
@@ -11125,7 +11131,7 @@ export class VisualAgentMapView extends ItemView {
     const task = this.synthesisTasks.get(node.path);
     if (!task || (task.state !== "failed" && task.state !== "cancelled")) return;
     void this.plugin.repo.readNote(node.path, this.map ?? undefined).then(note =>
-      this.plugin.confirmAiUsage(note.model, async () => {
+      this.plugin.confirmAiUsage(task.options.runOnce?.model || note.model, async () => {
         await this.startSynthesis(
           node,
           { ...task.options, continuesDirections: task.step === "draft" },
@@ -14645,15 +14651,30 @@ export class VisualAgentMapView extends ItemView {
       language
     );
   }
+  /**
+   * The model and reasoning a run really uses: a run-once choice first (never written to the topic), otherwise the
+   * topic's own resolution that `readNote` already did.
+   */
+  private async modelFor(
+    note: Pick<Note, "model" | "reasoning">,
+    path: string,
+    runOnce?: RunOnceModel
+  ): Promise<{ model: string; reasoning?: ReasoningLevel }> {
+    if (!runOnce?.model.trim()) return { model: note.model, reasoning: note.reasoning };
+    const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, this.map ?? undefined, runOnce);
+    return { model, reasoning };
+  }
   private async runAgent(
     node: MapNode,
     done?: (result: AiResult) => void,
     failed?: (message: string) => void,
     overrides?: Partial<TaskContext>,
-    onLaunchAccepted?: () => void
+    onLaunchAccepted?: () => void,
+    runOnce?: RunOnceModel
   ): Promise<AgentTaskHandle | null> {
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+    const used = await this.modelFor(note, node.path, runOnce);
     if (!(overrides?.task ?? note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
@@ -14702,7 +14723,7 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now(), note.model);
+    progress?.begin(taskPath, progressAttempt, Date.now(), used.model);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;
@@ -14758,8 +14779,8 @@ export class VisualAgentMapView extends ItemView {
     const completion = this.plugin
       .askModel(
         context,
-        note.model,
-        note.reasoning,
+        used.model,
+        used.reasoning,
         controller.signal,
         id => {
           exchangeId = id;
@@ -14843,7 +14864,7 @@ export class VisualAgentMapView extends ItemView {
             context,
             detail: saved.detail,
             formatIssues: result.formatIssues,
-            model: note.model,
+            model: used.model,
             language: context.outputLanguage ?? this.plugin.settings.language,
             template: context.detailTemplate
           });

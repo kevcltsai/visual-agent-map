@@ -942,7 +942,7 @@ export const en = {
   "ui.unassigned_0": "Unassigned ({0})",
   "ui.archived_0": "Archived ({0})",
   "ui.selected_0_1_2": "Selected {0}: {1}{2}",
-  "ui.multi_research_keep_topic_models": "Each topic's current model",
+  "ui.multi_research_current_model": "Current model (overridden topics keep their own)",
   "ui.expand_0": "Expand {0}",
   "ui.0_moved": "{0} (moved)",
   "ui.0_1_reasoning_can_be_adjusted_per_topic": "{0} · {1}; reasoning can be adjusted per topic.",

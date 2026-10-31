@@ -2,21 +2,13 @@ import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapDocument, MapNode } from "../map-model";
-import { markerSymbol, readTopicMarkers, type TopicMarker } from "../topic-markers";
+import { markerLabelKey, markerSymbol, readTopicMarkers, type TopicMarker } from "../topic-markers";
 import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
 export const OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 /** Lower-case for outline search; U+0307 is dropped so Turkish "İ" (which lowercases to "i" + a combining dot) finds "i". Traditional Chinese folds to Simplified so 图 finds 圖 and vice versa. */
 export const foldOutlineSearch = (text: string): string =>
   toSimplifiedFold(text.toLocaleLowerCase().replace(/\u0307/g, ""));
-const MARKER_NAME_KEYS = {
-  done: "share.viewer_marker_done",
-  warning: "share.viewer_marker_warning",
-  star: "share.viewer_marker_star",
-  "priority-1": "share.viewer_marker_priority_1",
-  "priority-2": "share.viewer_marker_priority_2",
-  "priority-3": "share.viewer_marker_priority_3"
-} as const satisfies Record<TopicMarker, string>;
 export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();
@@ -213,7 +205,7 @@ export class OutlineView extends ItemView {
       const marks = readTopicMarkers({ "topic-markers": this.markers.get(node.id) });
       if (marks.length) {
         const listSeparator = t("ui.list_separator");
-        const names = marks.map(id => t(MARKER_NAME_KEYS[id])).join(listSeparator);
+        const names = marks.map(id => t(markerLabelKey(id))).join(listSeparator);
         button.setAttr(
           "aria-label",
           `${title}${listSeparator === "、" ? "，" : ", "}${t("share.viewer_markers_0", names)}`

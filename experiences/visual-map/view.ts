@@ -18,7 +18,7 @@ import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import { relationLabelPoint, relationPathData, treeEdgePathData, type RelationBox } from "./relation-geometry";
-import { TOPIC_MARKERS, markerSymbol, type TopicMarker } from "../../topic-markers";
+import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -455,15 +455,6 @@ function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
 let relationMarkerSequence = 0;
 let relationSwatchSequence = 0;
 /** The structure dialog lists the types in the order of spec section 2 (not TOPIC_KINDS order, which the menus keep). */
-/** Names of the markers, shared with the outline and the shared page (`share.viewer_marker*`). */
-const MARKER_NAME_KEYS = {
-  done: "share.viewer_marker_done",
-  warning: "share.viewer_marker_warning",
-  star: "share.viewer_marker_star",
-  "priority-1": "share.viewer_marker_priority_1",
-  "priority-2": "share.viewer_marker_priority_2",
-  "priority-3": "share.viewer_marker_priority_3"
-} as const satisfies Record<TopicMarker, string>;
 const KIND_PICKER_ORDER: readonly TopicKind[] = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 type CardBox = RelationBox;
 /** Below this zoom the relation names are hidden; at it they show. */
@@ -7381,7 +7372,7 @@ export class VisualAgentMapView extends ItemView {
   /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
   private markersText(markers: readonly TopicMarker[]): string {
     return markers.length
-      ? t("share.viewer_markers_0", markers.map(id => t(MARKER_NAME_KEYS[id])).join(t("ui.list_separator")))
+      ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
       : "";
   }
   /**
@@ -7389,7 +7380,7 @@ export class VisualAgentMapView extends ItemView {
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
   private paintCardMarkers(card: HTMLElement, header: HTMLElement, id: string): void {
-    cardMarkerRows.get(card)?.remove();
+    const old = cardMarkerRows.get(card);
     cardMarkerRows.delete(card);
     const markers = this.markersOf(id),
       text = this.markersText(markers),
@@ -7400,7 +7391,11 @@ export class VisualAgentMapView extends ItemView {
       named = stripped === named ? named.replace(previous, "") : stripped;
     }
     if (markers.length) {
-      const row = header.createSpan("vam-card-markers");
+      // After the type tag on a first draw; a redraw puts the new row where the old one was.
+      const kindTag = old ? null : header.querySelector(".vam-hypothesis-tag");
+      const row = header.createSpan("vam-card-markers vam-hypothesis-tag");
+      if (old) old.replaceWith(row);
+      else if (kindTag) kindTag.after(row);
       row.setAttr("aria-hidden", "true");
       cardMarkerRows.set(card, row);
       for (const marker of markers) {
@@ -7408,7 +7403,10 @@ export class VisualAgentMapView extends ItemView {
         mark.dataset.marker = marker;
       }
       card.dataset.markerText = text;
-    } else delete card.dataset.markerText;
+    } else {
+      old?.remove();
+      delete card.dataset.markerText;
+    }
     if (named) this.labelCard(card, text ? t("ui.topic_card_label_0_1", named, text) : named);
   }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
@@ -8547,7 +8545,7 @@ export class VisualAgentMapView extends ItemView {
       group.empty();
       const active = this.markersOf(node.id);
       for (const id of TOPIC_MARKERS) {
-        const choice = this.button(group, t(MARKER_NAME_KEYS[id]), () => {
+        const choice = this.button(group, t(markerLabelKey(id)), () => {
           this.enqueue(async () => {
             await this.changeTopicMarker(node, id);
             paint(id);

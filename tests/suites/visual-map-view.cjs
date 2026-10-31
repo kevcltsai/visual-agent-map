@@ -2037,7 +2037,7 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
 const heNotes = (list) => new Map(list.map(([id, extra]) => [id, { title: id.toUpperCase(), summary: '', status: 'completed', ...extra }]));
 const heHyp = (strength) => ({ topicKind: 'hypothesis', ...(strength ? { hypothesisStrength: strength } : {}) });
 // The shared DOM stand-in has a read-only textContent; labelCard writes it.
-const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
+const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); }; el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
 function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
@@ -3423,6 +3423,26 @@ integrationTest('topic-markers: refreshing a card replaces its symbols and its n
   f.view.notes.get('fact').markers = [];
   f.view.refreshCard(node, false);
   assert.doesNotMatch(label.text, /Markers/);
+});
+integrationTest('topic-markers: refreshCard keeps the marker row where it was (after the type tag), and the row carries the tag style', () => {
+  const f = heFixture({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) });
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+  const node = f.view.map.nodes[0], card = f.view.stageEl.children[0];
+  f.view.stageEl.querySelector = () => card; f.view.drawEdges = () => {};
+  const header = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+  const order = () => header.children.map(c => (c.cls ?? '').split(/\s+/).find(n => ['vam-card-markers', 'vam-kind-tag', 'vam-status'].includes(n)) ?? c.cls);
+  const before = order(), at = before.indexOf('vam-card-markers');
+  assert.ok(at > before.indexOf('vam-kind-tag') && before.indexOf('vam-kind-tag') >= 0, 'first draw: after the type tag');
+  assert.match(header.children[at].cls, /vam-hypothesis-tag/);
+  f.view.notes.get('fact').markers = ['star'];
+  f.view.refreshCard(node, false);
+  assert.deepEqual(order(), before, 'same position after a redraw');
+  f.view.notes.get('fact').markers = [];
+  f.view.refreshCard(node, false);
+  assert.ok(!order().includes('vam-card-markers'));
+  f.view.notes.get('fact').markers = ['done'];
+  f.view.refreshCard(node, false);
+  assert.ok(order().indexOf('vam-card-markers') > order().indexOf('vam-kind-tag'), 'a row added later goes after the type tag');
 });
 integrationTest('topic-markers: the sample, an AIM map and select mode have no marker menu and refuse a toggle', async () => {
   for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {

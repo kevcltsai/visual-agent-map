@@ -58745,8 +58745,8 @@ var VisualAgentMapPlugin = class extends import_obsidian38.Plugin {
         dom: obsidianTranslateDom(),
         models: () => this.availableModels(),
         modelLabel: (model) => this.modelLabel(model),
-        defaultModel: () => this.settings.cliModel,
-        reasoning: () => normalizeReasoningLevel(this.settings.cliReasoning),
+        defaultModel: () => this.currentModelChoice().model,
+        reasoning: () => this.currentModelChoice().reasoning,
         confirmAiUsage: (model, run) => this.confirmAiUsage(model, run)
       }
     }).open();

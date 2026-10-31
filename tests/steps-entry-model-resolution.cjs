@@ -81,3 +81,12 @@ test('structure review and relevance grading read the one resolution (no direct 
   assert.doesNotMatch(grade, /settings\.cliModel|settings\.cliReasoning/);
   assert.match(grade, /reasoning: gradeReasoning/);
 });
+
+test('share translation defaults to the one resolution (#27)', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '..', 'main.ts'), 'utf8');
+  const from = source.indexOf('translation: {'); assert.ok(from >= 0);
+  const block = source.slice(from, source.indexOf('}', from));
+  assert.match(block, /defaultModel: \(\) => this\.currentModelChoice\(\)\.model/);
+  assert.match(block, /reasoning: \(\) => this\.currentModelChoice\(\)\.reasoning/);
+  assert.doesNotMatch(block, /settings\.cliModel|settings\.cliReasoning/);
+});

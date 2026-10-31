@@ -1882,7 +1882,7 @@ export class VisualAgentMapView extends ItemView {
         if (!isCurrent()) return;
         this.notes.set(node.id, fresh);
       } catch (error) {
-        console.warn("Visual Agent Map could not clear an interrupted run", error);
+        console.warn("Visual Agent Map interrupted run", error);
       }
     }
   }

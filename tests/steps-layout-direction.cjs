@@ -356,8 +356,8 @@ test('V4: in a left map new, moved and copied topics and a fold re-layout go to 
   assert.equal(copies.length, 1);
   assert.ok(copies[0].x < h.named('Target').x, 'copySelected');
   h.view.multiSelected = new Set([h.named('Src').id]);
-  await h.view.moveSelected(h.named('Target'));
-  assert.ok(h.named('Src').x < h.named('Target').x && h.named('Leaf').x < h.named('Src').x, 'moveSelected');
+  await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
+  assert.ok(h.named('Src').x < h.named('Target').x && h.named('Leaf').x < h.named('Src').x, 'moveBranches');
   const stage = stub('div');
   h.view.stageEl = stage;
   h.view.renderNode(h.named('Target'));
@@ -366,6 +366,22 @@ test('V4: in a left map new, moved and copied topics and a fold re-layout go to 
   collapse.handlers.get('click')({ stopPropagation() {} }); await h.settled(); await h.settled();
   assert.equal(h.named('Target').collapsed, true);
   for (const child of h.view.map.nodes.filter(n => n.parentId === h.named('Root').id)) assert.ok(child.x < h.named('Root').x, `${child.id} after the fold`);
+});
+
+const DOWN_MAP = { layout: { direction: 'down' } };
+
+test('V4d: in a down map moved and copied topics go below their parent, not to its right (layout-clipboard-final-merge-layoutOf)', async () => {
+  const spec = [['Root', null, 1000, 80], ['Target', 'Root', 640, 0], ['Src', 'Root', 640, 400], ['Leaf', 'Src', 280, 400]];
+  const h = await harness(spec, DOWN_MAP);
+  h.view.mergeUnlocked = () => true;
+  h.view.multiSelected = new Set([h.named('Src').id]);
+  await h.view.copySelected(h.named('Target'));
+  const copies = h.view.map.nodes.filter(n => n.parentId === h.named('Target').id);
+  assert.equal(copies.length, 1);
+  assert.ok(copies[0].y > h.named('Target').y, 'copySelected goes down');
+  h.view.multiSelected = new Set([h.named('Src').id]);
+  await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
+  assert.ok(h.named('Src').y > h.named('Target').y && h.named('Leaf').y > h.named('Src').y, 'moveBranches goes down');
 });
 
 test('V5: an AIM map and the built-in sample offer no direction in the Layout menu', async () => {

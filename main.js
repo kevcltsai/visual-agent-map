@@ -185,8 +185,21 @@ var en = {
   "ui.outline_warning_ignored_lines": "{0} non-heading lines will not be imported.",
   "ui.outline_import_log": "Imported from an outline ({0}).",
   "ui.outline_import_log_source": "Imported from an outline ({0}): [[{1}]]",
+  "ui.outline_import_log_file": "Imported from an outline ({0}): {1}",
   "ui.outline_import_map_save_failed": "The topic notes were created but the map could not be saved: {0}",
   "ui.outline_import": "Import outline",
+  "ui.exchange_import": "Import OPML or FreeMind file",
+  "ui.exchange_refused": "Not imported: {0} ({1})",
+  "ui.exchange_reason_too_large": "the file is larger than {0} MB",
+  "ui.exchange_reason_unsafe": "it contains a DOCTYPE, entity or processing instruction, which are not accepted",
+  "ui.exchange_reason_too_big": "it has too many topics, elements or levels",
+  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline ({0})",
+  "ui.exchange_reason_unreadable": "the file could not be read",
+  "ui.exchange_export_opml": "Export as OPML",
+  "ui.exchange_export_freemind": "Export as FreeMind (.mm)",
+  "ui.exchange_exported": "Exported to {0}",
+  "ui.exchange_export_failed": "Export failed: {0}",
+  "ui.exchange_export_no_name": "No free file name was found",
   "ui.outline_import_hint": "Paste a heading-only Markdown outline, or generate one with AI from a topic. Each heading becomes a topic.",
   "ui.outline_import_text_label": "Outline",
   "ui.outline_import_copy_format": "Copy format instructions",
@@ -2168,7 +2181,29 @@ var en = {
   "share.translate_diagrams_kept_0": "{0} diagrams could not be translated and keep their original labels.",
   "share.translate_images_note": "Text inside images is not translated.",
   "share.translate_total_size_0": "Total size with these languages: {0}",
-  "share.translate_languages_included_0": "Languages in the file: {0}"
+  "share.translate_languages_included_0": "Languages in the file: {0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "Could not copy the selection as a branch.",
+  "ui.clipboard_paste_readonly": "This map is read-only here, so nothing was pasted.",
+  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted.",
+  "ui.clipboard_cut_mark": "Cut",
+  "ui.clipboard_cut_readonly": "This map is read-only here, so nothing was cut.",
+  "ui.clipboard_cut_into_own": "A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.",
+  "ui.clipboard_cut_missing": "The cut branches or the target topic are no longer on the map, so nothing was moved.",
+  "ui.clipboard_cut_cross_changed": "The map the branches were cut from has changed since the cut, so nothing was moved. Cut them again.",
+  "ui.clipboard_cut_cross_busy": "The map the branches were cut from has an open conflict window. Resolve it and paste again; nothing was moved.",
+  "ui.clipboard_cut_cross_unsupported": "Branches cannot be moved out of an AIM map or include AIM topics, so nothing was moved.",
+  "ui.clipboard_cut_cross_history": "Move branches from another map",
+  "ui.cross_map_undo_refused": "This change touched two maps, and the notes or maps were changed elsewhere since, so it was not undone or redone. Nothing was changed.",
+  "ui.cross_map_undo_broken": "This change touched two maps and an earlier undo or redo could not be fully restored, so it can no longer be undone or redone.",
+  "ui.clipboard_text_too_long": "The pasted text is longer than {0} characters, so nothing was pasted.",
+  "ui.clipboard_text_too_many": "Line {0}: the pasted text has more than {1} topics, so nothing was pasted.",
+  "ui.clipboard_text_empty_title": "Line {0}: this line has no title text, so nothing was pasted.",
+  "ui.clipboard_text_title_too_long": "Line {0}: a title can be at most {1} characters, so nothing was pasted.",
+  "ui.clipboard_text_bad_title": "Line {0}: this title has characters or markup that cannot be used in a title, so nothing was pasted.",
+  "ui.clipboard_text_vam_note": "This looks like a Visual Agent Map note or map file, not an outline, so nothing was pasted.",
+  "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
+  "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted."
 };
 
 // i18n/zh-CN.ts
@@ -2253,8 +2288,21 @@ var zhCN = {
   "ui.outline_warning_ignored_lines": "\u6709 {0} \u884C\u4E0D\u662F\u6807\u9898\uFF0C\u4E0D\u4F1A\u5BFC\u5165\u3002",
   "ui.outline_import_log": "\u4ECE\u5927\u7EB2\u5BFC\u5165\uFF08{0}\uFF09\u3002",
   "ui.outline_import_log_source": "\u4ECE\u5927\u7EB2\u5BFC\u5165\uFF08{0}\uFF09\uFF1A[[{1}]]",
+  "ui.outline_import_log_file": "\u4ECE\u5927\u7EB2\u5BFC\u5165\uFF08{0}\uFF09\uFF1A{1}",
   "ui.outline_import_map_save_failed": "\u8BAE\u9898\u7B14\u8BB0\u5DF2\u521B\u5EFA\uFF0C\u4F46\u5FC3\u667A\u56FE\u65E0\u6CD5\u4FDD\u5B58\uFF1A{0}",
   "ui.outline_import": "\u5BFC\u5165\u5927\u7EB2",
+  "ui.exchange_import": "\u5BFC\u5165 OPML \u6216 FreeMind \u6587\u4EF6",
+  "ui.exchange_refused": "\u672A\u5BFC\u5165\uFF1A{0}\uFF08{1}\uFF09",
+  "ui.exchange_reason_too_large": "\u6587\u4EF6\u8D85\u8FC7 {0} MB",
+  "ui.exchange_reason_unsafe": "\u6587\u4EF6\u542B\u6709 DOCTYPE\u3001\u5B9E\u4F53\u6216\u5904\u7406\u6307\u4EE4\uFF0C\u8FD9\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
+  "ui.exchange_reason_too_big": "\u8BAE\u9898\u3001\u5143\u7D20\u6216\u5C42\u6570\u592A\u591A",
+  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7EB2\uFF08{0}\uFF09",
+  "ui.exchange_reason_unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u6587\u4EF6",
+  "ui.exchange_export_opml": "\u5BFC\u51FA\u4E3A OPML",
+  "ui.exchange_export_freemind": "\u5BFC\u51FA\u4E3A FreeMind\uFF08.mm\uFF09",
+  "ui.exchange_exported": "\u5DF2\u5BFC\u51FA\u5230 {0}",
+  "ui.exchange_export_failed": "\u5BFC\u51FA\u5931\u8D25\uFF1A{0}",
+  "ui.exchange_export_no_name": "\u627E\u4E0D\u5230\u53EF\u7528\u7684\u6587\u4EF6\u540D",
   "ui.outline_import_hint": "\u7C98\u8D34\u53EA\u6709\u6807\u9898\u7684 Markdown \u5927\u7EB2\uFF0C\u6216\u7528 AI \u4F9D\u4E3B\u9898\u751F\u6210\u3002\u6BCF\u4E2A\u6807\u9898\u4F1A\u53D8\u6210\u4E00\u4E2A\u8BAE\u9898\u3002",
   "ui.outline_import_text_label": "\u5927\u7EB2",
   "ui.outline_import_copy_format": "\u590D\u5236\u683C\u5F0F\u8BF4\u660E",
@@ -4236,7 +4284,29 @@ var zhCN = {
   "share.translate_diagrams_kept_0": "{0} \u5F20\u56FE\u8868\u65E0\u6CD5\u7FFB\u8BD1\uFF0C\u4FDD\u7559\u539F\u672C\u7684\u6807\u7B7E\u3002",
   "share.translate_images_note": "\u56FE\u7247\u91CC\u7684\u6587\u5B57\u4E0D\u4F1A\u7FFB\u8BD1\u3002",
   "share.translate_total_size_0": "\u52A0\u4E0A\u8FD9\u4E9B\u8BED\u8A00\u540E\u7684\u6587\u4EF6\u5927\u5C0F\uFF1A{0}",
-  "share.translate_languages_included_0": "\u6587\u4EF6\u5305\u542B\u7684\u8BED\u8A00\uFF1A{0}"
+  "share.translate_languages_included_0": "\u6587\u4EF6\u5305\u542B\u7684\u8BED\u8A00\uFF1A{0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "\u65E0\u6CD5\u628A\u9009\u62E9\u7684\u5185\u5BB9\u590D\u5236\u6210\u5206\u652F\u3002",
+  "ui.clipboard_paste_readonly": "\u8FD9\u5F20\u56FE\u5728\u8FD9\u91CC\u662F\u53EA\u8BFB\u7684\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_paste_invalid": "\u526A\u8D34\u677F\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_mark": "\u5DF2\u526A\u5207",
+  "ui.clipboard_cut_readonly": "\u8FD9\u5F20\u56FE\u5728\u8FD9\u91CC\u662F\u53EA\u8BFB\u7684\uFF0C\u6CA1\u6709\u526A\u5207\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_into_own": "\u4E0D\u80FD\u628A\u5206\u652F\u7C98\u8D34\u5230\u5B83\u81EA\u5DF1\u6216\u5B83\u7684\u5B50\u4E3B\u9898\u4E0B\u9762\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_missing": "\u526A\u5207\u7684\u5206\u652F\u6216\u76EE\u6807\u4E3B\u9898\u5DF2\u4E0D\u5728\u56FE\u4E0A\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_cross_changed": "\u526A\u5207\u5206\u652F\u7684\u90A3\u5F20\u56FE\u5728\u526A\u5207\u4E4B\u540E\u5DF2\u7ECF\u53D8\u52A8\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002\u8BF7\u91CD\u65B0\u526A\u5207\u3002",
+  "ui.clipboard_cut_cross_busy": "\u526A\u5207\u5206\u652F\u7684\u90A3\u5F20\u56FE\u6B63\u5F00\u7740\u51B2\u7A81\u7A97\u53E3\u3002\u8BF7\u5148\u5904\u7406\u518D\u7C98\u8D34\uFF1B\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_cross_unsupported": "AIM \u56FE\u7684\u5206\u652F\u6216\u542B AIM \u4E3B\u9898\u7684\u5206\u652F\u4E0D\u80FD\u79FB\u51FA\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_cross_history": "\u4ECE\u53E6\u4E00\u5F20\u56FE\u79FB\u5165\u5206\u652F",
+  "ui.cross_map_undo_refused": "\u6B64\u66F4\u6539\u6D89\u53CA\u4E24\u5F20\u56FE\uFF0C\u4E4B\u540E\u7B14\u8BB0\u6216\u56FE\u53C8\u5728\u5176\u4ED6\u5730\u65B9\u88AB\u66F4\u6539\uFF0C\u6240\u4EE5\u6CA1\u6709\u64A4\u9500\u6216\u91CD\u505A\uFF0C\u4E5F\u6CA1\u6709\u6539\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.cross_map_undo_broken": "\u6B64\u66F4\u6539\u6D89\u53CA\u4E24\u5F20\u56FE\uFF0C\u4E4B\u524D\u7684\u64A4\u9500\u6216\u91CD\u505A\u6CA1\u80FD\u5B8C\u6574\u8FD8\u539F\uFF0C\u6240\u4EE5\u4E0D\u80FD\u518D\u64A4\u9500\u6216\u91CD\u505A\u3002",
+  "ui.clipboard_text_too_long": "\u7C98\u8D34\u7684\u6587\u5B57\u8D85\u8FC7 {0} \u4E2A\u5B57\u7B26\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_too_many": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u6587\u5B57\u8D85\u8FC7 {1} \u4E2A\u4E3B\u9898\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_empty_title": "\u7B2C {0} \u884C\uFF1A\u8FD9\u4E00\u884C\u6CA1\u6709\u6807\u9898\u6587\u5B57\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_title_too_long": "\u7B2C {0} \u884C\uFF1A\u6807\u9898\u6700\u591A {1} \u4E2A\u5B57\u7B26\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_bad_title": "\u7B2C {0} \u884C\uFF1A\u8FD9\u4E2A\u6807\u9898\u542B\u6709\u4E0D\u80FD\u7528\u5728\u6807\u9898\u7684\u5B57\u7B26\u6216\u6807\u8BB0\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_vam_note": "\u8FD9\u770B\u8D77\u6765\u662F Visual Agent Map \u7684\u7B14\u8BB0\u6216\u56FE\u6587\u4EF6\uFF0C\u4E0D\u662F\u5927\u7EB2\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_outline": "\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -4321,8 +4391,21 @@ var zhTW = {
   "ui.outline_warning_ignored_lines": "\u6709 {0} \u884C\u4E0D\u662F\u6A19\u984C\uFF0C\u4E0D\u6703\u532F\u5165\u3002",
   "ui.outline_import_log": "\u5F9E\u5927\u7DB1\u532F\u5165\uFF08{0}\uFF09\u3002",
   "ui.outline_import_log_source": "\u5F9E\u5927\u7DB1\u532F\u5165\uFF08{0}\uFF09\uFF1A[[{1}]]",
+  "ui.outline_import_log_file": "\u5F9E\u5927\u7DB1\u532F\u5165\uFF08{0}\uFF09\uFF1A{1}",
   "ui.outline_import_map_save_failed": "\u8B70\u984C\u7B46\u8A18\u5DF2\u5EFA\u7ACB\uFF0C\u4F46\u5FC3\u667A\u5716\u7121\u6CD5\u5132\u5B58\uFF1A{0}",
   "ui.outline_import": "\u532F\u5165\u5927\u7DB1",
+  "ui.exchange_import": "\u532F\u5165 OPML \u6216 FreeMind \u6A94",
+  "ui.exchange_refused": "\u672A\u532F\u5165\uFF1A{0}\uFF08{1}\uFF09",
+  "ui.exchange_reason_too_large": "\u6A94\u6848\u8D85\u904E {0} MB",
+  "ui.exchange_reason_unsafe": "\u6A94\u6848\u542B\u6709 DOCTYPE\u3001\u5BE6\u9AD4\u6216\u8655\u7406\u6307\u4EE4\uFF0C\u9019\u4E9B\u4E00\u5F8B\u4E0D\u63A5\u53D7",
+  "ui.exchange_reason_too_big": "\u8B70\u984C\u3001\u5143\u7D20\u6216\u5C64\u6578\u592A\u591A",
+  "ui.exchange_reason_invalid": "\u4E0D\u662F\u6709\u6548\u7684 OPML \u6216 FreeMind \u5927\u7DB1\uFF08{0}\uFF09",
+  "ui.exchange_reason_unreadable": "\u7121\u6CD5\u8B80\u53D6\u6A94\u6848",
+  "ui.exchange_export_opml": "\u532F\u51FA\u70BA OPML",
+  "ui.exchange_export_freemind": "\u532F\u51FA\u70BA FreeMind\uFF08.mm\uFF09",
+  "ui.exchange_exported": "\u5DF2\u532F\u51FA\u5230 {0}",
+  "ui.exchange_export_failed": "\u532F\u51FA\u5931\u6557\uFF1A{0}",
+  "ui.exchange_export_no_name": "\u627E\u4E0D\u5230\u53EF\u7528\u7684\u6A94\u540D",
   "ui.outline_import_hint": "\u8CBC\u4E0A\u53EA\u6709\u6A19\u984C\u7684 Markdown \u5927\u7DB1\uFF0C\u6216\u7528 AI \u4F9D\u4E3B\u984C\u751F\u6210\u3002\u6BCF\u500B\u6A19\u984C\u6703\u8B8A\u6210\u4E00\u500B\u8B70\u984C\u3002",
   "ui.outline_import_text_label": "\u5927\u7DB1",
   "ui.outline_import_copy_format": "\u8907\u88FD\u683C\u5F0F\u8AAA\u660E",
@@ -6304,7 +6387,29 @@ var zhTW = {
   "share.translate_diagrams_kept_0": "{0} \u5F35\u5716\u8868\u7121\u6CD5\u7FFB\u8B6F\uFF0C\u4FDD\u7559\u539F\u672C\u7684\u6A19\u7C64\u3002",
   "share.translate_images_note": "\u5716\u7247\u88E1\u7684\u6587\u5B57\u4E0D\u6703\u7FFB\u8B6F\u3002",
   "share.translate_total_size_0": "\u52A0\u4E0A\u9019\u4E9B\u8A9E\u8A00\u5F8C\u7684\u6A94\u6848\u5927\u5C0F\uFF1A{0}",
-  "share.translate_languages_included_0": "\u6A94\u6848\u5305\u542B\u7684\u8A9E\u8A00\uFF1A{0}"
+  "share.translate_languages_included_0": "\u6A94\u6848\u5305\u542B\u7684\u8A9E\u8A00\uFF1A{0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "\u7121\u6CD5\u628A\u9078\u53D6\u7684\u5167\u5BB9\u8907\u88FD\u6210\u5206\u652F\u3002",
+  "ui.clipboard_paste_readonly": "\u9019\u5F35\u5716\u5728\u9019\u88E1\u662F\u552F\u8B80\u7684\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_paste_invalid": "\u526A\u8CBC\u7C3F\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_mark": "\u5DF2\u526A\u4E0B",
+  "ui.clipboard_cut_readonly": "\u9019\u5F35\u5716\u5728\u9019\u88E1\u662F\u552F\u8B80\u7684\uFF0C\u6C92\u6709\u526A\u4E0B\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_into_own": "\u4E0D\u80FD\u628A\u5206\u652F\u8CBC\u5230\u5B83\u81EA\u5DF1\u6216\u5B83\u7684\u5B50\u4E3B\u984C\u5E95\u4E0B\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_missing": "\u526A\u4E0B\u7684\u5206\u652F\u6216\u76EE\u6A19\u4E3B\u984C\u5DF2\u4E0D\u5728\u5716\u4E0A\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_cross_changed": "\u526A\u4E0B\u5206\u652F\u7684\u90A3\u5F35\u5716\u5728\u526A\u4E0B\u4E4B\u5F8C\u5DF2\u7D93\u8B8A\u52D5\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002\u8ACB\u91CD\u65B0\u526A\u4E0B\u3002",
+  "ui.clipboard_cut_cross_busy": "\u526A\u4E0B\u5206\u652F\u7684\u90A3\u5F35\u5716\u6B63\u958B\u8457\u885D\u7A81\u8996\u7A97\u3002\u8ACB\u5148\u8655\u7406\u518D\u8CBC\u4E0A\uFF1B\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_cross_unsupported": "AIM \u5716\u7684\u5206\u652F\u6216\u542B AIM \u4E3B\u984C\u7684\u5206\u652F\u4E0D\u80FD\u79FB\u51FA\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_cross_history": "\u5F9E\u53E6\u4E00\u5F35\u5716\u79FB\u5165\u5206\u652F",
+  "ui.cross_map_undo_refused": "\u9019\u500B\u8B8A\u66F4\u52D5\u5230\u5169\u5F35\u5716\uFF0C\u4E4B\u5F8C\u7B46\u8A18\u6216\u5716\u53C8\u5728\u5176\u4ED6\u5730\u65B9\u88AB\u66F4\u52D5\uFF0C\u6240\u4EE5\u6C92\u6709\u5FA9\u539F\u6216\u91CD\u505A\uFF0C\u4E5F\u6C92\u6709\u6539\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.cross_map_undo_broken": "\u9019\u500B\u8B8A\u66F4\u52D5\u5230\u5169\u5F35\u5716\uFF0C\u5148\u524D\u7684\u5FA9\u539F\u6216\u91CD\u505A\u6C92\u80FD\u5B8C\u6574\u9084\u539F\uFF0C\u6240\u4EE5\u4E0D\u80FD\u518D\u5FA9\u539F\u6216\u91CD\u505A\u3002",
+  "ui.clipboard_text_too_long": "\u8CBC\u4E0A\u7684\u6587\u5B57\u8D85\u904E {0} \u500B\u5B57\u5143\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_too_many": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u6587\u5B57\u8D85\u904E {1} \u500B\u4E3B\u984C\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_empty_title": "\u7B2C {0} \u884C\uFF1A\u9019\u4E00\u884C\u6C92\u6709\u6A19\u984C\u6587\u5B57\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_title_too_long": "\u7B2C {0} \u884C\uFF1A\u6A19\u984C\u6700\u591A {1} \u500B\u5B57\u5143\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_bad_title": "\u7B2C {0} \u884C\uFF1A\u9019\u500B\u6A19\u984C\u542B\u6709\u4E0D\u80FD\u7528\u5728\u6A19\u984C\u7684\u5B57\u5143\u6216\u6A19\u8A18\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_vam_note": "\u9019\u770B\u8D77\u4F86\u662F Visual Agent Map \u7684\u7B46\u8A18\u6216\u5716\u6A94\uFF0C\u4E0D\u662F\u5927\u7DB1\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_outline": "\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002"
 };
 
 // i18n/languages.ts
@@ -16064,8 +16169,8 @@ function cleanBranchLayouts(nodes, mapDirection, aim = false) {
   const done = /* @__PURE__ */ new Set();
   const directionAbove = (id, from) => {
     var _a2;
-    const own = layoutDirectionIn(byId, id, void 0);
-    if (own) return own;
+    const own2 = layoutDirectionIn(byId, id, void 0);
+    if (own2) return own2;
     if (mapDirection !== "balanced") return allowsBranchLayout(mapDirection) ? mapDirection : void 0;
     let topic = from;
     while ((topic == null ? void 0 : topic.parentId) && ((_a2 = byId.get(topic.parentId)) == null ? void 0 : _a2.parentId)) topic = byId.get(topic.parentId);
@@ -16095,8 +16200,8 @@ function layoutDirectionIn(byId, id, fallback) {
   const seen = /* @__PURE__ */ new Set();
   for (let node = byId.get(id); node && !seen.has(node.id); node = node.parentId ? byId.get(node.parentId) : void 0) {
     seen.add(node.id);
-    const own = branchDirectionOf(node);
-    if (own) return own;
+    const own2 = branchDirectionOf(node);
+    if (own2) return own2;
   }
   return fallback;
 }
@@ -16204,9 +16309,9 @@ function fishbonePositions(input) {
         next += sizes.get(kid.id) + gap;
         return centre2;
       });
-      const own = heightFor(node);
+      const own2 = heightFor(node);
       const centre = centres.length ? (centres[0] + centres[centres.length - 1]) / 2 : bandTop + sizes.get(node.id) / 2;
-      out2.push({ id: node.id, x: -depth * column, centre, height: own });
+      out2.push({ id: node.id, x: -depth * column, centre, height: own2 });
       return centre;
     };
     const topics = childrenOf(root).map((topic, index) => {
@@ -16403,9 +16508,9 @@ function verticalPositions(input) {
     };
     const kidXs = row(kids, depth + 1);
     const joinXs = row(extra, depth + spans.get(node.id));
-    const own = kidXs.length ? kidXs : joinXs;
+    const own2 = kidXs.length ? kidXs : joinXs;
     depths.set(node.id, depth);
-    xs.set(node.id, own.length ? (own[0] + own[own.length - 1]) / 2 : start);
+    xs.set(node.id, own2.length ? (own2[0] + own2[own2.length - 1]) / 2 : start);
   };
   let cursor = left;
   const order = [];
@@ -16538,15 +16643,6 @@ var DEFAULT_CARD_HEIGHT = 180;
 function isLayoutKind(value) {
   return value === "right" || value === "left" || value === "down" || value === "up" || value === "balanced" || value === "radial" || value === "timeline" || value === "fishbone";
 }
-function isLayoutDirection(value) {
-  return value === "right" || value === "left";
-}
-function layoutDirectionOf(map) {
-  var _a2;
-  if (!map || map.aim) return "right";
-  const direction = (_a2 = map.layout) == null ? void 0 : _a2.direction;
-  return isLayoutDirection(direction) ? direction : "right";
-}
 function layoutOf(map) {
   var _a2, _b2;
   const stored = map && !map.aim ? (_a2 = map.layout) == null ? void 0 : _a2.direction : void 0;
@@ -16630,12 +16726,12 @@ function horizontalPositions(input) {
     const joinYs = stack(extra, depth + spans.get(node.id));
     const list = kidYs.length ? kids : extra;
     const ys = kidYs.length ? kidYs : joinYs;
-    const own = heightFor(node);
-    let y = topY + (size - own) / 2;
+    const own2 = heightFor(node);
+    let y = topY + (size - own2) / 2;
     if (ys.length) {
       const first = ys[0] + heightFor(list[0]) / 2;
       const last = ys[ys.length - 1] + heightFor(list[list.length - 1]) / 2;
-      y = (first + last) / 2 - own / 2;
+      y = (first + last) / 2 - own2 / 2;
     }
     result.set(node.id, { x: left + sign * depth * COLUMN, y: top + y });
     return y;
@@ -16756,12 +16852,12 @@ function arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, la
   for (; ; ) {
     let next = shiftX;
     for (const [id, point] of placed) {
-      const own = cardHeight(heightOf, id);
+      const own2 = cardHeight(heightOf, id);
       const topY = point.y + shiftY;
       for (const node of fixed) {
         const other = cardHeight(heightOf, node.id);
         const x = point.x + shiftX;
-        if (x < node.x + WIDTH + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own + LAYOUT_GAP2)
+        if (x < node.x + WIDTH + LAYOUT_GAP2 && node.x < x + WIDTH + LAYOUT_GAP2 && topY < node.y + other + LAYOUT_GAP2 && node.y < topY + own2 + LAYOUT_GAP2)
           next = Math.max(next, node.x + WIDTH + LAYOUT_GAP2 - point.x);
       }
     }
@@ -16852,8 +16948,8 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "r
   const actual = layoutDirectionFor(nodes, parentId, direction);
   if (actual !== direction) {
     const spacing = typeof layout === "string" ? void 0 : layout.spacing;
-    const own = { direction: actual, ...spacing ? { spacing } : {} };
-    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own);
+    const own2 = { direction: actual, ...spacing ? { spacing } : {} };
+    return arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, own2);
   }
   const fresh = nodes.filter((node) => newIds.has(node.id));
   const roots = fresh.filter((node) => node.parentId === parentId);
@@ -16872,11 +16968,11 @@ function arrangeNewBranch(nodes, parentId, newIds, heightOf, minTop, layout = "r
   for (; ; ) {
     let next = offset;
     for (const [id, point] of placed) {
-      const own = cardHeight(heightOf, id);
+      const own2 = cardHeight(heightOf, id);
       for (const node of fixed) {
         const other = cardHeight(heightOf, node.id);
         const top = point.y + offset;
-        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own + LAYOUT_GAP2)
+        if (Math.abs(point.x - node.x) < WIDTH && top < node.y + other + LAYOUT_GAP2 && node.y < top + own2 + LAYOUT_GAP2)
           next = Math.max(next, node.y + other + LAYOUT_GAP2 - point.y);
       }
     }
@@ -17694,20 +17790,20 @@ function begin(deps) {
       }
     };
     const stale = async (direction) => {
-      const fail = () => {
+      const fail2 = () => {
         throw tagged(new Error(t("error.map_transaction_stale")), "stale");
       };
       for (const op of ops) {
-        if (!op.target) fail();
+        if (!op.target) fail2();
         const here = toward(op, direction) ? op.original : op.target, there = toward(op, direction) ? op.target : op.original;
-        if (!exists(here) || exists(there)) fail();
+        if (!exists(here) || exists(there)) fail2();
       }
       for (const record of records) {
         const expected = direction === "undo" ? record.after : record.before;
-        if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail();
+        if (structure(await repo.readMap(record.mapPath)) !== structure(expected)) fail2();
       }
       if (direction === "redo") {
-        for (const item of attachments) if (!exists(item.path)) fail();
+        for (const item of attachments) if (!exists(item.path)) fail2();
       }
     };
     const apply = async (direction) => {
@@ -18607,7 +18703,7 @@ function shapeInsets(kind, content) {
 
 // experiences/visual-map/view.ts
 var import_node_crypto14 = require("node:crypto");
-var import_obsidian31 = require("obsidian");
+var import_obsidian32 = require("obsidian");
 
 // ai/markdown-blocks.ts
 function fencedLines(lines) {
@@ -19604,8 +19700,8 @@ function resolveTaskModel(input) {
   if (once) {
     return { model: once, reasoning: (_d = (_c = input.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input.current.reasoning, origin: "run-once" };
   }
-  const own = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
-  if (input.override && own) return { model: own, reasoning: input.override.reasoning, origin: "override" };
+  const own2 = (_f = (_e = input.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
+  if (input.override && own2) return { model: own2, reasoning: input.override.reasoning, origin: "override" };
   return { model: input.current.model, reasoning: input.current.reasoning, origin: "current" };
 }
 
@@ -19951,11 +20047,11 @@ async function applyCharts(detail, charts, options) {
   const used = /* @__PURE__ */ new Set(), items = [];
   for (let index = 0; index < charts.length; index++) {
     const chart = charts[index], body = normBody(chart.mermaid);
-    const fail = (code) => ({ ok: false, code, index });
+    const fail2 = (code) => ({ ok: false, code, index });
     const nonBlank = body.split("\n").filter((l) => l.trim()).length;
-    if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail("bad_body");
+    if (body.includes("```") || body.includes("~~~") || nonBlank > 30 || body.length > 1500) return fail2("bad_body");
     const fence = "```mermaid\n" + body + "\n```";
-    if (neutralizeUnsafeMermaid(fence) !== fence) return fail("unsafe_or_header");
+    if (neutralizeUnsafeMermaid(fence) !== fence) return fail2("unsafe_or_header");
     if (options.parses) {
       let ok = true;
       try {
@@ -19963,15 +20059,15 @@ async function applyCharts(detail, charts, options) {
       } catch (e) {
         ok = false;
       }
-      if (!ok) return fail("unparsable");
+      if (!ok) return fail2("unparsable");
     }
     const tokens2 = numberTokens(body.replace(/^\s*\S+/, ""));
-    if (tokens2.some((n) => !noteNums.has(n))) return fail("number_not_in_note");
+    if (tokens2.some((n) => !noteNums.has(n))) return fail2("number_not_in_note");
     const anchor = anchorCheck(lines, mask, chart.anchor);
-    if (anchor.code) return fail(anchor.code);
+    if (anchor.code) return fail2(anchor.code);
     const block = anchor.block;
     const key2 = block.join("-");
-    if (used.has(key2)) return fail("anchor_shared");
+    if (used.has(key2)) return fail2("anchor_shared");
     used.add(key2);
     items.push({ body, block });
   }
@@ -21496,14 +21592,15 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
     );
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
-  async duplicateNote(sourcePath, map, mapPath) {
+  /** `keepTitle` keeps the source title as is (a paste); without it the copy gets the translated "copy" suffix. */
+  async duplicateNote(sourcePath, map, mapPath, options = {}) {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = text5(metadata.title, this.file(sourcePath).basename);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
-    const title = `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
+    const title = options.keepTitle ? sourceTitle : `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;
@@ -21739,8 +21836,8 @@ ${body}`);
    */
   renameAffectsVam(file, oldPath) {
     var _a2, _b2, _c;
-    const own = this.app.metadataCache.getFileCache(file);
-    if (!own || marker2((_a2 = own.frontmatter) == null ? void 0 : _a2["agent-map-node"]) || marker2((_b2 = own.frontmatter) == null ? void 0 : _b2["visual-agent-map"]))
+    const own2 = this.app.metadataCache.getFileCache(file);
+    if (!own2 || marker2((_a2 = own2.frontmatter) == null ? void 0 : _a2["agent-map-node"]) || marker2((_b2 = own2.frontmatter) == null ? void 0 : _b2["visual-agent-map"]))
       return true;
     for (const note of this.app.vault.getMarkdownFiles()) {
       const fm = (_c = this.app.metadataCache.getFileCache(note)) == null ? void 0 : _c.frontmatter;
@@ -26051,14 +26148,14 @@ var CodexAppServerRuntime = class {
     const threadId = typeof ((_d = started.thread) == null ? void 0 : _d.id) === "string" ? started.thread.id : "";
     if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
     let timedOut = false, interruptRequested = false;
-    const completed = new Promise((resolve, reject) => {
+    const completed = new Promise((resolve, reject2) => {
       var _a3, _b3;
       const timeout = window.setTimeout(() => {
         var _a4;
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5e3, t("error.ai_task_stop_after_timeout_failed"));
-        reject(
+        reject2(
           new Error(
             (_a4 = controls == null ? void 0 : controls.timeoutMessage) != null ? _a4 : (controls == null ? void 0 : controls.timeoutMs) ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
           )
@@ -26068,7 +26165,7 @@ var CodexAppServerRuntime = class {
         messages: [],
         visibleMessages: /* @__PURE__ */ new Map(),
         resolve,
-        reject,
+        reject: reject2,
         timeout,
         turnId: "",
         searches: 0,
@@ -26383,20 +26480,20 @@ var CodexAppServerRuntime = class {
   }
   request(method, params, timeoutMs = CONTROL_TIMEOUT_MS) {
     const id = this.nextId++;
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       const timeout = window.setTimeout(() => {
         this.pending.delete(id);
-        reject(
+        reject2(
           new Error(t("ui.codex_app_server_0_did_not_respond_within_1_seconds", method, Math.ceil(timeoutMs / 1e3)))
         );
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timeout });
+      this.pending.set(id, { resolve, reject: reject2, timeout });
       try {
         this.send({ id, method, params });
       } catch (error) {
         window.clearTimeout(timeout);
         this.pending.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject2(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -27052,7 +27149,7 @@ var ClaudeCodeCliRuntime = class {
       } catch (e) {
       }
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       var _a3, _b3, _c2, _d2, _e2, _f2;
       let child;
       try {
@@ -27063,7 +27160,7 @@ var ClaudeCodeCliRuntime = class {
           windowsHide: true
         });
       } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject2(error instanceof Error ? error : new Error(String(error)));
         return;
       }
       let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image || warm);
@@ -27137,7 +27234,7 @@ var ClaudeCodeCliRuntime = class {
         settled = true;
         cleanup();
         if (observer) reportMilestones(observer.milestones());
-        if (error) reject(error);
+        if (error) reject2(error);
         else resolve(result != null ? result : "");
       };
       const markAccepted = () => {
@@ -27218,7 +27315,7 @@ var ClaudeCodeCliRuntime = class {
           cleanup();
           this.streamUnsupported = true;
           (_b4 = (_a4 = this.options).onLog) == null ? void 0 : _b4.call(_a4, "warn", t("log.claude_stream_fallback"));
-          this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject);
+          this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject2);
           return;
         }
         if (!streaming && controls.onMilestones) {
@@ -28274,9 +28371,9 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
   if (strictGapAudit && (!["user_condition", "external_evidence"].includes(parsed.summary) || !parsed.detail.trim() || !Array.isArray(parsed.suggestions) || parsed.suggestions.length !== 0 || !Array.isArray(parsed.visualReferences) || parsed.visualReferences.length !== 0)) {
     throw new Error("AIM research-gap audit returned an invalid structured classification.");
   }
-  const isRecord3 = (value) => typeof value === "object" && value !== null;
+  const isRecord4 = (value) => typeof value === "object" && value !== null;
   const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.filter(
-    (item) => isRecord3(item) && typeof item.title === "string" && typeof item.task === "string"
+    (item) => isRecord4(item) && typeof item.title === "string" && typeof item.task === "string"
   ).map((item) => ({
     title: String(item.title).trim(),
     task: String(item.task).trim(),
@@ -28284,7 +28381,7 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
     parentTitle: typeof item.parentTitle === "string" ? item.parentTitle.trim() : ""
   })).filter((item) => item.title) : [];
   const visualReferences = Array.isArray(parsed.visualReferences) ? parsed.visualReferences.filter(
-    (item) => isRecord3(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
+    (item) => isRecord4(item) && typeof item.imageUrl === "string" && typeof item.sourceUrl === "string"
   ).map((item) => ({
     title: typeof item.title === "string" ? item.title.trim() : translateNote(language2, "note.visual_reference"),
     imageUrl: String(item.imageUrl).trim(),
@@ -28821,7 +28918,7 @@ var AiTaskService = class {
         }
       };
       const replaced = new Promise(
-        (_resolve, reject) => controller.signal.addEventListener("abort", () => reject(cancelled()), {
+        (_resolve, reject2) => controller.signal.addEventListener("abort", () => reject2(cancelled()), {
           once: true
         })
       );
@@ -30148,7 +30245,12 @@ function localDate3(now) {
 }
 function outlineRootDetail(language2, template, source, now) {
   var _a2;
-  const log = source ? translateNote(language2, "ui.outline_import_log_source", localDate3(now), source) : translateNote(language2, "ui.outline_import_log", localDate3(now));
+  const log = source && typeof source === "object" ? translateNote(
+    language2,
+    "ui.outline_import_log_file",
+    localDate3(now),
+    source.file.replace(/[[\]|<>`!\r\n]+/g, " ").trim()
+  ) : source ? translateNote(language2, "ui.outline_import_log_source", localDate3(now), source) : translateNote(language2, "ui.outline_import_log", localDate3(now));
   const heading = ((_a2 = template.sections.find((section3) => section3.role === "log")) != null ? _a2 : template.sections[0]).name;
   return canonicalDetail(`### ${heading}
 
@@ -30166,7 +30268,8 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
         mapPath,
         manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
         // A topic created from an outline starts in Quick mode (its first research, if any, is the short one).
-        top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
+        // A node's own note text, when the file had one, is its Detail as written; otherwise a root gets the import log.
+        node.body ? { detail: node.body, researchMode: "local" } : top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
       );
       note.parentId = top ? parentId : created[node.parent].id;
       created.push(note);
@@ -30263,6 +30366,555 @@ function limitOutline(nodes, limits) {
     }
   const result = nodes.filter((node) => kept.has(node.index));
   return { nodes: result, dropped: nodes.length - result.length };
+}
+
+// experiences/visual-map/clipboard.ts
+var CLIPBOARD_FORMAT = "vam-branch";
+var CLIPBOARD_VERSION = 1;
+var CLIPBOARD_MAX_CHARS = 2e6;
+var CLIPBOARD_MAX_NODES = 500;
+var CLIPBOARD_MAX_BODY = 2e5;
+var CLIPBOARD_MAX_RELATIONS = 2e3;
+var CLIP_ID = /^[A-Za-z0-9_-]{8,64}$/;
+var NODE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+var TITLE_FORBIDDEN = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+var RELATION_KIND_RECORD = {
+  supports: true,
+  contradicts: true,
+  verifies: true,
+  derives_from: true,
+  related: true,
+  prerequisite: true
+};
+var RELATION_KINDS = Object.keys(RELATION_KIND_RECORD);
+var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var own = (record, key2) => Object.prototype.hasOwnProperty.call(record, key2) ? record[key2] : void 0;
+var fail = (reason) => ({ ok: false, reason });
+var startsWithFrontmatter = (body) => /^---[ \t]*(?:\r?\n|$)/.test(body.replace(/^\uFEFF/, ""));
+function parseClipboard(raw) {
+  try {
+    if (typeof raw !== "string") return fail("not-text");
+    if (raw.length > CLIPBOARD_MAX_CHARS) return fail("too-large");
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      return fail("bad-json");
+    }
+    if (!isRecord2(data) || own(data, "format") !== CLIPBOARD_FORMAT) return fail("not-vam");
+    if (own(data, "version") !== CLIPBOARD_VERSION) return fail("version");
+    const clipId = own(data, "clipId");
+    if (typeof clipId !== "string" || !CLIP_ID.test(clipId)) return fail("bad-clip-id");
+    const rawNodes = own(data, "nodes");
+    if (!Array.isArray(rawNodes) || rawNodes.length === 0) return fail("bad-nodes");
+    if (rawNodes.length > CLIPBOARD_MAX_NODES) return fail("too-many-nodes");
+    const nodes = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const item of rawNodes) {
+      if (!isRecord2(item)) return fail("bad-nodes");
+      const id = own(item, "id");
+      if (typeof id !== "string" || !NODE_ID.test(id) || seen.has(id)) return fail("bad-id");
+      const parent = own(item, "parent");
+      if (parent !== null && (typeof parent !== "string" || !seen.has(parent))) return fail("bad-parent");
+      const title = own(item, "title");
+      if (typeof title !== "string") return fail("bad-title");
+      const trimmed2 = title.trim();
+      if (!trimmed2 || [...trimmed2].length > OUTLINE_TITLE_LIMIT || TITLE_FORBIDDEN.test(trimmed2))
+        return fail("bad-title");
+      const kind = own(item, "kind");
+      if (typeof kind !== "string" || !TOPIC_KINDS.includes(kind)) return fail("bad-kind");
+      const body = own(item, "body");
+      if (typeof body !== "string" || body.length > CLIPBOARD_MAX_BODY || body.includes("\0") || body.includes("<!-- visual-agent-map:") || startsWithFrontmatter(body))
+        return fail("bad-body");
+      seen.add(id);
+      const node = { id, parent, title: trimmed2, kind, body };
+      const strength = own(item, "strength");
+      if (kind === "hypothesis" && typeof strength === "string" && HYPOTHESIS_STRENGTHS.includes(strength))
+        node.strength = strength;
+      nodes.push(node);
+    }
+    const rawRelations = own(data, "relations");
+    if (rawRelations !== void 0 && !Array.isArray(rawRelations)) return fail("bad-relations");
+    const list = Array.isArray(rawRelations) ? rawRelations : [];
+    if (list.length > CLIPBOARD_MAX_RELATIONS) return fail("too-many-relations");
+    const relations = [];
+    const pairs = /* @__PURE__ */ new Set();
+    let droppedRelations = 0;
+    for (const item of list) {
+      if (!isRecord2(item)) {
+        droppedRelations++;
+        continue;
+      }
+      const kind = own(item, "kind");
+      const from = own(item, "from");
+      const to = own(item, "to");
+      if (typeof kind !== "string" || !RELATION_KINDS.includes(kind) || typeof from !== "string" || typeof to !== "string" || !seen.has(from) || !seen.has(to) || from === to) {
+        droppedRelations++;
+        continue;
+      }
+      const key2 = from > to ? `${to}\0${from}` : `${from}\0${to}`;
+      if (pairs.has(key2)) {
+        droppedRelations++;
+        continue;
+      }
+      pairs.add(key2);
+      const relation = { kind, from, to };
+      const description = own(item, "description");
+      const normalized = typeof description === "string" ? normalizeRelationDescription(description) : void 0;
+      if (normalized !== void 0) relation.description = normalized;
+      relations.push(relation);
+    }
+    return {
+      ok: true,
+      payload: { format: CLIPBOARD_FORMAT, version: CLIPBOARD_VERSION, clipId, nodes, relations },
+      droppedRelations
+    };
+  } catch (e) {
+    return fail("bad-json");
+  }
+}
+function serializeClipboard(payload) {
+  return JSON.stringify(payload);
+}
+function clipboardOutline(payload) {
+  var _a2;
+  const depth = /* @__PURE__ */ new Map();
+  const lines = [];
+  for (const node of payload.nodes) {
+    const level = node.parent === null ? 0 : ((_a2 = depth.get(node.parent)) != null ? _a2 : 0) + 1;
+    depth.set(node.id, level);
+    lines.push("	".repeat(level) + "- " + node.title);
+  }
+  return lines.join("\n");
+}
+function buildClipboardPayload(input) {
+  var _a2;
+  try {
+    const parentOf = new Map(input.nodes.map((n) => [n.id, n.parentId]));
+    const position = /* @__PURE__ */ new Map();
+    input.order.forEach((id, index) => {
+      if (!position.has(id)) position.set(id, index);
+    });
+    input.nodes.forEach((n) => {
+      if (!position.has(n.id)) position.set(n.id, input.order.length + position.size);
+    });
+    const rank = (id) => {
+      var _a3;
+      return (_a3 = position.get(id)) != null ? _a3 : Number.MAX_SAFE_INTEGER;
+    };
+    const selected = new Set(input.selectedIds.filter((id) => parentOf.has(id)));
+    const hasSelectedAncestor = (id) => {
+      var _a3, _b2;
+      const visited = /* @__PURE__ */ new Set([id]);
+      let current = (_a3 = parentOf.get(id)) != null ? _a3 : null;
+      while (current !== null && !visited.has(current)) {
+        if (selected.has(current)) return true;
+        visited.add(current);
+        current = (_b2 = parentOf.get(current)) != null ? _b2 : null;
+      }
+      return false;
+    };
+    const roots = [...selected].filter((id) => !hasSelectedAncestor(id)).sort((a, b) => rank(a) - rank(b));
+    const children = /* @__PURE__ */ new Map();
+    for (const n of input.nodes) {
+      if (n.parentId === null) continue;
+      const siblings = (_a2 = children.get(n.parentId)) != null ? _a2 : [];
+      siblings.push(n.id);
+      children.set(n.parentId, siblings);
+    }
+    const newId2 = /* @__PURE__ */ new Map();
+    const nodes = [];
+    const visit = (id, parent) => {
+      var _a3;
+      if (newId2.has(id)) return;
+      const clipped = `n${newId2.size + 1}`;
+      newId2.set(id, clipped);
+      const note = input.noteOf(id);
+      const node = { id: clipped, parent, title: note.title, kind: note.kind, body: note.body };
+      if (note.strength !== void 0) node.strength = note.strength;
+      nodes.push(node);
+      for (const child of [...(_a3 = children.get(id)) != null ? _a3 : []].sort((a, b) => rank(a) - rank(b))) visit(child, clipped);
+    };
+    for (const root of roots) visit(root, null);
+    const relations = [];
+    for (const r of input.relations) {
+      const from = newId2.get(r.from);
+      const to = newId2.get(r.to);
+      if (from === void 0 || to === void 0) continue;
+      const out = { kind: r.kind, from, to };
+      if (r.description !== void 0) out.description = r.description;
+      relations.push(out);
+    }
+    const raw = {
+      format: CLIPBOARD_FORMAT,
+      version: CLIPBOARD_VERSION,
+      clipId: input.clipId,
+      nodes,
+      relations
+    };
+    return parseClipboard(serializeClipboard(raw));
+  } catch (e) {
+    return fail("bad-nodes");
+  }
+}
+
+// experiences/visual-map/clipboard-io.ts
+var CLIPBOARD_MIME = "application/x-vam-branch";
+var EDITABLE = [
+  "input",
+  "textarea",
+  "select",
+  "[contenteditable]:not([contenteditable=false])",
+  ".vam-map-chat"
+].join(",");
+function inClipboardScope(target, root) {
+  const element = target;
+  if (!element || typeof element.closest !== "function") return false;
+  if (!root.contains(element)) return false;
+  return !element.closest(EDITABLE);
+}
+function writeClipboardData(data, serialized, outline) {
+  data.setData(CLIPBOARD_MIME, serialized);
+  data.setData("text/plain", outline);
+}
+function readClipboardData(data) {
+  const read = (type) => {
+    try {
+      const value = data == null ? void 0 : data.getData(type);
+      return typeof value === "string" ? value : "";
+    } catch (e) {
+      return "";
+    }
+  };
+  return { vam: read(CLIPBOARD_MIME), text: read("text/plain") };
+}
+
+// experiences/visual-map/clipboard-paste.ts
+function planPaste(payload) {
+  var _a2, _b2, _c;
+  try {
+    const nodes = payload.nodes;
+    const byId = /* @__PURE__ */ new Map();
+    for (let i = 0; i < nodes.length; i++) {
+      if (byId.has(nodes[i].id)) return { ok: false, reason: "bad-tree" };
+      byId.set(nodes[i].id, i);
+    }
+    const children = /* @__PURE__ */ new Map();
+    for (let i = 0; i < nodes.length; i++) {
+      const parent = nodes[i].parent === null ? null : (_a2 = byId.get(nodes[i].parent)) != null ? _a2 : -1;
+      if (parent === -1) return { ok: false, reason: "bad-tree" };
+      const list = (_b2 = children.get(parent)) != null ? _b2 : [];
+      list.push(i);
+      children.set(parent, list);
+    }
+    const order = [];
+    const itemOf = /* @__PURE__ */ new Map();
+    const visit = (from) => {
+      var _a3;
+      const pending2 = [from];
+      while (pending2.length) {
+        const node = pending2.pop();
+        itemOf.set(node, order.length);
+        order.push(node);
+        const kids = (_a3 = children.get(node)) != null ? _a3 : [];
+        for (let k = kids.length - 1; k >= 0; k--) pending2.push(kids[k]);
+      }
+    };
+    for (const root of (_c = children.get(null)) != null ? _c : []) visit(root);
+    if (order.length !== nodes.length) return { ok: false, reason: "bad-tree" };
+    const items = order.map((nodeIndex, index) => {
+      const n = nodes[nodeIndex];
+      const item = {
+        index,
+        parent: n.parent === null ? null : itemOf.get(byId.get(n.parent)),
+        title: n.title,
+        kind: n.kind,
+        body: n.body
+      };
+      if (n.strength !== void 0) item.strength = n.strength;
+      return item;
+    });
+    const relations = [];
+    let droppedRelations = 0;
+    for (const r of payload.relations) {
+      const from = byId.has(r.from) ? itemOf.get(byId.get(r.from)) : void 0;
+      const to = byId.has(r.to) ? itemOf.get(byId.get(r.to)) : void 0;
+      if (from === void 0 || to === void 0 || from === to) {
+        droppedRelations++;
+        continue;
+      }
+      const out = { kind: r.kind, from, to };
+      if (r.description !== void 0) out.description = r.description;
+      relations.push(out);
+    }
+    return { ok: true, items, relations, droppedRelations };
+  } catch (e) {
+    return { ok: false, reason: "bad-tree" };
+  }
+}
+function canPasteCut(nodes, rootIds, targetId) {
+  var _a2;
+  if (!rootIds.length) return { ok: false, reason: "nothing-selected" };
+  if (targetId === null) return { ok: true };
+  const parentOf = new Map(nodes.map((n) => [n.id, n.parentId]));
+  if (!parentOf.has(targetId)) return { ok: false, reason: "unknown-target" };
+  const roots = new Set(rootIds);
+  const visited = /* @__PURE__ */ new Set();
+  let current = targetId;
+  while (current !== null && !visited.has(current)) {
+    if (roots.has(current)) return { ok: false, reason: "into-own-branch" };
+    visited.add(current);
+    current = (_a2 = parentOf.get(current)) != null ? _a2 : null;
+  }
+  return { ok: true };
+}
+function resolveCrossSource(payload, record, sourceMap) {
+  try {
+    if (sourceMap.id !== record.sourceMapId) return null;
+    const count = payload.nodes.length;
+    if (!count || record.nodeIds.length !== count || record.notePaths.length !== count) return null;
+    const byId = new Map(sourceMap.nodes.map((node) => [node.id, node]));
+    const ids = new Set(record.nodeIds);
+    const branch = [];
+    const roots = [];
+    for (let i = 0; i < count; i++) {
+      const node = byId.get(record.nodeIds[i]);
+      if (!node || node.path !== record.notePaths[i]) return null;
+      const clip4 = payload.nodes[i];
+      if (clip4.parent === null) {
+        if (node.parentId && ids.has(node.parentId)) return null;
+        roots.push(node);
+      } else {
+        const parentIndex = payload.nodes.findIndex((item) => item.id === clip4.parent);
+        if (parentIndex < 0 || node.parentId !== record.nodeIds[parentIndex]) return null;
+      }
+      branch.push(node);
+    }
+    return { branch, roots };
+  } catch (e) {
+    return null;
+  }
+}
+
+// experiences/visual-map/clipboard-text.ts
+var PASTE_TEXT_MAX_CHARS = 1e5;
+var TAB_COLUMNS = 4;
+var MARKDOWN_HEADING = /^ {0,3}#{1,6}[ \t]+\S/m;
+var LIST_MARKER = /^(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/;
+var CHECKBOX = /^\[[ xX]\](?:[ \t]+|$)/;
+var TITLE_FORBIDDEN2 = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+var reject = (reason, line) => line === void 0 ? { ok: false, reason } : { ok: false, reason, line };
+function splitIndent(line) {
+  let indent2 = 0;
+  let index = 0;
+  for (; index < line.length; index++) {
+    if (line[index] === " ") indent2++;
+    else if (line[index] === "	") indent2 += TAB_COLUMNS;
+    else break;
+  }
+  return { indent: indent2, rest: line.slice(index) };
+}
+function parseIndentedText(text11) {
+  try {
+    if (typeof text11 !== "string") return reject("bad-title");
+    if (text11.length > PASTE_TEXT_MAX_CHARS) return reject("too-long");
+    const source = text11.charCodeAt(0) === 65279 ? text11.slice(1) : text11;
+    if (!source.trim()) return { ok: true, nodes: [] };
+    if (source.includes("<!-- visual-agent-map:")) return reject("vam-note");
+    if (MARKDOWN_HEADING.test(source)) {
+      const parsed = parseOutline(source);
+      if (parsed.errors.length) {
+        const first = parsed.errors[0];
+        const reason = first.key === "ui.outline_error_vam_note" ? "vam-note" : "outline";
+        return reject(reason, first.line > 0 ? first.line : void 0);
+      }
+      return { ok: true, nodes: parsed.nodes };
+    }
+    const nodes = [];
+    const stack = [];
+    const lines = source.split(/\r\n?|\n/);
+    for (let position = 0; position < lines.length; position++) {
+      const lineNumber = position + 1;
+      const { indent: indent2, rest } = splitIndent(lines[position]);
+      if (!rest.trim()) continue;
+      const marker5 = LIST_MARKER.exec(rest);
+      let body = marker5 ? rest.slice(marker5[0].length) : rest;
+      const box = marker5 ? CHECKBOX.exec(body) : null;
+      if (box) body = body.slice(box[0].length);
+      const title = outlineTitle(body);
+      if (!title) return reject("empty-title", lineNumber);
+      if (TITLE_FORBIDDEN2.test(title)) return reject("bad-title", lineNumber);
+      if ([...title].length > OUTLINE_TITLE_LIMIT) return reject("title-too-long", lineNumber);
+      const problem = titleProblem(title);
+      if (problem) return reject(`title-${problem}`, lineNumber);
+      if (nodes.length >= OUTLINE_NODE_LIMIT) return reject("too-many-nodes", lineNumber);
+      while (stack.length && stack[stack.length - 1].indent >= indent2) stack.pop();
+      const parent = stack.length ? stack[stack.length - 1].node : null;
+      const node = {
+        index: nodes.length,
+        title,
+        level: parent ? parent.level + 1 : 0,
+        parent: parent ? parent.index : null,
+        line: lineNumber
+      };
+      nodes.push(node);
+      stack.push({ indent: indent2, node });
+    }
+    return { ok: true, nodes };
+  } catch (e) {
+    return reject("bad-title");
+  }
+}
+
+// experiences/visual-map/clipboard-session.ts
+var ClipboardSession = class {
+  constructor() {
+    __publicField(this, "current", null);
+  }
+  /** Replaces any earlier record. The arrays are copied, so later changes by the caller cannot alter it. */
+  record(input) {
+    this.current = Object.freeze({
+      clipId: input.clipId,
+      serialized: input.serialized,
+      mode: input.mode,
+      sourceMapPath: input.sourceMapPath,
+      sourceMapId: input.sourceMapId,
+      nodeIds: Object.freeze([...input.nodeIds]),
+      notePaths: Object.freeze([...input.notePaths])
+    });
+    return this.current;
+  }
+  /** The record, or null when there is none. */
+  get() {
+    return this.current;
+  }
+  /** True only when `raw` is exactly the recorded string: one changed, added or missing character is a mismatch. */
+  matches(raw) {
+    return this.current !== null && typeof raw === "string" && raw === this.current.serialized;
+  }
+  /** The record when `raw` matches it, else null. */
+  match(raw) {
+    return this.matches(raw) ? this.current : null;
+  }
+  /** Drops a pending cut (the source cards lose their mark); a copy record is left alone. Returns whether one was dropped. */
+  cancelCut() {
+    var _a2;
+    if (((_a2 = this.current) == null ? void 0 : _a2.mode) !== "cut") return false;
+    this.current = null;
+    return true;
+  }
+  clear() {
+    this.current = null;
+  }
+};
+var sessions = /* @__PURE__ */ new WeakMap();
+function sessionFor(plugin) {
+  if (typeof plugin !== "object" || plugin === null) throw new TypeError("sessionFor needs the plugin object");
+  let session = sessions.get(plugin);
+  if (!session) {
+    session = new ClipboardSession();
+    sessions.set(plugin, session);
+  }
+  return session;
+}
+
+// experiences/visual-map/cross-map-history.ts
+var CROSS_MAP_HISTORY_LIMIT = 20;
+var CrossMapLedger = class {
+  constructor() {
+    __publicField(this, "slots", []);
+  }
+  /** Adds an applied change; the oldest is dropped past the limit. Returns false (and adds nothing) for a repeated id. */
+  push(input) {
+    if (this.slots.some((slot) => slot.id === input.id)) return false;
+    this.slots.push({
+      id: input.id,
+      paths: Object.freeze([...new Set(input.paths)]),
+      entry: input.entry,
+      status: "applied",
+      running: false
+    });
+    while (this.slots.length > CROSS_MAP_HISTORY_LIMIT) this.slots.shift();
+    return true;
+  }
+  /** Changes that touched `path`, oldest first, whatever their status. */
+  entriesFor(path) {
+    return this.slots.filter((slot) => slot.paths.includes(path)).map((slot) => ({ id: slot.id, paths: slot.paths, status: slot.status }));
+  }
+  statusOf(id) {
+    var _a2;
+    return (_a2 = this.slots.find((slot) => slot.id === id)) == null ? void 0 : _a2.status;
+  }
+  /** Forgets a change (for instance when a view finds its proxy no longer applies). */
+  forget(id) {
+    const index = this.slots.findIndex((slot) => slot.id === id);
+    if (index >= 0) this.slots.splice(index, 1);
+  }
+  /**
+   * Undo needs `applied` and redo needs `undone`; any other state does nothing. A second call for the same change
+   * while the first is still running does nothing. A `broken` change is refused. A throw whose `kind` is
+   * `rollback-failed` marks the change broken; any other throw leaves the state as it was.
+   */
+  async run(id, direction) {
+    const slot = this.slots.find((candidate) => candidate.id === id);
+    if (!slot) return { ran: false, reason: "unknown" };
+    if (slot.status === "broken") return { ran: false, reason: "broken", status: slot.status };
+    if (slot.running) return { ran: false, reason: "busy", status: slot.status };
+    if (slot.status !== (direction === "undo" ? "applied" : "undone"))
+      return { ran: false, reason: "wrong-state", status: slot.status };
+    slot.running = true;
+    try {
+      await (direction === "undo" ? slot.entry.undo() : slot.entry.redo());
+      slot.status = direction === "undo" ? "undone" : "applied";
+      return { ran: true, status: slot.status };
+    } catch (error) {
+      if ((error == null ? void 0 : error.kind) === "rollback-failed") slot.status = "broken";
+      return { ran: false, reason: slot.status === "broken" ? "broken" : "failed", status: slot.status, error };
+    } finally {
+      slot.running = false;
+    }
+  }
+};
+var ledgers = /* @__PURE__ */ new WeakMap();
+function ledgerFor(plugin) {
+  if (typeof plugin !== "object" || plugin === null) throw new TypeError("ledgerFor needs the plugin object");
+  let ledger = ledgers.get(plugin);
+  if (!ledger) {
+    ledger = new CrossMapLedger();
+    ledgers.set(plugin, ledger);
+  }
+  return ledger;
+}
+function cutSourceProblem(sourceMap, record, found) {
+  const present = new Set(sourceMap.nodes.map((node) => node.id));
+  if (sourceMap.id !== record.sourceMapId || record.nodeIds.every((id) => !present.has(id))) return "gone";
+  if (sourceMap.aim) return "aim";
+  if (!found) return "changed";
+  const ids = new Set(record.nodeIds);
+  if (sourceMap.nodes.some((node) => node.parentId !== null && ids.has(node.parentId) && !ids.has(node.id)))
+    return "changed";
+  if (found.branch.some((node) => node.aimKind !== void 0 || node.aimQuestion !== void 0)) return "aim";
+  return null;
+}
+var noteParts = (text11) => {
+  const found = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text11);
+  if (!found) return null;
+  const blocks = [];
+  for (const line of found[1].split("\n")) {
+    const continued = blocks.length > 0 && /^(\s|-(\s|$)|$)/.test(line);
+    if (continued) blocks[blocks.length - 1].push(line);
+    else blocks.push([line]);
+  }
+  return {
+    blocks: blocks.filter((lines) => !/^updated\s*:/.test(lines[0])).map((lines) => lines.join("\n")),
+    body: found[2]
+  };
+};
+function sameApartFromStamps(a, b) {
+  const first = noteParts(a), second = noteParts(b);
+  if (!first || !second || first.body !== second.body || first.blocks.length !== second.blocks.length) return false;
+  const sorted = (blocks) => [...blocks].sort().join("\n\0");
+  return sorted(first.blocks) === sorted(second.blocks);
 }
 
 // experiences/visual-map/outline-import-modal.ts
@@ -30887,9 +31539,526 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
   }
 };
 
-// experiences/visual-map/multi-research-modal.ts
+// experiences/visual-map/outline-exchange-io.ts
 var import_obsidian19 = require("obsidian");
-var MultiResearchModal = class extends import_obsidian19.Modal {
+
+// experiences/visual-map/outline-exchange.ts
+var EXCHANGE_MAX_BYTES = 5 * 1024 * 1024;
+var EXCHANGE_MAX_NODES = 500;
+var EXCHANGE_MAX_DEPTH = 64;
+var EXCHANGE_MAX_BODY = 2e5;
+var MAX_ELEMENTS = 5e4;
+var MAX_XML_DEPTH = 200;
+var MAX_ATTRIBUTES = 100;
+var FALLBACK_ROOT_TITLE = "Imported outline";
+var ExchangeReject = class extends Error {
+  constructor(reason, line) {
+    super(reason);
+    this.reason = reason;
+    this.line = line;
+  }
+};
+var RAW_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/;
+var TITLE_FORBIDDEN3 = /[\u0000-\u001f\u007f-\u009f]/;
+var ENTITY = /&(?:#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6}|amp|lt|gt|quot|apos);/g;
+var ENTITY_PARTS = /&(?:#([0-9]{1,7})|#x([0-9A-Fa-f]{1,6})|(amp|lt|gt|quot|apos));/g;
+var NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+var NAME = /[\p{L}_:][\p{L}\p{N}_:.-]*/uy;
+var XML_SPACE = /[ \t\r\n]/;
+function utf8Length(text11) {
+  let bytes = 0;
+  for (let i = 0; i < text11.length; i++) {
+    const c = text11.charCodeAt(i);
+    bytes += c < 128 ? 1 : c < 2048 ? 2 : c >= 55296 && c <= 57343 ? 2 : 3;
+  }
+  return bytes;
+}
+var isXmlChar = (code) => code === 9 || code === 10 || code === 13 || code >= 32 && code <= 55295 || code >= 57344 && code <= 65533 || code >= 65536 && code <= 1114111;
+function decodeEntities(raw, line) {
+  if (!raw.includes("&")) return raw;
+  if (raw.replace(ENTITY, "").includes("&")) throw new ExchangeReject("bad-entity", line);
+  return raw.replace(
+    ENTITY_PARTS,
+    (_m, dec, hex, named) => {
+      if (named !== void 0) return NAMED[named];
+      const code = dec !== void 0 ? parseInt(dec, 10) : parseInt(hex, 16);
+      if (!isXmlChar(code)) throw new ExchangeReject("bad-entity", line);
+      return String.fromCodePoint(code);
+    }
+  );
+}
+function tokenize(source) {
+  var _a2;
+  const length = source.length;
+  let pos = 0;
+  let lineAt = 0;
+  let line = 1;
+  const lineOf = (position) => {
+    while (lineAt < position && lineAt < length) if (source.charCodeAt(lineAt++) === 10) line++;
+    return line;
+  };
+  const fail2 = (reason, at = pos) => {
+    throw new ExchangeReject(reason, lineOf(at));
+  };
+  const skipSpace3 = () => {
+    while (pos < length && XML_SPACE.test(source[pos])) pos++;
+  };
+  const readName = () => {
+    NAME.lastIndex = pos;
+    const match = NAME.exec(source);
+    if (!match) return fail2("bad-xml");
+    pos += match[0].length;
+    return match[0];
+  };
+  skipSpace3();
+  if (source.startsWith("<?xml", pos) && XML_SPACE.test((_a2 = source[pos + 5]) != null ? _a2 : "")) {
+    const end = source.indexOf("?>", pos);
+    if (end < 0) fail2("bad-xml");
+    pos = end + 2;
+  }
+  const stack = [];
+  let root = null;
+  let total2 = 0;
+  while (pos < length) {
+    const lt = source.indexOf("<", pos);
+    const textEnd = lt < 0 ? length : lt;
+    if (textEnd > pos) {
+      const raw = source.slice(pos, textEnd);
+      if (stack.length === 0) {
+        if (/[^ \t\r\n]/.test(raw)) fail2("bad-xml");
+      } else {
+        if (raw.includes("]]>")) fail2("bad-xml");
+        stack[stack.length - 1].children.push(decodeEntities(raw, lineOf(pos)));
+      }
+      pos = textEnd;
+    }
+    if (lt < 0) break;
+    if (source.startsWith("<!--", pos)) {
+      const end = source.indexOf("-->", pos + 4);
+      if (end < 0) fail2("bad-xml");
+      pos = end + 3;
+      continue;
+    }
+    if (source.startsWith("<![CDATA[", pos)) {
+      if (stack.length === 0) fail2("bad-xml");
+      const end = source.indexOf("]]>", pos + 9);
+      if (end < 0) fail2("bad-xml");
+      stack[stack.length - 1].children.push(source.slice(pos + 9, end));
+      pos = end + 3;
+      continue;
+    }
+    if (source.startsWith("<!", pos)) fail2("forbidden-doctype");
+    if (source.startsWith("<?", pos)) fail2("forbidden-pi");
+    if (source.startsWith("</", pos)) {
+      const at = pos;
+      pos += 2;
+      const name = readName();
+      skipSpace3();
+      if (source[pos] !== ">") fail2("bad-xml");
+      pos++;
+      const open = stack.pop();
+      if (!open || open.name !== name) fail2("bad-xml", at);
+      continue;
+    }
+    const start = pos;
+    pos++;
+    const element = { name: readName(), attrs: /* @__PURE__ */ new Map(), children: [], line: lineOf(start) };
+    let selfClosing = false;
+    for (; ; ) {
+      const before = pos;
+      skipSpace3();
+      if (pos >= length) fail2("bad-xml");
+      if (source[pos] === ">") {
+        pos++;
+        break;
+      }
+      if (source.startsWith("/>", pos)) {
+        pos += 2;
+        selfClosing = true;
+        break;
+      }
+      if (pos === before) fail2("bad-xml");
+      const name = readName();
+      skipSpace3();
+      if (source[pos] !== "=") fail2("bad-xml");
+      pos++;
+      skipSpace3();
+      const quote = source[pos];
+      if (quote !== '"' && quote !== "'") fail2("bad-xml");
+      const close = source.indexOf(quote, pos + 1);
+      if (close < 0) fail2("bad-xml");
+      const raw = source.slice(pos + 1, close);
+      if (raw.includes("<")) fail2("bad-xml");
+      if (element.attrs.has(name) || element.attrs.size >= MAX_ATTRIBUTES) fail2("bad-xml");
+      element.attrs.set(name, decodeEntities(raw.replace(/[\t\r\n]/g, " "), lineOf(pos)));
+      pos = close + 1;
+    }
+    if (++total2 > MAX_ELEMENTS) fail2("too-many-elements", start);
+    if (stack.length === 0) {
+      if (root) fail2("bad-xml", start);
+      root = element;
+    } else stack[stack.length - 1].children.push(element);
+    if (!selfClosing) {
+      stack.push(element);
+      if (stack.length > MAX_XML_DEPTH) fail2("too-deep", start);
+    }
+  }
+  if (stack.length || !root) fail2("bad-xml", length);
+  return root;
+}
+var elementsOf = (element, name) => element.children.filter((child) => typeof child !== "string" && child.name === name);
+var BLOCK_TAGS = /* @__PURE__ */ new Set([
+  "p",
+  "li",
+  "ul",
+  "ol",
+  "div",
+  "tr",
+  "table",
+  "blockquote",
+  "pre",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6"
+]);
+var SKIPPED_TAGS = /* @__PURE__ */ new Set(["script", "style", "head"]);
+function richText(element) {
+  let out = "";
+  const newline = () => {
+    if (out && !out.endsWith("\n")) out += "\n";
+  };
+  const walk = (current) => {
+    const name = current.name.toLowerCase();
+    if (SKIPPED_TAGS.has(name)) return;
+    if (name === "br") {
+      out += "\n";
+      return;
+    }
+    const block = BLOCK_TAGS.has(name);
+    if (block) newline();
+    for (const child of current.children) {
+      if (typeof child !== "string") {
+        walk(child);
+        continue;
+      }
+      let piece = child.replace(/\s+/g, " ");
+      if (!out || out.endsWith("\n") || out.endsWith(" ")) piece = piece.trimStart();
+      out += piece;
+    }
+    if (block) newline();
+  };
+  walk(element);
+  return out.split("\n").map((part) => part.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function cleanTitle(raw, line) {
+  const title = raw.replace(/\s+/g, " ").trim();
+  if (!title) throw new ExchangeReject("empty-title", line);
+  if (TITLE_FORBIDDEN3.test(title)) throw new ExchangeReject("bad-title", line);
+  if ([...title].length > OUTLINE_TITLE_LIMIT) throw new ExchangeReject("title-too-long", line);
+  const problem = titleProblem(title);
+  if (problem) throw new ExchangeReject(`title-${problem}`, line);
+  return title;
+}
+function cleanBody(raw, line) {
+  const body = raw.replace(/\r\n?/g, "\n");
+  if (!body.trim()) return "";
+  if (body.length > EXCHANGE_MAX_BODY) throw new ExchangeReject("body-too-long", line);
+  if (body.includes("<!-- visual-agent-map:") || /^\uFEFF?---[ \t]*(?:\n|$)/.test(body))
+    throw new ExchangeReject("bad-body", line);
+  return body;
+}
+var readOpml = (element) => {
+  var _a2, _b2, _c;
+  return {
+    title: (_b2 = (_a2 = element.attrs.get("text")) != null ? _a2 : element.attrs.get("title")) != null ? _b2 : "",
+    body: (_c = element.attrs.get("_note")) != null ? _c : "",
+    kids: elementsOf(element, "outline")
+  };
+};
+var readFreeMind = (element) => {
+  const rich = (type) => elementsOf(element, "richcontent").find((child) => child.attrs.get("TYPE") === type);
+  const text11 = element.attrs.get("TEXT");
+  const nodeRich = rich("NODE");
+  const noteRich = rich("NOTE");
+  return {
+    title: text11 !== void 0 && text11.trim() ? text11 : nodeRich ? richText(nodeRich) : text11 != null ? text11 : "",
+    body: noteRich ? richText(noteRich) : "",
+    kids: elementsOf(element, "node")
+  };
+};
+function stemOf(fileName) {
+  var _a2;
+  if (!fileName) return void 0;
+  const leaf = (_a2 = fileName.split(/[\\/]/).pop()) != null ? _a2 : "";
+  const stem = leaf.replace(/\.(?:opml|mm|xml)$/i, "");
+  try {
+    return cleanTitle(stem, 0);
+  } catch (e) {
+    return void 0;
+  }
+}
+function parseOutlineExchange(input, options = {}) {
+  var _a2, _b2;
+  try {
+    if (typeof input !== "string") return { ok: false, reason: "not-text" };
+    if (input.length > EXCHANGE_MAX_BYTES || utf8Length(input) > EXCHANGE_MAX_BYTES)
+      return { ok: false, reason: "too-large" };
+    const source = input.charCodeAt(0) === 65279 ? input.slice(1) : input;
+    if (RAW_CONTROL.test(source)) return { ok: false, reason: "control-char" };
+    const root = tokenize(source);
+    let format;
+    let tops;
+    let read;
+    let rootTitle;
+    if (root.name === "opml") {
+      format = "opml";
+      const body = elementsOf(root, "body")[0];
+      tops = body ? elementsOf(body, "outline") : [];
+      read = readOpml;
+      const head = elementsOf(root, "head")[0];
+      const headTitle = head ? elementsOf(head, "title")[0] : void 0;
+      const titleText = headTitle == null ? void 0 : headTitle.children.filter((child) => typeof child === "string").join("");
+      if (titleText == null ? void 0 : titleText.trim()) {
+        try {
+          rootTitle = cleanTitle(titleText, (_a2 = headTitle == null ? void 0 : headTitle.line) != null ? _a2 : 0);
+        } catch (e) {
+          rootTitle = void 0;
+        }
+      }
+    } else if (root.name === "map") {
+      format = "freemind";
+      tops = elementsOf(root, "node");
+      read = readFreeMind;
+    } else return { ok: false, reason: "not-outline", line: root.line };
+    if (!tops.length) return { ok: false, reason: "empty" };
+    const synthesized = tops.length > 1;
+    const offset = synthesized ? 1 : 0;
+    const nodes = [];
+    if (synthesized)
+      nodes.push({
+        index: 0,
+        title: (_b2 = rootTitle != null ? rootTitle : stemOf(options.fileName)) != null ? _b2 : FALLBACK_ROOT_TITLE,
+        level: 0,
+        parent: null,
+        line: root.line,
+        body: ""
+      });
+    const add = (element, parent, level) => {
+      if (level - offset >= EXCHANGE_MAX_DEPTH) throw new ExchangeReject("too-deep", element.line);
+      if (nodes.length - offset >= EXCHANGE_MAX_NODES) throw new ExchangeReject("too-many-nodes", element.line);
+      const found = read(element);
+      const index = nodes.length;
+      nodes.push({
+        index,
+        title: cleanTitle(found.title, element.line),
+        level,
+        parent,
+        line: element.line,
+        body: cleanBody(found.body, element.line)
+      });
+      for (const kid of found.kids) add(kid, index, level + 1);
+    };
+    for (const top of tops) add(top, synthesized ? 0 : null, synthesized ? 1 : 0);
+    return { ok: true, format, nodes, synthesizedRoot: synthesized };
+  } catch (error) {
+    if (error instanceof ExchangeReject)
+      return error.line === void 0 ? { ok: false, reason: error.reason } : { ok: false, reason: error.reason, line: error.line };
+    return { ok: false, reason: "bad-xml" };
+  }
+}
+var XML_INVALID = /[^\t\n\r -퟿-�\u{10000}-\u{10FFFF}]/gu;
+var stripInvalid = (value) => value.replace(XML_INVALID, "");
+var escapeText2 = (value) => stripInvalid(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escapeAttr = (value) => escapeText2(value).replace(/"/g, "&quot;").replace(/'/g, "&apos;").replace(/\t/g, "&#9;").replace(/\n/g, "&#10;").replace(/\r/g, "&#13;");
+function buildTree(map) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const node of map.nodes) if (!byId.has(node.id)) byId.set(node.id, { id: node.id, children: [] });
+  const roots = [];
+  const attached = /* @__PURE__ */ new Set();
+  for (const node of map.nodes) {
+    if (attached.has(node.id)) continue;
+    attached.add(node.id);
+    const treeNode = byId.get(node.id);
+    const parent = node.parentId === null ? void 0 : byId.get(node.parentId);
+    if (!parent || node.parentId === node.id) roots.push(treeNode);
+    else parent.children.push(treeNode);
+  }
+  return roots;
+}
+function emitTree(roots, open, close) {
+  const lines = [];
+  const seen = /* @__PURE__ */ new Set();
+  const frames = [];
+  const enter = (node, depth) => {
+    if (seen.has(node.id)) return;
+    seen.add(node.id);
+    lines.push(open(node, depth));
+    if (node.children.length) frames.push({ node, next: 0, depth });
+    else {
+      const closing = close(node, depth);
+      if (closing) lines.push(closing);
+    }
+  };
+  for (const root of roots) {
+    enter(root, 0);
+    while (frames.length) {
+      const frame = frames[frames.length - 1];
+      if (frame.next < frame.node.children.length) enter(frame.node.children[frame.next++], frame.depth + 1);
+      else {
+        frames.pop();
+        lines.push(close(frame.node, frame.depth));
+      }
+    }
+  }
+  return lines;
+}
+var indent = (depth) => "  ".repeat(depth);
+var noteOf = (notes, id) => {
+  var _a2;
+  const note = notes.get(id);
+  return { title: (note == null ? void 0 : note.title) || id, body: (_a2 = note == null ? void 0 : note.body) != null ? _a2 : "" };
+};
+function toOpml(map, notes) {
+  const roots = buildTree(map);
+  const outlines = emitTree(
+    roots,
+    (node, depth) => {
+      const note = noteOf(notes, node.id);
+      const attrs = `text="${escapeAttr(note.title)}"${note.body ? ` _note="${escapeAttr(note.body)}"` : ""}`;
+      return `${indent(depth + 2)}<outline ${attrs}${node.children.length ? ">" : "/>"}`;
+    },
+    (node, depth) => node.children.length ? `${indent(depth + 2)}</outline>` : ""
+  );
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<opml version="2.0">',
+    "  <head>",
+    `    <title>${escapeText2(map.title)}</title>`,
+    "  </head>",
+    "  <body>",
+    ...outlines,
+    "  </body>",
+    "</opml>",
+    ""
+  ].join("\n");
+}
+function toFreeMind(map, notes) {
+  const roots = buildTree(map);
+  let counter = 0;
+  const lines = emitTree(
+    roots,
+    (node, depth) => {
+      const note = noteOf(notes, node.id);
+      const head = `${indent(depth + 1)}<node ID="ID_${++counter}" TEXT="${escapeAttr(note.title)}"`;
+      const rich = note.body ? [
+        `${indent(depth + 2)}<richcontent TYPE="NOTE"><html><head></head><body>${note.body.split(/\r\n?|\n/).map((part) => part ? `<p>${escapeText2(part)}</p>` : "<p><br/></p>").join("")}</body></html></richcontent>`
+      ] : [];
+      if (!node.children.length && !rich.length) return `${head}/>`;
+      return [`${head}>`, ...rich].join("\n");
+    },
+    (node, depth) => node.children.length || noteOf(notes, node.id).body ? `${indent(depth + 1)}</node>` : ""
+  );
+  const body = roots.length > 1 ? [`  <node ID="ID_0" TEXT="${escapeAttr(map.title)}">`, ...lines.map((line) => `  ${line}`), "  </node>"] : lines;
+  return ['<?xml version="1.0" encoding="UTF-8"?>', '<map version="1.0.1">', ...body, "</map>", ""].join("\n");
+}
+
+// experiences/visual-map/outline-exchange-io.ts
+var messageOf2 = (error) => {
+  const message = error == null ? void 0 : error.message;
+  return typeof message === "string" ? message : String(error);
+};
+function exchangeRefusal(reason, line) {
+  switch (reason) {
+    case "too-large":
+      return t("ui.exchange_reason_too_large", Math.round(EXCHANGE_MAX_BYTES / (1024 * 1024)));
+    case "forbidden-doctype":
+    case "forbidden-pi":
+    case "bad-entity":
+      return t("ui.exchange_reason_unsafe");
+    case "too-many-elements":
+    case "too-many-nodes":
+    case "too-deep":
+      return t("ui.exchange_reason_too_big");
+    default:
+      return t("ui.exchange_reason_invalid", line === void 0 ? reason : `${reason}, ${line}`);
+  }
+}
+async function importExchangeFile(host, file) {
+  const refuse = (why) => {
+    new import_obsidian19.Notice(t("ui.exchange_refused", file.name, why));
+    return false;
+  };
+  if (file.size > EXCHANGE_MAX_BYTES) return refuse(exchangeRefusal("too-large"));
+  let text11;
+  try {
+    text11 = await file.text();
+  } catch (e) {
+    return refuse(t("ui.exchange_reason_unreadable"));
+  }
+  const parsed = parseOutlineExchange(text11, { fileName: file.name });
+  if (!parsed.ok) return refuse(exchangeRefusal(parsed.reason, parsed.line));
+  try {
+    await host.importOutline({ nodes: parsed.nodes, source: { file: file.name }, shallowResearch: false });
+  } catch (error) {
+    new import_obsidian19.Notice(messageOf2(error));
+    return false;
+  }
+  return true;
+}
+function chooseAndImportExchange(host) {
+  const input = createEl("input", { type: "file", attr: { accept: ".opml,.mm,.xml" } });
+  input.addEventListener("change", () => {
+    var _a2;
+    const file = (_a2 = input.files) == null ? void 0 : _a2[0];
+    if (file) void importExchangeFile(host, file).catch((error) => new import_obsidian19.Notice(messageOf2(error)));
+  });
+  input.click();
+}
+var FORBIDDEN_NAME = /[\\/:*?"<>|#^[\]]/g;
+function exchangeFileStem(title) {
+  const stem = Array.from(title, (ch) => ch.charCodeAt(0) < 32 ? " " : ch).join("").replace(FORBIDDEN_NAME, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "").slice(0, 80).trim();
+  return stem || "map";
+}
+var EXTENSION = { opml: "opml", freemind: "mm" };
+async function exportMapExchange(vault, request) {
+  const notes = /* @__PURE__ */ new Map();
+  for (const [id, note] of request.notes) notes.set(id, { title: note.title, body: note.detail });
+  const input = { title: request.map.title, nodes: request.map.nodes };
+  const text11 = request.format === "opml" ? toOpml(input, notes) : toFreeMind(input, notes);
+  const slash = request.mapPath.lastIndexOf("/");
+  const folder = slash < 0 ? "" : request.mapPath.slice(0, slash + 1);
+  const stem = exchangeFileStem(request.map.title);
+  const extension = EXTENSION[request.format];
+  for (let attempt = 1; attempt <= 1e3; attempt++) {
+    const path = `${folder}${stem}${attempt === 1 ? "" : ` ${attempt}`}.${extension}`;
+    if (vault.getAbstractFileByPath(path) || await vault.adapter.exists(path)) continue;
+    try {
+      await vault.create(path, text11);
+      return path;
+    } catch (error) {
+      if (/exist/i.test(messageOf2(error))) continue;
+      throw error;
+    }
+  }
+  throw new Error(t("ui.exchange_export_no_name"));
+}
+async function exportMapWithNotice(vault, request) {
+  try {
+    const path = await exportMapExchange(vault, request);
+    new import_obsidian19.Notice(t("ui.exchange_exported", path));
+    return path;
+  } catch (error) {
+    new import_obsidian19.Notice(t("ui.exchange_export_failed", messageOf2(error)));
+    return null;
+  }
+}
+
+// experiences/visual-map/multi-research-modal.ts
+var import_obsidian20 = require("obsidian");
+var MultiResearchModal = class extends import_obsidian20.Modal {
   constructor(app, names3, models, templates, submit, tones = [], manageTones, links = {}, modes = []) {
     super(app);
     this.names = names3;
@@ -30962,13 +32131,13 @@ var MultiResearchModal = class extends import_obsidian19.Modal {
 };
 
 // experiences/visual-map/structure-review-modal.ts
-var import_obsidian24 = require("obsidian");
+var import_obsidian25 = require("obsidian");
 
 // experiences/visual-map/modals.ts
-var import_obsidian23 = require("obsidian");
+var import_obsidian24 = require("obsidian");
 
 // ui/reference-picker.ts
-var import_obsidian20 = require("obsidian");
+var import_obsidian21 = require("obsidian");
 var ReferencePicker = class {
   constructor(app, parent, topics, readTopic, currentTopicId, currentLabel) {
     this.app = app;
@@ -31059,7 +32228,7 @@ var ReferencePicker = class {
         const details = card.createEl("details");
         const summary = details.createEl("summary");
         const disclosure = summary.createSpan({ cls: "vam-reference-disclosure" });
-        (0, import_obsidian20.setIcon)(disclosure, "file-text");
+        (0, import_obsidian21.setIcon)(disclosure, "file-text");
         const summaryText2 = summary.createSpan({ cls: "vam-reference-summary-text" });
         summaryText2.createEl("strong", { text: group.name });
         summaryText2.createSpan({ text: group.location, cls: "vam-hint vam-reference-location" });
@@ -31097,7 +32266,7 @@ var ReferencePicker = class {
   createSourceButton(parent, icon, key2) {
     const button = parent.createEl("button", { cls: "vam-reference-action" });
     const image = button.createSpan({ cls: "vam-reference-action-icon" });
-    (0, import_obsidian20.setIcon)(image, icon);
+    (0, import_obsidian21.setIcon)(image, icon);
     button.createSpan({ text: t(key2), cls: "vam-reference-action-label" });
     return button;
   }
@@ -31128,7 +32297,7 @@ var ReferencePicker = class {
   async selectTopic() {
     try {
       const topics = (await this.topics()).filter((topic) => topic.id !== this.currentTopicId);
-      const modal = new import_obsidian20.Modal(this.app);
+      const modal = new import_obsidian21.Modal(this.app);
       modal.titleEl.setText(t("ui.reference_select_mind_map"));
       if (!topics.length)
         modal.contentEl.createEl("p", { text: t("ui.reference_no_other_mind_maps"), cls: "vam-hint" });
@@ -31183,7 +32352,7 @@ var ReferencePicker = class {
         if (!yaml) return true;
         let metadata;
         try {
-          metadata = (0, import_obsidian20.parseYaml)(yaml);
+          metadata = (0, import_obsidian21.parseYaml)(yaml);
         } catch (error) {
           if (yaml.includes("agent-map-node")) throw error;
           return true;
@@ -31220,7 +32389,7 @@ var ReferencePicker = class {
     var _a2;
     const nativePath = (_a2 = file.path) == null ? void 0 : _a2.replace(/\\/g, "/");
     const adapter = this.app.vault.adapter;
-    const vaultRoot = adapter instanceof import_obsidian20.FileSystemAdapter ? adapter.getBasePath().replace(/\\/g, "/").replace(/\/$/, "") : "";
+    const vaultRoot = adapter instanceof import_obsidian21.FileSystemAdapter ? adapter.getBasePath().replace(/\\/g, "/").replace(/\/$/, "") : "";
     const isInVault = !!nativePath && !!vaultRoot && nativePath.startsWith(`${vaultRoot}/`);
     const path = isInVault ? nativePath.slice(vaultRoot.length + 1) : nativePath || (fromFolder ? file.webkitRelativePath : file.name) || file.name;
     return {
@@ -31240,10 +32409,10 @@ var ReferencePicker = class {
 };
 
 // ui/modals/debug-log-modal.ts
-var import_obsidian21 = require("obsidian");
+var import_obsidian22 = require("obsidian");
 
 // ai-exchange-log.ts
-function isRecord2(value) {
+function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isUnknownArray(value) {
@@ -31262,12 +32431,12 @@ function promptMetrics(entry) {
   if (!prompt && entry.request) {
     try {
       const parsed = JSON.parse(entry.request);
-      const parsedRecord = isRecord2(parsed) ? parsed : void 0;
+      const parsedRecord = isRecord3(parsed) ? parsed : void 0;
       const requestValue = (_a2 = parsedRecord == null ? void 0 : parsedRecord.request) != null ? _a2 : parsed;
-      const request = isRecord2(requestValue) ? requestValue : void 0;
+      const request = isRecord3(requestValue) ? requestValue : void 0;
       if (typeof (request == null ? void 0 : request.prompt) === "string") prompt = request.prompt;
       else if (request && isUnknownArray(request.input)) {
-        prompt = request.input.map((item) => isRecord2(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
+        prompt = request.input.map((item) => isRecord3(item) && item.type === "text" && typeof item.text === "string" ? item.text : "").filter(Boolean).join("\n");
       }
     } catch (e) {
     }
@@ -31333,7 +32502,7 @@ var AiExchangeLog = class {
         const entry = item;
         return ["id", "startedAt", "topic", "mode", "model", "effort", "request", "response", "error"].every(
           (key2) => typeof entry[key2] === "string"
-        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord2(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
+        ) && (entry.prompt === void 0 || typeof entry.prompt === "string") && (entry.step === void 0 || typeof entry.step === "string") && (entry.milestones === void 0 || isRecord3(entry.milestones)) && (entry.sentAt === void 0 || typeof entry.sentAt === "string") && (entry.completedAt === void 0 || typeof entry.completedAt === "string") && (entry.durationMs === void 0 || typeof entry.durationMs === "number" && Number.isFinite(entry.durationMs) && entry.durationMs >= 0) && typeof entry.status === "string" && ["preparing", "sent", "received", "parsed", "completed", "failed"].includes(entry.status);
       });
       if (entries.length !== parsed.length) throw new Error(t("error.exchange_log_fields_invalid"));
       this.entries = entries.slice(-this.limit);
@@ -31438,7 +32607,7 @@ var AiExchangeLog = class {
 };
 
 // ui/modals/debug-log-modal.ts
-var DebugLogModal = class extends import_obsidian21.Modal {
+var DebugLogModal = class extends import_obsidian22.Modal {
   constructor(app, logs, exchanges, exchangeEnabled, setExchangeEnabled) {
     super(app);
     this.logs = logs;
@@ -31462,20 +32631,20 @@ var DebugLogModal = class extends import_obsidian21.Modal {
       cls: "vam-modal-intro",
       text: t("ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r")
     });
-    const actions = new import_obsidian21.Setting(this.contentEl);
+    const actions = new import_obsidian22.Setting(this.contentEl);
     actions.addButton((button) => button.setButtonText(t("ui.refresh_logs")).onClick(() => this.renderLogs()));
     actions.addButton(
       (button) => button.setButtonText(t("ui.copy_logs")).setCta().onClick(async () => {
         const text11 = formatDebugLogs(this.logs.getLogs());
         if (!text11) {
-          new import_obsidian21.Notice(t("ui.there_are_no_debug_logs_yet"));
+          new import_obsidian22.Notice(t("ui.there_are_no_debug_logs_yet"));
           return;
         }
         try {
           await navigator.clipboard.writeText(text11);
-          new import_obsidian21.Notice(t("ui.debug_log_copied"));
+          new import_obsidian22.Notice(t("ui.debug_log_copied"));
         } catch (e) {
-          new import_obsidian21.Notice(t("ui.unable_to_copy_the_debug_log"));
+          new import_obsidian22.Notice(t("ui.unable_to_copy_the_debug_log"));
         }
       })
     );
@@ -31500,7 +32669,7 @@ var DebugLogModal = class extends import_obsidian21.Modal {
       cls: "vam-modal-intro",
       text: this.exchangeEnabled() ? t("ui.up_to_20_exchanges_are_stored_in_this_vault_s_plugin_folder") : t("ui.ai_exchange_recording_is_off_enable_it_in_vam_settings")
     });
-    const exchangeActions = new import_obsidian21.Setting(this.contentEl);
+    const exchangeActions = new import_obsidian22.Setting(this.contentEl);
     if (this.setExchangeEnabled)
       exchangeActions.setName(t("ui.record_ai_exchanges")).addToggle(
         (toggle) => toggle.setValue(this.exchangeEnabled()).onChange(async (value) => {
@@ -31516,9 +32685,9 @@ var DebugLogModal = class extends import_obsidian21.Modal {
           await navigator.clipboard.writeText(
             ((_b3 = (_a3 = this.exchanges) == null ? void 0 : _a3.getEntries()) != null ? _b3 : []).map(formatAiExchange).join("\n\n---\n\n")
           );
-          new import_obsidian21.Notice(t("ui.ai_exchange_copied"));
+          new import_obsidian22.Notice(t("ui.ai_exchange_copied"));
         } catch (e) {
-          new import_obsidian21.Notice(t("ui.unable_to_copy_the_ai_exchange"));
+          new import_obsidian22.Notice(t("ui.unable_to_copy_the_ai_exchange"));
         }
       })
     );
@@ -31565,7 +32734,7 @@ var DebugLogModal = class extends import_obsidian21.Modal {
       if (exchange.error) item.createEl("pre", { text: `${t("ui.error")}: ${exchange.error}` });
       const copy = item.createEl("button", { text: t("ui.copy_this_exchange") });
       copy.addEventListener("click", () => {
-        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian21.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian21.Notice(t("ui.unable_to_copy_the_ai_exchange")));
+        void navigator.clipboard.writeText(formatAiExchange(exchange)).then(() => new import_obsidian22.Notice(t("ui.ai_exchange_copied"))).catch(() => new import_obsidian22.Notice(t("ui.unable_to_copy_the_ai_exchange")));
       });
     }
   }
@@ -31587,7 +32756,7 @@ var DebugLogModal = class extends import_obsidian21.Modal {
 };
 
 // ui/modals/detail-templates-modal.ts
-var import_obsidian22 = require("obsidian");
+var import_obsidian23 = require("obsidian");
 var same = (a, b) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 var PURPOSES = [
   ["none", "ui.detail_section_kind_none"],
@@ -31633,7 +32802,7 @@ function renderDetailTemplatesSetting(setting, app, plugin, refresh = () => {
     (button) => button.setButtonText(t("ui.manage_detail_templates")).onClick(() => new DetailTemplatesModal(app, plugin, refresh).open())
   );
 }
-var DetailTemplatesModal = class extends import_obsidian22.Modal {
+var DetailTemplatesModal = class extends import_obsidian23.Modal {
   constructor(app, plugin, onChanged = () => {
   }, initialId) {
     super(app);
@@ -31885,7 +33054,7 @@ var DetailTemplatesModal = class extends import_obsidian22.Modal {
     });
     const icon = (glyph, label, run, disabled) => {
       const button = header.createEl("button", { cls: "clickable-icon" });
-      (0, import_obsidian22.setIcon)(button, glyph);
+      (0, import_obsidian23.setIcon)(button, glyph);
       button.setAttr("aria-label", label);
       button.setAttr("title", label);
       button.disabled = readOnly || disabled;
@@ -32060,7 +33229,7 @@ function reasoningLabel(level) {
 }
 var PartialChildBatchError = class extends Error {
 };
-var NextStepModal = class extends import_obsidian23.Modal {
+var NextStepModal = class extends import_obsidian24.Modal {
   constructor(app, topic, childrenCount, pendingCount, plugin, research, expand, synthesize, modelSettings, selectionFlow) {
     super(app);
     this.topic = topic;
@@ -32394,7 +33563,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
         await work();
       } catch (error) {
         if (this.closed && !controller.signal.aborted)
-          new import_obsidian23.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian24.Notice(error instanceof Error ? error.message : String(error));
         this.failed(
           panel,
           button,
@@ -32484,7 +33653,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
         direction,
         (message) => {
           if (this.closed) {
-            new import_obsidian23.Notice(message);
+            new import_obsidian24.Notice(message);
             return;
           }
           settle();
@@ -32509,7 +33678,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
     button.disabled = false;
   }
   startedInBackground() {
-    new import_obsidian23.Notice(t("ui.task_started_in_background_0", this.topic));
+    new import_obsidian24.Notice(t("ui.task_started_in_background_0", this.topic));
     this.close();
   }
   failedAi(panel, button, message) {
@@ -32575,7 +33744,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
                 return;
               }
               consumed();
-              new import_obsidian23.Notice(t("ui.subtopics_created"));
+              new import_obsidian24.Notice(t("ui.subtopics_created"));
               this.taskSignal = void 0;
               this.taskController = void 0;
               this.close();
@@ -32640,7 +33809,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
             this.startedInBackground();
             return;
           }
-          new import_obsidian23.Notice(t("ui.subtopics_created"));
+          new import_obsidian24.Notice(t("ui.subtopics_created"));
           this.close();
         },
         false
@@ -32819,7 +33988,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
           },
           (message) => {
             if (this.closed) {
-              new import_obsidian23.Notice(message);
+              new import_obsidian24.Notice(message);
               return;
             }
             release2();
@@ -32929,7 +34098,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
             },
             (message, retryable) => {
               if (this.closed) {
-                new import_obsidian23.Notice(message);
+                new import_obsidian24.Notice(message);
                 return;
               }
               consumed();
@@ -33439,7 +34608,7 @@ var DraftReviewView = class {
     this.confirm = confirm;
     this.discard = discard;
     this.close = close;
-    __publicField(this, "renderer", new import_obsidian23.Component());
+    __publicField(this, "renderer", new import_obsidian24.Component());
     __publicField(this, "disarm");
     __publicField(this, "intro");
   }
@@ -33480,7 +34649,7 @@ var DraftReviewView = class {
       const state = (_a3 = generations.get(target)) != null ? _a3 : { count: 0 };
       const generation = ++state.count;
       if (state.child) this.renderer.removeChild(state.child);
-      const child = this.renderer.addChild(new import_obsidian23.Component());
+      const child = this.renderer.addChild(new import_obsidian24.Component());
       state.child = child;
       generations.set(target, state);
       target.empty();
@@ -33490,7 +34659,7 @@ var DraftReviewView = class {
         target.setText(markdown);
       };
       try {
-        void import_obsidian23.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
+        void import_obsidian24.MarkdownRenderer.render(this.app, markdown, target, (_b2 = this.review.sourcePath) != null ? _b2 : "", child).catch(fallback);
       } catch (e) {
         fallback();
       }
@@ -33550,7 +34719,7 @@ var DraftReviewView = class {
     this.renderer.unload();
   }
 };
-var DraftReviewModal = class extends import_obsidian23.Modal {
+var DraftReviewModal = class extends import_obsidian24.Modal {
   constructor(app, summary, detail, review, confirm, discard) {
     super(app);
     __publicField(this, "view");
@@ -33569,7 +34738,7 @@ var DraftReviewModal = class extends import_obsidian23.Modal {
     this.contentEl.empty();
   }
 };
-var ChildProposalModal = class extends import_obsidian23.Modal {
+var ChildProposalModal = class extends import_obsidian24.Modal {
   constructor(app, suggestions, submit) {
     super(app);
     this.suggestions = suggestions;
@@ -33602,7 +34771,7 @@ var ChildProposalModal = class extends import_obsidian23.Modal {
     });
   }
 };
-var MapConflictModal = class extends import_obsidian23.Modal {
+var MapConflictModal = class extends import_obsidian24.Modal {
   constructor(app, local, disk, resolve) {
     super(app);
     this.local = local;
@@ -33659,7 +34828,7 @@ var MapConflictModal = class extends import_obsidian23.Modal {
     if (!this.settled) this.resolve(clone(this.disk));
   }
 };
-var NoteCollectionModal = class extends import_obsidian23.Modal {
+var NoteCollectionModal = class extends import_obsidian24.Modal {
   constructor(app, titleText, files, actions) {
     super(app);
     this.titleText = titleText;
@@ -33679,10 +34848,10 @@ var NoteCollectionModal = class extends import_obsidian23.Modal {
           action.run(file);
         });
     }
-    new import_obsidian23.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
+    new import_obsidian24.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.close")).onClick(() => this.close()));
   }
 };
-var TopicPickerModal = class extends import_obsidian23.Modal {
+var TopicPickerModal = class extends import_obsidian24.Modal {
   constructor(app, titleText, topics, choose) {
     super(app);
     this.titleText = titleText;
@@ -33692,19 +34861,19 @@ var TopicPickerModal = class extends import_obsidian23.Modal {
   onOpen() {
     this.titleEl.setText(this.titleText);
     for (const topic of this.topics)
-      new import_obsidian23.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
+      new import_obsidian24.Setting(this.contentEl).setName(topic.title).setDesc(topic.root).addButton(
         (button) => button.setButtonText(t("ui.select")).onClick(() => {
           this.close();
           this.choose(topic);
         })
       );
     if (!this.topics.length) this.contentEl.createEl("p", { text: t("ui.no_other_topics") });
-    new import_obsidian23.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
+    new import_obsidian24.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => this.close()));
   }
 };
 
 // experiences/visual-map/structure-review-modal.ts
-var messageOf2 = (error) => {
+var messageOf3 = (error) => {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 };
@@ -33714,7 +34883,7 @@ var KIND = {
   move: "move",
   merge: "merge"
 };
-var StructureReviewModal = class extends import_obsidian24.Modal {
+var StructureReviewModal = class extends import_obsidian25.Modal {
   constructor(app, host) {
     super(app);
     this.host = host;
@@ -33777,7 +34946,7 @@ var StructureReviewModal = class extends import_obsidian24.Modal {
           )) != null ? _b2 : close).focus();
       }).catch((error) => {
         if (this.closed) return;
-        ready(controller.signal.aborted ? t("ui.structure_review_cancelled") : messageOf2(error));
+        ready(controller.signal.aborted ? t("ui.structure_review_cancelled") : messageOf3(error));
       }).finally(() => {
         if (this.controller === controller) this.controller = void 0;
       });
@@ -33878,7 +35047,7 @@ var StructureReviewModal = class extends import_obsidian24.Modal {
             entry.applied = applied;
             message = applied ? t("ui.structure_review_applied_note") : "";
           }).catch((error) => {
-            message = messageOf2(error);
+            message = messageOf3(error);
           }).finally(() => {
             busy = false;
             if (!this.closed) refreshAll();
@@ -34088,23 +35257,23 @@ function parseStructureReview(raw, tree, language2 = "en") {
     if (kind === "strengthen" && !title) throw invalid2(locale, `#${index + 1} title`);
     if (kind === "move" && !newParentId) throw invalid2(locale, `#${index + 1} newParentId`);
     if (kind === "merge" && !mergeIntoId) throw invalid2(locale, `#${index + 1} mergeIntoId`);
-    const reject = (code) => {
+    const reject2 = (code) => {
       rejected.push({ index, code });
     };
     if (kind !== "strengthen" && title || kind !== "move" && newParentId || kind !== "merge" && mergeIntoId)
-      return reject("stray_field");
+      return reject2("stray_field");
     const target = byId.get(targetId);
-    if (!target) return reject("unknown_target");
-    if (kind !== "strengthen" && target.parentId === null) return reject("root_target");
+    if (!target) return reject2("unknown_target");
+    if (kind !== "strengthen" && target.parentId === null) return reject2("root_target");
     if (kind === "move" || kind === "merge") {
       const destinationId = kind === "move" ? newParentId : mergeIntoId;
       const destination = byId.get(destinationId);
-      if (!destination) return reject(kind === "move" ? "unknown_parent" : "unknown_merge_target");
-      if (destinationId === targetId || descendantIds(tree, targetId).has(destinationId)) return reject("cycle");
-      if (kind === "move" && target.parentId === destinationId) return reject("noop");
+      if (!destination) return reject2(kind === "move" ? "unknown_parent" : "unknown_merge_target");
+      if (destinationId === targetId || descendantIds(tree, targetId).has(destinationId)) return reject2("cycle");
+      if (kind === "move" && target.parentId === destinationId) return reject2("noop");
     }
     const key2 = `${kind}:${targetId}`;
-    if (seen.has(key2)) return reject("duplicate");
+    if (seen.has(key2)) return reject2("duplicate");
     seen.add(key2);
     suggestions.push({
       kind,
@@ -35075,8 +36244,8 @@ function renderTopicTree(parent, options) {
 }
 
 // ui/modals/topic-tree-modal.ts
-var import_obsidian25 = require("obsidian");
-var TopicTreeModal = class extends import_obsidian25.Modal {
+var import_obsidian26 = require("obsidian");
+var TopicTreeModal = class extends import_obsidian26.Modal {
   constructor(app, titleText, description, nodes, title, selectable, choose) {
     super(app);
     this.titleText = titleText;
@@ -35108,9 +36277,9 @@ var TopicTreeModal = class extends import_obsidian25.Modal {
 };
 
 // ui/modals/aim-start-modal.ts
-var import_obsidian26 = require("obsidian");
+var import_obsidian27 = require("obsidian");
 var import_node_crypto9 = require("node:crypto");
-var AimStartModal = class extends import_obsidian26.Modal {
+var AimStartModal = class extends import_obsidian27.Modal {
   constructor(app, submit, models = [], defaultModel = FALLBACK_MODEL, defaultReasoning = "low", refreshModels) {
     super(app);
     this.submit = submit;
@@ -35306,7 +36475,7 @@ var AimStartModal = class extends import_obsidian26.Modal {
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending2 = false;
     let cancelButton;
-    const create = new import_obsidian26.Setting(this.contentEl).addButton((button) => {
+    const create = new import_obsidian27.Setting(this.contentEl).addButton((button) => {
       cancelButton = button;
       button.setButtonText(t("ui.cancel")).onClick(() => this.close());
     }).addButton(
@@ -35392,9 +36561,9 @@ var AimStartModal = class extends import_obsidian26.Modal {
 };
 
 // ui/modals/aim-answer-modal.ts
-var import_obsidian27 = require("obsidian");
+var import_obsidian28 = require("obsidian");
 var import_node_crypto10 = require("node:crypto");
-var AimAnswerModal = class extends import_obsidian27.Modal {
+var AimAnswerModal = class extends import_obsidian28.Modal {
   constructor(app, question, options, submit, requestId = (0, import_node_crypto10.randomUUID)()) {
     super(app);
     this.question = question;
@@ -35436,7 +36605,7 @@ var AimAnswerModal = class extends import_obsidian27.Modal {
     });
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending2 = false, submitButton;
-    const setting = new import_obsidian27.Setting(this.contentEl).addButton(
+    const setting = new import_obsidian28.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.cancel")).onClick(() => {
         if (!pending2) this.close();
       })
@@ -35465,8 +36634,8 @@ var AimAnswerModal = class extends import_obsidian27.Modal {
 };
 
 // ui/modals/aim-assumption-modal.ts
-var import_obsidian28 = require("obsidian");
-var AimAssumptionModal = class extends import_obsidian28.Modal {
+var import_obsidian29 = require("obsidian");
+var AimAssumptionModal = class extends import_obsidian29.Modal {
   constructor(app, assumptions, submit) {
     super(app);
     this.assumptions = assumptions;
@@ -35482,7 +36651,7 @@ var AimAssumptionModal = class extends import_obsidian28.Modal {
     const actualLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     actualLabel.createSpan({ text: t("ui.aim_correct_assumption_actual") });
     const actual = actualLabel.createEl("textarea", { attr: { rows: "3" } });
-    new import_obsidian28.Setting(this.contentEl).addButton(
+    new import_obsidian29.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.aim_correct_assumption_submit")).setCta().onClick(() => {
         if (!actual.value.trim()) {
           actual.focus();
@@ -35500,8 +36669,8 @@ var AimAssumptionModal = class extends import_obsidian28.Modal {
 };
 
 // ui/modals/aim-steer-modal.ts
-var import_obsidian29 = require("obsidian");
-var AimSteerModal = class extends import_obsidian29.Modal {
+var import_obsidian30 = require("obsidian");
+var AimSteerModal = class extends import_obsidian30.Modal {
   constructor(app, submit) {
     super(app);
     this.submit = submit;
@@ -35512,7 +36681,7 @@ var AimSteerModal = class extends import_obsidian29.Modal {
     const label = this.contentEl.createEl("label", { cls: "vam-field" });
     label.createSpan({ text: t("ui.aim_steer_prompt") });
     const direction = label.createEl("textarea", { attr: { rows: "3" } });
-    new import_obsidian29.Setting(this.contentEl).addButton(
+    new import_obsidian30.Setting(this.contentEl).addButton(
       (button) => button.setButtonText(t("ui.aim_steer_submit")).setCta().onClick(() => {
         if (!direction.value.trim()) {
           direction.focus();
@@ -38691,7 +39860,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     throwIfAborted(signal);
     const subscriber = Symbol("Planner request owner");
     entry.subscribers.add(subscriber);
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       let settled = false;
       const cleanup = () => {
         signal == null ? void 0 : signal.removeEventListener("abort", onAbort);
@@ -38707,7 +39876,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
         cleanup();
         const error = new Error("The operation was aborted.");
         error.name = "AbortError";
-        reject(error);
+        reject2(error);
       };
       signal == null ? void 0 : signal.addEventListener("abort", onAbort, { once: true });
       entry.promise.then(
@@ -38721,7 +39890,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
           if (settled) return;
           settled = true;
           cleanup();
-          reject(error instanceof Error ? error : new Error(String(error)));
+          reject2(error instanceof Error ? error : new Error(String(error)));
         }
       );
       if (signal == null ? void 0 : signal.aborted) onAbort();
@@ -41282,7 +42451,7 @@ function canvasPointerIntent(state) {
 }
 
 // experiences/visual-map/merge-topics.ts
-var import_obsidian30 = require("obsidian");
+var import_obsidian31 = require("obsidian");
 function readingOrder(nodes) {
   return [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
 }
@@ -41340,7 +42509,7 @@ function mergeTitleFromResult(result, fallback) {
   const name = raw.replace(/^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g, "").trim();
   return name && name.length <= MERGE_TITLE_MAX ? name : sanitizeGeneratedTitle(fallback);
 }
-var MergeTopicsModal = class extends import_obsidian30.Modal {
+var MergeTopicsModal = class extends import_obsidian31.Modal {
   constructor(app, count, value, submit, cancelled2 = () => {
   }, ai, parentName) {
     super(app);
@@ -41523,6 +42692,7 @@ var MERGE_DONE_NOTICE_MS = 15e3;
 var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
+var cardCutLabels = /* @__PURE__ */ new WeakMap();
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
@@ -41576,7 +42746,7 @@ var TOPIC_KIND_ICON = {
   evidence: "file-search",
   conclusion: "flag"
 };
-var RELATION_KINDS = [
+var RELATION_KINDS2 = [
   "supports",
   "contradicts",
   "verifies",
@@ -41613,7 +42783,7 @@ var AIM_STAGE_KEYS = {
 var documentReadyNotice = null;
 function showDocumentReady() {
   documentReadyNotice == null ? void 0 : documentReadyNotice.hide();
-  documentReadyNotice = new import_obsidian31.Notice(t("ui.aim_document_ready"), 6e4);
+  documentReadyNotice = new import_obsidian32.Notice(t("ui.aim_document_ready"), 6e4);
 }
 function chatSynthesisOptions(input) {
   return {
@@ -41656,7 +42826,7 @@ var mapChatTaskSequence = 0;
 function relationPairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
-var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.ItemView {
+var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
@@ -41748,6 +42918,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "zoomLabel", null);
     __publicField(this, "refreshTimer", null);
     __publicField(this, "viewportTimer", null);
+    /** True while the Map.md conflict window of this view is open. */
+    __publicField(this, "conflictOpen", false);
     __publicField(this, "hoverTimer", null);
     __publicField(this, "hoverCard", null);
     /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
@@ -41847,6 +43019,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimProgressRenderTimer", null);
     __publicField(this, "aimFailedReports", /* @__PURE__ */ new Map());
     __publicField(this, "aimAnswerRequestIds", /* @__PURE__ */ new Map());
+    // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
+    /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
+    __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     this.installUndoScope();
@@ -41906,7 +43081,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.registerEvent(
       workspace.on("active-leaf-change", (leaf) => {
         var _a2;
-        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian31.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
+        if ((leaf == null ? void 0 : leaf.view) instanceof import_obsidian32.MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
         (_a2 = this.chat) == null ? void 0 : _a2.refreshNote();
       })
     );
@@ -41920,7 +43095,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     }));
   }
   async onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     this.closed = false;
     (_a2 = this.announcer) == null ? void 0 : _a2.remove();
     this.announcer = (_c = (_b2 = this.containerEl) == null ? void 0 : _b2.createDiv({ cls: "vam-sr-only" })) != null ? _c : null;
@@ -41945,6 +43120,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.registerDomEvent((_l = this.contentEl.win) != null ? _l : window, "blur", () => {
       this.spaceHeld = false;
     });
+    this.bindClipboard();
+    (_n = (_m = this.contentEl).onWindowMigrated) == null ? void 0 : _n.call(_m, () => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
@@ -41992,7 +43169,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
    * undo (the handler passes the key through), and IME composition is never touched.
    */
   installUndoScope() {
-    const scope = new import_obsidian31.Scope(this.app.scope);
+    const scope = new import_obsidian32.Scope(this.app.scope);
     const seen = /* @__PURE__ */ new WeakSet();
     const run = (redo) => (event) => {
       if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
@@ -42042,13 +43219,15 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     this.closed = true;
+    (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
+    this.unbindClipboard = null;
     this.renderAfterDrag = false;
-    (_a2 = this.announcer) == null ? void 0 : _a2.remove();
+    (_b2 = this.announcer) == null ? void 0 : _b2.remove();
     this.announcer = null;
     this.announcedStages.clear();
-    (_b2 = this.unsubscribeResearch) == null ? void 0 : _b2.call(this);
+    (_c = this.unsubscribeResearch) == null ? void 0 : _c.call(this);
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -42059,10 +43238,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.abortMapChat();
-    (_c = this.chat) == null ? void 0 : _c.dispose();
-    (_d = this.relevancePanelCleanup) == null ? void 0 : _d.call(this);
+    (_d = this.chat) == null ? void 0 : _d.dispose();
+    (_e = this.relevancePanelCleanup) == null ? void 0 : _e.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_f = (_e = this.plugin).releaseWarmClaude) == null ? void 0 : _f.call(_e);
+    if (this.relevancePanelOpen) (_g = (_f = this.plugin).releaseWarmClaude) == null ? void 0 : _g.call(_f);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -42082,8 +43261,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_g = this.hoverCard) == null ? void 0 : _g.remove();
-    (_h = this.dragCleanup) == null ? void 0 : _h.call(this);
+    (_h = this.hoverCard) == null ? void 0 : _h.remove();
+    (_i = this.dragCleanup) == null ? void 0 : _i.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -42174,12 +43353,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       var _a2;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
       if (this.plugin.running.has(node.path)) {
-        new import_obsidian31.Notice(t("ui.ai_running_ai"));
+        new import_obsidian32.Notice(t("ui.ai_running_ai"));
         return;
       }
       await this.plugin.confirmAiUsage(note.model, async () => {
         const outputLanguage2 = outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-        await this.runAgent(node, void 0, (message) => new import_obsidian31.Notice(message), {
+        await this.runAgent(node, void 0, (message) => new import_obsidian32.Notice(message), {
           task: researchTopicTask(outputLanguage2, note.title),
           referenceGroups: [],
           outputLanguage: outputLanguage2,
@@ -42187,7 +43366,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
           ...aiModeOptions("standard", "research")
         });
       });
-    })().catch((error) => new import_obsidian31.Notice(errorMessage(error)));
+    })().catch((error) => new import_obsidian32.Notice(errorMessage(error)));
   }
   async persist() {
     if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
@@ -42327,6 +43506,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     this.selected = null;
     this.multiSelected.clear();
     this.history.clear();
+    this.restoreCrossProxies();
     await this.hydrate(isCurrent);
     if (!isCurrent()) return;
     this.render();
@@ -42475,7 +43655,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     var _a2;
     const target = prefill ? this.reopenedImportTarget(prefill.inputs) : this.outlineImportTarget();
     if (target.map !== "editable") {
-      new import_obsidian31.Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
+      new import_obsidian32.Notice(target.map === "aim" ? t("ui.outline_import_placement_aim") : t("ui.outline_import_placement_no_map"));
       return;
     }
     const placement = prefill ? prefill.inputs.placement : target.selected ? "under" : "tree";
@@ -42523,14 +43703,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
           if (signal.aborted) return;
           const inputs = started();
           signal.removeEventListener("abort", forward);
-          const own = {
+          const own2 = {
             mapPath: this.path,
             controller,
             state: "running",
             inputs
           };
-          run.task = own;
-          this.outlineDraftTask = own;
+          run.task = own2;
+          this.outlineDraftTask = own2;
           if (!this.closed) this.render();
           try {
             const result = await this.plugin.outlineGeneration.generate(
@@ -42543,18 +43723,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
               },
               controller.signal
             );
-            if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
-            own.state = "done";
-            own.markdown = result.markdown;
+            if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
+            own2.state = "done";
+            own2.markdown = result.markdown;
             backgroundResultNotice(t("ui.outline_ai_ready"), {
               label: t("ui.background_review"),
-              open: () => this.reopenOutlineDraft(own)
+              open: () => this.reopenOutlineDraft(own2)
             });
           } catch (error) {
-            if (controller.signal.aborted || this.outlineDraftTask !== own || this.closed) return;
-            own.state = "failed";
-            own.message = errorMessage(error);
-            new import_obsidian31.Notice(own.message);
+            if (controller.signal.aborted || this.outlineDraftTask !== own2 || this.closed) return;
+            own2.state = "failed";
+            own2.message = errorMessage(error);
+            new import_obsidian32.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
@@ -42712,7 +43892,7 @@ ${request.requirements}` : preset.text,
     const existing = this.structureReviewTask;
     if (existing && existing.mapPath === this.path) {
       if (existing.state === "running") {
-        new import_obsidian31.Notice(t("ui.ai_running_ai"));
+        new import_obsidian32.Notice(t("ui.ai_running_ai"));
         return;
       }
       if (existing.state === "done" && existing.scopeId === scopeId) {
@@ -42767,14 +43947,14 @@ ${request.requirements}` : preset.text,
           if (signal.aborted) return;
           run.began = true;
           signal.removeEventListener("abort", forward);
-          const own = {
+          const own2 = {
             mapPath,
             scopeId,
             controller,
             state: "running",
-            reopen: (result) => reopen(result, own)
+            reopen: (result) => reopen(result, own2)
           };
-          this.structureReviewTask = own;
+          this.structureReviewTask = own2;
           if (!this.closed) this.render();
           started();
           try {
@@ -42789,18 +43969,18 @@ ${request.requirements}` : preset.text,
               },
               controller.signal
             );
-            if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
-            own.state = "done";
-            own.result = review;
+            if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
+            own2.state = "done";
+            own2.result = review;
             backgroundResultNotice(t("ui.structure_review_ready_0", review.suggestions.length), {
               label: t("ui.structure_review_view_0", review.suggestions.length),
-              open: () => this.reopenStructureReview(own)
+              open: () => this.reopenStructureReview(own2)
             });
           } catch (error) {
-            if (controller.signal.aborted || this.structureReviewTask !== own || this.closed) return;
-            own.state = "failed";
-            own.message = errorMessage(error);
-            new import_obsidian31.Notice(own.message);
+            if (controller.signal.aborted || this.structureReviewTask !== own2 || this.closed) return;
+            own2.state = "failed";
+            own2.message = errorMessage(error);
+            new import_obsidian32.Notice(own2.message);
           }
           if (!this.closed) this.render();
         });
@@ -42879,7 +44059,7 @@ ${request.requirements}` : preset.text,
     button.setAttr("aria-expanded", String(this.relevancePanelOpen));
     button.setAttr("aria-controls", this.relevancePanelId);
     button.setAttr("aria-description", t(goal ? "ui.relevance_goal_edit_hint" : "ui.relevance_goal_set_hint"));
-    (0, import_obsidian31.setTooltip)(
+    (0, import_obsidian32.setTooltip)(
       button,
       goal ? [label, this.relevanceContext].filter(Boolean).join("\n") : t("ui.relevance_goal_set_hint")
     );
@@ -42902,7 +44082,7 @@ ${request.requirements}` : preset.text,
     if (sorted) {
       const icon = button.createSpan("vam-relevance-sort-icon");
       icon.setAttr("aria-hidden", "true");
-      (0, import_obsidian31.setIcon)(icon, "arrow-down-wide-narrow");
+      (0, import_obsidian32.setIcon)(icon, "arrow-down-wide-narrow");
     }
     this.relevanceButtonEl = button;
   }
@@ -42938,11 +44118,11 @@ ${request.requirements}` : preset.text,
   editRelevanceGoal() {
     var _a2, _b2, _c, _d, _e;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") {
-      new import_obsidian31.Notice(t("ui.relevance_goal_unavailable_grading"));
+      new import_obsidian32.Notice(t("ui.relevance_goal_unavailable_grading"));
       return;
     }
     if (!this.relevanceToolsEl) {
-      new import_obsidian31.Notice(t("ui.relevance_goal_unavailable_toolbar"));
+      new import_obsidian32.Notice(t("ui.relevance_goal_unavailable_toolbar"));
       return;
     }
     this.relevancePanelOpen = true;
@@ -43424,7 +44604,7 @@ ${request.requirements}` : preset.text,
         skipped2++;
       }
     }
-    if (skipped2) new import_obsidian31.Notice(t("ui.relevance_undo_skipped_0", skipped2));
+    if (skipped2) new import_obsidian32.Notice(t("ui.relevance_undo_skipped_0", skipped2));
   }
   /**
    * The tag's menu: the three tiers (a check on the current one) and Clear grade. Disabled while a grading run is
@@ -43433,7 +44613,7 @@ ${request.requirements}` : preset.text,
   openRelevanceMenu(node, current, anchor) {
     var _a2;
     if (((_a2 = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _a2.status) === "running") return;
-    const menu = new import_obsidian31.Menu();
+    const menu = new import_obsidian32.Menu();
     for (const tier of ["core", "support", "side"])
       menu.addItem(
         (item) => item.setTitle(t(RELEVANCE_LABEL[tier])).setChecked(tier === current).onClick(() => this.setManualRelevance(node, tier))
@@ -43609,7 +44789,7 @@ ${request.requirements}` : preset.text,
       if (reason) throw new Error(reason);
       const touched = [suggestion.targetId, suggestion.newParentId, suggestion.mergeIntoId];
       if (touched.some((id) => !!id && this.isMerging(id))) {
-        new import_obsidian31.Notice(t("ui.merge_locked"));
+        new import_obsidian32.Notice(t("ui.merge_locked"));
         throw new Error(t("ui.merge_locked"));
       }
     };
@@ -43637,10 +44817,10 @@ ${request.requirements}` : preset.text,
       }).then(
         () => true
       );
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       var _a2;
       const run = (work) => {
-        write(work).then(() => resolve(true), reject);
+        write(work).then(() => resolve(true), reject2);
       };
       const node = nodeOf(suggestion.targetId);
       if (suggestion.kind === "reduce") {
@@ -43686,7 +44866,7 @@ ${request.requirements}` : preset.text,
   }
   /** The side option on "+ Topic": one topic by default, or a pasted outline for several at once. */
   openTopicMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = new import_obsidian32.Menu();
     menu.addItem(
       (item) => item.setTitle(t("ui.paste_outline_add_many")).setIcon("list-tree").onClick(() => this.openOutlineImport())
     );
@@ -43699,7 +44879,7 @@ ${request.requirements}` : preset.text,
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   openKindMenu(event, pick) {
-    const menu = new import_obsidian31.Menu();
+    const menu = new import_obsidian32.Menu();
     for (const kind of TOPIC_KINDS)
       menu.addItem(
         (item) => item.setTitle(t(TOPIC_KIND_SHAPES[kind].labelKey)).setIcon(TOPIC_KIND_ICON[kind]).onClick(() => pick(kind))
@@ -43759,7 +44939,7 @@ ${request.requirements}` : preset.text,
   }
   /** The zoom cluster's Layout menu: collapse or expand levels, then re-arrange the whole map. */
   openLayoutMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = new import_obsidian32.Menu();
     const choices = [
       { title: t("ui.collapse_all"), icon: "chevrons-down-up", levels: 0 },
       { title: t("ui.expand_all"), icon: "chevrons-up-down", levels: null },
@@ -43805,6 +44985,25 @@ ${request.requirements}` : preset.text,
     );
     menu.showAtMouseEvent(event);
   }
+  /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
+  onPaneMenu(menu, source) {
+    super.onPaneMenu(menu, source);
+    if (!this.map || this.builtIn || !this.path) return;
+    menu.addSeparator();
+    for (const [format, key2] of [
+      ["opml", "ui.exchange_export_opml"],
+      ["freemind", "ui.exchange_export_freemind"]
+    ])
+      menu.addItem(
+        (item) => item.setTitle(t(key2)).setIcon("file-output").onClick(() => this.exportExchange(format))
+      );
+  }
+  /** Writes the open map as OPML or FreeMind next to its Map.md. */
+  exportExchange(format) {
+    const map = this.map;
+    if (!map || this.builtIn || !this.path) return;
+    void exportMapWithNotice(this.app.vault, { mapPath: this.path, map, notes: this.notes, format });
+  }
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   outlineImportTarget() {
     var _a2, _b2;
@@ -43838,7 +45037,7 @@ ${request.requirements}` : preset.text,
       );
     } catch (error) {
       if (!(error == null ? void 0 : error.mapCreated)) throw error;
-      new import_obsidian31.Notice(errorMessage(error));
+      new import_obsidian32.Notice(errorMessage(error));
       return;
     }
     let opened = true;
@@ -43858,7 +45057,7 @@ ${request.requirements}` : preset.text,
     } catch (e) {
       opened = false;
     }
-    if (result.failure) new import_obsidian31.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
+    if (result.failure) new import_obsidian32.Notice(t("ui.outline_import_partial", result.created, result.total, result.failure));
     if (result.failure || !opened || !request.shallowResearch || result.nodes.length < 2) return;
     const root = result.nodes.find((node) => node.parentId === null);
     if (!root) return;
@@ -43872,7 +45071,7 @@ ${request.requirements}` : preset.text,
           referenceGroups: []
         });
       }
-    ).catch((error) => new import_obsidian31.Notice(errorMessage(error)));
+    ).catch((error) => new import_obsidian32.Notice(errorMessage(error)));
   }
   /** Adds the outline to the open map, as a new top-level tree or under the selected topic; existing nodes stay put. */
   async importOutlineIntoMap(request, placement) {
@@ -43947,7 +45146,7 @@ ${request.requirements}` : preset.text,
               kept.unshift(node.path);
               continue;
             }
-            if (!(file instanceof import_obsidian31.TFile)) {
+            if (!(file instanceof import_obsidian32.TFile)) {
               this.notes.delete(node.id);
               continue;
             }
@@ -43964,7 +45163,7 @@ ${request.requirements}` : preset.text,
             return;
           }
           state.saveFailed = true;
-          new import_obsidian31.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
+          new import_obsidian32.Notice(t("ui.outline_import_map_save_failed", `${errorMessage(cause)} (${kept.join(", ")})`));
         };
         if (result.failure) return rollBack(new Error(result.failure));
         const top2 = created[0];
@@ -44029,7 +45228,7 @@ ${request.requirements}` : preset.text,
           ...request.toneId ? { toneId: request.toneId } : {}
         });
       }
-    ).catch((error) => new import_obsidian31.Notice(errorMessage(error)));
+    ).catch((error) => new import_obsidian32.Notice(errorMessage(error)));
   }
   openNewMindMapModal() {
     new NameModal(
@@ -44204,14 +45403,14 @@ ${request.requirements}` : preset.text,
           this.render();
           this.focusNode(question2);
         }
-        new import_obsidian31.Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
+        new import_obsidian32.Notice(t("ui.aim_waiting_user"));
+      } else if (result.status === "partial") new import_obsidian32.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new import_obsidian31.Notice(t("ui.aim_research_already_running"));
+      else if (result.status === "in-progress") new import_obsidian32.Notice(t("ui.aim_research_already_running"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
       const latest = await this.plugin.repo.readMap(mapPath);
       if (this.aimViewIsCurrent(epoch, mapPath)) {
         this.map = latest;
@@ -44262,7 +45461,7 @@ ${request.requirements}` : preset.text,
       for (let waited = 0; this.aimBusy && waited < 3e4; waited += 100)
         await new Promise((resolve) => window.setTimeout(resolve, 100));
       if (this.aimBusy) {
-        new import_obsidian31.Notice(t("ui.aim_research_already_running"));
+        new import_obsidian32.Notice(t("ui.aim_research_already_running"));
         return;
       }
     }
@@ -44279,7 +45478,7 @@ ${request.requirements}` : preset.text,
     const note = (_d = node && this.notes.get(node.id)) != null ? _d : topic && this.notes.get(topic.id);
     if (this.closed || !node || !note || !this.path || !((_e = this.map) == null ? void 0 : _e.aim)) return;
     if (this.aimBusy) {
-      new import_obsidian31.Notice(t("ui.aim_research_already_running"));
+      new import_obsidian32.Notice(t("ui.aim_research_already_running"));
       return;
     }
     const epoch = this.aimViewEpoch, mapPath = this.path, controller = new AbortController();
@@ -44295,12 +45494,12 @@ ${request.requirements}` : preset.text,
       this.map = await this.plugin.repo.readMap(mapPath);
       await this.hydrate(() => this.aimViewIsCurrent(epoch, mapPath));
       if (outcome.status === "completed") showDocumentReady();
-      else if (outcome.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
-      else if (outcome.status === "waiting-user") new import_obsidian31.Notice(t("ui.aim_waiting_user"));
+      else if (outcome.status === "partial") new import_obsidian32.Notice(t("ui.aim_research_partial"));
+      else if (outcome.status === "waiting-user") new import_obsidian32.Notice(t("ui.aim_waiting_user"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
     } finally {
       if (this.aimController === controller) {
         this.aimBusy = false;
@@ -44384,10 +45583,10 @@ ${request.requirements}` : preset.text,
         this.selected = result.node.id;
         this.render();
         this.focusNode(result.node);
-        new import_obsidian31.Notice(t("ui.aim_question_ready"));
+        new import_obsidian32.Notice(t("ui.aim_question_ready"));
       } else if (result.outcome) {
         const outcome = result.outcome;
-        if (outcome.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
+        if (outcome.status === "partial") new import_obsidian32.Notice(t("ui.aim_research_partial"));
         else if (outcome.status === "waiting-user") {
           const question = (_f = this.map) == null ? void 0 : _f.nodes.find((item) => item.id === outcome.questionNodeId);
           if (question) {
@@ -44395,15 +45594,15 @@ ${request.requirements}` : preset.text,
             this.render();
             this.focusNode(question);
           }
-          new import_obsidian31.Notice(t("ui.aim_waiting_user"));
+          new import_obsidian32.Notice(t("ui.aim_waiting_user"));
         } else if (outcome.status === "completed") showDocumentReady();
-        else if (outcome.status === "in-progress") new import_obsidian31.Notice(t("ui.aim_research_already_running"));
-        else new import_obsidian31.Notice(t("ui.aim_research_result_stale"));
-      } else new import_obsidian31.Notice(t("ui.aim_no_question_needed"));
+        else if (outcome.status === "in-progress") new import_obsidian32.Notice(t("ui.aim_research_already_running"));
+        else new import_obsidian32.Notice(t("ui.aim_research_result_stale"));
+      } else new import_obsidian32.Notice(t("ui.aim_no_question_needed"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
     } finally {
       if (this.aimController === controller) {
         this.aimBusy = false;
@@ -44443,15 +45642,15 @@ ${request.requirements}` : preset.text,
           this.render();
           this.focusNode(question);
         }
-        new import_obsidian31.Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
+        new import_obsidian32.Notice(t("ui.aim_waiting_user"));
+      } else if (result.status === "partial") new import_obsidian32.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new import_obsidian31.Notice(t("ui.aim_research_already_running"));
-      else new import_obsidian31.Notice(t("ui.aim_research_result_stale"));
+      else if (result.status === "in-progress") new import_obsidian32.Notice(t("ui.aim_research_already_running"));
+      else new import_obsidian32.Notice(t("ui.aim_research_result_stale"));
     } catch (error) {
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
-      if (controller.signal.aborted) new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      else new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+      if (controller.signal.aborted) new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+      else new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
     } finally {
       if (this.aimController === controller) {
         this.aimBusy = false;
@@ -44490,13 +45689,13 @@ ${request.requirements}` : preset.text,
       if (!isCurrent()) return;
       if (result.status === "waiting-user") {
         this.selected = result.questionNodeId;
-        new import_obsidian31.Notice(t("ui.aim_waiting_user"));
-      } else if (result.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
+        new import_obsidian32.Notice(t("ui.aim_waiting_user"));
+      } else if (result.status === "partial") new import_obsidian32.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
-      else if (result.status === "in-progress") new import_obsidian31.Notice(t("ui.aim_research_already_running"));
+      else if (result.status === "in-progress") new import_obsidian32.Notice(t("ui.aim_research_already_running"));
     } catch (error) {
       if (!isCurrent()) return;
-      new import_obsidian31.Notice(
+      new import_obsidian32.Notice(
         controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error)
       );
     } finally {
@@ -44510,7 +45709,7 @@ ${request.requirements}` : preset.text,
             }
           }
         } catch (error) {
-          if (isCurrent()) new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+          if (isCurrent()) new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
         } finally {
           if (this.aimController === controller) {
             this.aimBusy = false;
@@ -44543,7 +45742,7 @@ ${request.requirements}` : preset.text,
         const current = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id);
         if (current) this.openAimAnswer(current);
       }).catch((error) => {
-        if (this.aimViewIsCurrent(epoch, mapPath)) new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+        if (this.aimViewIsCurrent(epoch, mapPath)) new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
       });
       return;
     }
@@ -44573,16 +45772,16 @@ ${request.requirements}` : preset.text,
               this.render();
               this.focusNode(question);
             }
-            new import_obsidian31.Notice(t("ui.aim_waiting_user"));
-          } else if (result.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
+            new import_obsidian32.Notice(t("ui.aim_waiting_user"));
+          } else if (result.status === "partial") new import_obsidian32.Notice(t("ui.aim_research_partial"));
           else if (result.status === "completed") showDocumentReady();
-          else if (result.status === "in-progress") new import_obsidian31.Notice(t("ui.aim_research_already_running"));
-          else new import_obsidian31.Notice(t("ui.aim_research_result_stale"));
+          else if (result.status === "in-progress") new import_obsidian32.Notice(t("ui.aim_research_already_running"));
+          else new import_obsidian32.Notice(t("ui.aim_research_result_stale"));
         } catch (error) {
           if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) throw error;
           this.aimAnswerRequestIds.set(node.id, input.requestId);
-          if (controller.signal.aborted) new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+          if (controller.signal.aborted) new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+          else new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
           throw error;
         } finally {
           if (this.aimController === controller) {
@@ -44687,7 +45886,7 @@ ${request.requirements}` : preset.text,
     if (this.renderingCard) button.tabIndex = -1;
     button.setAttr("aria-label", label);
     button.dataset.icon = icon;
-    (0, import_obsidian31.setIcon)(button, icon);
+    (0, import_obsidian32.setIcon)(button, icon);
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       action(event);
@@ -44713,7 +45912,7 @@ ${request.requirements}` : preset.text,
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */
   openNewMapMenu(event) {
-    const menu = new import_obsidian31.Menu();
+    const menu = new import_obsidian32.Menu();
     menu.addItem(
       (item) => item.setTitle(t("ui.new_mind_map")).setIcon("file-plus").onClick(
         () => new NameModal(
@@ -45137,7 +46336,12 @@ ${request.requirements}` : preset.text,
     const structure2 = (map) => JSON.stringify({ ...map, viewport: null });
     if (structure2(disk) === structure2(this.map)) return false;
     const local = clone(this.map);
-    this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
+    this.conflictOpen = true;
+    try {
+      this.map = await new Promise((resolve) => new MapConflictModal(this.app, local, disk, resolve).open());
+    } finally {
+      this.conflictOpen = false;
+    }
     this.history.clear();
     return true;
   }
@@ -45238,7 +46442,7 @@ ${request.requirements}` : preset.text,
   mergeUnlocked(ids) {
     for (const id of ids)
       if (this.isMerging(id)) {
-        new import_obsidian31.Notice(t("ui.merge_locked"));
+        new import_obsidian32.Notice(t("ui.merge_locked"));
         return false;
       }
     return true;
@@ -45257,12 +46461,12 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d;
     if (!this.map || this.map.aim || this.builtIn || this.mergeOpen || !this.multiSelected.size) return;
     if (this.mergeTasks.has(this.path)) {
-      new import_obsidian31.Notice(t("ui.merge_locked"));
+      new import_obsidian32.Notice(t("ui.merge_locked"));
       return;
     }
     const check = this.mergeCheck();
     if (!check.ok) {
-      new import_obsidian31.Notice(t(check.reason));
+      new import_obsidian32.Notice(t(check.reason));
       return;
     }
     const snapshot = {
@@ -45326,7 +46530,7 @@ ${request.requirements}` : preset.text,
       });
     };
     if (!stillValid()) {
-      new import_obsidian31.Notice(t("ui.merge_draft_stale"));
+      new import_obsidian32.Notice(t("ui.merge_draft_stale"));
       return false;
     }
     const { model, reasoning } = await this.mergeModel((_a2 = snapshot.targetId) != null ? _a2 : snapshot.parentId);
@@ -45356,7 +46560,7 @@ ${request.requirements}` : preset.text,
       this.render();
       task.run = this.runMergeDraft(task);
     });
-    if (accepted && !began && !signal.aborted) new import_obsidian31.Notice(t("ui.merge_draft_stale"));
+    if (accepted && !began && !signal.aborted) new import_obsidian32.Notice(t("ui.merge_draft_stale"));
     return began;
   }
   isLiveMergeTask(task) {
@@ -45470,14 +46674,14 @@ ${request.requirements}` : preset.text,
           },
           MERGE_DONE_NOTICE_MS
         );
-      else new import_obsidian31.Notice(done, MERGE_DONE_NOTICE_MS);
+      else new import_obsidian32.Notice(done, MERGE_DONE_NOTICE_MS);
     } catch (error) {
       const live = this.mergeTasks.get(task.mapPath) === task;
       if (live) this.mergeTasks.delete(task.mapPath);
       if (!this.closed) this.render();
       if (task.controller.signal.aborted || this.closed) return;
       const stale = error instanceof Error && error.message === t("ui.merge_draft_stale");
-      new import_obsidian31.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
+      new import_obsidian32.Notice(stale ? t("ui.merge_draft_stale") : this.plugin.recordFailure(t("log.merge_failed"), error));
     } finally {
       progress.end();
     }
@@ -45496,7 +46700,7 @@ ${request.requirements}` : preset.text,
         },
         MERGE_DONE_NOTICE_MS
       );
-    else new import_obsidian31.Notice(message, MERGE_DONE_NOTICE_MS);
+    else new import_obsidian32.Notice(message, MERGE_DONE_NOTICE_MS);
   }
   /** Stop, or clear a finished one: the run is aborted and forgotten, so a late result changes nothing. */
   stopMergeTask(task) {
@@ -45560,7 +46764,7 @@ ${request.requirements}` : preset.text,
     );
     if (!check.ok) {
       if (content) stale();
-      new import_obsidian31.Notice(t(check.reason));
+      new import_obsidian32.Notice(t(check.reason));
       return;
     }
     if (((_a2 = snapshot.targetId) != null ? _a2 : null) !== check.targetId || check.sources.some((node) => {
@@ -45568,7 +46772,7 @@ ${request.requirements}` : preset.text,
       return ((_a3 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a3.path) !== node.path;
     })) {
       if (content) stale();
-      new import_obsidian31.Notice(t("ui.merge_missing_note"));
+      new import_obsidian32.Notice(t("ui.merge_missing_note"));
       return;
     }
     const sources2 = check.sources, mapPath = this.path, repo = this.plugin.repo, before = clone(this.map), language2 = this.plugin.settings.language;
@@ -45735,8 +46939,8 @@ ${request.requirements}` : preset.text,
   }
   /** Tells the user how many links the last merge removed: duplicates of a pair, and links that would have formed a cycle (both sentences when both happened). */
   noticeDroppedCycles() {
-    if (this.lastDroppedSamePair > 0) new import_obsidian31.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
-    if (this.lastDroppedCycles > 0) new import_obsidian31.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
+    if (this.lastDroppedSamePair > 0) new import_obsidian32.Notice(t("ui.merge_dropped_same_pair_0", String(this.lastDroppedSamePair)));
+    if (this.lastDroppedCycles > 0) new import_obsidian32.Notice(t("ui.merge_dropped_cycles_0", String(this.lastDroppedCycles)));
   }
   /** The merge is saved and in history; a failing reload must not look like the merge failed. */
   async finishMerge(id) {
@@ -45749,7 +46953,7 @@ ${request.requirements}` : preset.text,
       if (merged) this.focusNode(merged);
     } catch (e) {
       this.render();
-      new import_obsidian31.Notice(t("ui.merge_saved_refresh_failed"));
+      new import_obsidian32.Notice(t("ui.merge_saved_refresh_failed"));
     }
   }
   /** What the user is told when the transaction refuses or cannot restore; other errors pass through unchanged. */
@@ -45884,7 +47088,7 @@ ${request.requirements}` : preset.text,
       el.style.width = `${image.w}px`;
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
-      const source = file instanceof import_obsidian31.TFile ? (_d = (_c = this.app.vault).getResourcePath) == null ? void 0 : _d.call(_c, file) : void 0;
+      const source = file instanceof import_obsidian32.TFile ? (_d = (_c = this.app.vault).getResourcePath) == null ? void 0 : _d.call(_c, file) : void 0;
       const placeholder2 = () => {
         el.empty();
         el.addClass("is-missing");
@@ -46060,23 +47264,36 @@ ${request.requirements}` : preset.text,
         return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
       },
       (target) => copyNodes || roots.every((root) => canParent(this.map.nodes, root.id, target.id)),
-      (target) => this.enqueue(() => copyNodes ? this.copySelected(target) : this.moveSelected(target))
+      (target) => this.enqueue(() => copyNodes ? this.copySelected(target) : this.moveBranches(this.selectedRoots(), target))
     ).open();
   }
-  async moveSelected(target) {
-    const roots = this.selectedRoots();
-    if (!this.mergeUnlocked([target.id, ...roots.map((root) => root.id)])) return;
+  /**
+   * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
+   * its own descendants; the moved branches are laid out once, in the same entry.
+   */
+  async moveBranches(roots, target) {
+    if (!this.map) return;
+    if (!this.mergeUnlocked([...target ? [target.id] : [], ...roots.map((root) => root.id)])) return;
     this.assertAimReferencesRemain(this.map, new Set(roots.map((root) => root.id)), true);
     await this.mapChange((map) => {
+      var _a2;
       const moved = /* @__PURE__ */ new Set();
+      const branchOf = /* @__PURE__ */ new Map();
       for (const root of roots) {
-        if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-        map.nodes.find((item) => item.id === root.id).parentId = target.id;
-        moved.add(root.id);
-        for (const id of descendants(map.nodes, root.id)) moved.add(id);
+        if (target && !canParent(map.nodes, root.id, target.id))
+          throw new Error(t("ui.circular_links_are_not_allowed"));
+        map.nodes.find((item) => item.id === root.id).parentId = (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null;
+        const branch = /* @__PURE__ */ new Set([root.id, ...descendants(map.nodes, root.id)]);
+        branchOf.set(root.id, branch);
+        for (const id of branch) moved.add(id);
       }
-      map.nodes.find((node) => node.id === target.id).collapsed = false;
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, void 0, layoutDirectionOf(map));
+      if (target) {
+        map.nodes.find((node) => node.id === target.id).collapsed = false;
+        map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, void 0, layoutOf(map));
+      } else {
+        for (const root of roots)
+          map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id), this.cardHeightOf, layoutOf(map));
+      }
     });
     this.multiSelected.clear();
     this.render();
@@ -46146,14 +47363,24 @@ ${request.requirements}` : preset.text,
     }
   }
   async copySelected(target) {
-    var _a2, _b2;
-    if (!this.map) return;
-    const roots = this.selectedRoots(), before = clone(this.map), viewport = clone(this.map.viewport);
-    if (!this.mergeUnlocked([target.id, ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])]))
-      return;
-    const copies = [], pairs = [], replacement = /* @__PURE__ */ new Map(), repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
-    let entry;
-    try {
+    await this.copyBranches(this.selectedRoots(), target, {});
+  }
+  /**
+   * Duplicates the branches under `roots` below `target` (null = as new top-level trees), as one transaction. Copy to…
+   * gives each copy the "copy" suffix; a paste keeps the title (`keepTitle`) and may add relations between copied
+   * topics, given by the original ids. Returns the new top topics.
+   */
+  async copyBranches(roots, target, options) {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (!this.mergeUnlocked([
+      ...target ? [target.id] : [],
+      ...roots.flatMap((root) => [root.id, ...descendants(before.nodes, root.id)])
+    ]))
+      return [];
+    const repo = this.plugin.repo, replacement = /* @__PURE__ */ new Map();
+    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
+      var _a2, _b2, _c, _d;
       for (const root of roots) {
         const branch = [];
         const append = (node) => {
@@ -46162,35 +47389,82 @@ ${request.requirements}` : preset.text,
         };
         append(root);
         for (const original of branch) {
-          const copy = await repo.duplicateNote(original.path, before, this.path);
+          const copy = await repo.duplicateNote(
+            original.path,
+            before,
+            this.path,
+            options.keepTitle ? { keepTitle: true } : {}
+          );
           replacement.set(original.id, copy.id);
-          copy.parentId = original.id === root.id ? target.id : (_a2 = replacement.get(original.parentId)) != null ? _a2 : target.id;
-          copy.x = target.x + 340 + (original.x - root.x);
-          copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
+          copy.parentId = original.id === root.id ? (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null : (_c = (_b2 = replacement.get(original.parentId)) != null ? _b2 : target == null ? void 0 : target.id) != null ? _c : null;
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
           pairs.push({ from: original.path, to: copy.path });
         }
       }
-      await repo.rewriteCopiedNoteLinks(pairs);
-      const tx = this.beginMapTransaction();
+      for (const link of (_d = options.relations) != null ? _d : []) {
+        const from = replacement.get(link.from), to = replacement.get(link.to);
+        if (from && to)
+          relations.push({
+            kind: link.kind,
+            from,
+            to,
+            ...link.description !== void 0 ? { description: link.description } : {}
+          });
+      }
+    });
+  }
+  /**
+   * Writes new notes (made by `create`, which pushes each one into `copies` as soon as it exists) together with the
+   * Map.md edit as one transaction and one history step. A failure parks the notes in Unassigned (never deletes them).
+   */
+  async writeNewBranches(before, target, create, cross) {
+    var _a2;
+    const viewport = clone(before.viewport);
+    const copies = [], pairs = [], newRelations = [], repo = this.plugin.repo, parkFolder = repo.topicFolder(this.path, "Unassigned");
+    let entry;
+    try {
+      await (cross == null ? void 0 : cross.snapshot());
+      await create(copies, pairs, newRelations);
+      if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
+      const tx = cross ? cross.begin() : this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
+      cross == null ? void 0 : cross.join(tx);
       entry = await tx.editMap(this.path, (map) => {
+        var _a3, _b2;
         map.viewport = clone(viewport);
-        const found = map.nodes.find((node) => node.id === target.id);
-        if (!found) throw new Error(t("ui.outline_import_selected_missing"));
+        const found = target ? map.nodes.find((node) => node.id === target.id) : null;
+        if (target && !found) throw new Error(t("ui.outline_import_selected_missing"));
         map.nodes.push(...copies);
-        found.collapsed = false;
-        map.nodes = arrangeNewBranch(
-          map.nodes,
-          target.id,
-          new Set(copies.map((copy) => copy.id)),
-          this.cardHeightOf,
-          void 0,
-          layoutDirectionOf(map)
-        );
+        if (found) {
+          found.collapsed = false;
+          map.nodes = arrangeNewBranch(
+            map.nodes,
+            found.id,
+            new Set(copies.map((copy) => copy.id)),
+            this.cardHeightOf,
+            void 0,
+            layoutOf(map)
+          );
+        } else
+          for (const top of copies.filter((copy) => copy.parentId === null))
+            map.nodes = arrangeNewTree(
+              map.nodes,
+              top.id,
+              /* @__PURE__ */ new Set([top.id, ...descendants(copies, top.id)]),
+              this.cardHeightOf,
+              layoutOf(map)
+            );
+        for (const link of newRelations) {
+          if (!relationAllowed((_a3 = map.topicRelations) != null ? _a3 : [], link)) continue;
+          setTopicRelations(map, [...(_b2 = map.topicRelations) != null ? _b2 : [], link]);
+        }
       }).commit();
     } catch (error) {
       this.render();
+      if (cross && !isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {
+      });
       let parkFailure;
       try {
         let parkedAny = false;
@@ -46205,7 +47479,7 @@ ${request.requirements}` : preset.text,
         parkFailure = { error: parkError };
       }
       if (parkFailure || isTransactionError(error, "rollback-failed")) {
-        const earlier = isTransactionError(error, "rollback-failed") ? (_b2 = error.errors) != null ? _b2 : [error] : [error];
+        const earlier = isTransactionError(error, "rollback-failed") ? (_a2 = error.errors) != null ? _a2 : [error] : [error];
         throw Object.assign(
           new AggregateError(
             parkFailure ? [...earlier, parkFailure.error] : earlier,
@@ -46216,9 +47490,483 @@ ${request.requirements}` : preset.text,
       }
       throw error;
     }
-    this.history.push(this.copyEntry(entry));
+    if (cross) await cross.finish(entry);
+    else this.history.push(this.copyEntry(entry));
     this.multiSelected.clear();
     await this.refreshAfterSavedChange();
+    return copies.filter((copy) => {
+      var _a3;
+      return copy.parentId === ((_a3 = target == null ? void 0 : target.id) != null ? _a3 : null);
+    });
+  }
+  bindClipboard() {
+    var _a2, _b2;
+    (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
+    const doc = (_b2 = this.contentEl.doc) != null ? _b2 : this.contentEl.ownerDocument;
+    if (!(doc == null ? void 0 : doc.addEventListener)) return;
+    const copy = (event) => this.onClipboardEvent("copy", event);
+    const cut = (event) => this.onClipboardEvent("cut", event);
+    const paste = (event) => this.onClipboardEvent("paste", event);
+    doc.addEventListener("copy", copy);
+    doc.addEventListener("cut", cut);
+    doc.addEventListener("paste", paste);
+    this.unbindClipboard = () => {
+      doc.removeEventListener("copy", copy);
+      doc.removeEventListener("cut", cut);
+      doc.removeEventListener("paste", paste);
+    };
+  }
+  onClipboardEvent(kind, event) {
+    if (this.closed || event.defaultPrevented) return;
+    if (kind !== "paste") {
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
+    if (!this.map || !event.clipboardData) return;
+    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (kind === "paste") this.pasteFromClipboard(event);
+    else this.copyToClipboard(event, kind);
+  }
+  /** True when branches cannot be changed here: integration mode, AIM, the built-in sample, or no saved map. */
+  clipboardReadOnly() {
+    var _a2;
+    return this.builtIn || this.integrationMode || !!((_a2 = this.map) == null ? void 0 : _a2.aim) || this.outlineImportTarget().map !== "editable";
+  }
+  copyToClipboard(event, mode) {
+    var _a2, _b2, _c;
+    const map = this.map;
+    const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    if (!map || !ids.length || !event.clipboardData) return;
+    if (mode === "cut" && this.clipboardReadOnly()) {
+      new import_obsidian32.Notice(t("ui.clipboard_cut_readonly"));
+      return;
+    }
+    const selection = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.getSelection) == null ? void 0 : _b2.call(_a2);
+    if (selection && !selection.isCollapsed && selection.anchorNode && this.contentEl.contains(selection.anchorNode))
+      return;
+    const visited = [];
+    const built = buildClipboardPayload({
+      nodes: map.nodes,
+      order: [...map.nodes].sort((a, b) => a.y - b.y || a.x - b.x).map((node) => node.id),
+      selectedIds: ids,
+      noteOf: (id) => {
+        var _a3, _b3, _c2, _d;
+        visited.push(id);
+        const note = this.notes.get(id);
+        const node = map.nodes.find((item) => item.id === id);
+        return {
+          title: (_b3 = (_a3 = note == null ? void 0 : note.title) != null ? _a3 : node == null ? void 0 : node.path.replace(/^.*\//, "").replace(/\.md$/, "")) != null ? _b3 : "",
+          body: (_c2 = note == null ? void 0 : note.detail) != null ? _c2 : "",
+          kind: (_d = note == null ? void 0 : note.topicKind) != null ? _d : "topic",
+          ...(note == null ? void 0 : note.hypothesisStrength) !== void 0 ? { strength: note.hypothesisStrength } : {}
+        };
+      },
+      relations: (_c = map.topicRelations) != null ? _c : [],
+      clipId: crypto.randomUUID()
+    });
+    if (!built.ok || !visited.length) {
+      new import_obsidian32.Notice(t("ui.clipboard_copy_failed"));
+      return;
+    }
+    const serialized = serializeClipboard(built.payload);
+    writeClipboardData(event.clipboardData, serialized, clipboardOutline(built.payload));
+    event.preventDefault();
+    sessionFor(this.plugin).record({
+      clipId: built.payload.clipId,
+      serialized,
+      mode,
+      sourceMapPath: this.path,
+      sourceMapId: map.id,
+      nodeIds: visited,
+      notePaths: visited.map((id) => {
+        var _a3, _b3;
+        return (_b3 = (_a3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.path) != null ? _b3 : "";
+      })
+    });
+    this.refreshCutMarks();
+  }
+  pasteFromClipboard(event) {
+    const { vam, text: text11 } = readClipboardData(event.clipboardData);
+    if (!sessionFor(this.plugin).match(vam)) {
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
+    }
+    if (!vam) {
+      this.pasteText(event, text11);
+      return;
+    }
+    event.preventDefault();
+    if (this.clipboardReadOnly()) {
+      new import_obsidian32.Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseClipboard(vam);
+    if (!parsed.ok) {
+      if (text11.trim()) this.pasteText(event, text11);
+      else new import_obsidian32.Notice(t("ui.clipboard_paste_invalid"));
+      return;
+    }
+    this.enqueue(() => this.pasteBranches(parsed.payload, vam));
+  }
+  /** Plain text pasted onto the map: indentation makes the levels. Empty text is left alone; a refusal says why. */
+  pasteText(event, text11) {
+    var _a2, _b2;
+    if (!text11.trim()) return;
+    event.preventDefault();
+    if (this.clipboardReadOnly()) {
+      new import_obsidian32.Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseIndentedText(text11);
+    if (!parsed.ok) {
+      new import_obsidian32.Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
+      return;
+    }
+    if (!parsed.nodes.length) return;
+    const target = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === this.selected)) != null ? _b2 : null;
+    void this.importOutlineIntoMap(
+      { nodes: parsed.nodes, source: null, shallowResearch: false },
+      target ? { kind: "under", parentId: target.id } : { kind: "tree" }
+    ).catch((error) => new import_obsidian32.Notice(errorMessage(error)));
+  }
+  pasteTextRefusal(reason, line) {
+    const at = line != null ? line : 0;
+    switch (reason) {
+      case "too-long":
+        return t("ui.clipboard_text_too_long", PASTE_TEXT_MAX_CHARS);
+      case "too-many-nodes":
+        return t("ui.clipboard_text_too_many", at, OUTLINE_NODE_LIMIT);
+      case "empty-title":
+        return t("ui.clipboard_text_empty_title", at);
+      case "title-too-long":
+        return t("ui.clipboard_text_title_too_long", at, OUTLINE_TITLE_LIMIT);
+      case "vam-note":
+        return t("ui.clipboard_text_vam_note");
+      case "outline":
+        return line ? t("ui.clipboard_text_outline_line", line) : t("ui.clipboard_text_outline");
+      default:
+        return t("ui.clipboard_text_bad_title", at);
+    }
+  }
+  /**
+   * Pastes under the selected topic (or as new top-level trees). When the clipboard string is exactly what this plugin
+   * wrote and its source is still this map, the source notes are duplicated (D2); otherwise only the payload's
+   * whitelisted fields make new notes.
+   */
+  async pasteBranches(payload, raw) {
+    var _a2, _b2, _c, _d, _e, _f;
+    const map = this.map;
+    if (!map || this.clipboardReadOnly()) {
+      new import_obsidian32.Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const target = (_a2 = map.nodes.find((node) => node.id === this.selected)) != null ? _a2 : null;
+    const record = sessionFor(this.plugin).match(raw);
+    let tops = [];
+    const source = record && record.sourceMapPath === this.path && record.sourceMapId === map.id ? record : null;
+    const nodeIds = (_b2 = source == null ? void 0 : source.nodeIds) != null ? _b2 : [];
+    const ids = new Set(nodeIds);
+    const byId = new Map(map.nodes.map((node) => [node.id, node]));
+    const intact = source !== null && nodeIds.length === payload.nodes.length && payload.nodes.every((clip4, index) => {
+      const node = byId.get(nodeIds[index]);
+      if (!node) return false;
+      if (clip4.parent === null) return !node.parentId || !ids.has(node.parentId);
+      return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip4.parent)];
+    });
+    if ((record == null ? void 0 : record.mode) === "cut" && source && !intact) {
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
+    if ((record == null ? void 0 : record.mode) === "cut" && !source && record.sourceMapPath !== this.path) {
+      const accepted = await this.acceptCrossCut(payload, record);
+      if (!accepted) return;
+      tops = await this.copyFromOtherMap(
+        accepted,
+        target,
+        payload,
+        record.nodeIds,
+        this.crossCutOf(payload, record, accepted.branch)
+      );
+      const landed = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => {
+        var _a3;
+        return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
+      });
+      if (landed) {
+        this.selected = landed.id;
+        this.render();
+        this.focusNode(landed);
+      }
+      return;
+    }
+    const cross = (record == null ? void 0 : record.mode) === "copy" && !source && record.sourceMapPath !== this.path ? await this.crossSourceOf(payload, record) : null;
+    if (cross && record) {
+      tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
+    } else if (source && intact) {
+      const roots = payload.nodes.map((clip4, index) => clip4.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
+      if ((record == null ? void 0 : record.mode) === "cut") {
+        const check = canPasteCut(
+          map.nodes,
+          roots.map((root) => root.id),
+          (_d = target == null ? void 0 : target.id) != null ? _d : null
+        );
+        if (!check.ok) {
+          new import_obsidian32.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          return;
+        }
+        await this.moveBranches(roots, target);
+        sessionFor(this.plugin).cancelCut();
+        this.refreshCutMarks();
+        const moved = (_e = this.map) == null ? void 0 : _e.nodes.find((node) => node.id === roots[0].id);
+        if (moved) {
+          this.selected = moved.id;
+          this.render();
+          this.focusNode(moved);
+        }
+        return;
+      }
+      const original = (clipId) => nodeIds[payload.nodes.findIndex((item) => item.id === clipId)];
+      tops = await this.copyBranches(roots, target, {
+        keepTitle: true,
+        relations: payload.relations.map((link) => ({
+          kind: link.kind,
+          from: original(link.from),
+          to: original(link.to),
+          ...link.description !== void 0 ? { description: link.description } : {}
+        }))
+      });
+    } else {
+      const plan = planPaste(payload);
+      if (!plan.ok) {
+        new import_obsidian32.Notice(t("ui.clipboard_paste_invalid"));
+        return;
+      }
+      const repo = this.plugin.repo, settings = this.plugin.settings, before = clone(map), model = target ? inheritModel((await repo.readNote(target.path, map)).model, settings.cliModel) : settings.cliModel;
+      tops = await this.writeNewBranches(before, target, async (copies, _pairs, relations) => {
+        var _a3;
+        for (const item of plan.items) {
+          const node = await repo.createNote(
+            item.title,
+            model,
+            before,
+            this.path,
+            target || item.parent !== null ? "inherited" : "workspace",
+            { topicKind: item.kind, detail: item.body }
+          );
+          node.parentId = item.parent === null ? (_a3 = target == null ? void 0 : target.id) != null ? _a3 : null : copies[item.parent].id;
+          copies.push(node);
+          if (item.kind === "hypothesis" && item.strength) await repo.writeHypothesisStrength(node.path, item.strength);
+        }
+        for (const link of plan.relations)
+          relations.push({
+            kind: link.kind,
+            from: copies[link.from].id,
+            to: copies[link.to].id,
+            ...link.description !== void 0 ? { description: link.description } : {}
+          });
+      });
+    }
+    const placed = (_f = this.map) == null ? void 0 : _f.nodes.find((node) => {
+      var _a3;
+      return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
+    });
+    if (placed) {
+      this.selected = placed.id;
+      this.render();
+      this.focusNode(placed);
+    }
+  }
+  /** The recorded source of a copy made in another map, when that map still holds exactly those topics and notes; else null. */
+  async crossSourceOf(payload, record) {
+    try {
+      const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
+      const found = resolveCrossSource(payload, record, sourceMap);
+      if (!found || found.branch.some((node) => !this.app.vault.getAbstractFileByPath(node.path))) return null;
+      return found;
+    } catch (e) {
+      return null;
+    }
+  }
+  /**
+   * Duplicates topics of another map under `target` (null = new top-level trees) as one transaction of this map. The
+   * source notes are only read; links in the copies are rewritten from the source note's place by writeNewBranches.
+   */
+  async copyFromOtherMap(source, target, payload, nodeIds, cross) {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (!this.mergeUnlocked(target ? [target.id] : [])) return [];
+    const repo = this.plugin.repo, replacement = /* @__PURE__ */ new Map(), rootOf = /* @__PURE__ */ new Map();
+    return this.writeNewBranches(
+      before,
+      target,
+      async (copies, pairs, relations) => {
+        var _a2, _b2, _c, _d;
+        for (const original of source.branch) {
+          const root = source.roots.includes(original) ? original : (_a2 = rootOf.get(original.parentId)) != null ? _a2 : original;
+          rootOf.set(original.id, root);
+          const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
+          replacement.set(original.id, copy.id);
+          copy.parentId = source.roots.includes(original) ? (_b2 = target == null ? void 0 : target.id) != null ? _b2 : null : (_d = (_c = replacement.get(original.parentId)) != null ? _c : target == null ? void 0 : target.id) != null ? _d : null;
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
+          copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
+        }
+        for (const link of payload.relations) {
+          const from = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.from)]), to = replacement.get(nodeIds[payload.nodes.findIndex((item) => item.id === link.to)]);
+          if (from && to)
+            relations.push({
+              kind: link.kind,
+              from,
+              to,
+              ...link.description !== void 0 ? { description: link.description } : {}
+            });
+        }
+      },
+      cross
+    );
+  }
+  /**
+   * A cut made in another map: decides, before anything is written, whether its branches can still be cut out of the
+   * source map. Returns the branches found there, or null after saying why (the cut mark stays unless the source is
+   * gone, so the paste can be retried).
+   */
+  async acceptCrossCut(payload, record) {
+    const session = sessionFor(this.plugin), from = record.sourceMapPath;
+    const refuse = (key2, drop = false) => {
+      if (drop && session.cancelCut()) this.refreshCutMarks();
+      new import_obsidian32.Notice(t(key2));
+      return null;
+    };
+    if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
+    for (const view of this.plugin.views()) {
+      if (view === this || view.path !== from) continue;
+      if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
+      await view.flushForCrossMap();
+    }
+    let sourceMap;
+    try {
+      sourceMap = await this.plugin.repo.readMap(from);
+    } catch (e) {
+      return refuse("ui.clipboard_cut_missing", true);
+    }
+    const found = resolveCrossSource(payload, record, sourceMap);
+    const problem = cutSourceProblem(sourceMap, record, found);
+    if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
+    if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
+    if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
+    if (found.branch.some((node) => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    return found;
+  }
+  /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
+  crossCutOf(payload, record, branch) {
+    const plugin = this.plugin, repo = plugin.repo, from = record.sourceMapPath, into = this.path, id = crypto.randomUUID(), removed = new Set(branch.map((node) => node.id)), texts2 = /* @__PURE__ */ new Map();
+    const assertSource = (sourceMap) => {
+      const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
+      if (problem)
+        throw new Error(
+          t(
+            problem === "aim" ? "ui.clipboard_cut_cross_unsupported" : problem === "gone" ? "ui.clipboard_cut_missing" : "ui.clipboard_cut_cross_changed"
+          )
+        );
+    };
+    return {
+      snapshot: async () => {
+        for (const node of branch) texts2.set(node.path, await this.app.vault.read(repo.file(node.path)));
+      },
+      restore: async () => {
+        for (const [path, text11] of texts2) {
+          if (!this.app.vault.getAbstractFileByPath(path)) continue;
+          await this.app.vault.process(
+            repo.file(path),
+            (current) => current !== text11 && sameApartFromStamps(current, text11) ? text11 : current
+          );
+        }
+      },
+      begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
+      join: (tx) => {
+        const parkFolder = repo.topicFolder(from, "Unassigned");
+        for (const node of branch) tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        tx.editMap(from, (map) => {
+          assertSource(map);
+          map.nodes = map.nodes.filter((node) => !removed.has(node.id));
+          removeTopicRelationsFor(map, removed);
+        });
+      },
+      finish: async (entry) => {
+        ledgerFor(plugin).push({
+          id,
+          paths: [from, into],
+          entry: { undo: () => entry.undo(), redo: () => entry.redo() }
+        });
+        this.history.push(this.crossMapEntry(id));
+        if (sessionFor(plugin).cancelCut()) this.refreshCutMarks();
+        try {
+          this.adoptSavedMap(await repo.readMap(into));
+        } catch (e) {
+        }
+      }
+    };
+  }
+  /**
+   * A transaction over two maps that holds no view: the entry outlives the views, so every view of a map is found
+   * through the plugin when it is needed. `verify` runs on the source map after its open view settled any conflict and
+   * before anything is written.
+   */
+  beginCrossTransaction(sourcePath, verify) {
+    const plugin = this.plugin;
+    return begin({
+      repo: plugin.repo,
+      rebuildDerivedData: () => plugin.rebuildDerivedData(),
+      onApplied: () => {
+      },
+      checkConflict: async (mapPath) => {
+        if (mapPath === sourcePath) await verify();
+        for (const view of plugin.views())
+          if (view.path === mapPath && await view.resolveMapConflict()) await view.persist();
+      }
+    });
+  }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  async flushForCrossMap() {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
+  /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
+  crossMapEntry(id) {
+    return {
+      label: t("ui.clipboard_cut_cross_history"),
+      undo: () => this.runCrossMap(id, "undo"),
+      redo: () => this.runCrossMap(id, "redo")
+    };
+  }
+  async runCrossMap(id, direction) {
+    const result = await ledgerFor(this.plugin).run(id, direction);
+    if (result.ran) {
+      if (this.path && !this.builtIn) this.adoptSavedMap(await this.plugin.repo.readMap(this.path));
+      return;
+    }
+    if (result.reason === "failed" || result.reason === "broken") {
+      if (result.error === void 0) throw new Error(t("ui.cross_map_undo_broken"));
+      if (isTransactionError(result.error, "stale") || isTransactionError(result.error, "guard"))
+        throw new Error(t("ui.cross_map_undo_refused"));
+      throw result.error;
+    }
+    if (result.reason === "wrong-state" || result.reason === "unknown") {
+      const mark = this.history.mark();
+      if (direction === "undo") {
+        this.history.redo();
+        this.history.discardSince(mark);
+      } else {
+        this.history.discardSince({ ...mark, length: mark.length - 1 });
+      }
+    }
+  }
+  /** After this view's history was cleared: puts back a proxy for each cross-map change of this map that is still applied. */
+  restoreCrossProxies() {
+    if (!this.path || this.builtIn) return;
+    for (const item of ledgerFor(this.plugin).entriesFor(this.path))
+      if (item.status === "applied") this.history.push(this.crossMapEntry(item.id));
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   copyEntry(entry) {
@@ -46248,28 +47996,30 @@ ${request.requirements}` : preset.text,
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       onApplied: (mapPath, map) => {
-        if (mapPath !== this.path) return;
-        const next = clone(map);
-        if (!this.map) {
-          this.map = next;
-          return;
-        }
-        const viewport = this.map.viewport;
-        const target = this.map;
-        for (const key2 of Object.keys(target)) if (!(key2 in next)) delete target[key2];
-        for (const [key2, value] of Object.entries(next)) {
-          const current = target[key2];
-          if (Array.isArray(current) && Array.isArray(value))
-            current.splice(0, current.length, ...value);
-          else target[key2] = value;
-        }
-        this.map.viewport = clone(viewport);
+        if (mapPath === this.path) this.adoptSavedMap(map);
       },
       checkConflict: async (mapPath) => {
         if (mapPath !== this.path) return;
         if (await this.resolveMapConflict()) await this.persist();
       }
     });
+  }
+  /** Takes `saved` (the map as now stored) as the open map, in place: callers and tests hold references to the open map. */
+  adoptSavedMap(saved) {
+    const next = clone(saved);
+    if (!this.map) {
+      this.map = next;
+      return;
+    }
+    const viewport = this.map.viewport;
+    const target = this.map;
+    for (const key2 of Object.keys(target)) if (!(key2 in next)) delete target[key2];
+    for (const [key2, value] of Object.entries(next)) {
+      const current = target[key2];
+      if (Array.isArray(current) && Array.isArray(value)) current.splice(0, current.length, ...value);
+      else target[key2] = value;
+    }
+    this.map.viewport = clone(viewport);
   }
   /** The change is already saved and in history; a failing reload must not look like the change failed. */
   async refreshAfterSavedChange() {
@@ -46278,7 +48028,7 @@ ${request.requirements}` : preset.text,
       this.render();
     } catch (e) {
       this.render();
-      new import_obsidian31.Notice(t("ui.change_saved_refresh_failed"));
+      new import_obsidian32.Notice(t("ui.change_saved_refresh_failed"));
     }
   }
   async claimToCurrent(file) {
@@ -46438,7 +48188,7 @@ ${request.requirements}` : preset.text,
     this.updateHistoryButtons();
   }
   openDetails(node) {
-    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian31.Notice(error instanceof Error ? error.message : String(error)));
+    void this.plugin.openDetails(this.plugin.repo.file(node.path)).catch((error) => new import_obsidian32.Notice(error instanceof Error ? error.message : String(error)));
   }
   async travel(redo) {
     if (this.map && this.path && !this.builtIn && (redo ? this.history.canRedo : this.history.canUndo) && await this.resolveMapConflict()) {
@@ -46482,7 +48232,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     if (!this.path || !this.map || this.closed) return;
-    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian31.TFile)) {
+    if (!(this.app.vault.getAbstractFileByPath(this.path) instanceof import_obsidian32.TFile)) {
       this.map = null;
       this.path = "";
       this.history.clear();
@@ -46495,6 +48245,7 @@ ${request.requirements}` : preset.text,
       disk.viewport = this.map.viewport;
       this.map = disk;
       this.history.clear();
+      this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
@@ -46637,7 +48388,7 @@ ${request.requirements}` : preset.text,
   renameCurrentMap() {
     if (!this.map) return;
     if (this.aimActiveForPath(this.path)) {
-      new import_obsidian31.Notice(t("ui.aim_research_already_running"));
+      new import_obsidian32.Notice(t("ui.aim_research_already_running"));
       return;
     }
     new NameModal(
@@ -46647,11 +48398,11 @@ ${request.requirements}` : preset.text,
       (title) => this.enqueue(async () => {
         if (!this.map) return;
         if (this.aimActiveForPath(this.path)) {
-          new import_obsidian31.Notice(t("ui.aim_research_already_running"));
+          new import_obsidian32.Notice(t("ui.aim_research_already_running"));
           return;
         }
         if (!isManagedMapPath(this.plugin.settings, this.path)) {
-          new import_obsidian31.Notice(t("ui.legacy_map_view_only"));
+          new import_obsidian32.Notice(t("ui.legacy_map_view_only"));
           return;
         }
         const before = clone(this.map), beforeRoot = this.plugin.repo.topicRoot(this.path);
@@ -46735,7 +48486,7 @@ ${request.requirements}` : preset.text,
     const deleted = this.deletedMap;
     if (!deleted || deleted.deleted) return;
     const file = this.app.vault.getAbstractFileByPath(deleted.path);
-    if (!(file instanceof import_obsidian31.TFile) || await this.app.vault.read(file) !== deleted.content)
+    if (!(file instanceof import_obsidian32.TFile) || await this.app.vault.read(file) !== deleted.content)
       throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     await this.app.fileManager.trashFile(file);
     deleted.deleted = true;
@@ -46872,7 +48623,7 @@ ${request.requirements}` : preset.text,
     const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
     switcher.setAttr("aria-label", t("ui.switch_mind_map"));
     switcher.createSpan({ text: (_i = (_h = this.map) == null ? void 0 : _h.title) != null ? _i : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
-    (0, import_obsidian31.setIcon)(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
+    (0, import_obsidian32.setIcon)(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
     if (this.builtIn) toolbar.createSpan({ cls: "vam-readonly-badge", text: t("ui.official_sample_read_only") });
     if (this.map && !this.builtIn && !this.map.aim && this.map.nodes.length) this.renderResearchProgress(toolbar);
@@ -46886,13 +48637,13 @@ ${request.requirements}` : preset.text,
     } else if (this.map) {
       const newMap = headerActions.createEl("button", { cls: "vam-new-map" });
       newMap.createSpan({ text: t("ui.new_map") });
-      (0, import_obsidian31.setIcon)(newMap.createSpan("vam-new-map-icon"), "chevron-down");
+      (0, import_obsidian32.setIcon)(newMap.createSpan("vam-new-map-icon"), "chevron-down");
       newMap.addEventListener("click", (event) => {
         event.stopPropagation();
         this.openNewMapMenu(event);
       });
       this.iconButton(headerActions, "list-tree", t("ui.open_topic_outline"), () => {
-        void this.plugin.activateOutline(this).catch((error) => new import_obsidian31.Notice(String(error)));
+        void this.plugin.activateOutline(this).catch((error) => new import_obsidian32.Notice(String(error)));
       });
       const undo = this.iconButton(headerActions, "undo-2", t("ui.undo"), () => this.enqueue(() => this.travel(false)));
       undo.disabled = !this.history.canUndo;
@@ -47316,6 +49067,7 @@ ${request.requirements}` : preset.text,
       cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
     });
     this.cardEls.set(node.id, card);
+    this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(this.nodeDepth(node)));
@@ -47416,7 +49168,7 @@ ${request.requirements}` : preset.text,
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
-        (0, import_obsidian31.setTooltip)(tagButton, manualText);
+        (0, import_obsidian32.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
       const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
@@ -48163,7 +49915,35 @@ ${request.requirements}` : preset.text,
       cardLabels.set(card, label);
     }
     label.textContent = text11;
-    card.setAttr("aria-labelledby", label.id);
+    const cut = cardCutLabels.get(card);
+    card.setAttr("aria-labelledby", cut ? `${label.id} ${cut.id}` : label.id);
+  }
+  /** Marks or unmarks a card as cut: a dashed outline and a hidden "Cut" part of its accessible name. */
+  paintCut(card, id, cut = this.cutIds().has(id)) {
+    const existing = cardCutLabels.get(card);
+    if (cut && !existing) {
+      card.addClass("is-cut");
+      const part = card.createSpan({ cls: "vam-card-label", text: t("ui.clipboard_cut_mark") });
+      part.id = `vam-card-cut-${++cardLabelSequence}`;
+      cardCutLabels.set(card, part);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", `${label.id} ${part.id}`);
+    } else if (!cut && existing) {
+      card.removeClass("is-cut");
+      existing.remove();
+      cardCutLabels.delete(card);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", label.id);
+    }
+  }
+  /** The topics of a pending cut that belongs to this map. */
+  cutIds() {
+    const record = sessionFor(this.plugin).get();
+    return (record == null ? void 0 : record.mode) === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : /* @__PURE__ */ new Set();
+  }
+  refreshCutMarks() {
+    const cut = this.cutIds();
+    for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot() {
@@ -48275,7 +50055,7 @@ ${request.requirements}` : preset.text,
       this.paintHoverResearch();
     }
     const content = preview.createDiv("vam-hover-markdown");
-    void import_obsidian31.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
+    void import_obsidian32.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
     const host = workspace.getBoundingClientRect(), rect = card.getBoundingClientRect();
     const availableWidth = Math.max(180, host.width - 24);
     const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
@@ -48361,7 +50141,7 @@ ${request.requirements}` : preset.text,
         const map = await this.plugin.repo.readMap(topic.mapPath);
         const files = map.nodes.map((node) => {
           const file = this.app.vault.getAbstractFileByPath(node.path);
-          if (!(file instanceof import_obsidian31.TFile) || file.extension.toLowerCase() !== "md")
+          if (!(file instanceof import_obsidian32.TFile) || file.extension.toLowerCase() !== "md")
             throw new Error(t("ui.reference_map_note_unavailable", node.path));
           return file;
         });
@@ -48384,17 +50164,17 @@ ${request.requirements}` : preset.text,
    * the provider accepts (`end`), and a result that arrives with the dialog closed is announced by one Notice.
    */
   backgroundHooks(key2, node) {
-    let own;
+    let own2;
     const mapPath = this.path;
     return {
       begin: (controller) => {
-        own = controller;
+        own2 = controller;
         this.startingTasks.set(key2, controller);
         this.render();
       },
       end: () => {
-        if (own && this.startingTasks.get(key2) === own) this.startingTasks.delete(key2);
-        own = void 0;
+        if (own2 && this.startingTasks.get(key2) === own2) this.startingTasks.delete(key2);
+        own2 = void 0;
         if (!this.closed) this.render();
       },
       outlineReady: (outline) => {
@@ -48421,7 +50201,7 @@ ${request.requirements}` : preset.text,
               {
                 label: t("ui.rerun_standard"),
                 open: () => {
-                  if (this.path !== mapPath) new import_obsidian31.Notice(t("ui.rerun_standard_other_map"));
+                  if (this.path !== mapPath) new import_obsidian32.Notice(t("ui.rerun_standard_other_map"));
                   else this.rerunStandard(node);
                 }
               }
@@ -48541,7 +50321,7 @@ ${request.requirements}` : preset.text,
   }
   openNodePanel(node, mode) {
     const render = (content, close, host) => this.renderInspector(content, node, mode, close, host);
-    new class extends import_obsidian31.Modal {
+    new class extends import_obsidian32.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close(), this.modalEl);
@@ -48567,7 +50347,7 @@ ${request.requirements}` : preset.text,
         panel.createEl("h3", { text: note.title, attr: { dir: "auto" } });
         panel.createEl("p", { text: note.summary, cls: "vam-sample-summary" });
         const detail = panel.createDiv("vam-sample-detail");
-        void import_obsidian31.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
+        void import_obsidian32.MarkdownRenderer.render(this.app, note.detail, detail, "", this);
         if (note.sourcePaths.length) {
           const sources2 = panel.createDiv("vam-reference-sources");
           sources2.createEl("strong", { text: t("ui.source_topics") });
@@ -48590,16 +50370,16 @@ ${request.requirements}` : preset.text,
             const file = this.app.vault.getAbstractFileByPath(path);
             this.button(
               sources2,
-              (_f = sourceNote == null ? void 0 : sourceNote.title) != null ? _f : file instanceof import_obsidian31.TFile ? file.basename : t("ui.0_moved", (_e = path.split("/").at(-1)) == null ? void 0 : _e.replace(/\.md$/, "")),
+              (_f = sourceNote == null ? void 0 : sourceNote.title) != null ? _f : file instanceof import_obsidian32.TFile ? file.basename : t("ui.0_moved", (_e = path.split("/").at(-1)) == null ? void 0 : _e.replace(/\.md$/, "")),
               () => {
                 close == null ? void 0 : close();
                 if (sourceNode) {
                   this.selected = sourceNode.id;
                   this.render();
                   this.focusNode(sourceNode);
-                } else if (file instanceof import_obsidian31.TFile) void this.plugin.openDetails(file);
+                } else if (file instanceof import_obsidian32.TFile) void this.plugin.openDetails(file);
               },
-              !(sourceNode || file instanceof import_obsidian31.TFile)
+              !(sourceNode || file instanceof import_obsidian32.TFile)
             );
           }
         }
@@ -48785,7 +50565,7 @@ ${request.requirements}` : preset.text,
   async repairMissingTopic() {
     const broken = await this.plugin.repo.brokenTopics();
     if (!broken.length) {
-      new import_obsidian31.Notice(t("ui.no_topics_with_a_missing_map_md"));
+      new import_obsidian32.Notice(t("ui.no_topics_with_a_missing_map_md"));
       return;
     }
     new ChoiceModal(
@@ -48866,8 +50646,8 @@ ${request.requirements}` : preset.text,
   }
   /** The six relation kinds as a menu; `pick` gets the chosen one. */
   openRelationKindMenu(event, pick) {
-    const menu = new import_obsidian31.Menu();
-    for (const kind of RELATION_KINDS)
+    const menu = new import_obsidian32.Menu();
+    for (const kind of RELATION_KINDS2)
       menu.addItem(
         (item) => item.setTitle(t(RELATION_NAME_KEY[kind])).setIcon("link").onClick(() => pick(kind))
       );
@@ -48878,7 +50658,7 @@ ${request.requirements}` : preset.text,
     if (!this.map || !this.relationsEnabled()) return;
     const legal = new Set(legalRelationTargets(this.map, kind, node.id));
     if (!legal.size) {
-      new import_obsidian31.Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
+      new import_obsidian32.Notice(t("ui.no_relation_target_0", t(RELATION_NAME_KEY[kind])));
       return;
     }
     new TopicTreeModal(
@@ -48924,7 +50704,7 @@ ${request.requirements}` : preset.text,
     const render = (content, close) => {
       saveNote = this.renderRelationEditor(content, link, close, onChanged);
     };
-    new class extends import_obsidian31.Modal {
+    new class extends import_obsidian32.Modal {
       onOpen() {
         this.modalEl.addClass("vam-topic-modal", "vam-review-modal");
         render(this.contentEl, () => this.close());
@@ -49025,7 +50805,7 @@ ${request.requirements}` : preset.text,
       kindSelect.setAttr("id", "vam-relation-kind");
       kindSelect.setAttr("aria-label", t("ui.relation_kind_label"));
       const blocked = [];
-      for (const kind of RELATION_KINDS) {
+      for (const kind of RELATION_KINDS2) {
         const open = kind === current.kind || relationAllowed(relations, { kind, from: current.from, to: current.to }, index);
         if (!open) blocked.push(kind);
         const option2 = kindSelect.createEl("option", { text: t(RELATION_NAME_KEY[kind]), value: kind });
@@ -49501,7 +51281,7 @@ ${request.requirements}` : preset.text,
     }
     const model = parent ? (await this.plugin.repo.resolveTopicModel(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).model : this.plugin.currentModelChoice().model;
     if (!isManagedMapPath(this.plugin.settings, this.path)) {
-      new import_obsidian31.Notice(t("ui.legacy_map_view_only"));
+      new import_obsidian32.Notice(t("ui.legacy_map_view_only"));
       return;
     }
     const node = await this.plugin.repo.createNote(
@@ -49574,7 +51354,7 @@ ${request.requirements}` : preset.text,
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
+        else new import_obsidian32.Notice(message);
         return;
       }
       if (!found) {
@@ -49686,7 +51466,7 @@ ${request.requirements}` : preset.text,
       if (suggestions.length === 0) {
         const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
         if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
+        else new import_obsidian32.Notice(message);
         return;
       }
       const latest = await this.plugin.repo.readNote(parent.path, (_f = this.map) != null ? _f : void 0);
@@ -49716,7 +51496,7 @@ ${request.requirements}` : preset.text,
         console.error("Visual Agent Map AI split", error);
         const message = this.plugin.recordFailure(t("log.ai_split_failed"), error);
         if (failed) failed(message, !partial);
-        else new import_obsidian31.Notice(message);
+        else new import_obsidian32.Notice(message);
       }
     } finally {
       releaseTask();
@@ -49742,7 +51522,7 @@ ${request.requirements}` : preset.text,
     if (new Set(roots).size !== roots.length) {
       this.plugin.pendingSuggestions.delete(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
-      new import_obsidian31.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
+      new import_obsidian32.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
     }
     new ChildProposalModal(this.app, suggestions.slice(0, 15), (items) => {
@@ -49769,7 +51549,7 @@ ${request.requirements}` : preset.text,
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
           await this.startShallowResearch(parent, createdNodes, researchOptions);
       })().catch((error) => {
-        new import_obsidian31.Notice(error instanceof Error ? error.message : String(error));
+        new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
       });
     }).open();
   }
@@ -50010,7 +51790,7 @@ ${request.requirements}` : preset.text,
     if (!this.map || this.map.aim || this.builtIn || !this.multiSelected.size) return;
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
-      new import_obsidian31.Notice(t("ui.multi_research_already_running"));
+      new import_obsidian32.Notice(t("ui.multi_research_already_running"));
       return;
     }
     const selected = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
@@ -50032,16 +51812,16 @@ ${request.requirements}` : preset.text,
       await confirmEach(0, async () => {
         var _a2;
         if (this.plugin.expansionCoordinator.isRunning(key2)) {
-          new import_obsidian31.Notice(t("ui.multi_research_already_running"));
+          new import_obsidian32.Notice(t("ui.multi_research_already_running"));
           return;
         }
         const busy = (node) => this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.activeTasks.has(node.path);
         const nodes = selected.filter((node) => !busy(node));
         if (!nodes.length) {
-          new import_obsidian31.Notice(t("ui.multi_research_all_skipped"));
+          new import_obsidian32.Notice(t("ui.multi_research_all_skipped"));
           return;
         }
-        if (nodes.length < selected.length) new import_obsidian31.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
+        if (nodes.length < selected.length) new import_obsidian32.Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
         if (request.model)
           for (const node of nodes)
             await this.plugin.repo.updateNote(node.path, { model: request.model, modelSource: "manual" });
@@ -50094,7 +51874,7 @@ ${request.requirements}` : preset.text,
               const state = this.plugin.expansionBatches.get(key2);
               if (state && state.status !== "running" && !reported) {
                 reported = true;
-                new import_obsidian31.Notice(
+                new import_obsidian32.Notice(
                   [
                     t(
                       state.status === "stopped" ? "ui.multi_research_stopped" : "ui.multi_research_finished",
@@ -50115,7 +51895,7 @@ ${request.requirements}` : preset.text,
         }
       });
     } catch (error) {
-      new import_obsidian31.Notice(errorMessage(error));
+      new import_obsidian32.Notice(errorMessage(error));
     }
   }
   /** Counts that cannot be misread: succeeded of total, failures, optional current topic and stopped marker. */
@@ -50306,7 +52086,7 @@ ${request.requirements}` : preset.text,
     const paths = [...section3.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)].map((match) => {
       var _a2, _b2;
       const link = match[1], direct = link.endsWith(".md") ? link : `${link}.md`;
-      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian31.TFile) return direct;
+      if (this.app.vault.getAbstractFileByPath(direct) instanceof import_obsidian32.TFile) return direct;
       return (_b2 = (_a2 = this.app.metadataCache.getFirstLinkpathDest(link, ownerPath)) == null ? void 0 : _a2.path) != null ? _b2 : direct;
     });
     return [...new Set(paths)];
@@ -50407,7 +52187,7 @@ ${request.requirements}` : preset.text,
     if (!children.length && !((_b2 = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length))) {
       const message = t("ui.choose_another_note_source_first");
       if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
+      else new import_obsidian32.Notice(message);
       return;
     }
     const childSources = await this.topicReferenceGroup(
@@ -50435,7 +52215,7 @@ ${request.requirements}` : preset.text,
     if (!children.length && !selectedSources.some((group) => group.documents.length)) {
       const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
       if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
+      else new import_obsidian32.Notice(message);
       return;
     }
     const language2 = this.plugin.settings.language;
@@ -50586,25 +52366,25 @@ ${request.requirements}` : preset.text,
       } catch (error) {
         if (((_k = options == null ? void 0 : options.signal) == null ? void 0 : _k.aborted) || error instanceof Error && error.name === "AbortError") {
           if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+          else new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);
           const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
           if (failed) failed(message);
-          else new import_obsidian31.Notice(message);
+          else new import_obsidian32.Notice(message);
         }
       }
     } catch (error) {
       if (((_l = options == null ? void 0 : options.signal) == null ? void 0 : _l.aborted) || error instanceof Error && error.name === "AbortError") {
         await this.plugin.repo.updateNote(node.path, { status: note.status });
         if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+        else new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
         console.error("Visual Agent Map child integration", error);
         await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
         const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
         if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
+        else new import_obsidian32.Notice(message);
       }
     } finally {
       progress.end();
@@ -50679,7 +52459,7 @@ ${request.requirements}` : preset.text,
       (_a2 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a2.call(observer, () => controller.abort());
       accepted();
     };
-    const fail = (message) => {
+    const fail2 = (message) => {
       if (outcome) return;
       outcome = "failed";
       if (this.synthesisTasks.get(path) === task) {
@@ -50711,7 +52491,7 @@ ${request.requirements}` : preset.text,
                 open: () => this.openSynthesisDirections(node, task)
               });
           },
-          fail,
+          fail2,
           markAccepted
         );
       else
@@ -50729,12 +52509,12 @@ ${request.requirements}` : preset.text,
             this.undoNotice(t("ui.synthesis_written_0", (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : ""), previous);
             if (observer == null ? void 0 : observer.isOpen()) (_c = observer.written) == null ? void 0 : _c.call(observer);
           },
-          fail,
+          fail2,
           markAccepted
         );
-      if (!outcome) fail(t("ui.ai_task_cancelled"));
+      if (!outcome) fail2(t("ui.ai_task_cancelled"));
     } catch (error) {
-      fail(error instanceof Error ? error.message : String(error));
+      fail2(error instanceof Error ? error.message : String(error));
     } finally {
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
       if (this.plugin.activeTasks.get(path) === controller) this.plugin.activeTasks.delete(path);
@@ -50763,7 +52543,7 @@ ${request.requirements}` : preset.text,
           node,
           { ...task.options, continuesDirections: task.step === "draft" },
           task.step === "directions" ? null : task.direction,
-          (message) => new import_obsidian31.Notice(message),
+          (message) => new import_obsidian32.Notice(message),
           () => {
           }
         );
@@ -50773,12 +52553,12 @@ ${request.requirements}` : preset.text,
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
   integrateSelected() {
     if (!this.map || this.multiSelected.size < 2) {
-      new import_obsidian31.Notice(t("ui.select_at_least_two_topics"));
+      new import_obsidian32.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
     const task = this.integrationTask && this.integrationTask.mapPath === this.path ? this.integrationTask : null;
     if ((task == null ? void 0 : task.state) === "running") {
-      new import_obsidian31.Notice(t("ui.ai_running_ai"));
+      new import_obsidian32.Notice(t("ui.ai_running_ai"));
       return;
     }
     this.openSelectionSynthesis((task == null ? void 0 : task.state) === "directions" ? task : null);
@@ -50854,7 +52634,7 @@ ${request.requirements}` : preset.text,
     const abortBeforeAcceptance = () => controller.abort();
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let own;
+    let own2;
     let progress;
     const runOptions = {
       ...base,
@@ -50876,11 +52656,11 @@ ${request.requirements}` : preset.text,
       (_a3 = observer == null ? void 0 : observer.accepted) == null ? void 0 : _a3.call(observer, () => controller.abort());
       accepted();
     };
-    const fail = (error) => {
+    const fail2 = (error) => {
       const aborted = controller.signal.aborted || error instanceof Error && error.name === "AbortError";
       const task = this.integrationTask;
       if (aborted && (observer == null ? void 0 : observer.isOpen())) {
-        if (own && this.integrationTask === own) this.integrationTask = null;
+        if (own2 && this.integrationTask === own2) this.integrationTask = null;
         this.render();
         failed(t("ui.research_stopped_existing_content_was_preserved"));
         return;
@@ -50933,7 +52713,7 @@ ${request.requirements}` : preset.text,
         reasoning: chosen.reasoning
       };
       this.integrationTask = task;
-      own = task;
+      own2 = task;
       this.render();
       const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
       progress = taskProgress;
@@ -50996,7 +52776,7 @@ ${request.requirements}` : preset.text,
           }
         });
     } catch (error) {
-      fail(error);
+      fail2(error);
     } finally {
       progress == null ? void 0 : progress.end();
       this.selectionStarting = false;
@@ -51019,12 +52799,12 @@ ${request.requirements}` : preset.text,
           task.sources,
           { ...retained, synthesisTitle: task.title, continuesDirections: task.directions.length > 0 },
           task.step === "directions" ? null : task.goal,
-          (message) => new import_obsidian31.Notice(message),
+          (message) => new import_obsidian32.Notice(message),
           () => {
           }
         );
       })
-    ).catch((error) => new import_obsidian31.Notice(errorMessage(error)));
+    ).catch((error) => new import_obsidian32.Notice(errorMessage(error)));
   }
   /**
    * The model for a run over several cards: when every card has the same manual model (its own or an ancestor's) that
@@ -51298,7 +53078,7 @@ ${note.detail.trim()}` : "",
           this.focusNode(integrated);
         } catch (e) {
           this.render();
-          new import_obsidian31.Notice(t("ui.synthesis_saved_refresh_failed"));
+          new import_obsidian32.Notice(t("ui.synthesis_saved_refresh_failed"));
         }
         return;
       }
@@ -51828,7 +53608,7 @@ ${note.detail.trim()}` : "",
     const doc = this.contentEl.ownerDocument;
     for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : []) {
       const view = leaf.view;
-      if (!(view instanceof import_obsidian31.MarkdownView) || !view.file) continue;
+      if (!(view instanceof import_obsidian32.MarkdownView) || !view.file) continue;
       const el = view.containerEl;
       if (!el || doc && el.ownerDocument !== doc || !el.isShown()) continue;
       if (!shown.includes(view.file.path)) shown.push(view.file.path);
@@ -51841,7 +53621,7 @@ ${note.detail.trim()}` : "",
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
-      if (file instanceof import_obsidian31.TFile && file.extension === "md") return file;
+      if (file instanceof import_obsidian32.TFile && file.extension === "md") return file;
     }
     return null;
   }
@@ -51854,8 +53634,8 @@ ${note.detail.trim()}` : "",
     const workspace = this.app.workspace;
     const open = /* @__PURE__ */ new Set();
     for (const leaf of (_b2 = (_a2 = workspace.getLeavesOfType) == null ? void 0 : _a2.call(workspace, "markdown")) != null ? _b2 : [])
-      if (leaf.view instanceof import_obsidian31.MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
-    const live = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian31.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
+      if (leaf.view instanceof import_obsidian32.MarkdownView && leaf.view.file) open.add(leaf.view.file.path);
+    const live = (_e = (_d = (_c = workspace.getActiveViewOfType) == null ? void 0 : _c.call(workspace, import_obsidian32.MarkdownView)) == null ? void 0 : _d.file) == null ? void 0 : _e.path;
     const candidates = [
       live,
       this.lastMarkdownPath && open.has(this.lastMarkdownPath) ? this.lastMarkdownPath : null,
@@ -51863,21 +53643,21 @@ ${note.detail.trim()}` : "",
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
-      if (file instanceof import_obsidian31.TFile && file.extension === "md") return file;
+      if (file instanceof import_obsidian32.TFile && file.extension === "md") return file;
     }
     return null;
   }
   openMarkdownEditor(path) {
     var _a2, _b2, _c, _d;
     for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace).getLeavesOfType) == null ? void 0 : _b2.call(_a2, "markdown")) != null ? _c : [])
-      if (leaf.view instanceof import_obsidian31.MarkdownView && ((_d = leaf.view.file) == null ? void 0 : _d.path) === path) return leaf.view.editor;
+      if (leaf.view instanceof import_obsidian32.MarkdownView && ((_d = leaf.view.file) == null ? void 0 : _d.path) === path) return leaf.view.editor;
     return null;
   }
   /** A vault note's text as it is right now (an open note is read from its editor, which may hold unsaved typing). */
   async readChatFile(path) {
     const key2 = normalizeVaultPath(path);
     const file = key2 ? this.app.vault.getAbstractFileByPath(key2) : null;
-    if (!(file instanceof import_obsidian31.TFile)) return null;
+    if (!(file instanceof import_obsidian32.TFile)) return null;
     const editor = this.openMarkdownEditor(file.path);
     return { file, editor, text: editor ? editor.getValue() : await this.app.vault.read(file) };
   }
@@ -52053,7 +53833,7 @@ ${note.detail.trim()}` : "",
     const abandon = (reason) => {
       if (this.chatPrepAbandon === stopPreparing) this.chatPrepAbandon = null;
       if (!chat.retract(turn, again ? void 0 : draft)) return;
-      if (reason !== void 0) new import_obsidian31.Notice(reason);
+      if (reason !== void 0) new import_obsidian32.Notice(reason);
     };
     const stopPreparing = () => abandon();
     this.chatPrepAbandon = stopPreparing;
@@ -52233,11 +54013,11 @@ ${note.detail.trim()}` : "",
     const refTitles = this.chatRefTitles(result.actions);
     const items = result.actions.map((action) => this.chatActionLabel(action, refTitles));
     const groups = CHAT_PLAN_GROUP_ORDER.flatMap((group) => {
-      const own = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
-      return own.length ? [
+      const own2 = items.filter((_, index) => chatPlanGroupOf(result.actions[index].kind) === group);
+      return own2.length ? [
         {
-          label: t(`ui.map_chat_plan_group_${group}_0`, own.length),
-          items: own,
+          label: t(`ui.map_chat_plan_group_${group}_0`, own2.length),
+          items: own2,
           // Removing cards is said in words as well as in the warning colour.
           ...group === "delete" ? { danger: { mark: t("ui.map_chat_plan_mark_delete") } } : {}
         }
@@ -52510,7 +54290,7 @@ ${note.detail.trim()}` : "",
     let wrote = false;
     let noNewMap = false;
     let noNewMapReason = "ui.map_chat_skip_map_not_created";
-    const own = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
+    const own2 = { mdHashes: baseline.mdHashes, topicHashes: { ...baseline.topicHashes } };
     const adds = result.actions.filter((action) => action.kind === "add_child").length;
     const batched = adds === 0 || adds >= MAP_CHAT_AUTO_LAYOUT_MIN_NEW;
     try {
@@ -52538,7 +54318,7 @@ ${note.detail.trim()}` : "",
           if (outcome.status === "done") {
             wrote = true;
             touched.add(anchor.path);
-            own.topicHashes = {};
+            own2.topicHashes = {};
           } else {
             noNewMap = true;
             if ("created" in outcome && outcome.created) noNewMapReason = "ui.map_chat_skip_map_not_opened";
@@ -52549,7 +54329,7 @@ ${note.detail.trim()}` : "",
         const box = { outcome: { status: "done" } };
         try {
           await this.plugin.mutate(async () => {
-            box.outcome = await this.applyChatWrite(action, own, same2, run);
+            box.outcome = await this.applyChatWrite(action, own2, same2, run);
           });
         } catch (error) {
           box.outcome = { status: "failed", reason: errorMessage(error) };
@@ -52941,7 +54721,7 @@ ${note.detail.trim()}` : "",
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work) => {
-      void Promise.resolve(work).catch((error) => new import_obsidian31.Notice(errorMessage(error)));
+      void Promise.resolve(work).catch((error) => new import_obsidian32.Notice(errorMessage(error)));
     };
     const known = (ids) => ids.filter((id) => {
       var _a3;
@@ -53256,10 +55036,10 @@ ${addition}` : addition });
     }
     if (written2.error !== void 0) {
       const reason = t("ui.map_chat_save_failed_0", errorMessage(written2.error));
-      new import_obsidian31.Notice(reason);
+      new import_obsidian32.Notice(reason);
       return { ok: false, reason };
     }
-    new import_obsidian31.Notice(t("ui.map_chat_saved_0", written2.path));
+    new import_obsidian32.Notice(t("ui.map_chat_saved_0", written2.path));
     return { ok: true, path: written2.path };
   }
   /**
@@ -53271,7 +55051,7 @@ ${addition}` : addition });
   async chatExpand(parent, direction) {
     var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path) || this.plugin.running.has(parent.path)) {
-      new import_obsidian31.Notice(t("ui.ai_running_ai"));
+      new import_obsidian32.Notice(t("ui.ai_running_ai"));
       return;
     }
     const controller = new AbortController();
@@ -53301,7 +55081,7 @@ ${addition}` : addition });
       const { nodes } = limitOutline(generated, limits);
       const items = outlineProposals(nodes);
       if (!items.length) {
-        new import_obsidian31.Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        new import_obsidian32.Notice(t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
         return;
       }
       await outline.create(proposalOutline(items), {
@@ -53316,7 +55096,7 @@ ${addition}` : addition });
         )
       });
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian31.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
+      if (!controller.signal.aborted) new import_obsidian32.Notice(this.plugin.recordFailure(t("log.ai_split_failed"), error));
     } finally {
       if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
       this.plugin.running.delete(parent.path);
@@ -53387,7 +55167,7 @@ ${addition}` : addition });
       void this.plugin.confirmAiUsage(model, async () => {
         await start(
           (message) => {
-            if (settled) new import_obsidian31.Notice(message);
+            if (settled) new import_obsidian32.Notice(message);
             else settle({ status: "failed", reason: message });
           },
           () => settle({ status: "done" })
@@ -53458,7 +55238,7 @@ ${addition}` : addition });
         if (this.relevanceSortOn()) return;
         moved || (moved = Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3);
         if (moved && locked) {
-          if (!warned) new import_obsidian31.Notice(t("ui.merge_locked"));
+          if (!warned) new import_obsidian32.Notice(t("ui.merge_locked"));
           warned = true;
         }
         if (!moved || locked) return;
@@ -53894,7 +55674,7 @@ ${addition}` : addition });
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     const { template, missing } = this.resolveTopicTemplate(note, chosenId);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      new import_obsidian31.Notice(t("ui.detail_template_missing_0", note.detailTemplateId));
+      new import_obsidian32.Notice(t("ui.detail_template_missing_0", note.detailTemplateId));
       await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
     }
     return template;
@@ -53932,7 +55712,7 @@ ${addition}` : addition });
     if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
       const message = t("ui.enter_a_question_or_task_for_ai_first");
       if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
+      else new import_obsidian32.Notice(message);
       return null;
     }
     if (this.plugin.running.has(node.path)) {
@@ -54053,7 +55833,7 @@ ${addition}` : addition });
             );
           if (stale) {
             if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-            else new import_obsidian31.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+            else new import_obsidian32.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
           }
           return;
         }
@@ -54114,7 +55894,7 @@ ${addition}` : addition });
             await ((_h2 = (_g2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h2.call(_g2));
           } catch (error) {
             const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
-            new import_obsidian31.Notice(message);
+            new import_obsidian32.Notice(message);
           }
         }
         done == null ? void 0 : done(result);
@@ -54126,7 +55906,7 @@ ${addition}` : addition });
         if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
           await this.plugin.repo.updateNote(node.path, { status: note.status });
           if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
+          else new import_obsidian32.Notice(t("ui.research_stopped_existing_content_was_preserved"));
           return;
         }
         console.error("Visual Agent Map AI task", error);
@@ -54138,7 +55918,7 @@ ${addition}` : addition });
         await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
         const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
         if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
+        else new import_obsidian32.Notice(message);
       })
     ).finally(() => {
       var _a3;
@@ -54200,10 +55980,10 @@ async function applyMathRepair(vault, plan) {
 }
 
 // main.ts
-var import_obsidian39 = require("obsidian");
+var import_obsidian40 = require("obsidian");
 
 // ui/settings-tab.ts
-var import_obsidian32 = require("obsidian");
+var import_obsidian33 = require("obsidian");
 var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 var CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
 function bindMapFolderInput(plugin, key2, input) {
@@ -54236,7 +56016,7 @@ function bindMapFolderInput(plugin, key2, input) {
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));
-var CodexSetupModal = class extends import_obsidian32.Modal {
+var CodexSetupModal = class extends import_obsidian33.Modal {
   constructor(app, executable, recheck) {
     super(app);
     this.executable = executable;
@@ -54260,7 +56040,7 @@ var CodexSetupModal = class extends import_obsidian32.Modal {
       cls: "vam-setup-note"
     });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian32.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian33.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.i_ve_finished_check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -54268,7 +56048,7 @@ var CodexSetupModal = class extends import_obsidian32.Modal {
     );
   }
 };
-var AiUsageModal = class extends import_obsidian32.Modal {
+var AiUsageModal = class extends import_obsidian33.Modal {
   constructor(app, provider, resolve) {
     super(app);
     this.provider = provider;
@@ -54289,7 +56069,7 @@ var AiUsageModal = class extends import_obsidian32.Modal {
       this.close();
       this.resolve(confirmed);
     };
-    new import_obsidian32.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
+    new import_obsidian33.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.cancel")).onClick(() => finish(false))).addButton(
       (button) => button.setButtonText(t("ui.understand_and_run")).setCta().onClick(() => finish(true))
     );
   }
@@ -54297,7 +56077,7 @@ var AiUsageModal = class extends import_obsidian32.Modal {
     if (!this.settled) this.resolve(false);
   }
 };
-var ClaudeSetupModal = class extends import_obsidian32.Modal {
+var ClaudeSetupModal = class extends import_obsidian33.Modal {
   constructor(app, executable, url, recheck) {
     super(app);
     this.executable = executable;
@@ -54317,7 +56097,7 @@ var ClaudeSetupModal = class extends import_obsidian32.Modal {
     });
     steps.createEl("li", { text: t("ui.return_to_vam_and_check_the_cli_path_again") });
     this.contentEl.createEl("p", { text: t("ui.path_currently_checked_0", this.executable), cls: "vam-setup-path" });
-    new import_obsidian32.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
+    new import_obsidian33.Setting(this.contentEl).addButton((button) => button.setButtonText(t("ui.do_this_later")).onClick(() => this.close())).addButton(
       (button) => button.setButtonText(t("ui.check_again")).setCta().onClick(() => {
         this.close();
         this.recheck();
@@ -54325,7 +56105,7 @@ var ClaudeSetupModal = class extends import_obsidian32.Modal {
     );
   }
 };
-var VisualAgentMapSettingTab = class extends import_obsidian32.PluginSettingTab {
+var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -54623,9 +56403,9 @@ var import_node_path2 = require("node:path");
 async function fitImageForInput(dataUrl, limits, signal) {
   if (!limits) return dataUrl;
   const image = createEl("img");
-  await new Promise((resolve, reject) => {
+  await new Promise((resolve, reject2) => {
     image.onload = () => resolve();
-    image.onerror = () => reject(new Error(t("ui.context_ai_image_unavailable")));
+    image.onerror = () => reject2(new Error(t("ui.context_ai_image_unavailable")));
     image.src = dataUrl;
   });
   if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
@@ -54652,10 +56432,10 @@ async function fitImageForInput(dataUrl, limits, signal) {
 }
 
 // ui/outline-view.ts
-var import_obsidian33 = require("obsidian");
+var import_obsidian34 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 var foldOutlineSearch = (text11) => toSimplifiedFold(text11.toLocaleLowerCase().replace(/\u0307/g, ""));
-var OutlineView = class extends import_obsidian33.ItemView {
+var OutlineView = class extends import_obsidian34.ItemView {
   constructor(leaf, openNote) {
     super(leaf);
     this.openNote = openNote;
@@ -54788,7 +56568,7 @@ var OutlineView = class extends import_obsidian33.ItemView {
       if (item.status === "error") button.createEl("small", { text: t("ui.coffee_segment_incomplete") });
       button.addEventListener("click", () => {
         var _a3;
-        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian33.Notice(t("ui.coffee_segment_no_content"));
+        if (!((_a3 = this.locateCoffee) == null ? void 0 : _a3.call(this, item.id))) new import_obsidian34.Notice(t("ui.coffee_segment_no_content"));
       });
     });
   }
@@ -54868,7 +56648,7 @@ var OutlineView = class extends import_obsidian33.ItemView {
 };
 
 // experiences/sharing/share-modal.ts
-var import_obsidian35 = require("obsidian");
+var import_obsidian36 = require("obsidian");
 
 // experiences/sharing/share-format.ts
 var SHARE_FORMAT = "vam-share";
@@ -55565,7 +57345,7 @@ var TEXT_NODE = 3;
 var PLACEHOLDER_OPEN = "\u27E6";
 var PLACEHOLDER_CLOSE = "\u27E7";
 var TOKEN2 = /⟦(\/?)(\d+)(\/?)⟧/g;
-var BLOCK_TAGS = /* @__PURE__ */ new Set([
+var BLOCK_TAGS2 = /* @__PURE__ */ new Set([
   "address",
   "article",
   "aside",
@@ -55652,7 +57432,7 @@ var classesOf = (element) => {
 var elementChildren = (parent) => Array.from(parent.childNodes).filter((node) => node.nodeType === ELEMENT_NODE);
 function hasBlockDescendant(element) {
   for (const child of elementChildren(element)) {
-    if (BLOCK_TAGS.has(tagOf(child)) || SKIP_BLOCK_TAGS.has(tagOf(child)) || hasBlockDescendant(child)) return true;
+    if (BLOCK_TAGS2.has(tagOf(child)) || SKIP_BLOCK_TAGS.has(tagOf(child)) || hasBlockDescendant(child)) return true;
   }
   return false;
 }
@@ -55661,7 +57441,7 @@ function classify(element) {
   if (SKIP_BLOCK_TAGS.has(tag)) return "skip";
   if (ATOM_TAGS.has(tag) || element.getAttribute("translate") === "no" || classesOf(element).some((name) => ATOM_CLASSES.has(name)))
     return "atom";
-  if (BLOCK_TAGS.has(tag) || hasBlockDescendant(element)) return "block";
+  if (BLOCK_TAGS2.has(tag) || hasBlockDescendant(element)) return "block";
   return "inline";
 }
 function maskUrls(text11, parts) {
@@ -55865,11 +57645,11 @@ function elementsWithClass(root, className) {
 var SLOT_CLASS = "vam-mermaid-slot";
 var ELEMENT_NODE2 = 1;
 var TEXT_NODE2 = 3;
-var escapeText2 = (text11) => text11.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var escapeText3 = (text11) => text11.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var escapeAttribute = (text11) => text11.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 function canonicalNode(node) {
   var _a2, _b2;
-  if (node.nodeType === TEXT_NODE2) return escapeText2((_a2 = node.nodeValue) != null ? _a2 : "");
+  if (node.nodeType === TEXT_NODE2) return escapeText3((_a2 = node.nodeValue) != null ? _a2 : "");
   if (node.nodeType !== ELEMENT_NODE2) return `\0${node.nodeType}:${(_b2 = node.nodeValue) != null ? _b2 : ""}\0`;
   return canonicalElement(node);
 }
@@ -55910,9 +57690,9 @@ function detailCheckOf(extraction) {
 var svgCheckOf = (svg) => segmentHash(canonicalElement(svg));
 function normalizeSvgId(translated, originalId) {
   var _a2, _b2;
-  const own = translated.getAttribute("id");
-  if (!own || !originalId || own === originalId) return false;
-  const fix = (text11) => text11.split(own).join(originalId);
+  const own2 = translated.getAttribute("id");
+  if (!own2 || !originalId || own2 === originalId) return false;
+  const fix = (text11) => text11.split(own2).join(originalId);
   for (const node of flatNodes(translated)) {
     if (node.nodeType === TEXT_NODE2) node.nodeValue = fix((_a2 = node.nodeValue) != null ? _a2 : "");
     else if (node.nodeType === ELEMENT_NODE2) {
@@ -56076,15 +57856,15 @@ function assertCurrent(ticket) {
 }
 var isStaleBuild = (error) => (error == null ? void 0 : error.name) === "StaleBuildError";
 function pause(ticket, ms) {
-  return new Promise((resolve, reject) => {
-    if (!ticket.isCurrent()) return reject(new StaleBuildError());
+  return new Promise((resolve, reject2) => {
+    if (!ticket.isCurrent()) return reject2(new StaleBuildError());
     const timer = window.setTimeout(() => {
       ticket.signal.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
     const onAbort = () => {
       window.clearTimeout(timer);
-      reject(new StaleBuildError());
+      reject2(new StaleBuildError());
     };
     ticket.signal.addEventListener("abort", onAbort, { once: true });
   });
@@ -56225,7 +58005,7 @@ function attachTranslations(payload, options) {
 }
 
 // experiences/sharing/share-exporter.ts
-var import_obsidian34 = require("obsidian");
+var import_obsidian35 = require("obsidian");
 
 // experiences/sharing/share-viewer-dictionaries.ts
 var SHARE_VIEWER_UI_EXTRA = {
@@ -56468,11 +58248,11 @@ function shareViewerUiExtras(languages) {
 
 // experiences/sharing/viewer-bundle.generated.ts
 var SHARE_VIEWER_JS = '(()=>{function Ve(t){var n;let r=t.aimKind==="question"?[]:(n=t.aimConvergesFromNodeIds)!=null?n:[];return[...t.parentId?[t.parentId]:[],...r.filter(s=>s!==t.parentId)]}function fe(t,r){let n=new Set,s=[r];for(;s.length;){let i=s.pop();for(let l of t)l.parentId===i&&l.id!==r&&!n.has(l.id)&&(n.add(l.id),s.push(l.id))}return n}function me(t,r){let n=new Map(t.map(l=>[l.id,l])),s=l=>{let u=0,a=new Set([l.id]);for(let m=l.parentId;m&&n.has(m)&&!a.has(m);m=n.get(m).parentId)a.add(m),u++;return u},i=new Set(t.map(l=>l.parentId).filter(l=>!!l&&n.has(l)));for(let l of t)i.has(l.id)&&(l.collapsed=r===null?!1:s(l)>=r)}function ge(t){if(t>150)return"right";if(t<-150)return"left"}function Ye(t,r,n,s={left:0,right:0}){let i={...s},l=new Map;for(let u of t){let a=i.left<i.right?"left":"right";l.set(u.id,a),i[a]+=r(u)+n}return l}function We(t,r,n,s){let i=t.map(s),l={left:0,right:0};t.forEach((a,m)=>{let g=i[m];g&&(l[g]+=r(a)+n)});let u=Ye(t.filter((a,m)=>!i[m]),r,n,l);return new Map(t.map((a,m)=>{var g;return[a.id,(g=i[m])!=null?g:u.get(a.id)]}))}function Kn(t){return t==="right"||t==="left"||t==="down"||t==="up"}function Xe(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function Gt(t){if(!(t!=null&&t.parentId))return;let r=t.layout;if(!r||typeof r!="object"||Array.isArray(r))return;let n=r.direction;return Kn(n)?n:void 0}function Ge(t){let{width:r,column:n,mapDirection:s,engine:i}=t,l=(u,a)=>{var w,U;let m=[],g=(b,f)=>{for(let L of[...t.kidsOf(b),...t.joinsOf(b)])Gt(L)?m.push({node:L,root:f}):g(L,f)};for(let b of u)g(b,b);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!m.length)return i(a,p);let h=a==="down"||a==="up",M=m.map(({node:b,root:f})=>{let L=l([b],Gt(b)),P=1/0,x=-1/0,D=1/0,H=-1/0,T=new Map,$=E=>{T.set(E.id,E);for(let S of[...t.kidsOf(E),...t.joinsOf(E)])$(S)};$(b);for(let[E,S]of L)P=Math.min(P,S.x),x=Math.max(x,S.x+r),D=Math.min(D,S.y),H=Math.max(H,S.y+t.heightFor(T.get(E)));let v=Math.max(1,Math.ceil((x-P+n-r)/n));return{node:b,root:f,placed:L,minX:P,maxX:x,minY:D,maxY:H,slots:v}}),A=new Map(M.map(b=>[b.node.id,b])),z=b=>{let f=A.get(b.id);return!f||!h?[]:Array.from({length:f.slots},(L,P)=>({id:`${b.id}\\0pad${P}`}))},R=new Set,N=i(a,{roots:u,kidsOf:b=>{if(!A.has(b.id))return t.kidsOf(b);let f=z(b);for(let L of f)R.add(L.id);return f},joinsOf:b=>A.has(b.id)?[]:t.joinsOf(b),heightFor:b=>{if(R.has(b.id))return 0;let f=A.get(b.id);return f&&!h?f.maxY-f.minY:t.heightFor(b)}}),O=new Map;for(let[b,f]of N)!R.has(b)&&!A.has(b)&&O.set(b,f);for(let b of M){let f=N.get(b.node.id),L,P;h?(L=f.x+n/2-(b.minX+b.maxX)/2,P=a==="down"?f.y-b.minY:f.y+t.heightFor(b.node)-b.maxY):(L=a==="right"||a==="balanced"&&f.x>=((U=(w=N.get(b.root.id))==null?void 0:w.x)!=null?U:f.x)?f.x-b.minX:f.x+r-b.maxX,P=f.y-b.minY);for(let[x,D]of b.placed)O.set(x,{x:D.x+L,y:D.y+P})}return O};return l(t.roots,s)}var qe=1/Math.tan(Math.PI/3);function Ze(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:l,column:u,gap:a,left:m,top:g}=t,p=u-l,h=C=>[...n(C),...s(C)],M=r.map(C=>{let N=new Map,O=T=>T.reduce(($,v)=>$+N.get(v.id),0)+Math.max(0,T.length-1)*a,w=T=>{let $=h(T);for(let v of $)w(v);N.set(T.id,Math.max(i(T),O($)))},U=(T,$,v,E)=>{let S=h(T),K=v+(N.get(T.id)-O(S))/2,Y=S.map(et=>{let Z=U(et,$+1,K,E);return K+=N.get(et.id)+a,Z}),st=i(T),q=Y.length?(Y[0]+Y[Y.length-1])/2:v+N.get(T.id)/2;return E.push({id:T.id,x:-$*u,centre:q,height:st}),q},b=h(C).map((T,$)=>{let v=$%2===0?1:-1,E=h(T);for(let rt of E)w(rt);let S=[],K=a;for(let rt of E){let ht=S.length,dt=U(rt,0,K,S)*qe-p;for(let F=ht;F<S.length;F++)S[F].x+=dt-l;K+=N.get(rt.id)+a}let Y=Math.max(u,K),st=Y*qe,q=i(T),et=[-l/2,...S.map(rt=>rt.x)],Z=[l/2,st,...S.map(rt=>rt.x+l)];return{topic:T,side:v,length:Y,height:q,cards:S,minX:Math.min(...et),maxX:Math.max(...Z)}}),f=i(C),L=[{id:C.id,x:0,y:-f/2,height:f}],P={above:-p,below:-p};for(let T of b){let $=T.side===1?"above":"below",v=P[$]-T.maxX,E=-T.side*T.length;L.push({id:T.topic.id,x:v-l/2,y:E-T.side*(T.height/2)-T.height/2,height:T.height});for(let S of T.cards)L.push({id:S.id,x:v+S.x,y:E+T.side*S.centre-S.height/2,height:S.height});P[$]=v+T.minX-p}let x=Math.min(...L.map(T=>T.x)),D=Math.min(...L.map(T=>T.y)),H=Math.max(...L.map(T=>T.y+T.height));return{out:L,minX:x,minY:D,maxY:H}}),A=new Map,z=m+Math.max(0,...M.map(C=>-C.minX)),R=g;for(let C of M){for(let N of C.out)A.set(N.id,{x:z+N.x,y:R+N.y-C.minY});R+=C.maxY-C.minY+a}return A}var Vn=Math.PI*2,Yn=6,Wn=60;function Xn(t,r,n,s){let i=[...t.values()].sort((u,a)=>u.y-a.y),l=new Set;for(let u=0;u<i.length;u++){let a=i[u];for(let m=u+1;m<i.length;m++){let g=i[m];if(g.y>=a.y+a.height+n)break;s&&s.checks++,Math.abs(a.x-g.x)<r&&a.y<g.y+g.height+n&&l.add(Math.max(a.depth,g.depth))}}return l}function Qe(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:l,column:u,gap:a,left:m,top:g}=t,p=new Map,h=g;for(let M of r){let A=[],z=new Map,R=v=>[...n(v),...s(v)],C=v=>{let E=R(v),S=E.length?E.reduce((K,Y)=>K+C(Y),0):1;return z.set(v.id,S),S};C(M);let N=(v,E,S,K)=>{A.push({id:v.id,depth:E,angle:(S+K)/2,height:i(v)});let Y=S,st=(K-S)/z.get(v.id);for(let q of R(v)){let et=st*z.get(q.id);N(q,E+1,Y,Y+et),Y+=et}};N(M,0,0,Vn);let O=Math.max(...A.map(v=>v.depth)),w=Array.from({length:O+1},(v,E)=>E*u),U=()=>{let v=[];return w.forEach((E,S)=>v.push(S?Math.max(E,v[S-1]+u):0)),new Map(A.map(E=>{let S=v[E.depth];return[E.id,{x:Math.round(S*Math.sin(E.angle)-l/2),y:Math.round(-S*Math.cos(E.angle)-E.height/2),depth:E.depth,height:E.height}]}))},b=u/Yn,f=()=>(t.stats&&t.stats.rounds++,Xn(U(),l,a,t.stats)),L=b,P=f(),x=w.slice();for(let v=0;P.size&&v<Wn;v++){x=w.slice();for(let E of P)w[E]+=L;L*=2,P=f()}if(!P.size&&x.some((v,E)=>w[E]-v>b)){let v=w.slice();for(;v.some((E,S)=>E-x[S]>b);){let E=v.map((S,K)=>(S+x[K])/2);w.splice(0,w.length,...E),f().size?x=E:v=E}w.splice(0,w.length,...v)}let D=U(),H=Math.min(...[...D.values()].map(v=>v.x)),T=Math.min(...[...D.values()].map(v=>v.y)),$=Math.max(...[...D.values()].map(v=>v.y+v.height));for(let[v,E]of D)p.set(v,{x:Math.round(m)+E.x-H,y:h+E.y-T});h+=$-T+a}return p}function qt(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,column:l,rowGap:u,flip:a,left:m,top:g}=t,p=new Map,h=new Map,M=x=>x.reduce((D,H)=>D+p.get(H.id),0),A=x=>{let D=n(x),H=s(x);for(let T of[...D,...H])A(T);p.set(x.id,Math.max(l,M(D),M(H))),h.set(x.id,1+Math.max(0,...D.map(T=>h.get(T.id))))},z=new Map,R=new Map,C=(x,D,H)=>{let T=n(x),$=s(x),v=p.get(x.id),E=(st,q)=>{let et=H+(v-M(st))/2;return st.map(Z=>{C(Z,q,et);let rt=z.get(Z.id);return et+=p.get(Z.id),rt})},S=E(T,D+1),K=E($,D+h.get(x.id)),Y=S.length?S:K;R.set(x.id,D),z.set(x.id,Y.length?(Y[0]+Y[Y.length-1])/2:H)},N=m,O=[],w=x=>{O.push(x);for(let D of[...n(x),...s(x)])w(D)};for(let x of r)A(x),C(x,0,N),N+=p.get(x.id),w(x);let U=Math.max(0,...R.values()),b=Array.from({length:U+1},()=>0);for(let x of O)b[R.get(x.id)]=Math.max(b[R.get(x.id)],i(x));let f=[],L=g;for(let x=0;x<=U;x++){let D=a?U-x:x;f[D]=L,L+=b[D]+u}let P=new Map;for(let x of O){let D=R.get(x.id),H=a?f[D]+b[D]-i(x):f[D];P.set(x.id,{x:z.get(x.id),y:H})}return P}function Je(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,width:l,column:u,gap:a,left:m,top:g}=t,p=new Map,h=g;for(let M of r){let A=new Map,z=w=>{A.set(w.id,i(w));for(let U of[...n(w),...s(w)])z(U)};z(M);let R=[{id:M.id,x:m,y:0}],C=m+u;[...n(M),...s(M)].forEach((w,U)=>{let b=qt({roots:[w],kidsOf:n,joinsOf:s,heightFor:i,column:u,rowGap:u-l,flip:U%2===1,left:C,top:0}),f=b.get(w.id).y,L=C;for(let[P,x]of b)R.push({id:P,x:x.x,y:x.y-f}),L=Math.max(L,x.x);C=L+u});let N=Math.min(...R.map(w=>w.y)),O=Math.max(...R.map(w=>w.y+A.get(w.id)));for(let w of R)p.set(w.id,{x:w.x,y:h+w.y-N});h+=O-N+a}return p}var zt=300,Gn=24,qn={compact:{column:330,gap:12},standard:{column:360,gap:Gn},spacious:{column:420,gap:48}};function Zn(t){return t==="compact"||t==="spacious"}var Qn=180;function Jn(t){let r=typeof t=="string"?t:t.direction,n=typeof t=="string"?void 0:t.spacing;return{direction:r,...qn[Zn(n)?n:"standard"]}}var tr=t=>t==="left"?-1:1;var er=(t,r)=>{let n=t==null?void 0:t(r);return n!==void 0&&Number.isFinite(n)&&n>0?n:Qn};function nr(t,r){var m,g;let n=new Map(t.map(p=>[p.id,p])),s=new Map,i=new Map,l=(p,h,M)=>{var A;return p.set(h,[...(A=p.get(h))!=null?A:[],M])};for(let p of t){if(!p.parentId)continue;let h=p.aimKind!=="question"&&((m=p.aimConvergesFromNodeIds)!=null&&m.length)?Ve(p).map(A=>n.get(A)):[],M=(g=h[0])==null?void 0:g.parentId;M&&n.has(M)&&h.every(A=>A&&A.parentId===M)?l(i,M,p):l(s,p.parentId,p)}return{kidsOf:p=>{var h;return r&&p.collapsed?[]:(h=s.get(p.id))!=null?h:[]},joinsOf:p=>{var h;return r&&p.collapsed?[]:((h=i.get(p.id))!=null?h:[]).filter(M=>{var A;return!(r&&((A=n.get(M.parentId))!=null&&A.collapsed))})}}}function he(t){let{roots:r,kidsOf:n,joinsOf:s,heightFor:i,column:l,gap:u,sign:a,left:m,top:g}=t,p=new Map,h=new Map,M=new Map,A=N=>N.reduce((O,w)=>O+h.get(w.id),0)+Math.max(0,N.length-1)*u,z=N=>{let O=n(N),w=s(N);for(let U of[...O,...w])z(U);h.set(N.id,Math.max(i(N),A(O),A(w))),M.set(N.id,1+Math.max(0,...O.map(U=>M.get(U.id))))},R=(N,O,w)=>{let U=n(N),b=s(N),f=h.get(N.id),L=(v,E)=>{let S=w+(f-A(v))/2;return v.map(K=>{let Y=R(K,E,S);return S+=h.get(K.id)+u,Y})},P=L(U,O+1),x=L(b,O+M.get(N.id)),D=P.length?U:b,H=P.length?P:x,T=i(N),$=w+(f-T)/2;if(H.length){let v=H[0]+i(D[0])/2,E=H[H.length-1]+i(D[D.length-1])/2;$=(v+E)/2-T/2}return p.set(N.id,{x:m+a*O*l,y:g+$}),$},C=0;for(let N of r)z(N),R(N,0,C),C+=h.get(N.id)+u;return{placed:p,sizes:h}}function rr(t,r,n){let{roots:s,kidsOf:i,joinsOf:l,heightFor:u,column:a,gap:m,left:g,top:p}=r,h=he({...r,sign:1}).sizes,M=new Map(t.map(O=>[O.id,O])),A=s.map(O=>{var f;let w=(f=M.get(O.id))!=null?f:O,U=We(i(O),L=>h.get(L.id),m,L=>{var P;return n?void 0:ge(((P=M.get(L.id))!=null?P:L).x-w.x)}),b=L=>he({...r,roots:[O],kidsOf:P=>P.id===O.id?i(P).filter(x=>U.get(x.id)===L):i(P),joinsOf:P=>P.id===O.id&&L==="left"?[]:l(P),sign:L==="left"?-1:1,left:0,top:0}).placed;return{root:O,right:b("right"),left:b("left")}}),z=Math.max(0,...A.flatMap(({left:O})=>[...O.values()].map(w=>Math.round(-w.x/a)))),R=g+z*a,C=new Map,N=0;for(let{root:O,right:w,left:U}of A){let b=H=>H.get(O.id).y+u(O)/2,f=Math.max(b(w),b(U)),L=[];for(let H of[{placed:w,isLeft:!1},{placed:U,isLeft:!0}]){let{placed:T,isLeft:$}=H,v=f-b(T);for(let[E,S]of T)$&&E===O.id||L.push([E,{x:R+S.x,y:S.y+v}])}let P=H=>u(M.get(H)),x=Math.min(...L.map(([,H])=>H.y)),D=Math.max(...L.map(([H,T])=>T.y+P(H)));for(let[H,T]of L)C.set(H,{x:T.x,y:p+N+T.y-x});N+=D-x+m}return C}function or(t,r,n,s,i=!1,l,u="right",a=!1){let{direction:m,column:g,gap:p}=Jn(u),{kidsOf:h,joinsOf:M}=nr(t,i),A=C=>er(l,C.id),z=(C,N)=>{if(C==="down"||C==="up")return qt({...N,column:g,rowGap:g-zt,flip:C==="up",left:n,top:s});let O={...N,column:g,gap:p,left:n,top:s};if(C==="radial")return Qe({...O,width:zt});if(C==="timeline")return Je({...O,width:zt});if(C==="fishbone")return Ze({...O,width:zt});let w={...O,sign:tr(C)};return C==="balanced"?rr(t,w,a):he(w).placed},R={roots:r,kidsOf:h,joinsOf:M,heightFor:A};return Xe(m)&&t.some(C=>Gt(C))?Ge({...R,width:zt,column:g,mapDirection:m,engine:z}):z(m,R)}function tn(t,r,n,s="right",i={}){let l=r!=null&&r.size?t.filter(m=>!r.has(m.id)):t,u=l.filter(m=>!m.parentId),a=or(l,u,80,80,!0,n,s,i.reset===!0);return t.map(m=>({...m,...a.get(m.id)}))}function en(t,r){return!r||!(r.bottom>r.top)?0:Math.max(0,Math.ceil(r.bottom-t))+8}function nn(t,r,n,s){let i=t.zoom;return{zoom:i,x:n.width/2-r.x*i,y:s+(n.height-s)/2-r.y*i}}function rn(t,r,n,s=1.2){let i=Math.max(1,r.height-n),l=t.maxX-t.minX,u=t.maxY-t.minY,a=Math.max(.25,Math.min(s,(r.width-80)/l,(i-80)/u));return{zoom:a,x:(r.width-l*a)/2-t.minX*a,y:n+(i-u*a)/2-t.minY*a}}var Zt={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function ye(t){let r=3735928559,n=1103547991;for(let s=0;s<t.length;s++){let i=t.charCodeAt(s);r=Math.imul(r^i,2654435761),n=Math.imul(n^i,1597334677)}return r=Math.imul(r^r>>>16,2246822507)^Math.imul(n^n>>>13,3266489909),n=Math.imul(n^n>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),(4294967296*(2097151&n)+(r>>>0)).toString(36)}var xt="\\u27E6",Mt="\\u27E7",Ut=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,an=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),be=new Set(["pre","script","style","textarea","template","noscript"]),ir=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),sr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),ar=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,lr=/\\p{L}/u,Bt=t=>t.localName.toLowerCase(),ln=t=>{var r;return((r=t.getAttribute("class"))!=null?r:"").split(/\\s+/).filter(Boolean)},Qt=t=>Array.from(t.childNodes).filter(r=>r.nodeType===1);function cn(t){for(let r of Qt(t))if(an.has(Bt(r))||be.has(Bt(r))||cn(r))return!0;return!1}function dn(t){let r=Bt(t);return be.has(r)?"skip":ir.has(r)||t.getAttribute("translate")==="no"||ln(t).some(n=>sr.has(n))?"atom":an.has(r)||cn(t)?"block":"inline"}function cr(t,r){return t.replace(ar,n=>(r.push({literal:n,atom:!0}),`${xt}${r.length}/${Mt}`))}function dr(t,r){let n="",s=i=>{var u;if(i.nodeType===3){n+=cr((u=i.nodeValue)!=null?u:"",r);return}if(i.nodeType!==1){r.push({node:i,atom:!0}),n+=`${xt}${r.length}/${Mt}`;return}let l=i;if(dn(l)==="inline"){r.push({node:l,atom:!1});let a=r.length;n+=`${xt}${a}${Mt}`;for(let m of Array.from(l.childNodes))s(m);n+=`${xt}/${a}${Mt}`;return}r.push({node:l,atom:!0}),n+=`${xt}${r.length}/${Mt}`};for(let i of t)s(i);return n}function on(t){return lr.test(t.replace(Ut,""))}function un(t){let r=[],n=u=>{let a=u.getAttribute("alt");a&&on(a)&&r.push({index:r.length,kind:"attribute",text:a.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},s=u=>{for(let a of Qt(u)){let m=Bt(a);be.has(m)||m==="svg"||(m==="img"?n(a):s(a))}},i=u=>{if(!u.length)return;let a=[],m=dr(u,a),g=m.trim();if(!g||!on(g)||m.includes("\\u27E6\\u27E6"))return;let p=m.replace(Ut,"");if(p.includes(xt)||p.includes(Mt))return;let h=m.slice(0,m.length-m.trimStart().length),M=m.slice(m.trimEnd().length);r.push({index:r.length,kind:"run",text:g,nodes:u,lead:h,trail:M,parts:a})},l=u=>{let a=[];for(let m of Array.from(u.childNodes)){if(m.nodeType===3){a.push(m);continue}if(m.nodeType!==1){i(a),a=[];continue}let g=m,p=dn(g);p==="atom"||p==="inline"?a.push(g):(i(a),a=[],p==="block"&&l(g))}i(a)};return s(t),l(t),{units:r}}var sn=t=>[...t.matchAll(Ut)].map(r=>r[0]);function ur(t,r){if(!r.trim())return!1;let n=sn(t),s=sn(r);if(n.length!==s.length||n.some((l,u)=>l!==s[u]))return!1;let i=r.replace(Ut,"");return!i.includes(xt)&&!i.includes(Mt)}function pr(t,r,n){var m;let s=[],i=[],l=g=>{let p=i[i.length-1];p?p.appendChild(g):s.push(g)},u=g=>{g&&l(n.createTextNode(g))};u(t.lead);let a=0;for(let g of r.matchAll(Ut)){u(r.slice(a,g.index)),a=((m=g.index)!=null?m:0)+g[0].length;let p=t.parts[Number(g[2])-1];if(g[1]==="/")i.pop();else if(g[3]==="/")p.literal!==void 0?u(p.literal):p.node&&l(p.node.cloneNode(!0));else if(p.node){let h=p.node.cloneNode(!1);l(h),i.push(h)}}return u(r.slice(a)),u(t.trail),s}function pn(t,r){var i,l,u;let n={applied:0,kept:0},s=[...t.units.filter(a=>a.kind==="attribute"),...t.units.filter(a=>a.kind==="run")];for(let a of s){let m=r(a);if(m===void 0||!ur(a.text,m)){n.kept++;continue}if(a.kind==="attribute"){(l=a.element)==null||l.setAttribute((i=a.attribute)!=null?i:"alt",m.trim()),n.applied++;continue}let g=a.nodes[0],p=g==null?void 0:g.parentNode,h=g==null?void 0:g.ownerDocument;if(!g||!p||!h){n.kept++;continue}for(let M of pr(a,m,h))p.insertBefore(M,g);for(let M of a.nodes)(u=M.parentNode)==null||u.removeChild(M);n.applied++}return n}function fn(t){let r=[],n=s=>{for(let i of Qt(s))Bt(i)==="svg"?r.push(i):n(i)};return n(t),r}function mn(t,r){let n=[],s=i=>{for(let l of Qt(i))ln(l).includes(r)&&n.push(l),s(l)};return s(t),n}var gn="vam-mermaid-slot",Jt=1,hn=3,yn=t=>{let r=t;return!!r&&(Array.isArray(r.detailSegments)||Array.isArray(r.detailDiagrams))},fr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),mr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function gr(t){var r,n;return t.nodeType===hn?fr((r=t.nodeValue)!=null?r:""):t.nodeType!==Jt?`\\0${t.nodeType}:${(n=t.nodeValue)!=null?n:""}\\0`:bn(t)}function bn(t){let r=t.localName.toLowerCase(),n=t.getAttributeNames().sort().map(s=>{var i;return` ${s}="${mr((i=t.getAttribute(s))!=null?i:"")}"`}).join("");return`<${r}${n}>${hr(t)}</${r}>`}function hr(t){return Array.from(t.childNodes).map(gr).join("")}function yr(t){let r=[],n=s=>{if(r.push(s),s.nodeType===Jt)for(let i of Array.from(s.childNodes))n(i)};return n(t),r}function br(t,r){var s;let n=fn(t);for(let i of n){let l=r();l.setAttribute("class",gn),(s=i.parentNode)==null||s.replaceChild(l,i)}return{root:t,svgs:n,extraction:un(t)}}function xr(t){let r=t.units.map(n=>`${n.kind}\\0${n.text}`).join("");return`${t.units.length}.${ye(r)}`}var Mr=t=>ye(bn(t));function Tr(t,r){if(!Array.isArray(r))return!1;let n=yr(t);for(let s of r){if(!Array.isArray(s)||s.length!==2)return!1;let[i,l]=s;if(typeof i!="number"||!Number.isInteger(i)||i<0||i>=n.length)return!1;let u=n[i];if(typeof l=="string"){if(u.nodeType!==hn)return!1;u.nodeValue=l}else if(l&&typeof l=="object"&&!Array.isArray(l)){if(u.nodeType!==Jt)return!1;for(let[a,m]of Object.entries(l))if(m===null)u.removeAttribute(a);else if(typeof m=="string")u.setAttribute(a,m);else return!1}else return!1}return!0}function vr(t,r,n){if(!t||typeof t!="object")return null;let s=t;if(typeof s.svg=="string"){let i=n(s.svg),l=Array.from(i.childNodes).filter(u=>u.nodeType===Jt);return l.length===1&&l[0].localName.toLowerCase()==="svg"?l[0]:null}if(typeof s.check=="string"&&s.check===Mr(r)){let i=r.cloneNode(!0);return Tr(i,s.patch)?i:null}return null}function xn(t,r,n){var m,g;let s={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:i,extraction:l}=br(t,n.createSlot),u=r.detailSegments;if(u!==void 0||r.detailCheck!==void 0)if(Array.isArray(u)&&u.length===l.units.length&&r.detailCheck===xr(l)){let p=pn(l,M=>{let A=u[M.index];return typeof A=="string"?A:void 0}),h=u.filter(M=>typeof M!="string").length;if(s.applied=p.applied,s.kept=Math.max(0,p.kept-h),n.afterText&&!n.afterText(t))return s.fallback=!0,s}else s.fallback=!0;let a=mn(t,gn);a.length!==i.length&&(s.fallback=!0);for(let[p,h]of a.entries()){let M=i[p];if(!M)break;let A=(m=r.detailDiagrams)==null?void 0:m[p],z=M;if(A){let R=null;try{R=vr(A,M,n.parse)}catch{R=null}R?z=R:s.diagramsKept++}(g=h.parentNode)==null||g.replaceChild(z,h)}return s}function gt(t,r,n){let s=t.createElement(r);return n&&(s.className=n),s}function wr(t,r){var u;let n=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),s=(u=n==null?void 0:n[1])!=null?u:t,[i,l=""]=r.imageSource.split("{0}");return[i,s,l]}function Er(t,r,n){let[s,i,l]=wr(r,n),u=gt(t,"span");u.className="vam-image-source";let a=gt(t,"a");return a.setAttribute("href",r),a.setAttribute("target","_blank"),a.setAttribute("rel","noopener noreferrer"),a.textContent=i,u.append(t.createTextNode(s),a,t.createTextNode(l)),u}function xe(t,r,n,s,i){Mn(t,r,new DOMParser().parseFromString(n,"text/html").body,s,i)}function Mn(t,r,n,s,i){var u,a,m,g;for(let p of Array.from(n.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(n.querySelectorAll("*")))for(let h of p.getAttributeNames()){let M=(u=p.getAttribute(h))!=null?u:"",A=h.toLowerCase();(A.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(A)&&/^\\s*(javascript|vbscript):/i.test(M))&&p.removeAttribute(h)}let l=()=>{let p=gt(t,"span");return p.className="vam-image-omitted",p.textContent=i.imageOmitted,p};for(let p of Array.from(n.querySelectorAll("img"))){let h=(a=p.getAttribute("src"))!=null?a:"";if(h.startsWith("vam-asset:")){let M=s[h.slice(10)];typeof M=="string"&&M.startsWith("data:image/")?p.setAttribute("src",M):p.replaceWith(l())}else if(/^https?:\\/\\//i.test(h)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let M=p.closest("a");(M!=null?M:p).after(Er(t,h,i))}else/^data:image\\//i.test(h)||p.replaceWith(l())}for(let p of Array.from(n.querySelectorAll("a"))){let h=(m=p.getAttribute("href"))!=null?m:"";/^(https?:|mailto:)/i.test(h)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):h.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(n.querySelectorAll("table"))){if((g=p.parentElement)!=null&&g.classList.contains("vam-table-scroll"))continue;let h=gt(t,"div");h.className="vam-table-scroll",p.replaceWith(h),h.append(p)}r.append(...Array.from(n.childNodes).map(p=>t.importNode(p,!0)))}function Tn(t,r,n,s,i,l){let u=a=>new DOMParser().parseFromString(a,"text/html").body;try{let a=u(n);xn(a,s,{parse:u,createSlot:()=>gt(t,"div")}),Mn(t,r,a,i,l)}catch{r.replaceChildren(),xe(t,r,n,i,l)}}function vn(t,r,n,s){let i=Math.max(60,Math.abs(n-t)/2);return`M ${t} ${r} C ${t+i} ${r}, ${n-i} ${s}, ${n} ${s}`}var Me=["red","orange","yellow","green","blue","purple"];function wn(t){let r=t["topic-color"];return Me.find(n=>n===r)}var Ar=["done","warning","star","priority-1","priority-2","priority-3"];var kr={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3"};function En(t){let r=t["topic-markers"];return Array.isArray(r)?Ar.filter(n=>r.includes(n)):[]}function An(t){return kr[t]}var Nr=(t,r)=>t.toLowerCase()===r.toLowerCase(),te=(t,r)=>t.find(n=>Nr(n,r));function Lr(t,r){if(typeof t!="string"||!t.trim())return;let n=te(r,t.trim());if(n)return n;let s=t.trim().toLowerCase().split(/[-_]/),i=s[0];if(i==="zh"){let u=s.slice(1).some(a=>a==="hant"||a==="tw"||a==="hk"||a==="mo")?"TW":"CN";return te(r,`${i}-${u}`)}return r.find(l=>l.toLowerCase().split(/[-_]/)[0]===i)}function kn(t){let{languages:r}=t,n=r[0];if(typeof t.stored=="string"){let s=te(r,t.stored);if(s)return s}if(typeof t.defaultLanguage=="string"){let s=te(r,t.defaultLanguage);if(s)return s}for(let s of t.browser){let i=Lr(s,r);if(i)return i}return n}function Nn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Sr="https://github.com/kevcltsai/visual-agent-map?ref=share",Or="und",ee="http://www.w3.org/2000/svg",Ln="vam-share-panel-width",Sn="vam-share-outline-open",Cr="(max-width: 600px)",Ir=300,Te=240,Rr=.25,Pr=2,_r=280,Dr=4,Hr={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},zr={core:"target",support:"library",side:"skip"},On=t=>t==="core"||t==="support"||t==="side",Tt=(t,r)=>t.replace("{0}",String(r));function Ee(t,r){var s;let n=(s=t.getElementById(r))==null?void 0:s.textContent;if(n)try{return JSON.parse(n)}catch{return}}function Cn(t){let r={...Zt};if(t&&typeof t=="object")for(let i of Object.keys(r)){let l=t[i];typeof l=="string"&&(r[i]=l)}let n=t&&typeof t=="object"?t.markerNames:void 0;if(n&&typeof n=="object"){r.markerNames={...Zt.markerNames};for(let i of Object.keys(r.markerNames)){let l=n[i];typeof l=="string"&&l.trim()&&(r.markerNames[i]=l)}}let s=t&&typeof t=="object"?t.colorNames:void 0;if(r.colorNames={...Zt.colorNames},s&&typeof s=="object")for(let i of Me){let l=s[i];typeof l=="string"&&l.trim()&&(r.colorNames[i]=l)}return r}function Br(t){let r=Ee(t,"vam-ui"),n=new Map,s={};if(r&&typeof r=="object"){if(r.uiByLanguage&&typeof r.uiByLanguage=="object")for(let[i,l]of Object.entries(r.uiByLanguage))n.set(i,Cn(l));if(r.languageNames&&typeof r.languageNames=="object")for(let[i,l]of Object.entries(r.languageNames))typeof l=="string"&&l&&(s[i]=l)}return{sets:n,names:s}}var ct=t=>typeof t=="string"&&t.trim()!=="";function ve(t){try{return window.localStorage.getItem(t)}catch{return null}}function we(t,r){try{window.localStorage.setItem(t,r)}catch{}}var pt=()=>window.matchMedia(Cr).matches;function In(t){var Ue,$e,je,Fe;let r=Cn(Ee(t,"vam-ui")),n=r;t.documentElement.lang=n.lang;let s=t.getElementById("vam-app"),i=Ee(t,"vam-map");if(!s)return;if(!i||i.format!=="vam-share"||i.version!==1||!Array.isArray(i.nodes)){s.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let l=i.assets&&typeof i.assets=="object"?i.assets:{},u=new Map,a=[];for(let e of i.nodes)!e||typeof e.id!="string"||u.has(e.id)||(u.set(e.id,e),a.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed}));let m=new Map(a.map(e=>[e.id,e]));for(let e of a)e.parentId&&(!m.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let g=new Map;for(let e of a)e.parentId&&g.set(e.parentId,[...(Ue=g.get(e.parentId))!=null?Ue:[],e]);let p=Br(t),h=Array.isArray(i.languages)?Array.from(new Set(i.languages.filter(ct))):[],M=Nn(($e=i.source)==null?void 0:$e.mapId),A=h.length>=2,z=A?h[0]:"",R=z;if(A){let e=[];try{e=Array.from((je=window.navigator.languages)!=null?je:[window.navigator.language]).filter(ct)}catch{}R=kn({languages:h,stored:M?ve(M):null,defaultLanguage:ct(i.defaultLanguage)?i.defaultLanguage:void 0,browser:e})}let C=e=>{var o;return(o=p.sets.get(e))!=null?o:r},N=A&&z===Or,O=()=>A&&R!==z;A&&(n=C(R),t.documentElement.lang=R);let w=e=>{var c;let o=O()?(c=e.translations)==null?void 0:c[R]:void 0;return!o||typeof o!="object"?e:{title:ct(o.title)?o.title:e.title,summary:ct(o.summary)?o.summary:e.summary,reason:ct(o.reason)?o.reason:e.reason,detailHtml:ct(o.detailHtml)?o.detailHtml:e.detailHtml,...yn(o)&&ct(e.detailHtml)?{compact:o,detailHtml:e.detailHtml}:{}}},U=()=>{var d;let e=O()?(d=i.translations)==null?void 0:d[R]:void 0,o=ct(e==null?void 0:e.title)?e.title:i.title,c=ct(e==null?void 0:e.goal)?e.goal:i.goal;return{title:typeof o=="string"&&o.trim()||n.untitledMap,goal:typeof c=="string"?c.trim():""}},b=(e,o)=>{var c;try{let d=new Intl.DisplayNames([o!=null?o:e],{type:"language"}).of(e);if(d&&d!==e)return d}catch{}return(c=p.names[e])!=null?c:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),o=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};o(),e.addEventListener("change",o)}catch{}let f=(e,o,c)=>{let d=gt(t,e);return o&&(d.className=o),c!==void 0&&(d.textContent=c),d},L=e=>{let o=t.createElementNS(ee,"svg");o.setAttribute("class","svg-icon"),o.setAttribute("viewBox","0 0 24 24"),o.setAttribute("aria-hidden","true");for(let c of Hr[e]){let[d,...y]=c.split("|"),k=t.createElementNS(ee,d);for(let I of y)k.setAttribute(I.slice(0,I.indexOf("=")),I.slice(I.indexOf("=")+1));o.append(k)}return o},P=(e,o,c,d)=>{let y=f("button",c,o);return y.type="button",y.addEventListener("click",k=>{k.stopPropagation(),d()}),e.append(y),y},x=(e,o,c,d)=>{let y=f("button");return y.type="button",y.setAttribute("aria-label",c),y.title=c,y.append(L(o)),y.addEventListener("click",k=>{k.stopPropagation(),d()}),e.append(y),y},D=e=>e==="core"?n.tierCore:e==="support"?n.tierSupport:n.tierSide,H=e=>En({"topic-markers":e.markers}),T=()=>/^(zh|ja)/.test(n.lang),$=(e,o)=>{if(!o.length)return e;let c=o.map(d=>n.markerNames[d]).join(T()?"\\u3001":", ");return`${e}${T()?"\\uFF0C":", "}${Tt(n.markerLabel,c)}`},v=e=>wn({"topic-color":e.color}),E=e=>{let o=f("span","vam-markers");for(let c of e){let d=f("span","vam-marker",An(c));d.dataset.marker=c,d.setAttribute("aria-hidden","true"),o.append(d)}return o},S=(e,o)=>{let c=f("span","vam-relevance-tag");c.dataset.tier=e,o&&(c.title=o);let d=f("span","vam-relevance-icon");return d.append(L(zr[e])),c.append(d,f("span",void 0,D(e))),c};s.className="vam-app";let K=f("div","vam-toolbar"),Y=f("h1","vam-map-switcher"),st=f("span","vam-shared");K.append(Y,st);let q=x(K,"list","",()=>Nt(Q.hidden,!0));K.prepend(q),q.setAttribute("aria-controls","vam-outline");let et=f("div","vam-toolbar-actions"),Z=f("select","vam-language");if(A){for(let e of h){let o=f("option",void 0,(Fe=p.names[e])!=null?Fe:b(e));o.value=e,N&&e===z&&(o.dataset.original="1"),Z.append(o)}Z.value=R,et.append(Z)}let rt=f("span","vam-made-with"),ht=f("a","vam-install");ht.href=Sr,ht.target="_blank",ht.rel="noopener noreferrer",et.append(rt,ht),K.append(et);let vt=f("div","vam-translate-note");vt.hidden=!0;let dt=f("div","vam-workspace"),F=f("div","vam-viewport"),wt=f("div","vam-stage");wt.setAttribute("role","tree");let Lt=t.createElementNS(ee,"svg");Lt.setAttribute("class","vam-edges"),Lt.setAttribute("aria-hidden","true"),wt.append(Lt),F.append(wt);let $t=f("div","vam-canvas-overlay"),Et=f("div","vam-map-tools"),St=f("span","vam-goal"),Ae=f("span","vam-goal-text");St.append(L("target"),Ae);let ke=f("span","vam-canvas-hint"),ft=f("div","vam-zoom-controls"),Rn=x(ft,"minus","",()=>It(1/1.2)),Ot=f("button","vam-zoom","100%");Ot.type="button",Ot.addEventListener("click",e=>{e.stopPropagation(),It(1/j.zoom)}),ft.append(Ot);let Pn=x(ft,"plus","",()=>It(1.2)),_n=x(ft,"max","",()=>Rt()),ut=f("button","vam-layout-button");ut.type="button",ut.setAttribute("aria-haspopup","menu"),ut.setAttribute("aria-expanded","false"),ft.append(ut);let nt=f("div","vam-layout-menu");nt.setAttribute("role","menu"),nt.hidden=!0,ft.append(nt),$t.append(Et,ke,ft);let V=f("aside","vam-inspector");V.hidden=!0;let Q=f("nav","vam-outline");Q.id="vam-outline";let Ct=f("div","vam-outline-tree");Ct.setAttribute("role","tree"),Q.append(Ct),dt.append(Q,F,$t,V),s.replaceChildren(...A?[K,vt,dt]:[K,dt]);let j={x:0,y:0,zoom:1},J=null,ne=!1,jt=Number(ve(Ln))||Ir,X=new Map,Dn=()=>{let e=new Set,o=(c,d)=>{var y;for(let k of(y=g.get(c.id))!=null?y:[])d&&e.add(k.id),o(k,d||k.collapsed)};for(let c of a)c.parentId||o(c,c.collapsed);return e},Ne=e=>{var c,d;let o=0;for(let y=e.parentId;y&&!(++o>a.length);y=(d=(c=m.get(y))==null?void 0:c.parentId)!=null?d:null);return o},Le=()=>en(F.getBoundingClientRect().top,Et.hidden?void 0:Et.getBoundingClientRect());function mt(){wt.style.transform=`translate(${j.x}px, ${j.y}px) scale(${j.zoom})`;let e=`${Math.round(j.zoom*100)}%`;Ot.textContent=e,Ot.setAttribute("aria-label",Tt(n.zoomReset,e))}function It(e,o){let c=o!=null?o:{x:F.clientWidth/2,y:F.clientHeight/2},d=Math.min(Pr,Math.max(Rr,j.zoom*e)),y=d/j.zoom;j={x:c.x-(c.x-j.x)*y,y:c.y-(c.y-j.y)*y,zoom:d},mt()}let re=!1;function Rt(){if(!X.size)return;if(!F.clientWidth||!F.clientHeight){re=!0;return}let e=1/0,o=1/0,c=-1/0,d=-1/0;for(let y of X.values())e=Math.min(e,y.offsetLeft),o=Math.min(o,y.offsetTop),c=Math.max(c,y.offsetLeft+(y.offsetWidth||_r)),d=Math.max(d,y.offsetTop+y.offsetHeight);j=rn({minX:e,minY:o,maxX:c,maxY:d},{width:F.clientWidth,height:F.clientHeight},Le()),mt()}function Se(e){let o=X.get(e);o&&(j=nn(j,{x:o.offsetLeft+o.offsetWidth/2,y:o.offsetTop+o.offsetHeight/2},{width:F.clientWidth,height:F.clientHeight},Le()),mt())}function At(){var e;Lt.replaceChildren();for(let o of a){let c=o.parentId?X.get(o.parentId):void 0,d=X.get(o.id);if(!c||!d)continue;let y=t.createElementNS(ee,"path");y.setAttribute("d",vn(c.offsetLeft+c.offsetWidth,c.offsetTop+c.offsetHeight/2,d.offsetLeft,d.offsetTop+d.offsetHeight/2)),y.setAttribute("class",((e=u.get(o.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Lt.append(y)}}let oe=0,Oe=()=>{oe||(oe=window.requestAnimationFrame(()=>{oe=0,At()}))},ie=e=>{let o=X.get(e),c=m.get(e);!o||!c||(o.style.left=`${c.x}px`,o.style.top=`${c.y}px`)};function se(){var o,c;for(let d of X.values())d.remove();X.clear();let e=Dn();for(let d of a){if(e.has(d.id))continue;let y=u.get(d.id),k=w(y),I=fe(a,d.id).size,B=On(y.tier)?y.tier:void 0,_=f("div",`vam-node${d.id===J?" is-selected":""}`);_.dataset.nodeId=d.id,_.dataset.status=y.status==="completed"?"completed":"idea",B&&(_.dataset.relevance=B),_.tabIndex=0,_.setAttribute("role","treeitem"),_.setAttribute("aria-level",String(Ne(d)+1)),_.setAttribute("aria-selected",String(d.id===J));let at=H(y),lt=v(y);lt&&(_.dataset.topicColor=lt);let tt=$(String((o=k.title)!=null?o:""),at);_.setAttribute("aria-label",lt?`${tt}${T()?"\\uFF0C":", "}${Tt(n.colorLabel,n.colorNames[lt])}`:tt),I&&_.setAttribute("aria-expanded",String(!d.collapsed));let G=f("div","vam-node-header");_.append(G),y.status!=="completed"&&G.append(f("span","vam-status vam-status-idea",n.toResearch)),B&&G.append(S(B,typeof k.reason=="string"?k.reason:void 0)),at.length&&G.append(E(at));let Ke=f("div","vam-node-tools");if(_.append(Ke),I){let it=d.collapsed?Tt(n.expandCount,I):n.collapse,pe=P(G,it,"vam-collapse-button",()=>{d.collapsed=!d.collapsed,Pt(d.id,!0)});pe.setAttribute("aria-expanded",String(!d.collapsed)),pe.setAttribute("aria-label",it),pe.title=it}P(Ke,n.detailsButton,void 0,()=>kt(d.id)),_.append(f("h3","vam-card-title",String((c=k.title)!=null?c:""))),typeof k.summary=="string"&&k.summary.trim()&&_.append(f("p","vam-card-summary",k.summary)),_.addEventListener("click",()=>{ne||kt(d.id)}),_.addEventListener("keydown",it=>{it.target===_&&(it.key==="Enter"||it.key===" "?(it.preventDefault(),kt(d.id)):I&&it.key===(d.collapsed?"ArrowRight":"ArrowLeft")&&(it.preventDefault(),d.collapsed=!d.collapsed,Pt(d.id)))}),_.addEventListener("pointerdown",it=>Hn(it,d,_)),wt.append(_),X.set(d.id,_),ie(d.id)}}function Ft(){tn(a,void 0,o=>{var c;return(c=X.get(o))==null?void 0:c.offsetHeight}).forEach((o,c)=>{a[c].x=o.x,a[c].y=o.y});for(let o of X.keys())ie(o)}function Pt(e,o=!1){var y;let c=e?(y=X.get(e))==null?void 0:y.getBoundingClientRect():void 0;se(),Ft(),At();let d=e?X.get(e):void 0;if(d){if(c){let I=d.getBoundingClientRect();j={...j,x:j.x+c.left-I.left,y:j.y+c.top-I.top},mt()}let k=o?d.querySelector(".vam-collapse-button"):null;(k!=null?k:d).focus({preventScroll:!0})}}function Hn(e,o,c){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let d=e.clientX,y=e.clientY,k=o.x,I=o.y,B=!1,_=lt=>{let tt=lt.clientX-d,G=lt.clientY-y;if(!B){if(Math.hypot(tt,G)<=Dr)return;B=!0,c.classList.add("is-dragging"),c.setPointerCapture(lt.pointerId)}o.x=k+tt/j.zoom,o.y=I+G/j.zoom,ie(o.id),Oe()},at=()=>{c.removeEventListener("pointermove",_),c.removeEventListener("pointerup",at),c.removeEventListener("pointercancel",at),c.classList.remove("is-dragging"),B&&(ne=!0,window.setTimeout(()=>ne=!1,0))};c.addEventListener("pointermove",_),c.addEventListener("pointerup",at),c.addEventListener("pointercancel",at)}let ae=e=>Math.round(Math.min(Math.max(Te,e),Math.max(Te,dt.clientWidth*.7)));function Kt(){let e=pt();if(V.hidden||e){V.style.removeProperty("width"),$t.style.removeProperty("right");return}let o=ae(jt);V.style.width=`${o}px`,$t.style.right=`${o}px`,W.setAttribute("aria-valuenow",String(o)),W.setAttribute("aria-valuemax",String(ae(1/0)))}let W=f("div","vam-inspector-resizer");W.setAttribute("role","separator"),W.setAttribute("aria-orientation","vertical"),W.setAttribute("aria-label",n.resizePanel),W.setAttribute("aria-valuemin",String(Te)),W.tabIndex=0;let Vt=(e,o)=>{jt=ae(e),Kt(),o&&we(Ln,String(jt))};W.addEventListener("pointerdown",e=>{e.preventDefault();let o=e.clientX,c=V.offsetWidth;W.setPointerCapture(e.pointerId),W.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let d=k=>Vt(c+o-k.clientX,!1),y=()=>{W.removeEventListener("pointermove",d),W.removeEventListener("pointerup",y),W.removeEventListener("pointercancel",y),W.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),Vt(jt,!0)};W.addEventListener("pointermove",d),W.addEventListener("pointerup",y),W.addEventListener("pointercancel",y)}),W.addEventListener("keydown",e=>{let o=e.shiftKey?48:16;if(e.key==="ArrowLeft")Vt(V.offsetWidth+o,!0);else if(e.key==="ArrowRight")Vt(V.offsetWidth-o,!0);else return;e.preventDefault()});let le=pt();window.addEventListener("resize",()=>{Kt(),mt(),pt()!==le&&(le=pt(),Nt(le?!1:Pe(),!1))});function ce(){J=null;for(let e of X.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");V.hidden=!0,dt.classList.remove("has-inspector"),V.replaceChildren(),Kt(),bt()}function kt(e){var _,at,lt;let o=m.get(e),c=u.get(e);if(!o||!c)return;let d={...c,...w(c)};J=e;for(let[tt,G]of X)G.classList.toggle("is-selected",tt===e),G.setAttribute("aria-selected",String(tt===e));V.replaceChildren(W);let y=f("div","vam-inspector-heading");y.append(f("strong",void 0,n.topicDetails)),P(y,n.close,void 0,ce),V.append(y,f("h3",void 0,String((_=d.title)!=null?_:"")));let k=On(d.tier)?d.tier:void 0;if(k){let tt=f("div","vam-inspector-why");tt.append(S(k));let G=typeof d.reason=="string"&&d.reason.trim()?d.reason:d.manual?n.manualReason:"";G&&tt.append(f("span",void 0,G)),V.append(tt)}typeof d.summary=="string"&&d.summary.trim()&&V.append(f("p","vam-sample-summary",d.summary));let I=f("div","vam-sample-detail");typeof d.detailHtml=="string"&&d.detailHtml.trim()?d.compact?Tn(t,I,d.detailHtml,d.compact,l,n):xe(t,I,d.detailHtml,l,n):I.append(f("p","vam-inspector-empty",n.noContent)),V.append(I);let B=(at=g.get(e))!=null?at:[];if(B.length){let tt=f("div","vam-subtopics");tt.append(f("strong",void 0,n.subtopics));for(let G of B)P(tt,String((lt=w(u.get(G.id)).title)!=null?lt:""),void 0,()=>{o.collapsed&&(o.collapsed=!1,Pt(o.id)),kt(G.id),Se(G.id)});V.append(tt)}V.hidden=!1,dt.classList.add("has-inspector"),Kt(),V.scrollTop=0,bt(),_e()}let de=e=>{me(a,e),Pt(),Rt()},_t=e=>{nt.hidden||(nt.hidden=!0,ut.setAttribute("aria-expanded","false"),e&&ut.focus())};function zn(){nt.replaceChildren();let e=[{label:n.collapseAll,run:()=>de(0)},{label:n.expandAll,run:()=>de(null)},...[1,2,3].map(o=>({label:Tt(n.expandToLevel,o),run:()=>de(o)})),null,{label:n.autoLayout,run:()=>{Ft(),At()}}];for(let o of e){if(!o){nt.append(f("hr"));continue}let c=f("button",void 0,o.label);c.type="button",c.setAttribute("role","menuitem"),c.addEventListener("click",d=>{d.stopPropagation(),_t(!0),o.run()}),nt.append(c)}}let Ce=()=>Array.from(nt.querySelectorAll("button"));ut.addEventListener("click",e=>{var o;if(e.stopPropagation(),!nt.hidden)return _t(!0);nt.hidden=!1,ut.setAttribute("aria-expanded","true"),(o=Ce()[0])==null||o.focus()}),nt.addEventListener("keydown",e=>{let o=Ce(),c=o.indexOf(t.activeElement);if(e.key==="ArrowDown")o[(c+1)%o.length].focus();else if(e.key==="ArrowUp")o[(c-1+o.length)%o.length].focus();else if(e.key==="Home")o[0].focus();else if(e.key==="End")o[o.length-1].focus();else return e.key==="Tab"?_t(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!nt.hidden&&!ft.contains(e.target)&&_t(!1);let o=e.target;pt()&&!Q.hidden&&!Q.contains(o)&&!q.contains(o)&&Nt(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!nt.hidden)_t(!0);else if(pt()&&!Q.hidden)Nt(!1,!1),q.focus();else if(!V.hidden){let o=J?X.get(J):void 0;ce(),o==null||o.focus({preventScroll:!0})}}});function Ie(){let e=U();if(t.title=e.title,Y.textContent=e.title,wt.setAttribute("aria-label",e.title),st.textContent=n.readOnly,rt.textContent=n.madeWithVam,ht.textContent=n.install,Z.setAttribute("aria-label",n.language),Z.title=n.language,N)for(let c of Array.from(Z.options))c.dataset.original&&(c.textContent=n.originalText);e.goal?(Ae.textContent=Tt(n.goal,e.goal),St.title=e.goal,St.parentElement||Et.append(St),Et.hidden=!1):(St.remove(),Et.hidden=!0),ke.textContent=n.hint;let o=(c,d)=>{c.setAttribute("aria-label",d),c.title=d};if(o(Rn,n.zoomOut),o(Pn,n.zoomIn),o(_n,n.showAll),ut.textContent=n.layout,V.setAttribute("aria-label",n.topicDetails),Q.setAttribute("aria-label",n.outline),Ct.setAttribute("aria-label",n.outline),o(q,n.outline),W.setAttribute("aria-label",n.resizePanel),zn(),O()){let c=N?n.aiTranslatedUnknown:Tt(n.aiTranslated,b(z,R));vt.textContent=`${c} ${n.imageTextUntranslated}`,vt.hidden=!1}else vt.hidden=!0;mt()}function Bn(e){if(e===R||!h.includes(e))return;R=e,n=C(e),M&&we(M,e),t.documentElement.lang=e;let o=V.scrollTop;Ie(),se(),At(),He(),J!==null&&m.has(J)&&!V.hidden&&(kt(J),V.scrollTop=o),Oe()}Z.addEventListener("change",()=>Bn(Z.value));let Yt=[],Re=e=>{var o;Yt.push(e);for(let c of(o=g.get(e.id))!=null?o:[])Re(c)};for(let e of a)e.parentId||Re(e);let Dt=new Set,yt=new Map,Wt=null;function Pe(){return ve(Sn)!=="0"}function Nt(e,o){Q.hidden=!e,dt.classList.toggle("has-outline",e),q.setAttribute("aria-expanded",String(e)),o&&!pt()&&we(Sn,e?"1":"0")}let Un=()=>Yt.filter(e=>{var o;return!((o=yt.get(e.id))!=null&&o.hidden)});function bt(){var c,d,y;let e=[];for(let k of Yt){let I=yt.get(k.id);if(!I)continue;let B=!1;for(let _=k.parentId;_&&!B;_=(d=(c=m.get(_))==null?void 0:c.parentId)!=null?d:null)B=Dt.has(_);I.hidden=B,B||e.push(k),g.has(k.id)&&I.setAttribute("aria-expanded",String(!Dt.has(k.id))),k.id===J?I.setAttribute("aria-current","true"):I.removeAttribute("aria-current")}let o=(y=e.find(k=>k.id===Wt))!=null?y:e[0];for(let[k,I]of yt)I.tabIndex=k===(o==null?void 0:o.id)?0:-1}function _e(){let e=J?yt.get(J):void 0;!e||e.hidden||!Q.clientHeight||(e.offsetTop<Q.scrollTop?Q.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>Q.scrollTop+Q.clientHeight&&(Q.scrollTop=e.offsetTop+e.offsetHeight-Q.clientHeight))}function ue(e){Dt.delete(e)||Dt.add(e),bt()}function $n(e){var o;Wt=e,bt(),(o=yt.get(e))==null||o.focus()}function jn(){for(let[e,o]of X)o.classList.toggle("is-selected",e===J),o.setAttribute("aria-selected",String(e===J))}function De(e){var y,k,I;let o=m.get(e);if(!o)return;let c=!1,d=0;for(let B=o.parentId;B&&d++<=a.length;B=(k=(y=m.get(B))==null?void 0:y.parentId)!=null?k:null){let _=m.get(B);_!=null&&_.collapsed&&(_.collapsed=!1,c=!0)}J=e,c&&Pt(),Se(e),V.hidden?jn():kt(e),bt(),_e(),pt()&&Nt(!1,!1),(I=X.get(e))==null||I.focus({preventScroll:!0})}function Fn(e,o){var B;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let c=Un(),d=c.indexOf(o),y=(B=g.get(o.id))!=null?B:[],k=Dt.has(o.id),I;switch(e.key){case"ArrowDown":I=c[d+1];break;case"ArrowUp":I=c[d-1];break;case"Home":I=c[0];break;case"End":I=c[c.length-1];break;case"ArrowRight":y.length&&k?ue(o.id):I=y[0];break;case"ArrowLeft":y.length&&!k?ue(o.id):I=o.parentId?m.get(o.parentId):void 0;break;case"Enter":case" ":De(o.id);break;default:return}e.preventDefault(),I&&$n(I.id)}function He(){var e;Ct.replaceChildren(),yt.clear();for(let o of Yt){let c=String((e=w(u.get(o.id)).title)!=null?e:""),d=f("div","vam-outline-item");d.dataset.outlineId=o.id,d.setAttribute("role","treeitem");let y=Ne(o)+1;d.setAttribute("aria-level",String(y)),d.style.setProperty("--depth",String(y-1));let k=f("span","vam-outline-twist");g.has(o.id)&&(k.append(L("chevron")),k.addEventListener("click",_=>{_.stopPropagation(),ue(o.id)}));let I=f("span","vam-outline-title",c);I.title=c,d.append(k,I);let B=H(u.get(o.id));B.length&&(d.append(E(B)),d.setAttribute("aria-label",$(c,B))),d.addEventListener("click",()=>De(o.id)),d.addEventListener("keydown",_=>Fn(_,o)),d.addEventListener("focus",()=>{Wt!==o.id&&(Wt=o.id,bt())}),Ct.append(d),yt.set(o.id,d)}bt()}let ot=new Map,Ht=0,Xt=!1;F.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(F.setPointerCapture(e.pointerId),ot.set(e.pointerId,{x:e.clientX,y:e.clientY}),F.classList.add("is-panning"),ot.size===1&&(Xt=!1),ot.size===2)){let[o,c]=Array.from(ot.values());Ht=Math.hypot(o.x-c.x,o.y-c.y)}}),F.addEventListener("pointermove",e=>{let o=ot.get(e.pointerId);if(!o)return;if(ot.set(e.pointerId,{x:e.clientX,y:e.clientY}),ot.size===2&&Ht){let[y,k]=Array.from(ot.values()),I=Math.hypot(y.x-k.x,y.y-k.y),B=F.getBoundingClientRect();It(I/Ht,{x:(y.x+k.x)/2-B.left,y:(y.y+k.y)/2-B.top}),Ht=I,Xt=!0;return}let c=e.clientX-o.x,d=e.clientY-o.y;Xt||(Xt=Math.abs(c)+Math.abs(d)>0),j={...j,x:j.x+c,y:j.y+d},mt()});let ze=e=>{ot.delete(e.pointerId)&&(ot.size<2&&(Ht=0),ot.size||(F.classList.remove("is-panning"),!Xt&&e.type==="pointerup"&&!V.hidden&&ce()))};F.addEventListener("pointerup",ze),F.addEventListener("pointercancel",ze),F.addEventListener("wheel",e=>{e.preventDefault();let o=F.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?It(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-o.left,y:e.clientY-o.top}):(j={...j,x:j.x-e.deltaX,y:j.y-e.deltaY},mt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{re&&(re=!1,Rt())}).observe(F),Ie(),He(),Nt(pt()?!1:Pe(),!1),me(a,1),se(),Ft(),At(),Rt();let Be=t.fonts;Be&&Be.ready.then(()=>{J!==null||ot.size||(Ft(),At(),Rt())})}In(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
-var escapeText3 = (text11) => text11.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+var escapeText4 = (text11) => text11.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 var jsonForScript = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 function uiBlockFor(ui, languages) {
   return languages && languages.length >= 2 ? { ...ui, ...shareViewerUiExtras(languages) } : { ...ui };
@@ -56481,13 +58261,13 @@ function buildHtml(title, ui, mapJson, languages, contentLanguage) {
   return [
     "<!doctype html>",
     // The page language is the language of the content (the viewer updates it when the reader switches).
-    `<html lang="${escapeText3(contentLanguage || ui.lang)}">`,
+    `<html lang="${escapeText4(contentLanguage || ui.lang)}">`,
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
     '<meta name="color-scheme" content="light dark">',
     `<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">`,
-    `<title>${escapeText3(title)}</title>`,
+    `<title>${escapeText4(title)}</title>`,
     `<style>${SHARE_VIEWER_CSS}</style>`,
     "</head>",
     "<body>",
@@ -56526,12 +58306,12 @@ var IMAGE_MIME = {
 };
 var SHARE_WEBP_QUALITY = 0.82;
 var MERMAID_UNIT = ".mermaid-wrapper, .mermaid";
-var blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+var blobToDataUrl = (blob) => new Promise((resolve, reject2) => {
   const reader = new FileReader();
   reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
   reader.onerror = () => {
     var _a2;
-    return reject((_a2 = reader.error) != null ? _a2 : new Error("read failed"));
+    return reject2((_a2 = reader.error) != null ? _a2 : new Error("read failed"));
   };
   reader.readAsDataURL(blob);
 });
@@ -56638,7 +58418,7 @@ async function installWrapper() {
   if (installedWrapper) return;
   installing != null ? installing : installing = (async () => {
     try {
-      const mermaid = await (0, import_obsidian34.loadMermaid)();
+      const mermaid = await (0, import_obsidian35.loadMermaid)();
       const original = mermaid.render;
       if (typeof original === "function" && !installedWrapper) {
         const wrapped = function(id, text11, ...rest) {
@@ -56686,7 +58466,7 @@ var ShareExporter = class {
     __publicField(this, "images", /* @__PURE__ */ new Map());
     __publicField(this, "registry", createAssetRegistry());
     __publicField(this, "ownerPath", /* @__PURE__ */ new Map());
-    __publicField(this, "component", new import_obsidian34.Component());
+    __publicField(this, "component", new import_obsidian35.Component());
     __publicField(this, "container", null);
     __publicField(this, "disposed", false);
     __publicField(this, "forbidden", null);
@@ -56754,13 +58534,13 @@ var ShareExporter = class {
   async renderOne(detail, titles, ticket) {
     const cleaned = cleanShareMarkdown(detail, { titleOf: (target) => titles.get(target), assets: this.registry });
     const host = this.host().createDiv();
-    const child = new import_obsidian34.Component();
+    const child = new import_obsidian35.Component();
     this.component.addChild(child);
     const hasDiagram = /(`{3,}|~{3,})[ \t]*mermaid\b/i.test(cleaned.markdown);
     const capture = hasDiagram ? await captureMermaidSources() : { sources: /* @__PURE__ */ new Map(), restore() {
     } };
     try {
-      await import_obsidian34.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
+      await import_obsidian35.MarkdownRenderer.render(this.app, cleaned.markdown, host, "", child);
       assertCurrent(ticket);
       await this.settleMermaid(host, ticket);
       const finished = this.finish(host, capture.sources);
@@ -56789,11 +58569,11 @@ var ShareExporter = class {
     if (this.disposed || signal.aborted) return null;
     const ticket = { generation: 0, signal, isCurrent: () => !signal.aborted && !this.disposed };
     const host = this.host().createDiv();
-    const child = new import_obsidian34.Component();
+    const child = new import_obsidian35.Component();
     this.component.addChild(child);
     try {
       const fence = source.includes("```") ? "~~~~" : "```";
-      await import_obsidian34.MarkdownRenderer.render(this.app, `${fence}mermaid
+      await import_obsidian35.MarkdownRenderer.render(this.app, `${fence}mermaid
 ${source}
 ${fence}`, host, "", child);
       await this.settleMermaid(host, ticket);
@@ -56868,7 +58648,7 @@ ${fence}`, host, "", child);
         pre.after(caption);
       }
     const clean4 = createDiv();
-    clean4.append((0, import_obsidian34.sanitizeHTMLToDom)(host.innerHTML));
+    clean4.append((0, import_obsidian35.sanitizeHTMLToDom)(host.innerHTML));
     unwrapLocalLinks(clean4, () => createSpan());
     scrubShareTree(clean4);
     const slots = Array.from(clean4.querySelectorAll(".vam-mermaid-slot"));
@@ -56894,8 +58674,8 @@ ${fence}`, host, "", child);
     const relative = resolveRelative(folder, entry.ref);
     const candidates = [
       (_c = this.app.metadataCache.getFirstLinkpathDest(entry.ref, fromPath)) == null ? void 0 : _c.path,
-      relative ? (0, import_obsidian34.normalizePath)(relative) : void 0,
-      (0, import_obsidian34.normalizePath)(entry.ref)
+      relative ? (0, import_obsidian35.normalizePath)(relative) : void 0,
+      (0, import_obsidian35.normalizePath)(entry.ref)
     ];
     for (const path of candidates) {
       const file = path ? this.app.vault.getFileByPath(path) : null;
@@ -56931,7 +58711,7 @@ ${fence}`, host, "", child);
       const folder = this.source.mapPath.split("/").slice(0, -1).join("/");
       this.forbidden = forbiddenStringsFor(
         {
-          vaultPath: adapter instanceof import_obsidian34.FileSystemAdapter ? adapter.getBasePath() : void 0,
+          vaultPath: adapter instanceof import_obsidian35.FileSystemAdapter ? adapter.getBasePath() : void 0,
           vaultName: this.app.vault.getName(),
           mapFolder: folder
         },
@@ -57124,8 +58904,8 @@ function originalLanguage(source, uiLanguage) {
     const detected = detectAimContentLanguage(text11);
     return detected === void 0 || isFollowInputLanguage(detected) ? SHARE_UNKNOWN_LANGUAGE : detected;
   };
-  const own = [source.map.title, source.goal].find(hasLetter);
-  if (own !== void 0) return named(own);
+  const own2 = [source.map.title, source.goal].find(hasLetter);
+  if (own2 !== void 0) return named(own2);
   const found = /* @__PURE__ */ new Set();
   for (const note of Array.from(source.notes.values()).slice(0, 30))
     for (const text11 of [note.title, note.summary]) if (hasLetter(text11)) found.add(named(text11));
@@ -57133,7 +58913,7 @@ function originalLanguage(source, uiLanguage) {
 }
 var UNVERIFIED_LANGUAGES = ["ja", "ko", "es"];
 var AUTO_LANGUAGE = "auto";
-var ShareModal = class extends import_obsidian35.Modal {
+var ShareModal = class extends import_obsidian36.Modal {
   constructor(app, options) {
     var _a2, _b2;
     super(app);
@@ -57189,14 +58969,14 @@ var ShareModal = class extends import_obsidian35.Modal {
   onOpen() {
     this.titleEl.setText(t("share.title"));
     this.contentEl.createEl("p", { text: t("share.intro"), cls: "vam-modal-intro" });
-    this.fullSetting = new import_obsidian35.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle((toggle) => {
+    this.fullSetting = new import_obsidian36.Setting(this.contentEl).setName(t("share.option_full_name")).setDesc(t("share.option_full_desc")).addToggle((toggle) => {
       this.fullToggle = toggle;
       toggle.setValue(this.includeDetail).onChange((value) => {
         this.includeDetail = value;
         this.restart();
       });
     });
-    this.imagesSetting = new import_obsidian35.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t("share.option_images_desc")).addToggle((toggle) => {
+    this.imagesSetting = new import_obsidian36.Setting(this.contentEl).setName(t("share.option_images_name")).setDesc(t("share.option_images_desc")).addToggle((toggle) => {
       this.imagesToggle = toggle;
       toggle.setValue(this.includeImages).onChange((value) => {
         this.includeImages = value;
@@ -57264,11 +59044,11 @@ var ShareModal = class extends import_obsidian35.Modal {
   openTranslationSection() {
     const host = this.options.translation;
     if (!host) return;
-    new import_obsidian35.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
+    new import_obsidian36.Setting(this.contentEl).setName(t("share.translate_section")).setHeading();
     this.contentEl.createEl("p", { text: t("share.translate_intro"), cls: "vam-modal-intro" });
     for (const language2 of SHARE_TRANSLATION_LANGUAGES) {
       const original = language2 === this.sourceLanguage;
-      const setting = new import_obsidian35.Setting(this.contentEl).setName(
+      const setting = new import_obsidian36.Setting(this.contentEl).setName(
         original ? t("share.translate_original_0", this.languageLabel(language2)) : this.languageLabel(language2)
       );
       if (!original && UNVERIFIED_LANGUAGES.includes(language2))
@@ -57281,7 +59061,7 @@ var ShareModal = class extends import_obsidian35.Modal {
             else this.picked.delete(language2);
             if (!value && this.defaultChoice === language2) {
               this.defaultChoice = AUTO_LANGUAGE;
-              new import_obsidian35.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
+              new import_obsidian36.Notice(t("share.translate_open_reset_0", this.languageLabel(language2)));
             }
             this.renderOpenLanguage();
             this.selectionChanged();
@@ -57291,7 +59071,7 @@ var ShareModal = class extends import_obsidian35.Modal {
     }
     this.openLangEl = this.contentEl.createDiv();
     this.renderOpenLanguage();
-    this.modelSetting = new import_obsidian35.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
+    this.modelSetting = new import_obsidian36.Setting(this.contentEl).setName(t("share.translate_model_name")).setDesc(t("share.translate_model_desc")).addDropdown((dropdown) => {
       this.modelDropdown = dropdown;
       dropdown.addOption(FOLLOW_DEFAULT_MODEL, t("ui.follow_default_model", host.modelLabel(host.defaultModel())));
       for (const id of host.models()) dropdown.addOption(id, host.modelLabel(id));
@@ -57312,7 +59092,7 @@ var ShareModal = class extends import_obsidian35.Modal {
     if (!container) return;
     container.empty();
     const ids = [String(this.sourceLanguage), ...this.selected()];
-    this.openLangSetting = new import_obsidian35.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
+    this.openLangSetting = new import_obsidian36.Setting(container).setName(t("share.translate_open_language")).setDesc(t("share.translate_default_desc")).addDropdown((dropdown) => {
       this.openLangDropdown = dropdown;
       dropdown.addOption(AUTO_LANGUAGE, t("share.translate_default_auto"));
       for (const id of ids) dropdown.addOption(id, this.languageLabel(id));
@@ -57439,7 +59219,7 @@ var ShareModal = class extends import_obsidian35.Modal {
       this.phase = "done";
       this.estimateMemo = null;
       this.applyTranslation();
-      new import_obsidian35.Notice(t("share.translate_done"));
+      new import_obsidian36.Notice(t("share.translate_done"));
       this.render();
       this.saveButton.focus();
     } catch (error) {
@@ -57482,7 +59262,7 @@ var ShareModal = class extends import_obsidian35.Modal {
     if (choice2 === AUTO_LANGUAGE || choice2 === String(this.sourceLanguage)) return;
     const carried = ((_b2 = (_a2 = this.translationArg()) == null ? void 0 : _a2.pieces) != null ? _b2 : []).map((item) => item.language);
     if (carried.includes(choice2)) return;
-    new import_obsidian35.Notice(
+    new import_obsidian36.Notice(
       t("share.translate_open_dropped_0_1", this.languageLabel(choice2), this.languageLabel(String(this.sourceLanguage)))
     );
   }
@@ -57568,7 +59348,7 @@ var ShareModal = class extends import_obsidian35.Modal {
         row.createDiv({ text: t("share.translate_unverified_0", label), cls: "vam-share-note" });
     }
     if (item.status === "incomplete")
-      new import_obsidian35.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
+      new import_obsidian36.Setting(row).setName(`${label}: ${t("share.translate_include_incomplete")}`).addToggle(
         (toggle) => toggle.setValue(this.includeIncomplete.has(item.language)).onChange((value) => {
           if (value) this.includeIncomplete.add(item.language);
           else this.includeIncomplete.delete(item.language);
@@ -57690,9 +59470,9 @@ var ShareModal = class extends import_obsidian35.Modal {
     try {
       const write = (_a2 = this.options.writeClipboard) != null ? _a2 : (text11) => navigator.clipboard.writeText(text11);
       await write(publishInstructions());
-      new import_obsidian35.Notice(t("share.publish_done"));
+      new import_obsidian36.Notice(t("share.publish_done"));
     } catch (e) {
-      new import_obsidian35.Notice(t("share.publish_fail"));
+      new import_obsidian36.Notice(t("share.publish_fail"));
       this.publishFallback = true;
       if (!this.closed) this.render();
     }
@@ -57743,12 +59523,12 @@ var ShareModal = class extends import_obsidian35.Modal {
       else {
         const size = formatBytes(result.bytes);
         this.savedText = t(outcome === "saved" ? "share.saved_0_1" : "share.downloaded_0_1", name, size);
-        new import_obsidian35.Notice(this.savedText);
+        new import_obsidian36.Notice(this.savedText);
       }
     } catch (e) {
       if (!this.closed) {
         this.savedText = "";
-        new import_obsidian35.Notice(t("share.save_failed"));
+        new import_obsidian36.Notice(t("share.save_failed"));
       }
     }
     this.saving = false;
@@ -57757,13 +59537,13 @@ var ShareModal = class extends import_obsidian35.Modal {
 };
 
 // experiences/sharing/share-translate-dom.ts
-var import_obsidian36 = require("obsidian");
+var import_obsidian37 = require("obsidian");
 function obsidianTranslateDom() {
   return {
     parse: (html) => new DOMParser().parseFromString(html, "text/html").body,
     serialize: (root) => root.innerHTML,
     sanitize: (root) => {
-      const clean4 = (0, import_obsidian36.sanitizeHTMLToDom)(root.innerHTML);
+      const clean4 = (0, import_obsidian37.sanitizeHTMLToDom)(root.innerHTML);
       root.replaceChildren(clean4);
     },
     createSpan: () => createSpan(),
@@ -58448,9 +60228,9 @@ var ShallowExpansionCoordinator = class {
     };
     let rejectFirst = () => {
     };
-    const accepted = new Promise((resolve, reject) => {
+    const accepted = new Promise((resolve, reject2) => {
       acceptFirst = resolve;
-      rejectFirst = reject;
+      rejectFirst = reject2;
     });
     void (async () => {
       let dispatchAccepted = false;
@@ -59129,10 +60909,10 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
 }
 
 // experiences/markdown-context/selection-ai.ts
-var import_obsidian38 = require("obsidian");
+var import_obsidian39 = require("obsidian");
 
 // experiences/markdown-context/image-translate-action.ts
-var import_obsidian37 = require("obsidian");
+var import_obsidian38 = require("obsidian");
 
 // experiences/markdown-context/steps/image-translate/prompt.md
 var prompt_default8 = "Edit the attached image: create the same image with every piece of visible text translated into {{target}}.\nKeep the layout, illustrations, colors, arrows, icons and style the same; only replace the text, in a matching size and weight that fits each original text area. Do not add, remove or redraw other content. Leave proper names, numbers and units as they are unless they are normally translated.\nGenerate the image with the image generation tool, then reply with one short sentence describing the result in {{target}}.\n";
@@ -59158,7 +60938,7 @@ var languageIdsPattern = () => [...SUPPORTED_LANGUAGES, ...OUTPUT_LANGUAGE_CHOIC
 function imageFileBase(alt) {
   return (alt || "image").replace(/\.(?:png|jpe?g|gif|webp)$/i, "").replace(new RegExp(`-(?:${languageIdsPattern()})(?:[ -]\\d+)?$`), "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
-var ImageTranslateAction = class extends import_obsidian37.Component {
+var ImageTranslateAction = class extends import_obsidian38.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -59239,7 +61019,7 @@ var ImageTranslateAction = class extends import_obsidian37.Component {
     this.target = { view, path: view.file.path, image, token };
     const rect = image.getBoundingClientRect();
     const pill = this.app.workspace.containerEl.createEl("button", { cls: "vam-image-action vam-image-action-pill" });
-    (0, import_obsidian37.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
+    (0, import_obsidian38.setIcon)(pill.createSpan({ cls: "vam-image-action-icon" }), "wand-sparkles");
     pill.createSpan({ text: t("ui.image_translate_action") });
     pill.addEventListener("click", () => this.openPopover());
     this.pill = pill;
@@ -59277,7 +61057,7 @@ var ImageTranslateAction = class extends import_obsidian37.Component {
     header.createEl("strong", { text: t("ui.image_translate_action"), attr: { id: titleId } });
     const close = header.createEl("button", { cls: "clickable-icon" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian37.setIcon)(close, "x");
+    (0, import_obsidian38.setIcon)(close, "x");
     close.addEventListener("click", () => this.hide());
     const field = popover.createEl("label", { cls: "vam-image-action-field" });
     field.createSpan({ text: t("ui.image_translate_language") });
@@ -59357,10 +61137,10 @@ var ImageTranslateAction = class extends import_obsidian37.Component {
       const link = this.app.fileManager.generateMarkdownLink(saved, target.path);
       const embed = link.startsWith("!") ? link : `!${link}`;
       const outcome = await this.write(target, note, embed, placement);
-      new import_obsidian37.Notice(t(outcome, saved.path));
+      new import_obsidian38.Notice(t(outcome, saved.path));
       saved = null;
     } catch (error) {
-      if (!controller.signal.aborted) new import_obsidian37.Notice(error instanceof Error ? error.message : String(error));
+      if (!controller.signal.aborted) new import_obsidian38.Notice(error instanceof Error ? error.message : String(error));
       if (saved) await this.app.fileManager.trashFile(saved);
     } finally {
       if (this.running === controller) {
@@ -59411,7 +61191,7 @@ ${embed}
     };
     const open = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view) => {
       var _a2;
-      return view instanceof import_obsidian37.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
+      return view instanceof import_obsidian38.MarkdownView && ((_a2 = view.file) == null ? void 0 : _a2.path) === note.path;
     });
     if (open) {
       const editor = open.editor;
@@ -59582,7 +61362,7 @@ function locateImageToken(view, image, markdown, matches) {
   return rendered.length === matches.length ? toToken(matches[rendered.indexOf(image)]) : null;
 }
 var panelSequence2 = 0;
-var MarkdownSelectionAi = class extends import_obsidian38.Component {
+var MarkdownSelectionAi = class extends import_obsidian39.Component {
   constructor(app, options) {
     super();
     this.app = app;
@@ -59617,8 +61397,8 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
       const image = event.target;
       if (!(image instanceof HTMLImageElement) || !this.options.autoOpen()) return;
       if (image.closest(".vam-context-ai-panel, .vam-image-action")) return;
-      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian38.MarkdownView && candidate.containerEl.contains(image));
-      if (!(view instanceof import_obsidian38.MarkdownView) || !view.file) return;
+      const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((candidate) => candidate instanceof import_obsidian39.MarkdownView && candidate.containerEl.contains(image));
+      if (!(view instanceof import_obsidian39.MarkdownView) || !view.file) return;
       const markdown = view.editor.getValue();
       const embeddedPath = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src");
       const tokens2 = [...markdown.matchAll(/!\[\[[^\]\n]+\]\]|!\[[^\]\n]*\]\([^\n]+?\)/g)].filter((match) => {
@@ -59672,9 +61452,9 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount ? selection.getRangeAt(0) : null;
     const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find(
-      (candidate) => candidate instanceof import_obsidian38.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
+      (candidate) => candidate instanceof import_obsidian39.MarkdownView && candidate.file && (range ? candidate.containerEl.contains(range.commonAncestorContainer) : candidate.getMode() === "source" && candidate.containerEl.contains(document.activeElement))
     );
-    if (!(view instanceof import_obsidian38.MarkdownView) || !view.file) {
+    if (!(view instanceof import_obsidian39.MarkdownView) || !view.file) {
       this.hideLauncher();
       return;
     }
@@ -59716,7 +61496,7 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
     }
     this.updateLauncher(this.options.autoOpen());
     if (!this.snapshot) {
-      const view = this.app.workspace.getActiveViewOfType(import_obsidian38.MarkdownView);
+      const view = this.app.workspace.getActiveViewOfType(import_obsidian39.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
       const matchAt = view.editor.posToOffset(view.editor.getCursor());
@@ -59750,7 +61530,7 @@ var MarkdownSelectionAi = class extends import_obsidian38.Component {
     this.panel.open();
   }
 };
-var SelectionAiPanel = class extends import_obsidian38.Component {
+var SelectionAiPanel = class extends import_obsidian39.Component {
   constructor(app, snapshot, modelOf, modelLabel, language2, translateTarget, run) {
     super();
     this.app = app;
@@ -59795,7 +61575,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     this.titleEl.id = titleId;
     const close = header.createEl("button", { cls: "clickable-icon vam-context-ai-close" });
     close.setAttribute("aria-label", t("ui.close"));
-    (0, import_obsidian38.setIcon)(close, "x");
+    (0, import_obsidian39.setIcon)(close, "x");
     close.addEventListener("click", () => this.close());
     this.contentEl = this.modalEl.createDiv({ cls: "vam-context-ai-body" });
     this.load();
@@ -59869,7 +61649,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     const preset = (id, icon, label, prompt) => {
       const button = this.presets.createEl("button", { cls: "vam-context-ai-preset" });
       button.dataset.preset = id;
-      (0, import_obsidian38.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
+      (0, import_obsidian39.setIcon)(button.createSpan({ cls: "vam-context-ai-preset-icon" }), icon);
       button.createSpan({ text: label });
       button.addEventListener(
         "click",
@@ -59938,7 +61718,7 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     const bar = footer.createDiv({ cls: "vam-context-ai-bar" });
     bar.createSpan({
       cls: "vam-context-ai-shortcut",
-      text: t("ui.context_ai_shortcut", import_obsidian38.Platform.isMacOS ? "\u2318" : "Ctrl")
+      text: t("ui.context_ai_shortcut", import_obsidian39.Platform.isMacOS ? "\u2318" : "Ctrl")
     });
     this.stopButton = bar.createEl("button", { text: t("ui.cancel") });
     this.stopButton.addEventListener("click", () => {
@@ -60117,9 +61897,9 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
           result = result.replace(/\r\n?/g, "\n");
           if (!/^```mermaid[ \t]*\n(?:(?!```)[\s\S])+\n```$/.test(result.trim()) || unsafeMermaid(result.trim().split("\n").slice(1, -1)) || /(?:%%\{|@\{|\bimg\s*:|\bimage\s*:|\burl\s*\(|https?:|data:|file:|javascript:)/i.test(result))
             throw new Error(t("ui.context_ai_invalid_diagram"));
-          this.previewChild = new import_obsidian38.Component();
+          this.previewChild = new import_obsidian39.Component();
           this.previewChild.load();
-          await import_obsidian38.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
+          await import_obsidian39.MarkdownRenderer.render(this.app, result, this.preview, this.snapshot.path, this.previewChild);
         }
       }
       if (controller.signal.aborted || !this.modalEl.isConnected) return;
@@ -60148,13 +61928,13 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     if (!captionInstruction.trim()) return markdown;
     const image = createEl("img");
     image.referrerPolicy = "no-referrer";
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve, reject2) => {
       const finish = (error) => {
         window.clearTimeout(timeout);
         signal.removeEventListener("abort", abort);
         image.onload = null;
         image.onerror = null;
-        if (error) reject(error);
+        if (error) reject2(error);
         else resolve();
       };
       const abort = () => {
@@ -60220,7 +62000,7 @@ ${value}
       editor.replaceRange(addition, end, end);
     }
     this.close();
-    new import_obsidian38.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
+    new import_obsidian39.Notice(action === "replace" ? t("ui.context_ai_replaced") : t("ui.context_ai_appended"));
   }
 };
 
@@ -60275,7 +62055,7 @@ function settingsFromSaved(saved) {
   };
 }
 var CHART_JOB_LIMIT = 3;
-var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
+var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
   constructor() {
     super(...arguments);
     /** Diagnostics for the mermaid zoom viewer (observer count); read by UI checks only. */
@@ -60313,7 +62093,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       claudePath: () => this.settings.claudePath,
       clientVersion: () => this.manifest.version || "0.0.0",
       pluginDirectory: () => this.pluginDirectory(),
-      readLocalFile: (path) => import_obsidian39.FileSystemAdapter.readLocalFile(path),
+      readLocalFile: (path) => import_obsidian40.FileSystemAdapter.readLocalFile(path),
       onLog: (level, message) => this.logs.appendLog(level, message),
       checks: {
         refresh: (id) => this.refreshModelDiscovery(id),
@@ -60331,7 +62111,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       claudeRuntime: (directory) => this.claudeCli(directory),
       mermaidParses: async (code) => {
         try {
-          const mermaid = await (0, import_obsidian39.loadMermaid)();
+          const mermaid = await (0, import_obsidian40.loadMermaid)();
           await mermaid.parse(code);
           return true;
         } catch (e) {
@@ -60409,7 +62189,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
-      new import_obsidian39.Notice(message);
+      new import_obsidian40.Notice(message);
     });
     return result;
   }
@@ -60502,10 +62282,10 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     var _a2;
     const view = (_a2 = source != null ? source : this.app.workspace.getActiveViewOfType(VisualAgentMapView)) != null ? _a2 : this.views()[0];
     const snapshot = view == null ? void 0 : view.shareSnapshot();
-    if (!snapshot || snapshot === "none") return void new import_obsidian39.Notice(t("share.unavailable_no_map"));
-    if (snapshot === "sample") return void new import_obsidian39.Notice(t("share.unavailable_sample"));
-    if (snapshot === "aim") return void new import_obsidian39.Notice(t("share.unavailable_aim"));
-    if (snapshot === "empty") return void new import_obsidian39.Notice(t("share.unavailable_empty"));
+    if (!snapshot || snapshot === "none") return void new import_obsidian40.Notice(t("share.unavailable_no_map"));
+    if (snapshot === "sample") return void new import_obsidian40.Notice(t("share.unavailable_sample"));
+    if (snapshot === "aim") return void new import_obsidian40.Notice(t("share.unavailable_aim"));
+    if (snapshot === "empty") return void new import_obsidian40.Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
       source: snapshot,
       vamVersion: this.manifest.version || "0.0.0",
@@ -60547,12 +62327,12 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       this.useOutlineSource(leaf.view);
       return;
     }
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian39.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian40.MarkdownView) || !leaf.view.file || !this.isMap(leaf.view.file)) return;
     const path = leaf.view.file.path;
-    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian39.Notice(error instanceof Error ? error.message : String(error)));
+    void leaf.setViewState({ type: VIEW_TYPE, state: { file: path }, active: true }).catch((error) => new import_obsidian40.Notice(error instanceof Error ? error.message : String(error)));
   }
   async onload() {
-    announceTestOverrides((message) => new import_obsidian39.Notice(message, 0));
+    announceTestOverrides((message) => new import_obsidian40.Notice(message, 0));
     const saved = await this.loadData();
     this.settings = settingsFromSaved(saved);
     if (hasLegacyChatModel(saved)) await this.saveSettings();
@@ -60588,11 +62368,11 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       key: "ui.context_ai_open"
     });
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
-    if (this.app.vault.adapter instanceof import_obsidian39.FileSystemAdapter && this.manifest.dir) {
+    if (this.app.vault.adapter instanceof import_obsidian40.FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
       this.exchanges = new AiExchangeLog(
         adapter,
-        (0, import_obsidian39.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
+        (0, import_obsidian40.normalizePath)(`${this.manifest.dir}/ai-exchanges.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.exchange_log_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -60601,7 +62381,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       await this.exchanges.load();
       this.pendingSuggestions = new PendingSuggestions(
         adapter,
-        (0, import_obsidian39.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
+        (0, import_obsidian40.normalizePath)(`${this.manifest.dir}/pending-suggestions.json`),
         (error) => this.logs.appendLog(
           "error",
           t("log.pending_suggestions_save_failed_0", error instanceof Error ? error.message : String(error))
@@ -60633,7 +62413,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
         await this.saveSettings();
-        if (count) new import_obsidian39.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
+        if (count) new import_obsidian40.Notice(t("ui.synced_0_subtopic_filenames_with_their_names", count));
       }
     });
     this.ready = initialize;
@@ -60653,7 +62433,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     this.registerView(COFFEE_TABLES_VIEW_TYPE, (leaf) => new CoffeeTablesView(leaf, this));
     this.buildCoffee();
     const openCoffee = () => {
-      void this.activateCoffeeTables().catch((error) => new import_obsidian39.Notice(String(error)));
+      void this.activateCoffeeTables().catch((error) => new import_obsidian40.Notice(String(error)));
     };
     const coffeeRibbonIcon = this.addRibbonIcon("coffee", t("ui.open_coffee_tables"), openCoffee);
     this.coffeeRibbonIcon = coffeeRibbonIcon;
@@ -60670,12 +62450,12 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
           }
           await this.openDetails(this.repo.file(path));
         } catch (error) {
-          new import_obsidian39.Notice(error instanceof Error ? error.message : String(error));
+          new import_obsidian40.Notice(error instanceof Error ? error.message : String(error));
         }
       })
     );
     this.ribbonIcon = this.addRibbonIcon("brain-circuit", t("ui.open_map"), () => {
-      void this.activateView().catch((error) => new import_obsidian39.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian40.Notice(String(error)));
     });
     const mapRibbonIcon = this.ribbonIcon;
     this.app.workspace.onLayoutReady(() => this.register(groupRibbonIcons(mapRibbonIcon, coffeeRibbonIcon)));
@@ -60693,23 +62473,29 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
       key: "ui.map_chat_toggle_command"
     });
     this.addLocalizedCommand("open-map", "ui.open_map", () => {
-      void this.activateView().catch((error) => new import_obsidian39.Notice(String(error)));
+      void this.activateView().catch((error) => new import_obsidian40.Notice(String(error)));
     });
     this.addLocalizedCommand(AIM_CREATE_MAP_COMMAND_ID, "ui.aim_create_map", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openAimStart();
-      }).catch((error) => new import_obsidian39.Notice(String(error)));
+      }).catch((error) => new import_obsidian40.Notice(String(error)));
     });
     this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
       void this.activateView().then(() => {
         var _a2;
         return (_a2 = this.views()[0]) == null ? void 0 : _a2.openOutlineImport();
-      }).catch((error) => new import_obsidian39.Notice(String(error)));
+      }).catch((error) => new import_obsidian40.Notice(String(error)));
+    });
+    this.addLocalizedCommand("import-outline-exchange", "ui.exchange_import", () => {
+      void this.activateView().then(() => {
+        const view = this.views()[0];
+        if (view) chooseAndImportExchange(view);
+      }).catch((error) => new import_obsidian40.Notice(String(error)));
     });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
-      void this.activateOutline().catch((error) => new import_obsidian39.Notice(String(error)));
+      void this.activateOutline().catch((error) => new import_obsidian40.Notice(String(error)));
     });
     this.addLocalizedCommand("rebuild-references", "ui.refresh_vam_data", () => {
       this.runMutation(() => this.fullRebuild());
@@ -60717,23 +62503,23 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     this.addLocalizedCommand("normalize-note-filenames", "ui.sync_topic_names_and_filenames", () => {
       this.runMutation(async () => {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
-        new import_obsidian39.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
+        new import_obsidian40.Notice(count ? t("ui.synced_0_topic_filenames", count) : t("ui.topic_filenames_are_up_to_date"));
       });
     });
     this.addLocalizedCommand("repair-note-presentation", "ui.repair_topic_note_display", () => {
       this.runMutation(async () => {
         await this.repo.ensureNodePresentation();
-        new import_obsidian39.Notice(t("ui.topic_note_display_repaired"));
+        new import_obsidian40.Notice(t("ui.topic_note_display_repaired"));
       });
     });
     this.addLocalizedCommand("fix-math-formulas", "ui.fix_math_formulas", () => {
       void this.offerFixMathFormulas().catch(
-        (error) => new import_obsidian39.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian40.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("organize-workspace-folders", "ui.organize_workspace_folders", () => {
       void this.offerOrganizeWorkspaceFolders().catch(
-        (error) => new import_obsidian39.Notice(error instanceof Error ? error.message : String(error))
+        (error) => new import_obsidian40.Notice(error instanceof Error ? error.message : String(error))
       );
     });
     this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => {
@@ -60768,7 +62554,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     this.addSettingTab(this.settingTab);
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (file instanceof import_obsidian39.TFile && this.isMap(file))
+        if (file instanceof import_obsidian40.TFile && this.isMap(file))
           menu.addItem(
             (item) => item.setTitle(t("ui.open_as_mind_map")).setIcon("brain-circuit").onClick(() => {
               void this.activateView(file.path);
@@ -60812,13 +62598,13 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
   registerVaultEvents() {
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (!this.writing && file instanceof import_obsidian39.TFile) for (const view of this.views()) view.changed(file);
+        if (!this.writing && file instanceof import_obsidian40.TFile) for (const view of this.views()) view.changed(file);
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian39.TFile) this.scheduleExternalReconciliation(file.path);
-        if (!this.writing && file instanceof import_obsidian39.TFile) {
+        if (file instanceof import_obsidian40.TFile) this.scheduleExternalReconciliation(file.path);
+        if (!this.writing && file instanceof import_obsidian40.TFile) {
           for (const view of this.views()) view.deleted(file);
           if (file.path.startsWith(`${this.settings.mapsFolder}/`) || isManagedMapPath(this.settings, file.path) && file.name === "Map.md")
             this.runMutation(() => this.repo.rebuildDerivedData());
@@ -60827,7 +62613,7 @@ var VisualAgentMapPlugin = class extends import_obsidian39.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (!(file instanceof import_obsidian39.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
+        if (!(file instanceof import_obsidian40.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
         this.runMutation(async () => {
@@ -60861,7 +62647,7 @@ ${error}`;
       this.unreadableReported.set(key2, now);
       const message = t("ui.map_unreadable_skipped_0_1", path, error);
       this.logs.appendLog("warn", message);
-      new import_obsidian39.Notice(message);
+      new import_obsidian40.Notice(message);
     }
   }
   consumeFirstInstallSample() {
@@ -60879,7 +62665,7 @@ ${error}`;
       report: (done, total2, title) => {
         const message = t("ui.organize_progress_0_1_2", done, total2, title);
         if (notice) notice.setMessage(message);
-        else notice = new import_obsidian39.Notice(message, 0);
+        else notice = new import_obsidian40.Notice(message, 0);
       },
       done: () => notice == null ? void 0 : notice.hide()
     };
@@ -60914,12 +62700,12 @@ ${error}`;
         cleaned = await this.repo.removeEmptyLegacyFolders();
       });
       const base = plan.skipped.length ? t("ui.organize_only_skipped_0", plan.skipped.length) : t("ui.organize_nothing_to_do");
-      new import_obsidian39.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
+      new import_obsidian40.Notice(cleaned.length ? `${base} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : base);
       return;
     }
     const busyOpen = this.views().some((view) => plan.moves.some((move) => view.hasActiveAimWork(move.mapPath)));
     if (plan.busy.length || busyOpen) {
-      new import_obsidian39.Notice(t("error.organize_aim_busy"));
+      new import_obsidian40.Notice(t("error.organize_aim_busy"));
       return;
     }
     const mind = plan.moves.filter((move) => move.kind === "mind").length;
@@ -60953,7 +62739,7 @@ ${t("ui.organize_link_wait_hint")}`;
           for (const view of this.views()) view.relocate(mapping);
           this.app.workspace.requestSaveLayout();
           const cleaned = await this.repo.removeEmptyLegacyFolders();
-          new import_obsidian39.Notice(
+          new import_obsidian40.Notice(
             cleaned.length ? `${t("ui.organize_done_0", mapping.size)} ${t("ui.organize_cleaned_0", cleaned.join(", "))}` : t("ui.organize_done_0", mapping.size)
           );
         })
@@ -60966,7 +62752,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const files = (await this.repo.markedFiles("agent-map-node")).filter((file) => file.path.startsWith(prefix));
     const plan = await planMathRepair(this.app.vault, files);
     if (!plan.items.length) {
-      new import_obsidian39.Notice(t("ui.fix_math_none"));
+      new import_obsidian40.Notice(t("ui.fix_math_none"));
       return;
     }
     new ChoiceModal(
@@ -60977,10 +62763,10 @@ ${t("ui.organize_link_wait_hint")}`;
         {
           label: t("ui.fix_math_start"),
           action: () => void applyMathRepair(this.app.vault, plan).then(
-            (result) => new import_obsidian39.Notice(
+            (result) => new import_obsidian40.Notice(
               result.skipped ? t("ui.fix_math_done_0_1", result.changed, result.skipped) : t("ui.fix_math_done_0", result.changed)
             )
-          ).catch((error) => new import_obsidian39.Notice(error instanceof Error ? error.message : String(error)))
+          ).catch((error) => new import_obsidian40.Notice(error instanceof Error ? error.message : String(error)))
         }
       ]
     ).open();
@@ -60990,13 +62776,13 @@ ${t("ui.organize_link_wait_hint")}`;
     this.settings.workspaceInitialized = true;
     await this.saveSettings();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian39.Notice(t("ui.agent_workspace_is_ready"));
+    new import_obsidian40.Notice(t("ui.agent_workspace_is_ready"));
   }
   async fullRebuild() {
     await this.repo.reconcileMissingNodePaths();
     await this.repo.rebuildDerivedData();
     for (const view of this.views()) await view.refreshFromPlugin();
-    new import_obsidian39.Notice(t("ui.vam_data_has_been_refreshed"));
+    new import_obsidian40.Notice(t("ui.vam_data_has_been_refreshed"));
   }
   /** Builds Coffee Tables storage and manager for the current workspace folder (CoffeeStorage fixes its folder at construction). */
   buildCoffee() {
@@ -61043,7 +62829,7 @@ ${t("ui.organize_link_wait_hint")}`;
     const candidates = known != null ? known : await this.repo.workspaceCandidates();
     this.workspaceRecoveryCandidates = [];
     if (!candidates.length) {
-      new import_obsidian39.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
+      new import_obsidian40.Notice(t("ui.no_recognizable_existing_vam_workspace_was_found"));
       return;
     }
     new ChoiceModal(
@@ -61058,7 +62844,7 @@ ${t("ui.organize_link_wait_hint")}`;
           await this.rebuildCoffee();
           await this.repo.rebuildDerivedData();
           for (const view of this.views()) await view.refreshFromPlugin();
-          new import_obsidian39.Notice(t("ui.reconnected_workspace_0", root));
+          new import_obsidian40.Notice(t("ui.reconnected_workspace_0", root));
         })
       }))
     ).open();
@@ -61162,19 +62948,19 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.codexDiagnostic();
     if (!diagnostic.installed) {
       if (showGuide) this.openCodexSetupGuide();
-      else new import_obsidian39.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+      else new import_obsidian40.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
       return;
     }
     const state = await this.refreshModelDiscovery("codex");
-    if (state.status === "ready") new import_obsidian39.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
+    if (state.status === "ready") new import_obsidian40.Notice(t("ui.codex_app_server_is_ready_0", diagnostic.executable));
     else if (state.status === "error")
-      new import_obsidian39.Notice(
+      new import_obsidian40.Notice(
         t(
           "ui.codex_app_server_check_failed_0",
           this.recordFailure(t("log.codex_recheck_failed"), (_a2 = state.error) != null ? _a2 : "unknown error")
         )
       );
-    else new import_obsidian39.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
+    else new import_obsidian40.Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
   }
   async duplicateBuiltInSample() {
     await this.repo.ensureWorkspace();
@@ -61222,7 +63008,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.saveMap(path, map);
       await this.repo.rebuildDerivedData(root);
       await this.saveSettings();
-      new import_obsidian39.Notice(t("ui.created_an_editable_copy_of_the_sample"));
+      new import_obsidian40.Notice(t("ui.created_an_editable_copy_of_the_sample"));
       return path;
     } catch (error) {
       if (createdRoot) {
@@ -61250,7 +63036,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return marker5 === true || marker5 === "true" || file.extension === "md" && (file.path.startsWith(`${this.settings.notesFolder}/`) || isManagedMapPath(this.settings, file.path));
   }
   styleNodeLeaf(leaf) {
-    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian39.MarkdownView)) return;
+    if (!((leaf == null ? void 0 : leaf.view) instanceof import_obsidian40.MarkdownView)) return;
     leaf.view.containerEl.toggleClass("vam-topic-markdown", !!leaf.view.file && this.isNode(leaf.view.file));
   }
   onunload() {
@@ -61284,7 +63070,7 @@ ${t("ui.organize_link_wait_hint")}`;
         await this.saveData(nextSettings);
       } catch (error) {
         this.recordFailure(translate(previous, "ui.language_change_save_failed"), error);
-        new import_obsidian39.Notice(translate(previous, "ui.language_change_save_failed"));
+        new import_obsidian40.Notice(translate(previous, "ui.language_change_save_failed"));
         return false;
       }
       Object.assign(this.settings, nextSettings);
@@ -61311,7 +63097,7 @@ ${t("ui.organize_link_wait_hint")}`;
         failures.push(error);
       }
       for (const error of failures) this.recordFailure(t("ui.language_view_refresh_failed"), error);
-      new import_obsidian39.Notice(
+      new import_obsidian40.Notice(
         failures.length ? t("ui.language_change_partial_failure") : t("ui.language_changed_content_preserved")
       );
       return true;
@@ -61340,7 +63126,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (readiness.status === "missing") {
       if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
       else this.openCodexSetupGuide();
-    } else if (readiness.status === "model-unavailable") new import_obsidian39.Notice(t("ui.current_model_is_unavailable"));
+    } else if (readiness.status === "model-unavailable") new import_obsidian40.Notice(t("ui.current_model_is_unavailable"));
     else if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
     return false;
   }
@@ -61367,10 +63153,10 @@ ${t("ui.organize_link_wait_hint")}`;
     const diagnostic = this.claudeDiagnostic();
     const state = await this.refreshModelDiscovery("claude");
     if (!diagnostic.installed) {
-      new import_obsidian39.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
+      new import_obsidian40.Notice(t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"));
       return;
     }
-    new import_obsidian39.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
+    new import_obsidian40.Notice(t("ui.claude_cli_found_0", diagnostic.executable));
     if (state.status !== "ready") this.logs.appendLog("warn", `Claude model discovery status: ${state.status}`);
   }
   async confirmAiUsage(model, run) {
@@ -61392,7 +63178,7 @@ ${t("ui.organize_link_wait_hint")}`;
       await this.repo.rebuildDerivedData();
     } catch (error) {
       console.error("Visual Agent Map reference rebuild", error);
-      new import_obsidian39.Notice(
+      new import_obsidian40.Notice(
         t("ui.map_saved_but_reference_update_failed_0", error instanceof Error ? error.message : String(error))
       );
     }
@@ -61424,7 +63210,7 @@ ${t("ui.organize_link_wait_hint")}`;
     return this.app.workspace.getLeavesOfType("markdown").some(
       (leaf) => {
         var _a2, _b2;
-        return leaf.getRoot() === split && leaf.view instanceof import_obsidian39.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
+        return leaf.getRoot() === split && leaf.view instanceof import_obsidian40.MarkdownView && !!leaf.view.file && ((_b2 = (_a2 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a2.frontmatter) == null ? void 0 : _b2["agent-map-node"]) === true && leaf.view.containerEl.isShown();
       }
     );
   }
@@ -61437,7 +63223,7 @@ ${t("ui.organize_link_wait_hint")}`;
       this.detailsLeaf = (_b2 = (_a2 = markdownLeaves.filter(
         (leaf) => {
           var _a3, _b3;
-          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian39.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
+          return leaf.getRoot() === this.app.workspace.rightSplit && leaf.view instanceof import_obsidian40.MarkdownView && !!leaf.view.file && ((_b3 = (_a3 = this.app.metadataCache.getFileCache(leaf.view.file)) == null ? void 0 : _a3.frontmatter) == null ? void 0 : _b3["agent-map-node"]) === true;
         }
       ).sort(
         (a, b) => a.view.containerEl.getBoundingClientRect().top - b.view.containerEl.getBoundingClientRect().top
@@ -61451,11 +63237,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;
-    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian39.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
+    const closed = ((_a2 = this.detailsLeaf) == null ? void 0 : _a2.view) instanceof import_obsidian40.MarkdownView && ((_b2 = this.detailsLeaf.view.file) == null ? void 0 : _b2.path) === this.detailsPath;
     if (closed) {
       this.detailsLeaf.detach();
       this.app.workspace.trigger("file-open", null);
-      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian39.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
+      this.app.workspace.trigger("active-leaf-change", (_d = (_c = this.app.workspace.getActiveViewOfType(import_obsidian40.View)) == null ? void 0 : _c.leaf) != null ? _d : null);
     }
     this.detailsLeaf = null;
     this.detailsPath = null;
@@ -61471,7 +63257,7 @@ ${t("ui.organize_link_wait_hint")}`;
     if (leaf.view instanceof CoffeeTablesView) this.syncCoffeeOutline(leaf.view);
   }
   async runCoffeeRequest(request) {
-    if (!(this.app.vault.adapter instanceof import_obsidian39.FileSystemAdapter) || !this.manifest.dir)
+    if (!(this.app.vault.adapter instanceof import_obsidian40.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Coffee Tables requires the desktop runtime");
     const { session, signal, prompt } = request;
     const effort = effectiveReasoningLevel(
@@ -61524,16 +63310,16 @@ ${t("ui.organize_link_wait_hint")}`;
     }
     let bytes;
     const embeddedPath = (_b2 = (_a2 = image.closest(".internal-embed")) == null ? void 0 : _a2.getAttribute("src")) == null ? void 0 : _b2.split("#")[0];
-    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian39.MarkdownView && view2.containerEl.contains(image));
+    const view = this.app.workspace.getLeavesOfType("markdown").map((leaf) => leaf.view).find((view2) => view2 instanceof import_obsidian40.MarkdownView && view2.containerEl.contains(image));
     const file = embeddedPath ? this.app.metadataCache.getFirstLinkpathDest(
       embeddedPath,
-      view instanceof import_obsidian39.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
+      view instanceof import_obsidian40.MarkdownView ? (_d = (_c = view.file) == null ? void 0 : _c.path) != null ? _d : "" : ""
     ) : null;
     const remote = image.currentSrc || image.src;
-    if (file instanceof import_obsidian39.TFile) bytes = await this.app.vault.readBinary(file);
+    if (file instanceof import_obsidian40.TFile) bytes = await this.app.vault.readBinary(file);
     else if (/^https?:\/\//i.test(remote)) {
       try {
-        bytes = (await (0, import_obsidian39.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
+        bytes = (await (0, import_obsidian40.requestUrl)({ url: remote, method: "GET", throw: true })).arrayBuffer;
       } catch (e) {
         throw new Error(t("ui.context_ai_image_download_failed"));
       }
@@ -61612,7 +63398,7 @@ ${t("ui.organize_link_wait_hint")}`;
       if (!this.coffeeStorage) throw new Error("Coffee storage is not ready");
       await openCoffeeResearchHandoff(this, this.coffeeStorage, session, sourcePath, insightId);
     } catch (error) {
-      new import_obsidian39.Notice(error instanceof Error ? error.message : String(error));
+      new import_obsidian40.Notice(error instanceof Error ? error.message : String(error));
     }
   }
   async openResearchMap(path) {
@@ -61640,7 +63426,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   async loadCodexModels() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian39.FileSystemAdapter) || !this.manifest.dir)
+    if (!(adapter instanceof import_obsidian40.FileSystemAdapter) || !this.manifest.dir)
       throw new Error("Codex model discovery requires desktop Obsidian");
     const pluginDirectory = (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
     const models = await this.runtime(pluginDirectory).listModels();
@@ -61786,7 +63572,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   pluginDirectory() {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof import_obsidian39.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
+    if (!(adapter instanceof import_obsidian40.FileSystemAdapter)) throw new Error(t("ui.cli_mode_requires_desktop_obsidian"));
     if (!this.manifest.dir) throw new Error(t("ui.plugin_folder_not_found"));
     return (0, import_node_path2.join)(adapter.getBasePath(), this.manifest.dir);
   }

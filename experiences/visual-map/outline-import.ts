@@ -15,7 +15,11 @@ export interface OutlineNode {
   level: number;
   parent: number | null;
   line: number;
+  /** Note text that came with the node (an OPML / FreeMind file); becomes the topic's Detail. */
+  body?: string;
 }
+/** Where an outline came from: a vault note (shown as a link), a file by name (plain text only), or nothing. */
+export type OutlineSource = string | { file: string } | null;
 export type OutlineIssueKey =
   | "ui.outline_error_no_headings"
   | "ui.outline_error_empty_title"
@@ -293,12 +297,21 @@ function localDate(now: Date): string {
 function outlineRootDetail(
   language: ContentLanguage,
   template: DetailTemplate,
-  source: string | null,
+  source: OutlineSource,
   now: Date
 ): string {
-  const log = source
-    ? translateNote(language, "ui.outline_import_log_source", localDate(now), source)
-    : translateNote(language, "ui.outline_import_log", localDate(now));
+  // A file name is untrusted text: it is logged as plain words, with nothing that could form a link, embed or marker.
+  const log =
+    source && typeof source === "object"
+      ? translateNote(
+          language,
+          "ui.outline_import_log_file",
+          localDate(now),
+          source.file.replace(/[[\]|<>`!\r\n]+/g, " ").trim()
+        )
+      : source
+        ? translateNote(language, "ui.outline_import_log_source", localDate(now), source)
+        : translateNote(language, "ui.outline_import_log", localDate(now));
   const heading = (template.sections.find(section => section.role === "log") ?? template.sections[0]).name;
   return canonicalDetail(`### ${heading}\n\n- ${log}`, noteLanguageOf(language), template);
 }
@@ -331,7 +344,12 @@ async function createOutlineNotes(
         mapPath,
         manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
         // A topic created from an outline starts in Quick mode (its first research, if any, is the short one).
-        top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
+        // A node's own note text, when the file had one, is its Detail as written; otherwise a root gets the import log.
+        node.body
+          ? { detail: node.body, researchMode: "local" }
+          : top
+            ? { detail: rootDetail, researchMode: "local" }
+            : { researchMode: "local" }
       );
       note.parentId = top ? parentId : created[node.parent!].id;
       created.push(note);
@@ -352,7 +370,7 @@ export async function createOutlineMap(
   repository: Repository,
   model: string,
   nodes: OutlineNode[],
-  source: string | null,
+  source: OutlineSource,
   now = new Date(),
   template?: DetailTemplate,
   manualModel = false
@@ -418,7 +436,7 @@ export async function addOutlineToMap(
   mapPath: string,
   model: string,
   nodes: OutlineNode[],
-  source: string | null,
+  source: OutlineSource,
   parentId: string | null,
   template: DetailTemplate,
   detailTemplateId?: string,

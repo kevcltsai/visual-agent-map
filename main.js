@@ -702,6 +702,11 @@ var en = {
   "ui.zoom_out": "Zoom out",
   "ui.zoom_in": "Zoom in",
   "ui.show_all": "Show all",
+  "ui.map_search_label": "Search topics",
+  "ui.map_search_count_0": "{0} matches",
+  "ui.map_search_none": "No matches",
+  "ui.map_search_position_0_1_2": "{0}/{1}: {2}",
+  "ui.map_search_close": "Close search",
   "ui.canvas_images_group": "Canvas images",
   "ui.canvas_image_label": "Image: {0}",
   "ui.canvas_image_insert": "Insert image\u2026",
@@ -2838,6 +2843,11 @@ var zhCN = {
   "ui.zoom_out": "\u7F29\u5C0F",
   "ui.zoom_in": "\u653E\u5927",
   "ui.show_all": "\u663E\u793A\u5168\u90E8",
+  "ui.map_search_label": "\u641C\u7D22\u8BAE\u9898",
+  "ui.map_search_count_0": "{0} \u4E2A\u7B26\u5408",
+  "ui.map_search_none": "\u6CA1\u6709\u7B26\u5408",
+  "ui.map_search_position_0_1_2": "{0}\uFF0F{1}\uFF1A{2}",
+  "ui.map_search_close": "\u5173\u95ED\u641C\u7D22",
   "ui.canvas_images_group": "\u753B\u5E03\u56FE\u7247",
   "ui.canvas_image_label": "\u56FE\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u56FE\u7247\u2026",
@@ -4974,6 +4984,11 @@ var zhTW = {
   "ui.zoom_out": "\u7E2E\u5C0F",
   "ui.zoom_in": "\u653E\u5927",
   "ui.show_all": "\u986F\u793A\u5168\u90E8",
+  "ui.map_search_label": "\u641C\u5C0B\u8B70\u984C",
+  "ui.map_search_count_0": "{0} \u500B\u7B26\u5408",
+  "ui.map_search_none": "\u6C92\u6709\u7B26\u5408",
+  "ui.map_search_position_0_1_2": "{0}\uFF0F{1}\uFF1A{2}",
+  "ui.map_search_close": "\u95DC\u9589\u641C\u5C0B",
   "ui.canvas_images_group": "\u756B\u5E03\u5716\u7247",
   "ui.canvas_image_label": "\u5716\u7247\uFF1A{0}",
   "ui.canvas_image_insert": "\u63D2\u5165\u5716\u7247\u2026",
@@ -16410,6 +16425,155 @@ function mapOutline(nodes, titleOf) {
   };
   for (const root of roots) walk(root, 0);
   return lines.join("\n");
+}
+
+// experiences/visual-map/map-search.ts
+var foldSearchText = (text11) => toSimplifiedFold(text11.toLocaleLowerCase().replace(/̇/g, ""));
+function findMatches(order, titleOf, query) {
+  const needle = foldSearchText(query.trim());
+  if (!needle) return [];
+  return order.filter((id) => foldSearchText(titleOf(id)).includes(needle));
+}
+function nextMatch(order, matches, currentId, delta) {
+  const total2 = matches.length;
+  if (total2 === 0) return null;
+  const at = (index) => ({ id: matches[index], index, total: total2 });
+  const inMatches = currentId === null ? -1 : matches.indexOf(currentId);
+  if (inMatches >= 0) return at((inMatches + delta + total2) % total2);
+  const position = currentId === null ? -1 : order.indexOf(currentId);
+  if (position < 0) return at(delta === 1 ? 0 : total2 - 1);
+  const rank = new Map(order.map((id, i) => [id, i]));
+  const ranks = matches.map((id) => {
+    var _a2;
+    return (_a2 = rank.get(id)) != null ? _a2 : -1;
+  });
+  if (delta === 1) {
+    const found = ranks.findIndex((r) => r > position);
+    return at(found >= 0 ? found : 0);
+  }
+  for (let i = total2 - 1; i >= 0; i--) if (ranks[i] < position) return at(i);
+  return at(total2 - 1);
+}
+function collapsedAncestors(nodes, id) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const start = byId.get(id);
+  if (!start) return [];
+  const seen = /* @__PURE__ */ new Set([id]);
+  const result = [];
+  let parentId = start.parentId;
+  while (parentId !== null && !seen.has(parentId)) {
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    seen.add(parentId);
+    if (parent.collapsed === true) result.unshift(parent.id);
+    parentId = parent.parentId;
+  }
+  return result;
+}
+
+// experiences/visual-map/presentation-order.ts
+function readingOrder(nodes, opts = {}) {
+  var _a2;
+  const axis = (_a2 = opts.siblingAxis) != null ? _a2 : "y";
+  const other = axis === "y" ? "x" : "y";
+  const includeHidden = opts.includeHidden === true;
+  const position = /* @__PURE__ */ new Map();
+  nodes.forEach((node, index) => {
+    if (!position.has(node.id)) position.set(node.id, index);
+  });
+  const byPosition = (a, b) => {
+    var _a3, _b2;
+    return a[axis] - b[axis] || a[other] - b[other] || ((_a3 = position.get(a.id)) != null ? _a3 : 0) - ((_b2 = position.get(b.id)) != null ? _b2 : 0);
+  };
+  const roots = [];
+  const children = /* @__PURE__ */ new Map();
+  const seenInput = /* @__PURE__ */ new Set();
+  for (const node of nodes) {
+    if (seenInput.has(node.id)) continue;
+    seenInput.add(node.id);
+    if (node.parentId === null || !position.has(node.parentId)) {
+      roots.push(node);
+      continue;
+    }
+    const list = children.get(node.parentId);
+    if (list) list.push(node);
+    else children.set(node.parentId, [node]);
+  }
+  const sortedRoots = [...roots].sort(byPosition);
+  const sortedKids = /* @__PURE__ */ new Map();
+  for (const [id, list] of children) sortedKids.set(id, [...list].sort(byPosition));
+  const walk = (withHidden) => {
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    const stack = [...sortedRoots].reverse();
+    while (stack.length) {
+      const node = stack.pop();
+      if (seen.has(node.id)) continue;
+      seen.add(node.id);
+      out.push(node.id);
+      if (node.collapsed && !withHidden) continue;
+      const kids = sortedKids.get(node.id);
+      if (kids) for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    }
+    return out;
+  };
+  const order = walk(includeHidden);
+  const reachable = includeHidden ? new Set(order) : new Set(walk(true));
+  const cut = nodes.filter((node, index) => position.get(node.id) === index && !reachable.has(node.id));
+  for (const node of cut.sort(byPosition)) order.push(node.id);
+  return order;
+}
+
+// experiences/visual-map/map-search-bar.ts
+function searchMap(nodes, skip, titleOf, query, siblingAxis) {
+  const order = readingOrder(
+    nodes.filter((node) => !skip.has(node.id)),
+    { includeHidden: true, siblingAxis }
+  );
+  return { order, matches: findMatches(order, titleOf, query) };
+}
+function stepSearch(result, currentId, delta) {
+  return nextMatch(result.order, result.matches, currentId, delta);
+}
+function buildMapSearchBar(parent, options) {
+  const root = parent.createDiv({ cls: "vam-map-search", attr: { role: "search" } });
+  const input = root.createEl("input", {
+    cls: "vam-map-search-input",
+    type: "search",
+    attr: { "aria-label": options.label, placeholder: options.label, autocomplete: "off", spellcheck: "false" }
+  });
+  input.value = options.query;
+  const count = root.createSpan({ cls: "vam-map-search-count", text: options.countText });
+  const close = root.createEl("button", {
+    cls: "vam-map-search-close",
+    text: "\xD7",
+    attr: { "aria-label": options.closeLabel, type: "button" }
+  });
+  input.addEventListener("input", () => options.onInput(input.value));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      if (event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      options.onStep(event.shiftKey ? -1 : 1);
+    } else if (event.key === "Escape") {
+      if (event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      options.onClose();
+    }
+  });
+  close.addEventListener("click", (event) => {
+    event.stopPropagation();
+    options.onClose();
+  });
+  return {
+    root,
+    input,
+    setCount: (text11) => {
+      count.setText(text11);
+    }
+  };
 }
 
 // experiences/visual-map/map-text-language.ts
@@ -43125,7 +43289,7 @@ function canvasPointerIntent(state) {
 
 // experiences/visual-map/merge-topics.ts
 var import_obsidian31 = require("obsidian");
-function readingOrder(nodes) {
+function readingOrder2(nodes) {
   return [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
 }
 function mergeEligibility(input) {
@@ -43150,13 +43314,13 @@ function mergeEligibility(input) {
     if (children.some((node) => !input.hasNote(node.id)) || !input.hasNote(target.id))
       return { ok: false, reason: "ui.merge_missing_note" };
     if (picked.some((node) => input.busy(node))) return { ok: false, reason: "ui.merge_busy" };
-    return { ok: true, sources: [target, ...readingOrder(children)], parentId: target.parentId, targetId: target.id };
+    return { ok: true, sources: [target, ...readingOrder2(children)], parentId: target.parentId, targetId: target.id };
   }
   const parentId = picked[0].parentId;
   if (picked.some((node) => node.parentId !== parentId)) return { ok: false, reason: "ui.merge_needs_same_parent" };
   if (picked.some((node) => !input.hasNote(node.id))) return { ok: false, reason: "ui.merge_missing_note" };
   if (picked.some((node) => input.busy(node))) return { ok: false, reason: "ui.merge_busy" };
-  return { ok: true, sources: readingOrder(picked), parentId, targetId: null };
+  return { ok: true, sources: readingOrder2(picked), parentId, targetId: null };
 }
 function mergedDetail(sources2) {
   return sources2.filter((source) => source.detail.trim()).map((source) => `### ${source.title}
@@ -43667,6 +43831,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight));
     });
     __publicField(this, "cardChecks", /* @__PURE__ */ new Map());
+    /** Map search (Mod+F): the query, the current match and where Esc returns focus. Null while the search box is closed. */
+    __publicField(this, "mapSearch", null);
+    __publicField(this, "mapSearchBar", null);
     /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
     __publicField(this, "coverObserver", null);
     __publicField(this, "selectionBarEl", null);
@@ -43898,7 +44065,185 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     };
     scope.register(["Mod"], "Enter", cardKey(false));
     scope.register(["Shift"], "Enter", cardKey(true));
+    scope.register(["Mod"], "f", (event) => this.searchKey(event));
     this.scope = scope;
+  }
+  /** Mod+F: true leaves the key to Obsidian, false means the map search took it. */
+  searchKey(event) {
+    var _a2, _b2, _c;
+    if (this.closed || event.isComposing || event.defaultPrevented || !this.map) return true;
+    const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    if (!active) return true;
+    if (this.mapSearchBar && active === this.mapSearchBar.input) {
+      this.focusMapSearch();
+      return false;
+    }
+    if (!this.contentEl.contains(active)) return true;
+    if (isEditableTarget(active) || ((_c = active.closest) == null ? void 0 : _c.call(active, ".vam-map-chat"))) return true;
+    this.openMapSearch(active);
+    return false;
+  }
+  focusMapSearch() {
+    var _a2;
+    const input = (_a2 = this.mapSearchBar) == null ? void 0 : _a2.input;
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    input.select();
+  }
+  openMapSearch(origin = null) {
+    var _a2, _b2;
+    if (this.closed || !this.map) return;
+    if (this.mapSearch) {
+      this.focusMapSearch();
+      return;
+    }
+    const from = origin != null ? origin : (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
+    const card = from ? [...this.cardEls.entries()].find(([, el]) => el === from || el.contains(from)) : void 0;
+    this.mapSearch = {
+      query: "",
+      currentId: null,
+      returnNodeId: card ? card[0] : null,
+      returnEl: card ? null : from,
+      announceTimer: null
+    };
+    this.mountMapSearch();
+    this.applySearchMarks();
+    this.focusMapSearch();
+  }
+  mountMapSearch() {
+    var _a2, _b2;
+    const search = this.mapSearch;
+    const overlay = (_b2 = (_a2 = this.contentEl).querySelector) == null ? void 0 : _b2.call(_a2, ".vam-canvas-overlay");
+    if (!search || !overlay) return;
+    this.mapSearchBar = buildMapSearchBar(overlay, {
+      query: search.query,
+      label: t("ui.map_search_label"),
+      closeLabel: t("ui.map_search_close"),
+      countText: this.mapSearchCountText(),
+      onInput: (value) => {
+        search.query = value;
+        search.currentId = null;
+        this.applySearchMarks();
+        this.announceSearchLater(search);
+      },
+      onStep: (delta) => this.enqueue(() => this.stepMapSearch(delta)),
+      onClose: () => this.closeMapSearch(true)
+    });
+  }
+  /** Call before a repaint: the returned function (call it after) rebuilds the box and gives the field its focus, query and caret back. */
+  holdMapSearch() {
+    var _a2, _b2;
+    const bar = this.mapSearchBar;
+    this.mapSearchBar = null;
+    if (!this.mapSearch) return () => {
+    };
+    const focused = !!bar && ((_b2 = (_a2 = this.contentEl) == null ? void 0 : _a2.ownerDocument) == null ? void 0 : _b2.activeElement) === bar.input;
+    const start = focused ? bar.input.selectionStart : null, end = focused ? bar.input.selectionEnd : null;
+    return () => {
+      var _a3;
+      if (!this.mapSearch) return;
+      this.mountMapSearch();
+      this.applySearchMarks();
+      const input = (_a3 = this.mapSearchBar) == null ? void 0 : _a3.input;
+      if (!focused || !input) return;
+      input.focus({ preventScroll: true });
+      if (start !== null && end !== null) input.setSelectionRange(start, end);
+    };
+  }
+  mapSearchResult() {
+    if (!this.map || !this.mapSearch) return null;
+    const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
+    return searchMap(
+      this.map.nodes,
+      supersededAimNodeIds(this.map),
+      (id) => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.title) != null ? _b2 : "";
+      },
+      this.mapSearch.query,
+      vertical ? "x" : "y"
+    );
+  }
+  mapSearchCountText() {
+    var _a2, _b2;
+    const search = this.mapSearch;
+    if (!search || search.query === "") return "";
+    const matches = (_b2 = (_a2 = this.mapSearchResult()) == null ? void 0 : _a2.matches) != null ? _b2 : [];
+    if (!matches.length) return t("ui.map_search_none");
+    const at = search.currentId === null ? -1 : matches.indexOf(search.currentId);
+    return at >= 0 ? `${at + 1}/${matches.length}` : t("ui.map_search_count_0", matches.length);
+  }
+  /** Marks the matching cards (the current one stronger) and refreshes the visible count. Never touches how a card is built. */
+  applySearchMarks() {
+    var _a2, _b2, _c;
+    const search = this.mapSearch;
+    const matches = new Set(search ? (_b2 = (_a2 = this.mapSearchResult()) == null ? void 0 : _a2.matches) != null ? _b2 : [] : []);
+    for (const [id, card] of this.cardEls) {
+      card.toggleClass("is-search-match", matches.has(id));
+      card.toggleClass("is-search-current", !!search && id === search.currentId && matches.has(id));
+    }
+    (_c = this.mapSearchBar) == null ? void 0 : _c.setCount(this.mapSearchCountText());
+  }
+  /** Typing pauses for 300 ms before the count is spoken, so a screen reader does not read every keystroke. */
+  announceSearchLater(search) {
+    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    search.announceTimer = window.setTimeout(() => {
+      var _a2, _b2, _c;
+      search.announceTimer = null;
+      if (this.closed || this.mapSearch !== search || search.query === "") return;
+      const total2 = (_b2 = (_a2 = this.mapSearchResult()) == null ? void 0 : _a2.matches.length) != null ? _b2 : 0;
+      (_c = this.announcer) == null ? void 0 : _c.setText(total2 ? t("ui.map_search_count_0", total2) : t("ui.map_search_none"));
+    }, 300);
+  }
+  /** Enter / Shift+Enter: jump to the next / previous match (cycling). A match inside folded branches opens them in one history step. */
+  async stepMapSearch(delta) {
+    var _a2, _b2, _c, _d, _e;
+    const search = this.mapSearch;
+    if (!search || !this.map || this.closed) return;
+    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    search.announceTimer = null;
+    const result = this.mapSearchResult();
+    const step = result ? stepSearch(result, search.currentId, delta) : null;
+    if (!step) {
+      (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.map_search_none"));
+      return;
+    }
+    search.currentId = step.id;
+    const collapsed = collapsedAncestors(this.map.nodes, step.id);
+    if (collapsed.length && this.builtIn) {
+      for (const item of this.map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
+      this.render();
+    } else if (collapsed.length) {
+      await this.mapChange((map) => {
+        for (const item of map.nodes) if (collapsed.includes(item.id)) item.collapsed = false;
+      });
+    }
+    if (this.closed || this.mapSearch !== search) return;
+    const target = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === step.id);
+    if (!target) return;
+    this.focusNode(target, false);
+    this.applySearchMarks();
+    (_e = this.announcer) == null ? void 0 : _e.setText(
+      t("ui.map_search_position_0_1_2", step.index + 1, step.total, (_d = (_c = this.notes.get(step.id)) == null ? void 0 : _c.title) != null ? _d : "")
+    );
+  }
+  /** Closes the box and clears the marks. Esc passes `restoreFocus`: focus returns to where the search began, else to the map. */
+  closeMapSearch(restoreFocus) {
+    var _a2, _b2;
+    const search = this.mapSearch;
+    if (!search) return;
+    if (search.announceTimer !== null) window.clearTimeout(search.announceTimer);
+    this.mapSearch = null;
+    (_a2 = this.mapSearchBar) == null ? void 0 : _a2.root.remove();
+    this.mapSearchBar = null;
+    for (const card2 of this.cardEls.values()) {
+      card2.toggleClass("is-search-match", false);
+      card2.toggleClass("is-search-current", false);
+    }
+    if (!restoreFocus || this.closed) return;
+    const card = search.returnNodeId ? this.cardEls.get(search.returnNodeId) : void 0;
+    const back = card != null ? card : ((_b2 = search.returnEl) == null ? void 0 : _b2.isConnected) && this.contentEl.contains(search.returnEl) ? search.returnEl : null;
+    (back != null ? back : this.contentEl).focus({ preventScroll: true });
   }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   renameNode(node, current) {
@@ -43912,6 +44257,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   async onClose() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     this.closed = true;
+    this.closeMapSearch(false);
     this.releaseCovers();
     (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
     this.unbindClipboard = null;
@@ -44143,6 +44489,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     const viewEpoch = this.aimViewEpoch, openEpoch = ++this.mapOpenEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
+    if (path !== this.path) this.closeMapSearch(false);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -46548,6 +46895,7 @@ ${request.requirements}` : preset.text,
     this.abortRelevanceGrade();
     const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
     if (!this.builtIn) this.plugin.closeStaleDetails();
+    this.closeMapSearch(false);
     this.builtIn = true;
     this.path = "";
     this.map = sample.map;
@@ -49984,6 +50332,7 @@ ${request.requirements}` : preset.text,
     if (focusedCard && this.contentEl.contains(focusedCard)) (_f = this.focusNodeId) != null ? _f : this.focusNodeId = (_e = focusedCard.dataset.nodeId) != null ? _e : null;
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
+    const restoreSearch = this.holdMapSearch();
     this.relevancePanelGen++;
     (_g = this.relevancePanelCleanup) == null ? void 0 : _g.call(this);
     this.relevancePanelCleanup = null;
@@ -50396,6 +50745,7 @@ ${request.requirements}` : preset.text,
     }
     restoreRelevanceFocus();
     restoreChatFocus();
+    restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {

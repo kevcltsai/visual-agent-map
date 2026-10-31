@@ -50,7 +50,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
     ${card('data-status="idea"', 20, 260, `<div class="vam-node-header"><span class="vam-status vam-status-idea">To research</span></div><h3 class="vam-card-title">Idea topic</h3><p class="vam-card-summary">Idea summary</p><p class="vam-card-summary is-preview">Preview summary</p><p class="vam-task-preview">Task preview text</p>`)}
     ${card('data-status="error"', 340, 260, `<div class="vam-node-header"><span class="vam-status vam-status-error">Error</span><span class="vam-status">Plain</span><span class="vam-status vam-status-completed">Done</span><span class="vam-status vam-status-running">Running</span><span class="vam-status vam-status-queued">Queued</span><span class="vam-status vam-research-slow">Slow</span></div><h3 class="vam-card-title">Failed topic</h3><p class="vam-card-error">Something failed</p>`)}
   </div>
-  <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button><button class="vam-relevance-goal">Prioritise by goal</button></div></div>
+  <div class="vam-canvas-overlay"><div class="vam-map-tools"><button class="is-active">Done selecting</button><button class="vam-relevance-goal">Prioritise by goal</button></div><div class="vam-view"><div class="vam-map-search"><input class="vam-map-search-input" type="search" aria-label="Search topics"><span class="vam-map-search-count">3/7</span><button class="vam-map-search-close" aria-label="Close search">x</button></div><div class="vam-node is-search-match" style="position:static;width:120px;height:20px"></div><div class="vam-node is-search-current" style="position:static;width:120px;height:20px"></div></div></div>
 </div>
 </div>
 <div class="modal vam-next-modal" style="background:var(--background-primary);width:400px"><div class="modal-content"><div class="vam-next-actions"><button class="vam-discard">Remove from map</button></div><div class="vam-share-note vam-share-warning">3 images could not be read</div><div class="vam-share-note vam-share-error">Share failed</div><div class="vam-share-error">Save failed</div>
@@ -62,7 +62,7 @@ body { margin: 0; width: 1200px; height: 800px; background: var(--background-pri
 <div class="vam-node" style="position:static;width:200px"><button class="vam-add-child" style="opacity:1">+</button></div>
 </body></html>`;
 
-// [name, selector, kind, need, options]. kind: color (text colour), stroke (SVG stroke), fill (SVG fill), border (card frame), dot (::before fill), ring (::before border).
+// [name, selector, kind, need, options]. kind: outline (search highlight frame against the canvas), color (text colour), stroke (SVG stroke), fill (SVG fill), border (card frame), dot (::before fill), ring (::before border).
 const CASES = [
   ['edge', '.vam-edge[data-parent-line]', 'stroke', 3],
   ['edge-aim', '.vam-edge-aim', 'stroke', 3],
@@ -98,6 +98,10 @@ const CASES = [
   ['tools-done-selecting', '.vam-map-tools button.is-active', 'color', 4.5],
   ['tools-done-selecting-hover', '.vam-map-tools button.is-active', 'color', 4.5, { hover: true }],
   ['tools-by-goal', '.vam-map-tools .vam-relevance-goal', 'color', 4.5],
+  ['map-search-count', '.vam-map-search-count', 'color', 4.5],
+  ['map-search-close', '.vam-map-search-close', 'color', 4.5],
+  ['map-search-match-outline', '.vam-view .vam-node.is-search-match', 'outline', 3],
+  ['map-search-current-outline', '.vam-view .vam-node.is-search-current', 'outline', 3],
   ['running-label', '.vam-status-running', 'color', 4.5],
   ['queued-label', '.vam-status-queued', 'color', 4.5],
   ['dot-completed', '.vam-status-completed', 'dot', 3],
@@ -155,6 +159,7 @@ const PROBE = `(() => {
       if (kind === 'stroke') return rgba(style(target).stroke);
       if (kind === 'fill') return rgba(style(target).fill);
       if (kind === 'border') return rgba(style(target).borderTopColor);
+      if (kind === 'outline') return rgba(style(target).outlineColor);
       if (kind === 'dot') return rgba(getComputedStyle(target, '::before').backgroundColor);
       return rgba(getComputedStyle(target, '::before').borderTopColor);
     };
@@ -165,7 +170,7 @@ const PROBE = `(() => {
       let inner = backdrop;
       const own = i === chain.length - 1 && fills ? fills : null;
       const bg = rgba(s.backgroundColor);
-      if (own) inner = over(own, inner); else if (bg[3] > 0) inner = over(bg, inner);
+      if (kind === 'outline' && i === chain.length - 1) { /* the outline sits outside the card, on the canvas */ } else if (own) inner = over(own, inner); else if (bg[3] > 0) inner = over(bg, inner);
       const result = i === chain.length - 1 ? (ink ? over(ink, inner) : inner) : pixel(i + 1, inner, ink);
       return mix(backdrop, result, opacity);
     };

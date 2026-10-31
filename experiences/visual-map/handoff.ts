@@ -1,11 +1,14 @@
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { normalizeReasoningLevel, type Repository, originMarkdown } from "../../repository";
 import type { ThinkingArtifact } from "../../core/thinking-artifact";
+import type { ModelChoice } from "../../ai/model-resolution";
 import { HandoffWriteError, type ExperienceHandoffResult } from "../../core/experience-router";
 
 export interface VisualMapHandoffOptions {
   repo: Repository;
   defaultModel: () => string;
+  /** The current model and reasoning, read when the root is written (decision #14 D2). */
+  currentModel: () => ModelChoice;
   exists: (path: string) => boolean;
   mutate: (work: () => Promise<void>) => Promise<void>;
   navigate: (path: string) => Promise<void>;
@@ -34,6 +37,7 @@ export async function receiveVisualMapHandoff(
       const map = await options.repo.readMap(targetPath);
       const model = typeof artifact.metadata?.model === "string" ? artifact.metadata.model : options.defaultModel();
       const reasoning = normalizeReasoningLevel(artifact.metadata?.reasoning);
+      const current = options.currentModel();
       const links = artifact.sources.filter(source => source.path).map(source => `[[${source.path}|${source.label}]]`);
       const statement = "Simulated / unverified thinking source; not an adopted user conclusion.";
       // Quote arbitrary input so it cannot close Detail's managed markers.
@@ -56,7 +60,8 @@ export async function receiveVisualMapHandoff(
         model,
         map,
         targetPath,
-        "manual",
+        // The root follows the workspace only when both the model and the reasoning equal the current ones.
+        model === current.model && reasoning === normalizeReasoningLevel(current.reasoning) ? "workspace" : "manual",
         { detail, thinkingOrigin: origin, reasoning },
         record
       );

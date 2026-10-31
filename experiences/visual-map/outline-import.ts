@@ -342,7 +342,8 @@ async function createOutlineNotes(
         model,
         map,
         mapPath,
-        manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
+        // A manual model marks only the top-level topic; its children inherit it and resolve to the same model.
+        top && manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
         // A topic created from an outline starts in Quick mode (its first research, if any, is the short one).
         // A node's own note text, when the file had one, is its Detail as written; otherwise a root gets the import log.
         node.body

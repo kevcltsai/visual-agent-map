@@ -13504,7 +13504,7 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
     if (!engine || engine.busy) return;
     const confirmed = await new CoffeeSummaryConfirmModal(
       this.app,
-      engine.session.model,
+      this.plugin.modelLabel(engine.session.model),
       this.plugin.settings.language
     ).confirm();
     if (!confirmed || this.engine !== engine || engine.busy || this.closed) return;
@@ -13640,6 +13640,8 @@ var CoffeeTablesView = class extends import_obsidian8.ItemView {
         topicEdited: "true",
         model: edit.model,
         reasoning: edit.reasoning,
+        modelPicked: "false",
+        reasoningPicked: "false",
         hostCount: String((_e = (_d = edit.guests) == null ? void 0 : _d.hostCount) != null ? _e : 2),
         custom: (_g = (_f = edit.guests) == null ? void 0 : _f.customPrompt) != null ? _g : "",
         customization: JSON.stringify((_i = (_h = edit.guests) == null ? void 0 : _h.customization) != null ? _i : defaultCustomization(edit.language)),
@@ -13761,7 +13763,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
     };
     const setReasoning = () => {
       var _a3, _b3, _c2;
-      const selected = reasoning.value || this.homeForm.reasoning || (edit == null ? void 0 : edit.reasoning) || this.plugin.settings.cliReasoning;
+      const selected = reasoning.value || this.homeForm.reasoning || (edit == null ? void 0 : edit.reasoning) || this.plugin.currentModelChoice().reasoning;
       const status = (_c2 = (_b3 = (_a3 = this.plugin).modelDiscoveryState) == null ? void 0 : _b3.call(_a3, providerForModel(model.value)).status) != null ? _c2 : "ready";
       const state = reasoningChoiceState(selected, this.plugin.coffeeReasoningEfforts(model.value), status);
       reasoning.empty();
@@ -13771,7 +13773,7 @@ ${edit.guests.customPrompt}` : builtinCoffeeStyle(this.plugin.settings.language)
       reasoning.value = state.selected;
     };
     const setModels = (available) => {
-      const selected = model.value || this.homeForm.model || (edit == null ? void 0 : edit.model) || this.plugin.settings.cliModel;
+      const selected = model.value || this.homeForm.model || (edit == null ? void 0 : edit.model) || this.plugin.currentModelChoice().model;
       if (!model.value && selected) {
         model.add(new Option(this.plugin.modelLabel(selected), selected));
         model.value = selected;
@@ -14001,12 +14003,16 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       styleSelect.value = selected;
     };
     refreshStyleChoices(selectedStyleId);
+    const manualChoice = (chosenModel, chosenReasoning) => ({
+      model: this.homeForm.modelPicked === "true" ? chosenModel : "",
+      reasoning: this.homeForm.reasoningPicked === "true" ? chosenReasoning : ""
+    });
     const snapshotForm = () => {
       this.homeForm = {
         ...this.homeForm,
         topic: topic.value,
-        model: model.value,
-        reasoning: reasoning.value,
+        // Only a choice the user made (change event) is remembered; an untouched one follows the current model or the edited table.
+        ...manualChoice(model.value, reasoning.value),
         styleId: styleSelect.value,
         styleName: styleNameInput.value,
         stylePrompt: stylePrompt.value,
@@ -14200,11 +14206,15 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
       snapshotForm();
     });
     model.addEventListener("change", () => {
+      this.homeForm.modelPicked = "true";
       setReasoning();
       updateAdvancedSummary();
       snapshotForm();
     });
-    reasoning.addEventListener("change", snapshotForm);
+    reasoning.addEventListener("change", () => {
+      this.homeForm.reasoningPicked = "true";
+      snapshotForm();
+    });
     hostCount.addEventListener("change", () => {
       hostRisk.toggleClass("is-hidden", Number(hostCount.value) <= 2);
       updateAdvancedSummary();
@@ -18675,6 +18685,8 @@ function relationLabelPoint(a, b) {
 }
 function treeEdgePathData(parent, child, direction, depth = 1) {
   if (direction === "radial") return relationPathData(parent, child);
+  if (direction === "timeline" && depth >= 2)
+    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
   if (direction === "fishbone")
     return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
   if (direction === "down" || direction === "up") {
@@ -30418,7 +30430,8 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
         model,
         map,
         mapPath,
-        manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
+        // A manual model marks only the top-level topic; its children inherit it and resolve to the same model.
+        top && manualModel ? "manual" : top && parentId === null ? "workspace" : "inherited",
         // A topic created from an outline starts in Quick mode (its first research, if any, is the short one).
         // A node's own note text, when the file had one, is its Detail as written; otherwise a root gets the import log.
         node.body ? { detail: node.body, researchMode: "local" } : top ? { detail: rootDetail, researchMode: "local" } : { researchMode: "local" }
@@ -50321,9 +50334,18 @@ ${request.requirements}` : preset.text,
     const record = sessionFor(this.plugin).get();
     return (record == null ? void 0 : record.mode) === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : /* @__PURE__ */ new Set();
   }
-  refreshCutMarks() {
+  paintCutMarks() {
     const cut = this.cutIds();
     for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
+  }
+  /** Repaints the cut marks of this view and of every other map view, in the main window and in popout windows. */
+  refreshCutMarks() {
+    var _a2, _b2, _c;
+    this.paintCutMarks();
+    for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace) == null ? void 0 : _a2.getLeavesOfType) == null ? void 0 : _b2.call(_a2, VIEW_TYPE)) != null ? _c : []) {
+      const view = leaf.view;
+      if (view instanceof _VisualAgentMapView && view !== this) view.paintCutMarks();
+    }
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot() {
@@ -51416,7 +51438,6 @@ ${request.requirements}` : preset.text,
   }
   /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
   renderBranchLayoutSection(panel, node) {
-    var _a2;
     const choices = this.branchLayoutChoices(node);
     if (!choices.length) return;
     const section3 = panel.createDiv("vam-inspector-section vam-branch-layout-section");
@@ -51424,21 +51445,31 @@ ${request.requirements}` : preset.text,
     const group = section3.createDiv("vam-branch-layout vam-choice-group");
     group.setAttr("role", "group");
     group.setAttr("aria-label", t("ui.branch_layout"));
-    const current = (_a2 = branchDirectionOf(node)) != null ? _a2 : null;
-    const options = [
-      { direction: null, label: t("ui.branch_layout_follow") },
-      ...choices.map((direction) => ({ direction, label: t(BRANCH_LABEL[direction]) }))
-    ];
-    for (const option2 of options) {
-      const choice2 = this.button(
-        group,
-        option2.label,
-        () => this.enqueue(() => this.changeBranchLayout(node, option2.direction))
-      );
-      const on = option2.direction === current;
-      choice2.setAttr("aria-pressed", String(on));
-      if (on) choice2.addClass("is-pressed");
-    }
+    const paint = (focusDirection) => {
+      var _a2, _b2, _c;
+      group.empty();
+      const latest = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id)) != null ? _b2 : node;
+      const current = (_c = branchDirectionOf(latest)) != null ? _c : null;
+      const options = [
+        { direction: null, label: t("ui.branch_layout_follow") },
+        ...this.branchLayoutChoices(latest).map((direction) => ({ direction, label: t(BRANCH_LABEL[direction]) }))
+      ];
+      for (const option2 of options) {
+        const choice2 = this.button(
+          group,
+          option2.label,
+          () => this.enqueue(async () => {
+            await this.changeBranchLayout(node, option2.direction);
+            paint(option2.direction);
+          })
+        );
+        const on = option2.direction === current;
+        choice2.setAttr("aria-pressed", String(on));
+        if (on) choice2.addClass("is-pressed");
+        if (focusDirection !== void 0 && option2.direction === focusDirection) choice2.focus();
+      }
+    };
+    paint();
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   async changeTopicMarker(node, id) {
@@ -61243,6 +61274,7 @@ async function receiveVisualMapHandoff(artifact, options) {
       const map = await options.repo.readMap(targetPath);
       const model = typeof ((_b2 = artifact.metadata) == null ? void 0 : _b2.model) === "string" ? artifact.metadata.model : options.defaultModel();
       const reasoning = normalizeReasoningLevel((_c = artifact.metadata) == null ? void 0 : _c.reasoning);
+      const current = options.currentModel();
       const links = artifact.sources.filter((source) => source.path).map((source) => `[[${source.path}|${source.label}]]`);
       const statement = "Simulated / unverified thinking source; not an adopted user conclusion.";
       const detail = [artifact.content, statement, ...links].map(originMarkdown).join("\n\n");
@@ -61267,7 +61299,8 @@ ${artifact.sourceSnapshot || "No insight snapshot was supplied."}`
         model,
         map,
         targetPath,
-        "manual",
+        // The root follows the workspace only when both the model and the reasoning equal the current ones.
+        model === current.model && reasoning === normalizeReasoningLevel(current.reasoning) ? "workspace" : "manual",
         { detail, thinkingOrigin: origin, reasoning },
         record
       );
@@ -62803,6 +62836,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         (artifact, beforeWrite) => receiveVisualMapHandoff(artifact, {
           repo: this.repo,
           defaultModel: () => this.settings.cliModel,
+          currentModel: () => this.currentModelChoice(),
           exists: (path) => !!this.app.vault.getAbstractFileByPath(path),
           mutate: (work) => this.mutate(work),
           navigate: (path) => this.activateView(path),

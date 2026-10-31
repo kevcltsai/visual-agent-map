@@ -312,6 +312,24 @@ integrationTest('importOutline creates the map, opens it, and starts shallow res
   for (const node of map.nodes) assert.equal((await repo.readNote(node.path)).model, 'model-x');
 });
 
+integrationTest('importOutline with research: a model equal to cliModel stays workspace; a different one marks only the top-level topic manual', async () => {
+  const { repo, app } = fixture('en');
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-5.6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_model, run) => { await run(); return true; } };
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const opened = [];
+  const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
+  view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };
+  view.startShallowResearch = async () => {};
+  const nodes = api.parseOutline('# R\n## A\n### B').nodes;
+  const notesOf = async path => { const map = await repo.readMap(path); return Promise.all(map.nodes.map(async item => ({ parentId: item.parentId, note: await repo.readNote(item.path, map) }))); };
+  await view.importOutline({ nodes, source: null, shallowResearch: true, model: 'gpt-5.6-luna' });
+  const same = await notesOf(opened[0]);
+  assert.equal(same.find(item => item.parentId === null).note.modelSource, 'workspace');
+  for (const item of same) assert.equal(item.note.model, 'gpt-5.6-luna');
+  await view.importOutline({ nodes, source: null, shallowResearch: true, model: 'gpt-x' });
+  const other = await notesOf(opened[1]);
+  for (const item of other) { assert.equal(item.note.modelSource, item.parentId === null ? 'manual' : 'inherited'); assert.equal(item.note.model, 'gpt-x'); }
+});
 integrationTest('importOutline writes Reference Links (parent, children, map) into every new note', async () => {
   const { repo, app } = fixture('en');
   const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, confirmAiUsage: async (_m, run) => { await run(); return true; } };
@@ -994,13 +1012,14 @@ test('the outline prompt states the chosen levels and size after the preset only
   assert.doesNotMatch(buildOutlineGeneratePrompt({ ...base, language: 'en' }), /Levels and size for this run/);
 });
 
-integrationTest('importOutline under a manual parent: a shallow-research model equal to the workspace model but different from the parent is kept as a manual choice', async () => {
+integrationTest('importOutline under a manual parent: a shallow-research model equal to the workspace model but different from the parent is kept as a manual choice on the top-level topic only', async () => {
   const h = await placementHarness({ cliModel: 'claude:sonnet' });
   await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, aiMode: 'quick', model: 'claude:sonnet', placement: { kind: 'under', parentId: h.oldRoot.id } });
   const saved = await h.repo.readMap(h.mapPath);
   const fresh = saved.nodes.filter(item => item.parentId !== null && item.id !== h.oldChild.id);
   assert.equal(fresh.length, 2);
-  for (const item of fresh) { const note = await h.repo.readNote(item.path, saved); assert.equal(note.modelSource, 'manual'); assert.equal(note.model, 'claude:sonnet'); }
+  // Plan D6 (MS-07): only the top-level imported topic is a manual override; its child inherits and resolves to the same model.
+  for (const item of fresh) { const note = await h.repo.readNote(item.path, saved); assert.equal(note.modelSource, item.parentId === h.oldRoot.id ? 'manual' : 'inherited', note.title); assert.equal(note.model, 'claude:sonnet'); }
   assert.deepEqual(h.confirms, ['claude:sonnet']);
 });
 integrationTest('importOutline under a manual parent: no chosen model, or the parent model itself, stays inherited', async () => {
@@ -1063,4 +1082,21 @@ integrationTest('topics created by an outline import start in Quick mode, the ro
   assert.equal((await h.repo.readNote(h.oldChild.path, saved)).researchMode, 'local', 'an older topic (no research-mode) reads as Quick and is not touched');
   const text = await h.app.vault.cachedRead(h.app.vault.getAbstractFileByPath(created[0].path));
   assert.match(text, /research-mode: local/); assert.doesNotMatch(text, /research-depth/);
+});
+
+// MS-07 P7b (plan D6): when the model is a manual override only the top-level topic is written manual; its children inherit it.
+integrationTest('createOutlineMap: a manual model marks only the top-level topic; children inherit and still resolve to that model', async () => {
+  const { repo } = fixture('en'); repo.settings.cliModel = 'cur-model';
+  const result = await api.createOutlineMap(repo, 'gpt-x', api.parseOutline('# Root\n## A\n### B\n## C').nodes, null, undefined, undefined, true);
+  const map = await repo.readMap(result.mapPath);
+  const notes = await Promise.all(map.nodes.map(node => repo.readNote(node.path)));
+  assert.deepEqual(notes.map(note => note.modelSource), ['manual', 'inherited', 'inherited', 'inherited']);
+  assert.ok(notes.every(note => note.model === 'gpt-x'), 'every topic still uses the chosen model');
+});
+integrationTest('createOutlineMap: a model equal to the current one makes a workspace root with inherited children', async () => {
+  const { repo } = fixture('en');
+  const result = await api.createOutlineMap(repo, 'cur-model', api.parseOutline('# Root\n## A').nodes, null);
+  const map = await repo.readMap(result.mapPath);
+  const notes = await Promise.all(map.nodes.map(node => repo.readNote(node.path)));
+  assert.deepEqual(notes.map(note => note.modelSource), ['workspace', 'inherited']);
 });

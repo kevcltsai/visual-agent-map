@@ -505,7 +505,7 @@ export class CoffeeTablesView extends ItemView {
     if (!engine || engine.busy) return;
     const confirmed = await new CoffeeSummaryConfirmModal(
       this.app,
-      engine.session.model,
+      this.plugin.modelLabel(engine.session.model),
       this.plugin.settings.language
     ).confirm();
     if (!confirmed || this.engine !== engine || engine.busy || this.closed) return;
@@ -651,6 +651,8 @@ export class CoffeeTablesView extends ItemView {
         topicEdited: "true",
         model: edit.model,
         reasoning: edit.reasoning,
+        modelPicked: "false",
+        reasoningPicked: "false",
         hostCount: String(edit.guests?.hostCount ?? 2),
         custom: edit.guests?.customPrompt ?? "",
         customization: JSON.stringify(edit.guests?.customization ?? defaultCustomization(edit.language)),
@@ -778,7 +780,7 @@ export class CoffeeTablesView extends ItemView {
     };
     const setReasoning = (): void => {
       const selected =
-        reasoning.value || this.homeForm.reasoning || edit?.reasoning || this.plugin.settings.cliReasoning;
+        reasoning.value || this.homeForm.reasoning || edit?.reasoning || this.plugin.currentModelChoice().reasoning;
       const status = this.plugin.modelDiscoveryState?.(providerForModel(model.value)).status ?? "ready";
       const state = reasoningChoiceState(selected, this.plugin.coffeeReasoningEfforts(model.value), status);
       reasoning.empty();
@@ -788,7 +790,7 @@ export class CoffeeTablesView extends ItemView {
       reasoning.value = state.selected;
     };
     const setModels = (available: string[]): void => {
-      const selected = model.value || this.homeForm.model || edit?.model || this.plugin.settings.cliModel;
+      const selected = model.value || this.homeForm.model || edit?.model || this.plugin.currentModelChoice().model;
       if (!model.value && selected) {
         model.add(new Option(this.plugin.modelLabel(selected), selected));
         model.value = selected;
@@ -1032,12 +1034,16 @@ export class CoffeeTablesView extends ItemView {
       styleSelect.value = selected;
     };
     refreshStyleChoices(selectedStyleId);
+    const manualChoice = (chosenModel: string, chosenReasoning: string): Record<string, string> => ({
+      model: this.homeForm.modelPicked === "true" ? chosenModel : "",
+      reasoning: this.homeForm.reasoningPicked === "true" ? chosenReasoning : ""
+    });
     const snapshotForm = (): void => {
       this.homeForm = {
         ...this.homeForm,
         topic: topic.value,
-        model: model.value,
-        reasoning: reasoning.value,
+        // Only a choice the user made (change event) is remembered; an untouched one follows the current model or the edited table.
+        ...manualChoice(model.value, reasoning.value),
         styleId: styleSelect.value,
         styleName: styleNameInput.value,
         stylePrompt: stylePrompt.value,
@@ -1233,11 +1239,15 @@ export class CoffeeTablesView extends ItemView {
       snapshotForm();
     });
     model.addEventListener("change", () => {
+      this.homeForm.modelPicked = "true";
       setReasoning();
       updateAdvancedSummary();
       snapshotForm();
     });
-    reasoning.addEventListener("change", snapshotForm);
+    reasoning.addEventListener("change", () => {
+      this.homeForm.reasoningPicked = "true";
+      snapshotForm();
+    });
     hostCount.addEventListener("change", () => {
       hostRisk.toggleClass("is-hidden", Number(hostCount.value) <= 2);
       updateAdvancedSummary();

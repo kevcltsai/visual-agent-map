@@ -1426,6 +1426,8 @@ export class VisualAgentMapView extends ItemView {
     let map = await this.plugin.repo.readMap(path);
     if (!isCurrent()) return;
     if (map.aim?.creationId && map.aim.rootDraft) {
+      // The draft is compared with the current model and reasoning at this moment (plan D9); createAimMap decides
+      // workspace or manual, so no field is added to the map data.
       const resumed = await createAimMap(this.plugin.repo, this.plugin.settings.cliModel, {
         requestId: map.aim.creationId,
         topic: map.title,
@@ -8705,9 +8707,17 @@ export class VisualAgentMapView extends ItemView {
     const record = sessionFor(this.plugin).get();
     return record?.mode === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : new Set();
   }
-  private refreshCutMarks(): void {
+  private paintCutMarks(): void {
     const cut = this.cutIds();
     for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
+  }
+  /** Repaints the cut marks of this view and of every other map view, in the main window and in popout windows. */
+  private refreshCutMarks(): void {
+    this.paintCutMarks();
+    for (const leaf of this.app.workspace?.getLeavesOfType?.(VIEW_TYPE) ?? []) {
+      const view = leaf.view;
+      if (view instanceof VisualAgentMapView && view !== this) view.paintCutMarks();
+    }
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot():
@@ -9890,19 +9900,29 @@ export class VisualAgentMapView extends ItemView {
     const group = section.createDiv("vam-branch-layout vam-choice-group");
     group.setAttr("role", "group");
     group.setAttr("aria-label", t("ui.branch_layout"));
-    const current = branchDirectionOf(node) ?? null;
-    const options: { direction: BranchDirection | null; label: string }[] = [
-      { direction: null, label: t("ui.branch_layout_follow") },
-      ...choices.map(direction => ({ direction, label: t(BRANCH_LABEL[direction]) }))
-    ];
-    for (const option of options) {
-      const choice = this.button(group, option.label, () =>
-        this.enqueue(() => this.changeBranchLayout(node, option.direction))
-      );
-      const on = option.direction === current;
-      choice.setAttr("aria-pressed", String(on));
-      if (on) choice.addClass("is-pressed");
-    }
+    // Choosing re-reads the topic and repaints the group, as the colour menu does, so the panel need not be reopened.
+    const paint = (focusDirection?: BranchDirection | null): void => {
+      group.empty();
+      const latest = this.map?.nodes.find(item => item.id === node.id) ?? node;
+      const current = branchDirectionOf(latest) ?? null;
+      const options: { direction: BranchDirection | null; label: string }[] = [
+        { direction: null, label: t("ui.branch_layout_follow") },
+        ...this.branchLayoutChoices(latest).map(direction => ({ direction, label: t(BRANCH_LABEL[direction]) }))
+      ];
+      for (const option of options) {
+        const choice = this.button(group, option.label, () =>
+          this.enqueue(async () => {
+            await this.changeBranchLayout(node, option.direction);
+            paint(option.direction);
+          })
+        );
+        const on = option.direction === current;
+        choice.setAttr("aria-pressed", String(on));
+        if (on) choice.addClass("is-pressed");
+        if (focusDirection !== undefined && option.direction === focusDirection) choice.focus();
+      }
+    };
+    paint();
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   private async changeTopicMarker(node: MapNode, id: TopicMarker): Promise<void> {

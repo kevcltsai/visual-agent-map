@@ -518,6 +518,8 @@ export const en = {
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic":
     "A link contains a cycle or points to a missing parent topic.",
   "ui.ai_task_cancelled": "AI task cancelled",
+  "ui.ai_task_interrupted_by_reload":
+    "The AI task was interrupted when the plugin reloaded or Obsidian closed. No result was applied; existing content is kept, and you can run it again.",
   "ui.codex_app_server_has_stopped": "Codex App Server has stopped",
   "ui.codex_app_server_did_not_create_a_thread": "Codex App Server did not create a thread",
   "ui.could_not_start_codex_app_server_0_1": "Could not start Codex App Server ({0}): {1}",

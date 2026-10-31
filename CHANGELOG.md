@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **No more stuck "AI running" cards.** If the plugin reloaded or Obsidian closed while an AI task was running, the card now shows a task error when you open the map, with a note that the task was interrupted, so you can run it again.
+
 ## [0.28.0] - 2026-11-01
 
 ### One model, everywhere

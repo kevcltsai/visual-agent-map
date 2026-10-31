@@ -1257,106 +1257,125 @@ export class Repository {
     patch: NotePatch,
     options: { contentLanguage?: NoteLanguage; detailTemplate?: DetailTemplate } = {}
   ): Promise<void> {
+    await this.app.vault.process(this.file(path), content => this.patchedNote(path, content, patch, options));
+  }
+
+  /**
+   * Marks a note left at `status: running` by a reload as failed. The status and `stillIdle()` are checked inside the same
+   * `vault.process` callback that writes, so a task that starts or finishes in between is never overwritten.
+   * Returns whether it wrote. Does not take the mutation queue: callers are already inside it.
+   */
+  async markInterruptedRun(path: string, lastError: string, stillIdle: () => boolean): Promise<boolean> {
+    let wrote = false;
     await this.app.vault.process(this.file(path), content => {
-      const fm = frontmatter(content);
-      // One decision for every label this write emits: the note's own scaffolding language (see scaffoldLanguage).
-      const language = this.scaffoldLanguage(content, fm);
-      ensureNoteCssClass(fm);
-      if (Array.isArray(fm["agent-map-references"]))
-        fm["agent-map-references"] = fm["agent-map-references"].map(value =>
-          localizeReference(String(value), language)
-        );
-      fm.title = patch.title ?? noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
-      for (const key of ["summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
-      if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
-      if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
-      if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
-      if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
-      if (patch.detailTemplateId !== undefined)
-        patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];
-      if (patch.toneId !== undefined) patch.toneId ? (fm.tone = patch.toneId) : delete fm.tone;
-      if (patch.detailFormatIssues !== undefined)
-        patch.detailFormatIssues.length
-          ? (fm["detail-format-issues"] = patch.detailFormatIssues)
-          : delete fm["detail-format-issues"];
-      // A completed write ends the failure it follows; running leaves it (a stopped run restores the old status).
-      if (patch.lastError !== undefined)
-        patch.lastError ? (fm["last-error"] = patch.lastError) : delete fm["last-error"];
-      else if (patch.status === "completed") delete fm["last-error"];
-      if (patch.mapId !== undefined) patch.mapId ? (fm["agent-map-id"] = patch.mapId) : delete fm["agent-map-id"];
-      if (patch.topicId !== undefined) patch.topicId ? (fm["topic-id"] = patch.topicId) : delete fm["topic-id"];
-      if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;
-      if (patch.referencePaths !== undefined)
-        patch.referencePaths.length
-          ? (fm["reference-materials"] = [...new Set(patch.referencePaths)])
-          : delete fm["reference-materials"];
-      if (patch.sourcePaths !== undefined)
-        patch.sourcePaths.length ? (fm["source-notes"] = patch.sourcePaths) : delete fm["source-notes"];
-      fm.updated = new Date().toISOString();
-      let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      // AIM notes carry their content language; every other note keeps following the interface language.
-      const textLanguage = options.contentLanguage ?? noteContentLanguage(fm) ?? language;
-      if (options.contentLanguage !== undefined && noteContentLanguage(fm) === undefined)
-        fm["content-language"] = options.contentLanguage;
-      body = ensurePreview(body, language, textLanguage);
-      if (isPlaceholder(text(fm.summary))) fm.summary = placeholder(textLanguage);
-      if (patch.title !== undefined) {
-        const heading = managedHeadingValue(patch.title);
-        body = body.replace(/^# .*$/m, () => `# ${heading}`);
-      }
-      if (patch.summary !== undefined) body = replaceSummarySection(body, patch.summary);
-      if (patch.prompt !== undefined) body = replaceSection(body, "Prompt", patch.prompt);
-      if (patch.rules !== undefined) body = replaceSection(body, "Rules", patch.rules);
-      // A new detail carries its own open items, if any; the marker of the old one goes with it.
-      if (patch.detail !== undefined) body = replaceSection(splitOpenItems(body).text, "Detail", patch.detail);
-      if (patch.thinkingOrigin !== undefined)
-        body = replaceSection(body, "Thinking Origin", originMarkdown(patch.thinkingOrigin));
-      if (patch.visualReferences !== undefined) {
-        body = removeSection(body, "Visual References");
-        if (patch.visualReferences.trim())
-          body = replaceSection(
-            body,
-            "Detail",
-            detailWithVisualReferences(
-              section(body, "Detail"),
-              patch.visualReferences,
-              options.detailTemplate ?? standardTemplate(language)
-            )
-          );
-      }
-      if (patch.newFindings !== undefined) {
-        if (patch.newFindings.trim()) body = replaceSection(body, "Working Findings", patch.newFindings);
-        else {
-          body = removeSection(body, "Working Findings");
-          body = removeSection(body, "New Findings");
-        }
-      }
-      if (patch.preview !== undefined) {
-        body = replaceSection(body, previewHeading(language), patch.preview);
-        fm["preview-initialized"] = true;
-      } else if (patch.previewSection !== undefined) {
-        body = replaceSection(body, previewHeading(language), patch.previewSection);
-      } else if (
-        patch.summary !== undefined &&
-        patch.summary.trim() &&
-        !isPlaceholder(patch.summary) &&
-        fm["preview-initialized"] !== true
-      ) {
-        const preview = previewSection(body).trim();
-        if (!preview || isPlaceholder(preview))
-          body = replaceSection(body, previewHeading(language), initialPreview(patch.summary, section(body, "Detail")));
-        fm["preview-initialized"] = true;
-      }
-      if (patch.previewInitialized !== undefined) fm["preview-initialized"] = patch.previewInitialized;
-      body = normalizeBodyOrder(
-        body,
-        text(fm.title, path.replace(/\.md$/, "")),
-        text(fm.summary, placeholder(textLanguage)),
-        language,
-        textLanguage
-      );
-      return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm, language)}`;
+      if (frontmatter(content).status !== "running" || !stillIdle()) return content;
+      wrote = true;
+      return this.patchedNote(path, content, { status: "error", lastError }, {});
     });
+    return wrote;
+  }
+
+  private patchedNote(
+    path: string,
+    content: string,
+    patch: NotePatch,
+    options: { contentLanguage?: NoteLanguage; detailTemplate?: DetailTemplate }
+  ): string {
+    const fm = frontmatter(content);
+    // One decision for every label this write emits: the note's own scaffolding language (see scaffoldLanguage).
+    const language = this.scaffoldLanguage(content, fm);
+    ensureNoteCssClass(fm);
+    if (Array.isArray(fm["agent-map-references"]))
+      fm["agent-map-references"] = fm["agent-map-references"].map(value => localizeReference(String(value), language));
+    fm.title = patch.title ?? noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
+    for (const key of ["summary", "model", "status"] as const) if (patch[key] !== undefined) fm[key] = patch[key];
+    if (patch.modelSource !== undefined) fm["model-source"] = patch.modelSource;
+    if (patch.reasoning !== undefined) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
+    if (patch.researchMode !== undefined) fm["research-mode"] = patch.researchMode;
+    if (patch.visualMode !== undefined) fm["visual-mode"] = patch.visualMode;
+    if (patch.detailTemplateId !== undefined)
+      patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];
+    if (patch.toneId !== undefined) patch.toneId ? (fm.tone = patch.toneId) : delete fm.tone;
+    if (patch.detailFormatIssues !== undefined)
+      patch.detailFormatIssues.length
+        ? (fm["detail-format-issues"] = patch.detailFormatIssues)
+        : delete fm["detail-format-issues"];
+    // A completed write ends the failure it follows; running leaves it (a stopped run restores the old status).
+    if (patch.lastError !== undefined) patch.lastError ? (fm["last-error"] = patch.lastError) : delete fm["last-error"];
+    else if (patch.status === "completed") delete fm["last-error"];
+    if (patch.mapId !== undefined) patch.mapId ? (fm["agent-map-id"] = patch.mapId) : delete fm["agent-map-id"];
+    if (patch.topicId !== undefined) patch.topicId ? (fm["topic-id"] = patch.topicId) : delete fm["topic-id"];
+    if (patch.topicState !== undefined) fm["topic-state"] = patch.topicState;
+    if (patch.referencePaths !== undefined)
+      patch.referencePaths.length
+        ? (fm["reference-materials"] = [...new Set(patch.referencePaths)])
+        : delete fm["reference-materials"];
+    if (patch.sourcePaths !== undefined)
+      patch.sourcePaths.length ? (fm["source-notes"] = patch.sourcePaths) : delete fm["source-notes"];
+    fm.updated = new Date().toISOString();
+    let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    // AIM notes carry their content language; every other note keeps following the interface language.
+    const textLanguage = options.contentLanguage ?? noteContentLanguage(fm) ?? language;
+    if (options.contentLanguage !== undefined && noteContentLanguage(fm) === undefined)
+      fm["content-language"] = options.contentLanguage;
+    body = ensurePreview(body, language, textLanguage);
+    if (isPlaceholder(text(fm.summary))) fm.summary = placeholder(textLanguage);
+    if (patch.title !== undefined) {
+      const heading = managedHeadingValue(patch.title);
+      body = body.replace(/^# .*$/m, () => `# ${heading}`);
+    }
+    if (patch.summary !== undefined) body = replaceSummarySection(body, patch.summary);
+    if (patch.prompt !== undefined) body = replaceSection(body, "Prompt", patch.prompt);
+    if (patch.rules !== undefined) body = replaceSection(body, "Rules", patch.rules);
+    // A new detail carries its own open items, if any; the marker of the old one goes with it.
+    if (patch.detail !== undefined) body = replaceSection(splitOpenItems(body).text, "Detail", patch.detail);
+    if (patch.thinkingOrigin !== undefined)
+      body = replaceSection(body, "Thinking Origin", originMarkdown(patch.thinkingOrigin));
+    if (patch.visualReferences !== undefined) {
+      body = removeSection(body, "Visual References");
+      if (patch.visualReferences.trim())
+        body = replaceSection(
+          body,
+          "Detail",
+          detailWithVisualReferences(
+            section(body, "Detail"),
+            patch.visualReferences,
+            options.detailTemplate ?? standardTemplate(language)
+          )
+        );
+    }
+    if (patch.newFindings !== undefined) {
+      if (patch.newFindings.trim()) body = replaceSection(body, "Working Findings", patch.newFindings);
+      else {
+        body = removeSection(body, "Working Findings");
+        body = removeSection(body, "New Findings");
+      }
+    }
+    if (patch.preview !== undefined) {
+      body = replaceSection(body, previewHeading(language), patch.preview);
+      fm["preview-initialized"] = true;
+    } else if (patch.previewSection !== undefined) {
+      body = replaceSection(body, previewHeading(language), patch.previewSection);
+    } else if (
+      patch.summary !== undefined &&
+      patch.summary.trim() &&
+      !isPlaceholder(patch.summary) &&
+      fm["preview-initialized"] !== true
+    ) {
+      const preview = previewSection(body).trim();
+      if (!preview || isPlaceholder(preview))
+        body = replaceSection(body, previewHeading(language), initialPreview(patch.summary, section(body, "Detail")));
+      fm["preview-initialized"] = true;
+    }
+    if (patch.previewInitialized !== undefined) fm["preview-initialized"] = patch.previewInitialized;
+    body = normalizeBodyOrder(
+      body,
+      text(fm.title, path.replace(/\.md$/, "")),
+      text(fm.summary, placeholder(textLanguage)),
+      language,
+      textLanguage
+    );
+    return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm, language)}`;
   }
 
   async createNote(

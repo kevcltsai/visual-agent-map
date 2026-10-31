@@ -74,7 +74,7 @@ test('S1: spacing compact and spacious survive a round trip; standard, huge and 
   assert.equal('layout' in roundTrip({ direction: 'sideways', spacing: 'compact' }), false);
   assert.equal('layout' in roundTrip({ spacing: 'compact' }), false);
   // The arrangements whose engines do not exist yet are not accepted by parse; each engine packet adds its own value.
-  for (const direction of ['balanced', 'radial', 'timeline', 'fishbone'])
+  for (const direction of ['radial', 'timeline', 'fishbone'])
     assert.equal('layout' in roundTrip({ direction, spacing: 'compact' }), false, direction);
 });
 
@@ -102,7 +102,8 @@ test('S2b: layoutOf returns direction and stored spacing; AIM maps and bad value
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'compact' } }), { direction: 'left', spacing: 'compact' });
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'standard' } }), { direction: 'left' });
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'compact' }, aim: { version: 1 } }), { direction: 'right' });
-  assert.deepEqual(layoutOf({ layout: { direction: 'balanced', spacing: 'huge' } }), { direction: 'right' });
+  assert.deepEqual(layoutOf({ layout: { direction: 'radial', spacing: 'huge' } }), { direction: 'right' });
+  assert.deepEqual(layoutOf({ layout: { direction: 'balanced', spacing: 'huge' } }), { direction: 'balanced' });
   assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left', spacing: 'compact' } }), 'left');
 });
 
@@ -338,5 +339,181 @@ test('P1 data: down and up are stored and read back; layoutOf keeps them, layout
   assert.equal(layout.layoutDirectionOf({ layout: { direction: 'down' } }), 'right');
   assert.equal(layout.isLayoutDirection('down'), false);
   assert.equal(layout.isLayoutKind('up'), true);
-  assert.equal(layout.isLayoutKind('balanced'), false);
+  assert.equal(layout.isLayoutKind('balanced'), true);
+  assert.equal(layout.isLayoutKind('radial'), false);
+});
+
+// ---- P2 (ticket 21): balanced ----
+const sideOf = (list, id) => {
+  const by = new Map(list.map(item => [item.id, item]));
+  let n = by.get(id);
+  while (n.parentId && by.get(n.parentId).parentId) n = by.get(n.parentId);
+  const root = by.get(n.parentId);
+  return n.x < root.x ? 'left' : 'right';
+};
+const subtreeIds = (list, id) => {
+  const out = [id];
+  for (const item of list) if (item.parentId === id) out.push(...subtreeIds(list, item.id));
+  return out;
+};
+/** Vertical extent of the cards on one side of the root and of one first-level subtree. */
+const extent = (list, ids, heightOf) => {
+  const by = new Map(list.map(item => [item.id, item]));
+  const high = heightIn(list, heightOf);
+  const top = Math.min(...ids.map(id => by.get(id).y)), bottom = Math.max(...ids.map(id => by.get(id).y + high(id)));
+  return bottom - top;
+};
+const sideHeights = (list, heightOf) => {
+  const root = list.find(item => !item.parentId);
+  const out = { left: [], right: [] };
+  for (const kid of list.filter(item => item.parentId === root.id)) out[sideOf(list, kid.id)].push(...subtreeIds(list, kid.id));
+  return { left: out.left.length ? extent(list, out.left, heightOf) : 0, right: out.right.length ? extent(list, out.right, heightOf) : 0, ids: out };
+};
+const balancedSpec = spacing => ({ direction: 'balanced', spacing });
+
+test('B-1: the two sides differ in height by at most the tallest first-level subtree, at every spacing', () => {
+  for (const spacing of SPACINGS) {
+    const placed = layout.arrangeMap(wide(), undefined, wideHeight, balancedSpec(spacing));
+    const heights = sideHeights(placed, wideHeight);
+    assert.ok(heights.left > 0 && heights.right > 0, 'both sides are used');
+    const tallest = Math.max(...placed.filter(item => item.parentId === 'root').map(kid => extent(placed, subtreeIds(placed, kid.id), wideHeight)));
+    assert.ok(Math.abs(heights.left - heights.right) <= tallest, `${spacing} ${heights.left} vs ${heights.right} within ${tallest}`);
+    const root = placed.find(item => item.id === 'root');
+    const kidsTop = Math.min(...placed.filter(item => item.parentId === 'root').map(item => item.y));
+    assert.ok(root.y >= kidsTop - 1, 'the root sits inside the span of its children');
+  }
+  const sampleSides = layout.arrangeMap(sample(), undefined, sampleHeight, 'balanced');
+  assert.equal(sampleSides.length, 12);
+});
+
+test('B-2: every descendant of a first-level topic is on that topic\'s side of the root', () => {
+  for (const [name, [nodes, heightOf]] of Object.entries(plainTrees()))
+    for (const spacing of SPACINGS) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, balancedSpec(spacing));
+      const roots = placed.filter(item => !item.parentId);
+      if (name === 'wide') assert.equal(new Set(placed.filter(item => item.parentId === 'root').map(item => sideOf(placed, item.id))).size, 2, `${spacing} both sides are used`);
+      for (const root of roots)
+        for (const kid of placed.filter(item => item.parentId === root.id)) {
+          const side = sideOf(placed, kid.id);
+          for (const id of subtreeIds(placed, kid.id)) {
+            assert.equal(sideOf(placed, id), side, `${name} ${spacing} ${id}`);
+            const item = placed.find(entry => entry.id === id);
+            assert.ok(side === 'left' ? item.x < root.x : item.x > root.x, `${name} ${spacing} ${id} clear of the root`);
+          }
+        }
+    }
+});
+
+test('B-3: adding a last first-level topic and arranging again keeps the older branches on their sides', () => {
+  for (const spacing of SPACINGS) {
+    const spec = balancedSpec(spacing);
+    const base = layout.arrangeMap(wide(), undefined, wideHeight, spec);
+    const before = new Map(base.filter(item => item.parentId === 'root').map(item => [item.id, sideOf(base, item.id)]));
+    assert.equal(new Set(before.values()).size, 2, `${spacing} both sides are used`);
+    // The same topic list plus one more at the end, positions as the view leaves them (stale or at the origin).
+    const grown = [...base, node('extra', 'root'), node('extra-1', 'extra')];
+    const again = layout.arrangeMap(grown, undefined, wideHeight, spec);
+    for (const [id, side] of before) assert.equal(sideOf(again, id), side, `${spacing} ${id}`);
+    assert.ok(noOverlap(again, wideHeight, GAPS[spacing]), `${spacing} no overlap`);
+    // Arranging a third time changes nothing.
+    assert.deepEqual(snap(layout.arrangeMap(again, undefined, wideHeight, spec)), snap(again));
+    // Dropping a middle topic does not move the others across either.
+    const fewer = layout.arrangeMap(base.filter(item => !item.id.startsWith('t2')), undefined, wideHeight, spec);
+    for (const [id, side] of before) if (!id.startsWith('t2')) assert.equal(sideOf(fewer, id), side, `${spacing} after removing t2: ${id}`);
+  }
+});
+
+test('B-4: a new first-level topic goes to the shorter side, and a new sub-topic stays on its parent\'s side', () => {
+  for (const spacing of SPACINGS) {
+    const spec = balancedSpec(spacing);
+    const base = layout.arrangeMap(wide(), undefined, wideHeight, spec);
+    const heights = sideHeights(base, wideHeight);
+    const shorter = heights.left < heights.right ? 'left' : 'right';
+    const grown = [...base, node('extra', 'root'), node('extra-1', 'extra')];
+    const placed = layout.arrangeNewBranch(grown, 'root', new Set(['extra', 'extra-1']), wideHeight, undefined, spec);
+    assert.equal(sideOf(placed, 'extra'), shorter, `${spacing} shorter side`);
+    assert.equal(sideOf(placed, 'extra-1'), shorter);
+    assert.deepEqual(snap(placed.filter(item => !item.id.startsWith('extra'))), snap(base), `${spacing} older cards stay`);
+    assert.ok(noOverlap(placed, wideHeight, GAPS[spacing]), `${spacing} no overlap`);
+    // Sub-topics follow the side of the branch they hang under, whichever side that is.
+    for (const side of ['left', 'right']) {
+      const parentId = base.find(item => item.parentId === 'root' && sideOf(base, item.id) === side).id;
+      const withSub = [...base, node('sub', parentId)];
+      const subPlaced = layout.arrangeNewBranch(withSub, parentId, new Set(['sub']), wideHeight, undefined, spec);
+      assert.equal(sideOf(subPlaced, 'sub'), side, `${spacing} sub-topic under a ${side} branch`);
+      assert.ok(noOverlap(subPlaced, wideHeight, GAPS[spacing]), `${spacing} sub ${side} no overlap`);
+    }
+  }
+  // A new tree beside an existing balanced one shares the root column and sits below.
+  const base = layout.arrangeMap(wide(), undefined, wideHeight, 'balanced');
+  const tree = layout.arrangeNewTree([...base, node('n'), node('n1', 'n'), node('n2', 'n')], 'n', new Set(['n', 'n1', 'n2']), wideHeight, 'balanced');
+  assert.equal(tree.find(item => item.id === 'n').x, base.find(item => item.id === 'root').x);
+  assert.deepEqual(snap(tree.filter(item => !item.id.startsWith('n'))), snap(base.filter(item => !item.id.startsWith('n'))));
+  assert.ok(noOverlap(tree, wideHeight, 24));
+  assert.notEqual(sideOf(tree, 'n1'), sideOf(tree, 'n2'), 'the new tree is itself balanced');
+});
+
+test('B-5: left-side edges leave the parent left edge and enter the child right edge; right-side edges are the right curves', () => {
+  const parent = { x: 500, y: 100, width: 300, height: 120 };
+  const leftChild = { x: 100, y: 300, width: 300, height: 90 };
+  const rightChild = { x: 900, y: 300, width: 300, height: 90 };
+  assert.equal(geometry.treeEdgePathData(parent, leftChild, 'balanced'), geometry.treeEdgePathData(parent, leftChild, 'left'));
+  assert.equal(geometry.treeEdgePathData(parent, rightChild, 'balanced'), geometry.treeEdgePathData(parent, rightChild, 'right'));
+  for (const [name, [nodes, heightOf]] of Object.entries(plainTrees())) {
+    const placed = layout.arrangeMap(nodes, undefined, heightOf, 'balanced');
+    const by = new Map(placed.map(item => [item.id, boxOf(item, heightOf)]));
+    for (const item of placed) {
+      if (!item.parentId) continue;
+      const p = by.get(item.parentId), c = by.get(item.id);
+      const path = geometry.treeEdgePathData(p, c, 'balanced');
+      const [x1] = firstPoint(path), [x2] = lastPoint(path);
+      if (c.x < p.x) { assert.equal(x1, p.x, `${name} ${item.id} leaves the left edge`); assert.equal(x2, c.x + c.width, `${name} ${item.id} ends on the right edge`); }
+      else { assert.equal(x1, p.x + p.width, `${name} ${item.id} leaves the right edge`); assert.equal(x2, c.x, `${name} ${item.id} ends on the left edge`); }
+    }
+  }
+});
+
+test('B-6: balanced at three spacings never overlaps, including converging joins and collapsed topics', () => {
+  for (const [name, [nodes, heightOf]] of Object.entries(fixtures()))
+    for (const spacing of SPACINGS) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, balancedSpec(spacing));
+      assert.equal(placed.length, nodes.length);
+      assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${name} ${spacing}`);
+    }
+  for (const spacing of SPACINGS) {
+    const folded = wide().map(item => ({ ...item, collapsed: item.id === 't4' || item.id === 't2' }));
+    const placed = layout.arrangeMap(folded, undefined, wideHeight, balancedSpec(spacing));
+    assert.ok(noOverlap(placed.filter(item => item.parentId !== 't4' && item.parentId !== 't2'), wideHeight, GAPS[spacing]), `folded ${spacing}`);
+    const two = [node('r1'), node('a', 'r1'), node('b', 'r1'), node('r2'), node('c', 'r2'), node('d', 'r2')];
+    assert.ok(noOverlap(layout.arrangeMap(two, undefined, sizedHeight, balancedSpec(spacing)), sizedHeight, GAPS[spacing]), `two roots ${spacing}`);
+  }
+});
+
+test('B-7: arrow keys in a balanced map: the root goes to the first child on that side, other cards follow their side', () => {
+  const { neighborKey } = nav();
+  assert.equal(neighborKey('balanced', 'ArrowRight', 'root'), 'child-right');
+  assert.equal(neighborKey('balanced', 'ArrowLeft', 'root'), 'child-left');
+  assert.equal(neighborKey('balanced', 'ArrowUp', 'root'), 'sibling-');
+  assert.equal(neighborKey('balanced', 'ArrowDown', 'root'), 'sibling+');
+  for (const key of ['Enter', 'a', '']) assert.equal(neighborKey('balanced', key, 'root'), null);
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+    assert.equal(neighborKey('balanced', key, 'right'), neighborKey('right', key), `right side ${key}`);
+    assert.equal(neighborKey('balanced', key, 'left'), neighborKey('left', key), `left side ${key}`);
+  }
+  // Without a side, balanced behaves like right (the other arrangements are unchanged).
+  assert.equal(neighborKey('balanced', 'ArrowRight'), 'child');
+  assert.equal(neighborKey('right', 'ArrowRight', 'root'), 'child');
+});
+
+test('B-8: balanced keeps the first-level kids of one root in order on each side, and single-child maps stay valid', () => {
+  const placed = layout.arrangeMap(wide(), undefined, wideHeight, 'balanced');
+  for (const side of ['left', 'right']) {
+    const ys = placed.filter(item => item.parentId === 'root' && sideOf(placed, item.id) === side).map(item => item.y);
+    assert.deepEqual(ys, [...ys].sort((a, b) => a - b), `${side} order`);
+  }
+  const single = layout.arrangeMap([node('r'), node('a', 'r')], undefined, undefined, 'balanced');
+  assert.equal(single.length, 2);
+  assert.ok(noOverlap(single, undefined, 24));
+  assert.deepEqual(snap(layout.arrangeMap([], undefined, undefined, 'balanced')), []);
+  assert.deepEqual(plain(roundTrip({ direction: 'balanced', spacing: 'compact' }).layout), { direction: 'balanced', spacing: 'compact' });
 });

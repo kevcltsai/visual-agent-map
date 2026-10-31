@@ -101,6 +101,7 @@ export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number;
  * child's right edge, with both arms bending outward.
  * "down" runs from the parent's bottom edge midpoint to the child's top edge midpoint; "up" runs from the parent's top
  * edge midpoint to the child's bottom edge midpoint.
+ * "balanced" uses the "left" curve when the child's centre is left of the parent's centre and the "right" curve otherwise.
  */
 export function treeEdgePathData(parent: RelationBox, child: RelationBox, direction: LayoutKind): string {
   if (direction === "down" || direction === "up") {
@@ -115,7 +116,9 @@ export function treeEdgePathData(parent: RelationBox, child: RelationBox, direct
   }
   const y1 = parent.y + parent.height / 2,
     y2 = child.y + child.height / 2;
-  if (direction === "left") {
+  const leftward =
+    direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
+  if (leftward) {
     const x1 = parent.x,
       x2 = child.x + child.width,
       bend = Math.max(60, Math.abs(x2 - x1) / 2);

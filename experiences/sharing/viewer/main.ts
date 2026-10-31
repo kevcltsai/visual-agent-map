@@ -157,7 +157,8 @@ export function startViewer(doc: Document): void {
   for (const node of nodes)
     if (node.parentId && (!byId.has(node.parentId) || node.parentId === node.id)) node.parentId = null;
   // Text nodes (tree-text-node): plain text only. One hung under a topic keeps its offset from that topic; an orphan stays at its own spot.
-  const texts: Array<{ id: string; parentId: string | null; text: string; dx: number; dy: number }> = [];
+  const texts: Array<{ id: string; parentId: string | null; text: string; dx: number; dy: number; links: string[] }> =
+    [];
   if (Array.isArray(data.textNodes)) {
     const seenText = new Set<string>();
     for (const item of data.textNodes) {
@@ -170,7 +171,11 @@ export function startViewer(doc: Document): void {
         parentId: parent ? parent.id : null,
         text: item.text,
         dx: parent ? item.x - parent.x : item.x,
-        dy: parent ? item.y - parent.y : item.y
+        dy: parent ? item.y - parent.y : item.y,
+        links:
+          !parent && Array.isArray(item.links)
+            ? Array.from(new Set(item.links.filter((id): id is string => typeof id === "string" && byId.has(id))))
+            : []
       });
     }
   }
@@ -480,6 +485,15 @@ export function startViewer(doc: Document): void {
       maxX = Math.max(maxX, card.offsetLeft + (card.offsetWidth || CARD_WIDTH));
       maxY = Math.max(maxY, card.offsetTop + card.offsetHeight);
     }
+    // Free text blocks count too (canvas-text-node decision #8); attached ones follow their topic.
+    for (const text of texts) {
+      const el = text.parentId ? undefined : textEls.get(text.id);
+      if (!el) continue;
+      minX = Math.min(minX, el.offsetLeft);
+      minY = Math.min(minY, el.offsetTop);
+      maxX = Math.max(maxX, el.offsetLeft + (el.offsetWidth || 300));
+      maxY = Math.max(maxY, el.offsetTop + (el.offsetHeight || 60));
+    }
     view = fitViewport(
       { minX, minY, maxX, maxY },
       { width: viewport.clientWidth, height: viewport.clientHeight },
@@ -533,6 +547,28 @@ export function startViewer(doc: Document): void {
       );
       path.setAttribute("class", "vam-edge vam-text-edge");
       edges.append(path);
+    }
+    // Free text linked to topics (canvas-text-node): a dashed line, no arrow, no label.
+    for (const text of texts) {
+      const from = textEls.get(text.id);
+      if (!from) continue;
+      for (const id of text.links) {
+        const to = cards.get(id);
+        if (!to) continue;
+        const toRight = from.offsetLeft + from.offsetWidth / 2 <= to.offsetLeft + to.offsetWidth / 2;
+        const path = doc.createElementNS(SVG_NS, "path");
+        path.setAttribute(
+          "d",
+          edgePathData(
+            toRight ? from.offsetLeft + from.offsetWidth : from.offsetLeft,
+            from.offsetTop + from.offsetHeight / 2,
+            toRight ? to.offsetLeft : to.offsetLeft + to.offsetWidth,
+            to.offsetTop + to.offsetHeight / 2
+          )
+        );
+        path.setAttribute("class", "vam-edge vam-text-link");
+        edges.append(path);
+      }
     }
   }
   let edgeFrame = 0;

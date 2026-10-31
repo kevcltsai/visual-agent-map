@@ -9,6 +9,8 @@ const TOPICS = 'Agent Workspace/Topics';
 const MAP = `${TOPICS}/map-t/Map.md`;
 const txt = (over = {}) => ({ id: 't1', kind: 'text', text: 'Hello', parentId: undefined, x: 400, y: 80, ...over });
 
+const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(...n) { this.classes.push(...n); }, appendChild(c) { this.children.push(c); } });
+
 async function harness(build) {
   const { repo, app, contents } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
@@ -25,8 +27,9 @@ async function harness(build) {
   await repo.saveMap(MAP, doc);
   await repo.rebuildDerivedData();
   let pending = Promise.resolve();
-  const notices = [];
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices) } }, { createFragment: dom.createFragment });
+  const notices = [], menus = [];
+  const Menu = class { constructor() { this.items = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } showAtPosition() { return this; } showAtMouseEvent() { return this; } };
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: dom.makeNotice(notices), Menu } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg, requestAnimationFrame: () => 1, cancelAnimationFrame() {} });
   const plugin = withExpansionCoordinator({
     repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
     mutate: work => (pending = Promise.resolve().then(work))
@@ -46,7 +49,8 @@ async function harness(build) {
   const onDisk = async () => plain((await repo.readMap(MAP)).canvasItems ?? []);
   const noteFiles = () => [...contents.keys()].filter(k => k.endsWith('.md') && !k.endsWith('Map.md')).length;
   const textEl = id => find(view.stageEl, i => i.dataset.itemId === id);
-  return { repo, view, root: view.map.nodes[0], child: view.map.nodes[1], settle, onDisk, noteFiles, textEl, notices };
+  view.announcer = element('div');
+  return { repo, view, root: view.map.nodes[0], child: view.map.nodes[1], settle, onDisk, noteFiles, textEl, notices, menus };
 }
 
 test('render: attached text under a shown topic, free text for an orphan, folded parent hides it, text stays text', async () => {
@@ -148,13 +152,52 @@ test('counter-example: AIM, built-in sample and presentation cannot edit text', 
   }
 });
 
-test('add without a selection tells the user and writes nothing', async () => {
+test('canvas-text-node: add without a selection makes a free text block in the view center (one undo step, editor opens)', async () => {
   const h = await harness();
+  h.view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, right: 800, top: 0, bottom: 600 }) };
   h.view.selected = null;
+  const past = h.view.history.past.length;
   h.view.addTextNodeUnder();
   await h.settle();
+  const items = await h.onDisk();
+  assert.equal(items.length, 1);
+  assert.equal(items[0].parentId, undefined, 'a free block has no parent');
+  assert.equal(items[0].links, undefined);
+  assert.deepEqual([items[0].x, items[0].y], [250, 300]);
+  assert.equal(h.view.history.past.length, past + 1);
+  assert.ok(h.textEl(items[0].id).hasClass('is-free'));
+  assert.ok(find(h.textEl(items[0].id), i => i.tag === 'textarea'), 'the editor opens at once');
+  assert.deepEqual(h.notices, [], 'no "select a topic" notice any more');
+  await h.view.travel(false);
   assert.deepEqual(await h.onDisk(), []);
-  assert.ok(h.notices.some(n => String(n).includes('Select a topic')));
+});
+
+test('canvas-text-node: with a selected topic the command still hangs the block on the tree', async () => {
+  const h = await harness();
+  h.view.selected = h.root.id;
+  h.view.addTextNodeUnder();
+  await h.settle();
+  assert.equal((await h.onDisk())[0].parentId, h.root.id);
+});
+
+test('canvas-text-node: the empty-canvas menu offers Add text node here; AIM and presentation do not', async () => {
+  const h = await harness();
+  h.view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, right: 800, top: 0, bottom: 600 }) };
+  h.view.onCanvasContextMenu({ clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } });
+  const titles = h.menus[0].items.map(i => i.title);
+  assert.ok(titles.includes('Add text node here'));
+  h.menus[0].items[titles.indexOf('Add text node here')].click();
+  await h.settle();
+  const items = await h.onDisk();
+  assert.deepEqual([items[0].x, items[0].y, items[0].parentId], [110, 45, undefined]);
+  for (const mode of ['aim', 'presentation']) {
+    const g = await harness();
+    g.view.viewportEl = h.view.viewportEl;
+    if (mode === 'aim') g.view.map.aim = { branches: [] };
+    else g.view.presentation = { order: [], currentId: 'x' };
+    g.view.onCanvasContextMenu({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: () => null } });
+    assert.ok(!(g.menus[0]?.items ?? []).some(i => i.title === 'Add text node here'), mode);
+  }
 });
 
 test('layout: text nodes follow auto layout, a map without text keeps no canvasItems, heightOf gives text 180', async () => {
@@ -245,4 +288,215 @@ test('control: with an existing text node already in edit, a repaint keeps the e
   assert.ok(area(), 'editor kept');
   assert.equal(h.view.editingTextId, 't1');
   assert.equal(doc.activeElement, area());
+});
+
+// ---- canvas-text-node P2: drag, keys, link mode, unlink, delete, layout ------------------------------------------------
+const free = (over = {}) => txt({ id: 'f1', text: 'Budget', x: 600, y: 40, ...over });
+const clickCard = (h, id) => h.view.stageEl.fire('click', { target: h.view.cardEls.get(id) });
+
+test('canvas-text-node: a pointer drag of a free block is one undo step; a click moves nothing; attached blocks do not drag', async () => {
+  const h = await harness(({ root }) => [free(), txt({ parentId: root.id })]);
+  const past = h.view.history.past.length;
+  const el = h.textEl('f1');
+  el.fire('pointerdown', { button: 0, clientX: 10, clientY: 10, pointerId: 1 });
+  el.fire('pointerup', {});
+  await h.settle();
+  assert.equal(h.view.history.past.length, past, 'a click writes nothing');
+  el.fire('pointerdown', { button: 0, clientX: 10, clientY: 10, pointerId: 1 });
+  el.fire('pointermove', { clientX: 60, clientY: 35 });
+  el.fire('pointerup', {});
+  await h.settle();
+  assert.deepEqual((await h.onDisk()).find(i => i.id === 'f1'), { id: 'f1', kind: 'text', text: 'Budget', x: 650, y: 65 });
+  assert.equal(h.view.history.past.length, past + 1);
+  await h.view.travel(false);
+  assert.equal((await h.onDisk()).find(i => i.id === 'f1').x, 600);
+  assert.equal(h.textEl('t1').listeners.pointerdown, undefined, 'a tree-attached block is placed by the layout, not by hand');
+});
+
+test('canvas-text-node: arrow keys move a free block 10px, Shift 50px, one undo step each; attached blocks and the editor ignore them', async () => {
+  const h = await harness(({ root }) => [free(), txt({ parentId: root.id })]);
+  const past = h.view.history.past.length;
+  h.textEl('f1').fire('keydown', { key: 'ArrowRight' });
+  await h.settle();
+  h.textEl('f1').fire('keydown', { key: 'ArrowDown', shiftKey: true });
+  await h.settle();
+  const item = (await h.onDisk()).find(i => i.id === 'f1');
+  assert.deepEqual([item.x, item.y], [610, 90]);
+  assert.equal(h.view.history.past.length, past + 2);
+  h.textEl('t1').fire('keydown', { key: 'ArrowRight' });
+  await h.settle();
+  assert.equal((await h.onDisk()).find(i => i.id === 't1').x, 400);
+  h.textEl('f1').fire('dblclick', {});
+  find(h.textEl('f1'), i => i.tag === 'textarea').fire('keydown', { key: 'ArrowLeft' });
+  await h.settle();
+  assert.equal((await h.onDisk()).find(i => i.id === 'f1').x, 610);
+});
+
+test('canvas-text-node: link mode (button or L) connects the clicked card as one undo step, announces, then ends', async () => {
+  const h = await harness(() => [free()]);
+  const past = h.view.history.past.length;
+  find(h.textEl('f1'), i => i.hasClass('vam-text-node-connect')).click();
+  assert.equal(h.view.linkingTextId, 'f1');
+  assert.match(h.view.announcer.text, /Choose a card/);
+  assert.ok(h.view.stageEl.hasClass('is-linking'));
+  clickCard(h, h.child.id);
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].links, [h.child.id]);
+  assert.equal(h.view.history.past.length, past + 1);
+  assert.equal(h.view.linkingTextId, null);
+  assert.ok(!h.view.stageEl.hasClass('is-linking'));
+  assert.equal(h.textEl('f1').attrs['aria-label'], 'Text node: Budget, linked to 1 cards');
+  // Again: L, same card -> announced, not written twice.
+  h.textEl('f1').fire('keydown', { key: 'l' });
+  assert.equal(h.view.linkingTextId, 'f1');
+  clickCard(h, h.child.id);
+  await h.settle();
+  assert.equal(h.view.announcer.text, 'Already connected.');
+  assert.equal(h.view.history.past.length, past + 1);
+  await h.view.travel(false);
+  assert.equal((await h.onDisk())[0].links, undefined, 'one undo removes the connection');
+  await h.view.travel(true);
+  assert.deepEqual((await h.onDisk())[0].links, [h.child.id]);
+});
+
+test('canvas-text-node: link mode with the keyboard (Enter on a focused card) and cancel paths leave nothing half written', async () => {
+  const h = await harness(() => [free()]);
+  const past = h.view.history.past.length;
+  const stage = h.view.stageEl;
+  h.view.startLinking('f1');
+  stage.fire('keydown', { key: 'Enter', target: h.view.cardEls.get(h.root.id) });
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].links, [h.root.id]);
+  for (const cancel of [
+    () => stage.fire('keydown', { key: 'Escape', target: h.textEl('f1') }),
+    () => stage.fire('click', { target: stage }),
+    () => h.view.onClose()
+  ]) {
+    h.view.startLinking('f1');
+    cancel();
+    await h.settle();
+    assert.equal(h.view.linkingTextId, null);
+    assert.ok(!stage.hasClass('is-linking'));
+  }
+  assert.equal(h.view.history.past.length, past + 1, 'only the accepted link wrote');
+  // The block disappears while linking (deleted elsewhere): the next paint ends the mode.
+  h.view.startLinking('f1');
+  await h.view.changeCanvasItems('f1', items => items.filter(i => i.id !== 'f1'));
+  h.view.render();
+  assert.equal(h.view.linkingTextId, null);
+});
+
+test('canvas-text-node: clicking the empty viewport (not the 1px stage) cancels link mode; a card click still links', async () => {
+  const h = await harness(() => [free()]);
+  const past = h.view.history.past.length;
+  const viewport = element('div');
+  h.view.viewportEl = viewport;
+  h.view.startLinking('f1');
+  viewport.fire('click', { target: viewport });
+  await h.settle();
+  assert.equal(h.view.linkingTextId, null);
+  assert.ok(!h.view.stageEl.hasClass('is-linking'));
+  assert.match(h.view.announcer.text, /cancel/i);
+  assert.deepEqual(viewport.listeners.click, [], 'the viewport listener is removed with the mode');
+  h.view.startLinking('f1');
+  clickCard(h, h.child.id);
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].links, [h.child.id]);
+  assert.equal(h.view.history.past.length, past + 1);
+});
+
+test('canvas-text-node: fit (Show all) includes free text blocks, not folded or attached ones', async () => {
+  const h = await harness(() => [free({ x: 1500, y: 40 })]);
+  h.view.viewportEl = { clientWidth: 1000, clientHeight: 600 };
+  h.view.canvasNodes = () => h.view.map.nodes;
+  h.view.transform = () => {}; h.view.saveViewport = () => {}; h.view.canvasInset = () => 0;
+  h.view.fit();
+  const withFree = h.view.map.viewport.zoom;
+  assert.ok(withFree < 1000 / 1800 + 1e-9, `zoom ${withFree} leaves room for the block at x=1500..1800`);
+  await h.view.changeCanvasItems('f1', items => items.filter(i => i.id !== 'f1'));
+  h.view.render();
+  h.view.fit();
+  assert.ok(h.view.map.viewport.zoom > withFree, 'without the block the fit is closer');
+});
+
+test('canvas-text-node: unlink menu lists linked cards, removing one is one undo step; a dangling link is not counted', async () => {
+  const h = await harness(({ root, child }) => [free({ links: [root.id, child.id, 'gone'] })]);
+  assert.equal(h.textEl('f1').attrs['aria-label'], 'Text node: Budget, linked to 2 cards');
+  const button = find(h.textEl('f1'), i => i.hasClass('vam-text-node-unlink'));
+  button.getBoundingClientRect = () => ({ left: 5, bottom: 9 });
+  button.click();
+  assert.deepEqual(h.menus.at(-1).items.map(i => i.title), ['Disconnect from Root', 'Disconnect from Child']);
+  const past = h.view.history.past.length;
+  h.menus.at(-1).items[0].click();
+  await h.settle();
+  assert.deepEqual((await h.onDisk())[0].links, [h.child.id], 'the dangling id is cleaned by the write');
+  assert.equal(h.view.history.past.length, past + 1);
+  await h.view.travel(false);
+  assert.deepEqual((await h.onDisk())[0].links, [h.root.id, h.child.id, 'gone'], 'undo restores the file as it was');
+});
+
+test('canvas-text-node: links are drawn as dashed path lines (no marker, no label) to shown cards only', async () => {
+  const h = await harness(({ root }) => [free({ links: [root.id, 'gone'] }), txt({ parentId: root.id })]);
+  const place = (el, x) => Object.assign(el, { offsetLeft: x, offsetTop: 0, offsetWidth: 100, offsetHeight: 50 });
+  place(h.view.cardEls.get(h.root.id), 0); place(h.view.cardEls.get(h.child.id), 200); place(h.textEl('f1'), 600); place(h.textEl('t1'), 400);
+  h.view.edgesEl = { children: [], replaceChildren() { this.children = []; }, appendChild(c) { this.children.push(c); } };
+  h.view.relationsLayerEl = { children: [], replaceChildren() {}, appendChild() {} };
+  h.view.drawEdges();
+  const links = h.view.edgesEl.children.filter(p => p.classes.includes('vam-text-link'));
+  assert.equal(links.length, 1, 'one live link; the dangling id draws nothing');
+  const attr = k => links[0].attrs[k];
+  assert.equal(attr('data-text-id'), 'f1');
+  assert.equal(attr('data-card-id'), h.root.id);
+  assert.match(String(attr('d')), /^M /);
+  assert.equal(attr('marker-end'), undefined);
+});
+
+test('canvas-text-node: deleting a card removes its links in the same step, one undo brings card and link back', async () => {
+  const h = await harness(({ root, child }) => [free({ links: [root.id, child.id] })]);
+  const past = h.view.history.past.length;
+  await h.view.removeToUnassigned(h.child, false);
+  assert.deepEqual((await h.onDisk())[0].links, [h.root.id]);
+  assert.equal(h.view.history.past.length, past + 1);
+  await h.view.travel(false);
+  assert.deepEqual((await h.onDisk())[0].links, [h.root.id, h.child.id]);
+});
+
+test('canvas-text-node: no free block, no links, no canvasItems written by delete', async () => {
+  const h = await harness();
+  await h.view.removeToUnassigned(h.child, false);
+  assert.equal('canvasItems' in (await h.repo.readMap(MAP)), false);
+});
+
+test('canvas-text-node: no layout direction moves a free block', async () => {
+  for (const direction of ['right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone']) {
+    const h = await harness(({ root }) => [free({ links: [root.id] })]);
+    h.view.setLayout({ direction });
+    await h.settle();
+    h.view.autoLayout();
+    await h.settle();
+    const item = (await h.onDisk()).find(i => i.id === 'f1');
+    assert.deepEqual([item.x, item.y, item.links], [600, 40, [h.root.id]], direction);
+  }
+});
+
+test('canvas-text-node: chatUserTexts carries links for the map chat context', async () => {
+  const h = await harness(({ root }) => [free({ links: [root.id] }), txt({ parentId: root.id })]);
+  const out = plain(h.view.chatUserTexts());
+  assert.deepEqual(out.find(t => t.id === 'f1').links, [h.root.id]);
+  assert.equal('links' in out.find(t => t.id === 't1'), false);
+});
+
+test('canvas-text-node: AIM, built-in and presentation cannot start link mode or move a block', async () => {
+  for (const mode of ['aim', 'builtIn', 'presentation']) {
+    const h = await harness(() => [free()]);
+    if (mode === 'aim') h.view.map.aim = { branches: [] };
+    if (mode === 'builtIn') h.view.builtIn = true;
+    if (mode === 'presentation') h.view.presentation = { order: [], currentId: 'x' };
+    h.view.render();
+    h.view.startLinking('f1');
+    assert.equal(h.view.linkingTextId, null, mode);
+    h.textEl('f1').fire('keydown', { key: 'ArrowRight' });
+    await h.settle();
+    assert.equal((await h.onDisk())[0].x, 600, mode);
+  }
 });

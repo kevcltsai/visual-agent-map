@@ -61,6 +61,8 @@ export interface MapChatUserText {
   /** The topic it hangs under; null for a free one (its topic is gone). */
   parentId: string | null;
   text: string;
+  /** Topic ids the note is linked to; sent as `linkedTo` with each title taken from the outline (unknown ids are left out). */
+  links?: string[];
 }
 export interface MapChatSnippet {
   path: string;
@@ -164,6 +166,10 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     const node = byId.get(id);
     return node ? { id: node.id, title: clip(node.title, TITLE_LIMIT) } : null;
   };
+  const linkedTo = (links?: string[]): { linkedTo?: { id: string; title: string }[] } => {
+    const found = (links ?? []).map(brief).filter((entry): entry is { id: string; title: string } => entry !== null);
+    return found.length ? { linkedTo: found } : {};
+  };
   let detailLeft = input.detailBudget ?? MAP_CHAT_DETAIL_BUDGET;
   const topic = (ref: MapChatTopicRef, withLinks: boolean): Record<string, unknown> => {
     ids.add(ref.id);
@@ -254,7 +260,8 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
             parentId: item.parentId,
             ...(item.parentId === null ? { unattached: true } : {}),
             readOnly: true,
-            text: item.text
+            text: item.text,
+            ...linkedTo(item.links)
           })),
           userTextsNote:
             "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."

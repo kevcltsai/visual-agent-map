@@ -1499,6 +1499,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-text-node-promote { display: none; margin-top: 4px; font-size: var(--font-ui-smaller); }
 .vam-view .vam-text-node:hover .vam-text-node-promote, .vam-view .vam-text-node:focus-within .vam-text-node-promote { display: inline-block; }
 .vam-view .vam-text-edge { opacity: 0.8; }
+.vam-view .vam-text-link { fill: none; stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.8; pointer-events: none; }
+.vam-view .vam-text-node.is-free { cursor: grab; }
+.vam-view .vam-text-node-links { display: none; gap: 4px; margin-top: 4px; }
+.vam-view .vam-text-node-links button { font-size: var(--font-ui-smaller); }
+.vam-view .vam-text-node:hover .vam-text-node-links, .vam-view .vam-text-node:focus-within .vam-text-node-links { display: flex; }
+.vam-view .vam-stage.is-linking .vam-node { cursor: crosshair; outline: 1px dashed var(--interactive-accent); }
+.vam-view .vam-stage[data-presenting] .vam-text-node-links { display: none; }
 .vam-view .vam-stage[data-presenting] .vam-text-node { opacity: 0.35; }
 .vam-view .vam-stage[data-presenting] .vam-text-node-promote { display: none; }
 .vam-view .vam-stage[data-presenting] .vam-text-node.is-presenting { opacity: 1; outline: 3px solid var(--interactive-accent); outline-offset: 3px; }

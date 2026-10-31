@@ -473,3 +473,25 @@ test('sharing text-nodes: counterexample - script and img text stay literal in t
   assert.ok(start > 0 && block.includes('el.textContent = text.text'));
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment/.test(block));
 });
+
+// canvas-text-node: a free text block's links travel as an optional `links` list of live topic ids.
+test('sharing text-nodes: links appear only when live, dangling and duplicate ids drop, a tree text node carries none', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  const a = map.nodes[0].id;
+  map.canvasItems = [
+    { id: 'f1', kind: 'text', text: 'budget', x: 1, y: 2, links: [a, a, 'gone', 7, 'f1'] },
+    { id: 'f2', kind: 'text', text: 'no links', x: 3, y: 4, links: ['gone'] },
+    { id: 'f3', kind: 'text', text: 'tree', parentId: a, x: 5, y: 6, links: [a] }
+  ];
+  const payload = format.buildSharePayload(map, notesById, options());
+  const byId = Object.fromEntries(payload.textNodes.map(t => [t.id, t]));
+  assert.deepEqual(plain(byId.f1.links), [a]);
+  assert.ok(!('links' in byId.f2), 'no live link means no key');
+  assert.ok(!('links' in byId.f3), 'a text node under a topic has no links');
+  const src = fs.readFileSync(path.join(root, 'experiences', 'sharing', 'viewer', 'main.ts'), 'utf8');
+  const start = src.indexOf('Free text linked to topics');
+  const block = src.slice(start, src.indexOf('let edgeFrame'));
+  assert.ok(start > 0 && block.includes('vam-text-link'));
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment/.test(block));
+});

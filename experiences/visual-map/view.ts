@@ -7,18 +7,24 @@ import {
   resolveAimContentLanguage
 } from "../aim/content-language";
 import {
+  addFreeTextNode,
   addImage,
   addTextNode,
   boundaryBounds,
   cleanText,
+  linkTextNode,
   moveItem,
+  moveTextNode,
   pruneBoundaries,
   removeItem,
+  removeLinksTo,
   removeTextNode,
   resizeKeepRatio,
   treeTextNodes,
+  unlinkTextNode,
   updateTextNode,
   IMAGE_MIN_SIZE,
+  LINK_LIMIT,
   TEXT_LIMIT,
   type BoundaryItem,
   type CanvasItem,
@@ -979,6 +985,10 @@ export class VisualAgentMapView extends ItemView {
   /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
   private pendingTextEditId: string | null = null;
   private editingTextId: string | null = null;
+  /** The free text block waiting for a card to connect to (link mode, canvas-text-node decision #5); null when not linking. */
+  private linkingTextId: string | null = null;
+  /** Removes the link-mode listeners from the stage they were put on. */
+  private endLinkListeners: (() => void) | null = null;
   /** Detaches the open text editor without saving and returns its draft, so a repaint can reopen it (null when none is open). */
   private suspendTextEdit: (() => { id: string; value: string }) | null = null;
   /** Draft carried across a repaint; renderTextNodes reopens the editor with it. */
@@ -988,6 +998,10 @@ export class VisualAgentMapView extends ItemView {
       id.startsWith("txt-") ||
       !!this.map?.canvasItems?.some(item => item.kind === "text" && (item as TextItem).id === id)
     );
+  }
+  /** Drops the links of every free text block to the removed cards, in the same map edit (decision #2); no `canvasItems` appears out of nothing. */
+  private dropTextLinks(map: MapDocument, ids: Iterable<string>): void {
+    if (map.canvasItems?.length) map.canvasItems = removeLinksTo(map.canvasItems, new Set(ids));
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
@@ -1654,6 +1668,7 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.cancelLinking(false);
     this.closeMapSearch(false);
     this.exitPresentation(false);
     this.releaseCovers();
@@ -5143,6 +5158,7 @@ export class VisualAgentMapView extends ItemView {
           );
           this.takeRetargetDrops(retargetTopicRelations(map, [node.id], adopterId));
         } else removeTopicRelationsFor(map, ids);
+        this.dropTextLinks(map, ids);
         if (adopterId && adopted.size) {
           const adopter = map.nodes.find(item => item.id === adopterId);
           if (adopter) adopter.collapsed = false;
@@ -5885,7 +5901,10 @@ export class VisualAgentMapView extends ItemView {
   private renderCanvasItems(): void {
     const stage = this.stageEl,
       items = this.map?.canvasItems;
-    if (!stage || !items?.length) return;
+    if (!stage || !items?.length) {
+      if (this.linkingTextId) this.cancelLinking(false); // the block it was waiting for is gone
+      return;
+    }
     const editable = this.canEditCanvasItems();
     const layer = items.some(item => item.kind === "image") ? stage.createDiv("vam-canvas-items") : null;
     layer?.setAttr("role", "group");
@@ -5958,6 +5977,7 @@ export class VisualAgentMapView extends ItemView {
     const texts = items.filter((item): item is TextItem => item.kind === "text");
     if (!texts.length) {
       this.textEditDraft = null;
+      if (this.linkingTextId) this.cancelLinking(false);
       return;
     }
     const editable = this.canEditText();
@@ -5973,7 +5993,14 @@ export class VisualAgentMapView extends ItemView {
       el.dataset.itemId = text.id;
       if (!attachedIds.has(text.id)) el.addClass("is-free");
       el.setAttr("role", "note");
-      el.setAttr("aria-label", t("ui.text_node_label", text.text.slice(0, 60)));
+      const free = !attachedIds.has(text.id),
+        liveLinks = free ? this.liveLinks(text) : [];
+      el.setAttr(
+        "aria-label",
+        liveLinks.length
+          ? t("ui.text_node_label_linked", text.text.slice(0, 60), String(liveLinks.length))
+          : t("ui.text_node_label", text.text.slice(0, 60))
+      );
       el.tabIndex = 0;
       el.style.left = `${text.x}px`;
       el.style.top = `${text.y}px`;
@@ -5999,9 +6026,28 @@ export class VisualAgentMapView extends ItemView {
       });
       promote.addEventListener("keydown", event => event.stopPropagation());
       promote.addEventListener("dblclick", event => event.stopPropagation());
+      if (free) this.addFreeTextControls(el, text, liveLinks);
       el.addEventListener("keydown", event => {
         if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
-        if (event.key === "Enter" && !event.shiftKey) {
+        const step = event.shiftKey ? 50 : 10,
+          arrow = (
+            { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as Record<
+              string,
+              [number, number]
+            >
+          )[event.key];
+        if (free && arrow) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.focusItemId = text.id;
+          this.enqueue(() =>
+            this.changeCanvasItems(text.id, items => moveTextNode(items, text.id, arrow[0], arrow[1]))
+          );
+        } else if (free && !event.shiftKey && (event.key === "l" || event.key === "L")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startLinking(text.id);
+        } else if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
           event.stopPropagation();
           this.startTextEdit(text.id);
@@ -6012,6 +6058,9 @@ export class VisualAgentMapView extends ItemView {
         }
       });
     }
+    // Link mode survives a repaint only while its block is still there (decision #5: nothing half-written is left).
+    if (this.linkingTextId && !this.textEls.has(this.linkingTextId)) this.cancelLinking(false);
+    else if (this.linkingTextId) this.bindLinking(stage);
     const wanted = this.pendingTextEditId ?? this.focusItemId;
     const pending = this.pendingTextEditId;
     this.pendingTextEditId = null;
@@ -6031,6 +6080,231 @@ export class VisualAgentMapView extends ItemView {
       this.focusItemId = null;
       this.textEls.get(wanted)?.focus({ preventScroll: true });
     }
+  }
+  /** The cards a free text block still links to (a link whose card is gone is skipped here and cleaned on the next write). */
+  private liveLinks(text: TextItem): string[] {
+    const alive = new Set((this.map?.nodes ?? []).map(node => node.id));
+    return (text.links ?? []).filter(id => alive.has(id));
+  }
+  /** The buttons and drag of a free text block: connect to a card, remove a connection, drag with the pointer. */
+  private addFreeTextControls(el: HTMLElement, text: TextItem, liveLinks: readonly string[]): void {
+    const bar = el.createDiv("vam-text-node-links");
+    const connect = bar.createEl("button", {
+      cls: "vam-text-node-connect",
+      text: t("ui.text_link_start"),
+      attr: { type: "button", "aria-label": t("ui.text_link_start_label") }
+    });
+    connect.addEventListener("click", event => {
+      event.stopPropagation();
+      this.startLinking(text.id);
+    });
+    const unlink = bar.createEl("button", {
+      cls: "vam-text-node-unlink",
+      text: t("ui.text_unlink"),
+      attr: { type: "button", "aria-label": t("ui.text_unlink_label"), "aria-haspopup": "menu" }
+    });
+    if (!liveLinks.length) unlink.disabled = true;
+    unlink.addEventListener("click", event => {
+      event.stopPropagation();
+      this.openUnlinkMenu(text.id, unlink);
+    });
+    for (const button of [connect, unlink]) {
+      button.addEventListener("keydown", event => event.stopPropagation());
+      button.addEventListener("dblclick", event => event.stopPropagation());
+    }
+    this.enableTextDrag(el, text);
+  }
+  /** One gesture, one undo step: the block follows the pointer and the map is written on release (a click moves nothing). */
+  private enableTextDrag(el: HTMLElement, text: TextItem): void {
+    el.addEventListener("pointerdown", event => {
+      const target = event.target as Element | null;
+      if (
+        event.button !== 0 ||
+        this.editingTextId ||
+        this.linkingTextId ||
+        !this.map ||
+        target?.closest?.("button, textarea")
+      )
+        return;
+      event.stopPropagation();
+      const start = { x: event.clientX, y: event.clientY },
+        zoom = this.map.viewport.zoom || 1;
+      let dx = 0,
+        dy = 0,
+        done = false;
+      el.setPointerCapture?.(event.pointerId);
+      const move = (e: PointerEvent): void => {
+        dx = (e.clientX - start.x) / zoom;
+        dy = (e.clientY - start.y) / zoom;
+        el.style.left = `${text.x + dx}px`;
+        el.style.top = `${text.y + dy}px`;
+      };
+      const settle = (): void => {
+        done = true;
+        el.removeEventListener("pointermove", move);
+        el.removeEventListener("pointerup", up);
+        el.removeEventListener("pointercancel", cancel);
+        el.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        el.style.left = `${text.x}px`;
+        el.style.top = `${text.y}px`;
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        if (Math.hypot(dx, dy) >= 3) {
+          this.focusItemId = text.id;
+          this.enqueue(() =>
+            this.changeCanvasItems(text.id, items => moveTextNode(items, text.id, Math.round(dx), Math.round(dy)))
+          );
+        } else restore();
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      el.addEventListener("pointermove", move);
+      el.addEventListener("pointerup", up);
+      el.addEventListener("pointercancel", cancel);
+      el.addEventListener("lostpointercapture", cancel);
+    });
+  }
+  /** Enters link mode for a free block (decision #5): the next card clicked, or confirmed with Enter, is connected; Esc cancels. */
+  private startLinking(id: string): void {
+    if (!this.canEditText() || !this.stageEl || !this.textEls.has(id)) return;
+    this.cancelLinking(false);
+    this.linkingTextId = id;
+    this.bindLinking(this.stageEl);
+    this.announcer?.setText(t("ui.text_link_mode"));
+  }
+  /** Puts the link-mode listeners on the current stage (a repaint makes a new one). */
+  private bindLinking(stage: HTMLElement): void {
+    this.endLinkListeners?.();
+    stage.addClass("is-linking");
+    const cardIdOf = (target: EventTarget | null): string | null => {
+      for (const [cardId, card] of this.cardEls) if (card === target || card.contains?.(target as Node)) return cardId;
+      return null;
+    };
+    const down = (event: Event): void => {
+      if (cardIdOf(event.target)) event.stopPropagation(); // a card is picked on click; no card drag starts
+    };
+    const click = (event: Event): void => {
+      const cardId = cardIdOf(event.target);
+      if (!cardId) {
+        this.cancelLinking(true);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      this.finishLinking(cardId);
+    };
+    const key = (event: Event): void => {
+      const e = event as KeyboardEvent;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.cancelLinking(true);
+      } else if (e.key === "Enter" && !e.isComposing) {
+        const cardId = cardIdOf(e.target);
+        if (!cardId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.finishLinking(cardId);
+      }
+    };
+    // The stage is 1px; a click on the empty canvas lands on the viewport, so that cancels too.
+    const viewport = this.viewportEl;
+    const blank = (event: Event): void => {
+      if (event.target === viewport) this.cancelLinking(true);
+    };
+    viewport?.addEventListener("click", blank, true);
+    stage.addEventListener("pointerdown", down, true);
+    stage.addEventListener("click", click, true);
+    stage.addEventListener("keydown", key, true);
+    this.endLinkListeners = () => {
+      stage.removeEventListener("pointerdown", down, true);
+      stage.removeEventListener("click", click, true);
+      stage.removeEventListener("keydown", key, true);
+      viewport?.removeEventListener("click", blank, true);
+      stage.removeClass("is-linking");
+      this.endLinkListeners = null;
+    };
+  }
+  /** Leaves link mode without writing anything; `announce` tells a screen reader it was cancelled. */
+  private cancelLinking(announce: boolean): void {
+    const id = this.linkingTextId;
+    this.endLinkListeners?.();
+    this.linkingTextId = null;
+    if (!id) return;
+    if (announce) this.announcer?.setText(t("ui.text_link_cancelled"));
+    this.textEls.get(id)?.focus?.({ preventScroll: true });
+  }
+  /** Writes the link as one undo step, then leaves link mode; a repeat is announced and not written twice. */
+  private finishLinking(cardId: string): void {
+    const id = this.linkingTextId;
+    this.endLinkListeners?.();
+    this.linkingTextId = null;
+    if (!id) return;
+    this.focusItemId = id;
+    this.enqueue(async () => {
+      const text = (this.map?.canvasItems ?? []).find(
+        (item): item is TextItem => item.kind === "text" && item.id === id
+      );
+      if (!text || !this.map?.nodes.some(node => node.id === cardId)) return;
+      if (text.links?.includes(cardId)) {
+        this.announcer?.setText(t("ui.text_link_exists"));
+        this.textEls.get(id)?.focus?.({ preventScroll: true });
+        return;
+      }
+      if ((text.links?.length ?? 0) >= LINK_LIMIT) {
+        this.announcer?.setText(t("ui.text_link_full", String(LINK_LIMIT)));
+        return;
+      }
+      await this.changeCanvasItems(id, items => linkTextNode(items, id, cardId));
+      this.announcer?.setText(t("ui.text_link_added"));
+    });
+  }
+  /** Lists the connected cards of a free block under its button; choosing one removes that connection (one undo step). */
+  private openUnlinkMenu(id: string, anchor: HTMLElement): void {
+    const text = (this.map?.canvasItems ?? []).find((item): item is TextItem => item.kind === "text" && item.id === id);
+    if (!text || !this.canEditText()) return;
+    const menu = new Menu();
+    for (const cardId of this.liveLinks(text)) {
+      const title = this.notes.get(cardId)?.title ?? cardId;
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.text_unlink_item", title))
+          .setIcon("unlink")
+          .onClick(() => {
+            this.focusItemId = id;
+            this.enqueue(async () => {
+              await this.changeCanvasItems(id, items => unlinkTextNode(items, id, cardId));
+              this.announcer?.setText(t("ui.text_link_removed"));
+            });
+          })
+      );
+    }
+    const rect = anchor.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom });
+  }
+  /** Adds a free text block at a stage point and opens its editor; one undo step. */
+  private async addFreeText(point: { x: number; y: number } | null): Promise<void> {
+    if (!this.map || !this.canEditText()) return;
+    const id = `txt-${randomUUID().slice(0, 8)}`,
+      at = point ?? { x: 0, y: 0 };
+    this.pendingTextEditId = id;
+    await this.mapChange(map => {
+      map.canvasItems = addFreeTextNode(map.canvasItems ?? [], {
+        id,
+        text: t("ui.text_node_placeholder"),
+        x: Math.round(at.x),
+        y: Math.round(at.y)
+      });
+    }, false);
+    this.pendingTextEditId = null;
+    this.announcer?.setText(t("ui.text_node_added"));
   }
   /** Swaps the node's text for a textarea: Cmd/Ctrl+Enter or leaving it saves, Esc cancels, an empty text removes the node. */
   private startTextEdit(id: string, draft?: string): void {
@@ -6166,7 +6440,8 @@ export class VisualAgentMapView extends ItemView {
       .map(text => ({
         id: text.id,
         parentId: text.parentId && ids.has(text.parentId) ? text.parentId : null,
-        text: text.text
+        text: text.text,
+        ...(text.links?.length ? { links: text.links } : {})
       }));
   }
   /** Adds a text node under `parent` (or the selected topic) and opens its editor; one undo step. */
@@ -6176,7 +6451,9 @@ export class VisualAgentMapView extends ItemView {
       const target = parent ?? this.map.nodes.find(node => node.id === this.selected);
       const owner = target && this.map.nodes.find(node => node.id === target.id);
       if (!owner) {
-        new Notice(t("ui.text_node_select_topic"));
+        // No topic selected: a free block in the middle of the view (canvas-text-node decision #4).
+        const center = this.stagePoint(null);
+        await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
         return;
       }
       const id = `txt-${randomUUID().slice(0, 8)}`;
@@ -6408,10 +6685,13 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map.canvasItems?.some(item => (item as { id?: unknown }).id === id)) return;
     await this.mapChange(map => {
       // An empty frame (every member gone) is cleared with the next canvas write, so an undo of a topic removal still finds it.
-      const next = pruneBoundaries(
-        change(map.canvasItems ?? []),
-        map.nodes.map(node => node.id)
-      );
+      const alive = new Set(map.nodes.map(node => node.id));
+      const changed = change(map.canvasItems ?? []);
+      // A link to a card that is gone (an older version deleted the card) is cleaned with the next canvas write.
+      const dangling = new Set<string>();
+      for (const item of changed)
+        if (item.kind === "text") for (const id of (item as TextItem).links ?? []) if (!alive.has(id)) dangling.add(id);
+      const next = pruneBoundaries(dangling.size ? removeLinksTo(changed, dangling) : changed, [...alive]);
       if (next.length) map.canvasItems = next;
       else delete map.canvasItems;
     }, false);
@@ -6594,6 +6874,13 @@ export class VisualAgentMapView extends ItemView {
         .setIcon("image-plus")
         .onClick(() => this.openCanvasImagePicker(point))
     );
+    if (this.canEditText())
+      menu.addItem(item =>
+        item
+          .setTitle(t("ui.text_node_add_here"))
+          .setIcon("sticky-note")
+          .onClick(() => this.enqueue(() => this.addFreeText(point)))
+      );
     menu.showAtMouseEvent(event);
   }
   /** The system file picker, images only; the chosen files take the same path as a drop. */
@@ -6730,6 +7017,7 @@ export class VisualAgentMapView extends ItemView {
           const prior = clone(map);
           map.nodes = map.nodes.filter(node => !ids.has(node.id));
           removeTopicRelationsFor(map, ids);
+          this.dropTextLinks(map, ids);
           this.removeAimReferences(map, ids, prior.nodes);
         })
         .commit();
@@ -7470,6 +7758,7 @@ export class VisualAgentMapView extends ItemView {
           assertSource(map);
           map.nodes = map.nodes.filter(node => !removed.has(node.id));
           removeTopicRelationsFor(map, removed);
+          this.dropTextLinks(map, removed);
         });
       },
       finish: async entry => {
@@ -8074,7 +8363,11 @@ export class VisualAgentMapView extends ItemView {
       const style = computed(el);
       const stroke = colorOf(style.stroke);
       if (!d || !stroke || stroke === "none" || style.display === "none") continue;
-      edges.push({ d, stroke });
+      edges.push({
+        d,
+        stroke,
+        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {})
+      });
       try {
         const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();
         if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
@@ -13790,16 +14083,24 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || !this.viewportEl) return;
     const nodes = this.canvasNodes();
     if (!nodes.length) return;
-    const minX = Math.min(...nodes.map(n => n.x)),
-      maxX = Math.max(...nodes.map(n => n.x + 280));
-    const minY = Math.min(...nodes.map(n => n.y)),
-      maxY = Math.max(
-        ...nodes.map(
-          n =>
-            n.y +
-            (this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180)
-        )
-      );
+    // Free text blocks (canvas-text-node decision #8) count too: fit must not hide what the user placed.
+    const boxes = nodes.map(n => ({
+      x: n.x,
+      y: n.y,
+      w: 280,
+      h: this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180
+    }));
+    for (const item of this.map.canvasItems ?? []) {
+      if (item.kind !== "text") continue;
+      const text = item as TextItem;
+      const el = this.textEls.get(text.id);
+      if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
+      boxes.push({ x: text.x, y: text.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
+    }
+    const minX = Math.min(...boxes.map(b => b.x)),
+      maxX = Math.max(...boxes.map(b => b.x + b.w));
+    const minY = Math.min(...boxes.map(b => b.y)),
+      maxY = Math.max(...boxes.map(b => b.y + b.h));
     this.map.viewport = fitViewport(
       { minX, minY, maxX, maxY },
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
@@ -16621,6 +16922,24 @@ export class VisualAgentMapView extends ItemView {
       path.addClass("vam-edge", "vam-text-edge");
       if (!this.map.aim && !this.builtIn) path.setAttribute("data-parent-line", "");
       this.edgesEl.appendChild(path);
+    }
+    // A free text block is joined to the cards it links to by a dashed line: no arrow, no label (canvas-text-node decision #2).
+    for (const [textId, textEl] of this.textEls) {
+      if (!textEl.classList.contains("is-free")) continue;
+      const text = (this.map.canvasItems ?? []).find(
+        item => item.kind === "text" && (item as TextItem).id === textId
+      ) as TextItem | undefined;
+      if (!text) continue;
+      for (const cardId of this.liveLinks(text)) {
+        const card = this.cardEls.get(cardId);
+        if (!card) continue;
+        const path = createSvg("path");
+        path.setAttribute("d", relationPathData(boxOf(textEl), boxOf(card)));
+        path.addClass("vam-text-link");
+        path.setAttribute("data-text-id", textId);
+        path.setAttribute("data-card-id", cardId);
+        this.edgesEl.appendChild(path);
+      }
     }
     // A fishbone also draws the main bone (spine) of each head that has a first-level topic on screen.
     if (mapDirection === "fishbone") {

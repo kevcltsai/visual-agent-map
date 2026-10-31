@@ -216,7 +216,7 @@ test('context menu on the empty canvas offers Insert image; on a card it does no
   const empty = { clientX: 110, clientY: 45, preventDefault() {}, target: { closest: () => null } };
   h.view.onCanvasContextMenu(empty);
   assert.equal(h.menus.length, 1);
-  assert.deepEqual(h.menus[0].items.map(i => i.title), ['Insert image…']);
+  assert.deepEqual(h.menus[0].items.map(i => i.title), ['Insert image…', 'Add text node here']); // canvas-text-node P2 added the second entry
   h.menus[0].items[0].click();
   assert.deepEqual(plain(picked), [{ x: 25, y: 10 }]);
 });

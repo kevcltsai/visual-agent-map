@@ -55189,10 +55189,11 @@ ${addition}` : addition });
     }
     const dragged = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === id);
     const spineId = this.spineEls.has(id) ? id : (dragged == null ? void 0 : dragged.parentId) && this.spineEls.has(dragged.parentId) ? dragged.parentId : null;
+    const spineBoxes = spineId ? this.spineBoxes(spineId) : null;
     return {
       update: (x, y) => {
         var _a3, _b3;
-        if (spineId) this.placeSpine(spineId, { id, box: { x, y, ...size } });
+        if (spineId && spineBoxes) this.placeSpine(spineId, { id, box: { x, y, ...size } }, spineBoxes);
         for (const link of linked) {
           const path = this.relationEls.get(link.key);
           if (!path) continue;
@@ -55226,20 +55227,33 @@ ${addition}` : addition });
       }
     };
   }
-  /** Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM. */
-  placeSpine(headId, moved) {
-    var _a2;
-    const path = this.spineEls.get(headId);
+  /** The head and first-level topic boxes of one spine, read from the cards on screen. */
+  spineBoxes(headId) {
     const head = this.cardEls.get(headId);
-    if (!path || !head || !this.map) return;
-    const boxFor = (id, card) => (moved == null ? void 0 : moved.id) === id ? moved.box : card ? boxOf(card) : null;
+    if (!head || !this.map) return null;
     const topics = [];
     for (const node of this.canvasNodes()) {
       if (node.parentId !== headId) continue;
-      const box = boxFor(node.id, this.cardEls.get(node.id));
-      if (box) topics.push(box);
+      const card = this.cardEls.get(node.id);
+      if (card) topics.push({ id: node.id, box: boxOf(card) });
     }
-    path.setAttribute("d", fishboneSpinePathData((_a2 = boxFor(headId, head)) != null ? _a2 : boxOf(head), topics));
+    return { head: boxOf(head), topics };
+  }
+  /**
+   * Sets one spine's path from the cards on screen; `moved` is a card being dragged, whose box is not yet in the DOM,
+   * and `boxes` are the measured boxes a drag reuses so each move reads nothing from the DOM.
+   */
+  placeSpine(headId, moved, boxes = this.spineBoxes(headId)) {
+    const path = this.spineEls.get(headId);
+    if (!path || !boxes) return;
+    const boxFor = (id, box) => (moved == null ? void 0 : moved.id) === id ? moved.box : box;
+    path.setAttribute(
+      "d",
+      fishboneSpinePathData(
+        boxFor(headId, boxes.head),
+        boxes.topics.map((topic) => boxFor(topic.id, topic.box))
+      )
+    );
   }
   drawEdges() {
     var _a2, _b2, _c;

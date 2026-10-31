@@ -1145,3 +1145,189 @@ test('C-4b: cleanBranchLayouts keeps none on an AIM map and is safe on long pare
   compose.cleanBranchLayouts(aimNodes, 'right', true);
   assert.equal(aimNodes[1].layout, undefined);
 });
+
+// ---- PV1 (tickets 20, 21, 22, 38, 39, 40): the view. A real view over a fake vault, as in tests/steps-layout-direction.cjs. ----
+const support = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const MAP = 'Agent Workspace/Topics/map-pv1/Map.md';
+const RIGHT_TITLE = 'Lay out to the right', LEFT_TITLE = 'Lay out to the left';
+
+/** `spec` is [title, parentTitle|null, x, y] per node; `extra` is merged into the map before it is saved. */
+async function harness(spec, extra = {}) {
+  const { repo, app } = support.fixture('en', { linkIndex: true });
+  const settings = { ...support.DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
+  repo.settings = settings;
+  const mapDoc = { id: 'map-pv1', title: 'PV1', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-pv1');
+  const byTitle = new Map();
+  for (const [title, parentTitle, x, y] of spec) {
+    const created = await repo.createNote(title, 'gpt-6-luna', mapDoc, MAP, 'workspace');
+    Object.assign(created, { parentId: parentTitle ? byTitle.get(parentTitle).id : null, x, y });
+    byTitle.set(title, created);
+    mapDoc.nodes.push(created);
+  }
+  Object.assign(mapDoc, extra);
+  await app.vault.create(MAP, support.core.serializeMap(mapDoc));
+  await repo.rebuildDerivedData();
+  const menus = [];
+  class Menu {
+    constructor() { this.items = []; menus.push(this); }
+    addItem(callback) { const item = { checked: undefined, setTitle(value) { this.title = value; return this; }, setIcon(value) { this.icon = value; return this; }, setChecked(value) { this.checked = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; }
+    addSeparator() { this.items.push({ separator: true }); return this; }
+    showAtMouseEvent() { return this; }
+  }
+  const Base = dom.makeModal();
+  class Modal extends Base { open() { super.open(); this.close(); } }
+  const createSvg = tag => ({ tag, attrs: {}, classes: [], children: [], setAttribute(n, v) { this.attrs[n] = v; }, getAttribute(n) { return this.attrs[n]; }, addClass(n) { this.classes.push(n); }, appendChild(c) { this.children.push(c); } });
+  const { VisualAgentMapView } = support.load('main.ts', { obsidian: { ...support.obsidian, Modal, Menu, Notice: dom.makeNotice([]) } }, { createFragment: dom.createFragment, createSvg });
+  let pending = Promise.resolve();
+  const plugin = support.withExpansionCoordinator({
+    repo, settings, running: new Set(), logs: { appendLog() {} }, rebuildDerivedData: () => repo.rebuildDerivedData(), relevanceGrades: new Map(), expansionBatches: new Map(), pendingSuggestions: new Map(), releaseOutline() {}, setOutlineActive() {}, detailsShown: () => false,
+    mutate: work => (pending = Promise.resolve().then(work))
+  });
+  const view = new VisualAgentMapView({ app }, plugin);
+  view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = dom.element('div'); view.stageEl = dom.element('div');
+  let fits = 0;
+  view.focusNode = () => {}; view.openDetails = () => {}; view.render = () => {}; view.fit = () => { fits++; };
+  view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
+  await view.hydrate();
+  view.cardHeightOf = () => 180;
+  const named = title => view.map.nodes.find(n => view.notes.get(n.id)?.title === title);
+  const menuTitles = () => menus.at(-1).items.map(item => (item.separator ? '---' : item.title));
+  const choose = async title => { view.openLayoutMenu({}); menus.at(-1).items.find(item => item.title === title).click(); await pending; await pending; };
+  return { repo, view, named, menus, menuTitles, choose, settled: () => pending, fits: () => fits, saved: () => repo.readMap(MAP), createSvg };
+}
+const edgeHost = () => ({ children: [], replaceChildren() { this.children = []; }, appendChild(child) { this.children.push(child); } });
+const card = (x, y, width = 300, height = 180) => ({ offsetLeft: x, offsetTop: y, offsetWidth: width, offsetHeight: height });
+const tree4 = [['Root', null, 1000, 80], ['A', 'Root', 1360, 0], ['B', 'Root', 1360, 300], ['A1', 'A', 1720, 0]];
+const plainJson = value => JSON.parse(JSON.stringify(value));
+const DOWN = 'Lay out downward', UP = 'Lay out upward', BALANCED = 'Lay out balanced left and right', RADIAL = 'Lay out radially', TIMELINE = 'Lay out as a timeline', FISHBONE = 'Lay out as a fishbone';
+const COMPACT = 'Compact spacing', STANDARD = 'Standard spacing', SPACIOUS = 'Spacious spacing';
+
+test('V1: choosing Lay out downward is one write and one undo step; the field is {direction:"down"} and undo restores it', async () => {
+  const h = await harness(tree4);
+  const positions = () => JSON.stringify(h.view.map.nodes.map(n => [n.id, n.x, n.y]));
+  const before = positions();
+  const writes = h.view.history.past.length;
+  await h.choose(DOWN);
+  assert.equal(h.view.history.past.length, writes + 1, 'one history entry');
+  assert.deepEqual(plainJson(h.view.map.layout), { direction: 'down' });
+  assert.deepEqual(plainJson((await h.saved()).layout), { direction: 'down' }, 'stored in Map.md');
+  const root = h.named('Root'), a = h.named('A');
+  assert.ok(a.y > root.y && h.named('A1').y > a.y, 'children sit below their parent');
+  assert.equal(h.fits(), 1);
+  await h.view.travel(false);
+  assert.equal('layout' in h.view.map, false, 'undo removes the field'); assert.equal(positions(), before, 'undo restores the coordinates');
+  for (const [title, kind] of [[UP, 'up'], [BALANCED, 'balanced'], [RADIAL, 'radial'], [TIMELINE, 'timeline'], [FISHBONE, 'fishbone']]) {
+    await h.choose(title);
+    assert.deepEqual(plainJson(h.view.map.layout), { direction: kind }, kind);
+    assert.deepEqual(plainJson((await h.saved()).layout), { direction: kind }, `${kind} stored`);
+  }
+});
+
+test('V1b: the menu lists the eight arrangements and the three spacings after the original items and checks the current ones', async () => {
+  const h = await harness(tree4);
+  h.view.openLayoutMenu({});
+  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', DOWN, UP, BALANCED, RADIAL, TIMELINE, FISHBONE, '---', COMPACT, STANDARD, SPACIOUS, 'Auto layout']);
+  const checked = () => h.menus.at(-1).items.filter(item => item.checked).map(item => item.title);
+  assert.deepEqual(checked(), ['Lay out to the right', STANDARD]);
+  await h.choose(DOWN);
+  h.view.openLayoutMenu({});
+  assert.deepEqual(checked(), [DOWN, STANDARD]);
+});
+
+test('V2: choosing Spacious writes spacing and re-arranges; going back to Standard deletes the field (and the whole layout on a right map)', async () => {
+  const h = await harness(tree4);
+  await h.choose(SPACIOUS);
+  const root = () => h.named('Root');
+  assert.deepEqual(plainJson(h.view.map.layout), { direction: 'right', spacing: 'spacious' });
+  assert.equal(h.named('A').x, root().x + 420, 'the column is 420 apart');
+  assert.deepEqual(plainJson((await h.saved()).layout), { direction: 'right', spacing: 'spacious' });
+  await h.choose(COMPACT);
+  assert.deepEqual(plainJson(h.view.map.layout), { direction: 'right', spacing: 'compact' });
+  assert.equal(h.named('A').x, root().x + 330);
+  await h.choose(DOWN);
+  assert.deepEqual(plainJson(h.view.map.layout), { direction: 'down', spacing: 'compact' }, 'a direction change keeps the spacing');
+  await h.choose(STANDARD);
+  assert.deepEqual(plainJson(h.view.map.layout), { direction: 'down' }, 'standard removes spacing only');
+  await h.choose('Lay out to the right');
+  assert.equal('layout' in h.view.map, false, 'right and standard leave no layout field');
+  assert.equal('layout' in (await h.saved()), false);
+});
+
+test('V3: in a down map ArrowDown goes to the child, ArrowUp to the parent, ArrowLeft and ArrowRight between siblings; up swaps the vertical keys; balanced follows each side', async () => {
+  const down = await harness(tree4, { layout: { direction: 'down' } });
+  const root = down.named('Root'), a = down.named('A'), b = down.named('B');
+  await down.choose(DOWN);
+  assert.equal(down.view.keyboardNeighbor(down.named('Root'), 'ArrowDown').id, a.id);
+  assert.equal(down.view.keyboardNeighbor(down.named('A'), 'ArrowUp').id, root.id);
+  const [first, second] = [down.named('A'), down.named('B')].sort((p, q) => p.x - q.x);
+  assert.equal(down.view.keyboardNeighbor(first, 'ArrowRight').id, second.id);
+  assert.equal(down.view.keyboardNeighbor(second, 'ArrowLeft').id, first.id);
+  const up = await harness(tree4, { layout: { direction: 'up' } });
+  await up.choose(UP);
+  assert.equal(up.view.keyboardNeighbor(up.named('Root'), 'ArrowUp').id, up.named('A').id, 'up map: ArrowUp goes to the first child');
+  assert.equal(up.view.keyboardNeighbor(up.named('A'), 'ArrowDown').id, up.named('Root').id);
+  const bal = await harness([['Root', null, 1000, 80], ['A', 'Root', 0, 0], ['B', 'Root', 0, 0], ['A1', 'A', 0, 0]], { layout: { direction: 'balanced' } });
+  await bal.choose(BALANCED);
+  const sideOf = title => (bal.named(title).x < bal.named('Root').x ? 'left' : 'right');
+  assert.notEqual(sideOf('A'), sideOf('B'), 'the two topics are on opposite halves');
+  const goes = (from, key) => bal.view.keyboardNeighbor(bal.named(from), key)?.id;
+  assert.equal(goes('Root', 'ArrowLeft'), bal.named(sideOf('A') === 'left' ? 'A' : 'B').id);
+  assert.equal(goes('Root', 'ArrowRight'), bal.named(sideOf('A') === 'right' ? 'A' : 'B').id);
+  const outer = sideOf('A') === 'left' ? 'ArrowLeft' : 'ArrowRight', inner = sideOf('A') === 'left' ? 'ArrowRight' : 'ArrowLeft';
+  assert.equal(goes('A', outer), bal.named('A1').id, 'outward key goes to the child');
+  assert.equal(goes('A1', inner), bal.named('A').id, 'inward key goes to the parent');
+});
+
+test('V4: in a down map the parent line leaves the parent\'s bottom edge for the child\'s top edge, also while dragging; a fishbone passes the depth', async () => {
+  const h = await harness(tree4.slice(0, 2), { layout: { direction: 'down' } });
+  const root = h.named('Root'), a = h.named('A');
+  h.view.edgesEl = edgeHost(); h.view.relationsLayerEl = edgeHost();
+  h.view.cardEls.set(root.id, card(1000, 80)); h.view.cardEls.set(a.id, card(1000, 420));
+  h.view.drawEdges();
+  assert.equal(h.view.edgesEl.children[0].attrs.d, 'M 1150 260 C 1150 340, 1150 340, 1150 420');
+  const drag = h.view.dragEdges(a.id, { offsetWidth: 300, offsetHeight: 180 });
+  drag.update(1200, 500);
+  assert.equal(h.view.edgeEls.get(`${root.id}\u0000${a.id}`).attrs.d, 'M 1150 260 C 1150 380, 1350 380, 1350 500', 'dragging the child keeps the down geometry');
+  const f = await harness([['Root', null, 1000, 80], ['A', 'Root', 600, 0], ['A1', 'A', 300, 0]], { layout: { direction: 'fishbone' } });
+  const geometry2 = load('experiences/visual-map/relation-geometry.ts');
+  f.view.edgesEl = edgeHost(); f.view.relationsLayerEl = edgeHost();
+  const ids = ['Root', 'A', 'A1'].map(title => f.named(title).id);
+  const boxes = [card(1000, 80), card(600, 0), card(300, 0)];
+  ids.forEach((id, i) => f.view.cardEls.set(id, boxes[i]));
+  f.view.drawEdges();
+  const box = c => ({ x: c.offsetLeft, y: c.offsetTop, width: c.offsetWidth, height: c.offsetHeight });
+  assert.equal(f.view.edgeEls.get(`${ids[0]}\u0000${ids[1]}`).attrs.d, geometry2.treeEdgePathData(box(boxes[0]), box(boxes[1]), 'fishbone', 1), 'depth 1 is the diagonal bone');
+  assert.equal(f.view.edgeEls.get(`${ids[1]}\u0000${ids[2]}`).attrs.d, geometry2.treeEdgePathData(box(boxes[1]), box(boxes[2]), 'fishbone', 2), 'depth 2 is the rib');
+});
+
+test('V4b: a branch with its own direction draws its edges by the parent card\'s direction; right maps keep the old curve text', async () => {
+  const h = await harness(tree4, { layout: { direction: 'right' } });
+  h.view.map.nodes.find(n => n.id === h.named('A').id).layout = { direction: 'down' };
+  h.view.edgesEl = edgeHost(); h.view.relationsLayerEl = edgeHost();
+  const root = h.named('Root'), a = h.named('A'), a1 = h.named('A1'), b = h.named('B');
+  h.view.cardEls.set(root.id, card(1000, 80)); h.view.cardEls.set(a.id, card(1360, 0)); h.view.cardEls.set(b.id, card(1360, 300)); h.view.cardEls.set(a1.id, card(1360, 300));
+  h.view.drawEdges();
+  const d = (p, c) => h.view.edgeEls.get(`${p.id}\u0000${c.id}`).attrs.d;
+  assert.equal(d(root, a), 'M 1300 170 C 1360 170, 1300 90, 1360 90', 'into the branch: the parent (right map) decides');
+  assert.equal(d(a, a1), 'M 1510 180 C 1510 240, 1510 240, 1510 300', 'inside the branch: down');
+});
+
+test('V5: an AIM map and the built-in sample have none of the new menu items', async () => {
+  const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
+  const h = await harness(tree4);
+  h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  h.view.openLayoutMenu({});
+  assert.deepEqual(h.menuTitles(), original);
+  h.view.map.aim = undefined; h.view.builtIn = true;
+  h.view.openLayoutMenu({});
+  assert.deepEqual(h.menuTitles(), original);
+});
+
+test('V6: switching to balanced deals the topics out again even when their old x already straddles the root', async () => {
+  const h = await harness([['Root', null, 1000, 80], ['A', 'Root', 1000, 0], ['B', 'Root', 1000, 400], ['C', 'Root', 1000, 800], ['D', 'Root', 1000, 1200]], { layout: { direction: 'down' } });
+  await h.choose(BALANCED);
+  const sides = ['A', 'B', 'C', 'D'].map(title => (h.named(title).x < h.named('Root').x ? 'left' : 'right'));
+  assert.ok(sides.includes('left') && sides.includes('right'), 'both halves are used');
+});

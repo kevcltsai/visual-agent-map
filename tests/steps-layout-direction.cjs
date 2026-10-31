@@ -379,7 +379,7 @@ test('V5: an AIM map and the built-in sample offer no direction in the Layout me
   assert.deepEqual(h.menuTitles(), original);
   h.view.builtIn = false;
   h.view.openLayoutMenu({});
-  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Auto layout']);
+  assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
 });
 
 // ---- P3: the map chat's new cards follow the map's direction. ----

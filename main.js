@@ -49922,16 +49922,18 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
   }
   async noteChange(node, patch) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key2 of Object.keys(patch)) before[key2] = current[key2];
-    if (patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0) {
-      before.previewSection = current.previewSection;
+    const followsSummary = patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0;
+    if (followsSummary) {
+      before.previewSection = current.preview;
       before.previewInitialized = current.previewInitialized;
       before.previewAutoHash = current.previewAutoHash;
     }
     if (Object.keys(patch).every((key2) => current[key2] === patch[key2])) return;
     await this.plugin.repo.updateNote(node.path, patch);
+    const written2 = followsSummary ? await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0) : null;
     if (patch.referencePaths !== void 0) {
       this.plugin.pendingSuggestions.delete(node.path);
       this.plugin.pendingResearchOptions.delete(node.path);
@@ -49949,12 +49951,25 @@ ${request.requirements}` : preset.text,
       "sourcePaths",
       "referencePaths"
     ].some((key2) => key2 in patch))
-      (_c = (_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.get(node.path)) == null ? void 0 : _c.abort();
+      (_d = (_c = this.plugin.activeTasks) == null ? void 0 : _c.get(node.path)) == null ? void 0 : _d.abort();
     this.history.push({
-      undo: () => this.plugin.repo.updateNote(node.path, before),
+      undo: async () => {
+        var _a3;
+        let restore = before;
+        if (written2) {
+          const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
+          if (latest.previewSection !== written2.previewSection || latest.previewAutoHash !== written2.previewAutoHash) {
+            restore = { ...before };
+            delete restore.previewSection;
+            delete restore.previewInitialized;
+            delete restore.previewAutoHash;
+          }
+        }
+        await this.plugin.repo.updateNote(node.path, restore);
+      },
       redo: () => this.plugin.repo.updateNote(node.path, patch)
     });
-    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, (_d = this.map) != null ? _d : void 0));
+    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, (_e = this.map) != null ? _e : void 0));
     this.render();
   }
   /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */

@@ -40,6 +40,15 @@ import {
 } from "./map-export";
 import { buildMapSearchBar, searchMap, stepSearch, type MapSearchBar, type MapSearchResult } from "./map-search-bar";
 import { collapsedAncestors } from "./map-search";
+import {
+  classifyPresentationKey,
+  moveInOrder,
+  reconcileCurrent,
+  startingId,
+  type PresentationAction,
+  type PresentationState
+} from "./presentation-mode";
+import { readingOrder } from "./presentation-order";
 import { resolveMapTextLanguage, synthesisDefaultName } from "./map-text-language";
 import {
   begin as beginTransaction,
@@ -957,6 +966,9 @@ export class VisualAgentMapView extends ItemView {
     announceTimer: number | null;
   } | null = null;
   private mapSearchBar: MapSearchBar | null = null;
+  /** Presentation mode: null while not presenting. Lives in memory only; Map.md is never written by it. */
+  private presentation: PresentationState | null = null;
+  private presentationBarEl: HTMLElement | null = null;
   /** Lazy-loads card cover images; owned by this view, disconnected on every redraw and on close. */
   private coverObserver: IntersectionObserver | null = null;
   private selectionBarEl: HTMLElement | null = null;
@@ -1108,6 +1120,8 @@ export class VisualAgentMapView extends ItemView {
     this.bindClipboard();
     // The listener belongs to the element (it goes away with it); a move to another window binds the new document.
     this.contentEl.onWindowMigrated?.(() => this.bindClipboard());
+    // Presentation keys are taken in the capture phase, before any card or tree key handler can see them.
+    this.registerDomEvent(this.contentEl, "keydown", event => this.presentationKey(event), { capture: true });
     this.registerDomEvent(this.contentEl, "keydown", event => {
       // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
@@ -1166,6 +1180,8 @@ export class VisualAgentMapView extends ItemView {
       (redo: boolean) =>
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || isEditableTarget(event.target)) return true;
+        // A presentation is read-only: undo and redo are swallowed, not passed on to Obsidian.
+        if (this.presentation) return false;
         // Some hosts match the shifted letter as "Z" as well as "z"; one key press undoes one step.
         if (seen.has(event)) return false;
         seen.add(event);
@@ -1179,6 +1195,7 @@ export class VisualAgentMapView extends ItemView {
     // matched first) claims it only while a card has focus and otherwise lets the default command run.
     scope.register([], "F2", (event: KeyboardEvent): boolean => {
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
+      if (this.presentation) return false;
       if (this.builtIn || this.integrationMode || this.map?.aim) return true;
       const active = this.contentEl.ownerDocument?.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
@@ -1195,6 +1212,7 @@ export class VisualAgentMapView extends ItemView {
       (sibling: boolean) =>
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || event.defaultPrevented) return true;
+        if (this.presentation) return false;
         if (this.builtIn || this.integrationMode || this.map?.aim) return true;
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
@@ -1213,6 +1231,8 @@ export class VisualAgentMapView extends ItemView {
   /** Mod+F: true leaves the key to Obsidian, false means the map search took it. */
   private searchKey(event: KeyboardEvent): boolean {
     if (this.closed || event.isComposing || event.defaultPrevented || !this.map) return true;
+    // No search box while presenting; the key is swallowed so Obsidian's own search does not open over the show either.
+    if (this.presentation) return false;
     const active = (this.contentEl.ownerDocument?.activeElement ?? null) as HTMLElement | null;
     if (!active) return true;
     // The search field itself: Mod+F selects its text instead of opening Obsidian's search.
@@ -1377,6 +1397,154 @@ export class VisualAgentMapView extends ItemView {
       card ?? (search.returnEl?.isConnected && this.contentEl.contains(search.returnEl) ? search.returnEl : null);
     (back ?? this.contentEl).focus({ preventScroll: true });
   }
+  /** The topics a presentation visits: the reading order of what is drawn (folded branches are one stop, not their descendants). */
+  private presentationOrder(): string[] {
+    if (!this.map) return [];
+    const shown = new Set(this.canvasNodes().map(node => node.id));
+    const vertical = ["down", "up"].includes(layoutOf(this.map).direction);
+    return readingOrder(
+      this.map.nodes.filter(node => shown.has(node.id)),
+      { siblingAxis: vertical ? "x" : "y" }
+    );
+  }
+  /** The start button is on only when there is something to show and the map is not in select mode. */
+  private canPresent(): boolean {
+    return !!this.map && !this.closed && !this.integrationMode && this.canvasNodes().length > 0;
+  }
+  private startPresentation(): void {
+    if (this.presentation || !this.map || !this.canPresent()) return;
+    const order = this.presentationOrder();
+    const first = startingId(order, this.selected);
+    if (first === null) return;
+    const active = (this.contentEl.ownerDocument?.activeElement ?? null) as HTMLElement | null;
+    const card = active
+      ? [...this.cardEls.entries()].find(([, el]) => el === active || el.contains(active))
+      : undefined;
+    this.closeMapSearch(false);
+    this.clearHoverTimer();
+    this.hoverCard?.remove();
+    this.hoverCard = null;
+    this.presentation = {
+      order,
+      currentId: first,
+      viewport: { ...this.map.viewport },
+      selected: this.selected,
+      multiSelected: [...this.multiSelected],
+      returnNodeId: card ? card[0] : null,
+      returnEl: card ? null : active
+    };
+    this.applyPresentationMarks(true);
+  }
+  /** One key of a presentation. Everything it does is in memory: the camera follows, nothing is saved. */
+  private stepPresentation(action: PresentationAction): void {
+    const session = this.presentation;
+    if (!session) return;
+    if (action === "exit") {
+      this.exitPresentation(true);
+      return;
+    }
+    if (action === "block") return;
+    const move = moveInOrder(session.order, session.currentId, action);
+    if (!move) return;
+    if (move.kind === "edge") {
+      this.announcer?.setText(t(move.edge === "first" ? "ui.presentation_first" : "ui.presentation_last"));
+      return;
+    }
+    session.currentId = move.id;
+    this.applyPresentationMarks(true);
+  }
+  /** Capture-phase keydown: a presentation takes its keys and the read-only ones, and nothing reaches the cards. */
+  private presentationKey(event: KeyboardEvent): void {
+    if (!this.presentation || this.closed) return;
+    const target = event.target as HTMLElement | null;
+    const inBar = !!target?.closest?.(".vam-presentation-bar");
+    if (!inBar && target && (isEditableTarget(target) || target.closest?.(".vam-map-chat"))) return;
+    // On the bar's own button Enter and Space click it.
+    if (inBar && (event.key === "Enter" || event.key === " ")) return;
+    const action = classifyPresentationKey(event);
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.stepPresentation(action);
+  }
+  /**
+   * Called at the end of every paint and after each step: re-reads the order (a repaint may have removed the current
+   * topic), marks the current card, draws the bar, centres the card and keeps DOM focus on it.
+   * `announce` speaks the position; a plain repaint speaks only when the topic changed under it.
+   */
+  private applyPresentationMarks(announce = false): void {
+    const session = this.presentation;
+    if (!session || !this.map) return;
+    const order = this.presentationOrder();
+    const currentId = reconcileCurrent(session.order, order, session.currentId);
+    if (currentId === null) {
+      this.exitPresentation(this.cardEls.size > 0);
+      return;
+    }
+    if (currentId !== session.currentId) announce = true;
+    session.order = order;
+    session.currentId = currentId;
+    this.contentEl.dataset.presenting = "true";
+    if (this.stageEl) this.stageEl.dataset.presenting = "true";
+    for (const [id, card] of this.cardEls) card.toggleClass("is-presenting", id === currentId);
+    this.presentationBarEl?.remove();
+    this.presentationBarEl = null;
+    const overlay = this.contentEl.querySelector?.<HTMLElement>(".vam-canvas-overlay");
+    const index = order.indexOf(currentId);
+    if (overlay) {
+      const bar = overlay.createDiv({ cls: "vam-presentation-bar", attr: { role: "group" } });
+      bar.createSpan({ cls: "vam-presentation-count", text: t("ui.presentation_count_0_1", index + 1, order.length) });
+      const exit = bar.createEl("button", {
+        cls: "vam-presentation-exit",
+        text: t("ui.presentation_exit"),
+        attr: { type: "button" }
+      });
+      exit.addEventListener("click", event => {
+        event.stopPropagation();
+        this.exitPresentation(true);
+      });
+      this.presentationBarEl = bar;
+    }
+    const target = this.map.nodes.find(node => node.id === currentId);
+    if (target) this.focusNode(target, false);
+    const card = this.cardEls.get(currentId);
+    const active = this.contentEl.ownerDocument?.activeElement ?? null;
+    const lost = !active || active === this.contentEl || !this.contentEl.contains(active);
+    if (card && (announce || lost) && active !== card) card.focus({ preventScroll: true });
+    if (announce)
+      this.announcer?.setText(
+        t("ui.presentation_position_0_1_2", index + 1, order.length, this.notes.get(currentId)?.title ?? "")
+      );
+  }
+  /**
+   * Leaves the presentation. `restore` puts back the viewport (in memory, never saved), the selection and the focus;
+   * switching maps or closing the view passes false because nothing of the old map is worth restoring.
+   */
+  private exitPresentation(restore = true): void {
+    const session = this.presentation;
+    if (!session) return;
+    this.presentation = null;
+    delete this.contentEl.dataset.presenting;
+    if (this.stageEl) delete this.stageEl.dataset.presenting;
+    this.presentationBarEl?.remove();
+    this.presentationBarEl = null;
+    for (const card of this.cardEls.values()) card.toggleClass("is-presenting", false);
+    if (!restore || this.closed || !this.map) return;
+    const ids = new Set(this.map.nodes.map(node => node.id));
+    const previous = this.selected,
+      touched = [...this.multiSelected];
+    this.selected = session.selected !== null && ids.has(session.selected) ? session.selected : null;
+    this.multiSelected = new Set(session.multiSelected.filter(id => ids.has(id)));
+    this.commitSelection(previous, this.selected, [...touched, ...this.multiSelected]);
+    if (!this.map) return;
+    this.map.viewport = { ...session.viewport };
+    this.transform();
+    const card = session.returnNodeId ? this.cardEls.get(session.returnNodeId) : undefined;
+    const back =
+      card ?? (session.returnEl?.isConnected && this.contentEl.contains(session.returnEl) ? session.returnEl : null);
+    (back ?? this.contentEl).focus({ preventScroll: true });
+    this.announcer?.setText(t("ui.presentation_exited"));
+  }
   /** The rename dialog shared by F2, the title double-click and the Rename tool. */
   private renameNode(node: MapNode, current: string): void {
     new NameModal(this.app, t("ui.new_topic_name"), current, name =>
@@ -1386,6 +1554,7 @@ export class VisualAgentMapView extends ItemView {
   async onClose(): Promise<void> {
     this.closed = true;
     this.closeMapSearch(false);
+    this.exitPresentation(false);
     this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
@@ -1625,7 +1794,10 @@ export class VisualAgentMapView extends ItemView {
       openEpoch = ++this.mapOpenEpoch;
     const isCurrent = () => !this.closed && this.aimViewEpoch === viewEpoch && this.mapOpenEpoch === openEpoch;
     if (!isCurrent()) return;
-    if (path !== this.path) this.closeMapSearch(false);
+    if (path !== this.path) {
+      this.closeMapSearch(false);
+      this.exitPresentation(false);
+    }
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -4213,6 +4385,7 @@ export class VisualAgentMapView extends ItemView {
     const sample = builtInSample(noteLanguageOf(this.plugin.settings.language));
     if (!this.builtIn) this.plugin.closeStaleDetails();
     this.closeMapSearch(false);
+    this.exitPresentation(false);
     this.builtIn = true;
     this.path = "";
     this.map = sample.map;
@@ -8326,6 +8499,8 @@ export class VisualAgentMapView extends ItemView {
     this.zoomLabel = zoomReset;
     this.iconButton(zoom, "plus", t("ui.zoom_in"), () => this.zoomBy(1.2));
     this.iconButton(zoom, "maximize", t("ui.show_all"), () => this.fit());
+    const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
+    present.disabled = !this.canPresent();
     if (!this.builtIn) {
       const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
       layout.setAttr("aria-haspopup", "menu");
@@ -8389,6 +8564,7 @@ export class VisualAgentMapView extends ItemView {
     }
     restoreRelevanceFocus();
     restoreChatFocus();
+    this.applyPresentationMarks();
     restoreSearch();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
@@ -9581,6 +9757,7 @@ export class VisualAgentMapView extends ItemView {
     }, 220);
   }
   private showHoverCard(card: HTMLElement, note: Note): void {
+    if (this.presentation) return;
     // The card is placed against the canvas, not the whole row: the chat window beside it is not part of the map.
     const workspace = this.contentEl.querySelector<HTMLElement>(".vam-canvas");
     if (!workspace) return;

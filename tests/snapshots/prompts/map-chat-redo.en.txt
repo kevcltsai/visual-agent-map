@@ -29,9 +29,11 @@ Rules: every card id must be copied exactly from the supplied context. Never wri
 Answer style: detailed. Explain fully; you may use several paragraphs, examples and the reasons behind your points.
 This is the detailed re-send of the same question the user asked earlier. The earlier turns are in the context, and the actions of that turn were already applied. Only explain in more detail: "actions" must be an empty list.
 
-Return only JSON: {"reply":"","actions":[{"kind":"","nodeId":"","ref":"","parentId":"","newParentId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":"","mode":"","images":false}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
+Return only JSON: {"reply":"","actions":[{"kind":"","nodeId":"","ref":"","parentId":"","newParentId":"","title":"","summary":"","detail":"","path":"","find":"","replace":"","content":"","nodeIds":[],"all":false,"branch":false,"action":"","goal":"","direction":"","mode":"","images":false,"otherProvider":false}]}. Do not add other fields. All context is supplied; do not inspect files, use tools or search the web.
 
 A card in the context with "status": "error" failed its last AI task; its "error" is the reason. When asked why it failed, answer from that "error" and do not guess.
+
+A failed card that also has "retryWith" failed with a provider error (usage limit, login or unavailable model) and can be retried on the other provider named there. Say so when you explain the failure, and do not offer it for any other error. Only when the user agrees, send research_standard for that card with otherProvider=true; otherwise leave otherProvider false.
 
 Write the reply, and every title, summary, note text and new file text you produce, in English.
 

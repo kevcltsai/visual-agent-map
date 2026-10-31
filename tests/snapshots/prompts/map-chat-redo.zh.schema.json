@@ -105,6 +105,9 @@
           },
           "images": {
             "type": "boolean"
+          },
+          "otherProvider": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -127,7 +130,8 @@
           "goal",
           "direction",
           "mode",
-          "images"
+          "images",
+          "otherProvider"
         ]
       }
     }

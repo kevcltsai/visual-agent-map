@@ -81,6 +81,8 @@ export type MapChatAction =
       mode: MapChatResearchMode | "";
       /** research_standard: true = also search for images (Standard only; a Quick research never does). Ignored by every other action. */
       images: boolean;
+      /** research_standard: true = retry the targets on the other provider (this run only); the view honours it only for targets that offer `retryWith`. Present only when true. */
+      otherProvider?: true;
     }
   /** Always the first action: a new map, opened for the rest of the reply. */
   | { kind: "create_map"; title: string }
@@ -169,7 +171,8 @@ export const MAP_CHAT_SCHEMA = {
           goal: STRING,
           direction: STRING,
           mode: { type: "string", enum: [...MAP_CHAT_RESEARCH_MODES, ""] },
-          images: { type: "boolean" }
+          images: { type: "boolean" },
+          otherProvider: { type: "boolean" }
         },
         required: [
           "kind",
@@ -191,7 +194,8 @@ export const MAP_CHAT_SCHEMA = {
           "goal",
           "direction",
           "mode",
-          "images"
+          "images",
+          "otherProvider"
         ]
       }
     }
@@ -384,7 +388,8 @@ export function parseMapChat(
             goal,
             direction: text("direction", false),
             mode,
-            images: research && mode !== "quick" && flag("images")
+            images: research && mode !== "quick" && flag("images"),
+            ...(research && flag("otherProvider") ? { otherProvider: true as const } : {})
           });
           break;
         }

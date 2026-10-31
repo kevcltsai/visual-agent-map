@@ -13858,9 +13858,17 @@ export class VisualAgentMapView extends ItemView {
       }
       return depth;
     };
-    const failureOf = (id: string): { status?: "error"; error?: string } => {
+    const failureOf = (id: string): { status?: "error"; error?: string; retryWith?: string } => {
       const note = this.notes.get(id);
-      return note?.status === "error" ? { status: "error", ...(note.lastError ? { error: note.lastError } : {}) } : {};
+      if (note?.status !== "error") return {};
+      // A provider error with another provider to offer carries that model's label (the card's own button uses the same rule).
+      const node = byId.get(id);
+      const target = node ? this.otherProviderTarget([node]) : null;
+      return {
+        status: "error",
+        ...(note.lastError ? { error: note.lastError } : {}),
+        ...(target ? { retryWith: this.plugin.modelLabel(target) } : {})
+      };
     };
     const outline: MapChatOutlineNode[] = map.nodes.map(node => ({
       id: node.id,
@@ -15023,9 +15031,18 @@ export class VisualAgentMapView extends ItemView {
         // The search count comes when the batch ends, long after this turn: it joins this answer's lines if no newer turn began.
         const chat = this.chat;
         const turns = chat?.transcript().length ?? 0;
+        // otherProvider counts only when every target offers the same other-provider model; otherwise it is ignored (D15).
+        const retryModel = action.otherProvider
+          ? this.otherProviderTarget(
+              [...this.multiSelected].flatMap(id => this.map?.nodes.filter(node => node.id === id) ?? [])
+            )
+          : null;
         launch(
           this.startMultiResearch(
-            chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+            {
+              ...chatResearchRequest(action, this.map?.aiMode, mode => aiModeOptions(mode, "research")),
+              ...(retryModel ? { model: retryModel } : {})
+            },
             undefined,
             web => {
               const lines = researchWebLines(web);

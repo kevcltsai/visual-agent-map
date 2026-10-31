@@ -40,6 +40,7 @@ function element(tag, options = {}) {
 }
 const hasCls = (item, name) => (item.cls ?? '').split(/\s+/).includes(name);
 function matcher(selector) {
+  if (selector.includes(',')) { const parts = selector.split(',').map(part => matcher(part.trim())); return item => parts.some(match => match(item)); }
   if (selector.startsWith('.')) { const name = selector.slice(1); return item => hasCls(item, name); }
   return item => item.tag === selector;
 }

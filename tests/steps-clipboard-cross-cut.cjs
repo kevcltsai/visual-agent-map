@@ -542,6 +542,12 @@ test('P7 counter-example M1b: only `updated` and the order of the keys differ (l
     note(['aliases:', '  - Alpha', 'updated: 1', 'tags:', '  - beta'])), true);
 });
 
+test('P7 counter-example M1d: paragraphs of a multi-line string swapped (blank lines between them) are not "only a stamp"', () => {
+  const note = lines => `---\n${lines.join('\n')}\n---\ntext\n`;
+  assert.equal(sameApartFromStamps(note(['a: |', '  x', '', '  y', '', '  z']), note(['a: |', '  x', '', '  z', '', '  y'])), false, 'paragraphs reordered');
+  assert.equal(sameApartFromStamps(note(['a: |', '  x', '', '  y', 'b: |', '  p', '', '  q']), note(['a: |', '  x', '', '  q', 'b: |', '  p', '', '  y'])), false, 'paragraphs swapped across keys');
+});
+
 test('P7 counter-example M1c: a note is edited between the restore\'s read and its write: the edit is kept', async () => {
   const h = await harness();
   const raw = cutInA(h, ['p']);

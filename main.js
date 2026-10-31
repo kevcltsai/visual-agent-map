@@ -29884,7 +29884,7 @@ var noteParts = (text11) => {
   if (!found) return null;
   const blocks = [];
   for (const line of found[1].split("\n")) {
-    const continued = blocks.length > 0 && /^(\s|-(\s|$))/.test(line);
+    const continued = blocks.length > 0 && /^(\s|-(\s|$)|$)/.test(line);
     if (continued) blocks[blocks.length - 1].push(line);
     else blocks.push([line]);
   }

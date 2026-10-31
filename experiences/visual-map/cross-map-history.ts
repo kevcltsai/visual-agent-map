@@ -144,11 +144,11 @@ export function cutSourceProblem(
 const noteParts = (text: string): { blocks: string[]; body: string } | null => {
   const found = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
   if (!found) return null;
-  // A key and the lines under it (indented lines, `- ` list items, a flow list continued on the next line) are one block,
-  // so a list item that moved to another key changes two blocks. The `updated` key is the only one left out.
+  // A key and the lines under it (indented lines, `- ` list items, blank lines inside a multi-line string, a flow list
+  // continued on the next line) are one block, so a list item that moved to another key changes two blocks. The `updated` key is the only one left out.
   const blocks: string[][] = [];
   for (const line of found[1].split("\n")) {
-    const continued = blocks.length > 0 && /^(\s|-(\s|$))/.test(line);
+    const continued = blocks.length > 0 && /^(\s|-(\s|$)|$)/.test(line);
     if (continued) blocks[blocks.length - 1].push(line);
     else blocks.push([line]);
   }

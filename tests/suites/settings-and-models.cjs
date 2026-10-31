@@ -321,6 +321,16 @@ integrationTest('MS-04: upgrade-0.18 notes keep their stored reasoning-level byt
     assert.equal(contents.get(rel), fs.readFileSync(file, 'utf8'), `${rel} is byte-identical after reading`);
   }
 });
+integrationTest('MS-04: a dialog that only changes the model of an old workspace note (stored high, current low) leaves the note reading low', async () => {
+  const { repo, app, root } = await reasoningFixture();
+  await setFm(app, repo, root.path, c => c.replace(/^reasoning-level:.*$/m, 'reasoning-level: high'));
+  // The patch the dialog now saves for workspace -> manual: the model, manual and the level shown (low).
+  await repo.updateNote(root.path, { model: 'picked', modelSource: 'manual', reasoning: 'low' });
+  const note = await repo.readNote(root.path);
+  assert.equal(note.model, 'picked'); assert.equal(note.reasoning, 'low');
+  assert.equal((await repo.resolveTopicModel(root.path)).reasoning, 'low');
+});
+
 integrationTest('MS-04: merge model and reasoning follow the upper topic resolution (manual parent, workspace parent, no parent)', async () => {
   const { repo, root, child, map, support } = await reasoningFixture();
   const plugin = { repo, settings: { ...support.DEFAULT_SETTINGS, cliModel: 'cur-model', cliReasoning: 'low' } };

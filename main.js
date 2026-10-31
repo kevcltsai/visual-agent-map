@@ -31143,10 +31143,13 @@ var NextStepModal = class extends import_obsidian22.Modal {
         save({ modelSource: settings.modelSource });
         delete this.pendingSettings.model;
         delete this.pendingSettings.reasoning;
+        settings.reasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+        reasoning.value = settings.reasoning;
         describeModel();
         return;
       }
       if (!options.has(model.value)) return;
+      const wasManual = settings.modelSource === "manual";
       settings.model = model.value;
       settings.modelSource = "manual";
       modelSummary.setText(
@@ -31156,7 +31159,11 @@ var NextStepModal = class extends import_obsidian22.Modal {
           sourceLabels[settings.modelSource]
         )
       );
-      save({ model: settings.model, modelSource: settings.modelSource });
+      save({
+        model: settings.model,
+        modelSource: settings.modelSource,
+        ...wasManual ? {} : { reasoning: normalizeReasoningLevel(settings.reasoning) }
+      });
       describeModel();
     });
     const reasoningField = advanced.createEl("label", { cls: "vam-field" });
@@ -31173,6 +31180,10 @@ var NextStepModal = class extends import_obsidian22.Modal {
       settings.reasoning = level;
       if (settings.modelSource !== "manual") {
         settings.modelSource = "manual";
+        if (!Array.from(model.children).some((option2) => option2.value === settings.model))
+          model.createEl("option", { value: settings.model, text: this.plugin.modelLabel(settings.model) });
+        model.value = settings.model;
+        options.add(settings.model);
         modelSummary.setText(
           t(
             "ui.0_1_reasoning_can_be_adjusted_per_topic",
@@ -47707,7 +47718,7 @@ ${request.requirements}` : preset.text,
   }
   /** `focus` false leaves the camera to the caller (a batch frames the whole branch once it is laid out). */
   async addNode(parentNode, suggestedTitle, rebuildDerivedData = true, focus = true, kind = "topic") {
-    var _a2, _b2, _c, _d, _e, _f, _g;
+    var _a2, _b2, _c, _d, _e, _f;
     if (!this.map) return;
     const typed = kind !== "topic" && this.relationsEnabled();
     const parent = parentNode && this.map.nodes.find((item) => item.id === parentNode.id) || parentNode;
@@ -47738,13 +47749,9 @@ ${request.requirements}` : preset.text,
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
       { researchMode: "local", ...typed ? { topicKind: kind } : {} }
     );
-    if (parent) {
-      const parentNote = await this.plugin.repo.readNote(parent.path, (_c = this.map) != null ? _c : void 0);
-      await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
-    }
-    node.parentId = (_d = parent == null ? void 0 : parent.id) != null ? _d : null;
+    node.parentId = (_c = parent == null ? void 0 : parent.id) != null ? _c : null;
     node.x = parent ? parent.x + 340 : 80;
-    node.y = (_e = parent == null ? void 0 : parent.y) != null ? _e : 80;
+    node.y = (_d = parent == null ? void 0 : parent.y) != null ? _d : 80;
     this.notes.set(
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
@@ -47776,7 +47783,7 @@ ${request.requirements}` : preset.text,
     );
     if (!focus) return;
     if (this.map) this.map.viewport.zoom = Math.max(this.map.viewport.zoom, 0.7);
-    this.focusNode((_g = (_f = this.map) == null ? void 0 : _f.nodes.find((n) => n.id === node.id)) != null ? _g : node);
+    this.focusNode((_f = (_e = this.map) == null ? void 0 : _e.nodes.find((n) => n.id === node.id)) != null ? _f : node);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;

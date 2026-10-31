@@ -24,7 +24,7 @@ test('AIM start: auto while the model and the current reasoning are the same mak
   assert.equal(parsed.nodes.length, 1);
 });
 
-test('AIM start: the root draft never carries reasoning when auto is chosen, and a resume keeps auto', async () => {
+test('AIM start: the root draft never carries reasoning when auto is chosen, and a resume that is passed auto again writes auto', async () => {
   const { repo, app, contents } = setup('low');
   const realCreateNoteAt = repo.createNoteAt.bind(repo); let fail = true;
   repo.createNoteAt = async (...args) => { if (fail) { fail = false; throw new Error('crash before note'); } return realCreateNoteAt(...args); };

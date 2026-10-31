@@ -8547,10 +8547,7 @@ export class VisualAgentMapView extends ItemView {
       // A new topic starts in Quick mode (a research of it may still be run in Standard).
       { researchMode: "local", ...(typed ? { topicKind: kind } : {}) }
     );
-    if (parent) {
-      const parentNote = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      await this.plugin.repo.updateNote(node.path, { reasoning: parentNote.reasoning });
-    }
+    // The child is inherited: its reasoning is resolved at read time (manual ancestor, else current), never written.
     node.parentId = parent?.id ?? null;
     // Provisional spot; the real one is laid out against measured card heights inside the history entry below.
     node.x = parent ? parent.x + 340 : 80;

@@ -579,13 +579,17 @@ export class NextStepModal extends Modal {
           )
         );
         save({ modelSource: settings.modelSource });
-        // Follow-default pins nothing: a specific model picked earlier in this dialog is not written.
+        // Follow-default pins nothing: a specific model or level picked earlier in this dialog is not written, and the
+        // level shown goes back to the current setting (what a non-override topic runs on).
         delete this.pendingSettings.model;
         delete this.pendingSettings.reasoning;
+        settings.reasoning = normalizeReasoningLevel(this.plugin.settings.cliReasoning);
+        reasoning.value = settings.reasoning;
         describeModel();
         return;
       }
       if (!options.has(model.value)) return;
+      const wasManual = settings.modelSource === "manual";
       settings.model = model.value;
       settings.modelSource = "manual";
       modelSummary.setText(
@@ -595,7 +599,12 @@ export class NextStepModal extends Modal {
           sourceLabels[settings.modelSource]
         )
       );
-      save({ model: settings.model, modelSource: settings.modelSource });
+      // Becoming an override also stores the level shown here, so a level left in an old note never takes over.
+      save({
+        model: settings.model,
+        modelSource: settings.modelSource,
+        ...(wasManual ? {} : { reasoning: normalizeReasoningLevel(settings.reasoning) })
+      });
       describeModel();
     });
     const reasoningField = advanced.createEl("label", { cls: "vam-field" });
@@ -615,6 +624,11 @@ export class NextStepModal extends Modal {
         // A non-override topic follows the current model's reasoning, so a chosen level would be ignored: store the
         // whole set as an override instead (the resolved model shown here, manual, and this level).
         settings.modelSource = "manual";
+        // The model menu must show the stored override too, or it could not be chosen back to follow-default.
+        if (!Array.from(model.children).some(option => (option as HTMLOptionElement).value === settings.model))
+          model.createEl("option", { value: settings.model, text: this.plugin.modelLabel(settings.model) });
+        model.value = settings.model;
+        options.add(settings.model);
         modelSummary.setText(
           t(
             "ui.0_1_reasoning_can_be_adjusted_per_topic",

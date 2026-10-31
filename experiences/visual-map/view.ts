@@ -213,7 +213,14 @@ import {
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
-import { addOutlineToMap, createOutlineMap, limitOutline, type OutlineNode } from "./outline-import";
+import {
+  addOutlineToMap,
+  createOutlineMap,
+  limitOutline,
+  OUTLINE_NODE_LIMIT,
+  OUTLINE_TITLE_LIMIT,
+  type OutlineNode
+} from "./outline-import";
 import {
   buildClipboardPayload,
   clipboardOutline,
@@ -222,7 +229,8 @@ import {
   type ClipboardPayload
 } from "./clipboard";
 import { inClipboardScope, readClipboardData, writeClipboardData } from "./clipboard-io";
-import { planPaste } from "./clipboard-paste";
+import { canPasteCut, planPaste } from "./clipboard-paste";
+import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } from "./clipboard-text";
 import { sessionFor } from "./clipboard-session";
 import {
   OutlineImportModal,
@@ -448,6 +456,8 @@ type SynthesisWrite = (
 /** Unique ids for the hidden card labels; any view may render a card. */
 let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
+/** The extra accessible-name part of a card that is waiting to be moved by a paste ("cut"). */
+const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
@@ -5202,24 +5212,43 @@ export class VisualAgentMapView extends ItemView {
       this.map.nodes,
       target => this.notes.get(target.id)?.title ?? target.path,
       target => copyNodes || roots.every(root => canParent(this.map!.nodes, root.id, target.id)),
-      target => this.enqueue(() => (copyNodes ? this.copySelected(target) : this.moveSelected(target)))
+      target =>
+        this.enqueue(() => (copyNodes ? this.copySelected(target) : this.moveBranches(this.selectedRoots(), target)))
     ).open();
   }
-  private async moveSelected(target: MapNode): Promise<void> {
-    const roots = this.selectedRoots();
-    if (!this.mergeUnlocked([target.id, ...roots.map(root => root.id)])) return;
-    this.assertAimReferencesRemain(this.map!, new Set(roots.map(root => root.id)), true);
+  /**
+   * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
+   * its own descendants; the moved branches are laid out once, in the same entry.
+   */
+  private async moveBranches(roots: MapNode[], target: MapNode | null): Promise<void> {
+    if (!this.map) return;
+    if (!this.mergeUnlocked([...(target ? [target.id] : []), ...roots.map(root => root.id)])) return;
+    this.assertAimReferencesRemain(this.map, new Set(roots.map(root => root.id)), true);
     await this.mapChange(map => {
       const moved = new Set<string>();
+      const branchOf = new Map<string, Set<string>>();
       for (const root of roots) {
-        if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-        map.nodes.find(item => item.id === root.id)!.parentId = target.id;
-        moved.add(root.id);
-        for (const id of descendants(map.nodes, root.id)) moved.add(id);
+        if (target && !canParent(map.nodes, root.id, target.id))
+          throw new Error(t("ui.circular_links_are_not_allowed"));
+        map.nodes.find(item => item.id === root.id)!.parentId = target?.id ?? null;
+        const branch = new Set([root.id, ...descendants(map.nodes, root.id)]);
+        branchOf.set(root.id, branch);
+        for (const id of branch) moved.add(id);
       }
-      map.nodes.find(node => node.id === target.id)!.collapsed = false;
-      // One layout for the moved branches under the target, in the same history entry as the move.
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutDirectionOf(map));
+      if (target) {
+        map.nodes.find(node => node.id === target.id)!.collapsed = false;
+        // One layout for the moved branches under the target, in the same history entry as the move.
+        map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutDirectionOf(map));
+      } else {
+        for (const root of roots)
+          map.nodes = arrangeNewTree(
+            map.nodes,
+            root.id,
+            branchOf.get(root.id)!,
+            this.cardHeightOf,
+            layoutDirectionOf(map)
+          );
+      }
     });
     this.multiSelected.clear();
     this.render();
@@ -5471,24 +5500,41 @@ export class VisualAgentMapView extends ItemView {
     const doc: Document | undefined = this.contentEl.doc ?? this.contentEl.ownerDocument;
     if (!doc?.addEventListener) return;
     const copy = (event: Event): void => this.onClipboardEvent("copy", event as ClipboardEvent);
+    const cut = (event: Event): void => this.onClipboardEvent("cut", event as ClipboardEvent);
     const paste = (event: Event): void => this.onClipboardEvent("paste", event as ClipboardEvent);
     doc.addEventListener("copy", copy);
+    doc.addEventListener("cut", cut);
     doc.addEventListener("paste", paste);
     this.unbindClipboard = () => {
       doc.removeEventListener("copy", copy);
+      doc.removeEventListener("cut", cut);
       doc.removeEventListener("paste", paste);
     };
   }
-  private onClipboardEvent(kind: "copy" | "paste", event: ClipboardEvent): void {
-    if (this.closed || event.defaultPrevented || !this.map || !event.clipboardData) return;
+  private onClipboardEvent(kind: "copy" | "cut" | "paste", event: ClipboardEvent): void {
+    if (this.closed || event.defaultPrevented) return;
+    // Any copy or cut in this window, wherever it happens, drops a pending cut: the clipboard no longer holds it.
+    if (kind !== "paste") {
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
+    if (!this.map || !event.clipboardData) return;
     if (!inClipboardScope(event.target, this.contentEl)) return;
-    if (kind === "copy") this.copyToClipboard(event);
-    else this.pasteFromClipboard(event);
+    if (kind === "paste") this.pasteFromClipboard(event);
+    else this.copyToClipboard(event, kind);
   }
-  private copyToClipboard(event: ClipboardEvent): void {
+  /** True when branches cannot be changed here: integration mode, AIM, the built-in sample, or no saved map. */
+  private clipboardReadOnly(): boolean {
+    return this.builtIn || this.integrationMode || !!this.map?.aim || this.outlineImportTarget().map !== "editable";
+  }
+  private copyToClipboard(event: ClipboardEvent, mode: "copy" | "cut"): void {
     const map = this.map;
     const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
     if (!map || !ids.length || !event.clipboardData) return;
+    if (mode === "cut" && this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_cut_readonly"));
+      return;
+    }
     // Selected text (for example in a preview) is copied as text, not as a branch.
     const selection = this.contentEl.ownerDocument?.getSelection?.();
     if (selection && !selection.isCollapsed && selection.anchorNode && this.contentEl.contains(selection.anchorNode))
@@ -5522,19 +5568,27 @@ export class VisualAgentMapView extends ItemView {
     sessionFor(this.plugin).record({
       clipId: built.payload.clipId,
       serialized,
-      mode: "copy",
+      mode,
       sourceMapPath: this.path,
       sourceMapId: map.id,
       nodeIds: visited,
       notePaths: visited.map(id => map.nodes.find(node => node.id === id)?.path ?? "")
     });
+    this.refreshCutMarks();
   }
   private pasteFromClipboard(event: ClipboardEvent): void {
-    const { vam } = readClipboardData(event.clipboardData);
-    // Without the private format this is plain text: the text paste is a later packet, so the event is left alone.
-    if (!vam) return;
+    const { vam, text } = readClipboardData(event.clipboardData);
+    // A clipboard that is not exactly what this plugin wrote means the cut was overtaken: its mark goes away.
+    if (!sessionFor(this.plugin).match(vam)) {
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
+    }
+    // Without the private format only plain text is left: it becomes an outline under the selected topic.
+    if (!vam) {
+      this.pasteText(event, text);
+      return;
+    }
     event.preventDefault();
-    if (this.integrationMode || this.outlineImportTarget().map !== "editable") {
+    if (this.clipboardReadOnly()) {
       new Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
@@ -5545,6 +5599,46 @@ export class VisualAgentMapView extends ItemView {
     }
     this.enqueue(() => this.pasteBranches(parsed.payload, vam));
   }
+  /** Plain text pasted onto the map: indentation makes the levels. Empty text is left alone; a refusal says why. */
+  private pasteText(event: ClipboardEvent, text: string): void {
+    if (!text.trim()) return;
+    event.preventDefault();
+    if (this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseIndentedText(text);
+    if (!parsed.ok) {
+      new Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
+      return;
+    }
+    if (!parsed.nodes.length) return;
+    const target = this.map?.nodes.find(node => node.id === this.selected) ?? null;
+    // importOutlineIntoMap queues its own write, so it is not wrapped in enqueue.
+    void this.importOutlineIntoMap(
+      { nodes: parsed.nodes, source: null, shallowResearch: false },
+      target ? { kind: "under", parentId: target.id } : { kind: "tree" }
+    ).catch(error => new Notice(errorMessage(error)));
+  }
+  private pasteTextRefusal(reason: IndentedTextRejection, line?: number): string {
+    const at = line ?? 0;
+    switch (reason) {
+      case "too-long":
+        return t("ui.clipboard_text_too_long", PASTE_TEXT_MAX_CHARS);
+      case "too-many-nodes":
+        return t("ui.clipboard_text_too_many", at, OUTLINE_NODE_LIMIT);
+      case "empty-title":
+        return t("ui.clipboard_text_empty_title", at);
+      case "title-too-long":
+        return t("ui.clipboard_text_title_too_long", at, OUTLINE_TITLE_LIMIT);
+      case "vam-note":
+        return t("ui.clipboard_text_vam_note");
+      case "outline":
+        return line ? t("ui.clipboard_text_outline_line", line) : t("ui.clipboard_text_outline");
+      default:
+        return t("ui.clipboard_text_bad_title", at);
+    }
+  }
   /**
    * Pastes under the selected topic (or as new top-level trees). When the clipboard string is exactly what this plugin
    * wrote and its source is still this map, the source notes are duplicated (D2); otherwise only the payload's
@@ -5552,7 +5646,7 @@ export class VisualAgentMapView extends ItemView {
    */
   private async pasteBranches(payload: ClipboardPayload, raw: string): Promise<void> {
     const map = this.map;
-    if (!map || this.builtIn || this.integrationMode || map.aim || this.outlineImportTarget().map !== "editable") {
+    if (!map || this.clipboardReadOnly()) {
       new Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
@@ -5573,10 +5667,36 @@ export class VisualAgentMapView extends ItemView {
         if (clip.parent === null) return !node.parentId || !ids.has(node.parentId);
         return node.parentId === nodeIds[payload.nodes.findIndex(item => item.id === clip.parent)];
       });
+    if (record?.mode === "cut" && source && !intact) {
+      // The source changed after the cut: it is not moved, and the mark goes away; the payload is pasted as a copy.
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
     if (source && intact) {
       const roots = payload.nodes
         .map((clip, index) => (clip.parent === null ? byId.get(nodeIds[index]) : undefined))
         .filter((node): node is MapNode => !!node);
+      if (record?.mode === "cut") {
+        const check = canPasteCut(
+          map.nodes,
+          roots.map(root => root.id),
+          target?.id ?? null
+        );
+        if (!check.ok) {
+          new Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          return;
+        }
+        await this.moveBranches(roots, target);
+        sessionFor(this.plugin).cancelCut();
+        this.refreshCutMarks();
+        const moved = this.map?.nodes.find(node => node.id === roots[0].id);
+        if (moved) {
+          this.selected = moved.id;
+          this.render();
+          this.focusNode(moved);
+        }
+        return;
+      }
       const original = (clipId: string): string => nodeIds[payload.nodes.findIndex(item => item.id === clipId)];
       tops = await this.copyBranches(roots, target, {
         keepTitle: true,
@@ -6797,6 +6917,7 @@ export class VisualAgentMapView extends ItemView {
         cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
       });
     this.cardEls.set(node.id, card);
+    this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(this.nodeDepth(node)));
@@ -7618,7 +7739,35 @@ export class VisualAgentMapView extends ItemView {
       cardLabels.set(card, label);
     }
     label.textContent = text;
-    card.setAttr("aria-labelledby", label.id);
+    const cut = cardCutLabels.get(card);
+    card.setAttr("aria-labelledby", cut ? `${label.id} ${cut.id}` : label.id);
+  }
+  /** Marks or unmarks a card as cut: a dashed outline and a hidden "Cut" part of its accessible name. */
+  private paintCut(card: HTMLElement, id: string, cut = this.cutIds().has(id)): void {
+    const existing = cardCutLabels.get(card);
+    if (cut && !existing) {
+      card.addClass("is-cut");
+      const part = card.createSpan({ cls: "vam-card-label", text: t("ui.clipboard_cut_mark") });
+      part.id = `vam-card-cut-${++cardLabelSequence}`;
+      cardCutLabels.set(card, part);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", `${label.id} ${part.id}`);
+    } else if (!cut && existing) {
+      card.removeClass("is-cut");
+      existing.remove();
+      cardCutLabels.delete(card);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", label.id);
+    }
+  }
+  /** The topics of a pending cut that belongs to this map. */
+  private cutIds(): Set<string> {
+    const record = sessionFor(this.plugin).get();
+    return record?.mode === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : new Set();
+  }
+  private refreshCutMarks(): void {
+    const cut = this.cutIds();
+    for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot():

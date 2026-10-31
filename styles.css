@@ -65,6 +65,7 @@
 .vam-marquee { position: absolute; z-index: 4; pointer-events: none; border: 1px solid var(--interactive-accent); border-radius: 4px; background: color-mix(in srgb, var(--interactive-accent) 10%, transparent); }
 .vam-node.is-marquee-hit { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
 .vam-node.is-marquee-remove { outline: 2px dashed var(--text-error); outline-offset: 3px; opacity: 0.6; }
+.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }
 .vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }
 .vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }

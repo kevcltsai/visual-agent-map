@@ -2125,5 +2125,17 @@ export const zhCN: Record<TranslationKey, string> = {
   // Clipboard: copy and paste of branches inside one map
   "ui.clipboard_copy_failed": "无法把选择的内容复制成分支。",
   "ui.clipboard_paste_readonly": "这张图在这里是只读的，没有粘贴任何内容。",
-  "ui.clipboard_paste_invalid": "剪贴板内容不是有效的分支，没有粘贴任何内容。"
+  "ui.clipboard_paste_invalid": "剪贴板内容不是有效的分支，没有粘贴任何内容。",
+  "ui.clipboard_cut_mark": "已剪切",
+  "ui.clipboard_cut_readonly": "这张图在这里是只读的，没有剪切任何内容。",
+  "ui.clipboard_cut_into_own": "不能把分支粘贴到它自己或它的子主题下面，没有移动任何内容。",
+  "ui.clipboard_cut_missing": "剪切的分支或目标主题已不在图上，没有移动任何内容。",
+  "ui.clipboard_text_too_long": "粘贴的文字超过 {0} 个字符，没有粘贴任何内容。",
+  "ui.clipboard_text_too_many": "第 {0} 行：粘贴的文字超过 {1} 个主题，没有粘贴任何内容。",
+  "ui.clipboard_text_empty_title": "第 {0} 行：这一行没有标题文字，没有粘贴任何内容。",
+  "ui.clipboard_text_title_too_long": "第 {0} 行：标题最多 {1} 个字符，没有粘贴任何内容。",
+  "ui.clipboard_text_bad_title": "第 {0} 行：这个标题含有不能用在标题的字符或标记，没有粘贴任何内容。",
+  "ui.clipboard_text_vam_note": "这看起来是 Visual Agent Map 的笔记或图文件，不是大纲，没有粘贴任何内容。",
+  "ui.clipboard_text_outline_line": "第 {0} 行：粘贴的大纲不合法，没有粘贴任何内容。",
+  "ui.clipboard_text_outline": "粘贴的大纲不合法，没有粘贴任何内容。"
 };

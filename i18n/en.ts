@@ -2291,7 +2291,21 @@ export const en = {
   // Clipboard: copy and paste of branches inside one map
   "ui.clipboard_copy_failed": "Could not copy the selection as a branch.",
   "ui.clipboard_paste_readonly": "This map is read-only here, so nothing was pasted.",
-  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted."
+  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted.",
+  "ui.clipboard_cut_mark": "Cut",
+  "ui.clipboard_cut_readonly": "This map is read-only here, so nothing was cut.",
+  "ui.clipboard_cut_into_own": "A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.",
+  "ui.clipboard_cut_missing": "The cut branches or the target topic are no longer on the map, so nothing was moved.",
+  "ui.clipboard_text_too_long": "The pasted text is longer than {0} characters, so nothing was pasted.",
+  "ui.clipboard_text_too_many": "Line {0}: the pasted text has more than {1} topics, so nothing was pasted.",
+  "ui.clipboard_text_empty_title": "Line {0}: this line has no title text, so nothing was pasted.",
+  "ui.clipboard_text_title_too_long": "Line {0}: a title can be at most {1} characters, so nothing was pasted.",
+  "ui.clipboard_text_bad_title":
+    "Line {0}: this title has characters or markup that cannot be used in a title, so nothing was pasted.",
+  "ui.clipboard_text_vam_note":
+    "This looks like a Visual Agent Map note or map file, not an outline, so nothing was pasted.",
+  "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
+  "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted."
 } as const;
 
 export type TranslationKey = keyof typeof en;

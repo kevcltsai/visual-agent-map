@@ -2139,7 +2139,19 @@ var en = {
   // Clipboard: copy and paste of branches inside one map
   "ui.clipboard_copy_failed": "Could not copy the selection as a branch.",
   "ui.clipboard_paste_readonly": "This map is read-only here, so nothing was pasted.",
-  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted."
+  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted.",
+  "ui.clipboard_cut_mark": "Cut",
+  "ui.clipboard_cut_readonly": "This map is read-only here, so nothing was cut.",
+  "ui.clipboard_cut_into_own": "A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.",
+  "ui.clipboard_cut_missing": "The cut branches or the target topic are no longer on the map, so nothing was moved.",
+  "ui.clipboard_text_too_long": "The pasted text is longer than {0} characters, so nothing was pasted.",
+  "ui.clipboard_text_too_many": "Line {0}: the pasted text has more than {1} topics, so nothing was pasted.",
+  "ui.clipboard_text_empty_title": "Line {0}: this line has no title text, so nothing was pasted.",
+  "ui.clipboard_text_title_too_long": "Line {0}: a title can be at most {1} characters, so nothing was pasted.",
+  "ui.clipboard_text_bad_title": "Line {0}: this title has characters or markup that cannot be used in a title, so nothing was pasted.",
+  "ui.clipboard_text_vam_note": "This looks like a Visual Agent Map note or map file, not an outline, so nothing was pasted.",
+  "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
+  "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted."
 };
 
 // i18n/zh-CN.ts
@@ -4178,7 +4190,19 @@ var zhCN = {
   // Clipboard: copy and paste of branches inside one map
   "ui.clipboard_copy_failed": "\u65E0\u6CD5\u628A\u9009\u62E9\u7684\u5185\u5BB9\u590D\u5236\u6210\u5206\u652F\u3002",
   "ui.clipboard_paste_readonly": "\u8FD9\u5F20\u56FE\u5728\u8FD9\u91CC\u662F\u53EA\u8BFB\u7684\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
-  "ui.clipboard_paste_invalid": "\u526A\u8D34\u677F\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002"
+  "ui.clipboard_paste_invalid": "\u526A\u8D34\u677F\u5185\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_mark": "\u5DF2\u526A\u5207",
+  "ui.clipboard_cut_readonly": "\u8FD9\u5F20\u56FE\u5728\u8FD9\u91CC\u662F\u53EA\u8BFB\u7684\uFF0C\u6CA1\u6709\u526A\u5207\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_into_own": "\u4E0D\u80FD\u628A\u5206\u652F\u7C98\u8D34\u5230\u5B83\u81EA\u5DF1\u6216\u5B83\u7684\u5B50\u4E3B\u9898\u4E0B\u9762\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_cut_missing": "\u526A\u5207\u7684\u5206\u652F\u6216\u76EE\u6807\u4E3B\u9898\u5DF2\u4E0D\u5728\u56FE\u4E0A\uFF0C\u6CA1\u6709\u79FB\u52A8\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_too_long": "\u7C98\u8D34\u7684\u6587\u5B57\u8D85\u8FC7 {0} \u4E2A\u5B57\u7B26\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_too_many": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u6587\u5B57\u8D85\u8FC7 {1} \u4E2A\u4E3B\u9898\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_empty_title": "\u7B2C {0} \u884C\uFF1A\u8FD9\u4E00\u884C\u6CA1\u6709\u6807\u9898\u6587\u5B57\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_title_too_long": "\u7B2C {0} \u884C\uFF1A\u6807\u9898\u6700\u591A {1} \u4E2A\u5B57\u7B26\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_bad_title": "\u7B2C {0} \u884C\uFF1A\u8FD9\u4E2A\u6807\u9898\u542B\u6709\u4E0D\u80FD\u7528\u5728\u6807\u9898\u7684\u5B57\u7B26\u6216\u6807\u8BB0\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_vam_note": "\u8FD9\u770B\u8D77\u6765\u662F Visual Agent Map \u7684\u7B14\u8BB0\u6216\u56FE\u6587\u4EF6\uFF0C\u4E0D\u662F\u5927\u7EB2\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.clipboard_text_outline": "\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -6217,7 +6241,19 @@ var zhTW = {
   // Clipboard: copy and paste of branches inside one map
   "ui.clipboard_copy_failed": "\u7121\u6CD5\u628A\u9078\u53D6\u7684\u5167\u5BB9\u8907\u88FD\u6210\u5206\u652F\u3002",
   "ui.clipboard_paste_readonly": "\u9019\u5F35\u5716\u5728\u9019\u88E1\u662F\u552F\u8B80\u7684\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
-  "ui.clipboard_paste_invalid": "\u526A\u8CBC\u7C3F\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002"
+  "ui.clipboard_paste_invalid": "\u526A\u8CBC\u7C3F\u5167\u5BB9\u4E0D\u662F\u6709\u6548\u7684\u5206\u652F\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_mark": "\u5DF2\u526A\u4E0B",
+  "ui.clipboard_cut_readonly": "\u9019\u5F35\u5716\u5728\u9019\u88E1\u662F\u552F\u8B80\u7684\uFF0C\u6C92\u6709\u526A\u4E0B\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_into_own": "\u4E0D\u80FD\u628A\u5206\u652F\u8CBC\u5230\u5B83\u81EA\u5DF1\u6216\u5B83\u7684\u5B50\u4E3B\u984C\u5E95\u4E0B\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_cut_missing": "\u526A\u4E0B\u7684\u5206\u652F\u6216\u76EE\u6A19\u4E3B\u984C\u5DF2\u4E0D\u5728\u5716\u4E0A\uFF0C\u6C92\u6709\u79FB\u52D5\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_too_long": "\u8CBC\u4E0A\u7684\u6587\u5B57\u8D85\u904E {0} \u500B\u5B57\u5143\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_too_many": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u6587\u5B57\u8D85\u904E {1} \u500B\u4E3B\u984C\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_empty_title": "\u7B2C {0} \u884C\uFF1A\u9019\u4E00\u884C\u6C92\u6709\u6A19\u984C\u6587\u5B57\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_title_too_long": "\u7B2C {0} \u884C\uFF1A\u6A19\u984C\u6700\u591A {1} \u500B\u5B57\u5143\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_bad_title": "\u7B2C {0} \u884C\uFF1A\u9019\u500B\u6A19\u984C\u542B\u6709\u4E0D\u80FD\u7528\u5728\u6A19\u984C\u7684\u5B57\u5143\u6216\u6A19\u8A18\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_vam_note": "\u9019\u770B\u8D77\u4F86\u662F Visual Agent Map \u7684\u7B46\u8A18\u6216\u5716\u6A94\uFF0C\u4E0D\u662F\u5927\u7DB1\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.clipboard_text_outline": "\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002"
 };
 
 // i18n/languages.ts
@@ -25015,14 +25051,14 @@ var CodexAppServerRuntime = class {
     const threadId = typeof ((_d = started.thread) == null ? void 0 : _d.id) === "string" ? started.thread.id : "";
     if (!threadId) throw new Error(t("ui.codex_app_server_did_not_create_a_thread"));
     let timedOut = false, interruptRequested = false;
-    const completed = new Promise((resolve, reject) => {
+    const completed = new Promise((resolve, reject2) => {
       var _a3, _b3;
       const timeout = window.setTimeout(() => {
         var _a4;
         this.turns.delete(threadId);
         timedOut = true;
         interrupt(5e3, t("error.ai_task_stop_after_timeout_failed"));
-        reject(
+        reject2(
           new Error(
             (_a4 = controls == null ? void 0 : controls.timeoutMessage) != null ? _a4 : (controls == null ? void 0 : controls.timeoutMs) ? t("ui.ai_task_exceeded_0_minutes", Math.ceil(controls.timeoutMs / 6e4)) : t("ui.the_ai_task_exceeded_3_minutes_vam_attempts_to_interrupt_it")
           )
@@ -25032,7 +25068,7 @@ var CodexAppServerRuntime = class {
         messages: [],
         visibleMessages: /* @__PURE__ */ new Map(),
         resolve,
-        reject,
+        reject: reject2,
         timeout,
         turnId: "",
         searches: 0,
@@ -25347,20 +25383,20 @@ var CodexAppServerRuntime = class {
   }
   request(method, params, timeoutMs = CONTROL_TIMEOUT_MS) {
     const id = this.nextId++;
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       const timeout = window.setTimeout(() => {
         this.pending.delete(id);
-        reject(
+        reject2(
           new Error(t("ui.codex_app_server_0_did_not_respond_within_1_seconds", method, Math.ceil(timeoutMs / 1e3)))
         );
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timeout });
+      this.pending.set(id, { resolve, reject: reject2, timeout });
       try {
         this.send({ id, method, params });
       } catch (error) {
         window.clearTimeout(timeout);
         this.pending.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject2(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -26016,7 +26052,7 @@ var ClaudeCodeCliRuntime = class {
       } catch (e) {
       }
     }
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       var _a3, _b3, _c2, _d2, _e2, _f2;
       let child;
       try {
@@ -26027,7 +26063,7 @@ var ClaudeCodeCliRuntime = class {
           windowsHide: true
         });
       } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+        reject2(error instanceof Error ? error : new Error(String(error)));
         return;
       }
       let stdout = "", stderr = "", settled = false, accepted = false, inputOpen = Boolean(controls.onSteer || image || warm);
@@ -26101,7 +26137,7 @@ var ClaudeCodeCliRuntime = class {
         settled = true;
         cleanup();
         if (observer) reportMilestones(observer.milestones());
-        if (error) reject(error);
+        if (error) reject2(error);
         else resolve(result != null ? result : "");
       };
       const markAccepted = () => {
@@ -26182,7 +26218,7 @@ var ClaudeCodeCliRuntime = class {
           cleanup();
           this.streamUnsupported = true;
           (_b4 = (_a4 = this.options).onLog) == null ? void 0 : _b4.call(_a4, "warn", t("log.claude_stream_fallback"));
-          this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject);
+          this.run(prompt, model, effort, outputSchema, controls, true).then(resolve, reject2);
           return;
         }
         if (!streaming && controls.onMilestones) {
@@ -27785,7 +27821,7 @@ var AiTaskService = class {
         }
       };
       const replaced = new Promise(
-        (_resolve, reject) => controller.signal.addEventListener("abort", () => reject(cancelled()), {
+        (_resolve, reject2) => controller.signal.addEventListener("abort", () => reject2(cancelled()), {
           once: true
         })
       );
@@ -29511,6 +29547,92 @@ function planPaste(payload) {
     return { ok: true, items, relations, droppedRelations };
   } catch (e) {
     return { ok: false, reason: "bad-tree" };
+  }
+}
+function canPasteCut(nodes, rootIds, targetId) {
+  var _a2;
+  if (!rootIds.length) return { ok: false, reason: "nothing-selected" };
+  if (targetId === null) return { ok: true };
+  const parentOf = new Map(nodes.map((n) => [n.id, n.parentId]));
+  if (!parentOf.has(targetId)) return { ok: false, reason: "unknown-target" };
+  const roots = new Set(rootIds);
+  const visited = /* @__PURE__ */ new Set();
+  let current = targetId;
+  while (current !== null && !visited.has(current)) {
+    if (roots.has(current)) return { ok: false, reason: "into-own-branch" };
+    visited.add(current);
+    current = (_a2 = parentOf.get(current)) != null ? _a2 : null;
+  }
+  return { ok: true };
+}
+
+// experiences/visual-map/clipboard-text.ts
+var PASTE_TEXT_MAX_CHARS = 1e5;
+var TAB_COLUMNS = 4;
+var MARKDOWN_HEADING = /^ {0,3}#{1,6}[ \t]+\S/m;
+var LIST_MARKER = /^(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$)/;
+var CHECKBOX = /^\[[ xX]\](?:[ \t]+|$)/;
+var TITLE_FORBIDDEN2 = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+var reject = (reason, line) => line === void 0 ? { ok: false, reason } : { ok: false, reason, line };
+function splitIndent(line) {
+  let indent = 0;
+  let index = 0;
+  for (; index < line.length; index++) {
+    if (line[index] === " ") indent++;
+    else if (line[index] === "	") indent += TAB_COLUMNS;
+    else break;
+  }
+  return { indent, rest: line.slice(index) };
+}
+function parseIndentedText(text11) {
+  try {
+    if (typeof text11 !== "string") return reject("bad-title");
+    if (text11.length > PASTE_TEXT_MAX_CHARS) return reject("too-long");
+    const source = text11.charCodeAt(0) === 65279 ? text11.slice(1) : text11;
+    if (!source.trim()) return { ok: true, nodes: [] };
+    if (source.includes("<!-- visual-agent-map:")) return reject("vam-note");
+    if (MARKDOWN_HEADING.test(source)) {
+      const parsed = parseOutline(source);
+      if (parsed.errors.length) {
+        const first = parsed.errors[0];
+        const reason = first.key === "ui.outline_error_vam_note" ? "vam-note" : "outline";
+        return reject(reason, first.line > 0 ? first.line : void 0);
+      }
+      return { ok: true, nodes: parsed.nodes };
+    }
+    const nodes = [];
+    const stack = [];
+    const lines = source.split(/\r\n?|\n/);
+    for (let position = 0; position < lines.length; position++) {
+      const lineNumber = position + 1;
+      const { indent, rest } = splitIndent(lines[position]);
+      if (!rest.trim()) continue;
+      const marker5 = LIST_MARKER.exec(rest);
+      let body = marker5 ? rest.slice(marker5[0].length) : rest;
+      const box = marker5 ? CHECKBOX.exec(body) : null;
+      if (box) body = body.slice(box[0].length);
+      const title = outlineTitle(body);
+      if (!title) return reject("empty-title", lineNumber);
+      if (TITLE_FORBIDDEN2.test(title)) return reject("bad-title", lineNumber);
+      if ([...title].length > OUTLINE_TITLE_LIMIT) return reject("title-too-long", lineNumber);
+      const problem = titleProblem(title);
+      if (problem) return reject(`title-${problem}`, lineNumber);
+      if (nodes.length >= OUTLINE_NODE_LIMIT) return reject("too-many-nodes", lineNumber);
+      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+      const parent = stack.length ? stack[stack.length - 1].node : null;
+      const node = {
+        index: nodes.length,
+        title,
+        level: parent ? parent.level + 1 : 0,
+        parent: parent ? parent.index : null,
+        line: lineNumber
+      };
+      nodes.push(node);
+      stack.push({ indent, node });
+    }
+    return { ok: true, nodes };
+  } catch (e) {
+    return reject("bad-title");
   }
 }
 
@@ -33389,23 +33511,23 @@ function parseStructureReview(raw, tree, language2 = "en") {
     if (kind === "strengthen" && !title) throw invalid2(locale, `#${index + 1} title`);
     if (kind === "move" && !newParentId) throw invalid2(locale, `#${index + 1} newParentId`);
     if (kind === "merge" && !mergeIntoId) throw invalid2(locale, `#${index + 1} mergeIntoId`);
-    const reject = (code) => {
+    const reject2 = (code) => {
       rejected.push({ index, code });
     };
     if (kind !== "strengthen" && title || kind !== "move" && newParentId || kind !== "merge" && mergeIntoId)
-      return reject("stray_field");
+      return reject2("stray_field");
     const target = byId.get(targetId);
-    if (!target) return reject("unknown_target");
-    if (kind !== "strengthen" && target.parentId === null) return reject("root_target");
+    if (!target) return reject2("unknown_target");
+    if (kind !== "strengthen" && target.parentId === null) return reject2("root_target");
     if (kind === "move" || kind === "merge") {
       const destinationId = kind === "move" ? newParentId : mergeIntoId;
       const destination = byId.get(destinationId);
-      if (!destination) return reject(kind === "move" ? "unknown_parent" : "unknown_merge_target");
-      if (destinationId === targetId || descendantIds(tree, targetId).has(destinationId)) return reject("cycle");
-      if (kind === "move" && target.parentId === destinationId) return reject("noop");
+      if (!destination) return reject2(kind === "move" ? "unknown_parent" : "unknown_merge_target");
+      if (destinationId === targetId || descendantIds(tree, targetId).has(destinationId)) return reject2("cycle");
+      if (kind === "move" && target.parentId === destinationId) return reject2("noop");
     }
     const key2 = `${kind}:${targetId}`;
-    if (seen.has(key2)) return reject("duplicate");
+    if (seen.has(key2)) return reject2("duplicate");
     seen.add(key2);
     suggestions.push({
       kind,
@@ -37992,7 +38114,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
     throwIfAborted(signal);
     const subscriber = Symbol("Planner request owner");
     entry.subscribers.add(subscriber);
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       let settled = false;
       const cleanup = () => {
         signal == null ? void 0 : signal.removeEventListener("abort", onAbort);
@@ -38008,7 +38130,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
         cleanup();
         const error = new Error("The operation was aborted.");
         error.name = "AbortError";
-        reject(error);
+        reject2(error);
       };
       signal == null ? void 0 : signal.addEventListener("abort", onAbort, { once: true });
       entry.promise.then(
@@ -38022,7 +38144,7 @@ ${requestId}`, fingerprint2 = JSON.stringify({ parentNodeId, parentBranchId, mod
           if (settled) return;
           settled = true;
           cleanup();
-          reject(error instanceof Error ? error : new Error(String(error)));
+          reject2(error instanceof Error ? error : new Error(String(error)));
         }
       );
       if (signal == null ? void 0 : signal.aborted) onAbort();
@@ -40817,6 +40939,7 @@ var MERGE_DONE_NOTICE_MS = 15e3;
 var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
+var cardCutLabels = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
@@ -42906,10 +43029,10 @@ ${request.requirements}` : preset.text,
       }).then(
         () => true
       );
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject2) => {
       var _a2;
       const run = (work) => {
-        write(work).then(() => resolve(true), reject);
+        write(work).then(() => resolve(true), reject2);
       };
       const node = nodeOf(suggestion.targetId);
       if (suggestion.kind === "reduce") {
@@ -45156,23 +45279,42 @@ ${request.requirements}` : preset.text,
         return (_b2 = (_a2 = this.notes.get(target.id)) == null ? void 0 : _a2.title) != null ? _b2 : target.path;
       },
       (target) => copyNodes || roots.every((root) => canParent(this.map.nodes, root.id, target.id)),
-      (target) => this.enqueue(() => copyNodes ? this.copySelected(target) : this.moveSelected(target))
+      (target) => this.enqueue(() => copyNodes ? this.copySelected(target) : this.moveBranches(this.selectedRoots(), target))
     ).open();
   }
-  async moveSelected(target) {
-    const roots = this.selectedRoots();
-    if (!this.mergeUnlocked([target.id, ...roots.map((root) => root.id)])) return;
+  /**
+   * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
+   * its own descendants; the moved branches are laid out once, in the same entry.
+   */
+  async moveBranches(roots, target) {
+    if (!this.map) return;
+    if (!this.mergeUnlocked([...target ? [target.id] : [], ...roots.map((root) => root.id)])) return;
     this.assertAimReferencesRemain(this.map, new Set(roots.map((root) => root.id)), true);
     await this.mapChange((map) => {
+      var _a2;
       const moved = /* @__PURE__ */ new Set();
+      const branchOf = /* @__PURE__ */ new Map();
       for (const root of roots) {
-        if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-        map.nodes.find((item) => item.id === root.id).parentId = target.id;
-        moved.add(root.id);
-        for (const id of descendants(map.nodes, root.id)) moved.add(id);
+        if (target && !canParent(map.nodes, root.id, target.id))
+          throw new Error(t("ui.circular_links_are_not_allowed"));
+        map.nodes.find((item) => item.id === root.id).parentId = (_a2 = target == null ? void 0 : target.id) != null ? _a2 : null;
+        const branch = /* @__PURE__ */ new Set([root.id, ...descendants(map.nodes, root.id)]);
+        branchOf.set(root.id, branch);
+        for (const id of branch) moved.add(id);
       }
-      map.nodes.find((node) => node.id === target.id).collapsed = false;
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, void 0, layoutDirectionOf(map));
+      if (target) {
+        map.nodes.find((node) => node.id === target.id).collapsed = false;
+        map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, void 0, layoutDirectionOf(map));
+      } else {
+        for (const root of roots)
+          map.nodes = arrangeNewTree(
+            map.nodes,
+            root.id,
+            branchOf.get(root.id),
+            this.cardHeightOf,
+            layoutDirectionOf(map)
+          );
+      }
     });
     this.multiSelected.clear();
     this.render();
@@ -45379,25 +45521,42 @@ ${request.requirements}` : preset.text,
     const doc = (_b2 = this.contentEl.doc) != null ? _b2 : this.contentEl.ownerDocument;
     if (!(doc == null ? void 0 : doc.addEventListener)) return;
     const copy = (event) => this.onClipboardEvent("copy", event);
+    const cut = (event) => this.onClipboardEvent("cut", event);
     const paste = (event) => this.onClipboardEvent("paste", event);
     doc.addEventListener("copy", copy);
+    doc.addEventListener("cut", cut);
     doc.addEventListener("paste", paste);
     this.unbindClipboard = () => {
       doc.removeEventListener("copy", copy);
+      doc.removeEventListener("cut", cut);
       doc.removeEventListener("paste", paste);
     };
   }
   onClipboardEvent(kind, event) {
-    if (this.closed || event.defaultPrevented || !this.map || !event.clipboardData) return;
+    if (this.closed || event.defaultPrevented) return;
+    if (kind !== "paste") {
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
+    if (!this.map || !event.clipboardData) return;
     if (!inClipboardScope(event.target, this.contentEl)) return;
-    if (kind === "copy") this.copyToClipboard(event);
-    else this.pasteFromClipboard(event);
+    if (kind === "paste") this.pasteFromClipboard(event);
+    else this.copyToClipboard(event, kind);
   }
-  copyToClipboard(event) {
+  /** True when branches cannot be changed here: integration mode, AIM, the built-in sample, or no saved map. */
+  clipboardReadOnly() {
+    var _a2;
+    return this.builtIn || this.integrationMode || !!((_a2 = this.map) == null ? void 0 : _a2.aim) || this.outlineImportTarget().map !== "editable";
+  }
+  copyToClipboard(event, mode) {
     var _a2, _b2, _c;
     const map = this.map;
     const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
     if (!map || !ids.length || !event.clipboardData) return;
+    if (mode === "cut" && this.clipboardReadOnly()) {
+      new import_obsidian31.Notice(t("ui.clipboard_cut_readonly"));
+      return;
+    }
     const selection = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.getSelection) == null ? void 0 : _b2.call(_a2);
     if (selection && !selection.isCollapsed && selection.anchorNode && this.contentEl.contains(selection.anchorNode))
       return;
@@ -45431,7 +45590,7 @@ ${request.requirements}` : preset.text,
     sessionFor(this.plugin).record({
       clipId: built.payload.clipId,
       serialized,
-      mode: "copy",
+      mode,
       sourceMapPath: this.path,
       sourceMapId: map.id,
       nodeIds: visited,
@@ -45440,12 +45599,19 @@ ${request.requirements}` : preset.text,
         return (_b3 = (_a3 = map.nodes.find((node) => node.id === id)) == null ? void 0 : _a3.path) != null ? _b3 : "";
       })
     });
+    this.refreshCutMarks();
   }
   pasteFromClipboard(event) {
-    const { vam } = readClipboardData(event.clipboardData);
-    if (!vam) return;
+    const { vam, text: text11 } = readClipboardData(event.clipboardData);
+    if (!sessionFor(this.plugin).match(vam)) {
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
+    }
+    if (!vam) {
+      this.pasteText(event, text11);
+      return;
+    }
     event.preventDefault();
-    if (this.integrationMode || this.outlineImportTarget().map !== "editable") {
+    if (this.clipboardReadOnly()) {
       new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
@@ -45456,15 +45622,55 @@ ${request.requirements}` : preset.text,
     }
     this.enqueue(() => this.pasteBranches(parsed.payload, vam));
   }
+  /** Plain text pasted onto the map: indentation makes the levels. Empty text is left alone; a refusal says why. */
+  pasteText(event, text11) {
+    var _a2, _b2;
+    if (!text11.trim()) return;
+    event.preventDefault();
+    if (this.clipboardReadOnly()) {
+      new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseIndentedText(text11);
+    if (!parsed.ok) {
+      new import_obsidian31.Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
+      return;
+    }
+    if (!parsed.nodes.length) return;
+    const target = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === this.selected)) != null ? _b2 : null;
+    void this.importOutlineIntoMap(
+      { nodes: parsed.nodes, source: null, shallowResearch: false },
+      target ? { kind: "under", parentId: target.id } : { kind: "tree" }
+    ).catch((error) => new import_obsidian31.Notice(errorMessage(error)));
+  }
+  pasteTextRefusal(reason, line) {
+    const at = line != null ? line : 0;
+    switch (reason) {
+      case "too-long":
+        return t("ui.clipboard_text_too_long", PASTE_TEXT_MAX_CHARS);
+      case "too-many-nodes":
+        return t("ui.clipboard_text_too_many", at, OUTLINE_NODE_LIMIT);
+      case "empty-title":
+        return t("ui.clipboard_text_empty_title", at);
+      case "title-too-long":
+        return t("ui.clipboard_text_title_too_long", at, OUTLINE_TITLE_LIMIT);
+      case "vam-note":
+        return t("ui.clipboard_text_vam_note");
+      case "outline":
+        return line ? t("ui.clipboard_text_outline_line", line) : t("ui.clipboard_text_outline");
+      default:
+        return t("ui.clipboard_text_bad_title", at);
+    }
+  }
   /**
    * Pastes under the selected topic (or as new top-level trees). When the clipboard string is exactly what this plugin
    * wrote and its source is still this map, the source notes are duplicated (D2); otherwise only the payload's
    * whitelisted fields make new notes.
    */
   async pasteBranches(payload, raw) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d, _e;
     const map = this.map;
-    if (!map || this.builtIn || this.integrationMode || map.aim || this.outlineImportTarget().map !== "editable") {
+    if (!map || this.clipboardReadOnly()) {
       new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
@@ -45481,8 +45687,33 @@ ${request.requirements}` : preset.text,
       if (clip4.parent === null) return !node.parentId || !ids.has(node.parentId);
       return node.parentId === nodeIds[payload.nodes.findIndex((item) => item.id === clip4.parent)];
     });
+    if ((record == null ? void 0 : record.mode) === "cut" && source && !intact) {
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
     if (source && intact) {
       const roots = payload.nodes.map((clip4, index) => clip4.parent === null ? byId.get(nodeIds[index]) : void 0).filter((node) => !!node);
+      if ((record == null ? void 0 : record.mode) === "cut") {
+        const check = canPasteCut(
+          map.nodes,
+          roots.map((root) => root.id),
+          (_c = target == null ? void 0 : target.id) != null ? _c : null
+        );
+        if (!check.ok) {
+          new import_obsidian31.Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          return;
+        }
+        await this.moveBranches(roots, target);
+        sessionFor(this.plugin).cancelCut();
+        this.refreshCutMarks();
+        const moved = (_d = this.map) == null ? void 0 : _d.nodes.find((node) => node.id === roots[0].id);
+        if (moved) {
+          this.selected = moved.id;
+          this.render();
+          this.focusNode(moved);
+        }
+        return;
+      }
       const original = (clipId) => nodeIds[payload.nodes.findIndex((item) => item.id === clipId)];
       tops = await this.copyBranches(roots, target, {
         keepTitle: true,
@@ -45524,7 +45755,7 @@ ${request.requirements}` : preset.text,
           });
       });
     }
-    const placed = (_c = this.map) == null ? void 0 : _c.nodes.find((node) => {
+    const placed = (_e = this.map) == null ? void 0 : _e.nodes.find((node) => {
       var _a3;
       return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
     });
@@ -46629,6 +46860,7 @@ ${request.requirements}` : preset.text,
       cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
     });
     this.cardEls.set(node.id, card);
+    this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(this.nodeDepth(node)));
@@ -47349,7 +47581,35 @@ ${request.requirements}` : preset.text,
       cardLabels.set(card, label);
     }
     label.textContent = text11;
-    card.setAttr("aria-labelledby", label.id);
+    const cut = cardCutLabels.get(card);
+    card.setAttr("aria-labelledby", cut ? `${label.id} ${cut.id}` : label.id);
+  }
+  /** Marks or unmarks a card as cut: a dashed outline and a hidden "Cut" part of its accessible name. */
+  paintCut(card, id, cut = this.cutIds().has(id)) {
+    const existing = cardCutLabels.get(card);
+    if (cut && !existing) {
+      card.addClass("is-cut");
+      const part = card.createSpan({ cls: "vam-card-label", text: t("ui.clipboard_cut_mark") });
+      part.id = `vam-card-cut-${++cardLabelSequence}`;
+      cardCutLabels.set(card, part);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", `${label.id} ${part.id}`);
+    } else if (!cut && existing) {
+      card.removeClass("is-cut");
+      existing.remove();
+      cardCutLabels.delete(card);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", label.id);
+    }
+  }
+  /** The topics of a pending cut that belongs to this map. */
+  cutIds() {
+    const record = sessionFor(this.plugin).get();
+    return (record == null ? void 0 : record.mode) === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : /* @__PURE__ */ new Set();
+  }
+  refreshCutMarks() {
+    const cut = this.cutIds();
+    for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot() {
@@ -53612,9 +53872,9 @@ var import_node_path2 = require("node:path");
 async function fitImageForInput(dataUrl, limits, signal) {
   if (!limits) return dataUrl;
   const image = createEl("img");
-  await new Promise((resolve, reject) => {
+  await new Promise((resolve, reject2) => {
     image.onload = () => resolve();
-    image.onerror = () => reject(new Error(t("ui.context_ai_image_unavailable")));
+    image.onerror = () => reject2(new Error(t("ui.context_ai_image_unavailable")));
     image.src = dataUrl;
   });
   if (signal.aborted) throw new Error(t("ui.ai_task_cancelled"));
@@ -55045,15 +55305,15 @@ function assertCurrent(ticket) {
 }
 var isStaleBuild = (error) => (error == null ? void 0 : error.name) === "StaleBuildError";
 function pause(ticket, ms) {
-  return new Promise((resolve, reject) => {
-    if (!ticket.isCurrent()) return reject(new StaleBuildError());
+  return new Promise((resolve, reject2) => {
+    if (!ticket.isCurrent()) return reject2(new StaleBuildError());
     const timer = window.setTimeout(() => {
       ticket.signal.removeEventListener("abort", onAbort);
       resolve();
     }, ms);
     const onAbort = () => {
       window.clearTimeout(timer);
-      reject(new StaleBuildError());
+      reject2(new StaleBuildError());
     };
     ticket.signal.addEventListener("abort", onAbort, { once: true });
   });
@@ -55386,7 +55646,7 @@ function shareViewerUiExtras(languages) {
 
 // experiences/sharing/viewer-bundle.generated.ts
 var SHARE_VIEWER_JS = '(()=>{function Ct(t){var r;let i=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...i.filter(l=>l!==t.parentId)]}function Rt(t,i){let r=new Set,l=[i];for(;l.length;){let s=l.pop();for(let d of t)d.parentId===s&&d.id!==i&&!r.has(d.id)&&(r.add(d.id),l.push(d.id))}return r}function nt(t,i){let r=new Map(t.map(d=>[d.id,d])),l=d=>{let p=0,c=new Set([d.id]);for(let m=d.parentId;m&&r.has(m)&&!c.has(m);m=r.get(m).parentId)c.add(m),p++;return p},s=new Set(t.map(d=>d.parentId).filter(d=>!!d&&r.has(d)));for(let d of t)s.has(d.id)&&(d.collapsed=i===null?!1:l(d)>=i)}var vn=360;var rt=24,En=180;var An=t=>t==="left"?-1:1;var Tn=(t,i)=>{let r=t==null?void 0:t(i);return r!==void 0&&Number.isFinite(r)&&r>0?r:En};function wn(t,i,r,l,s=!1,d,p="right"){var h,se;let c=An(p),m=new Map(t.map(b=>[b.id,b])),y=new Map,f=new Map,v=(b,M,O)=>{var C;return b.set(M,[...(C=b.get(M))!=null?C:[],O])};for(let b of t){if(!b.parentId)continue;let M=b.aimKind!=="question"&&((h=b.aimConvergesFromNodeIds)!=null&&h.length)?Ct(b).map(C=>m.get(C)):[],O=(se=M[0])==null?void 0:se.parentId;O&&m.has(O)&&M.every(C=>C&&C.parentId===O)?v(f,O,b):v(y,b.parentId,b)}let A=new Map,I=b=>{var M;return s&&b.collapsed?[]:(M=y.get(b.id))!=null?M:[]},W=b=>{var M;return s&&b.collapsed?[]:((M=f.get(b.id))!=null?M:[]).filter(O=>{var C;return!(s&&((C=m.get(O.parentId))!=null&&C.collapsed))})},k=b=>Tn(d,b.id),Q=new Map,ie=new Map,oe=b=>b.reduce((M,O)=>M+Q.get(O.id),0)+Math.max(0,b.length-1)*rt,ae=b=>{let M=I(b),O=W(b);for(let C of[...M,...O])ae(C);Q.set(b.id,Math.max(k(b),oe(M),oe(O))),ie.set(b.id,1+Math.max(0,...M.map(C=>ie.get(C.id))))},De=(b,M,O)=>{let C=I(b),j=W(b),xe=Q.get(b.id),ve=($,N)=>{let Y=O+(xe-oe($))/2;return $.map(ee=>{let fe=De(ee,N,Y);return Y+=Q.get(ee.id)+rt,fe})},K=ve(C,M+1),Ee=ve(j,M+ie.get(b.id)),V=K.length?C:j,le=K.length?K:Ee,J=k(b),X=O+(xe-J)/2;if(le.length){let $=le[0]+k(V[0])/2,N=le[le.length-1]+k(V[V.length-1])/2;X=($+N)/2-J/2}return A.set(b.id,{x:r+c*M*vn,y:l+X}),X},be=0;for(let b of i)ae(b),De(b,0,be),be+=Q.get(b.id)+rt;return A}function It(t,i,r,l="right"){let s=i!=null&&i.size?t.filter(c=>!i.has(c.id)):t,d=s.filter(c=>!c.parentId),p=wn(s,d,80,80,!0,r,l);return t.map(c=>({...c,...p.get(c.id)}))}function Ot(t,i){return!i||!(i.bottom>i.top)?0:Math.max(0,Math.ceil(i.bottom-t))+8}function Dt(t,i,r,l){let s=t.zoom;return{zoom:s,x:r.width/2-i.x*s,y:l+(r.height-l)/2-i.y*s}}function Ht(t,i,r,l=1.2){let s=Math.max(1,i.height-r),d=t.maxX-t.minX,p=t.maxY-t.minY,c=Math.max(.25,Math.min(l,(i.width-80)/d,(s-80)/p));return{zoom:c,x:(i.width-d*c)/2-t.minX*c,y:r+(s-p*c)/2-t.minY*c}}var _t={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated."};function it(t){let i=3735928559,r=1103547991;for(let l=0;l<t.length;l++){let s=t.charCodeAt(l);i=Math.imul(i^s,2654435761),r=Math.imul(r^s,1597334677)}return i=Math.imul(i^i>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(i^i>>>13,3266489909),(4294967296*(2097151&r)+(i>>>0)).toString(36)}var ue="\\u27E6",pe="\\u27E7",Ie=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,Vt=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),ot=new Set(["pre","script","style","textarea","template","noscript"]),Mn=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),Nn=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),Ln=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,Sn=/\\p{L}/u,Re=t=>t.localName.toLowerCase(),$t=t=>{var i;return((i=t.getAttribute("class"))!=null?i:"").split(/\\s+/).filter(Boolean)},Be=t=>Array.from(t.childNodes).filter(i=>i.nodeType===1);function Ut(t){for(let i of Be(t))if(Vt.has(Re(i))||ot.has(Re(i))||Ut(i))return!0;return!1}function Bt(t){let i=Re(t);return ot.has(i)?"skip":Mn.has(i)||t.getAttribute("translate")==="no"||$t(t).some(r=>Nn.has(r))?"atom":Vt.has(i)||Ut(t)?"block":"inline"}function kn(t,i){return t.replace(Ln,r=>(i.push({literal:r,atom:!0}),`${ue}${i.length}/${pe}`))}function Cn(t,i){let r="",l=s=>{var p;if(s.nodeType===3){r+=kn((p=s.nodeValue)!=null?p:"",i);return}if(s.nodeType!==1){i.push({node:s,atom:!0}),r+=`${ue}${i.length}/${pe}`;return}let d=s;if(Bt(d)==="inline"){i.push({node:d,atom:!1});let c=i.length;r+=`${ue}${c}${pe}`;for(let m of Array.from(d.childNodes))l(m);r+=`${ue}/${c}${pe}`;return}i.push({node:d,atom:!0}),r+=`${ue}${i.length}/${pe}`};for(let s of t)l(s);return r}function Pt(t){return Sn.test(t.replace(Ie,""))}function Wt(t){let i=[],r=p=>{let c=p.getAttribute("alt");c&&Pt(c)&&i.push({index:i.length,kind:"attribute",text:c.trim(),nodes:[],lead:"",trail:"",parts:[],element:p,attribute:"alt"})},l=p=>{for(let c of Be(p)){let m=Re(c);ot.has(m)||m==="svg"||(m==="img"?r(c):l(c))}},s=p=>{if(!p.length)return;let c=[],m=Cn(p,c),y=m.trim();if(!y||!Pt(y)||m.includes("\\u27E6\\u27E6"))return;let f=m.replace(Ie,"");if(f.includes(ue)||f.includes(pe))return;let v=m.slice(0,m.length-m.trimStart().length),A=m.slice(m.trimEnd().length);i.push({index:i.length,kind:"run",text:y,nodes:p,lead:v,trail:A,parts:c})},d=p=>{let c=[];for(let m of Array.from(p.childNodes)){if(m.nodeType===3){c.push(m);continue}if(m.nodeType!==1){s(c),c=[];continue}let y=m,f=Bt(y);f==="atom"||f==="inline"?c.push(y):(s(c),c=[],f==="block"&&d(y))}s(c)};return l(t),d(t),{units:i}}var zt=t=>[...t.matchAll(Ie)].map(i=>i[0]);function Rn(t,i){if(!i.trim())return!1;let r=zt(t),l=zt(i);if(r.length!==l.length||r.some((d,p)=>d!==l[p]))return!1;let s=i.replace(Ie,"");return!s.includes(ue)&&!s.includes(pe)}function In(t,i,r){var m;let l=[],s=[],d=y=>{let f=s[s.length-1];f?f.appendChild(y):l.push(y)},p=y=>{y&&d(r.createTextNode(y))};p(t.lead);let c=0;for(let y of i.matchAll(Ie)){p(i.slice(c,y.index)),c=((m=y.index)!=null?m:0)+y[0].length;let f=t.parts[Number(y[2])-1];if(y[1]==="/")s.pop();else if(y[3]==="/")f.literal!==void 0?p(f.literal):f.node&&d(f.node.cloneNode(!0));else if(f.node){let v=f.node.cloneNode(!1);d(v),s.push(v)}}return p(i.slice(c)),p(t.trail),l}function Kt(t,i){var s,d,p;let r={applied:0,kept:0},l=[...t.units.filter(c=>c.kind==="attribute"),...t.units.filter(c=>c.kind==="run")];for(let c of l){let m=i(c);if(m===void 0||!Rn(c.text,m)){r.kept++;continue}if(c.kind==="attribute"){(d=c.element)==null||d.setAttribute((s=c.attribute)!=null?s:"alt",m.trim()),r.applied++;continue}let y=c.nodes[0],f=y==null?void 0:y.parentNode,v=y==null?void 0:y.ownerDocument;if(!y||!f||!v){r.kept++;continue}for(let A of In(c,m,v))f.insertBefore(A,y);for(let A of c.nodes)(p=A.parentNode)==null||p.removeChild(A);r.applied++}return r}function Ft(t){let i=[],r=l=>{for(let s of Be(l))Re(s)==="svg"?i.push(s):r(s)};return r(t),i}function jt(t,i){let r=[],l=s=>{for(let d of Be(s))$t(d).includes(i)&&r.push(d),l(d)};return l(t),r}var Xt="vam-mermaid-slot",We=1,Yt=3,Gt=t=>{let i=t;return!!i&&(Array.isArray(i.detailSegments)||Array.isArray(i.detailDiagrams))},On=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Dn=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Hn(t){var i,r;return t.nodeType===Yt?On((i=t.nodeValue)!=null?i:""):t.nodeType!==We?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:qt(t)}function qt(t){let i=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(l=>{var s;return` ${l}="${Dn((s=t.getAttribute(l))!=null?s:"")}"`}).join("");return`<${i}${r}>${_n(t)}</${i}>`}function _n(t){return Array.from(t.childNodes).map(Hn).join("")}function Pn(t){let i=[],r=l=>{if(i.push(l),l.nodeType===We)for(let s of Array.from(l.childNodes))r(s)};return r(t),i}function zn(t,i){var l;let r=Ft(t);for(let s of r){let d=i();d.setAttribute("class",Xt),(l=s.parentNode)==null||l.replaceChild(d,s)}return{root:t,svgs:r,extraction:Wt(t)}}function Vn(t){let i=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${it(i)}`}var $n=t=>it(qt(t));function Un(t,i){if(!Array.isArray(i))return!1;let r=Pn(t);for(let l of i){if(!Array.isArray(l)||l.length!==2)return!1;let[s,d]=l;if(typeof s!="number"||!Number.isInteger(s)||s<0||s>=r.length)return!1;let p=r[s];if(typeof d=="string"){if(p.nodeType!==Yt)return!1;p.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(p.nodeType!==We)return!1;for(let[c,m]of Object.entries(d))if(m===null)p.removeAttribute(c);else if(typeof m=="string")p.setAttribute(c,m);else return!1}else return!1}return!0}function Bn(t,i,r){if(!t||typeof t!="object")return null;let l=t;if(typeof l.svg=="string"){let s=r(l.svg),d=Array.from(s.childNodes).filter(p=>p.nodeType===We);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof l.check=="string"&&l.check===$n(i)){let s=i.cloneNode(!0);return Un(s,l.patch)?s:null}return null}function Zt(t,i,r){var m,y;let l={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:s,extraction:d}=zn(t,r.createSlot),p=i.detailSegments;if(p!==void 0||i.detailCheck!==void 0)if(Array.isArray(p)&&p.length===d.units.length&&i.detailCheck===Vn(d)){let f=Kt(d,A=>{let I=p[A.index];return typeof I=="string"?I:void 0}),v=p.filter(A=>typeof A!="string").length;if(l.applied=f.applied,l.kept=Math.max(0,f.kept-v),r.afterText&&!r.afterText(t))return l.fallback=!0,l}else l.fallback=!0;let c=jt(t,Xt);c.length!==s.length&&(l.fallback=!0);for(let[f,v]of c.entries()){let A=s[f];if(!A)break;let I=(m=i.detailDiagrams)==null?void 0:m[f],W=A;if(I){let k=null;try{k=Bn(I,A,r.parse)}catch{k=null}k?W=k:l.diagramsKept++}(y=v.parentNode)==null||y.replaceChild(W,v)}return l}function re(t,i,r){let l=t.createElement(i);return r&&(l.className=r),l}function Wn(t,i){var p;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),l=(p=r==null?void 0:r[1])!=null?p:t,[s,d=""]=i.imageSource.split("{0}");return[s,l,d]}function Kn(t,i,r){let[l,s,d]=Wn(i,r),p=re(t,"span");p.className="vam-image-source";let c=re(t,"a");return c.setAttribute("href",i),c.setAttribute("target","_blank"),c.setAttribute("rel","noopener noreferrer"),c.textContent=s,p.append(t.createTextNode(l),c,t.createTextNode(d)),p}function at(t,i,r,l,s){Qt(t,i,new DOMParser().parseFromString(r,"text/html").body,l,s)}function Qt(t,i,r,l,s){var p,c,m,y;for(let f of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))f.remove();for(let f of Array.from(r.querySelectorAll("*")))for(let v of f.getAttributeNames()){let A=(p=f.getAttribute(v))!=null?p:"",I=v.toLowerCase();(I.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(I)&&/^\\s*(javascript|vbscript):/i.test(A))&&f.removeAttribute(v)}let d=()=>{let f=re(t,"span");return f.className="vam-image-omitted",f.textContent=s.imageOmitted,f};for(let f of Array.from(r.querySelectorAll("img"))){let v=(c=f.getAttribute("src"))!=null?c:"";if(v.startsWith("vam-asset:")){let A=l[v.slice(10)];typeof A=="string"&&A.startsWith("data:image/")?f.setAttribute("src",A):f.replaceWith(d())}else if(/^https?:\\/\\//i.test(v)){f.setAttribute("referrerpolicy","no-referrer"),f.setAttribute("loading","lazy");let A=f.closest("a");(A!=null?A:f).after(Kn(t,v,s))}else/^data:image\\//i.test(v)||f.replaceWith(d())}for(let f of Array.from(r.querySelectorAll("a"))){let v=(m=f.getAttribute("href"))!=null?m:"";/^(https?:|mailto:)/i.test(v)?(f.setAttribute("target","_blank"),f.setAttribute("rel","noopener noreferrer")):v.startsWith("#")||f.removeAttribute("href")}for(let f of Array.from(r.querySelectorAll("table"))){if((y=f.parentElement)!=null&&y.classList.contains("vam-table-scroll"))continue;let v=re(t,"div");v.className="vam-table-scroll",f.replaceWith(v),v.append(f)}i.append(...Array.from(r.childNodes).map(f=>t.importNode(f,!0)))}function Jt(t,i,r,l,s,d){let p=c=>new DOMParser().parseFromString(c,"text/html").body;try{let c=p(r);Zt(c,l,{parse:p,createSlot:()=>re(t,"div")}),Qt(t,i,c,s,d)}catch{i.replaceChildren(),at(t,i,r,s,d)}}function en(t,i,r,l){let s=Math.max(60,Math.abs(r-t)/2);return`M ${t} ${i} C ${t+s} ${i}, ${r-s} ${l}, ${r} ${l}`}var Fn=(t,i)=>t.toLowerCase()===i.toLowerCase(),Ke=(t,i)=>t.find(r=>Fn(r,i));function jn(t,i){if(typeof t!="string"||!t.trim())return;let r=Ke(i,t.trim());if(r)return r;let l=t.trim().toLowerCase().split(/[-_]/),s=l[0];if(s==="zh"){let p=l.slice(1).some(c=>c==="hant"||c==="tw"||c==="hk"||c==="mo")?"TW":"CN";return Ke(i,`${s}-${p}`)}return i.find(d=>d.toLowerCase().split(/[-_]/)[0]===s)}function tn(t){let{languages:i}=t,r=i[0];if(typeof t.stored=="string"){let l=Ke(i,t.stored);if(l)return l}if(typeof t.defaultLanguage=="string"){let l=Ke(i,t.defaultLanguage);if(l)return l}for(let l of t.browser){let s=jn(l,i);if(s)return s}return r}function nn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Xn="https://github.com/kevcltsai/visual-agent-map?ref=share",Yn="und",Fe="http://www.w3.org/2000/svg",rn="vam-share-panel-width",on="vam-share-outline-open",Gn="(max-width: 600px)",qn=300,st=240,Zn=.25,Qn=2,Jn=280,er=4,tr={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},nr={core:"target",support:"library",side:"skip"},an=t=>t==="core"||t==="support"||t==="side",Oe=(t,i)=>t.replace("{0}",String(i));function dt(t,i){var l;let r=(l=t.getElementById(i))==null?void 0:l.textContent;if(r)try{return JSON.parse(r)}catch{return}}function sn(t){let i={..._t};if(t&&typeof t=="object")for(let r of Object.keys(i)){let l=t[r];typeof l=="string"&&(i[r]=l)}return i}function rr(t){let i=dt(t,"vam-ui"),r=new Map,l={};if(i&&typeof i=="object"){if(i.uiByLanguage&&typeof i.uiByLanguage=="object")for(let[s,d]of Object.entries(i.uiByLanguage))r.set(s,sn(d));if(i.languageNames&&typeof i.languageNames=="object")for(let[s,d]of Object.entries(i.languageNames))typeof d=="string"&&d&&(l[s]=d)}return{sets:r,names:l}}var F=t=>typeof t=="string"&&t.trim()!=="";function lt(t){try{return window.localStorage.getItem(t)}catch{return null}}function ct(t,i){try{window.localStorage.setItem(t,i)}catch{}}var Z=()=>window.matchMedia(Gn).matches;function ln(t){var Nt,Lt,St,kt;let i=sn(dt(t,"vam-ui")),r=i;t.documentElement.lang=r.lang;let l=t.getElementById("vam-app"),s=dt(t,"vam-map");if(!l)return;if(!s||s.format!=="vam-share"||s.version!==1||!Array.isArray(s.nodes)){l.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=s.assets&&typeof s.assets=="object"?s.assets:{},p=new Map,c=[];for(let e of s.nodes)!e||typeof e.id!="string"||p.has(e.id)||(p.set(e.id,e),c.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed}));let m=new Map(c.map(e=>[e.id,e]));for(let e of c)e.parentId&&(!m.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let y=new Map;for(let e of c)e.parentId&&y.set(e.parentId,[...(Nt=y.get(e.parentId))!=null?Nt:[],e]);let f=rr(t),v=Array.isArray(s.languages)?Array.from(new Set(s.languages.filter(F))):[],A=nn((Lt=s.source)==null?void 0:Lt.mapId),I=v.length>=2,W=I?v[0]:"",k=W;if(I){let e=[];try{e=Array.from((St=window.navigator.languages)!=null?St:[window.navigator.language]).filter(F)}catch{}k=tn({languages:v,stored:A?lt(A):null,defaultLanguage:F(s.defaultLanguage)?s.defaultLanguage:void 0,browser:e})}let Q=e=>{var n;return(n=f.sets.get(e))!=null?n:i},ie=I&&W===Yn,oe=()=>I&&k!==W;I&&(r=Q(k),t.documentElement.lang=k);let ae=e=>{var o;let n=oe()?(o=e.translations)==null?void 0:o[k]:void 0;return!n||typeof n!="object"?e:{title:F(n.title)?n.title:e.title,summary:F(n.summary)?n.summary:e.summary,reason:F(n.reason)?n.reason:e.reason,detailHtml:F(n.detailHtml)?n.detailHtml:e.detailHtml,...Gt(n)&&F(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},De=()=>{var a;let e=oe()?(a=s.translations)==null?void 0:a[k]:void 0,n=F(e==null?void 0:e.title)?e.title:s.title,o=F(e==null?void 0:e.goal)?e.goal:s.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof o=="string"?o.trim():""}},be=(e,n)=>{var o;try{let a=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(a&&a!==e)return a}catch{}return(o=f.names[e])!=null?o:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let h=(e,n,o)=>{let a=re(t,e);return n&&(a.className=n),o!==void 0&&(a.textContent=o),a},se=e=>{let n=t.createElementNS(Fe,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let o of tr[e]){let[a,...u]=o.split("|"),g=t.createElementNS(Fe,a);for(let x of u)g.setAttribute(x.slice(0,x.indexOf("=")),x.slice(x.indexOf("=")+1));n.append(g)}return n},b=(e,n,o,a)=>{let u=h("button",o,n);return u.type="button",u.addEventListener("click",g=>{g.stopPropagation(),a()}),e.append(u),u},M=(e,n,o,a)=>{let u=h("button");return u.type="button",u.setAttribute("aria-label",o),u.title=o,u.append(se(n)),u.addEventListener("click",g=>{g.stopPropagation(),a()}),e.append(u),u},O=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,C=(e,n)=>{let o=h("span","vam-relevance-tag");o.dataset.tier=e,n&&(o.title=n);let a=h("span","vam-relevance-icon");return a.append(se(nr[e])),o.append(a,h("span",void 0,O(e))),o};l.className="vam-app";let j=h("div","vam-toolbar"),xe=h("h1","vam-map-switcher"),ve=h("span","vam-shared");j.append(xe,ve);let K=M(j,"list","",()=>ye(H.hidden,!0));j.prepend(K),K.setAttribute("aria-controls","vam-outline");let Ee=h("div","vam-toolbar-actions"),V=h("select","vam-language");if(I){for(let e of v){let n=h("option",void 0,(kt=f.names[e])!=null?kt:be(e));n.value=e,ie&&e===W&&(n.dataset.original="1"),V.append(n)}V.value=k,Ee.append(V)}let le=h("span","vam-made-with"),J=h("a","vam-install");J.href=Xn,J.target="_blank",J.rel="noopener noreferrer",Ee.append(le,J),j.append(Ee);let X=h("div","vam-translate-note");X.hidden=!0;let $=h("div","vam-workspace"),N=h("div","vam-viewport"),Y=h("div","vam-stage");Y.setAttribute("role","tree");let ee=t.createElementNS(Fe,"svg");ee.setAttribute("class","vam-edges"),ee.setAttribute("aria-hidden","true"),Y.append(ee),N.append(Y);let fe=h("div","vam-canvas-overlay"),me=h("div","vam-map-tools"),Ae=h("span","vam-goal"),ut=h("span","vam-goal-text");Ae.append(se("target"),ut);let pt=h("span","vam-canvas-hint"),te=h("div","vam-zoom-controls"),cn=M(te,"minus","",()=>Me(1/1.2)),Te=h("button","vam-zoom","100%");Te.type="button",Te.addEventListener("click",e=>{e.stopPropagation(),Me(1/w.zoom)}),te.append(Te);let dn=M(te,"plus","",()=>Me(1.2)),un=M(te,"max","",()=>Ne()),G=h("button","vam-layout-button");G.type="button",G.setAttribute("aria-haspopup","menu"),G.setAttribute("aria-expanded","false"),te.append(G);let z=h("div","vam-layout-menu");z.setAttribute("role","menu"),z.hidden=!0,te.append(z),fe.append(me,pt,te);let S=h("aside","vam-inspector");S.hidden=!0;let H=h("nav","vam-outline");H.id="vam-outline";let we=h("div","vam-outline-tree");we.setAttribute("role","tree"),H.append(we),$.append(H,N,fe,S),l.replaceChildren(...I?[j,X,$]:[j,$]);let w={x:0,y:0,zoom:1},_=null,je=!1,He=Number(lt(rn))||qn,D=new Map,pn=()=>{let e=new Set,n=(o,a)=>{var u;for(let g of(u=y.get(o.id))!=null?u:[])a&&e.add(g.id),n(g,a||g.collapsed)};for(let o of c)o.parentId||n(o,o.collapsed);return e},ft=e=>{var o,a;let n=0;for(let u=e.parentId;u&&!(++n>c.length);u=(a=(o=m.get(u))==null?void 0:o.parentId)!=null?a:null);return n},mt=()=>Ot(N.getBoundingClientRect().top,me.hidden?void 0:me.getBoundingClientRect());function ne(){Y.style.transform=`translate(${w.x}px, ${w.y}px) scale(${w.zoom})`;let e=`${Math.round(w.zoom*100)}%`;Te.textContent=e,Te.setAttribute("aria-label",Oe(r.zoomReset,e))}function Me(e,n){let o=n!=null?n:{x:N.clientWidth/2,y:N.clientHeight/2},a=Math.min(Qn,Math.max(Zn,w.zoom*e)),u=a/w.zoom;w={x:o.x-(o.x-w.x)*u,y:o.y-(o.y-w.y)*u,zoom:a},ne()}let Xe=!1;function Ne(){if(!D.size)return;if(!N.clientWidth||!N.clientHeight){Xe=!0;return}let e=1/0,n=1/0,o=-1/0,a=-1/0;for(let u of D.values())e=Math.min(e,u.offsetLeft),n=Math.min(n,u.offsetTop),o=Math.max(o,u.offsetLeft+(u.offsetWidth||Jn)),a=Math.max(a,u.offsetTop+u.offsetHeight);w=Ht({minX:e,minY:n,maxX:o,maxY:a},{width:N.clientWidth,height:N.clientHeight},mt()),ne()}function gt(e){let n=D.get(e);n&&(w=Dt(w,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:N.clientWidth,height:N.clientHeight},mt()),ne())}function ge(){var e;ee.replaceChildren();for(let n of c){let o=n.parentId?D.get(n.parentId):void 0,a=D.get(n.id);if(!o||!a)continue;let u=t.createElementNS(Fe,"path");u.setAttribute("d",en(o.offsetLeft+o.offsetWidth,o.offsetTop+o.offsetHeight/2,a.offsetLeft,a.offsetTop+a.offsetHeight/2)),u.setAttribute("class",((e=p.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),ee.append(u)}}let Ye=0,ht=()=>{Ye||(Ye=window.requestAnimationFrame(()=>{Ye=0,ge()}))},Ge=e=>{let n=D.get(e),o=m.get(e);!n||!o||(n.style.left=`${o.x}px`,n.style.top=`${o.y}px`)};function qe(){var n,o;for(let a of D.values())a.remove();D.clear();let e=pn();for(let a of c){if(e.has(a.id))continue;let u=p.get(a.id),g=ae(u),x=Rt(c,a.id).size,T=an(u.tier)?u.tier:void 0,E=h("div",`vam-node${a.id===_?" is-selected":""}`);E.dataset.nodeId=a.id,E.dataset.status=u.status==="completed"?"completed":"idea",T&&(E.dataset.relevance=T),E.tabIndex=0,E.setAttribute("role","treeitem"),E.setAttribute("aria-level",String(ft(a)+1)),E.setAttribute("aria-selected",String(a.id===_)),E.setAttribute("aria-label",String((n=g.title)!=null?n:"")),x&&E.setAttribute("aria-expanded",String(!a.collapsed));let B=h("div","vam-node-header");E.append(B),u.status!=="completed"&&B.append(h("span","vam-status vam-status-idea",r.toResearch)),T&&B.append(C(T,typeof g.reason=="string"?g.reason:void 0));let q=h("div","vam-node-tools");if(E.append(q),x){let L=a.collapsed?Oe(r.expandCount,x):r.collapse,P=b(B,L,"vam-collapse-button",()=>{a.collapsed=!a.collapsed,Le(a.id,!0)});P.setAttribute("aria-expanded",String(!a.collapsed)),P.setAttribute("aria-label",L),P.title=L}b(q,r.detailsButton,void 0,()=>he(a.id)),E.append(h("h3","vam-card-title",String((o=g.title)!=null?o:""))),typeof g.summary=="string"&&g.summary.trim()&&E.append(h("p","vam-card-summary",g.summary)),E.addEventListener("click",()=>{je||he(a.id)}),E.addEventListener("keydown",L=>{L.target===E&&(L.key==="Enter"||L.key===" "?(L.preventDefault(),he(a.id)):x&&L.key===(a.collapsed?"ArrowRight":"ArrowLeft")&&(L.preventDefault(),a.collapsed=!a.collapsed,Le(a.id)))}),E.addEventListener("pointerdown",L=>fn(L,a,E)),Y.append(E),D.set(a.id,E),Ge(a.id)}}function _e(){It(c,void 0,n=>{var o;return(o=D.get(n))==null?void 0:o.offsetHeight}).forEach((n,o)=>{c[o].x=n.x,c[o].y=n.y});for(let n of D.keys())Ge(n)}function Le(e,n=!1){var u;let o=e?(u=D.get(e))==null?void 0:u.getBoundingClientRect():void 0;qe(),_e(),ge();let a=e?D.get(e):void 0;if(a){if(o){let x=a.getBoundingClientRect();w={...w,x:w.x+o.left-x.left,y:w.y+o.top-x.top},ne()}let g=n?a.querySelector(".vam-collapse-button"):null;(g!=null?g:a).focus({preventScroll:!0})}}function fn(e,n,o){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let a=e.clientX,u=e.clientY,g=n.x,x=n.y,T=!1,E=q=>{let L=q.clientX-a,P=q.clientY-u;if(!T){if(Math.hypot(L,P)<=er)return;T=!0,o.classList.add("is-dragging"),o.setPointerCapture(q.pointerId)}n.x=g+L/w.zoom,n.y=x+P/w.zoom,Ge(n.id),ht()},B=()=>{o.removeEventListener("pointermove",E),o.removeEventListener("pointerup",B),o.removeEventListener("pointercancel",B),o.classList.remove("is-dragging"),T&&(je=!0,window.setTimeout(()=>je=!1,0))};o.addEventListener("pointermove",E),o.addEventListener("pointerup",B),o.addEventListener("pointercancel",B)}let Ze=e=>Math.round(Math.min(Math.max(st,e),Math.max(st,$.clientWidth*.7)));function Pe(){let e=Z();if(S.hidden||e){S.style.removeProperty("width"),fe.style.removeProperty("right");return}let n=Ze(He);S.style.width=`${n}px`,fe.style.right=`${n}px`,R.setAttribute("aria-valuenow",String(n)),R.setAttribute("aria-valuemax",String(Ze(1/0)))}let R=h("div","vam-inspector-resizer");R.setAttribute("role","separator"),R.setAttribute("aria-orientation","vertical"),R.setAttribute("aria-label",r.resizePanel),R.setAttribute("aria-valuemin",String(st)),R.tabIndex=0;let ze=(e,n)=>{He=Ze(e),Pe(),n&&ct(rn,String(He))};R.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,o=S.offsetWidth;R.setPointerCapture(e.pointerId),R.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let a=g=>ze(o+n-g.clientX,!1),u=()=>{R.removeEventListener("pointermove",a),R.removeEventListener("pointerup",u),R.removeEventListener("pointercancel",u),R.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),ze(He,!0)};R.addEventListener("pointermove",a),R.addEventListener("pointerup",u),R.addEventListener("pointercancel",u)}),R.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")ze(S.offsetWidth+n,!0);else if(e.key==="ArrowRight")ze(S.offsetWidth-n,!0);else return;e.preventDefault()});let Qe=Z();window.addEventListener("resize",()=>{Pe(),ne(),Z()!==Qe&&(Qe=Z(),ye(Qe?!1:vt(),!1))});function Je(){_=null;for(let e of D.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");S.hidden=!0,$.classList.remove("has-inspector"),S.replaceChildren(),Pe(),de()}function he(e){var E,B,q;let n=m.get(e),o=p.get(e);if(!n||!o)return;let a={...o,...ae(o)};_=e;for(let[L,P]of D)P.classList.toggle("is-selected",L===e),P.setAttribute("aria-selected",String(L===e));S.replaceChildren(R);let u=h("div","vam-inspector-heading");u.append(h("strong",void 0,r.topicDetails)),b(u,r.close,void 0,Je),S.append(u,h("h3",void 0,String((E=a.title)!=null?E:"")));let g=an(a.tier)?a.tier:void 0;if(g){let L=h("div","vam-inspector-why");L.append(C(g));let P=typeof a.reason=="string"&&a.reason.trim()?a.reason:a.manual?r.manualReason:"";P&&L.append(h("span",void 0,P)),S.append(L)}typeof a.summary=="string"&&a.summary.trim()&&S.append(h("p","vam-sample-summary",a.summary));let x=h("div","vam-sample-detail");typeof a.detailHtml=="string"&&a.detailHtml.trim()?a.compact?Jt(t,x,a.detailHtml,a.compact,d,r):at(t,x,a.detailHtml,d,r):x.append(h("p","vam-inspector-empty",r.noContent)),S.append(x);let T=(B=y.get(e))!=null?B:[];if(T.length){let L=h("div","vam-subtopics");L.append(h("strong",void 0,r.subtopics));for(let P of T)b(L,String((q=ae(p.get(P.id)).title)!=null?q:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Le(n.id)),he(P.id),gt(P.id)});S.append(L)}S.hidden=!1,$.classList.add("has-inspector"),Pe(),S.scrollTop=0,de(),Et()}let et=e=>{nt(c,e),Le(),Ne()},Se=e=>{z.hidden||(z.hidden=!0,G.setAttribute("aria-expanded","false"),e&&G.focus())};function mn(){z.replaceChildren();let e=[{label:r.collapseAll,run:()=>et(0)},{label:r.expandAll,run:()=>et(null)},...[1,2,3].map(n=>({label:Oe(r.expandToLevel,n),run:()=>et(n)})),null,{label:r.autoLayout,run:()=>{_e(),ge()}}];for(let n of e){if(!n){z.append(h("hr"));continue}let o=h("button",void 0,n.label);o.type="button",o.setAttribute("role","menuitem"),o.addEventListener("click",a=>{a.stopPropagation(),Se(!0),n.run()}),z.append(o)}}let yt=()=>Array.from(z.querySelectorAll("button"));G.addEventListener("click",e=>{var n;if(e.stopPropagation(),!z.hidden)return Se(!0);z.hidden=!1,G.setAttribute("aria-expanded","true"),(n=yt()[0])==null||n.focus()}),z.addEventListener("keydown",e=>{let n=yt(),o=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(o+1)%n.length].focus();else if(e.key==="ArrowUp")n[(o-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Se(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!z.hidden&&!te.contains(e.target)&&Se(!1);let n=e.target;Z()&&!H.hidden&&!H.contains(n)&&!K.contains(n)&&ye(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!z.hidden)Se(!0);else if(Z()&&!H.hidden)ye(!1,!1),K.focus();else if(!S.hidden){let n=_?D.get(_):void 0;Je(),n==null||n.focus({preventScroll:!0})}}});function bt(){let e=De();if(t.title=e.title,xe.textContent=e.title,Y.setAttribute("aria-label",e.title),ve.textContent=r.readOnly,le.textContent=r.madeWithVam,J.textContent=r.install,V.setAttribute("aria-label",r.language),V.title=r.language,ie)for(let o of Array.from(V.options))o.dataset.original&&(o.textContent=r.originalText);e.goal?(ut.textContent=Oe(r.goal,e.goal),Ae.title=e.goal,Ae.parentElement||me.append(Ae),me.hidden=!1):(Ae.remove(),me.hidden=!0),pt.textContent=r.hint;let n=(o,a)=>{o.setAttribute("aria-label",a),o.title=a};if(n(cn,r.zoomOut),n(dn,r.zoomIn),n(un,r.showAll),G.textContent=r.layout,S.setAttribute("aria-label",r.topicDetails),H.setAttribute("aria-label",r.outline),we.setAttribute("aria-label",r.outline),n(K,r.outline),R.setAttribute("aria-label",r.resizePanel),mn(),oe()){let o=ie?r.aiTranslatedUnknown:Oe(r.aiTranslated,be(W,k));X.textContent=`${o} ${r.imageTextUntranslated}`,X.hidden=!1}else X.hidden=!0;ne()}function gn(e){if(e===k||!v.includes(e))return;k=e,r=Q(e),A&&ct(A,e),t.documentElement.lang=e;let n=S.scrollTop;bt(),qe(),ge(),Tt(),_!==null&&m.has(_)&&!S.hidden&&(he(_),S.scrollTop=n),ht()}V.addEventListener("change",()=>gn(V.value));let Ve=[],xt=e=>{var n;Ve.push(e);for(let o of(n=y.get(e.id))!=null?n:[])xt(o)};for(let e of c)e.parentId||xt(e);let ke=new Set,ce=new Map,$e=null;function vt(){return lt(on)!=="0"}function ye(e,n){H.hidden=!e,$.classList.toggle("has-outline",e),K.setAttribute("aria-expanded",String(e)),n&&!Z()&&ct(on,e?"1":"0")}let hn=()=>Ve.filter(e=>{var n;return!((n=ce.get(e.id))!=null&&n.hidden)});function de(){var o,a,u;let e=[];for(let g of Ve){let x=ce.get(g.id);if(!x)continue;let T=!1;for(let E=g.parentId;E&&!T;E=(a=(o=m.get(E))==null?void 0:o.parentId)!=null?a:null)T=ke.has(E);x.hidden=T,T||e.push(g),y.has(g.id)&&x.setAttribute("aria-expanded",String(!ke.has(g.id))),g.id===_?x.setAttribute("aria-current","true"):x.removeAttribute("aria-current")}let n=(u=e.find(g=>g.id===$e))!=null?u:e[0];for(let[g,x]of ce)x.tabIndex=g===(n==null?void 0:n.id)?0:-1}function Et(){let e=_?ce.get(_):void 0;!e||e.hidden||!H.clientHeight||(e.offsetTop<H.scrollTop?H.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>H.scrollTop+H.clientHeight&&(H.scrollTop=e.offsetTop+e.offsetHeight-H.clientHeight))}function tt(e){ke.delete(e)||ke.add(e),de()}function yn(e){var n;$e=e,de(),(n=ce.get(e))==null||n.focus()}function bn(){for(let[e,n]of D)n.classList.toggle("is-selected",e===_),n.setAttribute("aria-selected",String(e===_))}function At(e){var u,g,x;let n=m.get(e);if(!n)return;let o=!1,a=0;for(let T=n.parentId;T&&a++<=c.length;T=(g=(u=m.get(T))==null?void 0:u.parentId)!=null?g:null){let E=m.get(T);E!=null&&E.collapsed&&(E.collapsed=!1,o=!0)}_=e,o&&Le(),gt(e),S.hidden?bn():he(e),de(),Et(),Z()&&ye(!1,!1),(x=D.get(e))==null||x.focus({preventScroll:!0})}function xn(e,n){var T;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let o=hn(),a=o.indexOf(n),u=(T=y.get(n.id))!=null?T:[],g=ke.has(n.id),x;switch(e.key){case"ArrowDown":x=o[a+1];break;case"ArrowUp":x=o[a-1];break;case"Home":x=o[0];break;case"End":x=o[o.length-1];break;case"ArrowRight":u.length&&g?tt(n.id):x=u[0];break;case"ArrowLeft":u.length&&!g?tt(n.id):x=n.parentId?m.get(n.parentId):void 0;break;case"Enter":case" ":At(n.id);break;default:return}e.preventDefault(),x&&yn(x.id)}function Tt(){var e;we.replaceChildren(),ce.clear();for(let n of Ve){let o=String((e=ae(p.get(n.id)).title)!=null?e:""),a=h("div","vam-outline-item");a.dataset.outlineId=n.id,a.setAttribute("role","treeitem");let u=ft(n)+1;a.setAttribute("aria-level",String(u)),a.style.setProperty("--depth",String(u-1));let g=h("span","vam-outline-twist");y.has(n.id)&&(g.append(se("chevron")),g.addEventListener("click",T=>{T.stopPropagation(),tt(n.id)}));let x=h("span","vam-outline-title",o);x.title=o,a.append(g,x),a.addEventListener("click",()=>At(n.id)),a.addEventListener("keydown",T=>xn(T,n)),a.addEventListener("focus",()=>{$e!==n.id&&($e=n.id,de())}),we.append(a),ce.set(n.id,a)}de()}let U=new Map,Ce=0,Ue=!1;N.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(N.setPointerCapture(e.pointerId),U.set(e.pointerId,{x:e.clientX,y:e.clientY}),N.classList.add("is-panning"),U.size===1&&(Ue=!1),U.size===2)){let[n,o]=Array.from(U.values());Ce=Math.hypot(n.x-o.x,n.y-o.y)}}),N.addEventListener("pointermove",e=>{let n=U.get(e.pointerId);if(!n)return;if(U.set(e.pointerId,{x:e.clientX,y:e.clientY}),U.size===2&&Ce){let[u,g]=Array.from(U.values()),x=Math.hypot(u.x-g.x,u.y-g.y),T=N.getBoundingClientRect();Me(x/Ce,{x:(u.x+g.x)/2-T.left,y:(u.y+g.y)/2-T.top}),Ce=x,Ue=!0;return}let o=e.clientX-n.x,a=e.clientY-n.y;Ue||(Ue=Math.abs(o)+Math.abs(a)>0),w={...w,x:w.x+o,y:w.y+a},ne()});let wt=e=>{U.delete(e.pointerId)&&(U.size<2&&(Ce=0),U.size||(N.classList.remove("is-panning"),!Ue&&e.type==="pointerup"&&!S.hidden&&Je()))};N.addEventListener("pointerup",wt),N.addEventListener("pointercancel",wt),N.addEventListener("wheel",e=>{e.preventDefault();let n=N.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?Me(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(w={...w,x:w.x-e.deltaX,y:w.y-e.deltaY},ne())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{Xe&&(Xe=!1,Ne())}).observe(N),bt(),Tt(),ye(Z()?!1:vt(),!1),nt(c,1),qe(),_e(),ge(),Ne();let Mt=t.fonts;Mt&&Mt.ready.then(()=>{_!==null||U.size||(_e(),ge(),Ne())})}ln(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #e9973f;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
@@ -55444,12 +55704,12 @@ var IMAGE_MIME = {
 };
 var SHARE_WEBP_QUALITY = 0.82;
 var MERMAID_UNIT = ".mermaid-wrapper, .mermaid";
-var blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+var blobToDataUrl = (blob) => new Promise((resolve, reject2) => {
   const reader = new FileReader();
   reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
   reader.onerror = () => {
     var _a2;
-    return reject((_a2 = reader.error) != null ? _a2 : new Error("read failed"));
+    return reject2((_a2 = reader.error) != null ? _a2 : new Error("read failed"));
   };
   reader.readAsDataURL(blob);
 });
@@ -57364,9 +57624,9 @@ var ShallowExpansionCoordinator = class {
     };
     let rejectFirst = () => {
     };
-    const accepted = new Promise((resolve, reject) => {
+    const accepted = new Promise((resolve, reject2) => {
       acceptFirst = resolve;
-      rejectFirst = reject;
+      rejectFirst = reject2;
     });
     void (async () => {
       let dispatchAccepted = false;
@@ -59053,13 +59313,13 @@ var SelectionAiPanel = class extends import_obsidian38.Component {
     if (!captionInstruction.trim()) return markdown;
     const image = createEl("img");
     image.referrerPolicy = "no-referrer";
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve, reject2) => {
       const finish = (error) => {
         window.clearTimeout(timeout);
         signal.removeEventListener("abort", abort);
         image.onload = null;
         image.onerror = null;
-        if (error) reject(error);
+        if (error) reject2(error);
         else resolve();
       };
       const abort = () => {

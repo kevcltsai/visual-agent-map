@@ -356,8 +356,8 @@ test('V4: in a left map new, moved and copied topics and a fold re-layout go to 
   assert.equal(copies.length, 1);
   assert.ok(copies[0].x < h.named('Target').x, 'copySelected');
   h.view.multiSelected = new Set([h.named('Src').id]);
-  await h.view.moveSelected(h.named('Target'));
-  assert.ok(h.named('Src').x < h.named('Target').x && h.named('Leaf').x < h.named('Src').x, 'moveSelected');
+  await h.view.moveBranches(h.view.selectedRoots(), h.named('Target'));
+  assert.ok(h.named('Src').x < h.named('Target').x && h.named('Leaf').x < h.named('Src').x, 'moveBranches');
   const stage = stub('div');
   h.view.stageEl = stage;
   h.view.renderNode(h.named('Target'));

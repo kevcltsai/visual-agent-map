@@ -136,7 +136,7 @@ test('FG20-06: Move to... lays the moved branches out clear of the target\'s chi
   const before = h.positions();
   h.view.multiSelected = new Set([h.node('Src').id, h.node('Solo').id]);
   h.view.mergeUnlocked = () => true;
-  await h.view.moveSelected(h.node('Target'));
+  await h.view.moveBranches(h.view.selectedRoots(), h.node('Target'));
   assert.equal(h.node('Src').parentId, h.node('Target').id);
   assert.equal(h.node('Leaf1').parentId, h.node('Src').id);
   assert.deepEqual(h.overlaps(), []);

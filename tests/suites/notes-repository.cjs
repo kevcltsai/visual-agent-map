@@ -1427,10 +1427,10 @@ integrationTest('AI merge lock: while merging, delete, remove, move, copy and st
   await refused('remove selected', () => h.view.removeSelected());
   await refused('move one card', () => h.view.moveTopic(gamma, h.parent));
   await refused('move under a merging card', () => h.view.moveTopic(h.kid, gamma));
-  await refused('move selected', () => h.view.moveSelected(h.parent));
+  await refused('move selected', () => h.view.moveBranches(h.view.selectedRoots(), h.parent));
   await refused('copy selected', () => h.view.copySelected(h.parent));
   h.view.multiSelected = new Set([h.kid.id]);
-  await refused('move something under a merging card (multi)', () => h.view.moveSelected(alpha));
+  await refused('move something under a merging card (multi)', () => h.view.moveBranches(h.view.selectedRoots(), alpha));
   for (const suggestion of [{ kind: 'move', targetId: alpha.id, newParentId: h.parent.id }, { kind: 'move', targetId: h.kid.id, newParentId: beta.id }, { kind: 'merge', targetId: h.kid.id, mergeIntoId: gamma.id }, { kind: 'reduce', targetId: beta.id }])
     await assert.rejects(() => h.view.applyStructureSuggestion(suggestion, '', () => null), /Merging; try again when it finishes/);
   const before = await state();

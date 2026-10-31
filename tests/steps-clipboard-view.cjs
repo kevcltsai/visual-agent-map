@@ -125,8 +125,8 @@ test('P4 scope: events outside the view, in a text control, in the chat panel, o
   assert.equal(none.defaultPrevented, false, 'nothing selected: the default copy runs');
   await tick(); await tick();
   assert.equal(h.map().nodes.length, 5); assert.equal(h.history(), 0);
-  const text = pasteOf(h, { 'text/plain': '- plain' });
-  assert.equal(text.defaultPrevented, false, 'plain text is left to the text paste');
+  const text = pasteOf(h, { 'text/plain': '   ' }, body);
+  assert.equal(text.defaultPrevented, false, 'outside the view, plain text is left alone (P5 handles plain text inside it)');
 });
 
 test('P4 paste: the same map under the selected card duplicates the notes with the same title, one history step, and undo removes them', async () => {
@@ -294,17 +294,17 @@ test('P4 paste: when a copied topic is gone the paste still works from the paylo
   assert.equal(added.parentId, h.ids.other);
 });
 
-test('P4 binding: listeners go on the window document, one pair, and move with the view to a popout window', async () => {
+test('P4 binding: listeners go on the window document, one set, and move with the view to a popout window', async () => {
   const h = await harness();
   const makeDoc = () => { const log = { added: [], removed: [] }; return { log, addEventListener: (n, f) => log.added.push([n, f]), removeEventListener: (n, f) => log.removed.push([n, f]) }; };
   const main = makeDoc(), popout = makeDoc();
   h.view.contentEl.doc = main;
   h.view.bindClipboard();
-  assert.deepEqual(main.log.added.map(([n]) => n), ['copy', 'paste']);
+  assert.deepEqual(main.log.added.map(([n]) => n), ['copy', 'cut', 'paste']);
   h.view.contentEl.doc = popout;
   h.view.bindClipboard();
-  assert.equal(main.log.removed.length, 2, 'the old window is released');
-  assert.deepEqual(popout.log.added.map(([n]) => n), ['copy', 'paste']);
+  assert.equal(main.log.removed.length, 3, 'the old window is released');
+  assert.deepEqual(popout.log.added.map(([n]) => n), ['copy', 'cut', 'paste']);
   // The registered listener runs the same handler.
   const paste = popout.log.added.find(([n]) => n === 'paste')[1];
   h.view.selected = h.ids.root;
@@ -313,7 +313,7 @@ test('P4 binding: listeners go on the window document, one pair, and move with t
   assert.equal(event.defaultPrevented, true);
   await until(() => h.map().nodes.length === 6);
   h.view.unbindClipboard();
-  assert.equal(popout.log.removed.length, 2);
+  assert.equal(popout.log.removed.length, 3);
 });
 
 test('P4 Copy to…: the copy keeps the "copy" suffix; only a paste keeps the title', async () => {

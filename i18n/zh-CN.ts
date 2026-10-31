@@ -746,6 +746,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.subtopic_names_must_be_unique": "子议题名称不能重复。",
   "ui.create_subtopics_without_research": "只创建子议题，不运行研究",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota": "创建后会逐一做简短研究，会使用 AI 额度",
+  "ui.layout_direction_right": "向右排列",
+  "ui.layout_direction_left": "向左排列",
   "ui.auto_layout": "自动排版",
   "ui.layout": "排版",
   "ui.expansion_failed": "展开失败",

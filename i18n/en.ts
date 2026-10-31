@@ -806,6 +806,8 @@ export const en = {
   "ui.create_subtopics_without_research": "Create subtopics without research",
   "ui.research_each_subtopic_after_creation_and_use_codex_quota":
     "Each new subtopic gets a short research pass, using AI quota",
+  "ui.layout_direction_right": "Lay out to the right",
+  "ui.layout_direction_left": "Lay out to the left",
   "ui.auto_layout": "Auto layout",
   "ui.layout": "Layout",
   "ui.expansion_failed": "Expansion failed",

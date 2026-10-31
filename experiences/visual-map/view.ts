@@ -243,6 +243,7 @@ import {
   type OutlineImportTarget,
   type OutlinePlacement
 } from "./outline-import-modal";
+import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal, type MultiResearchRequest } from "./multi-research-modal";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
@@ -470,6 +471,8 @@ let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The extra accessible-name part of a card that is waiting to be moved by a paste ("cut"). */
 const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
+/** The model tag drawn in a card header, so a redraw replaces exactly it. */
+const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
@@ -882,6 +885,9 @@ export class VisualAgentMapView extends ItemView {
   } | null = null;
   /** Text spans the one-second tick rewrites in place, so progress never re-renders the whole map. */
   private aimProgressEls = new Map<string, HTMLElement>();
+  /** Model of each AIM branch's root topic, resolved once when its first progress event arrives; dropped when the run ends. */
+  private aimBranchModels = new Map<string, string>();
+  private aimBranchModelPending = new Set<string>();
   private aimProgressTimer: number | null = null;
   private aimProgressRenderTimer: number | null = null;
   private aimFailedReports = new Map<string, { runId: string; diagnosticNotePath: string }>();
@@ -2937,6 +2943,28 @@ export class VisualAgentMapView extends ItemView {
     );
     menu.showAtMouseEvent(event);
   }
+  /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
+  override onPaneMenu(menu: Menu, source: string): void {
+    super.onPaneMenu(menu, source);
+    if (!this.map || this.builtIn || !this.path) return;
+    menu.addSeparator();
+    for (const [format, key] of [
+      ["opml", "ui.exchange_export_opml"],
+      ["freemind", "ui.exchange_export_freemind"]
+    ] as const)
+      menu.addItem(item =>
+        item
+          .setTitle(t(key))
+          .setIcon("file-output")
+          .onClick(() => this.exportExchange(format))
+      );
+  }
+  /** Writes the open map as OPML or FreeMind next to its Map.md. */
+  private exportExchange(format: "opml" | "freemind"): void {
+    const map = this.map;
+    if (!map || this.builtIn || !this.path) return;
+    void exportMapWithNotice(this.app.vault, { mapPath: this.path, map, notes: this.notes, format });
+  }
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   private outlineImportTarget(): OutlineImportTarget {
     if (!this.map || this.builtIn || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
@@ -3952,6 +3980,7 @@ export class VisualAgentMapView extends ItemView {
   /** Research coverage is the map's headline fact: how much of the frontier already has a conclusion. */
   private onAimProgress(event: AimProgressEvent): void {
     if (this.closed || event.mapPath !== this.path) return;
+    this.ensureAimBranchModel(event.branchId);
     let structural = false;
     if (event.kind === "plan") {
       this.aimProgress = {
@@ -4003,6 +4032,7 @@ export class VisualAgentMapView extends ItemView {
   }
   private stopAimProgress(): void {
     this.aimProgress = null;
+    this.aimBranchModels.clear();
     this.aimProgressEls.clear();
     if (this.aimProgressTimer !== null) window.clearInterval(this.aimProgressTimer);
     if (this.aimProgressRenderTimer !== null) window.clearTimeout(this.aimProgressRenderTimer);
@@ -4018,6 +4048,24 @@ export class VisualAgentMapView extends ItemView {
       Math.round((Date.now() - (target.startedAt ?? Date.now())) / 1000)
     );
   }
+  /** The branch root topic's resolved model, read once per branch (the cache answers every later event and tick). */
+  private ensureAimBranchModel(branchId: string): void {
+    if (this.aimBranchModels.has(branchId) || this.aimBranchModelPending.has(branchId)) return;
+    const branches = this.map?.aim?.branches ?? [];
+    let root = branches.find(item => item.id === branchId);
+    for (let depth = 0; root?.parentBranchId && depth < branches.length; depth++)
+      root = branches.find(item => item.id === root?.parentBranchId) ?? root;
+    const node = root && this.map?.nodes.find(item => item.id === root.questionNodeId);
+    if (!node) return;
+    this.aimBranchModelPending.add(branchId);
+    void this.plugin.repo
+      .resolveTopicModel(node.path, this.map ?? undefined)
+      .then(resolved => {
+        if (!this.closed && this.aimProgress) this.aimBranchModels.set(branchId, resolved.model);
+      })
+      .catch(() => {})
+      .finally(() => this.aimBranchModelPending.delete(branchId));
+  }
   private aimStageText(): string {
     const progress = this.aimProgress;
     if (!progress) return "";
@@ -4032,7 +4080,9 @@ export class VisualAgentMapView extends ItemView {
             targets.length
           )
         : t(AIM_STAGE_KEYS[progress.stage] ?? "ui.aim_stage_research");
-    return t("ui.aim_stage_with_elapsed_0_1", stage, clock);
+    const model = this.aimBranchModels.get(progress.branchId);
+    const shown = model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(model)) : stage;
+    return t("ui.aim_stage_with_elapsed_0_1", shown, clock);
   }
   /** One-second tick: rewrite only the progress texts; stop when the run is over. */
   private paintAimProgress(): void {
@@ -4098,6 +4148,12 @@ export class VisualAgentMapView extends ItemView {
       : "";
   }
   private researchStageText(progress: ResearchProgress): string {
+    const stage = this.researchStageName(progress);
+    return progress.model
+      ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model))
+      : stage;
+  }
+  private researchStageName(progress: ResearchProgress): string {
     switch (progress.stage) {
       case "searching":
         return progress.query ? t("ui.research_stage_searching_0", progress.query) : t("ui.research_stage_searching");
@@ -4141,11 +4197,11 @@ export class VisualAgentMapView extends ItemView {
    * task key. The entry belongs to the caller: `end()` runs when the answer arrives (before anything is written), and again
    * in the caller's finally. A key that already has an entry (a chart step of that note) is left alone.
    */
-  private startTaskProgress(key: string): { observer?: ResearchObserver; end: () => void } {
+  private startTaskProgress(key: string, model: string): { observer?: ResearchObserver; end: () => void } {
     const progress = this.plugin.researchProgress;
     if (!progress || progress.get(key)) return { end: () => {} };
     let attempt = "starting";
-    progress.begin(key, attempt, Date.now());
+    progress.begin(key, attempt, Date.now(), model);
     return {
       observer: {
         onAttempt: id => {
@@ -4607,7 +4663,7 @@ export class VisualAgentMapView extends ItemView {
   /** The model call of an AI merge; a stopped, replaced or late run changes nothing. */
   private async runMergeDraft(task: MergeTask): Promise<void> {
     const language = this.plugin.settings.language;
-    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath));
+    const progress = this.startTaskProgress(this.taskProgressKey("merge", task.mapPath), task.model);
     try {
       const sourceGroup = await this.topicReferenceGroup(task.sources, "strong", { origin: false });
       if (!this.isLiveMergeTask(task)) return;
@@ -7369,6 +7425,8 @@ export class VisualAgentMapView extends ItemView {
     }
     // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
     this.paintCardMarkers(card, header, node.id);
+    // The model tag follows the marker row (see paintModelTag).
+    this.paintModelTag(card, header, note);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -8035,6 +8093,40 @@ export class VisualAgentMapView extends ItemView {
       : "";
   }
   /**
+   * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
+   * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
+   */
+  private paintModelTag(card: HTMLElement, header: HTMLElement, note: Note | undefined): void {
+    const old = cardModelTags.get(header);
+    cardModelTags.delete(header);
+    const previous = card.dataset.modelText ?? "";
+    // The accessible name is the card label (aria-labelledby), so the model part is merged into it and replaced on a redraw.
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (note?.modelOverride) {
+      const label = this.plugin.modelLabel(note.model),
+        text = t("ui.card_model_override_0", label),
+        tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
+      // The card name already carries the text, so the tag itself is hidden from screen readers (no second reading).
+      tag.setAttr("aria-hidden", "true");
+      tag.setAttr("title", text);
+      // In place on a redraw; otherwise right after the marker row (painted first), so renderNode and refreshCard agree.
+      const row = cardMarkerRows.get(card);
+      if (old) old.replaceWith(tag);
+      else if (row && row.parentElement === header) row.after(tag);
+      cardModelTags.set(header, tag);
+      card.dataset.modelText = text;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
+    } else {
+      old?.remove();
+      delete card.dataset.modelText;
+      if (named) this.labelCard(card, named);
+    }
+  }
+  /**
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
    * name. Safe to call again: the old symbols and the old name part are replaced.
    */
@@ -8293,7 +8385,10 @@ export class VisualAgentMapView extends ItemView {
         named = cardLabels.get(card)?.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
-    if (header) this.paintCardMarkers(card, header, node.id);
+    if (header) {
+      this.paintCardMarkers(card, header, node.id);
+      this.paintModelTag(card, header, note);
+    }
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -10291,7 +10386,7 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     this.plugin.running.add(node.path);
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     try {
       const childSources = await this.topicReferenceGroup(
         children,
@@ -10422,7 +10517,7 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.repo.updateNote(node.path, { status: "running" });
     await this.hydrate();
     this.render();
-    const progress = this.startTaskProgress(node.path);
+    const progress = this.startTaskProgress(node.path, note.model);
     // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
     try {
@@ -10967,7 +11062,7 @@ export class VisualAgentMapView extends ItemView {
       this.integrationTask = task;
       own = task;
       this.render();
-      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"));
+      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
       progress = taskProgress;
       const language = this.plugin.settings.language;
       const result = await this.plugin.askModel(
@@ -11162,7 +11257,7 @@ export class VisualAgentMapView extends ItemView {
     };
     this.integrationTask = task;
     this.render();
-    const progress = this.startTaskProgress(this.taskProgressKey("integration"));
+    const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
     const model = chosen.model;
     const language = this.plugin.settings.language;
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
@@ -14274,7 +14369,7 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now());
+    progress?.begin(taskPath, progressAttempt, Date.now(), note.model);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;

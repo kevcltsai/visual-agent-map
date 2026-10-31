@@ -74,6 +74,7 @@ import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
 import { OutlineView, OUTLINE_VIEW_TYPE } from "./ui/outline-view";
+import { chooseAndImportExchange } from "./experiences/visual-map/outline-exchange-io";
 import { ShareModal } from "./experiences/sharing/share-modal";
 import { releaseMermaidCapture } from "./experiences/sharing/share-exporter";
 import { ShareTranslationCache } from "./experiences/sharing/share-translate-plan";
@@ -472,6 +473,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     const markdownSelectionAi = new MarkdownSelectionAi(this.app, {
       model: () => this.currentModelChoice().model,
       imageNeedsCodex: () => this.runtimeIdFor(this.currentModelChoice().model) === "claude",
+      modelLabel: model => this.modelLabel(model),
       autoOpen: () => this.settings.markdownSelectionAiAutoOpen,
       language: selected =>
         languagePromptName(selectionOutputLanguage(this.settings.language, selected), "en", "plain", {
@@ -622,6 +624,14 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.addLocalizedCommand("import-outline", "ui.outline_import", () => {
       void this.activateView()
         .then(() => this.views()[0]?.openOutlineImport())
+        .catch(error => new Notice(String(error)));
+    });
+    this.addLocalizedCommand("import-outline-exchange", "ui.exchange_import", () => {
+      void this.activateView()
+        .then(() => {
+          const view = this.views()[0];
+          if (view) chooseAndImportExchange(view);
+        })
         .catch(error => new Notice(String(error)));
     });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
@@ -1756,7 +1766,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.chartJobs.set(job.path, controller);
     const progressId = `charts-${++this.chartProgressSeq}`;
     this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now());
+    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
     this.researchProgress.stage(job.path, progressId, "charts", Date.now());
     let exchangeId = "";
     const run = async (): Promise<void> => {

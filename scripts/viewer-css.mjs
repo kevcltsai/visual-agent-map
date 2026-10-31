@@ -28,7 +28,7 @@ const ALLOW = new RegExp(`^(?:\\.theme-dark\\s+)?\\.(?:${ALLOW_PREFIXES.join("|"
  * forbids (the goal button, level and context inputs). `:not([data-aim-kind])` is how plugin rules say "ordinary topic".
  */
 const DENY =
-  /relevance-(?:goal|level|context|tier|reason|manual)|source-notes|agent-map-references|content-language|(?:^|[^a-z])aim(?:[^a-z]|$)|marquee|add-child|research|structure|conclusion|new-map|topic-more|ai-explore|is-selecting|sample-tour|sample-start|empty|proposal|inspector-topic|inspector-section/;
+  /relevance-(?:goal|level|context|tier|reason|manual)|model-tag|source-notes|agent-map-references|content-language|(?:^|[^a-z])aim(?:[^a-z]|$)|marquee|add-child|research|structure|conclusion|new-map|topic-more|ai-explore|is-selecting|sample-tour|sample-start|empty|proposal|inspector-topic|inspector-section/;
 const ORDINARY_TOPIC = ":not([data-aim-kind])";
 
 /** Splits CSS into top-level chunks `{ prelude, body, text }`; comments are dropped, strings respected. */

@@ -16647,12 +16647,12 @@ function arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, mi
     ...fresh.filter((item) => item.parentId === id).flatMap((item) => below(item.id))
   ];
   let current = nodes;
-  const pending = new Set(newIds);
+  const pending2 = new Set(newIds);
   for (const side of ["right", "left"]) {
     const mine = new Set(roots.filter((root) => sides.get(root.id) === side).flatMap((root) => below(root.id)));
     if (!mine.size) continue;
-    for (const id of mine) pending.delete(id);
-    const others = new Set(pending);
+    for (const id of mine) pending2.delete(id);
+    const others = new Set(pending2);
     const placed = arrangeNewBranch(
       current.filter((node) => !others.has(node.id)),
       parent.id,

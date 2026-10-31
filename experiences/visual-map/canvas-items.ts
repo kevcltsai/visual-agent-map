@@ -26,6 +26,8 @@ export interface TextItem {
   parentId?: string;
   x: number;
   y: number;
+  /** Topic ids this note is drawn a dashed line to (decision #1); deduped, at most {@link LINK_LIMIT}; omitted when empty. */
+  links?: string[];
 }
 export interface UnknownItem {
   kind: string;
@@ -51,6 +53,7 @@ const LABEL_LIMIT = 200;
 const MEMBER_LIMIT = 500;
 export const TEXT_LIMIT = 2000;
 const PARENT_ID_LIMIT = 200;
+export const LINK_LIMIT = 20;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -88,6 +91,17 @@ export function cleanText(value: unknown): string | null {
   return text ? text : null;
 }
 
+/** Keeps the valid, distinct topic ids (not the note's own id), first LINK_LIMIT of them; anything else is dropped one by one. */
+function cleanLinks(value: unknown, ownId: string): string[] {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<string>();
+  for (const entry of value) {
+    if (out.size >= LINK_LIMIT) break;
+    if (typeof entry === "string" && ID.test(entry) && entry !== ownId) out.add(entry);
+  }
+  return [...out];
+}
+
 function cleanTextItem(raw: Record<string, unknown>): TextItem | null {
   const { id, text, parentId, x, y } = raw;
   if (typeof id !== "string" || !ID.test(id) || !finite(x) || !finite(y)) return null;
@@ -98,6 +112,8 @@ function cleanTextItem(raw: Record<string, unknown>): TextItem | null {
     if (typeof parentId !== "string" || !parentId || parentId.length > PARENT_ID_LIMIT) return null;
     item.parentId = parentId;
   }
+  const links = cleanLinks(raw.links, id);
+  if (links.length) item.links = links;
   return item;
 }
 
@@ -220,4 +236,61 @@ export function pruneBoundaries(
 ): CanvasItem[] {
   const alive = new Set<string>(existingIds);
   return items.filter(item => item.kind !== "boundary" || (item as BoundaryItem).members.some(m => alive.has(m)));
+}
+
+const withLinks = (item: TextItem, links: string[]): TextItem => {
+  const { links: _old, ...rest } = item;
+  void _old;
+  return links.length ? { ...rest, links } : rest;
+};
+
+/** Adds a free text block (no parent, no links). A bad or duplicate one leaves the list unchanged. */
+export function addFreeTextNode(
+  items: readonly CanvasItem[],
+  node: { id: string; text: string; x: number; y: number }
+): CanvasItem[] {
+  return addTextNode(items, { id: node.id, text: node.text, x: node.x, y: node.y });
+}
+
+/** Moves one text node by (dx, dy); a non-finite delta or an unknown id changes nothing. */
+export function moveTextNode(items: readonly CanvasItem[], id: string, dx: number, dy: number): CanvasItem[] {
+  if (!finite(dx) || !finite(dy)) return [...items];
+  return items.map(item => (isText(item) && item.id === id ? { ...item, x: item.x + dx, y: item.y + dy } : item));
+}
+
+/** Links a text node to a topic. Unknown node, bad or own id, a repeat, or a full list (LINK_LIMIT) changes nothing. */
+export function linkTextNode(items: readonly CanvasItem[], id: string, topicId: string): CanvasItem[] {
+  if (typeof topicId !== "string" || !ID.test(topicId) || topicId === id) return [...items];
+  return items.map(item => {
+    if (!isText(item) || item.id !== id) return item;
+    const links = item.links ?? [];
+    if (links.includes(topicId) || links.length >= LINK_LIMIT) return item;
+    return withLinks(item, [...links, topicId]);
+  });
+}
+
+/** Removes one link; the `links` field disappears when it was the last. */
+export function unlinkTextNode(items: readonly CanvasItem[], id: string, topicId: string): CanvasItem[] {
+  return items.map(item => {
+    if (!isText(item) || item.id !== id || !item.links?.includes(topicId)) return item;
+    return withLinks(
+      item,
+      item.links.filter(l => l !== topicId)
+    );
+  });
+}
+
+/** Drops every link to the given topic ids (used when cards are deleted, in the same transaction). Other items are untouched. */
+export function removeLinksTo(
+  items: readonly CanvasItem[],
+  nodeIds: ReadonlySet<string> | readonly string[]
+): CanvasItem[] {
+  const gone = new Set<string>(nodeIds);
+  return items.map(item => {
+    if (!isText(item) || !item.links?.some(l => gone.has(l))) return item;
+    return withLinks(
+      item,
+      item.links.filter(l => !gone.has(l))
+    );
+  });
 }

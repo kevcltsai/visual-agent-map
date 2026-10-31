@@ -82,6 +82,27 @@ test('A5 chat: user texts go in as read-only context, orphans marked unattached,
   assert.ok(result.rejected.every(entry => entry.code === 'unknown_node'), JSON.stringify(result.rejected));
 });
 
+test('canvas A4 chat: free text linked to A carries linkedTo (id and title), once, read-only; no links = unchanged bytes; writeback on text ids refused', () => {
+  const free = { id: 'txt-free', parentId: null, text: 'Budget cap 500k' };
+  const base = JSON.parse(buildMapChatContext(chatInput({ userTexts: [free] })).json);
+  assert.ok(!('linkedTo' in base.userTexts[0]), 'no links: same shape as before');
+  const ctx = buildMapChatContext(chatInput({ userTexts: [{ ...free, links: ['a', 'gone'] }] }));
+  const parsed = JSON.parse(ctx.json);
+  assert.deepEqual(parsed.userTexts[0], { id: 'txt-free', parentId: null, unattached: true, readOnly: true, text: 'Budget cap 500k', linkedTo: [{ id: 'a', title: 'A' }] });
+  assert.equal(ctx.json.split('Budget cap 500k').length - 1, 1, 'text appears once');
+  assert.match(parsed.userTextsNote, /must not be rewritten or deleted/);
+  assert.ok(!ctx.nodeIds.includes('txt-free'));
+  const bads = [item('edit_topic_note', { nodeId: 'txt-free', detail: 'x' }), item('rename_topic', { nodeId: 'txt-free', title: 'x' }), item('delete_topic', { nodeId: 'txt-free' }), item('move_topic', { nodeId: 'txt-free', newParentId: 'a' })];
+  const result = JSON.parse(JSON.stringify(parseMapChat(JSON.stringify({ reply: 'ok', actions: bads }), ctx)));
+  assert.deepEqual(result.actions, []);
+  assert.ok(result.rejected.every(entry => entry.code === 'unknown_node'));
+});
+
+test('canvas A4: research and integration prompts do not mention links (unchanged)', () => {
+  const base = { title: 'T', summary: 's', rules: '', detail: '', task: 'do', ancestors: '', mode: 'synthesize', researchMode: 'local', researchDepth: 'normal' };
+  for (const language of ['en', 'zh-TW']) assert.ok(!/linkedTo/.test(taskPrompt({ ...base, userTexts: '- my note' }, language)));
+});
+
 test('A5 research and integration prompts: user text appears under its own read-only label, absent when there is none', () => {
   const base = { title: 'T', summary: 's', rules: '', detail: '', task: 'do', ancestors: '', mode: 'synthesize', researchMode: 'local', researchDepth: 'normal' };
   for (const language of ['en', 'zh-TW']) {

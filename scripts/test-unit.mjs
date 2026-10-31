@@ -10,6 +10,7 @@ const shards = Math.max(1, Number(process.env.VAM_TEST_SHARDS) || 4);
 export const nodeTestFiles = [
   "tests/compliance-gates.mjs",
   "tests/css-support.mjs",
+  "tests/changelog-section.mjs",
   "tests/prompt-snapshots.cjs",
   "tests/replay.cjs",
   "tests/markdown-selection-auto-open.cjs",

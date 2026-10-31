@@ -90,3 +90,11 @@ test('share translation defaults to the one resolution (#27)', () => {
   assert.match(block, /reasoning: \(\) => this\.currentModelChoice\(\)\.reasoning/);
   assert.doesNotMatch(block, /settings\.cliModel|settings\.cliReasoning/);
 });
+
+test('selection AI and image translation take their reasoning from the one resolution (#22, #23)', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '..', 'main.ts'), 'utf8');
+  const from = source.indexOf('task: prepared.prompt'); assert.ok(from >= 0);
+  const call = source.slice(from, source.indexOf(');', from));
+  assert.match(call, /this\.currentModelChoice\(\)\.reasoning/);
+  assert.doesNotMatch(call, /settings\.cliReasoning/);
+});

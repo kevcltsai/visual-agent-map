@@ -1570,7 +1570,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.pluginDirectory();
     const effort = effectiveReasoningLevel(
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
-      normalizeReasoningLevel(this.settings.cliReasoning)
+      this.currentModelChoice().reasoning
     );
     return this.aiCalls.run(
       prepared,

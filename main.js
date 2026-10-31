@@ -59808,7 +59808,7 @@ ${t("ui.organize_link_wait_hint")}`;
     this.pluginDirectory();
     const effort = effectiveReasoningLevel(
       { title: "Selected Markdown text", summary: "", detail: "", rules: "", task: prepared.prompt, ancestors: "" },
-      normalizeReasoningLevel(this.settings.cliReasoning)
+      this.currentModelChoice().reasoning
     );
     return this.aiCalls.run(
       prepared,

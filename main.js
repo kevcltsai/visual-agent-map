@@ -32313,7 +32313,12 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
         return picked ? { model: picked } : {};
       };
       void generator.generate(
-        { topic: topic.value.trim(), presetText: text11.value, ...generationModel() },
+        {
+          topic: topic.value.trim(),
+          presetText: text11.value,
+          placement: this.placementRequest(),
+          ...generationModel()
+        },
         controller.signal,
         () => {
           const snapshot = inputs();
@@ -44981,13 +44986,18 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       initialTopic,
       ...prefill ? { prefill } : {},
       generate: async (request, signal, started) => {
-        var _a2, _b2;
+        var _a2, _b2, _c, _d, _e;
         if (((_a2 = this.outlineDraftTask) == null ? void 0 : _a2.state) === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
+        const current = this.plugin.currentModelChoice();
+        const parent = ((_b2 = request.placement) == null ? void 0 : _b2.kind) === "under" ? (_c = this.map) == null ? void 0 : _c.nodes.find((node) => node.id === request.placement.parentId) : void 0;
+        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, (_d = this.map) != null ? _d : void 0) : null;
         const { model, reasoning } = resolveTaskModel({
           runOnce: request.model ? { model: request.model } : null,
-          current: this.plugin.currentModelChoice()
+          override: (inherited == null ? void 0 : inherited.origin) === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
+          current
         });
+        const { placement: _placement, ...forService } = request;
         const controller = new AbortController();
         const forward = () => controller.abort();
         signal.addEventListener("abort", forward, { once: true });
@@ -45008,7 +45018,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
           try {
             const result = await this.plugin.outlineGeneration.generate(
               {
-                ...request,
+                ...forService,
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
@@ -45033,7 +45043,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
         });
         signal.removeEventListener("abort", forward);
         if (!ran || !run.task) throw new Error(t("ui.outline_ai_not_started"));
-        return (_b2 = run.task.markdown) != null ? _b2 : "";
+        return (_e = run.task.markdown) != null ? _e : "";
       }
     };
   }
@@ -55371,7 +55381,8 @@ ${note.detail.trim()}` : "",
     );
     viewport.addEventListener("pointerdown", (event) => {
       const target = event.target;
-      if (target.closest(".vam-node") || target.closest(INTERACTIVE_SELECTOR) || !this.map) return;
+      if (target.closest(".vam-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
+        return;
       const intent = canvasPointerIntent({
         button: event.button,
         integrationMode: this.integrationMode,

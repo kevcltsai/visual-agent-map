@@ -2067,10 +2067,21 @@ export class VisualAgentMapView extends ItemView {
         if (this.outlineDraftTask?.state === "running") throw new Error(t("ui.ai_running_ai"));
         const settings = this.plugin.settings;
         // The model menu's pick is for this generation only; the reasoning is the current model's (D5).
+        const current = this.plugin.currentModelChoice();
+        // Under a topic the default follows that topic's manual model (as the window's default entry says); the
+        // reasoning stays the current model's. A new tree or a parent with no manual model uses the current model.
+        const parent =
+          request.placement?.kind === "under"
+            ? this.map?.nodes.find(node => node.id === (request.placement as { parentId: string }).parentId)
+            : undefined;
+        const inherited = parent ? await this.plugin.repo.resolveTopicModel(parent.path, this.map ?? undefined) : null;
         const { model, reasoning } = resolveTaskModel({
           runOnce: request.model ? { model: request.model } : null,
-          current: this.plugin.currentModelChoice()
+          override: inherited?.origin === "override" ? { model: inherited.model, reasoning: current.reasoning } : null,
+          current
         });
+        const { placement: _placement, ...forService } = request;
+        void _placement;
         const controller = new AbortController();
         // Closing the window before AI starts (usage notice still open) stops the run; after that only Stop does.
         const forward = (): void => controller.abort();
@@ -2092,7 +2103,7 @@ export class VisualAgentMapView extends ItemView {
           try {
             const result = await this.plugin.outlineGeneration.generate(
               {
-                ...request,
+                ...forService,
                 language: settings.language,
                 contentLanguage: outputLanguageForMap(this.map, settings.language, request.topic),
                 model,
@@ -13344,7 +13355,14 @@ export class VisualAgentMapView extends ItemView {
     );
     viewport.addEventListener("pointerdown", event => {
       const target = event.target as Element;
-      if (target.closest(".vam-node") || target.closest(INTERACTIVE_SELECTOR) || !this.map) return;
+      // A frame's label chip is its own target: panning would capture the pointer and retarget its double-click.
+      if (
+        target.closest(".vam-node") ||
+        target.closest(".vam-boundary-label") ||
+        target.closest(INTERACTIVE_SELECTOR) ||
+        !this.map
+      )
+        return;
       // Normal mode: a drag pans, Shift+drag draws a selection box. Topic selection mode: a drag adds to the selection,
       // Option (Alt)+drag removes from it, and Space+drag or the middle button pans.
       const intent = canvasPointerIntent({

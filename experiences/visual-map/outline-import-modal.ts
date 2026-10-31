@@ -104,6 +104,8 @@ export interface OutlineGenerator {
       presetText: string;
       /** The model picked in the research options (used for this generation only); absent: the current model. */
       model?: string;
+      /** Where the outline will go; under a topic, the default model follows that topic's manual model. */
+      placement?: OutlinePlacement;
     },
     signal: AbortSignal,
     started: () => OutlineDraftInputs
@@ -448,7 +450,12 @@ export class OutlineImportModal extends Modal {
       // Unsaved edits in the preset box are used for this run only.
       void generator
         .generate(
-          { topic: topic.value.trim(), presetText: text.value, ...generationModel() },
+          {
+            topic: topic.value.trim(),
+            presetText: text.value,
+            placement: this.placementRequest(),
+            ...generationModel()
+          },
           controller.signal,
           () => {
             // AI started: hide this window; the host owns the run from here (Stop is on its status bar).

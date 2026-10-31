@@ -45,7 +45,16 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     aiTranslated: "{0}から AI が翻訳しました。",
     aiTranslatedUnknown: "AI が翻訳しました。",
     originalText: "原文",
-    imageTextUntranslated: "画像内の文字は翻訳されません。"
+    imageTextUntranslated: "画像内の文字は翻訳されません。",
+    markerLabel: "マーク：{0}",
+    markerNames: {
+      done: "完了",
+      warning: "警告",
+      star: "スター",
+      "priority-1": "優先度 1",
+      "priority-2": "優先度 2",
+      "priority-3": "優先度 3"
+    }
   },
   ko: {
     lang: "ko",
@@ -84,7 +93,16 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     aiTranslated: "{0}에서 AI가 번역했습니다.",
     aiTranslatedUnknown: "AI가 번역했습니다.",
     originalText: "원문",
-    imageTextUntranslated: "이미지 안의 글자는 번역되지 않습니다."
+    imageTextUntranslated: "이미지 안의 글자는 번역되지 않습니다.",
+    markerLabel: "표시: {0}",
+    markerNames: {
+      done: "완료",
+      warning: "경고",
+      star: "별표",
+      "priority-1": "우선순위 1",
+      "priority-2": "우선순위 2",
+      "priority-3": "우선순위 3"
+    }
   },
   es: {
     lang: "es",
@@ -123,6 +141,57 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     aiTranslated: "Traducido por IA desde {0}.",
     aiTranslatedUnknown: "Traducido por IA.",
     originalText: "Original",
-    imageTextUntranslated: "El texto dentro de las imágenes no está traducido."
+    imageTextUntranslated: "El texto dentro de las imágenes no está traducido.",
+    markerLabel: "Marcas: {0}",
+    markerNames: {
+      done: "Hecho",
+      warning: "Aviso",
+      star: "Destacado",
+      "priority-1": "Prioridad 1",
+      "priority-2": "Prioridad 2",
+      "priority-3": "Prioridad 3"
+    }
+  }
+};
+
+/**
+ * Marker text for the languages whose viewer text comes from the plugin (share-viewer-text.ts): `markerLabel` is the
+ * accessible-name part of a topic that has markers (`{0}` is the names joined), `markerNames` the name of each marker.
+ */
+export const SHARE_MARKER_TEXT: Readonly<
+  Record<"en" | "zh-TW" | "zh-CN", Pick<ShareViewerUi, "markerLabel" | "markerNames">>
+> = {
+  en: {
+    markerLabel: "Markers: {0}",
+    markerNames: {
+      done: "Done",
+      warning: "Warning",
+      star: "Star",
+      "priority-1": "Priority 1",
+      "priority-2": "Priority 2",
+      "priority-3": "Priority 3"
+    }
+  },
+  "zh-TW": {
+    markerLabel: "標記：{0}",
+    markerNames: {
+      done: "完成",
+      warning: "警告",
+      star: "星號",
+      "priority-1": "優先 1",
+      "priority-2": "優先 2",
+      "priority-3": "優先 3"
+    }
+  },
+  "zh-CN": {
+    markerLabel: "标记：{0}",
+    markerNames: {
+      done: "完成",
+      warning: "警告",
+      star: "星标",
+      "priority-1": "优先 1",
+      "priority-2": "优先 2",
+      "priority-3": "优先 3"
+    }
   }
 };

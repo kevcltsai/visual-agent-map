@@ -1,7 +1,7 @@
 import { translate } from "../../i18n";
 import type { ShareViewerUi, ShareViewerUiExtras } from "./share-viewer-ui";
 import type { ShareLanguage } from "./share-format";
-import { SHARE_VIEWER_UI_EXTRA, type ShareExtraUiLanguage } from "./share-viewer-dictionaries";
+import { SHARE_MARKER_TEXT, SHARE_VIEWER_UI_EXTRA, type ShareExtraUiLanguage } from "./share-viewer-dictionaries";
 import { LANGUAGES, OUTPUT_LANGUAGES } from "../../i18n/languages";
 
 /** The viewer's interface text in `language` (the exporter's interface language), from the plugin dictionaries. */
@@ -44,7 +44,9 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
     aiTranslated: text("share.viewer_ai_translated_0"),
     aiTranslatedUnknown: text("share.viewer_ai_translated_unknown"),
     originalText: text("share.viewer_original_text"),
-    imageTextUntranslated: text("share.viewer_image_text_untranslated")
+    imageTextUntranslated: text("share.viewer_image_text_untranslated"),
+    markerLabel: SHARE_MARKER_TEXT[language].markerLabel,
+    markerNames: { ...SHARE_MARKER_TEXT[language].markerNames }
   };
 }
 

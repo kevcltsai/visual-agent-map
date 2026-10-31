@@ -118,6 +118,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node.vam-node[data-relevance="side"] { opacity: 1; }
 .vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }
+/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */
+.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }
+.vam-outline-item .vam-markers { margin-left: 6px; }
 .vam-status-idea.vam-status-idea { color: var(--text-muted); }
 .vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }
 /* Reading styles for the note HTML that Obsidian rendered at export time. */

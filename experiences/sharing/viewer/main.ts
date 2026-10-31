@@ -1,4 +1,4 @@
-import { applyCollapseLevel, descendants, type MapNode } from "../../../map-graph";
+import { applyCollapseLevel, CARD_WIDTH, clampCardWidth, descendants, type MapNode } from "../../../map-graph";
 import { arrangeMap } from "../../../map-layout";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
@@ -23,7 +23,6 @@ const PANEL_DEFAULT = 300;
 const PANEL_MIN = 240;
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 2;
-const CARD_WIDTH = 280;
 const DRAG_THRESHOLD = 4;
 
 type Tier = "core" | "support" | "side";
@@ -143,13 +142,15 @@ export function startViewer(doc: Document): void {
   for (const item of data.nodes) {
     if (!item || typeof item.id !== "string" || info.has(item.id)) continue;
     info.set(item.id, item);
+    const width = clampCardWidth(item.width);
     nodes.push({
       id: item.id,
       path: item.id,
       parentId: typeof item.parentId === "string" ? item.parentId : null,
       x: Number.isFinite(item.x) ? item.x : 0,
       y: Number.isFinite(item.y) ? item.y : 0,
-      collapsed: !!item.collapsed
+      collapsed: !!item.collapsed,
+      ...(width !== undefined && width !== CARD_WIDTH ? { width } : {})
     });
   }
   const byId = new Map(nodes.map(node => [node.id, node]));
@@ -512,6 +513,7 @@ export function startViewer(doc: Document): void {
     if (!card || !node) return;
     card.style.left = `${node.x}px`;
     card.style.top = `${node.y}px`;
+    if (node.width) card.style.width = `${node.width}px`;
   };
 
   function renderCards(): void {

@@ -96,8 +96,21 @@ export const en = {
   "ui.outline_warning_ignored_lines": "{0} non-heading lines will not be imported.",
   "ui.outline_import_log": "Imported from an outline ({0}).",
   "ui.outline_import_log_source": "Imported from an outline ({0}): [[{1}]]",
+  "ui.outline_import_log_file": "Imported from an outline ({0}): {1}",
   "ui.outline_import_map_save_failed": "The topic notes were created but the map could not be saved: {0}",
   "ui.outline_import": "Import outline",
+  "ui.exchange_import": "Import OPML or FreeMind file",
+  "ui.exchange_refused": "Not imported: {0} ({1})",
+  "ui.exchange_reason_too_large": "the file is larger than {0} MB",
+  "ui.exchange_reason_unsafe": "it contains a DOCTYPE, entity or processing instruction, which are not accepted",
+  "ui.exchange_reason_too_big": "it has too many topics, elements or levels",
+  "ui.exchange_reason_invalid": "it is not a valid OPML or FreeMind outline ({0})",
+  "ui.exchange_reason_unreadable": "the file could not be read",
+  "ui.exchange_export_opml": "Export as OPML",
+  "ui.exchange_export_freemind": "Export as FreeMind (.mm)",
+  "ui.exchange_exported": "Exported to {0}",
+  "ui.exchange_export_failed": "Export failed: {0}",
+  "ui.exchange_export_no_name": "No free file name was found",
   "ui.outline_import_hint":
     "Paste a heading-only Markdown outline, or generate one with AI from a topic. Each heading becomes a topic.",
   "ui.outline_import_text_label": "Outline",
@@ -812,6 +825,17 @@ export const en = {
     "Each new subtopic gets a short research pass, using AI quota",
   "ui.layout_direction_right": "Lay out to the right",
   "ui.layout_direction_left": "Lay out to the left",
+  "ui.layout_direction_down": "Lay out downward",
+  "ui.layout_direction_up": "Lay out upward",
+  "ui.layout_direction_balanced": "Lay out balanced left and right",
+  "ui.layout_direction_radial": "Lay out radially",
+  "ui.layout_direction_timeline": "Lay out as a timeline",
+  "ui.layout_direction_fishbone": "Lay out as a fishbone",
+  "ui.branch_layout": "Branch layout",
+  "ui.branch_layout_follow": "Follow the map",
+  "ui.layout_spacing_compact": "Compact spacing",
+  "ui.layout_spacing_standard": "Standard spacing",
+  "ui.layout_spacing_spacious": "Spacious spacing",
   "ui.auto_layout": "Auto layout",
   "ui.layout": "Layout",
   "ui.expansion_failed": "Expansion failed",
@@ -2307,7 +2331,36 @@ export const en = {
   "share.translate_diagrams_kept_0": "{0} diagrams could not be translated and keep their original labels.",
   "share.translate_images_note": "Text inside images is not translated.",
   "share.translate_total_size_0": "Total size with these languages: {0}",
-  "share.translate_languages_included_0": "Languages in the file: {0}"
+  "share.translate_languages_included_0": "Languages in the file: {0}",
+  // Clipboard: copy and paste of branches inside one map
+  "ui.clipboard_copy_failed": "Could not copy the selection as a branch.",
+  "ui.clipboard_paste_readonly": "This map is read-only here, so nothing was pasted.",
+  "ui.clipboard_paste_invalid": "The clipboard does not hold a valid branch, so nothing was pasted.",
+  "ui.clipboard_cut_mark": "Cut",
+  "ui.clipboard_cut_readonly": "This map is read-only here, so nothing was cut.",
+  "ui.clipboard_cut_into_own": "A branch cannot be pasted into itself or its own sub-topics, so nothing was moved.",
+  "ui.clipboard_cut_missing": "The cut branches or the target topic are no longer on the map, so nothing was moved.",
+  "ui.clipboard_cut_cross_changed":
+    "The map the branches were cut from has changed since the cut, so nothing was moved. Cut them again.",
+  "ui.clipboard_cut_cross_busy":
+    "The map the branches were cut from has an open conflict window. Resolve it and paste again; nothing was moved.",
+  "ui.clipboard_cut_cross_unsupported":
+    "Branches cannot be moved out of an AIM map or include AIM topics, so nothing was moved.",
+  "ui.clipboard_cut_cross_history": "Move branches from another map",
+  "ui.cross_map_undo_refused":
+    "This change touched two maps, and the notes or maps were changed elsewhere since, so it was not undone or redone. Nothing was changed.",
+  "ui.cross_map_undo_broken":
+    "This change touched two maps and an earlier undo or redo could not be fully restored, so it can no longer be undone or redone.",
+  "ui.clipboard_text_too_long": "The pasted text is longer than {0} characters, so nothing was pasted.",
+  "ui.clipboard_text_too_many": "Line {0}: the pasted text has more than {1} topics, so nothing was pasted.",
+  "ui.clipboard_text_empty_title": "Line {0}: this line has no title text, so nothing was pasted.",
+  "ui.clipboard_text_title_too_long": "Line {0}: a title can be at most {1} characters, so nothing was pasted.",
+  "ui.clipboard_text_bad_title":
+    "Line {0}: this title has characters or markup that cannot be used in a title, so nothing was pasted.",
+  "ui.clipboard_text_vam_note":
+    "This looks like a Visual Agent Map note or map file, not an outline, so nothing was pasted.",
+  "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
+  "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted."
 } as const;
 
 export type TranslationKey = keyof typeof en;

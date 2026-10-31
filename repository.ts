@@ -1470,14 +1470,22 @@ export class Repository {
     return { id, path, parentId: null, x: 80, y: 80, collapsed: false };
   }
 
-  async duplicateNote(sourcePath: string, map: MapDocument, mapPath: string): Promise<MapNode> {
+  /** `keepTitle` keeps the source title as is (a paste); without it the copy gets the translated "copy" suffix. */
+  async duplicateNote(
+    sourcePath: string,
+    map: MapDocument,
+    mapPath: string,
+    options: { keepTitle?: boolean } = {}
+  ): Promise<MapNode> {
     const folder = this.topicFolder(mapPath, "Notes");
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
     const sourceTitle = text(metadata.title, this.file(sourcePath).basename);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
-    const title = `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
+    const title = options.keepTitle
+      ? sourceTitle
+      : `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
     metadata["node-id"] = id;
     metadata["topic-id"] = map.id;

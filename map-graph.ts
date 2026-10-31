@@ -6,6 +6,8 @@ export interface MapNode {
   x: number;
   y: number;
   collapsed: boolean;
+  /** This branch's own arrangement, instead of the map's; only right, left, down and up are stored (decision D9). */
+  layout?: { direction: "right" | "left" | "down" | "up" };
   aimKind?: AimNodeKind;
   aimQuestion?: {
     requestId: string;

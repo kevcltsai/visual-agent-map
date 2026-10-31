@@ -963,7 +963,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -1633,18 +1633,18 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   view.autoLayout(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutDirectionOf\(map\)\);/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
+  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\);/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
 });
-integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the two directions and Auto layout', () => {
+integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the eight arrangements, a separator, the three spacings and Auto layout', () => {
   const menus = [];
   class Menu { constructor() { this.items = []; menus.push(this); } addItem(callback) { const item = { setTitle(value) { this.title = value; return this; }, setIcon() { return this; }, setChecked(value) { this.checked = value; return this; }, onClick(handler) { this.click = handler; return this; } }; callback(item); this.items.push(item); return this; } addSeparator() { this.items.push({ separator: true }); return this; } showAtMouseEvent() { return this; } }
   const { view } = selectionView(load, {}, { ...obsidian, Menu });
-  const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayoutDirection = direction => calls.push(direction);
+  const calls = []; view.collapseTo = levels => calls.push(levels); view.autoLayout = () => calls.push('arrange'); view.setLayout = patch => calls.push(patch.direction ?? patch.spacing);
   view.openLayoutMenu({});
-  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Auto layout']);
-  assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, undefined], 'the current direction is checked');
+  assert.deepEqual(menus[0].items.map(item => item.separator ? '---' : item.title), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Lay out to the right', 'Lay out to the left', 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
+  assert.deepEqual(menus[0].items.filter(item => !item.separator).map(item => item.checked), [undefined, undefined, undefined, undefined, undefined, true, false, false, false, false, false, false, false, false, true, false, undefined], 'the current direction and spacing are checked');
   menus[0].items.filter(item => !item.separator).forEach(item => item.click());
-  assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'arrange']);
+  assert.deepEqual(calls, [0, null, 1, 2, 3, 'right', 'left', 'down', 'up', 'balanced', 'radial', 'timeline', 'fishbone', 'compact', 'standard', 'spacious', 'arrange']);
   const { translate } = load('i18n.ts');
   assert.equal(translate('zh-TW', 'ui.layout'), '排版'); assert.equal(translate('en', 'ui.layout'), 'Layout');
   assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-layout-button::after \{ content: "▾" \/ "";/, 'the menu caret is decoration, not part of the name');

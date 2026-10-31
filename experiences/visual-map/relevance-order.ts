@@ -1,4 +1,4 @@
-import { arrangeMap, type LayoutDirection } from "../../map-layout";
+import { arrangeMap, type LayoutKind, type MapLayout } from "../../map-layout";
 import type { MapNode } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 
@@ -32,7 +32,7 @@ export function relevanceDisplayNodes(
   nodes: MapNode[],
   tierOf: (id: string) => RelevanceTier | undefined,
   hidden?: Set<string>,
-  direction: LayoutDirection = "right"
+  direction: LayoutKind | MapLayout = "right"
 ): MapNode[] {
   const groups = new Map<string | null, MapNode[]>();
   for (const node of nodes) {

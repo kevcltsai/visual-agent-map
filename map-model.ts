@@ -3,7 +3,8 @@ import { upgradeLegacyAimData } from "./experiences/aim/legacy-names";
 import type { AiResult } from "./ai/types";
 import { debugLog, type LogLevel } from "./log-manager";
 import { isMapAiMode, type MapAiMode } from "./experiences/visual-map/ai-mode";
-import type { MapLayout } from "./map-layout";
+import { cleanBranchLayouts } from "./layouts/compose";
+import { isLayoutKind, isStoredLayoutSpacing, type MapLayout } from "./map-layout";
 import type { FinalDeliveryCheckpoint } from "./experiences/aim/final-delivery";
 import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, type NoteLanguage } from "./i18n";
 import {
@@ -590,12 +591,11 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
   if (map.aiMode !== undefined && !isMapAiMode(map.aiMode)) delete map.aiMode;
   if (
     map.layout !== undefined &&
-    (!map.layout ||
-      typeof map.layout !== "object" ||
-      Array.isArray(map.layout) ||
-      (map.layout.direction !== "right" && map.layout.direction !== "left"))
+    (!map.layout || typeof map.layout !== "object" || Array.isArray(map.layout) || !isLayoutKind(map.layout.direction))
   )
     delete map.layout;
+  else if (map.layout && map.layout.spacing !== undefined && !isStoredLayoutSpacing(map.layout.spacing))
+    delete map.layout.spacing;
   const ids = new Set<string>(),
     aimQuestionRequests = new Set<string>();
   for (const n of map.nodes) {
@@ -667,6 +667,7 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
   for (const n of map.nodes)
     if (!canParent(map.nodes, n.id, n.parentId))
       throw new Error(t("ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic"));
+  cleanBranchLayouts(map.nodes, map.layout?.direction ?? "right", map.aim !== undefined);
   if (map.aim !== undefined) validateAimMap(map);
   if (
     !map.viewport ||

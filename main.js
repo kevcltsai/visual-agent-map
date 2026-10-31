@@ -18486,6 +18486,8 @@ function relationLabelPoint(a, b) {
 }
 function treeEdgePathData(parent, child, direction, depth = 1) {
   if (direction === "radial") return relationPathData(parent, child);
+  if (direction === "timeline" && depth >= 2)
+    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
   if (direction === "fishbone")
     return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
   if (direction === "down" || direction === "up") {
@@ -49720,9 +49722,18 @@ ${request.requirements}` : preset.text,
     const record = sessionFor(this.plugin).get();
     return (record == null ? void 0 : record.mode) === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : /* @__PURE__ */ new Set();
   }
-  refreshCutMarks() {
+  paintCutMarks() {
     const cut = this.cutIds();
     for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
+  }
+  /** Repaints the cut marks of this view and of every other map view, in the main window and in popout windows. */
+  refreshCutMarks() {
+    var _a2, _b2, _c;
+    this.paintCutMarks();
+    for (const leaf of (_c = (_b2 = (_a2 = this.app.workspace) == null ? void 0 : _a2.getLeavesOfType) == null ? void 0 : _b2.call(_a2, VIEW_TYPE)) != null ? _c : []) {
+      const view = leaf.view;
+      if (view instanceof _VisualAgentMapView && view !== this) view.paintCutMarks();
+    }
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot() {
@@ -50815,7 +50826,6 @@ ${request.requirements}` : preset.text,
   }
   /** Inspector section: how the branch under this topic is arranged (D9). Absent for a root and for radial, timeline and fishbone maps. */
   renderBranchLayoutSection(panel, node) {
-    var _a2;
     const choices = this.branchLayoutChoices(node);
     if (!choices.length) return;
     const section3 = panel.createDiv("vam-inspector-section vam-branch-layout-section");
@@ -50823,21 +50833,31 @@ ${request.requirements}` : preset.text,
     const group = section3.createDiv("vam-branch-layout vam-choice-group");
     group.setAttr("role", "group");
     group.setAttr("aria-label", t("ui.branch_layout"));
-    const current = (_a2 = branchDirectionOf(node)) != null ? _a2 : null;
-    const options = [
-      { direction: null, label: t("ui.branch_layout_follow") },
-      ...choices.map((direction) => ({ direction, label: t(BRANCH_LABEL[direction]) }))
-    ];
-    for (const option2 of options) {
-      const choice2 = this.button(
-        group,
-        option2.label,
-        () => this.enqueue(() => this.changeBranchLayout(node, option2.direction))
-      );
-      const on = option2.direction === current;
-      choice2.setAttr("aria-pressed", String(on));
-      if (on) choice2.addClass("is-pressed");
-    }
+    const paint = (focusDirection) => {
+      var _a2, _b2, _c;
+      group.empty();
+      const latest = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id)) != null ? _b2 : node;
+      const current = (_c = branchDirectionOf(latest)) != null ? _c : null;
+      const options = [
+        { direction: null, label: t("ui.branch_layout_follow") },
+        ...this.branchLayoutChoices(latest).map((direction) => ({ direction, label: t(BRANCH_LABEL[direction]) }))
+      ];
+      for (const option2 of options) {
+        const choice2 = this.button(
+          group,
+          option2.label,
+          () => this.enqueue(async () => {
+            await this.changeBranchLayout(node, option2.direction);
+            paint(option2.direction);
+          })
+        );
+        const on = option2.direction === current;
+        choice2.setAttr("aria-pressed", String(on));
+        if (on) choice2.addClass("is-pressed");
+        if (focusDirection !== void 0 && option2.direction === focusDirection) choice2.focus();
+      }
+    };
+    paint();
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   async changeTopicMarker(node, id) {

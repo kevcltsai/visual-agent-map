@@ -6421,7 +6421,7 @@ export class VisualAgentMapView extends ItemView {
    * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
    * its own descendants; the moved branches are laid out once, in the same entry.
    */
-  private async moveBranches(roots: MapNode[], target: MapNode | null): Promise<void> {
+  private async moveBranches(roots: MapNode[], target: MapNode | null, clearSelection = true): Promise<void> {
     if (!this.map) return;
     if (!this.mergeUnlocked([...(target ? [target.id] : []), ...roots.map(root => root.id)])) return;
     this.assertAimReferencesRemain(this.map, new Set(roots.map(root => root.id)), true);
@@ -6445,7 +6445,7 @@ export class VisualAgentMapView extends ItemView {
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
       }
     });
-    this.multiSelected.clear();
+    if (clearSelection) this.multiSelected.clear();
     this.render();
   }
   private assertAimReferencesRemain(
@@ -15710,6 +15710,33 @@ export class VisualAgentMapView extends ItemView {
         if (member) groupOrigins.set(id, { x: member.x, y: member.y });
       }
       let delta = { x: 0, y: 0 };
+      // Where on the card the pointer grabbed it, in map units, so the pointer's map position can be followed.
+      const zoom0 = this.map.viewport.zoom;
+      const rect0 = typeof card.getBoundingClientRect === "function" ? card.getBoundingClientRect() : null;
+      const grab = rect0 ? { x: (start.x - rect0.left) / zoom0, y: (start.y - rect0.top) / zoom0 } : { x: 0, y: 0 };
+      // The card the pointer is over when it can take the dragged branch(es) as children (highlighted), and its element.
+      let hover: { node: MapNode; invalid: boolean } | null = null;
+      let hoverEl: HTMLElement | null = null;
+      const setHover = (next: { node: MapNode; invalid: boolean } | null): void => {
+        hover = next;
+        const el = next && !next.invalid ? (this.cardEls.get(next.node.id) ?? null) : null;
+        if (el === hoverEl) return;
+        hoverEl?.classList.remove("is-reparent-target");
+        el?.classList.add("is-reparent-target");
+        hoverEl = el;
+      };
+      const targetAt = (e: PointerEvent): { node: MapNode; invalid: boolean } | null => {
+        if (!this.canSelectTopics() || !this.map) return null;
+        const self = this.map.nodes.find(item => item.id === node.id);
+        const roots = group ? this.selectedRoots() : self ? [self] : [];
+        const z = this.map.viewport.zoom;
+        return this.reparentTargetAt(
+          origin.x + grab.x + (e.clientX - start.x) / z,
+          origin.y + grab.y + (e.clientY - start.y) / z,
+          roots,
+          node.id
+        );
+      };
       // Sizes and the far end of each touching edge are read once; a move then only writes.
       const edges = group ? null : this.dragEdges(node.id, card);
       const groupEdges = group ? this.groupDragEdges(group) : null;
@@ -15759,11 +15786,14 @@ export class VisualAgentMapView extends ItemView {
         if (selecting) {
           travelled ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
           if (!group || !travelled || this.relevanceSortOn()) return;
-          if (locked || timelineBlocked) {
+          // A locked group neither moves nor changes parent; otherwise a card under the pointer is the new parent.
+          setHover(locked || overChat ? null : targetAt(e));
+          if (locked || (timelineBlocked && !hover)) {
             if (!warned) new Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
             warned = true;
             return;
           }
+          if (timelineBlocked) return;
           const zoom = this.map!.viewport.zoom;
           delta = { x: (e.clientX - start.x) / zoom, y: (e.clientY - start.y) / zoom };
           this.dragFrame ??= window.requestAnimationFrame(paint);
@@ -15777,6 +15807,7 @@ export class VisualAgentMapView extends ItemView {
           warned = true;
         }
         if (!moved || locked) return;
+        setHover(overChat ? null : targetAt(e));
         position = {
           x: origin.x + (e.clientX - start.x) / this.map!.viewport.zoom,
           y: origin.y + (e.clientY - start.y) / this.map!.viewport.zoom
@@ -15784,6 +15815,7 @@ export class VisualAgentMapView extends ItemView {
         this.dragFrame ??= window.requestAnimationFrame(paint);
       };
       const settle = (): void => {
+        setHover(null);
         this.chat?.setDropHighlight(false);
         this.dragging = false;
         this.dragOrigin = null;
@@ -15798,9 +15830,10 @@ export class VisualAgentMapView extends ItemView {
       // The drop's own work comes first; a repaint that was asked for during the drag then runs once.
       const finish = (e: PointerEvent): void => {
         const stale = this.dragStale();
+        const landed = hover;
         settle();
         try {
-          if (!stale) drop(e);
+          if (!stale) drop(e, landed);
         } finally {
           if (this.renderAfterDrag && !this.dragging) {
             this.renderAfterDrag = false;
@@ -15808,7 +15841,7 @@ export class VisualAgentMapView extends ItemView {
           }
         }
       };
-      const drop = (e: PointerEvent): void => {
+      const drop = (e: PointerEvent, landed: { node: MapNode; invalid: boolean } | null): void => {
         // A plain click in selection mode is left to the click handler; a drag there must not toggle the card.
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
@@ -15835,7 +15868,18 @@ export class VisualAgentMapView extends ItemView {
         }
         if (selecting) {
           if (!group) return;
-          if (locked || timelineBlocked || this.relevanceSortOn()) {
+          if (this.relevanceSortOn()) {
+            putBack();
+            return;
+          }
+          if (landed) {
+            // On a card: the picked branches become its children (same rule and write as "Move to...").
+            putBack();
+            if (landed.invalid) new Notice(t("ui.circular_links_are_not_allowed"));
+            else this.enqueue(() => this.moveBranches(this.selectedRoots(), landed.node));
+            return;
+          }
+          if (locked || timelineBlocked) {
             putBack();
             return;
           }
@@ -15856,6 +15900,12 @@ export class VisualAgentMapView extends ItemView {
         }
         if (moved && locked) {
           // The Notice already showed when the drag started.
+        } else if (moved && landed) {
+          // On a card: the dragged branch becomes its child; the picked cards stay picked.
+          putBack();
+          const dragged = this.map?.nodes.find(item => item.id === node.id);
+          if (landed.invalid) new Notice(t("ui.circular_links_are_not_allowed"));
+          else if (dragged) this.enqueue(() => this.moveBranches([dragged], landed.node, false));
         } else if (moved) {
           paint();
           this.enqueue(() =>
@@ -15905,6 +15955,32 @@ export class VisualAgentMapView extends ItemView {
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
     });
+  }
+  /**
+   * The card under a dragged branch's pointer (map coordinates) that may become its parent, or null when the pointer is
+   * over empty space, the dragged card itself (single drag) or the parent every dragged branch already has. A card
+   * inside the dragged branches (or a picked card of a group) is returned with `invalid`: it would make a loop.
+   */
+  private reparentTargetAt(
+    px: number,
+    py: number,
+    roots: MapNode[],
+    selfId: string
+  ): { node: MapNode; invalid: boolean } | null {
+    const nodes = this.map?.nodes;
+    if (!nodes || !roots.length) return null;
+    let found: MapNode | null = null;
+    for (const [id, el] of this.cardEls) {
+      if (px < el.offsetLeft || px >= el.offsetLeft + el.offsetWidth) continue;
+      if (py < el.offsetTop || py >= el.offsetTop + el.offsetHeight) continue;
+      found = nodes.find(item => item.id === id) ?? found;
+    }
+    if (!found) return null;
+    if (found.id === selfId) return null;
+    const target = found;
+    if (roots.every(root => root.parentId === target.id)) return null;
+    const inside = roots.some(root => root.id === target.id || descendants(nodes, root.id).has(target.id));
+    return { node: target, invalid: inside || !roots.every(root => canParent(nodes, root.id, target.id)) };
   }
   /** The picked cards that move together when one of them is dragged in selection mode, by id. */
   private groupDragMembers(node: MapNode, card: HTMLElement): Map<string, HTMLElement> {

@@ -116,6 +116,7 @@ export function parseClipboard(raw: unknown): ClipboardParse {
         typeof body !== "string" ||
         body.length > CLIPBOARD_MAX_BODY ||
         body.includes("\u0000") ||
+        body.includes("<!-- visual-agent-map:") ||
         startsWithFrontmatter(body)
       )
         return fail("bad-body");

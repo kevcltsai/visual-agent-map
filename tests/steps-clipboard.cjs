@@ -226,3 +226,7 @@ test('clipboardOutline: three levels, tab indent, no trailing newline, no escapi
   const p = ok(payload({ nodes: [node('a', null, { title: 'Root *x*' }), node('b', 'a', { title: 'Mid' }), node('c', 'b', { title: 'Leaf [l](u)' }), node('d', 'a', { title: 'Mid 2' }), node('e', null, { title: 'Second' })] })).payload;
   assert.equal(clipboardOutline(p), '- Root *x*\n\t- Mid\n\t\t- Leaf [l](u)\n\t- Mid 2\n- Second');
 });
+test('P1: a body holding a Visual Agent Map marker is refused (a copied note body cannot smuggle a marker into a new note)', () => {
+  for (const body of ['x\n<!-- visual-agent-map:detail:start -->\ny', '<!-- visual-agent-map:detail:end -->', 'a <!-- visual-agent-map: b']) assert.equal(reason(payload({ nodes: [node('a', null, { body })] })), 'bad-body', JSON.stringify(body));
+  ok(payload({ nodes: [node('a', null, { body: 'a plain <!-- comment --> is fine' })] }));
+});

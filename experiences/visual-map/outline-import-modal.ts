@@ -1,6 +1,12 @@
 import { App, Modal, Notice } from "obsidian";
 import { t } from "../../i18n";
-import { parseOutline, sanitizeOutlineDraft, type OutlineIssue, type OutlineNode } from "./outline-import";
+import {
+  parseOutline,
+  sanitizeOutlineDraft,
+  type OutlineIssue,
+  type OutlineNode,
+  type OutlineSource
+} from "./outline-import";
 import type { MapAiMode } from "./ai-mode";
 import type { TaskOptions } from "./modals";
 import { aiModeField, modelField, noteStyleField, type FieldLinks, type ModelChoices } from "./research-fields";
@@ -34,7 +40,7 @@ export interface OutlineImportTarget {
 export interface OutlineImportRequest {
   nodes: OutlineNode[];
   placement?: OutlinePlacement;
-  source: string | null;
+  source: OutlineSource;
   shallowResearch: boolean;
   /** AI mode of the shallow research (Quick when omitted). */
   aiMode?: MapAiMode;

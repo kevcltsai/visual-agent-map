@@ -83,7 +83,6 @@ import {
   DEFAULT_CARD_HEIGHT,
   LAYOUT_GAP,
   layoutDirectionFor,
-  layoutDirectionOf,
   layoutOf,
   medianHeight,
   reorderTopLevel,
@@ -221,7 +220,26 @@ import {
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
 import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
-import { addOutlineToMap, createOutlineMap, limitOutline, type OutlineNode } from "./outline-import";
+import {
+  addOutlineToMap,
+  createOutlineMap,
+  limitOutline,
+  OUTLINE_NODE_LIMIT,
+  OUTLINE_TITLE_LIMIT,
+  type OutlineNode
+} from "./outline-import";
+import {
+  buildClipboardPayload,
+  clipboardOutline,
+  parseClipboard,
+  serializeClipboard,
+  type ClipboardPayload
+} from "./clipboard";
+import { inClipboardScope, readClipboardData, writeClipboardData } from "./clipboard-io";
+import { canPasteCut, planPaste, resolveCrossSource } from "./clipboard-paste";
+import { PASTE_TEXT_MAX_CHARS, parseIndentedText, type IndentedTextRejection } from "./clipboard-text";
+import { sessionFor, type ClipRecord } from "./clipboard-session";
+import { cutSourceProblem, ledgerFor, sameApartFromStamps } from "./cross-map-history";
 import {
   OutlineImportModal,
   type OutlineDraftInputs,
@@ -231,6 +249,7 @@ import {
   type OutlineImportTarget,
   type OutlinePlacement
 } from "./outline-import-modal";
+import { exportMapWithNotice } from "./outline-exchange-io";
 import { MultiResearchModal, type MultiResearchRequest } from "./multi-research-modal";
 import { StructureReviewModal } from "./structure-review-modal";
 import {
@@ -316,6 +335,16 @@ const BRANCH_LABEL = {
   up: "ui.layout_direction_up"
 } as const;
 export const VIEW_TYPE = "visual-agent-map-view";
+/** What a cross-map cut adds to writeNewBranches: its own transaction, the source map's part of it, and the success step. */
+interface CrossCut {
+  /** Reads what must be put back byte for byte if the commit fails; runs before `begin`. */
+  snapshot: () => Promise<void>;
+  /** After a failed commit that rolled back cleanly: puts back the exact text of what the rollback only restored in value. */
+  restore: () => Promise<void>;
+  begin: () => Transaction;
+  join: (tx: Transaction) => void;
+  finish: (entry: TransactionEntry) => Promise<void>;
+}
 interface Action {
   undo: () => Promise<void>;
   redo: () => Promise<void>;
@@ -454,6 +483,8 @@ type SynthesisWrite = (
 /** Unique ids for the hidden card labels; any view may render a card. */
 let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
+/** The extra accessible-name part of a card that is waiting to be moved by a paste ("cut"). */
+const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
@@ -797,6 +828,8 @@ export class VisualAgentMapView extends ItemView {
   private zoomLabel: HTMLElement | null = null;
   private refreshTimer: number | null = null;
   private viewportTimer: number | null = null;
+  /** True while the Map.md conflict window of this view is open. */
+  private conflictOpen = false;
   private hoverTimer: number | null = null;
   private hoverCard: HTMLElement | null = null;
   /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
@@ -997,6 +1030,10 @@ export class VisualAgentMapView extends ItemView {
     this.registerDomEvent(this.contentEl.win ?? window, "blur", () => {
       this.spaceHeld = false;
     });
+    // Copy and paste of branches: on the document, popout windows included (decision #29, evidence/clipboard-mime.md).
+    this.bindClipboard();
+    // The listener belongs to the element (it goes away with it); a move to another window binds the new document.
+    this.contentEl.onWindowMigrated?.(() => this.bindClipboard());
     this.registerDomEvent(this.contentEl, "keydown", event => {
       // Escape inside the chat window folds the window (the panel handles it); it never clears the map's selection.
       if (
@@ -1105,6 +1142,8 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
+    this.unbindClipboard?.();
+    this.unbindClipboard = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
     this.announcer = null;
@@ -1396,6 +1435,7 @@ export class VisualAgentMapView extends ItemView {
     this.selected = null;
     this.multiSelected.clear();
     this.history.clear();
+    this.restoreCrossProxies();
     await this.hydrate(isCurrent);
     if (!isCurrent()) return;
     this.render();
@@ -2976,6 +3016,28 @@ export class VisualAgentMapView extends ItemView {
     );
     menu.showAtMouseEvent(event);
   }
+  /** The tab's "More options" menu: export the open map as OPML or FreeMind. Reading only, so a read-only map may use it. */
+  override onPaneMenu(menu: Menu, source: string): void {
+    super.onPaneMenu(menu, source);
+    if (!this.map || this.builtIn || !this.path) return;
+    menu.addSeparator();
+    for (const [format, key] of [
+      ["opml", "ui.exchange_export_opml"],
+      ["freemind", "ui.exchange_export_freemind"]
+    ] as const)
+      menu.addItem(item =>
+        item
+          .setTitle(t(key))
+          .setIcon("file-output")
+          .onClick(() => this.exportExchange(format))
+      );
+  }
+  /** Writes the open map as OPML or FreeMind next to its Map.md. */
+  private exportExchange(format: "opml" | "freemind"): void {
+    const map = this.map;
+    if (!map || this.builtIn || !this.path) return;
+    void exportMapWithNotice(this.app.vault, { mapPath: this.path, map, notes: this.notes, format });
+  }
   /** Whether the open map can take an imported outline, and the selected topic for "under the selected topic". */
   private outlineImportTarget(): OutlineImportTarget {
     if (!this.map || this.builtIn || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
@@ -4389,7 +4451,13 @@ export class VisualAgentMapView extends ItemView {
     const structure = (map: MapDocument): string => JSON.stringify({ ...map, viewport: null });
     if (structure(disk) === structure(this.map)) return false;
     const local = clone(this.map);
-    this.map = await new Promise<MapDocument>(resolve => new MapConflictModal(this.app, local, disk, resolve).open());
+    // A cross-map cut refuses to touch this map while its conflict window is still open.
+    this.conflictOpen = true;
+    try {
+      this.map = await new Promise<MapDocument>(resolve => new MapConflictModal(this.app, local, disk, resolve).open());
+    } finally {
+      this.conflictOpen = false;
+    }
     this.history.clear();
     return true;
   }
@@ -5268,24 +5336,37 @@ export class VisualAgentMapView extends ItemView {
       this.map.nodes,
       target => this.notes.get(target.id)?.title ?? target.path,
       target => copyNodes || roots.every(root => canParent(this.map!.nodes, root.id, target.id)),
-      target => this.enqueue(() => (copyNodes ? this.copySelected(target) : this.moveSelected(target)))
+      target =>
+        this.enqueue(() => (copyNodes ? this.copySelected(target) : this.moveBranches(this.selectedRoots(), target)))
     ).open();
   }
-  private async moveSelected(target: MapNode): Promise<void> {
-    const roots = this.selectedRoots();
-    if (!this.mergeUnlocked([target.id, ...roots.map(root => root.id)])) return;
-    this.assertAimReferencesRemain(this.map!, new Set(roots.map(root => root.id)), true);
+  /**
+   * Moves the branches under `roots` below `target` (null = to the top level), as one history entry. Each branch keeps
+   * its own descendants; the moved branches are laid out once, in the same entry.
+   */
+  private async moveBranches(roots: MapNode[], target: MapNode | null): Promise<void> {
+    if (!this.map) return;
+    if (!this.mergeUnlocked([...(target ? [target.id] : []), ...roots.map(root => root.id)])) return;
+    this.assertAimReferencesRemain(this.map, new Set(roots.map(root => root.id)), true);
     await this.mapChange(map => {
       const moved = new Set<string>();
+      const branchOf = new Map<string, Set<string>>();
       for (const root of roots) {
-        if (!canParent(map.nodes, root.id, target.id)) throw new Error(t("ui.circular_links_are_not_allowed"));
-        map.nodes.find(item => item.id === root.id)!.parentId = target.id;
-        moved.add(root.id);
-        for (const id of descendants(map.nodes, root.id)) moved.add(id);
+        if (target && !canParent(map.nodes, root.id, target.id))
+          throw new Error(t("ui.circular_links_are_not_allowed"));
+        map.nodes.find(item => item.id === root.id)!.parentId = target?.id ?? null;
+        const branch = new Set([root.id, ...descendants(map.nodes, root.id)]);
+        branchOf.set(root.id, branch);
+        for (const id of branch) moved.add(id);
       }
-      map.nodes.find(node => node.id === target.id)!.collapsed = false;
-      // One layout for the moved branches under the target, in the same history entry as the move.
-      map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutDirectionOf(map));
+      if (target) {
+        map.nodes.find(node => node.id === target.id)!.collapsed = false;
+        // One layout for the moved branches under the target, in the same history entry as the move.
+        map.nodes = arrangeNewBranch(map.nodes, target.id, moved, this.cardHeightOf, undefined, layoutOf(map));
+      } else {
+        for (const root of roots)
+          map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
+      }
     });
     this.multiSelected.clear();
     this.render();
@@ -5376,19 +5457,33 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private async copySelected(target: MapNode): Promise<void> {
-    if (!this.map) return;
-    const roots = this.selectedRoots(),
-      before = clone(this.map),
-      viewport = clone(this.map.viewport);
-    if (!this.mergeUnlocked([target.id, ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])]))
-      return;
-    const copies: MapNode[] = [],
-      pairs: Array<{ from: string; to: string }> = [],
-      replacement = new Map<string, string>(),
-      repo = this.plugin.repo,
-      parkFolder = repo.topicFolder(this.path, "Unassigned");
-    let entry: TransactionEntry;
-    try {
+    await this.copyBranches(this.selectedRoots(), target, {});
+  }
+  /**
+   * Duplicates the branches under `roots` below `target` (null = as new top-level trees), as one transaction. Copy to…
+   * gives each copy the "copy" suffix; a paste keeps the title (`keepTitle`) and may add relations between copied
+   * topics, given by the original ids. Returns the new top topics.
+   */
+  private async copyBranches(
+    roots: MapNode[],
+    target: MapNode | null,
+    options: {
+      keepTitle?: boolean;
+      relations?: readonly { kind: TopicRelationKind; from: string; to: string; description?: string }[];
+    }
+  ): Promise<MapNode[]> {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (
+      !this.mergeUnlocked([
+        ...(target ? [target.id] : []),
+        ...roots.flatMap(root => [root.id, ...descendants(before.nodes, root.id)])
+      ])
+    )
+      return [];
+    const repo = this.plugin.repo,
+      replacement = new Map<string, string>();
+    return this.writeNewBranches(before, target, async (copies, pairs, relations) => {
       for (const root of roots) {
         const branch: MapNode[] = [];
         const append = (node: MapNode): void => {
@@ -5397,38 +5492,101 @@ export class VisualAgentMapView extends ItemView {
         };
         append(root);
         for (const original of branch) {
-          const copy = await repo.duplicateNote(original.path, before, this.path);
+          const copy = await repo.duplicateNote(
+            original.path,
+            before,
+            this.path,
+            options.keepTitle ? { keepTitle: true } : {}
+          );
           replacement.set(original.id, copy.id);
-          copy.parentId = original.id === root.id ? target.id : (replacement.get(original.parentId!) ?? target.id);
-          copy.x = target.x + 340 + (original.x - root.x);
-          copy.y = target.y + roots.indexOf(root) * 220 + (original.y - root.y);
+          copy.parentId =
+            original.id === root.id
+              ? (target?.id ?? null)
+              : (replacement.get(original.parentId!) ?? target?.id ?? null);
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + roots.indexOf(root) * 220 + (original.y - root.y);
           copies.push(copy);
           pairs.push({ from: original.path, to: copy.path });
         }
       }
+      for (const link of options.relations ?? []) {
+        const from = replacement.get(link.from),
+          to = replacement.get(link.to);
+        if (from && to)
+          relations.push({
+            kind: link.kind,
+            from,
+            to,
+            ...(link.description !== undefined ? { description: link.description } : {})
+          });
+      }
+    });
+  }
+  /**
+   * Writes new notes (made by `create`, which pushes each one into `copies` as soon as it exists) together with the
+   * Map.md edit as one transaction and one history step. A failure parks the notes in Unassigned (never deletes them).
+   */
+  private async writeNewBranches(
+    before: MapDocument,
+    target: MapNode | null,
+    create: (
+      copies: MapNode[],
+      pairs: Array<{ from: string; to: string }>,
+      relations: TopicRelation[]
+    ) => Promise<void>,
+    cross?: CrossCut
+  ): Promise<MapNode[]> {
+    const viewport = clone(before.viewport);
+    const copies: MapNode[] = [],
+      pairs: Array<{ from: string; to: string }> = [],
+      newRelations: TopicRelation[] = [],
+      repo = this.plugin.repo,
+      parkFolder = repo.topicFolder(this.path, "Unassigned");
+    let entry: TransactionEntry;
+    try {
+      await cross?.snapshot();
+      await create(copies, pairs, newRelations);
       // Only the new copies are written, before the transaction; a failure parks them like any other.
-      await repo.rewriteCopiedNoteLinks(pairs);
-      const tx = this.beginMapTransaction();
+      if (pairs.length) await repo.rewriteCopiedNoteLinks(pairs);
+      const tx = cross ? cross.begin() : this.beginMapTransaction();
       for (const copy of copies) tx.create(copy.path, parkFolder, before.id);
+      cross?.join(tx);
       entry = await tx
         .editMap(this.path, map => {
           map.viewport = clone(viewport);
-          const found = map.nodes.find(node => node.id === target.id);
-          if (!found) throw new Error(t("ui.outline_import_selected_missing"));
+          const found = target ? map.nodes.find(node => node.id === target.id) : null;
+          if (target && !found) throw new Error(t("ui.outline_import_selected_missing"));
           map.nodes.push(...copies);
-          found.collapsed = false;
-          map.nodes = arrangeNewBranch(
-            map.nodes,
-            target.id,
-            new Set(copies.map(copy => copy.id)),
-            this.cardHeightOf,
-            undefined,
-            layoutDirectionOf(map)
-          );
+          if (found) {
+            found.collapsed = false;
+            map.nodes = arrangeNewBranch(
+              map.nodes,
+              found.id,
+              new Set(copies.map(copy => copy.id)),
+              this.cardHeightOf,
+              undefined,
+              layoutOf(map)
+            );
+          } else
+            for (const top of copies.filter(copy => copy.parentId === null))
+              map.nodes = arrangeNewTree(
+                map.nodes,
+                top.id,
+                new Set([top.id, ...descendants(copies, top.id)]),
+                this.cardHeightOf,
+                layoutOf(map)
+              );
+          for (const link of newRelations) {
+            if (!relationAllowed(map.topicRelations ?? [], link)) continue;
+            setTopicRelations(map, [...(map.topicRelations ?? []), link]);
+          }
         })
         .commit();
     } catch (error) {
       this.render();
+      // A rollback that did not fail is complete in value; the source notes also get their exact bytes back. A failure
+      // here loses nothing (the values are already back), so it is not reported as a failed rollback.
+      if (cross && !isTransactionError(error, "rollback-failed")) await cross.restore().catch(() => {});
       // The copies are created outside the transaction: park them (never delete them) and rebuild.
       let parkFailure: { error: unknown } | undefined;
       try {
@@ -5457,9 +5615,525 @@ export class VisualAgentMapView extends ItemView {
       }
       throw error;
     }
-    this.history.push(this.copyEntry(entry));
+    if (cross) await cross.finish(entry);
+    else this.history.push(this.copyEntry(entry));
     this.multiSelected.clear();
     await this.refreshAfterSavedChange();
+    return copies.filter(copy => copy.parentId === (target?.id ?? null));
+  }
+  // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
+  /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
+  private unbindClipboard: (() => void) | null = null;
+  private bindClipboard(): void {
+    this.unbindClipboard?.();
+    const doc: Document | undefined = this.contentEl.doc ?? this.contentEl.ownerDocument;
+    if (!doc?.addEventListener) return;
+    const copy = (event: Event): void => this.onClipboardEvent("copy", event as ClipboardEvent);
+    const cut = (event: Event): void => this.onClipboardEvent("cut", event as ClipboardEvent);
+    const paste = (event: Event): void => this.onClipboardEvent("paste", event as ClipboardEvent);
+    doc.addEventListener("copy", copy);
+    doc.addEventListener("cut", cut);
+    doc.addEventListener("paste", paste);
+    this.unbindClipboard = () => {
+      doc.removeEventListener("copy", copy);
+      doc.removeEventListener("cut", cut);
+      doc.removeEventListener("paste", paste);
+    };
+  }
+  private onClipboardEvent(kind: "copy" | "cut" | "paste", event: ClipboardEvent): void {
+    if (this.closed || event.defaultPrevented) return;
+    // Any copy or cut in this window, wherever it happens, drops a pending cut: the clipboard no longer holds it.
+    if (kind !== "paste") {
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
+    if (!this.map || !event.clipboardData) return;
+    if (!inClipboardScope(event.target, this.contentEl)) return;
+    if (kind === "paste") this.pasteFromClipboard(event);
+    else this.copyToClipboard(event, kind);
+  }
+  /** True when branches cannot be changed here: integration mode, AIM, the built-in sample, or no saved map. */
+  private clipboardReadOnly(): boolean {
+    return this.builtIn || this.integrationMode || !!this.map?.aim || this.outlineImportTarget().map !== "editable";
+  }
+  private copyToClipboard(event: ClipboardEvent, mode: "copy" | "cut"): void {
+    const map = this.map;
+    const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    if (!map || !ids.length || !event.clipboardData) return;
+    if (mode === "cut" && this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_cut_readonly"));
+      return;
+    }
+    // Selected text (for example in a preview) is copied as text, not as a branch.
+    const selection = this.contentEl.ownerDocument?.getSelection?.();
+    if (selection && !selection.isCollapsed && selection.anchorNode && this.contentEl.contains(selection.anchorNode))
+      return;
+    const visited: string[] = [];
+    const built = buildClipboardPayload({
+      nodes: map.nodes,
+      order: [...map.nodes].sort((a, b) => a.y - b.y || a.x - b.x).map(node => node.id),
+      selectedIds: ids,
+      noteOf: id => {
+        visited.push(id);
+        const note = this.notes.get(id);
+        const node = map.nodes.find(item => item.id === id);
+        return {
+          title: note?.title ?? node?.path.replace(/^.*\//, "").replace(/\.md$/, "") ?? "",
+          body: note?.detail ?? "",
+          kind: note?.topicKind ?? "topic",
+          ...(note?.hypothesisStrength !== undefined ? { strength: note.hypothesisStrength } : {})
+        };
+      },
+      relations: map.topicRelations ?? [],
+      clipId: crypto.randomUUID()
+    });
+    if (!built.ok || !visited.length) {
+      new Notice(t("ui.clipboard_copy_failed"));
+      return;
+    }
+    const serialized = serializeClipboard(built.payload);
+    writeClipboardData(event.clipboardData, serialized, clipboardOutline(built.payload));
+    event.preventDefault();
+    sessionFor(this.plugin).record({
+      clipId: built.payload.clipId,
+      serialized,
+      mode,
+      sourceMapPath: this.path,
+      sourceMapId: map.id,
+      nodeIds: visited,
+      notePaths: visited.map(id => map.nodes.find(node => node.id === id)?.path ?? "")
+    });
+    this.refreshCutMarks();
+  }
+  private pasteFromClipboard(event: ClipboardEvent): void {
+    const { vam, text } = readClipboardData(event.clipboardData);
+    // A clipboard that is not exactly what this plugin wrote means the cut was overtaken: its mark goes away.
+    if (!sessionFor(this.plugin).match(vam)) {
+      if (sessionFor(this.plugin).cancelCut()) this.refreshCutMarks();
+    }
+    // Without the private format only plain text is left: it becomes an outline under the selected topic.
+    if (!vam) {
+      this.pasteText(event, text);
+      return;
+    }
+    event.preventDefault();
+    if (this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseClipboard(vam);
+    if (!parsed.ok) {
+      // A private payload that cannot be read falls back to the plain text beside it; with no usable text, say so.
+      if (text.trim()) this.pasteText(event, text);
+      else new Notice(t("ui.clipboard_paste_invalid"));
+      return;
+    }
+    this.enqueue(() => this.pasteBranches(parsed.payload, vam));
+  }
+  /** Plain text pasted onto the map: indentation makes the levels. Empty text is left alone; a refusal says why. */
+  private pasteText(event: ClipboardEvent, text: string): void {
+    if (!text.trim()) return;
+    event.preventDefault();
+    if (this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const parsed = parseIndentedText(text);
+    if (!parsed.ok) {
+      new Notice(this.pasteTextRefusal(parsed.reason, parsed.line));
+      return;
+    }
+    if (!parsed.nodes.length) return;
+    const target = this.map?.nodes.find(node => node.id === this.selected) ?? null;
+    // importOutlineIntoMap queues its own write, so it is not wrapped in enqueue.
+    void this.importOutlineIntoMap(
+      { nodes: parsed.nodes, source: null, shallowResearch: false },
+      target ? { kind: "under", parentId: target.id } : { kind: "tree" }
+    ).catch(error => new Notice(errorMessage(error)));
+  }
+  private pasteTextRefusal(reason: IndentedTextRejection, line?: number): string {
+    const at = line ?? 0;
+    switch (reason) {
+      case "too-long":
+        return t("ui.clipboard_text_too_long", PASTE_TEXT_MAX_CHARS);
+      case "too-many-nodes":
+        return t("ui.clipboard_text_too_many", at, OUTLINE_NODE_LIMIT);
+      case "empty-title":
+        return t("ui.clipboard_text_empty_title", at);
+      case "title-too-long":
+        return t("ui.clipboard_text_title_too_long", at, OUTLINE_TITLE_LIMIT);
+      case "vam-note":
+        return t("ui.clipboard_text_vam_note");
+      case "outline":
+        return line ? t("ui.clipboard_text_outline_line", line) : t("ui.clipboard_text_outline");
+      default:
+        return t("ui.clipboard_text_bad_title", at);
+    }
+  }
+  /**
+   * Pastes under the selected topic (or as new top-level trees). When the clipboard string is exactly what this plugin
+   * wrote and its source is still this map, the source notes are duplicated (D2); otherwise only the payload's
+   * whitelisted fields make new notes.
+   */
+  private async pasteBranches(payload: ClipboardPayload, raw: string): Promise<void> {
+    const map = this.map;
+    if (!map || this.clipboardReadOnly()) {
+      new Notice(t("ui.clipboard_paste_readonly"));
+      return;
+    }
+    const target = map.nodes.find(node => node.id === this.selected) ?? null;
+    const record = sessionFor(this.plugin).match(raw);
+    let tops: MapNode[] = [];
+    const source = record && record.sourceMapPath === this.path && record.sourceMapId === map.id ? record : null;
+    const nodeIds = source?.nodeIds ?? [];
+    const ids = new Set(nodeIds);
+    const byId = new Map(map.nodes.map(node => [node.id, node] as const));
+    // The source must still be the same tree: every copied topic exists and keeps the parent the payload recorded.
+    const intact =
+      source !== null &&
+      nodeIds.length === payload.nodes.length &&
+      payload.nodes.every((clip, index) => {
+        const node = byId.get(nodeIds[index]);
+        if (!node) return false;
+        if (clip.parent === null) return !node.parentId || !ids.has(node.parentId);
+        return node.parentId === nodeIds[payload.nodes.findIndex(item => item.id === clip.parent)];
+      });
+    if (record?.mode === "cut" && source && !intact) {
+      // The source changed after the cut: it is not moved, and the mark goes away; the payload is pasted as a copy.
+      sessionFor(this.plugin).cancelCut();
+      this.refreshCutMarks();
+    }
+    // A cut made in another map: this map gets copies, the originals park in the source map's Unassigned (D8).
+    if (record?.mode === "cut" && !source && record.sourceMapPath !== this.path) {
+      const accepted = await this.acceptCrossCut(payload, record);
+      if (!accepted) return;
+      tops = await this.copyFromOtherMap(
+        accepted,
+        target,
+        payload,
+        record.nodeIds,
+        this.crossCutOf(payload, record, accepted.branch)
+      );
+      const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
+      if (landed) {
+        this.selected = landed.id;
+        this.render();
+        this.focusNode(landed);
+      }
+      return;
+    }
+    // A copy made in another map: its notes are duplicated into this one, the source map is only read (D2, D3).
+    const cross =
+      record?.mode === "copy" && !source && record.sourceMapPath !== this.path
+        ? await this.crossSourceOf(payload, record)
+        : null;
+    if (cross && record) {
+      tops = await this.copyFromOtherMap(cross, target, payload, record.nodeIds);
+    } else if (source && intact) {
+      const roots = payload.nodes
+        .map((clip, index) => (clip.parent === null ? byId.get(nodeIds[index]) : undefined))
+        .filter((node): node is MapNode => !!node);
+      if (record?.mode === "cut") {
+        const check = canPasteCut(
+          map.nodes,
+          roots.map(root => root.id),
+          target?.id ?? null
+        );
+        if (!check.ok) {
+          new Notice(t(check.reason === "into-own-branch" ? "ui.clipboard_cut_into_own" : "ui.clipboard_cut_missing"));
+          return;
+        }
+        await this.moveBranches(roots, target);
+        sessionFor(this.plugin).cancelCut();
+        this.refreshCutMarks();
+        const moved = this.map?.nodes.find(node => node.id === roots[0].id);
+        if (moved) {
+          this.selected = moved.id;
+          this.render();
+          this.focusNode(moved);
+        }
+        return;
+      }
+      const original = (clipId: string): string => nodeIds[payload.nodes.findIndex(item => item.id === clipId)];
+      tops = await this.copyBranches(roots, target, {
+        keepTitle: true,
+        relations: payload.relations.map(link => ({
+          kind: link.kind,
+          from: original(link.from),
+          to: original(link.to),
+          ...(link.description !== undefined ? { description: link.description } : {})
+        }))
+      });
+    } else {
+      const plan = planPaste(payload);
+      if (!plan.ok) {
+        new Notice(t("ui.clipboard_paste_invalid"));
+        return;
+      }
+      const repo = this.plugin.repo,
+        settings = this.plugin.settings,
+        before = clone(map),
+        model = target
+          ? inheritModel((await repo.readNote(target.path, map)).model, settings.cliModel)
+          : settings.cliModel;
+      tops = await this.writeNewBranches(before, target, async (copies, _pairs, relations) => {
+        for (const item of plan.items) {
+          const node = await repo.createNote(
+            item.title,
+            model,
+            before,
+            this.path,
+            target || item.parent !== null ? "inherited" : "workspace",
+            { topicKind: item.kind, detail: item.body }
+          );
+          node.parentId = item.parent === null ? (target?.id ?? null) : copies[item.parent].id;
+          copies.push(node);
+          if (item.kind === "hypothesis" && item.strength) await repo.writeHypothesisStrength(node.path, item.strength);
+        }
+        for (const link of plan.relations)
+          relations.push({
+            kind: link.kind,
+            from: copies[link.from].id,
+            to: copies[link.to].id,
+            ...(link.description !== undefined ? { description: link.description } : {})
+          });
+      });
+    }
+    const placed = this.map?.nodes.find(node => node.id === tops[0]?.id);
+    if (placed) {
+      this.selected = placed.id;
+      this.render();
+      this.focusNode(placed);
+    }
+  }
+  /** The recorded source of a copy made in another map, when that map still holds exactly those topics and notes; else null. */
+  private async crossSourceOf(
+    payload: ClipboardPayload,
+    record: { sourceMapPath: string; sourceMapId: string; nodeIds: readonly string[]; notePaths: readonly string[] }
+  ): Promise<{ branch: MapNode[]; roots: MapNode[] } | null> {
+    try {
+      const sourceMap = await this.plugin.repo.readMap(record.sourceMapPath);
+      const found = resolveCrossSource(payload, record, sourceMap);
+      if (!found || found.branch.some(node => !this.app.vault.getAbstractFileByPath(node.path))) return null;
+      return found;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Duplicates topics of another map under `target` (null = new top-level trees) as one transaction of this map. The
+   * source notes are only read; links in the copies are rewritten from the source note's place by writeNewBranches.
+   */
+  private async copyFromOtherMap(
+    source: { branch: MapNode[]; roots: MapNode[] },
+    target: MapNode | null,
+    payload: ClipboardPayload,
+    nodeIds: readonly string[],
+    cross?: CrossCut
+  ): Promise<MapNode[]> {
+    if (!this.map) return [];
+    const before = clone(this.map);
+    if (!this.mergeUnlocked(target ? [target.id] : [])) return [];
+    const repo = this.plugin.repo,
+      replacement = new Map<string, string>(),
+      rootOf = new Map<string, MapNode>();
+    return this.writeNewBranches(
+      before,
+      target,
+      async (copies, pairs, relations) => {
+        for (const original of source.branch) {
+          const root = source.roots.includes(original) ? original : (rootOf.get(original.parentId!) ?? original);
+          rootOf.set(original.id, root);
+          const copy = await repo.duplicateNote(original.path, before, this.path, { keepTitle: true });
+          replacement.set(original.id, copy.id);
+          copy.parentId = source.roots.includes(original)
+            ? (target?.id ?? null)
+            : (replacement.get(original.parentId!) ?? target?.id ?? null);
+          copy.x = (target ? target.x + 340 : 80) + (original.x - root.x);
+          copy.y = (target ? target.y : 80) + source.roots.indexOf(root) * 220 + (original.y - root.y);
+          copies.push(copy);
+          pairs.push({ from: original.path, to: copy.path });
+        }
+        for (const link of payload.relations) {
+          const from = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.from)]),
+            to = replacement.get(nodeIds[payload.nodes.findIndex(item => item.id === link.to)]);
+          if (from && to)
+            relations.push({
+              kind: link.kind,
+              from,
+              to,
+              ...(link.description !== undefined ? { description: link.description } : {})
+            });
+        }
+      },
+      cross
+    );
+  }
+  /**
+   * A cut made in another map: decides, before anything is written, whether its branches can still be cut out of the
+   * source map. Returns the branches found there, or null after saying why (the cut mark stays unless the source is
+   * gone, so the paste can be retried).
+   */
+  private async acceptCrossCut(
+    payload: ClipboardPayload,
+    record: ClipRecord
+  ): Promise<{ branch: MapNode[]; roots: MapNode[] } | null> {
+    const session = sessionFor(this.plugin),
+      from = record.sourceMapPath;
+    const refuse = (key: TranslationKey, drop = false): null => {
+      if (drop && session.cancelCut()) this.refreshCutMarks();
+      new Notice(t(key));
+      return null;
+    };
+    if (!this.app.vault.getAbstractFileByPath(from)) return refuse("ui.clipboard_cut_missing", true);
+    // The source map may be open in another view: its pending save goes out first, and an open conflict window stops the cut.
+    for (const view of this.plugin.views()) {
+      if (view === this || view.path !== from) continue;
+      if (view.conflictOpen) return refuse("ui.clipboard_cut_cross_busy");
+      await view.flushForCrossMap();
+    }
+    let sourceMap: MapDocument;
+    try {
+      sourceMap = await this.plugin.repo.readMap(from);
+    } catch {
+      return refuse("ui.clipboard_cut_missing", true);
+    }
+    const found = resolveCrossSource(payload, record, sourceMap);
+    const problem = cutSourceProblem(sourceMap, record, found);
+    if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
+    if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
+    if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
+    if (found.branch.some(node => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    return found;
+  }
+  /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
+  private crossCutOf(payload: ClipboardPayload, record: ClipRecord, branch: MapNode[]): CrossCut {
+    const plugin = this.plugin,
+      repo = plugin.repo,
+      from = record.sourceMapPath,
+      into = this.path,
+      id = crypto.randomUUID(),
+      removed = new Set(branch.map(node => node.id)),
+      texts = new Map<string, string>();
+    const assertSource = (sourceMap: MapDocument): void => {
+      const problem = cutSourceProblem(sourceMap, record, resolveCrossSource(payload, record, sourceMap));
+      if (problem)
+        throw new Error(
+          t(
+            problem === "aim"
+              ? "ui.clipboard_cut_cross_unsupported"
+              : problem === "gone"
+                ? "ui.clipboard_cut_missing"
+                : "ui.clipboard_cut_cross_changed"
+          )
+        );
+    };
+    return {
+      snapshot: async () => {
+        for (const node of branch) texts.set(node.path, await this.app.vault.read(repo.file(node.path)));
+      },
+      restore: async () => {
+        for (const [path, text] of texts) {
+          if (!this.app.vault.getAbstractFileByPath(path)) continue;
+          // Putting a parked note back rewrites its `updated:` stamp and front matter order; anything else is left alone.
+          // The check runs on the text `process` hands over, so an edit made after any earlier read is never overwritten.
+          await this.app.vault.process(repo.file(path), current =>
+            current !== text && sameApartFromStamps(current, text) ? text : current
+          );
+        }
+      },
+      begin: () => this.beginCrossTransaction(from, async () => assertSource(await repo.readMap(from))),
+      join: tx => {
+        const parkFolder = repo.topicFolder(from, "Unassigned");
+        for (const node of branch) tx.park(node.path, parkFolder, record.sourceMapId, "unassigned");
+        tx.editMap(from, map => {
+          // The transaction hands over Map.md as it reads it at commit: a change made since the checks stops here.
+          assertSource(map);
+          map.nodes = map.nodes.filter(node => !removed.has(node.id));
+          removeTopicRelationsFor(map, removed);
+        });
+      },
+      finish: async entry => {
+        ledgerFor(plugin).push({
+          id,
+          paths: [from, into],
+          entry: { undo: () => entry.undo(), redo: () => entry.redo() }
+        });
+        this.history.push(this.crossMapEntry(id));
+        if (sessionFor(plugin).cancelCut()) this.refreshCutMarks();
+        try {
+          this.adoptSavedMap(await repo.readMap(into));
+        } catch {
+          /* The saved change is reloaded by refreshAfterSavedChange. */
+        }
+      }
+    };
+  }
+  /**
+   * A transaction over two maps that holds no view: the entry outlives the views, so every view of a map is found
+   * through the plugin when it is needed. `verify` runs on the source map after its open view settled any conflict and
+   * before anything is written.
+   */
+  private beginCrossTransaction(sourcePath: string, verify: () => Promise<void>): Transaction {
+    const plugin = this.plugin;
+    return beginTransaction({
+      repo: plugin.repo,
+      rebuildDerivedData: () => plugin.rebuildDerivedData(),
+      onApplied: () => {},
+      checkConflict: async mapPath => {
+        // The source map is judged first, so a cut that cannot go ahead never opens a conflict window in its view.
+        if (mapPath === sourcePath) await verify();
+        for (const view of plugin.views())
+          if (view.path === mapPath && (await view.resolveMapConflict())) await view.persist();
+      }
+    });
+  }
+  /** Sends out what this view still has pending for its map (a pan or zoom not yet written). */
+  private async flushForCrossMap(): Promise<void> {
+    if (this.viewportTimer === null) return;
+    window.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    await this.persistViewport();
+  }
+  /** History proxy of a change that touched two maps: undo and redo go through the plugin's ledger, which runs each once. */
+  private crossMapEntry(id: string): Action {
+    return {
+      label: t("ui.clipboard_cut_cross_history"),
+      undo: () => this.runCrossMap(id, "undo"),
+      redo: () => this.runCrossMap(id, "redo")
+    };
+  }
+  private async runCrossMap(id: string, direction: "undo" | "redo"): Promise<void> {
+    const result = await ledgerFor(this.plugin).run(id, direction);
+    if (result.ran) {
+      // The other map's view reloads when the write queue ends; this view adopts its own map now.
+      if (this.path && !this.builtIn) this.adoptSavedMap(await this.plugin.repo.readMap(this.path));
+      return;
+    }
+    if (result.reason === "failed" || result.reason === "broken") {
+      if (result.error === undefined) throw new Error(t("ui.cross_map_undo_broken"));
+      if (isTransactionError(result.error, "stale") || isTransactionError(result.error, "guard"))
+        throw new Error(t("ui.cross_map_undo_refused"));
+      // Thrown as it is: a failed rollback keeps its `rollback-failed` kind and its messages (errors cross realms in tests).
+      throw result.error as Error;
+    }
+    // Another view already ran it (or it is gone): nothing to do, and this view's proxy goes away. `travel` has already
+    // moved the proxy to the other stack; take it out of that one too, so it cannot be pressed again.
+    if (result.reason === "wrong-state" || result.reason === "unknown") {
+      const mark = this.history.mark();
+      if (direction === "undo") {
+        this.history.redo();
+        this.history.discardSince(mark);
+      } else {
+        this.history.discardSince({ ...mark, length: mark.length - 1 });
+      }
+    }
+  }
+  /** After this view's history was cleared: puts back a proxy for each cross-map change of this map that is still applied. */
+  private restoreCrossProxies(): void {
+    if (!this.path || this.builtIn) return;
+    for (const item of ledgerFor(this.plugin).entriesFor(this.path))
+      if (item.status === "applied") this.history.push(this.crossMapEntry(item.id));
   }
   /** One history step for a copy: the commit's entry, with its own message when undo cannot be fully restored. */
   private copyEntry(entry: TransactionEntry): TransactionEntry {
@@ -5488,30 +6162,31 @@ export class VisualAgentMapView extends ItemView {
       repo: this.plugin.repo,
       rebuildDerivedData: () => this.plugin.rebuildDerivedData(),
       onApplied: (mapPath, map) => {
-        if (mapPath !== this.path) return;
-        const next = clone(map);
-        if (!this.map) {
-          this.map = next;
-          return;
-        }
-        // In place: callers and tests hold references to the open map.
-        const viewport = this.map.viewport;
-        const target = this.map as unknown as Record<string, unknown>;
-        for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
-        for (const [key, value] of Object.entries(next)) {
-          const current = target[key];
-          // Arrays keep their identity too (the node list is held by cards and tests).
-          if (Array.isArray(current) && Array.isArray(value))
-            current.splice(0, current.length, ...(value as unknown[]));
-          else target[key] = value;
-        }
-        this.map.viewport = clone(viewport);
+        if (mapPath === this.path) this.adoptSavedMap(map);
       },
       checkConflict: async mapPath => {
         if (mapPath !== this.path) return;
         if (await this.resolveMapConflict()) await this.persist();
       }
     });
+  }
+  /** Takes `saved` (the map as now stored) as the open map, in place: callers and tests hold references to the open map. */
+  private adoptSavedMap(saved: MapDocument): void {
+    const next = clone(saved);
+    if (!this.map) {
+      this.map = next;
+      return;
+    }
+    const viewport = this.map.viewport;
+    const target = this.map as unknown as Record<string, unknown>;
+    for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
+    for (const [key, value] of Object.entries(next)) {
+      const current = target[key];
+      // Arrays keep their identity too (the node list is held by cards and tests).
+      if (Array.isArray(current) && Array.isArray(value)) current.splice(0, current.length, ...(value as unknown[]));
+      else target[key] = value;
+    }
+    this.map.viewport = clone(viewport);
   }
   /** The change is already saved and in history; a failing reload must not look like the change failed. */
   private async refreshAfterSavedChange(): Promise<void> {
@@ -5774,6 +6449,7 @@ export class VisualAgentMapView extends ItemView {
       disk.viewport = this.map.viewport;
       this.map = disk;
       this.history.clear();
+      this.restoreCrossProxies();
     }
     const before = JSON.stringify(Array.from(this.notes));
     await this.hydrate();
@@ -6629,6 +7305,7 @@ export class VisualAgentMapView extends ItemView {
         cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
       });
     this.cardEls.set(node.id, card);
+    this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(this.nodeDepth(node)));
@@ -7588,7 +8265,35 @@ export class VisualAgentMapView extends ItemView {
       cardLabels.set(card, label);
     }
     label.textContent = text;
-    card.setAttr("aria-labelledby", label.id);
+    const cut = cardCutLabels.get(card);
+    card.setAttr("aria-labelledby", cut ? `${label.id} ${cut.id}` : label.id);
+  }
+  /** Marks or unmarks a card as cut: a dashed outline and a hidden "Cut" part of its accessible name. */
+  private paintCut(card: HTMLElement, id: string, cut = this.cutIds().has(id)): void {
+    const existing = cardCutLabels.get(card);
+    if (cut && !existing) {
+      card.addClass("is-cut");
+      const part = card.createSpan({ cls: "vam-card-label", text: t("ui.clipboard_cut_mark") });
+      part.id = `vam-card-cut-${++cardLabelSequence}`;
+      cardCutLabels.set(card, part);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", `${label.id} ${part.id}`);
+    } else if (!cut && existing) {
+      card.removeClass("is-cut");
+      existing.remove();
+      cardCutLabels.delete(card);
+      const label = cardLabels.get(card);
+      if (label) card.setAttr("aria-labelledby", label.id);
+    }
+  }
+  /** The topics of a pending cut that belongs to this map. */
+  private cutIds(): Set<string> {
+    const record = sessionFor(this.plugin).get();
+    return record?.mode === "cut" && record.sourceMapPath === this.path ? new Set(record.nodeIds) : new Set();
+  }
+  private refreshCutMarks(): void {
+    const cut = this.cutIds();
+    for (const [id, card] of this.cardEls) this.paintCut(card, id, cut.has(id));
   }
   /** What the share dialog may read: a snapshot of the open map, or the reason it cannot be shared. */
   shareSnapshot():

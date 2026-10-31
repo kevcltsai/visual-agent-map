@@ -87,7 +87,7 @@ integrationTest('selected subtopics move together and copied notes keep their co
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
   view.multiSelected = new Set([first.id]);
-  await view.moveSelected(second);
+  await view.moveBranches(view.selectedRoots(), second);
   assert.equal((await repo.readMap(mapPath)).nodes.find(node => node.id === first.id).parentId, second.id);
   view.multiSelected = new Set([first.id]);
   await view.copySelected(root);

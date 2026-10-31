@@ -526,6 +526,7 @@ export const en = {
   "ui.topic_kind_conclusion": "Conclusion",
   "ui.topic_kind_action": "Action",
   "ui.topic_type": "Topic type",
+  "ui.topic_markers": "Markers",
   "ui.add_subtopic_menu": "Add subtopic…",
   "ui.add_kind_0": "Add {0}",
   "ui.new_kind_0": "New {0}",

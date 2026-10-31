@@ -3232,9 +3232,9 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Parent topic']);
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Parent topic'], 'the marker section sits after the relations (ticket 33)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Parent topic'], 'no strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Parent topic'], 'no strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
   const css = heCss();
@@ -3381,4 +3381,112 @@ integrationTest('hypothesis-evidence: every merge path hands the retarget result
   assert.doesNotMatch(view, /lastDroppedCycles = retargetTopicRelations/);
   const texts = { en: 'Removed {0} duplicate relation(s) (only one relation is kept for each pair of topics)', 'zh-TW': '已移除 {0} 條重複的關係（同一對議題只保留一條）', 'zh-CN': '已移除 {0} 条重复的关系（同一对议题只保留一条）' };
   for (const [lang, text] of Object.entries(texts)) assert.equal(load('i18n.ts').translate(lang, 'ui.merge_dropped_same_pair_0', '3'), text.replace('{0}', '3'), lang);
+});
+// ---- topic markers (ticket 33, P2b) ----
+const tmRender = (options, id) => {
+  const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
+  const card = f.view.stageEl.children[0];
+  return { card, label: dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label')), marks: dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')) };
+};
+integrationTest('topic-markers: a card shows whitelisted markers as aria-hidden symbols in a fixed order and names them in its accessible name; a topic without any shows none', () => {
+  const notes = heNotes([['fact', { markers: ['star', 'done', 'priority-2'] }], ['hyp', heHyp('weak')], ['other', {}]]);
+  const shown = tmRender({ notes }, 'fact');
+  assert.deepEqual(shown.marks.map(m => m.text), ['✓', '★', 'P2'], 'whitelist order, plain Unicode');
+  const row = dom.find(shown.card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-markers'));
+  assert.equal(row.attrs['aria-hidden'], 'true');
+  assert.match(shown.label.text, /Markers: Done, Star, Priority 2/); assert.match(shown.label.text, /^FACT, /);
+  assert.equal(shown.card.attrs['aria-labelledby'], shown.label.id);
+  const kindToo = tmRender({ notes: heNotes([['fact', { topicKind: 'evidence', markers: ['done'] }], ['hyp', {}], ['other', {}]]) }, 'fact');
+  assert.match(kindToo.label.text, /Evidence/); assert.match(kindToo.label.text, /Markers: Done/);
+  const none = tmRender({ notes }, 'other');
+  assert.deepEqual(none.marks, []); assert.doesNotMatch(none.label.text, /Markers/);
+  const aim = tmRender({ aim: true, notes }, 'fact');
+  assert.equal(aim.marks.length, 3, 'a read-only map still shows the markers');
+});
+integrationTest('topic-markers: a value outside the whitelist is not shown, not drawn and not read out', () => {
+  const notes = heNotes([['fact', { markers: ['<img src=x onerror=alert(1)>', 'DONE', 3, 'star', 'star'] }], ['hyp', {}], ['other', {}]]);
+  const shown = tmRender({ notes }, 'fact');
+  assert.deepEqual(shown.marks.map(m => m.text), ['★']);
+  assert.doesNotMatch(shown.label.text, /img|onerror|DONE|3/); assert.match(shown.label.text, /Markers: Star$/);
+});
+integrationTest('topic-markers: refreshing a card replaces its symbols and its name part (no duplicates)', () => {
+  const f = heFixture({ notes: heNotes([['fact', { markers: ['done'] }], ['hyp', {}], ['other', {}]]) });
+  f.view.stageEl = hePatch(dom.element('stage')); f.view.cardEls = new Map(); f.view.renderNode(f.view.map.nodes[0]);
+  const node = f.view.map.nodes[0], card = f.view.stageEl.children[0];
+  f.view.stageEl.querySelector = sel => card;
+  f.view.drawEdges = () => {};
+  f.view.notes.get('fact').markers = ['warning', 'priority-3'];
+  f.view.refreshCard(node, false);
+  assert.deepEqual(dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-marker')).map(m => m.text), ['⚠', 'P3']);
+  const label = dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
+  assert.match(label.text, /Markers: Warning, Priority 3/); assert.doesNotMatch(label.text, /Done/); assert.equal((label.text.match(/Markers/g) ?? []).length, 1);
+  f.view.notes.get('fact').markers = [];
+  f.view.refreshCard(node, false);
+  assert.doesNotMatch(label.text, /Markers/);
+});
+integrationTest('topic-markers: the sample, an AIM map and select mode have no marker menu and refuse a toggle', async () => {
+  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+    const { view, writes } = heFixture(options);
+    if (options.integration) view.integrationMode = true;
+    const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[2]);
+    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
+    view.beginMapTransaction = () => assert.fail('no transaction');
+    await view.changeTopicMarker(view.map.nodes[2], 'done');
+    assert.deepEqual(writes, []);
+  }
+});
+integrationTest('topic-markers: the panel has one aria-pressed toggle per marker and priority is one of three', async () => {
+  const { view } = heFixture();
+  view.enqueue = work => work();
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.history = { push() {} };
+  const toggled = [];
+  view.plugin.repo.writeTopicMarkers = async (path, id) => {
+    toggled.push(id); const note = view.notes.get(path.replace('.md', '')); const cur = note.markers ?? [];
+    note.markers = cur.includes(id) ? cur.filter(x => x !== id) : [...cur.filter(x => !(id.startsWith('priority') && x.startsWith('priority'))), id];
+  };
+  view.refreshAfterSavedChange = async () => {};
+  const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
+  const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
+  assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, 6);
+  assert.deepEqual(pressed(), []);
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
+  assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
+  assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
+  click('Done'); await dom.tick();
+  assert.equal(pressed().length, 1);
+});
+integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-m/Map.md';
+  const doc = { id: 'map-m', title: 'm', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-m');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const topic = await repo.createNote('Topic', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(topic); await repo.saveMap(MAP, doc);
+  const { view } = heFixture({ topics: [topic] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  await view.refreshAfterSavedChange();
+  const text = () => contents.get(topic.path).match(/topic-markers:.*(\n\s+- .*)*/g)?.join('').replace(/"/g, '') ?? null;
+  const before = contents.get(topic.path);
+  await view.changeTopicMarker(view.map.nodes[0], 'star');
+  assert.equal(pushed.length, 1, 'one history entry per toggle'); assert.ok(text()); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['star']);
+  await pushed[0].undo();
+  assert.equal(contents.get(topic.path), before, 'one undo gives back the exact note text'); assert.equal(text(), null);
+  await pushed[0].redo(); assert.ok(text());
+  await pushed[0].undo();
+  await view.refreshAfterSavedChange();
+  await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
+  await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
+  assert.equal(pushed.length, 3); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
 });

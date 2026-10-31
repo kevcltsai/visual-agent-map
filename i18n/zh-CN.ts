@@ -475,6 +475,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.topic_kind_conclusion": "结论",
   "ui.topic_kind_action": "行动",
   "ui.topic_type": "议题类型",
+  "ui.topic_markers": "标记",
   "ui.add_subtopic_menu": "添加子议题…",
   "ui.add_kind_0": "添加{0}",
   "ui.new_kind_0": "新{0}",

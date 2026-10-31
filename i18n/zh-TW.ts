@@ -475,6 +475,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.topic_kind_conclusion": "結論",
   "ui.topic_kind_action": "行動",
   "ui.topic_type": "議題類型",
+  "ui.topic_markers": "標記",
   "ui.add_subtopic_menu": "新增子議題…",
   "ui.add_kind_0": "新增{0}",
   "ui.new_kind_0": "新{0}",

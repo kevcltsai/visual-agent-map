@@ -559,6 +559,7 @@ var en = {
   "ui.topic_kind_conclusion": "Conclusion",
   "ui.topic_kind_action": "Action",
   "ui.topic_type": "Topic type",
+  "ui.topic_markers": "Markers",
   "ui.add_subtopic_menu": "Add subtopic\u2026",
   "ui.add_kind_0": "Add {0}",
   "ui.new_kind_0": "New {0}",
@@ -2601,6 +2602,7 @@ var zhCN = {
   "ui.topic_kind_conclusion": "\u7ED3\u8BBA",
   "ui.topic_kind_action": "\u884C\u52A8",
   "ui.topic_type": "\u8BAE\u9898\u7C7B\u578B",
+  "ui.topic_markers": "\u6807\u8BB0",
   "ui.add_subtopic_menu": "\u6DFB\u52A0\u5B50\u8BAE\u9898\u2026",
   "ui.add_kind_0": "\u6DFB\u52A0{0}",
   "ui.new_kind_0": "\u65B0{0}",
@@ -4643,6 +4645,7 @@ var zhTW = {
   "ui.topic_kind_conclusion": "\u7D50\u8AD6",
   "ui.topic_kind_action": "\u884C\u52D5",
   "ui.topic_type": "\u8B70\u984C\u985E\u578B",
+  "ui.topic_markers": "\u6A19\u8A18",
   "ui.add_subtopic_menu": "\u65B0\u589E\u5B50\u8B70\u984C\u2026",
   "ui.add_kind_0": "\u65B0\u589E{0}",
   "ui.new_kind_0": "\u65B0{0}",
@@ -17398,6 +17401,36 @@ function treeEdgePathData(parent, child, direction) {
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
 }
 
+// topic-markers.ts
+var TOPIC_MARKERS = ["done", "warning", "star", "priority-1", "priority-2", "priority-3"];
+var PRIORITIES = ["priority-1", "priority-2", "priority-3"];
+var SYMBOLS = {
+  done: "\u2713",
+  warning: "\u26A0",
+  star: "\u2605",
+  "priority-1": "P1",
+  "priority-2": "P2",
+  "priority-3": "P3"
+};
+function readTopicMarkers(fm) {
+  const raw = fm["topic-markers"];
+  if (!Array.isArray(raw)) return [];
+  return TOPIC_MARKERS.filter((id) => raw.includes(id));
+}
+function toggleTopicMarker(raw, id) {
+  const current = Array.isArray(raw) ? raw.filter((v) => typeof v === "string") : [];
+  let next;
+  if (current.includes(id)) next = current.filter((v) => v !== id);
+  else {
+    next = PRIORITIES.includes(id) ? current.filter((v) => !PRIORITIES.includes(v)) : current.slice();
+    next.push(id);
+  }
+  return next.length ? next : null;
+}
+function markerSymbol(id) {
+  return SYMBOLS[id];
+}
+
 // experiences/visual-map/topic-kind-shape.ts
 var TOPIC_KIND_SHAPES = {
   topic: { shape: "rounded", labelKey: "ui.topic_kind_topic" },
@@ -19159,38 +19192,6 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
 
 // repository.ts
 var import_obsidian14 = require("obsidian");
-
-// topic-markers.ts
-var TOPIC_MARKERS = ["done", "warning", "star", "priority-1", "priority-2", "priority-3"];
-var PRIORITIES = ["priority-1", "priority-2", "priority-3"];
-var SYMBOLS = {
-  done: "\u2713",
-  warning: "\u26A0",
-  star: "\u2605",
-  "priority-1": "P1",
-  "priority-2": "P2",
-  "priority-3": "P3"
-};
-function readTopicMarkers(fm) {
-  const raw = fm["topic-markers"];
-  if (!Array.isArray(raw)) return [];
-  return TOPIC_MARKERS.filter((id) => raw.includes(id));
-}
-function toggleTopicMarker(raw, id) {
-  const current = Array.isArray(raw) ? raw.filter((v) => typeof v === "string") : [];
-  let next;
-  if (current.includes(id)) next = current.filter((v) => v !== id);
-  else {
-    next = PRIORITIES.includes(id) ? current.filter((v) => !PRIORITIES.includes(v)) : current.slice();
-    next.push(id);
-  }
-  return next.length ? next : null;
-}
-function markerSymbol(id) {
-  return SYMBOLS[id];
-}
-
-// repository.ts
 var import_node_crypto5 = require("node:crypto");
 
 // core/map-chat-layout.ts
@@ -40531,6 +40532,7 @@ var MERGE_DONE_NOTICE_MS = 15e3;
 var STRUCTURE_REVIEW_ENTRY_SHOWN = false;
 var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
+var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var relevanceRunToken = 0;
 var relevancePanelSeq = 0;
 var relevanceSortedMaps = /* @__PURE__ */ new Set();
@@ -40540,6 +40542,14 @@ function edgePathData(x1, y1, x2, y2) {
 }
 var relationMarkerSequence = 0;
 var relationSwatchSequence = 0;
+var MARKER_NAME_KEYS = {
+  done: "share.viewer_marker_done",
+  warning: "share.viewer_marker_warning",
+  star: "share.viewer_marker_star",
+  "priority-1": "share.viewer_marker_priority_1",
+  "priority-2": "share.viewer_marker_priority_2",
+  "priority-3": "share.viewer_marker_priority_3"
+};
 var KIND_PICKER_ORDER = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 var RELATION_LABEL_MIN_ZOOM = 0.6;
 var RELATION_LABEL_NOTE_MAX = 60;
@@ -46233,6 +46243,7 @@ ${request.requirements}` : preset.text,
       const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    this.paintCardMarkers(card, header, node.id);
     const errorDetails = [];
     if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
       const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
@@ -46829,6 +46840,42 @@ ${request.requirements}` : preset.text,
   hypothesisTagText(strength) {
     return t("ui.hypothesis_tag_0", t(STRENGTH_LABEL[strength]));
   }
+  /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
+  markersOf(id) {
+    var _a2;
+    const raw = (_a2 = this.notes.get(id)) == null ? void 0 : _a2.markers;
+    return raw ? TOPIC_MARKERS.filter((marker5) => raw.includes(marker5)) : [];
+  }
+  /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
+  markersText(markers) {
+    return markers.length ? t("share.viewer_markers_0", markers.map((id) => t(MARKER_NAME_KEYS[id])).join(t("ui.list_separator"))) : "";
+  }
+  /**
+   * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
+   * name. Safe to call again: the old symbols and the old name part are replaced.
+   */
+  paintCardMarkers(card, header, id) {
+    var _a2, _b2, _c;
+    (_a2 = cardMarkerRows.get(card)) == null ? void 0 : _a2.remove();
+    cardMarkerRows.delete(card);
+    const markers = this.markersOf(id), text11 = this.markersText(markers), previous = (_b2 = card.dataset.markerText) != null ? _b2 : "";
+    let named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (markers.length) {
+      const row = header.createSpan("vam-card-markers");
+      row.setAttr("aria-hidden", "true");
+      cardMarkerRows.set(card, row);
+      for (const marker5 of markers) {
+        const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(marker5) });
+        mark.dataset.marker = marker5;
+      }
+      card.dataset.markerText = text11;
+    } else delete card.dataset.markerText;
+    if (named) this.labelCard(card, text11 ? t("ui.topic_card_label_0_1", named, text11) : named);
+  }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   labelCard(card, text11) {
     let label = cardLabels.get(card);
@@ -47009,6 +47056,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
+    if (header) this.paintCardMarkers(card, header, node.id);
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
   }
@@ -47289,6 +47337,7 @@ ${request.requirements}` : preset.text,
     }
     if (mode !== "structure") return;
     if (note) this.renderHypothesisSection(panel, node, close);
+    if (note) this.renderMarkerSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
     relationship.createEl("strong", {
       text: t("ui.parent_topic"),
@@ -47864,6 +47913,47 @@ ${request.requirements}` : preset.text,
       svg.appendChild(line);
     }
     parent.insertBefore(svg, null);
+  }
+  /** Markers can be edited only on an ordinary editable map: not the sample, an AIM map or the select mode. */
+  markersEditable(node) {
+    return this.relationsEnabled() && !node.aimKind && !this.integrationMode;
+  }
+  /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
+  renderMarkerSection(panel, node) {
+    if (!this.markersEditable(node)) return;
+    const section3 = panel.createDiv("vam-inspector-section vam-marker-section");
+    section3.createEl("strong", { text: t("ui.topic_markers"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const group = section3.createDiv("vam-topic-markers vam-choice-group");
+    group.setAttr("role", "group");
+    group.setAttr("aria-label", t("ui.topic_markers"));
+    const paint = (focusId) => {
+      group.empty();
+      const active = this.markersOf(node.id);
+      for (const id of TOPIC_MARKERS) {
+        const choice2 = this.button(group, t(MARKER_NAME_KEYS[id]), () => {
+          this.enqueue(async () => {
+            await this.changeTopicMarker(node, id);
+            paint(id);
+          });
+        });
+        choice2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+        const on = active.includes(id);
+        choice2.setAttr("aria-pressed", String(on));
+        if (on) choice2.addClass("is-pressed");
+        if (id === focusId) choice2.focus();
+      }
+    };
+    paint();
+  }
+  /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
+  async changeTopicMarker(node, id) {
+    if (!this.map || !this.markersEditable(node)) return;
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction().rewriteNote(node.path, (path) => this.plugin.repo.writeTopicMarkers(path, id)).editMap(this.path, (map) => {
+      map.viewport = clone(viewport);
+    }).commit({ deferRebuild: true, label: t("ui.topic_markers") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
   }
   /** The six-type switch, a hypothesis's strength, and the relations that start or end at this topic. */
   renderHypothesisSection(panel, node, close) {
@@ -53133,7 +53223,7 @@ async function fitImageForInput(dataUrl, limits, signal) {
 var import_obsidian33 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
 var foldOutlineSearch = (text11) => toSimplifiedFold(text11.toLocaleLowerCase().replace(/\u0307/g, ""));
-var MARKER_NAME_KEYS = {
+var MARKER_NAME_KEYS2 = {
   done: "share.viewer_marker_done",
   warning: "share.viewer_marker_warning",
   star: "share.viewer_marker_star",
@@ -53320,7 +53410,7 @@ var OutlineView = class extends import_obsidian33.ItemView {
       const marks = readTopicMarkers({ "topic-markers": this.markers.get(node.id) });
       if (marks.length) {
         const listSeparator = t("ui.list_separator");
-        const names3 = marks.map((id) => t(MARKER_NAME_KEYS[id])).join(listSeparator);
+        const names3 = marks.map((id) => t(MARKER_NAME_KEYS2[id])).join(listSeparator);
         button.setAttr(
           "aria-label",
           `${title}${listSeparator === "\u3001" ? "\uFF0C" : ", "}${t("share.viewer_markers_0", names3)}`

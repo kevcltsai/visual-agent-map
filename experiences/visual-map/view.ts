@@ -439,9 +439,9 @@ type SynthesisWrite = (
 /** Unique ids for the hidden card labels; any view may render a card. */
 let cardLabelSequence = 0;
 const cardLabels = new WeakMap<HTMLElement, HTMLElement>();
-/** The marker row drawn in each card header, so a refresh can replace it. */
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
+/** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
@@ -6742,8 +6742,9 @@ export class VisualAgentMapView extends ItemView {
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
-    this.paintModelTag(header, note);
     this.paintCardMarkers(card, header, node.id);
+    // The model tag follows the marker row (see paintModelTag).
+    this.paintModelTag(card, header, note);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -7413,16 +7414,34 @@ export class VisualAgentMapView extends ItemView {
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
    * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
    */
-  private paintModelTag(header: HTMLElement, note: Note | undefined): void {
-    cardModelTags.get(header)?.remove();
+  private paintModelTag(card: HTMLElement, header: HTMLElement, note: Note | undefined): void {
+    const old = cardModelTags.get(header);
     cardModelTags.delete(header);
-    if (!note?.modelOverride) return;
-    const label = this.plugin.modelLabel(note.model),
-      tag = header.createSpan({ cls: "vam-node-model-tag", text: label }),
-      named = t("ui.card_model_override_0", label);
-    tag.setAttr("aria-label", named);
-    tag.setAttr("title", named);
-    cardModelTags.set(header, tag);
+    const previous = card.dataset.modelText ?? "";
+    // The accessible name is the card label (aria-labelledby), so the model part is merged into it and replaced on a redraw.
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (note?.modelOverride) {
+      const label = this.plugin.modelLabel(note.model),
+        text = t("ui.card_model_override_0", label),
+        tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
+      tag.setAttr("aria-label", text);
+      tag.setAttr("title", text);
+      // In place on a redraw; otherwise right after the marker row (painted first), so renderNode and refreshCard agree.
+      const row = cardMarkerRows.get(card);
+      if (old) old.replaceWith(tag);
+      else if (row && row.parentElement === header) row.after(tag);
+      cardModelTags.set(header, tag);
+      card.dataset.modelText = text;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
+    } else {
+      old?.remove();
+      delete card.dataset.modelText;
+      if (named) this.labelCard(card, named);
+    }
   }
   /**
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
@@ -7656,8 +7675,8 @@ export class VisualAgentMapView extends ItemView {
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
-      this.paintModelTag(header, note);
       this.paintCardMarkers(card, header, node.id);
+      this.paintModelTag(card, header, note);
     }
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
@@ -13639,7 +13658,7 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now());
+    progress?.begin(taskPath, progressAttempt, Date.now(), note.model);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;

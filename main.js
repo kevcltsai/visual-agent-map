@@ -46282,8 +46282,8 @@ ${request.requirements}` : preset.text,
       const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
-    this.paintModelTag(header, note);
     this.paintCardMarkers(card, header, node.id);
+    this.paintModelTag(card, header, note);
     const errorDetails = [];
     if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
       const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
@@ -46894,15 +46894,31 @@ ${request.requirements}` : preset.text,
    * A quiet tag with the model name on a card whose model is its own (set by hand, or inherited from a manual ancestor).
    * Never for a card that follows the current model, so switching the current model changes no tag. Safe to call again.
    */
-  paintModelTag(header, note) {
-    var _a2;
-    (_a2 = cardModelTags.get(header)) == null ? void 0 : _a2.remove();
+  paintModelTag(card, header, note) {
+    var _a2, _b2;
+    const old = cardModelTags.get(header);
     cardModelTags.delete(header);
-    if (!(note == null ? void 0 : note.modelOverride)) return;
-    const label = this.plugin.modelLabel(note.model), tag = header.createSpan({ cls: "vam-node-model-tag", text: label }), named = t("ui.card_model_override_0", label);
-    tag.setAttr("aria-label", named);
-    tag.setAttr("title", named);
-    cardModelTags.set(header, tag);
+    const previous = (_a2 = card.dataset.modelText) != null ? _a2 : "";
+    let named = (_b2 = cardLabels.get(card)) == null ? void 0 : _b2.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    if (note == null ? void 0 : note.modelOverride) {
+      const label = this.plugin.modelLabel(note.model), text11 = t("ui.card_model_override_0", label), tag = header.createSpan({ cls: "vam-node-model-tag", text: label });
+      tag.setAttr("aria-label", text11);
+      tag.setAttr("title", text11);
+      const row = cardMarkerRows.get(card);
+      if (old) old.replaceWith(tag);
+      else if (row && row.parentElement === header) row.after(tag);
+      cardModelTags.set(header, tag);
+      card.dataset.modelText = text11;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text11));
+    } else {
+      old == null ? void 0 : old.remove();
+      delete card.dataset.modelText;
+      if (named) this.labelCard(card, named);
+    }
   }
   /**
    * Draws the marker symbols in the card header (aria-hidden: decoration) and adds their names to the card's accessible
@@ -47117,8 +47133,8 @@ ${request.requirements}` : preset.text,
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
-      this.paintModelTag(header, note);
       this.paintCardMarkers(card, header, node.id);
+      this.paintModelTag(card, header, note);
     }
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -52606,7 +52622,7 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now());
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), note.model);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;

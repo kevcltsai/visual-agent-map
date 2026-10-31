@@ -18,7 +18,19 @@ const { VisualAgentMapView } = replay.load(
 const { t } = S.load('i18n.ts');
 const view = () => Object.assign(Object.create(VisualAgentMapView.prototype), { plugin: { modelLabel: id => `L:${id}` } });
 const tags = header => dom.findAll(header, item => (item.cls ?? '').split(/\s+/).includes('vam-node-model-tag'));
-const paint = (header, note) => view().paintModelTag(header, note);
+// The shared DOM stand-in lacks replaceWith/after/parentElement and has a read-only textContent; the card label writes it.
+function patch(el) {
+  Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } });
+  Object.defineProperty(el, 'parentElement', { configurable: true, get() { return this.parent; } });
+  el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); };
+  el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); };
+  const child = el.child;
+  el.child = function (...args) { return patch(child.apply(this, args)); };
+  return el;
+}
+const cards = new WeakMap();
+const cardOf = header => { if (!cards.has(header)) { patch(header); cards.set(header, patch(dom.element('div'))); } return cards.get(header); };
+const paint = (header, note) => view().paintModelTag(cardOf(header), header, note);
 
 test('an override card shows the tag with the model label, an accessible name and a title', () => {
   const header = dom.element('div');
@@ -42,11 +54,11 @@ test('counterexample: a card that follows the current model has no tag', () => {
 test('counterexample: switching the current model leaves an override tag as it was and gives a following card none', () => {
   const v = view();
   const override = dom.element('div'), following = dom.element('div');
-  v.paintModelTag(override, { model: 'manual-m', modelOverride: true });
-  v.paintModelTag(following, { model: 'current-1' });
+  v.paintModelTag(cardOf(override), override, { model: 'manual-m', modelOverride: true });
+  v.paintModelTag(cardOf(following), following, { model: 'current-1' });
   // The note read after the switch: the override keeps its own model, the other follows the new current model.
-  v.paintModelTag(override, { model: 'manual-m', modelOverride: true });
-  v.paintModelTag(following, { model: 'current-2' });
+  v.paintModelTag(cardOf(override), override, { model: 'manual-m', modelOverride: true });
+  v.paintModelTag(cardOf(following), following, { model: 'current-2' });
   assert.deepEqual(tags(override).map(item => item.text), ['L:manual-m']);
   assert.equal(tags(following).length, 0);
 });
@@ -62,7 +74,7 @@ test('painting again replaces the tag (no duplicates) and removes it when the ov
 
 test('renderNode and refreshCard both paint the tag, next to (not inside) the marker row', () => {
   const source = read('experiences/visual-map/view.ts');
-  assert.equal((source.match(/this\.paintModelTag\(header, note\)/g) ?? []).length, 2);
+  assert.equal((source.match(/this\.paintModelTag\(card, header, note\)/g) ?? []).length, 2);
   const method = source.match(/private paintCardMarkers[\s\S]*?\n  }\n/)[0];
   assert.ok(!method.includes('model-tag'), 'the marker row code is untouched');
 });
@@ -115,4 +127,34 @@ test('counterexample: the share file (shell, payload and stylesheet) never menti
   const output = html.renderShareHtml(data, text.shareViewerUiFor('en'));
   assert.ok(output.length > 1000);
   assert.ok(!output.includes('vam-node-model-tag'));
+});
+
+test('counterexample: the card name (aria-labelledby target) gains the override model text and loses it when the override ends', () => {
+  const v = view(), card = patch(dom.element('div')), header = card.child('div');
+  v.labelCard(card, 'Title');
+  const name = () => dom.find(card, item => (item.cls ?? '').includes('vam-card-label')).text;
+  const text = t('ui.card_model_override_0', 'L:m');
+  v.paintModelTag(card, header, { model: 'm', modelOverride: true });
+  assert.equal(name(), t('ui.topic_card_label_0_1', 'Title', text));
+  v.paintModelTag(card, header, { model: 'm', modelOverride: true });
+  assert.equal(name(), t('ui.topic_card_label_0_1', 'Title', text), 'a redraw does not stack the text');
+  v.paintModelTag(card, header, { model: 'n', modelOverride: true });
+  assert.equal(name(), t('ui.topic_card_label_0_1', 'Title', t('ui.card_model_override_0', 'L:n')));
+  v.paintModelTag(card, header, { model: 'n' });
+  assert.equal(name(), 'Title');
+  assert.equal(card.attrs['aria-labelledby'], dom.find(card, item => (item.cls ?? '').includes('vam-card-label')).id);
+});
+
+test('counterexample: a redraw replaces the tag in place, whatever else the header holds', () => {
+  const v = view(), card = patch(dom.element('div')), header = card.child('div');
+  header.createSpan({ cls: 'vam-hypothesis-tag' });
+  v.labelCard(card, 'Title');
+  v.paintModelTag(card, header, { model: 'a', modelOverride: true });
+  header.createSpan({ cls: 'vam-status' });
+  const order = () => header.children.map(item => item.cls || item.text);
+  const first = order();
+  v.paintModelTag(card, header, { model: 'b', modelOverride: true });
+  const again = order();
+  assert.equal(again.length, first.length);
+  assert.equal(again.indexOf('L:b'), first.indexOf('L:a'), 'replaced in place, not moved to the end');
 });

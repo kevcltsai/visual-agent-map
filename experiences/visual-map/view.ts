@@ -1859,8 +1859,32 @@ export class VisualAgentMapView extends ItemView {
     this.restoreCrossProxies();
     await this.hydrate(isCurrent);
     if (!isCurrent()) return;
+    await this.recoverInterruptedNotes(isCurrent);
+    if (!isCurrent()) return;
     this.render();
     this.app.workspace.requestSaveLayout();
+  }
+  /**
+   * A note still at `status: running` that no task in this plugin instance owns was left by a reload or a closed Obsidian:
+   * mark it as an error so the card stops saying "AI running". Runs inside the mutation queue, so it does not queue again.
+   */
+  private async recoverInterruptedNotes(isCurrent: () => boolean): Promise<void> {
+    if (this.builtIn || !this.map) return;
+    const message = t("ui.ai_task_interrupted_by_reload");
+    for (const node of [...this.map.nodes]) {
+      if (!isCurrent()) return;
+      const note = this.notes.get(node.id);
+      if (note?.status !== "running" || this.plugin.isNoteTaskBusy(node.path)) continue;
+      try {
+        await this.plugin.repo.markInterruptedRun(node.path, message, () => !this.plugin.isNoteTaskBusy(node.path));
+        if (!isCurrent()) return;
+        const fresh = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+        if (!isCurrent()) return;
+        this.notes.set(node.id, fresh);
+      } catch (error) {
+        console.warn("Visual Agent Map could not clear an interrupted run", error);
+      }
+    }
   }
   openAimStart(): void {
     if (this.closed) return;

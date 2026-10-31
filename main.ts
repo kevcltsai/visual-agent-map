@@ -1431,6 +1431,15 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.styleNodeLeaf(this.detailsLeaf);
     await this.app.workspace.revealLeaf(this.detailsLeaf);
   }
+  /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
+  isNoteTaskBusy(path: string): boolean {
+    if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;
+    if (this.expansionCoordinator.isRunning(path)) return true;
+    for (const batch of this.expansionBatches.values())
+      if (batch.status === "running" && (batch.currentPath === path || batch.queuedPaths.includes(path))) return true;
+    return false;
+  }
+
   closeStaleDetails(): void {
     const closed =
       this.detailsLeaf?.view instanceof MarkdownView && this.detailsLeaf.view.file?.path === this.detailsPath;

@@ -467,6 +467,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.invalid_node_data_or_duplicate_id": "議題資料不正確或 ID 重複。",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "連結有循環或指向不存在的母議題。",
   "ui.ai_task_cancelled": "AI 任務已取消",
+  "ui.ai_task_interrupted_by_reload":
+    "AI 任務在外掛重新載入或 Obsidian 關閉時中斷，結果未套用；原有內容已保留，可重新執行。",
   "ui.codex_app_server_has_stopped": "Codex App Server 已停止",
   "ui.codex_app_server_did_not_create_a_thread": "Codex App Server 沒有建立 thread",
   "ui.could_not_start_codex_app_server_0_1": "無法啟動 Codex App Server（{0}）：{1}",

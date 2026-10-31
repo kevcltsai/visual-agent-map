@@ -551,6 +551,7 @@ var en = {
   "ui.invalid_node_data_or_duplicate_id": "Invalid node data or duplicate ID.",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "A link contains a cycle or points to a missing parent topic.",
   "ui.ai_task_cancelled": "AI task cancelled",
+  "ui.ai_task_interrupted_by_reload": "The AI task was interrupted when the plugin reloaded or Obsidian closed. No result was applied; existing content is kept, and you can run it again.",
   "ui.codex_app_server_has_stopped": "Codex App Server has stopped",
   "ui.codex_app_server_did_not_create_a_thread": "Codex App Server did not create a thread",
   "ui.could_not_start_codex_app_server_0_1": "Could not start Codex App Server ({0}): {1}",
@@ -2700,6 +2701,7 @@ var zhCN = {
   "ui.invalid_node_data_or_duplicate_id": "\u8BAE\u9898\u6570\u636E\u4E0D\u6B63\u786E\u6216 ID \u91CD\u590D\u3002",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "\u94FE\u63A5\u6709\u5FAA\u73AF\u6216\u6307\u5411\u4E0D\u5B58\u5728\u7684\u7236\u8BAE\u9898\u3002",
   "ui.ai_task_cancelled": "AI \u4EFB\u52A1\u5DF2\u53D6\u6D88",
+  "ui.ai_task_interrupted_by_reload": "AI \u4EFB\u52A1\u5728\u63D2\u4EF6\u91CD\u65B0\u52A0\u8F7D\u6216 Obsidian \u5173\u95ED\u65F6\u4E2D\u65AD\uFF0C\u7ED3\u679C\u672A\u5E94\u7528\uFF1B\u539F\u6709\u5185\u5BB9\u5DF2\u4FDD\u7559\uFF0C\u53EF\u91CD\u65B0\u8FD0\u884C\u3002",
   "ui.codex_app_server_has_stopped": "Codex App Server \u5DF2\u505C\u6B62",
   "ui.codex_app_server_did_not_create_a_thread": "Codex App Server \u6CA1\u6709\u521B\u5EFA thread",
   "ui.could_not_start_codex_app_server_0_1": "\u65E0\u6CD5\u542F\u52A8 Codex App Server\uFF08{0}\uFF09\uFF1A{1}",
@@ -4849,6 +4851,7 @@ var zhTW = {
   "ui.invalid_node_data_or_duplicate_id": "\u8B70\u984C\u8CC7\u6599\u4E0D\u6B63\u78BA\u6216 ID \u91CD\u8907\u3002",
   "ui.a_link_contains_a_cycle_or_points_to_a_missing_parent_topic": "\u9023\u7D50\u6709\u5FAA\u74B0\u6216\u6307\u5411\u4E0D\u5B58\u5728\u7684\u6BCD\u8B70\u984C\u3002",
   "ui.ai_task_cancelled": "AI \u4EFB\u52D9\u5DF2\u53D6\u6D88",
+  "ui.ai_task_interrupted_by_reload": "AI \u4EFB\u52D9\u5728\u5916\u639B\u91CD\u65B0\u8F09\u5165\u6216 Obsidian \u95DC\u9589\u6642\u4E2D\u65B7\uFF0C\u7D50\u679C\u672A\u5957\u7528\uFF1B\u539F\u6709\u5167\u5BB9\u5DF2\u4FDD\u7559\uFF0C\u53EF\u91CD\u65B0\u57F7\u884C\u3002",
   "ui.codex_app_server_has_stopped": "Codex App Server \u5DF2\u505C\u6B62",
   "ui.codex_app_server_did_not_create_a_thread": "Codex App Server \u6C92\u6709\u5EFA\u7ACB thread",
   "ui.could_not_start_codex_app_server_0_1": "\u7121\u6CD5\u555F\u52D5 Codex App Server\uFF08{0}\uFF09\uFF1A{1}",
@@ -21131,96 +21134,108 @@ var Repository = class {
    * headings and the reference frame stay in the interface language. Notes created by AIM remember it in frontmatter.
    */
   async updateNote(path, patch, options = {}) {
+    await this.app.vault.process(this.file(path), (content) => this.patchedNote(path, content, patch, options));
+  }
+  /**
+   * Marks a note left at `status: running` by a reload as failed. The status and `stillIdle()` are checked inside the same
+   * `vault.process` callback that writes, so a task that starts or finishes in between is never overwritten.
+   * Returns whether it wrote. Does not take the mutation queue: callers are already inside it.
+   */
+  async markInterruptedRun(path, lastError, stillIdle) {
+    let wrote = false;
     await this.app.vault.process(this.file(path), (content) => {
-      var _a2, _b2, _c, _d;
-      const fm = frontmatter(content);
-      const language2 = this.scaffoldLanguage(content, fm);
-      ensureNoteCssClass(fm);
-      if (Array.isArray(fm["agent-map-references"]))
-        fm["agent-map-references"] = fm["agent-map-references"].map(
-          (value) => localizeReference(String(value), language2)
+      if (frontmatter(content).status !== "running" || !stillIdle()) return content;
+      wrote = true;
+      return this.patchedNote(path, content, { status: "error", lastError }, {});
+    });
+    return wrote;
+  }
+  patchedNote(path, content, patch, options) {
+    var _a2, _b2, _c, _d;
+    const fm = frontmatter(content);
+    const language2 = this.scaffoldLanguage(content, fm);
+    ensureNoteCssClass(fm);
+    if (Array.isArray(fm["agent-map-references"]))
+      fm["agent-map-references"] = fm["agent-map-references"].map((value) => localizeReference(String(value), language2));
+    fm.title = (_a2 = patch.title) != null ? _a2 : noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
+    for (const key2 of ["summary", "model", "status"]) if (patch[key2] !== void 0) fm[key2] = patch[key2];
+    if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
+    if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
+    if (patch.researchMode !== void 0) fm["research-mode"] = patch.researchMode;
+    if (patch.visualMode !== void 0) fm["visual-mode"] = patch.visualMode;
+    if (patch.detailTemplateId !== void 0)
+      patch.detailTemplateId ? fm["detail-template"] = patch.detailTemplateId : delete fm["detail-template"];
+    if (patch.toneId !== void 0) patch.toneId ? fm.tone = patch.toneId : delete fm.tone;
+    if (patch.detailFormatIssues !== void 0)
+      patch.detailFormatIssues.length ? fm["detail-format-issues"] = patch.detailFormatIssues : delete fm["detail-format-issues"];
+    if (patch.lastError !== void 0) patch.lastError ? fm["last-error"] = patch.lastError : delete fm["last-error"];
+    else if (patch.status === "completed") delete fm["last-error"];
+    if (patch.mapId !== void 0) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
+    if (patch.topicId !== void 0) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
+    if (patch.topicState !== void 0) fm["topic-state"] = patch.topicState;
+    if (patch.referencePaths !== void 0)
+      patch.referencePaths.length ? fm["reference-materials"] = [...new Set(patch.referencePaths)] : delete fm["reference-materials"];
+    if (patch.sourcePaths !== void 0)
+      patch.sourcePaths.length ? fm["source-notes"] = patch.sourcePaths : delete fm["source-notes"];
+    fm.updated = (/* @__PURE__ */ new Date()).toISOString();
+    let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
+    const textLanguage = (_c = (_b2 = options.contentLanguage) != null ? _b2 : noteContentLanguage(fm)) != null ? _c : language2;
+    if (options.contentLanguage !== void 0 && noteContentLanguage(fm) === void 0)
+      fm["content-language"] = options.contentLanguage;
+    body = ensurePreview(body, language2, textLanguage);
+    if (isPlaceholder(text5(fm.summary))) fm.summary = placeholder(textLanguage);
+    if (patch.title !== void 0) {
+      const heading = managedHeadingValue(patch.title);
+      body = body.replace(/^# .*$/m, () => `# ${heading}`);
+    }
+    if (patch.summary !== void 0) body = replaceSummarySection(body, patch.summary);
+    if (patch.prompt !== void 0) body = replaceSection(body, "Prompt", patch.prompt);
+    if (patch.rules !== void 0) body = replaceSection(body, "Rules", patch.rules);
+    if (patch.detail !== void 0) body = replaceSection(splitOpenItems(body).text, "Detail", patch.detail);
+    if (patch.thinkingOrigin !== void 0)
+      body = replaceSection(body, "Thinking Origin", originMarkdown(patch.thinkingOrigin));
+    if (patch.visualReferences !== void 0) {
+      body = removeSection(body, "Visual References");
+      if (patch.visualReferences.trim())
+        body = replaceSection(
+          body,
+          "Detail",
+          detailWithVisualReferences(
+            section2(body, "Detail"),
+            patch.visualReferences,
+            (_d = options.detailTemplate) != null ? _d : standardTemplate(language2)
+          )
         );
-      fm.title = (_a2 = patch.title) != null ? _a2 : noteTitle(content, fm, baseName(path).replace(/\.md$/, ""));
-      for (const key2 of ["summary", "model", "status"]) if (patch[key2] !== void 0) fm[key2] = patch[key2];
-      if (patch.modelSource !== void 0) fm["model-source"] = patch.modelSource;
-      if (patch.reasoning !== void 0) fm["reasoning-level"] = normalizeReasoningLevel(patch.reasoning);
-      if (patch.researchMode !== void 0) fm["research-mode"] = patch.researchMode;
-      if (patch.visualMode !== void 0) fm["visual-mode"] = patch.visualMode;
-      if (patch.detailTemplateId !== void 0)
-        patch.detailTemplateId ? fm["detail-template"] = patch.detailTemplateId : delete fm["detail-template"];
-      if (patch.toneId !== void 0) patch.toneId ? fm.tone = patch.toneId : delete fm.tone;
-      if (patch.detailFormatIssues !== void 0)
-        patch.detailFormatIssues.length ? fm["detail-format-issues"] = patch.detailFormatIssues : delete fm["detail-format-issues"];
-      if (patch.lastError !== void 0)
-        patch.lastError ? fm["last-error"] = patch.lastError : delete fm["last-error"];
-      else if (patch.status === "completed") delete fm["last-error"];
-      if (patch.mapId !== void 0) patch.mapId ? fm["agent-map-id"] = patch.mapId : delete fm["agent-map-id"];
-      if (patch.topicId !== void 0) patch.topicId ? fm["topic-id"] = patch.topicId : delete fm["topic-id"];
-      if (patch.topicState !== void 0) fm["topic-state"] = patch.topicState;
-      if (patch.referencePaths !== void 0)
-        patch.referencePaths.length ? fm["reference-materials"] = [...new Set(patch.referencePaths)] : delete fm["reference-materials"];
-      if (patch.sourcePaths !== void 0)
-        patch.sourcePaths.length ? fm["source-notes"] = patch.sourcePaths : delete fm["source-notes"];
-      fm.updated = (/* @__PURE__ */ new Date()).toISOString();
-      let body = decodeCalloutSections(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""));
-      const textLanguage = (_c = (_b2 = options.contentLanguage) != null ? _b2 : noteContentLanguage(fm)) != null ? _c : language2;
-      if (options.contentLanguage !== void 0 && noteContentLanguage(fm) === void 0)
-        fm["content-language"] = options.contentLanguage;
-      body = ensurePreview(body, language2, textLanguage);
-      if (isPlaceholder(text5(fm.summary))) fm.summary = placeholder(textLanguage);
-      if (patch.title !== void 0) {
-        const heading = managedHeadingValue(patch.title);
-        body = body.replace(/^# .*$/m, () => `# ${heading}`);
+    }
+    if (patch.newFindings !== void 0) {
+      if (patch.newFindings.trim()) body = replaceSection(body, "Working Findings", patch.newFindings);
+      else {
+        body = removeSection(body, "Working Findings");
+        body = removeSection(body, "New Findings");
       }
-      if (patch.summary !== void 0) body = replaceSummarySection(body, patch.summary);
-      if (patch.prompt !== void 0) body = replaceSection(body, "Prompt", patch.prompt);
-      if (patch.rules !== void 0) body = replaceSection(body, "Rules", patch.rules);
-      if (patch.detail !== void 0) body = replaceSection(splitOpenItems(body).text, "Detail", patch.detail);
-      if (patch.thinkingOrigin !== void 0)
-        body = replaceSection(body, "Thinking Origin", originMarkdown(patch.thinkingOrigin));
-      if (patch.visualReferences !== void 0) {
-        body = removeSection(body, "Visual References");
-        if (patch.visualReferences.trim())
-          body = replaceSection(
-            body,
-            "Detail",
-            detailWithVisualReferences(
-              section2(body, "Detail"),
-              patch.visualReferences,
-              (_d = options.detailTemplate) != null ? _d : standardTemplate(language2)
-            )
-          );
-      }
-      if (patch.newFindings !== void 0) {
-        if (patch.newFindings.trim()) body = replaceSection(body, "Working Findings", patch.newFindings);
-        else {
-          body = removeSection(body, "Working Findings");
-          body = removeSection(body, "New Findings");
-        }
-      }
-      if (patch.preview !== void 0) {
-        body = replaceSection(body, previewHeading(language2), patch.preview);
-        fm["preview-initialized"] = true;
-      } else if (patch.previewSection !== void 0) {
-        body = replaceSection(body, previewHeading(language2), patch.previewSection);
-      } else if (patch.summary !== void 0 && patch.summary.trim() && !isPlaceholder(patch.summary) && fm["preview-initialized"] !== true) {
-        const preview = previewSection(body).trim();
-        if (!preview || isPlaceholder(preview))
-          body = replaceSection(body, previewHeading(language2), initialPreview(patch.summary, section2(body, "Detail")));
-        fm["preview-initialized"] = true;
-      }
-      if (patch.previewInitialized !== void 0) fm["preview-initialized"] = patch.previewInitialized;
-      body = normalizeBodyOrder(
-        body,
-        text5(fm.title, path.replace(/\.md$/, "")),
-        text5(fm.summary, placeholder(textLanguage)),
-        language2,
-        textLanguage
-      );
-      return `---
+    }
+    if (patch.preview !== void 0) {
+      body = replaceSection(body, previewHeading(language2), patch.preview);
+      fm["preview-initialized"] = true;
+    } else if (patch.previewSection !== void 0) {
+      body = replaceSection(body, previewHeading(language2), patch.previewSection);
+    } else if (patch.summary !== void 0 && patch.summary.trim() && !isPlaceholder(patch.summary) && fm["preview-initialized"] !== true) {
+      const preview = previewSection(body).trim();
+      if (!preview || isPlaceholder(preview))
+        body = replaceSection(body, previewHeading(language2), initialPreview(patch.summary, section2(body, "Detail")));
+      fm["preview-initialized"] = true;
+    }
+    if (patch.previewInitialized !== void 0) fm["preview-initialized"] = patch.previewInitialized;
+    body = normalizeBodyOrder(
+      body,
+      text5(fm.title, path.replace(/\.md$/, "")),
+      text5(fm.summary, placeholder(textLanguage)),
+      language2,
+      textLanguage
+    );
+    return `---
 ${(0, import_obsidian12.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, language2)}`;
-    });
   }
   async createNote(title, model, map, mapPath, modelSource, initial = {}, onCreate) {
     var _a2, _b2, _c, _d;
@@ -44833,8 +44848,33 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     this.restoreCrossProxies();
     await this.hydrate(isCurrent);
     if (!isCurrent()) return;
+    await this.recoverInterruptedNotes(isCurrent);
+    if (!isCurrent()) return;
     this.render();
     this.app.workspace.requestSaveLayout();
+  }
+  /**
+   * A note still at `status: running` that no task in this plugin instance owns was left by a reload or a closed Obsidian:
+   * mark it as an error so the card stops saying "AI running". Runs inside the mutation queue, so it does not queue again.
+   */
+  async recoverInterruptedNotes(isCurrent) {
+    var _a2;
+    if (this.builtIn || !this.map) return;
+    const message = t("ui.ai_task_interrupted_by_reload");
+    for (const node of [...this.map.nodes]) {
+      if (!isCurrent()) return;
+      const note = this.notes.get(node.id);
+      if ((note == null ? void 0 : note.status) !== "running" || this.plugin.isNoteTaskBusy(node.path)) continue;
+      try {
+        await this.plugin.repo.markInterruptedRun(node.path, message, () => !this.plugin.isNoteTaskBusy(node.path));
+        if (!isCurrent()) return;
+        const fresh = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+        if (!isCurrent()) return;
+        this.notes.set(node.id, fresh);
+      } catch (error) {
+        console.warn("Visual Agent Map could not clear an interrupted run", error);
+      }
+    }
   }
   openAimStart() {
     var _a2;
@@ -65489,6 +65529,14 @@ ${t("ui.organize_link_wait_hint")}`;
     this.detailsPath = file.path;
     this.styleNodeLeaf(this.detailsLeaf);
     await this.app.workspace.revealLeaf(this.detailsLeaf);
+  }
+  /** Whether this plugin instance is running, queued or batching an AI task for the note. A `running` note that is not busy was left by a reload. */
+  isNoteTaskBusy(path) {
+    if (this.running.has(path) || this.activeTasks.has(path) || this.quickExpandPending.has(path)) return true;
+    if (this.expansionCoordinator.isRunning(path)) return true;
+    for (const batch of this.expansionBatches.values())
+      if (batch.status === "running" && (batch.currentPath === path || batch.queuedPaths.includes(path))) return true;
+    return false;
   }
   closeStaleDetails() {
     var _a2, _b2, _c, _d;

@@ -15577,17 +15577,49 @@ export class VisualAgentMapView extends ItemView {
       let position = { ...origin },
         moved = false,
         travelled = false;
+      // Dragging a picked card in selection mode moves every picked card together.
+      const group = selecting && this.multiSelected.has(node.id) ? this.groupDragMembers(node, card) : null;
+      const groupOrigins = new Map<string, { x: number; y: number }>();
+      for (const id of group?.keys() ?? []) {
+        const member = this.map.nodes.find(item => item.id === id);
+        if (member) groupOrigins.set(id, { x: member.x, y: member.y });
+      }
+      let delta = { x: 0, y: 0 };
       // Sizes and the far end of each touching edge are read once; a move then only writes.
-      const edges = this.dragEdges(node.id, card);
+      const edges = group ? null : this.dragEdges(node.id, card);
+      const groupEdges = group ? this.groupDragEdges(group) : null;
+      const placeGroup = (dx: number, dy: number): void => {
+        for (const [id, el] of group ?? []) {
+          const from = groupOrigins.get(id);
+          if (!from) continue;
+          el.style.left = `${from.x + dx}px`;
+          el.style.top = `${from.y + dy}px`;
+        }
+        groupEdges?.update(dx, dy);
+      };
       card.setPointerCapture(event.pointerId);
       const paint = (): void => {
         this.dragFrame = null;
+        if (group) {
+          placeGroup(delta.x, delta.y);
+          return;
+        }
         card.style.left = `${position.x}px`;
         card.style.top = `${position.y}px`;
-        edges.update(position.x, position.y);
+        edges?.update(position.x, position.y);
       };
       // A merging card stays where it is; the drop reports why.
-      const locked = this.isMerging(node.id);
+      const locked = group ? [...group.keys()].some(id => this.isMerging(id)) : this.isMerging(node.id);
+      // In a timeline a first-level topic is reordered, not placed, so a group holding one cannot move.
+      const timelineBlocked =
+        !!group &&
+        !this.map.aim &&
+        layoutOf(this.map).direction === "timeline" &&
+        [...group.keys()].some(id => {
+          const parentId = this.map?.nodes.find(item => item.id === id)?.parentId;
+          const parent = parentId ? this.map?.nodes.find(item => item.id === parentId) : undefined;
+          return !!parent && !parent.parentId;
+        });
       let warned = false;
       // Released over the AI chat window the card is a reference to add, not something to move.
       let overChat = false;
@@ -15601,6 +15633,15 @@ export class VisualAgentMapView extends ItemView {
         this.chat?.setDropHighlight(overChat);
         if (selecting) {
           travelled ||= Math.hypot(e.clientX - start.x, e.clientY - start.y) > 3;
+          if (!group || !travelled || this.relevanceSortOn()) return;
+          if (locked || timelineBlocked) {
+            if (!warned) new Notice(t(locked ? "ui.merge_locked" : "ui.group_drag_timeline_top_level"));
+            warned = true;
+            return;
+          }
+          const zoom = this.map!.viewport.zoom;
+          delta = { x: (e.clientX - start.x) / zoom, y: (e.clientY - start.y) / zoom };
+          this.dragFrame ??= window.requestAnimationFrame(paint);
           return;
         }
         // While sorted the card sits at a display position; saving a drag would write that, so cards stay put.
@@ -15647,21 +15688,47 @@ export class VisualAgentMapView extends ItemView {
         if (selecting && !travelled) return;
         this.suppressClickUntil = Date.now() + 250;
         // The browser lost the pointer (or it was cancelled) without a release: put the card back.
-        if (e.type === "pointercancel" || e.type === "lostpointercapture") {
+        const putBack = (): void => {
+          if (group) {
+            placeGroup(0, 0);
+            return;
+          }
           card.style.left = `${origin.x}px`;
           card.style.top = `${origin.y}px`;
-          edges.update(origin.x, origin.y);
+          edges?.update(origin.x, origin.y);
+        };
+        if (e.type === "pointercancel" || e.type === "lostpointercapture") {
+          putBack();
           return;
         }
         if (overChat) {
           // Dropped on the chat: the card goes back where it was, nothing is written to the map.
-          card.style.left = `${origin.x}px`;
-          card.style.top = `${origin.y}px`;
-          edges.update(origin.x, origin.y);
-          if (this.map?.nodes.some(item => item.id === node.id)) this.chat?.addTopicReference(node.id);
+          putBack();
+          const ids = group ? [...group.keys()] : [node.id];
+          for (const id of ids) if (this.map?.nodes.some(item => item.id === id)) this.chat?.addTopicReference(id);
           return;
         }
-        if (selecting) return;
+        if (selecting) {
+          if (!group) return;
+          if (locked || timelineBlocked || this.relevanceSortOn()) {
+            putBack();
+            return;
+          }
+          placeGroup(delta.x, delta.y);
+          const { x: dx, y: dy } = delta;
+          // One change for the whole group, so one undo puts every card back.
+          this.enqueue(() =>
+            this.mapChange(map => {
+              for (const [id, from] of groupOrigins) {
+                const current = map.nodes.find(n => n.id === id);
+                if (!current) continue;
+                current.x = Math.round(from.x + dx);
+                current.y = Math.round(from.y + dy);
+              }
+            })
+          );
+          return;
+        }
         if (moved && locked) {
           // The Notice already showed when the drag started.
         } else if (moved) {
@@ -15713,6 +15780,93 @@ export class VisualAgentMapView extends ItemView {
       card.addEventListener("pointercancel", finish);
       card.addEventListener("lostpointercapture", finish);
     });
+  }
+  /** The picked cards that move together when one of them is dragged in selection mode, by id. */
+  private groupDragMembers(node: MapNode, card: HTMLElement): Map<string, HTMLElement> {
+    const members = new Map<string, HTMLElement>();
+    for (const id of this.multiSelected) {
+      const el = id === node.id ? (this.cardEls.get(id) ?? card) : this.cardEls.get(id);
+      if (el && this.map?.nodes.some(item => item.id === id)) members.set(id, el);
+    }
+    return members;
+  }
+  /**
+   * The edges touching a group of cards that move by the same offset. An edge with both ends in the group moves
+   * with both; an edge with one end in the group keeps the other end where it was measured.
+   */
+  private groupDragEdges(group: Map<string, HTMLElement>): { update: (dx: number, dy: number) => void } {
+    const nodes = this.map?.nodes ?? [];
+    const directionOf = branchDirectionResolver(nodes, layoutOf(this.map).direction);
+    const base = new Map<string, CardBox>();
+    for (const [id, el] of group) base.set(id, boxOf(el));
+    const boxFor = (id: string): CardBox | undefined => {
+      const known = base.get(id);
+      if (known) return known;
+      const el = this.cardEls.get(id);
+      return el ? boxOf(el) : undefined;
+    };
+    const shifted = (id: string, dx: number, dy: number): CardBox | undefined => {
+      const box = boxFor(id);
+      return box && group.has(id) ? { ...box, x: box.x + dx, y: box.y + dy } : box;
+    };
+    const tree: { key: string; parentId: string; childId: string; direction: string; depth: number }[] = [];
+    for (const key of this.edgeEls.keys()) {
+      const [parentId, childId] = key.split("\u0000");
+      if (!group.has(parentId) && !group.has(childId)) continue;
+      if (!boxFor(parentId) || !boxFor(childId)) continue;
+      tree.push({ key, parentId, childId, direction: directionOf(parentId), depth: depthOf(nodes, childId) });
+    }
+    const linked: { key: string; fromId: string; toId: string }[] = [];
+    for (const key of this.relationEls.keys()) {
+      const [fromId, toId] = key.split("\u0000");
+      if (!group.has(fromId) && !group.has(toId)) continue;
+      if (boxFor(fromId) && boxFor(toId)) linked.push({ key, fromId, toId });
+    }
+    // Each fishbone spine touched by a member (the head, or a first-level topic of the head) follows the move.
+    const spineIds = new Set<string>();
+    for (const id of group.keys()) {
+      const parentId = nodes.find(item => item.id === id)?.parentId;
+      if (this.spineEls.has(id)) spineIds.add(id);
+      else if (parentId && this.spineEls.has(parentId)) spineIds.add(parentId);
+    }
+    const spines = [...spineIds].flatMap(id => {
+      const boxes = this.spineBoxes(id);
+      return boxes ? [{ id, boxes }] : [];
+    });
+    return {
+      update: (dx, dy) => {
+        for (const { id, boxes } of spines) {
+          const move = (item: string, box: CardBox): CardBox => (group.has(item) ? (shifted(item, dx, dy) ?? box) : box);
+          this.placeSpine(id, undefined, {
+            head: move(id, boxes.head),
+            topics: boxes.topics.map(topic => ({ id: topic.id, box: move(topic.id, topic.box) }))
+          });
+        }
+        for (const link of linked) {
+          const path = this.relationEls.get(link.key);
+          const from = shifted(link.fromId, dx, dy),
+            to = shifted(link.toId, dx, dy);
+          if (!path || !from || !to) continue;
+          const d = relationPathData(from, to);
+          path.setAttribute("d", d);
+          this.relationHitEls.get(link.key)?.setAttribute("d", d);
+          this.relationGapEls.get(link.key)?.setAttribute("d", d);
+          this.placeRelationLabel(link.key, relationLabelPoint(from, to));
+        }
+        for (const edge of tree) {
+          const path = this.edgeEls.get(edge.key);
+          const parent = shifted(edge.parentId, dx, dy),
+            child = shifted(edge.childId, dx, dy);
+          if (!path || !parent || !child) continue;
+          path.setAttribute(
+            "d",
+            edge.direction !== "right"
+              ? treeEdgePathData(parent, child, edge.direction as LayoutKind, edge.depth)
+              : edgePathData(parent.x + parent.width, parent.y + parent.height / 2, child.x, child.y + child.height / 2)
+          );
+        }
+      }
+    };
   }
   /** The map changed under a running drag: end it without writing anything, then run the repaint that waited for it. */
   private endStaleDrag(): void {

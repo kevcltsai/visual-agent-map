@@ -770,6 +770,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.merging": "合并中…",
   "ui.merge_bar_title": "合并中：",
   "ui.merge_locked": "合并中，完成后再操作",
+  "ui.group_drag_timeline_top_level": "时间轴的第一层议题用拖拽排序，不能整组移动；取消勾选第一层议题后再拖",
   "ui.merge_done_0": "已合并成“{0}”，可撤销",
   "ui.move_links_dialog_notice_0":
     "你有 {0} 篇其他笔记连到这张卡；Obsidian 可能会询问是否更新链接，建议选“更新”，链接才不会失效。",

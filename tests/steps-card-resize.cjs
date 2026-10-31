@@ -80,3 +80,81 @@ test('A3 arrangeNewBranch makes room for a wide parent and wide new children', (
   const left = byId(layout.arrangeNewBranch([node('p', null, { x: 800 }), node('c', 'p', { width: 520 })], 'p', new Set(['c']), heightOf, undefined, 'left'));
   assert.equal(left.c.x, 800 - COLUMN - 240);
 });
+
+// ---- View: the width handle (A5, unit level) -------------------------------------------------------------------------
+const support = require('./support.cjs');
+const viewHarness = (width) => {
+  const { VisualAgentMapView } = support.load('main.ts', { obsidian: support.obsidian });
+  const nodes = [Object.assign(support.node('a', null), width ? { width } : {})];
+  const doc = support.map(nodes);
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...support.DEFAULT_SETTINGS }, pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} });
+  view.map = doc;
+  const handlers = new Map(), attrs = {};
+  const handle = { attrs, handlers, tabIndex: 0, focused: false,
+    setAttr(name, value) { attrs[name] = value; }, addEventListener(name, fn) { handlers.set(name, fn); }, removeEventListener(name) { handlers.delete(name); }, setPointerCapture() {} };
+  const style = { removeProperty(name) { delete style[name]; } };
+  const card = { style, createDiv: opts => { Object.assign(attrs, opts.attr); return handle; } };
+  const changes = [];
+  view.enqueue = work => work();
+  view.mapChange = async change => { changes.push(change); };
+  view.clearHoverTimer = () => {};
+  view.attachResizeHandle(card, nodes[0]);
+  const run = () => { const copy = JSON.parse(JSON.stringify(doc)); changes.splice(0).forEach(change => change(copy)); return copy.nodes[0].width; };
+  const key = k => { let prevented = false; handle.handlers.get('keydown')({ key: k, preventDefault() { prevented = true; }, stopPropagation() {} }); return prevented; };
+  const pointer = (name, x) => handle.handlers.get(name)?.({ button: 0, pointerId: 1, clientX: x, preventDefault() {}, stopPropagation() {} });
+  return { view, doc, nodes, handle, attrs, card, changes, run, key, pointer };
+};
+
+test('A5 the handle is a vertical separator with range and value, out of the tab order until the card is focused', () => {
+  const h = viewHarness(400);
+  assert.deepEqual({ ...h.attrs }, { role: 'separator', 'aria-orientation': 'vertical', 'aria-label': 'Card width', 'aria-valuemin': '200', 'aria-valuemax': '560', 'aria-valuenow': '400' });
+  assert.equal(h.handle.tabIndex, -1);
+});
+
+test('A5 a drag writes once on release and not while moving', () => {
+  const h = viewHarness();
+  h.pointer('pointerdown', 100);
+  h.pointer('pointermove', 180);
+  h.pointer('pointermove', 220);
+  assert.equal(h.card.style.width, '400px');
+  assert.equal(h.changes.length, 0);
+  h.pointer('pointerup', 220);
+  assert.equal(h.changes.length, 1);
+  assert.equal(h.run(), 400);
+});
+
+test('A5 a drag is clamped and respects zoom; dragging back to 280 clears the field', () => {
+  const h = viewHarness();
+  h.pointer('pointerdown', 0); h.pointer('pointermove', 5000); h.pointer('pointerup', 5000);
+  assert.equal(h.run(), 560);
+  const z = viewHarness(); z.doc.viewport.zoom = 2;
+  z.pointer('pointerdown', 0); z.pointer('pointermove', 80); z.pointer('pointerup', 80);
+  assert.equal(z.run(), 320);
+  const back = viewHarness(400);
+  back.pointer('pointerdown', 0); back.pointer('pointermove', -120); back.pointer('pointerup', -120);
+  assert.equal(back.run(), undefined);
+});
+
+test('A5 a cancelled or zero-length drag writes nothing and restores the width', () => {
+  const h = viewHarness(400);
+  h.pointer('pointerdown', 0); h.pointer('pointermove', 100); h.pointer('pointercancel', 100);
+  assert.equal(h.card.style.width, '400px');
+  h.pointer('pointerdown', 0); h.pointer('pointerup', 0);
+  assert.equal(h.changes.length, 0);
+});
+
+test('A5 keyboard: each press is one change; Home/End; Enter and double click reset; limits do nothing', () => {
+  const h = viewHarness();
+  assert.equal(h.key('ArrowRight'), true);
+  assert.equal(h.run(), 320);
+  assert.equal(h.changes.length, 0);
+  const l = viewHarness(); l.key('ArrowLeft'); assert.equal(l.run(), 240);
+  const lo = viewHarness(200); lo.key('ArrowLeft'); assert.equal(lo.changes.length, 0);
+  const hi = viewHarness(560); hi.key('ArrowRight'); assert.equal(hi.changes.length, 0);
+  const home = viewHarness(); home.key('Home'); assert.equal(home.run(), 200);
+  const end = viewHarness(); end.key('End'); assert.equal(end.run(), 560);
+  const enter = viewHarness(400); enter.key('Enter'); assert.equal(enter.run(), undefined);
+  const plain = viewHarness(); plain.key('Enter'); assert.equal(plain.changes.length, 0);
+  const dbl = viewHarness(400); dbl.handle.handlers.get('dblclick')({ preventDefault() {}, stopPropagation() {} }); assert.equal(dbl.run(), undefined);
+  assert.equal(h.key('a'), false);
+});

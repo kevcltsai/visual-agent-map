@@ -308,6 +308,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.aim_answer_snapshot": "回答",
   "ui.aim_research_not_generated": "這個回答尚未產生研究子議題。",
   "ui.aim_retry_subtopics": "重新產生子議題",
+  "ui.card_resize_label": "卡片寬度",
   "ui.start_using_vam": "開始使用 VAM",
   "ui.check_codex": "檢查 Codex",
   "ui.check_claude_code": "檢查 Claude Code",

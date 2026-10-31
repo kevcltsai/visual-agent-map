@@ -9,6 +9,8 @@ export interface ReadingOrderOptions {
   siblingAxis?: "y" | "x";
   /** List the descendants of collapsed nodes too (default false). */
   includeHidden?: boolean;
+  /** Text nodes hung on topics (`treeTextNodes(...).attached`); each reads as a leaf among its parent's children. */
+  textNodes?: readonly { id: string; parentId: string; x: number; y: number }[];
 }
 
 export interface OrderStep {
@@ -18,7 +20,18 @@ export interface OrderStep {
 }
 
 /** Ids in presentation order. Iterative; ignores aimConvergesFromNodeIds; each id appears once. */
-export function readingOrder(nodes: readonly MapNode[], opts: ReadingOrderOptions = {}): string[] {
+export function readingOrder(topics: readonly MapNode[], opts: ReadingOrderOptions = {}): string[] {
+  let nodes = topics;
+  if (opts.textNodes?.length) {
+    const known = new Set(topics.map(node => node.id));
+    const leaves: MapNode[] = [];
+    for (const text of opts.textNodes) {
+      if (known.has(text.id) || !known.has(text.parentId)) continue;
+      known.add(text.id);
+      leaves.push({ id: text.id, path: "", parentId: text.parentId, x: text.x, y: text.y, collapsed: false });
+    }
+    nodes = [...topics, ...leaves];
+  }
   const axis = opts.siblingAxis ?? "y";
   const other = axis === "y" ? "x" : "y";
   const includeHidden = opts.includeHidden === true;

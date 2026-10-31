@@ -167,3 +167,5 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 @media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }
 /* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */
 @media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }
+.vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vam-text-edge { opacity: 0.8; }

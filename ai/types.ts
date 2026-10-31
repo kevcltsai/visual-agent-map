@@ -35,6 +35,8 @@ export interface TaskContext {
   detail: string;
   task: string;
   ancestors: string;
+  /** Text nodes the user wrote under this topic (read-only context); empty or absent adds nothing to the prompt. */
+  userTexts?: string;
   workingFindings?: string;
   sourceContext?: string;
   referenceGroups?: ReferenceGroup[];

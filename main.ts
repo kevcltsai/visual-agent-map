@@ -635,6 +635,19 @@ export default class VisualAgentMapPlugin extends Plugin {
         })
         .catch(error => new Notice(String(error)));
     });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "add-text-node",
+        name: t("ui.text_node_add_command"),
+        checkCallback: checking => {
+          const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
+          if (!view) return false;
+          if (!checking) view.addTextNodeUnder();
+          return true;
+        }
+      }),
+      key: "ui.text_node_add_command"
+    });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {
       void this.activateOutline().catch(error => new Notice(String(error)));

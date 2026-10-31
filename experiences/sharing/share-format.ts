@@ -101,6 +101,18 @@ export interface ShareNodePayload {
   translations?: Record<string, ShareNodeTranslation>;
 }
 
+/**
+ * Optional (tree-text-node): a user-written text node. `parentId` is the topic it hangs under, or null for an orphan
+ * (no parent topic left); an orphan is shown as free text at its own x/y. `text` is plain text, never HTML.
+ */
+export interface ShareTextNodePayload {
+  id: string;
+  parentId: string | null;
+  text: string;
+  x: number;
+  y: number;
+}
+
 export interface SharePayload {
   format: typeof SHARE_FORMAT;
   version: typeof SHARE_VERSION;
@@ -111,6 +123,8 @@ export interface SharePayload {
   source: { vamVersion: string; mapId: string };
   viewport: { x: number; y: number; zoom: number };
   nodes: ShareNodePayload[];
+  /** Optional (tree-text-node): present only when the map has text nodes; absent keeps older files byte-identical. `version` stays 1. */
+  textNodes?: ShareTextNodePayload[];
   assets: Record<string, string>;
   /** Optional (D-2026-10-116). Language id of the original text; any registry language, so it may lie outside the six. */
   contentLanguage?: string;
@@ -164,6 +178,28 @@ const optionalText = (value: string | undefined): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+/** Same limit as `cleanText` in canvas-items.ts, kept literal so the viewer bundle imports nothing new. */
+const SHARE_TEXT_LIMIT = 2000;
+
+/** The map's text nodes for the payload: a parent that is missing or the node itself makes it an orphan (parentId null), never dropped. */
+function shareTextNodes(map: MapDocument): ShareTextNodePayload[] {
+  const ids = new Set(map.nodes.map(node => node.id));
+  const seen = new Set<string>();
+  const out: ShareTextNodePayload[] = [];
+  for (const item of map.canvasItems ?? []) {
+    const raw = item as unknown as Record<string, unknown>;
+    if (raw.kind !== "text" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (typeof raw.text !== "string") continue;
+    const text = raw.text.trim().slice(0, SHARE_TEXT_LIMIT);
+    if (!text || typeof raw.x !== "number" || typeof raw.y !== "number") continue;
+    if (!Number.isFinite(raw.x) || !Number.isFinite(raw.y)) continue;
+    seen.add(raw.id);
+    const parentId = typeof raw.parentId === "string" && ids.has(raw.parentId) ? raw.parentId : null;
+    out.push({ id: raw.id, parentId, text, x: raw.x, y: raw.y });
+  }
+  return out;
+}
+
 /** Builds the share payload. Throws ShareError for AIM maps, which cannot be shared. */
 export function buildSharePayload(
   map: MapDocument,
@@ -203,6 +239,7 @@ export function buildSharePayload(
     return out;
   });
   const goal = optionalText(options.goal);
+  const textNodes = shareTextNodes(map);
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -213,6 +250,7 @@ export function buildSharePayload(
     source: { vamVersion: options.vamVersion, mapId: map.id },
     viewport: { x: map.viewport.x, y: map.viewport.y, zoom: map.viewport.zoom },
     nodes,
+    ...(textNodes.length ? { textNodes } : {}),
     assets: options.includeImages ? { ...options.assets } : {}
   };
 }

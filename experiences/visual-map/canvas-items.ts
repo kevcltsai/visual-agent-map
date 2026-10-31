@@ -18,11 +18,20 @@ export interface BoundaryItem {
   members: string[];
   label?: string;
 }
+/** A user-written note without a file. `parentId` hangs it under a topic on the tree; without it (or when that topic is gone) it is free text. */
+export interface TextItem {
+  id: string;
+  kind: "text";
+  text: string;
+  parentId?: string;
+  x: number;
+  y: number;
+}
 export interface UnknownItem {
   kind: string;
   [key: string]: unknown;
 }
-export type CanvasItem = ImageItem | BoundaryItem | UnknownItem;
+export type CanvasItem = ImageItem | BoundaryItem | TextItem | UnknownItem;
 export interface Rect {
   x: number;
   y: number;
@@ -40,6 +49,8 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 const CONTROL_ALL = /[\u0000-\u001f\u007f]/g;
 const LABEL_LIMIT = 200;
 const MEMBER_LIMIT = 500;
+export const TEXT_LIMIT = 2000;
+const PARENT_ID_LIMIT = 200;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -70,6 +81,26 @@ function cleanBoundary(raw: Record<string, unknown>): BoundaryItem | null {
   return item;
 }
 
+/** Trimmed text cut to TEXT_LIMIT characters; null when it is not a string or has nothing but whitespace. */
+export function cleanText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim().slice(0, TEXT_LIMIT).trim();
+  return text ? text : null;
+}
+
+function cleanTextItem(raw: Record<string, unknown>): TextItem | null {
+  const { id, text, parentId, x, y } = raw;
+  if (typeof id !== "string" || !ID.test(id) || !finite(x) || !finite(y)) return null;
+  const clean = cleanText(text);
+  if (clean === null) return null;
+  const item: TextItem = { id, kind: "text", text: clean, x, y };
+  if (parentId !== undefined && parentId !== null) {
+    if (typeof parentId !== "string" || !parentId || parentId.length > PARENT_ID_LIMIT) return null;
+    item.parentId = parentId;
+  }
+  return item;
+}
+
 /** Parses untrusted JSON. Never throws; a bad item is dropped alone, an unknown kind is kept as is. */
 export function sanitizeCanvasItems(raw: unknown): CanvasItem[] {
   if (!Array.isArray(raw)) return [];
@@ -80,10 +111,11 @@ export function sanitizeCanvasItems(raw: unknown): CanvasItem[] {
     let item: CanvasItem | null;
     if (entry.kind === "image") item = cleanImage(entry);
     else if (entry.kind === "boundary") item = cleanBoundary(entry);
+    else if (entry.kind === "text") item = cleanTextItem(entry);
     else item = entry as UnknownItem;
     if (!item) continue;
-    if (item.kind === "image" || item.kind === "boundary") {
-      const id = (item as ImageItem | BoundaryItem).id;
+    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text") {
+      const id = (item as ImageItem | BoundaryItem | TextItem).id;
       if (seen.has(id)) continue;
       seen.add(id);
     }
@@ -119,6 +151,43 @@ export function resizeKeepRatio(items: readonly CanvasItem[], id: string, width:
 
 export function removeItem(items: readonly CanvasItem[], id: string): CanvasItem[] {
   return items.filter(item => !(isRecord(item) && (item as { id?: unknown }).id === id));
+}
+
+const isText = (item: CanvasItem): item is TextItem => item.kind === "text";
+
+/** Adds a text node; a bad or duplicate one (any item with that id) leaves the list unchanged. */
+export function addTextNode(items: readonly CanvasItem[], text: Omit<TextItem, "kind">): CanvasItem[] {
+  const clean = cleanTextItem({ ...text, kind: "text" });
+  if (!clean || items.some(i => (i as { id?: unknown }).id === clean.id)) return [...items];
+  return [...items, clean];
+}
+
+/** Replaces the text of one text node. Empty or invalid text changes nothing; callers remove the node instead. */
+export function updateTextNode(items: readonly CanvasItem[], id: string, text: string): CanvasItem[] {
+  const clean = cleanText(text);
+  if (clean === null) return [...items];
+  return items.map(item => (isText(item) && item.id === id ? { ...item, text: clean } : item));
+}
+
+export function removeTextNode(items: readonly CanvasItem[], id: string): CanvasItem[] {
+  return items.filter(item => !(isText(item) && item.id === id));
+}
+
+/** Text nodes split by whether their parent topic exists. Orphans (no parent, missing parent, parent is itself) are never dropped. */
+export function treeTextNodes(
+  items: readonly CanvasItem[],
+  nodeIds: ReadonlySet<string> | readonly string[]
+): { attached: TextItem[]; orphans: TextItem[] } {
+  const alive = new Set<string>(nodeIds);
+  const attached: TextItem[] = [];
+  const orphans: TextItem[] = [];
+  for (const item of items) {
+    if (!isText(item)) continue;
+    if (item.parentId !== undefined && item.parentId !== item.id && alive.has(item.parentId) && !alive.has(item.id))
+      attached.push(item);
+    else orphans.push(item);
+  }
+  return { attached, orphans };
 }
 
 /** Bounding box of the members that currently have a rect, grown by `pad`. Null when none of them exist. */

@@ -967,6 +967,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
     renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
+    cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch,
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
@@ -1502,14 +1503,14 @@ integrationTest('card tools: labelled actions wait for hover, focus or selection
     return tools.children.filter(child => child.tag === 'button');
   };
   const buttons = toolsOf();
-  assert.deepEqual(buttons.map(button => button.text), ['Collapse', 'Structure', 'Rename', 'Select subtopics', 'Details', 'AI explore']);
+  assert.deepEqual(buttons.map(button => button.text), ['Collapse', 'Structure', 'Rename', 'Select subtopics', 'Add text', 'Details', 'AI explore']);
   const explore = buttons.at(-1);
   assert.ok(explore.classes.has('vam-ai-explore')); assert.equal(explore.attrs['aria-label'], undefined, 'the visible text is the accessible name (WCAG 2.5.3)');
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
-  assert.equal(buttons[1].attrs['aria-label'], 'Structure and links'); assert.equal(buttons[3].attrs['aria-label'], 'Select every direct subtopic of this topic'); assert.equal(buttons[4].attrs['aria-label'], 'Open details in right sidebar');
+  assert.equal(buttons[1].attrs['aria-label'], 'Structure and links'); assert.equal(buttons[3].attrs['aria-label'], 'Select every direct subtopic of this topic'); assert.equal(buttons[5].attrs['aria-label'], 'Open details in right sidebar');
   assert.equal(buttons[2].attrs['aria-label'], undefined);
   // A leaf has no Collapse; the sample keeps only Details; select mode keeps only Details.
-  assert.deepEqual(toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); }).map(button => button.text), ['Structure', 'Rename', 'Details', 'AI explore']);
+  assert.deepEqual(toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); }).map(button => button.text), ['Structure', 'Rename', 'Add text', 'Details', 'AI explore']);
   const sample = toolsOf(({ view }) => { view.builtIn = true; });
   assert.deepEqual(sample.map(button => button.text), ['Details']); assert.equal(sample[0].attrs.title, 'View sample content');
   assert.deepEqual(toolsOf(({ view }) => { view.integrationMode = true; }).map(button => button.text), ['Collapse', 'Details']);
@@ -1636,7 +1637,7 @@ integrationTest('collapse control: sets the flags, fits the map and is a single 
   view.autoLayout(); await view.pending;
   assert.equal(saved, writes + 1, 'one write'); assert.equal(at('b').x, at('a').x + 360, 'auto layout re-arranges the map'); assert.notEqual(at('c').y, -9999);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /n\.collapsed = !n\.collapsed;\s*map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\);/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
+  assert.match(source, /n\.collapsed = !n\.collapsed;\s*(?:map\.nodes = arrangeMap\(map\.nodes(?:, supersededAimNodeIds\(map\))?(?:, this\.cardHeightOf)?, layoutOf\(map\)\)|this\.arrangeAll\(map\));/, 'the card collapse button re-arranges in the same change, in the map\'s direction');
 });
 integrationTest('Layout menu offers collapse all, expand all, levels 1 to 3, a separator, the eight arrangements, a separator, the three spacings and Auto layout', () => {
   const menus = [];

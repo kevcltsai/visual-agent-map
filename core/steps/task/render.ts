@@ -13,6 +13,7 @@ import {
   LABEL_SUMMARY,
   LABEL_TASK,
   LABEL_TOPIC,
+  LABEL_USER_TEXT,
   LOCAL_FIRST,
   NONE,
   OBSIDIAN_FORMAT,
@@ -126,6 +127,7 @@ export function generalTaskPrompt(
     `${inLanguage(LABEL_RULES, language)}:\n${context.rules || none}`,
     context.workingFindings ? `${inLanguage(LABEL_FINDINGS, language)}:\n${context.workingFindings}` : "",
     context.sourceContext ? `${inLanguage(LABEL_SOURCES, language)}:\n${context.sourceContext}` : "",
+    ...(context.userTexts ? [`${inLanguage(LABEL_USER_TEXT, language)}:\n${context.userTexts}`] : []),
     `${inLanguage(LABEL_ANCESTORS, language)}:\n${context.ancestors || none}`,
     `${inLanguage(LABEL_TASK, language)}:\n${context.task}`
   ].join("\n\n");

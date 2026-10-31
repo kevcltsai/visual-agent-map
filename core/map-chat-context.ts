@@ -52,6 +52,16 @@ export interface MapChatTopicRef {
   /** Label of the model on the other provider the failure can be retried with; only for a provider error that has one. */
   retryWith?: string;
 }
+/**
+ * A text node the user wrote on the map (decision #4). Read-only context: it is sent as `userTexts`, never in the outline, so
+ * its id is not one a reply may act on (`nodeIds` leaves it out) and no edit action can rewrite or delete it.
+ */
+export interface MapChatUserText {
+  id: string;
+  /** The topic it hangs under; null for a free one (its topic is gone). */
+  parentId: string | null;
+  text: string;
+}
 export interface MapChatSnippet {
   path: string;
   text: string;
@@ -75,6 +85,8 @@ export interface MapChatContextInput {
   references: MapChatTopicRef[];
   snippets: MapChatSnippet[];
   files: MapChatFile[];
+  /** The user's text nodes, read-only; omitted or empty leaves the context exactly as it was. */
+  userTexts?: MapChatUserText[];
   activeFile?: MapChatFile | null;
   history: MapChatTurn[];
   /** Question and answer rounds to keep; default {@link MAP_CHAT_DEFAULT_TURNS}. */
@@ -235,6 +247,19 @@ export function buildMapChatContext(input: MapChatContextInput): MapChatContext 
     references: input.references.map(ref => topic(ref, false)),
     snippets,
     files,
+    ...(input.userTexts?.length
+      ? {
+          userTexts: input.userTexts.map(item => ({
+            id: item.id,
+            parentId: item.parentId,
+            ...(item.parentId === null ? { unattached: true } : {}),
+            readOnly: true,
+            text: item.text
+          })),
+          userTextsNote:
+            "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
+        }
+      : {}),
     activeFile: active,
     earlierTurns: history.map(turn => ({ role: turn.role, text: turn.text }))
   });

@@ -8669,7 +8669,7 @@ export class VisualAgentMapView extends ItemView {
     const placed = this.map?.nodes.find(n => n.id === node.id) ?? node;
     this.focusNode(placed);
     // focusNode only moves the camera; the dialog handed DOM focus back to the old card, so give it to the new one.
-    this.moveKeyboardFocus(placed);
+    if (this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   private async proposeChildren(
     parent: MapNode,

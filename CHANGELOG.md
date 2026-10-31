@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **Previews follow the latest summary.** The hover preview now updates when a new summary is written, instead of staying on the first one. A preview you edited or cleared yourself is kept, and anything you added after it stays. Older notes whose preview is a single paragraph take the new summary the next time one is written (undo covers research and similar steps, not AIM writes).
 - **No more stuck "AI running" cards.** If the plugin reloaded or Obsidian closed while an AI task was running, the card now shows a task error when you open the map, with a note that the task was interrupted, so you can run it again.
 
 ## [0.28.0] - 2026-11-01

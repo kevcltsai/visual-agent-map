@@ -20217,6 +20217,243 @@ function rewriteCopiedLinks(body, options) {
   return { text: text11 + body.slice(cursor), rewritten: edits.length, unverified };
 }
 
+// core/map-chat-guard.ts
+var TOPIC_IDENTITY_KEYS = ["agent-map-node", "node-id", "topic-id"];
+function normalizeVaultPath(path) {
+  if (typeof path !== "string") return null;
+  const text11 = path.trim().replace(/\\/g, "/");
+  if (!text11 || text11.startsWith("/") || text11.startsWith("~") || /^[A-Za-z]:/.test(text11) || text11.includes("\0"))
+    return null;
+  const parts = [];
+  for (const part of text11.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") return null;
+    parts.push(part);
+  }
+  return parts.length ? parts.join("/") : null;
+}
+function frontmatterBlock(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  return match ? match[1] : null;
+}
+function topLevelValues(block, keys) {
+  const found = /* @__PURE__ */ new Map();
+  if (block === null) return found;
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
+    if (!match || !keys.includes(match[1]) || found.has(match[1])) continue;
+    found.set(match[1], match[2].replace(/^(["'])(.*)\1$/, "$2"));
+  }
+  return found;
+}
+var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-strength"];
+function hypothesisLines(block) {
+  var _a2, _b2;
+  if (block === null) return [];
+  const found = [];
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
+    const key2 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
+    if (match && key2 !== void 0 && HYPOTHESIS_KEYS.includes(key2))
+      found.push(`${key2}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
+  }
+  return found;
+}
+function hasDuplicateIdentityKey(block) {
+  if (block === null) return false;
+  const seen = /* @__PURE__ */ new Set();
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z0-9_-]+)\s*:/);
+    if (!match || !TOPIC_IDENTITY_KEYS.includes(match[1])) continue;
+    if (seen.has(match[1])) return true;
+    seen.add(match[1]);
+  }
+  return false;
+}
+var hasMapMarker = (content) => /```agent-map\s*\n/.test(content) || topLevelValues(frontmatterBlock(content), ["visual-agent-map"]).has("visual-agent-map");
+function guardMapChatWrite(check) {
+  var _a2, _b2;
+  const path = normalizeVaultPath(check.path);
+  if (path === null) return { ok: false, code: "outside_vault" };
+  const configDir = normalizeVaultPath(check.configDir);
+  const lower = path.toLowerCase();
+  const inside2 = (dir) => !!dir && (lower === dir.toLowerCase() || lower.startsWith(`${dir.toLowerCase()}/`));
+  if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
+  if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
+  if (check.kind === "create") {
+    if (check.exists) return { ok: false, code: "exists" };
+    if (hasMapMarker(check.newContent) || topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS).size > 0)
+      return { ok: false, code: "reserved_frontmatter" };
+    return { ok: true };
+  }
+  const baseline = (_a2 = check.knownHashes) != null ? _a2 : {};
+  if (!Object.prototype.hasOwnProperty.call(baseline, path)) return { ok: false, code: "no_baseline" };
+  const before = (_b2 = check.oldContent) != null ? _b2 : "";
+  if (hasMapMarker(before) || hasMapMarker(check.newContent)) {
+    try {
+      parseMap(check.newContent);
+    } catch (e) {
+      return { ok: false, code: "map_unparseable" };
+    }
+    return { ok: false, code: "map_file" };
+  }
+  if (hasDuplicateIdentityKey(frontmatterBlock(before)) || hasDuplicateIdentityKey(frontmatterBlock(check.newContent)))
+    return { ok: false, code: "duplicate_identity_key" };
+  const was = topLevelValues(frontmatterBlock(before), TOPIC_IDENTITY_KEYS);
+  const now = topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS);
+  for (const key2 of TOPIC_IDENTITY_KEYS) {
+    if (was.get(key2) === now.get(key2)) continue;
+    return { ok: false, code: was.has(key2) ? "topic_identity_changed" : "reserved_frontmatter" };
+  }
+  if (hypothesisLines(frontmatterBlock(before)).join("\n") !== hypothesisLines(frontmatterBlock(check.newContent)).join("\n"))
+    return { ok: false, code: "hypothesis_frontmatter_changed" };
+  return { ok: true };
+}
+function applyMdEdit(content, find, replace) {
+  if (!find) return null;
+  const at = content.indexOf(find);
+  if (at < 0 || content.indexOf(find, at + 1) >= 0) return null;
+  return content.slice(0, at) + replace + content.slice(at + find.length);
+}
+
+// core/map-chat-context.ts
+var MAP_CHAT_DEFAULT_TURNS = 6;
+var MAP_CHAT_DETAIL_BUDGET = 6e4;
+var MAP_CHAT_MAP_TITLE_LIMIT = 200;
+var TITLE_LIMIT = 200;
+var SUMMARY_LIMIT = 240;
+var ERROR_LIMIT = 200;
+var errorFields = (node) => node.status === "error" ? {
+  status: "error",
+  ...node.error ? { error: clip(node.error, ERROR_LIMIT) } : {},
+  ...node.retryWith ? { retryWith: clip(node.retryWith, TITLE_LIMIT) } : {}
+} : {};
+function contentHash2(text11) {
+  let h1 = 3735928559, h2 = 1103547991;
+  for (let i = 0; i < text11.length; i++) {
+    const code = text11.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507) ^ Math.imul(h2 ^ h2 >>> 13, 3266489909);
+  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507) ^ Math.imul(h1 ^ h1 >>> 13, 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, "0");
+}
+function isMdStale(hashes, path, currentContent) {
+  const key2 = normalizeVaultPath(path);
+  if (key2 === null || !Object.prototype.hasOwnProperty.call(hashes, key2)) return true;
+  return hashes[key2] !== contentHash2(currentContent);
+}
+var clip = (value, limit) => {
+  const text11 = value.replace(/\s+/g, " ").trim();
+  const characters = [...text11];
+  return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
+};
+function buildMapChatContext(input) {
+  var _a2, _b2, _c, _d;
+  const hashes = {};
+  const topicHashes = {};
+  const byId = new Map(input.outline.map((node) => [node.id, node]));
+  const ids = new Set(byId.keys());
+  const children = /* @__PURE__ */ new Map();
+  for (const node of input.outline)
+    if (node.parentId !== null) children.set(node.parentId, [...(_a2 = children.get(node.parentId)) != null ? _a2 : [], node.id]);
+  const brief = (id) => {
+    const node = byId.get(id);
+    return node ? { id: node.id, title: clip(node.title, TITLE_LIMIT) } : null;
+  };
+  let detailLeft = (_b2 = input.detailBudget) != null ? _b2 : MAP_CHAT_DETAIL_BUDGET;
+  const topic = (ref, withLinks) => {
+    var _a3, _b3;
+    ids.add(ref.id);
+    const node = byId.get(ref.id);
+    const withDetail = ref.detail.length <= detailLeft;
+    if (withDetail) detailLeft -= ref.detail.length;
+    topicHashes[ref.id] = {
+      title: ref.title,
+      parentId: (_a3 = node == null ? void 0 : node.parentId) != null ? _a3 : null,
+      summary: ref.summary,
+      ...withDetail ? { detailHash: contentHash2(ref.detail) } : {}
+    };
+    return {
+      id: ref.id,
+      title: ref.title,
+      summary: ref.summary,
+      ...withDetail ? { detail: ref.detail } : { detailOmitted: true },
+      path: ref.path,
+      ...errorFields(ref),
+      ...withLinks ? {
+        parent: (node == null ? void 0 : node.parentId) ? brief(node.parentId) : null,
+        children: ((_b3 = children.get(ref.id)) != null ? _b3 : []).map(brief).filter(Boolean)
+      } : {}
+    };
+  };
+  for (const node of input.outline) topicHashes[node.id] = { title: node.title, parentId: node.parentId };
+  const record = (path, content) => {
+    const key2 = normalizeVaultPath(path);
+    if (key2 === null) return null;
+    hashes[key2] = contentHash2(content);
+    return key2;
+  };
+  const files = input.files.map((file) => {
+    const key2 = record(file.path, file.content);
+    return { path: file.path, contentHash: key2 === null ? null : hashes[key2], content: file.content };
+  });
+  const active = input.activeFile ? (() => {
+    const key2 = normalizeVaultPath(input.activeFile.path);
+    const duplicate = key2 !== null && input.files.some((file) => normalizeVaultPath(file.path) === key2);
+    if (!duplicate) record(input.activeFile.path, input.activeFile.content);
+    return duplicate ? { path: input.activeFile.path, sameAsListedFile: true } : {
+      path: input.activeFile.path,
+      contentHash: key2 === null ? null : hashes[key2],
+      content: input.activeFile.content
+    };
+  })() : null;
+  const snippets = input.snippets.map((snippet) => {
+    const key2 = snippet.fileContent === void 0 ? null : record(snippet.path, snippet.fileContent);
+    return {
+      path: snippet.path,
+      ...snippet.pathGuessed ? { pathGuessed: true } : {},
+      contentHash: key2 === null ? null : hashes[key2],
+      text: snippet.text
+    };
+  });
+  const mapTitles = [...new Set(((_c = input.mapTitles) != null ? _c : []).map((title) => clip(title, TITLE_LIMIT)).filter(Boolean))].slice(
+    0,
+    MAP_CHAT_MAP_TITLE_LIMIT
+  );
+  const turns = Math.max(0, (_d = input.maxTurns) != null ? _d : MAP_CHAT_DEFAULT_TURNS) * 2;
+  const history2 = turns ? input.history.slice(-turns) : [];
+  const json = JSON.stringify({
+    mapTitle: input.mapTitle,
+    ...input.noEditableMap ? { noEditableMap: true } : {},
+    mapTitles,
+    outline: input.outline.map((node) => ({
+      id: node.id,
+      title: clip(node.title, TITLE_LIMIT),
+      summary: clip(node.summary, SUMMARY_LIMIT),
+      parentId: node.parentId,
+      depth: node.depth,
+      ...errorFields(node)
+    })),
+    selected: input.selected.map((ref) => topic(ref, true)),
+    references: input.references.map((ref) => topic(ref, false)),
+    snippets,
+    files,
+    activeFile: active,
+    earlierTurns: history2.map((turn) => ({ role: turn.role, text: turn.text }))
+  });
+  return {
+    json,
+    nodeIds: [...ids],
+    selectedCount: input.selected.length,
+    noEditableMap: !!input.noEditableMap,
+    parents: Object.fromEntries(input.outline.map((node) => [node.id, node.parentId])),
+    mdHashes: hashes,
+    topicHashes
+  };
+}
+
 // note-values.ts
 var managedSectionValue = (value) => value.trim();
 var managedHeadingValue = (value) => value.replace(/\n/g, " ").trim();
@@ -20677,6 +20914,30 @@ function initialPreview(summary, detail) {
   const image = (_a2 = detail.match(/!\[[^\]]*\]\((?:https?:\/\/[^)\s]+)\)/)) == null ? void 0 : _a2[0];
   return [summary.trim(), image].filter(Boolean).join("\n\n");
 }
+var PREVIEW_MANUAL = "manual";
+var normalizePreviewText = (value) => value.normalize("NFC").replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+var previewHash = (value) => `v1:${contentHash2(normalizePreviewText(value))}`;
+var readPreviewAutoHash = (value) => typeof value === "string" && (value === PREVIEW_MANUAL || /^v1:[0-9a-f]{14}$/.test(value)) ? value : "";
+var LEGACY_PREVIEW_BLOCK_START = /^(?:#|>|-|\*|\+|\||<|!|```|\d+[.)])/;
+var LEGACY_PREVIEW_IMAGE = /^!\[[^\]]*\]\(https?:\/\/[^)\s]+\)$/;
+function followedPreview(current, auto, hash, initialized) {
+  if (hash === PREVIEW_MANUAL) return { preview: null, hash };
+  const text11 = isPlaceholder(current) ? "" : normalizePreviewText(current);
+  const paragraphs = text11 ? text11.split("\n\n") : [];
+  const replaceFirst = (count) => ({
+    preview: [auto, ...paragraphs.slice(count)].join("\n\n"),
+    hash: previewHash(auto)
+  });
+  if (hash) {
+    for (let k = 1; k <= paragraphs.length; k++)
+      if (previewHash(paragraphs.slice(0, k).join("\n\n")) === hash) return replaceFirst(k);
+    return { preview: null, hash };
+  }
+  if (!initialized) return text11 ? { preview: null, hash: PREVIEW_MANUAL } : replaceFirst(0);
+  const [first, second] = paragraphs;
+  if (!first || first.includes("\n") || LEGACY_PREVIEW_BLOCK_START.test(first)) return { preview: null, hash: PREVIEW_MANUAL };
+  return replaceFirst(second !== void 0 && LEGACY_PREVIEW_IMAGE.test(second) ? 2 : 1);
+}
 function noteBody(title, summary, language2, prompt = "", rules = "", preview = "", detail = "", visualReferences = "", newFindings = "", leftover = "", layout = "answer-first") {
   if (layout === "legacy") {
     const legacyBlock = `${DETAIL_START}
@@ -21105,6 +21366,7 @@ var Repository = class {
       preview: [previewSection(content), section2(content, "User Notes")].filter(Boolean).join("\n\n"),
       previewSection: previewSection(content),
       previewInitialized: fm["preview-initialized"] === true,
+      previewAutoHash: readPreviewAutoHash(fm["preview-auto-hash"]),
       model,
       modelSource,
       ...effective.overridden ? { modelOverride: true } : {},
@@ -21217,15 +21479,23 @@ var Repository = class {
     if (patch.preview !== void 0) {
       body = replaceSection(body, previewHeading(language2), patch.preview);
       fm["preview-initialized"] = true;
+      fm["preview-auto-hash"] = PREVIEW_MANUAL;
     } else if (patch.previewSection !== void 0) {
       body = replaceSection(body, previewHeading(language2), patch.previewSection);
-    } else if (patch.summary !== void 0 && patch.summary.trim() && !isPlaceholder(patch.summary) && fm["preview-initialized"] !== true) {
-      const preview = previewSection(body).trim();
-      if (!preview || isPlaceholder(preview))
-        body = replaceSection(body, previewHeading(language2), initialPreview(patch.summary, section2(body, "Detail")));
+    } else if (patch.summary !== void 0 && patch.summary.trim() && !isPlaceholder(patch.summary)) {
+      const result = followedPreview(
+        previewSection(body),
+        initialPreview(patch.summary, section2(body, "Detail")),
+        readPreviewAutoHash(fm["preview-auto-hash"]),
+        fm["preview-initialized"] === true
+      );
+      if (result.preview !== null) body = replaceSection(body, previewHeading(language2), result.preview);
+      fm["preview-auto-hash"] = result.hash;
       fm["preview-initialized"] = true;
     }
     if (patch.previewInitialized !== void 0) fm["preview-initialized"] = patch.previewInitialized;
+    if (patch.previewAutoHash !== void 0)
+      patch.previewAutoHash ? fm["preview-auto-hash"] = patch.previewAutoHash : delete fm["preview-auto-hash"];
     body = normalizeBodyOrder(
       body,
       text5(fm.title, path.replace(/\.md$/, "")),
@@ -23640,6 +23910,7 @@ function builtInSample(language2, useEmbeddedAssets = true) {
     notes.set(node.id, {
       ...note,
       preview: useEmbeddedAssets ? embedAssets(note.preview) : note.preview,
+      previewAutoHash: "",
       detail: useEmbeddedAssets ? embedAssets(note.detail) : note.detail,
       visualReferences: "",
       newFindings: "",
@@ -24357,7 +24628,7 @@ function settledLine(line) {
   var _a2;
   const block = line.images;
   if (!block) return line;
-  const title = clip(block.nodeTitle);
+  const title = clip2(block.nodeTitle);
   const model = block.modelLabel ? t("ui.map_chat_model_suffix_0", block.modelLabel) : "";
   switch (block.state) {
     case "searching":
@@ -24372,7 +24643,7 @@ function settledLine(line) {
       return {
         ...line,
         status: "failed",
-        text: t("ui.map_chat_line_images_failed_0_1", title, clip((_a2 = block.reason) != null ? _a2 : "", 160)) + model
+        text: t("ui.map_chat_line_images_failed_0_1", title, clip2((_a2 = block.reason) != null ? _a2 : "", 160)) + model
       };
     case "stopped":
       return { ...line, status: "skipped", text: t("ui.map_chat_line_images_stopped_0", title) };
@@ -24380,7 +24651,7 @@ function settledLine(line) {
 }
 var STAGE_ORDER = { preparing: 0, waiting: 1, writing: 2, applying: 3 };
 var LABEL_LIMIT2 = 40;
-var clip = (value, limit = LABEL_LIMIT2) => {
+var clip2 = (value, limit = LABEL_LIMIT2) => {
   const text11 = value.replace(/\s+/g, " ").trim();
   const characters = [...text11];
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
@@ -25021,7 +25292,7 @@ ${typed}` : draft;
     this.clearStage();
     this.renderLog();
     this.renderBusy();
-    this.announce(announce !== void 0 ? clip(announce, 160) : t("ui.map_chat_live_failed_0", clip(text11, 160)));
+    this.announce(announce !== void 0 ? clip2(announce, 160) : t("ui.map_chat_live_failed_0", clip2(text11, 160)));
     this.markUnread();
   }
   /** The user stopped the turn: whatever text arrived stays, marked as stopped. */
@@ -25050,9 +25321,9 @@ ${typed}` : draft;
     this.renderLog();
     this.renderHint();
     this.announce(
-      `${t("ui.map_chat_live_done_0", clip(last.text, 160))} ${t(
+      `${t("ui.map_chat_live_done_0", clip2(last.text, 160))} ${t(
         "ui.map_chat_live_plan_0",
-        clip((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
+        clip2((_a2 = plan.summary) != null ? _a2 : t("ui.map_chat_plan_summary_0", plan.reasons.join(t("ui.map_chat_count_separator"))), 160)
       )}`
     );
     (_c = (_b2 = this.host).stateChanged) == null ? void 0 : _c.call(_b2);
@@ -25117,10 +25388,10 @@ ${typed}` : draft;
     block.stop = void 0;
     this.renderLog();
     if (block.state === "ready")
-      this.announceImages(t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle)));
+      this.announceImages(t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip2(block.nodeTitle)));
     else if (block.state === "empty") this.announceImages(t("ui.map_chat_images_none"));
     else if (block.state === "failed")
-      this.announceImages(t("ui.map_chat_images_failed_0", clip((_a2 = block.reason) != null ? _a2 : "", 160)));
+      this.announceImages(t("ui.map_chat_images_failed_0", clip2((_a2 = block.reason) != null ? _a2 : "", 160)));
     else if (block.state === "stopped") this.announceImages(t("ui.map_chat_images_stopped"));
   }
   /** Back to an empty conversation (a different map was opened). */
@@ -25460,7 +25731,7 @@ ${typed}` : draft;
     parent.createSpan({ cls: "vam-map-chat-count-failed", text: t("ui.map_chat_count_failed_0", counts.failed) });
   }
   spokenTurn(reply, lines) {
-    const said = t("ui.map_chat_live_done_0", clip(reply, 160));
+    const said = t("ui.map_chat_live_done_0", clip2(reply, 160));
     const counts = this.countsText(countChatLines(lines, t("ui.map_chat_not_undoable")));
     return counts ? `${said} ${t("ui.map_chat_live_results_0", counts)}` : said;
   }
@@ -25637,10 +25908,10 @@ ${shown}` : t("ui.map_chat_model_label"));
   chipLabel(chip) {
     if (chip.kind === "topic") {
       const title = this.host.topicTitle(chip.id);
-      return t("ui.map_chat_ref_topic_0", title === null ? t("ui.map_chat_ref_gone") : clip(title));
+      return t("ui.map_chat_ref_topic_0", title === null ? t("ui.map_chat_ref_gone") : clip2(title));
     }
-    if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip(baseName2(chip.path)));
-    return chip.path ? t("ui.map_chat_ref_snippet_0", clip(baseName2(chip.path))) : t("ui.map_chat_ref_text");
+    if (chip.kind === "file") return t("ui.map_chat_ref_file_0", clip2(baseName2(chip.path)));
+    return chip.path ? t("ui.map_chat_ref_snippet_0", clip2(baseName2(chip.path))) : t("ui.map_chat_ref_text");
   }
   renderChips() {
     if (!this.built) return;
@@ -25651,11 +25922,11 @@ ${shown}` : t("ui.map_chat_model_label"));
       const title = this.host.topicTitle(id);
       if (title === null) continue;
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-auto" });
-      chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip(title)) });
+      chip.createSpan({ cls: "vam-map-chat-chip-label", text: t("ui.map_chat_ref_selected_0", clip2(title)) });
     }
     if (this.noteChip) {
       const note = this.noteChip;
-      const label = t("ui.map_chat_ref_note_0", clip(baseName2(note)));
+      const label = t("ui.map_chat_ref_note_0", clip2(baseName2(note)));
       const chip = this.chipsEl.createDiv({ cls: "vam-map-chat-chip is-note" });
       chip.createSpan({ cls: "vam-map-chat-chip-label", text: label });
       const remove = chip.createEl("button", {
@@ -25914,11 +26185,11 @@ ${shown}` : t("ui.map_chat_model_label"));
   buildImages(row, block) {
     const box = row.createDiv({
       cls: `vam-map-chat-images is-${block.state}`,
-      attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip(block.nodeTitle)) }
+      attr: { role: "group", "aria-label": t("ui.map_chat_images_label_0", clip2(block.nodeTitle)) }
     });
     const statusText = () => {
       var _a2;
-      return block.state === "searching" ? t("ui.map_chat_images_searching_0", clip(block.query, 80)) : block.state === "ready" ? usableImageCount(block) ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip(block.nodeTitle)) : t("ui.map_chat_images_none") : block.state === "empty" ? t("ui.map_chat_images_none") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip((_a2 = block.reason) != null ? _a2 : "", 160)) : t("ui.map_chat_images_stopped");
+      return block.state === "searching" ? t("ui.map_chat_images_searching_0", clip2(block.query, 80)) : block.state === "ready" ? usableImageCount(block) ? t("ui.map_chat_images_ready_0_1", usableImageCount(block), clip2(block.nodeTitle)) : t("ui.map_chat_images_none") : block.state === "empty" ? t("ui.map_chat_images_none") : block.state === "failed" ? t("ui.map_chat_images_failed_0", clip2((_a2 = block.reason) != null ? _a2 : "", 160)) : t("ui.map_chat_images_stopped");
     };
     box.createDiv({ cls: "vam-map-chat-images-status", text: statusText() });
     if (block.state === "searching" && block.stop) {
@@ -25947,7 +26218,7 @@ ${shown}` : t("ui.map_chat_model_label"));
       cls: "vam-map-chat-images-pick",
       attr: {
         type: "button",
-        "aria-label": item.inserted ? t("ui.map_chat_images_inserted_0", clip(item.inserted)) : t("ui.map_chat_images_insert_0_1", clip(candidate.title), clip(block.nodeTitle)),
+        "aria-label": item.inserted ? t("ui.map_chat_images_inserted_0", clip2(item.inserted)) : t("ui.map_chat_images_insert_0_1", clip2(candidate.title), clip2(block.nodeTitle)),
         "aria-disabled": String(!!item.inserted || !!item.broken || !!item.busy)
       }
     });
@@ -25969,11 +26240,11 @@ ${shown}` : t("ui.map_chat_model_label"));
         restore();
       });
     }
-    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip(candidate.title, 80) });
+    pick.createSpan({ cls: "vam-map-chat-images-title", text: clip2(candidate.title, 80) });
     if (item.inserted) {
       const state = pick.createSpan({ cls: "vam-map-chat-images-state is-inserted" });
       (0, import_obsidian17.setIcon)(state.createSpan({ cls: "vam-map-chat-images-state-icon" }), "check");
-      state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip(item.inserted)) });
+      state.createSpan({ text: t("ui.map_chat_images_inserted_0", clip2(item.inserted)) });
     } else if (item.broken) pick.createSpan({ cls: "vam-map-chat-images-state", text: t("ui.map_chat_images_broken") });
     pick.addEventListener("click", () => this.pickImage(block, item));
     const source = cell.createEl("a", {
@@ -25983,7 +26254,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         href: candidate.source,
         target: "_blank",
         rel: "noopener noreferrer",
-        "aria-label": t("ui.map_chat_images_source_0", clip(candidate.title))
+        "aria-label": t("ui.map_chat_images_source_0", clip2(candidate.title))
       }
     });
     this.sourceEls.set(item, source);
@@ -26037,7 +26308,7 @@ ${shown}` : t("ui.map_chat_model_label"));
         block.notice = result.ok ? void 0 : result.reason;
         this.renderLog();
         if (hadFocus) (_a3 = this.pickEls.get(item)) == null ? void 0 : _a3.focus();
-        this.announceImages(result.ok ? t("ui.map_chat_images_inserted_0", clip(block.nodeTitle)) : result.reason);
+        this.announceImages(result.ok ? t("ui.map_chat_images_inserted_0", clip2(block.nodeTitle)) : result.reason);
       },
       (error) => {
         var _a3;
@@ -26351,243 +26622,6 @@ async function loadableImages(candidates, signal) {
     )
   );
   return candidates.filter((_, index) => loads[index]);
-}
-
-// core/map-chat-guard.ts
-var TOPIC_IDENTITY_KEYS = ["agent-map-node", "node-id", "topic-id"];
-function normalizeVaultPath(path) {
-  if (typeof path !== "string") return null;
-  const text11 = path.trim().replace(/\\/g, "/");
-  if (!text11 || text11.startsWith("/") || text11.startsWith("~") || /^[A-Za-z]:/.test(text11) || text11.includes("\0"))
-    return null;
-  const parts = [];
-  for (const part of text11.split("/")) {
-    if (part === "" || part === ".") continue;
-    if (part === "..") return null;
-    parts.push(part);
-  }
-  return parts.length ? parts.join("/") : null;
-}
-function frontmatterBlock(content) {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  return match ? match[1] : null;
-}
-function topLevelValues(block, keys) {
-  const found = /* @__PURE__ */ new Map();
-  if (block === null) return found;
-  for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
-    if (!match || !keys.includes(match[1]) || found.has(match[1])) continue;
-    found.set(match[1], match[2].replace(/^(["'])(.*)\1$/, "$2"));
-  }
-  return found;
-}
-var HYPOTHESIS_KEYS = ["topic-kind", "hypothesis-strength"];
-function hypothesisLines(block) {
-  var _a2, _b2;
-  if (block === null) return [];
-  const found = [];
-  for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^(?:"([A-Za-z0-9_-]+)"|'([A-Za-z0-9_-]+)'|([A-Za-z0-9_-]+))\s*:\s*(.*?)\s*$/);
-    const key2 = match ? (_b2 = (_a2 = match[1]) != null ? _a2 : match[2]) != null ? _b2 : match[3] : void 0;
-    if (match && key2 !== void 0 && HYPOTHESIS_KEYS.includes(key2))
-      found.push(`${key2}=${match[4].replace(/^(["'])(.*)\1$/, "$2")}`);
-  }
-  return found;
-}
-function hasDuplicateIdentityKey(block) {
-  if (block === null) return false;
-  const seen = /* @__PURE__ */ new Set();
-  for (const line of block.split(/\r?\n/)) {
-    const match = line.match(/^([A-Za-z0-9_-]+)\s*:/);
-    if (!match || !TOPIC_IDENTITY_KEYS.includes(match[1])) continue;
-    if (seen.has(match[1])) return true;
-    seen.add(match[1]);
-  }
-  return false;
-}
-var hasMapMarker = (content) => /```agent-map\s*\n/.test(content) || topLevelValues(frontmatterBlock(content), ["visual-agent-map"]).has("visual-agent-map");
-function guardMapChatWrite(check) {
-  var _a2, _b2;
-  const path = normalizeVaultPath(check.path);
-  if (path === null) return { ok: false, code: "outside_vault" };
-  const configDir = normalizeVaultPath(check.configDir);
-  const lower = path.toLowerCase();
-  const inside2 = (dir) => !!dir && (lower === dir.toLowerCase() || lower.startsWith(`${dir.toLowerCase()}/`));
-  if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
-  if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
-  if (check.kind === "create") {
-    if (check.exists) return { ok: false, code: "exists" };
-    if (hasMapMarker(check.newContent) || topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS).size > 0)
-      return { ok: false, code: "reserved_frontmatter" };
-    return { ok: true };
-  }
-  const baseline = (_a2 = check.knownHashes) != null ? _a2 : {};
-  if (!Object.prototype.hasOwnProperty.call(baseline, path)) return { ok: false, code: "no_baseline" };
-  const before = (_b2 = check.oldContent) != null ? _b2 : "";
-  if (hasMapMarker(before) || hasMapMarker(check.newContent)) {
-    try {
-      parseMap(check.newContent);
-    } catch (e) {
-      return { ok: false, code: "map_unparseable" };
-    }
-    return { ok: false, code: "map_file" };
-  }
-  if (hasDuplicateIdentityKey(frontmatterBlock(before)) || hasDuplicateIdentityKey(frontmatterBlock(check.newContent)))
-    return { ok: false, code: "duplicate_identity_key" };
-  const was = topLevelValues(frontmatterBlock(before), TOPIC_IDENTITY_KEYS);
-  const now = topLevelValues(frontmatterBlock(check.newContent), TOPIC_IDENTITY_KEYS);
-  for (const key2 of TOPIC_IDENTITY_KEYS) {
-    if (was.get(key2) === now.get(key2)) continue;
-    return { ok: false, code: was.has(key2) ? "topic_identity_changed" : "reserved_frontmatter" };
-  }
-  if (hypothesisLines(frontmatterBlock(before)).join("\n") !== hypothesisLines(frontmatterBlock(check.newContent)).join("\n"))
-    return { ok: false, code: "hypothesis_frontmatter_changed" };
-  return { ok: true };
-}
-function applyMdEdit(content, find, replace) {
-  if (!find) return null;
-  const at = content.indexOf(find);
-  if (at < 0 || content.indexOf(find, at + 1) >= 0) return null;
-  return content.slice(0, at) + replace + content.slice(at + find.length);
-}
-
-// core/map-chat-context.ts
-var MAP_CHAT_DEFAULT_TURNS = 6;
-var MAP_CHAT_DETAIL_BUDGET = 6e4;
-var MAP_CHAT_MAP_TITLE_LIMIT = 200;
-var TITLE_LIMIT = 200;
-var SUMMARY_LIMIT = 240;
-var ERROR_LIMIT = 200;
-var errorFields = (node) => node.status === "error" ? {
-  status: "error",
-  ...node.error ? { error: clip2(node.error, ERROR_LIMIT) } : {},
-  ...node.retryWith ? { retryWith: clip2(node.retryWith, TITLE_LIMIT) } : {}
-} : {};
-function contentHash2(text11) {
-  let h1 = 3735928559, h2 = 1103547991;
-  for (let i = 0; i < text11.length; i++) {
-    const code = text11.charCodeAt(i);
-    h1 = Math.imul(h1 ^ code, 2654435761);
-    h2 = Math.imul(h2 ^ code, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507) ^ Math.imul(h2 ^ h2 >>> 13, 3266489909);
-  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507) ^ Math.imul(h1 ^ h1 >>> 13, 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, "0");
-}
-function isMdStale(hashes, path, currentContent) {
-  const key2 = normalizeVaultPath(path);
-  if (key2 === null || !Object.prototype.hasOwnProperty.call(hashes, key2)) return true;
-  return hashes[key2] !== contentHash2(currentContent);
-}
-var clip2 = (value, limit) => {
-  const text11 = value.replace(/\s+/g, " ").trim();
-  const characters = [...text11];
-  return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
-};
-function buildMapChatContext(input) {
-  var _a2, _b2, _c, _d;
-  const hashes = {};
-  const topicHashes = {};
-  const byId = new Map(input.outline.map((node) => [node.id, node]));
-  const ids = new Set(byId.keys());
-  const children = /* @__PURE__ */ new Map();
-  for (const node of input.outline)
-    if (node.parentId !== null) children.set(node.parentId, [...(_a2 = children.get(node.parentId)) != null ? _a2 : [], node.id]);
-  const brief = (id) => {
-    const node = byId.get(id);
-    return node ? { id: node.id, title: clip2(node.title, TITLE_LIMIT) } : null;
-  };
-  let detailLeft = (_b2 = input.detailBudget) != null ? _b2 : MAP_CHAT_DETAIL_BUDGET;
-  const topic = (ref, withLinks) => {
-    var _a3, _b3;
-    ids.add(ref.id);
-    const node = byId.get(ref.id);
-    const withDetail = ref.detail.length <= detailLeft;
-    if (withDetail) detailLeft -= ref.detail.length;
-    topicHashes[ref.id] = {
-      title: ref.title,
-      parentId: (_a3 = node == null ? void 0 : node.parentId) != null ? _a3 : null,
-      summary: ref.summary,
-      ...withDetail ? { detailHash: contentHash2(ref.detail) } : {}
-    };
-    return {
-      id: ref.id,
-      title: ref.title,
-      summary: ref.summary,
-      ...withDetail ? { detail: ref.detail } : { detailOmitted: true },
-      path: ref.path,
-      ...errorFields(ref),
-      ...withLinks ? {
-        parent: (node == null ? void 0 : node.parentId) ? brief(node.parentId) : null,
-        children: ((_b3 = children.get(ref.id)) != null ? _b3 : []).map(brief).filter(Boolean)
-      } : {}
-    };
-  };
-  for (const node of input.outline) topicHashes[node.id] = { title: node.title, parentId: node.parentId };
-  const record = (path, content) => {
-    const key2 = normalizeVaultPath(path);
-    if (key2 === null) return null;
-    hashes[key2] = contentHash2(content);
-    return key2;
-  };
-  const files = input.files.map((file) => {
-    const key2 = record(file.path, file.content);
-    return { path: file.path, contentHash: key2 === null ? null : hashes[key2], content: file.content };
-  });
-  const active = input.activeFile ? (() => {
-    const key2 = normalizeVaultPath(input.activeFile.path);
-    const duplicate = key2 !== null && input.files.some((file) => normalizeVaultPath(file.path) === key2);
-    if (!duplicate) record(input.activeFile.path, input.activeFile.content);
-    return duplicate ? { path: input.activeFile.path, sameAsListedFile: true } : {
-      path: input.activeFile.path,
-      contentHash: key2 === null ? null : hashes[key2],
-      content: input.activeFile.content
-    };
-  })() : null;
-  const snippets = input.snippets.map((snippet) => {
-    const key2 = snippet.fileContent === void 0 ? null : record(snippet.path, snippet.fileContent);
-    return {
-      path: snippet.path,
-      ...snippet.pathGuessed ? { pathGuessed: true } : {},
-      contentHash: key2 === null ? null : hashes[key2],
-      text: snippet.text
-    };
-  });
-  const mapTitles = [...new Set(((_c = input.mapTitles) != null ? _c : []).map((title) => clip2(title, TITLE_LIMIT)).filter(Boolean))].slice(
-    0,
-    MAP_CHAT_MAP_TITLE_LIMIT
-  );
-  const turns = Math.max(0, (_d = input.maxTurns) != null ? _d : MAP_CHAT_DEFAULT_TURNS) * 2;
-  const history2 = turns ? input.history.slice(-turns) : [];
-  const json = JSON.stringify({
-    mapTitle: input.mapTitle,
-    ...input.noEditableMap ? { noEditableMap: true } : {},
-    mapTitles,
-    outline: input.outline.map((node) => ({
-      id: node.id,
-      title: clip2(node.title, TITLE_LIMIT),
-      summary: clip2(node.summary, SUMMARY_LIMIT),
-      parentId: node.parentId,
-      depth: node.depth,
-      ...errorFields(node)
-    })),
-    selected: input.selected.map((ref) => topic(ref, true)),
-    references: input.references.map((ref) => topic(ref, false)),
-    snippets,
-    files,
-    activeFile: active,
-    earlierTurns: history2.map((turn) => ({ role: turn.role, text: turn.text }))
-  });
-  return {
-    json,
-    nodeIds: [...ids],
-    selectedCount: input.selected.length,
-    noEditableMap: !!input.noEditableMap,
-    parents: Object.fromEntries(input.outline.map((node) => [node.id, node.parentId])),
-    mdHashes: hashes,
-    topicHashes
-  };
 }
 
 // core/ai-task-service.ts
@@ -49890,6 +49924,11 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c, _d;
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key2 of Object.keys(patch)) before[key2] = current[key2];
+    if (patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0) {
+      before.previewSection = current.previewSection;
+      before.previewInitialized = current.previewInitialized;
+      before.previewAutoHash = current.previewAutoHash;
+    }
     if (Object.keys(patch).every((key2) => current[key2] === patch[key2])) return;
     await this.plugin.repo.updateNote(node.path, patch);
     if (patch.referencePaths !== void 0) {
@@ -54551,6 +54590,7 @@ ${request.requirements}` : preset.text,
             "newFindings",
             "previewSection",
             "previewInitialized",
+            "previewAutoHash",
             "status",
             "lastError",
             "detailFormatIssues"
@@ -58159,6 +58199,7 @@ ${addition}` : addition });
             "newFindings",
             "previewSection",
             "previewInitialized",
+            "previewAutoHash",
             "status",
             "lastError",
             "researchMode"

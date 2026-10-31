@@ -7349,6 +7349,12 @@ export class VisualAgentMapView extends ItemView {
     const current = await this.plugin.repo.readNote(node.path, this.map ?? undefined),
       before: NotePatch = {};
     for (const key of Object.keys(patch) as (keyof Note)[]) (before as Record<string, unknown>)[key] = current[key];
+    // A summary can rewrite the preview, so its undo restores the preview text and its bookkeeping too.
+    if (patch.summary !== undefined && patch.preview === undefined && patch.previewSection === undefined) {
+      before.previewSection = current.previewSection;
+      before.previewInitialized = current.previewInitialized;
+      before.previewAutoHash = current.previewAutoHash;
+    }
     if (Object.keys(patch).every(key => current[key as keyof Note] === patch[key as keyof Note])) return;
     await this.plugin.repo.updateNote(node.path, patch);
     if (patch.referencePaths !== undefined) {
@@ -12381,6 +12387,7 @@ export class VisualAgentMapView extends ItemView {
               "newFindings",
               "previewSection",
               "previewInitialized",
+              "previewAutoHash",
               "status",
               "lastError",
               "detailFormatIssues"
@@ -16348,6 +16355,7 @@ export class VisualAgentMapView extends ItemView {
               "newFindings",
               "previewSection",
               "previewInitialized",
+              "previewAutoHash",
               "status",
               "lastError",
               "researchMode"

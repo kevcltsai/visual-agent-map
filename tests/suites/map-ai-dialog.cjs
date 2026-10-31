@@ -211,6 +211,26 @@ integrationTest('Next Step: the model select starts with Follow default; saves o
   assert.deepEqual(plain(back.saved), [{ modelSource: 'workspace' }], 'a specific model picked then dropped is not written');
 });
 
+integrationTest('MS-04: choosing a model on a non-manual topic also saves the shown reasoning; choosing a level then follow-default restores the current level', async () => {
+  const pick = (h, value) => { const select = byLabel(h.modal.contentEl, 'Model'); select.value = value; select.fire('change'); };
+  const run = async h => { button(h.actions(), 'Confirm research task').click(); await tick(); await tick(); };
+  const model = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
+  pick(model, 'gpt-other'); await run(model);
+  assert.deepEqual(plain(model.saved), [{ model: 'gpt-other', modelSource: 'manual', reasoning: 'low' }], 'the shown level is stored with the new override');
+  const already = nextStepHarness({ modelSettings: { topicStatus: 'idea', model: 'gpt-test', modelSource: 'manual', reasoning: 'high' } });
+  pick(already, 'gpt-other'); await run(already);
+  assert.deepEqual(plain(already.saved), [{ model: 'gpt-other', modelSource: 'manual' }], 'an existing override keeps its own stored level');
+  const level = nextStepHarness({ modelSettings: { topicStatus: 'idea', reasoning: 'low' } });
+  const reasoning = byLabel(level.modal.contentEl, 'Reasoning level'), modelSelect = byLabel(level.modal.contentEl, 'Model');
+  reasoning.value = 'high'; reasoning.fire('change');
+  assert.equal(modelSelect.value, 'gpt-test', 'the model menu shows the stored override, not follow-default');
+  assert.ok(find(level.modal.contentEl, i => hasCls(i, 'vam-hint') && /Manually selected/.test(i.text)), 'the summary says manual');
+  pick(level, '__follow_default__');
+  assert.equal(reasoning.value, 'low', 'follow-default brings the level back to the current setting');
+  await run(level);
+  assert.deepEqual(plain(level.saved), [{ modelSource: 'workspace' }], 'nothing else is written');
+});
+
 integrationTest('Next Step: the tone select defaults to keeping the topic tone and its choice reaches the run options', async () => {
   const h = nextStepHarness({ modelSettings: { tones: [{ id: 'plain', name: 'Plain explanation' }, { id: 'academic', name: 'Academic rigor' }], currentTone: 'Academic rigor' } });
   const tone = byLabel(h.modal.contentEl, 'Writing tone');

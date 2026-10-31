@@ -101,9 +101,12 @@ export function relationLabelPoint(a: RelationBox, b: RelationBox): { x: number;
  * child's right edge, with both arms bending outward.
  * "down" runs from the parent's bottom edge midpoint to the child's top edge midpoint; "up" runs from the parent's top
  * edge midpoint to the child's bottom edge midpoint.
+ * "radial" runs between the nearest edge midpoints of the two cards (see `nearestSides`), so a ring of children fans out
+ * in every direction.
  * "balanced" uses the "left" curve when the child's centre is left of the parent's centre and the "right" curve otherwise.
  */
 export function treeEdgePathData(parent: RelationBox, child: RelationBox, direction: LayoutKind): string {
+  if (direction === "radial") return relationPathData(parent, child);
   if (direction === "down" || direction === "up") {
     const x1 = parent.x + parent.width / 2,
       x2 = child.x + child.width / 2,

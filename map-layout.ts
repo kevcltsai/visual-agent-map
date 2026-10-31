@@ -1,4 +1,6 @@
 import { assignSides, greedySides, sideFromOffset, type BalancedSide } from "./layouts/balanced";
+import { radialPositions } from "./layouts/radial";
+import { timelinePositions } from "./layouts/timeline";
 import { verticalPositions } from "./layouts/vertical";
 import { parentIdsForNode, type MapNode } from "./map-graph";
 
@@ -35,8 +37,16 @@ export interface MapLayout {
 }
 
 /** The arrangements whose engines exist, so a map file may store them; each engine packet adds its own value. */
-export function isLayoutKind(value: unknown): value is "right" | "left" | "down" | "up" | "balanced" {
-  return value === "right" || value === "left" || value === "down" || value === "up" || value === "balanced";
+export function isLayoutKind(value: unknown): value is Exclude<LayoutKind, "fishbone"> {
+  return (
+    value === "right" ||
+    value === "left" ||
+    value === "down" ||
+    value === "up" ||
+    value === "balanced" ||
+    value === "radial" ||
+    value === "timeline"
+  );
 }
 
 export function isLayoutDirection(value: unknown): value is LayoutDirection {
@@ -268,6 +278,10 @@ function positions(
       left,
       top
     });
+  if (direction === "radial" || direction === "timeline") {
+    const engine = direction === "radial" ? radialPositions : timelinePositions;
+    return engine({ roots, kidsOf, joinsOf, heightFor, width: WIDTH, column: COLUMN, gap: LAYOUT_GAP, left, top });
+  }
   const input = {
     roots,
     kidsOf,
@@ -294,6 +308,22 @@ export function arrangeMap(
   const roots = laidOut.filter(node => !node.parentId);
   const placed = positions(laidOut, roots, 80, 80, true, heightOf, layout);
   return nodes.map(node => ({ ...node, ...placed.get(node.id) }));
+}
+
+/** Radial and timeline maps lay the whole map out again when a branch is added; hand-placed cards are reset (decision D5). */
+function rearrangeWhole(nodes: MapNode[], heightOf: HeightOf | undefined, layout: LayoutKind | MapLayout): MapNode[] {
+  const roots = nodes.filter(node => !node.parentId);
+  if (!roots.length) return nodes;
+  const placed = positions(nodes, roots, 80, 80, true, heightOf, layout);
+  // The first root stays where it is, so adding a topic does not make the whole map jump.
+  const anchor = roots[0];
+  const dx = anchor.x - placed.get(anchor.id)!.x;
+  const dy = anchor.y - placed.get(anchor.id)!.y;
+  return nodes.map(node => {
+    const point = placed.get(node.id);
+    if (!point || node.id === anchor.id) return node;
+    return { ...node, x: Math.round(point.x + dx), y: Math.round(point.y + dy) };
+  });
 }
 
 /** A new branch in a down or up map: one row below (above) the parent, centred under it, sliding along x past older cards. */
@@ -442,6 +472,7 @@ export function arrangeNewBranch(
   if (!parent || !newIds.size) return nodes;
   const fresh = nodes.filter(node => newIds.has(node.id));
   const roots = fresh.filter(node => node.parentId === parentId);
+  if (direction === "radial" || direction === "timeline") return rearrangeWhole(nodes, heightOf, layout);
   if (isVertical(direction)) return arrangeVerticalBranch(nodes, parent, fresh, roots, newIds, heightOf, layout);
   if (direction === "balanced")
     return arrangeBalancedBranch(nodes, parent, fresh, roots, newIds, heightOf, minTop, layout);
@@ -544,4 +575,30 @@ export function arrangeNewTree(
     const point = placed.get(node.id);
     return point ? { ...node, x: point.x, y: Math.round(point.y) } : node;
   });
+}
+
+/**
+ * Moves a first-level topic of `rootId` to the place `dropX` (the canvas x of the dragged card's centre) points at: it goes
+ * in front of the first other topic whose centre is right of `dropX`, or last when there is none. Only the topics change
+ * places with each other in the array; every other card keeps its index. An unknown id, a card that is not a first-level
+ * topic of that root or a `dropX` that is not a finite number returns `nodes` itself.
+ */
+export function reorderTopLevel<T extends { id: string; parentId?: string | null; x: number }>(
+  nodes: T[],
+  rootId: string,
+  movedId: string,
+  dropX: number
+): T[] {
+  if (!Number.isFinite(dropX)) return nodes;
+  const slots = nodes.flatMap((node, index) => (node.parentId === rootId ? [index] : []));
+  const moved = slots.map(index => nodes[index]).find(node => node.id === movedId);
+  if (!moved) return nodes;
+  const others = slots.map(index => nodes[index]).filter(node => node !== moved);
+  const at = others.findIndex(node => node.x + WIDTH / 2 > dropX);
+  const order = at < 0 ? [...others, moved] : [...others.slice(0, at), moved, ...others.slice(at)];
+  const result = nodes.slice();
+  slots.forEach((index, place) => {
+    result[index] = order[place];
+  });
+  return result;
 }

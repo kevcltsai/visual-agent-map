@@ -74,7 +74,7 @@ test('S1: spacing compact and spacious survive a round trip; standard, huge and 
   assert.equal('layout' in roundTrip({ direction: 'sideways', spacing: 'compact' }), false);
   assert.equal('layout' in roundTrip({ spacing: 'compact' }), false);
   // The arrangements whose engines do not exist yet are not accepted by parse; each engine packet adds its own value.
-  for (const direction of ['radial', 'timeline', 'fishbone'])
+  for (const direction of ['fishbone'])
     assert.equal('layout' in roundTrip({ direction, spacing: 'compact' }), false, direction);
 });
 
@@ -102,7 +102,8 @@ test('S2b: layoutOf returns direction and stored spacing; AIM maps and bad value
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'compact' } }), { direction: 'left', spacing: 'compact' });
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'standard' } }), { direction: 'left' });
   assert.deepEqual(layoutOf({ layout: { direction: 'left', spacing: 'compact' }, aim: { version: 1 } }), { direction: 'right' });
-  assert.deepEqual(layoutOf({ layout: { direction: 'radial', spacing: 'huge' } }), { direction: 'right' });
+  assert.deepEqual(layoutOf({ layout: { direction: 'radial', spacing: 'huge' } }), { direction: 'radial' });
+  assert.deepEqual(layoutOf({ layout: { direction: 'fishbone', spacing: 'huge' } }), { direction: 'right' });
   assert.deepEqual(layoutOf({ layout: { direction: 'balanced', spacing: 'huge' } }), { direction: 'balanced' });
   assert.equal(layout.layoutDirectionOf({ layout: { direction: 'left', spacing: 'compact' } }), 'left');
 });
@@ -340,7 +341,9 @@ test('P1 data: down and up are stored and read back; layoutOf keeps them, layout
   assert.equal(layout.isLayoutDirection('down'), false);
   assert.equal(layout.isLayoutKind('up'), true);
   assert.equal(layout.isLayoutKind('balanced'), true);
-  assert.equal(layout.isLayoutKind('radial'), false);
+  assert.equal(layout.isLayoutKind('radial'), true);
+  assert.equal(layout.isLayoutKind('timeline'), true);
+  assert.equal(layout.isLayoutKind('fishbone'), false);
 });
 
 // ---- P2 (ticket 21): balanced ----
@@ -516,4 +519,278 @@ test('B-8: balanced keeps the first-level kids of one root in order on each side
   assert.ok(noOverlap(single, undefined, 24));
   assert.deepEqual(snap(layout.arrangeMap([], undefined, undefined, 'balanced')), []);
   assert.deepEqual(plain(roundTrip({ direction: 'balanced', spacing: 'compact' }).layout), { direction: 'balanced', spacing: 'compact' });
+});
+
+// ---- P3 (tickets 38, 39): radial and timeline ----
+const radialSpec = spacing => ({ direction: 'radial', spacing });
+const timelineSpec = spacing => ({ direction: 'timeline', spacing });
+const centreOfCard = (item, heightOf) => ({ x: item.x + WIDTH / 2, y: item.y + heightIn([], heightOf)(item.id) / 2 });
+/** Two roots (one with a collapsed topic) to cover stacking of several trees. */
+const twoRoots = () => [...sized(), node('r2'), node('b1', 'r2'), node('b2', 'r2'), node('b3', 'r2'), node('b3x', 'b3')];
+const twoRootsHeight = id => sizedHeight(id) ?? 100 + (id.length % 3) * 40;
+const everyTree = () => ({ ...plainTrees(), converging: [converging(), undefined], twoRoots: [twoRoots(), twoRootsHeight] });
+const leavesOf = (list, id) => { const kids = list.filter(item => item.parentId === id); return kids.length ? kids.reduce((sum, kid) => sum + leavesOf(list, kid.id), 0) : 1; };
+const TAU = Math.PI * 2;
+/** Clockwise angle from straight up, in [0, TAU), of a card centre around the root's centre. */
+const angleAround = (centre, point) => (Math.atan2(point.x - centre.x, centre.y - point.y) + TAU) % TAU;
+
+test('R-1: radial never overlaps on every fixture at three spacings, and is repeatable', () => {
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries(everyTree())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, radialSpec(spacing));
+      assert.equal(placed.length, nodes.length, name);
+      assert.ok(placed.every(item => Number.isFinite(item.x) && Number.isFinite(item.y)), `${name} ${spacing} finite`);
+      assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${name} ${spacing}`);
+      assert.deepEqual(snap(layout.arrangeMap(nodes, undefined, heightOf, radialSpec(spacing))), snap(placed), `${name} ${spacing} repeatable`);
+      if (nodes.length > 2) assert.notDeepEqual(snap(placed), snap(layout.arrangeMap(nodes, undefined, heightOf, { direction: 'right', spacing })), `${name} ${spacing} is its own arrangement`);
+    }
+  // A collapsed topic is a leaf and its hidden cards keep their coordinates.
+  const folded = wide().map(item => (item.id === 't4' ? { ...item, collapsed: true } : item));
+  const hidden = new Set(folded.filter(item => item.parentId === 't4').map(item => item.id));
+  const placed = layout.arrangeMap(folded, hidden, wideHeight, radialSpec('standard'));
+  assert.ok(noOverlap(placed.filter(item => !hidden.has(item.id)), wideHeight, 24));
+  for (const id of hidden) assert.deepEqual([placed.find(i => i.id === id).x, placed.find(i => i.id === id).y], [0, 0]);
+  assert.deepEqual(snap(layout.arrangeMap([], undefined, undefined, 'radial')), []);
+  assert.deepEqual(snap(layout.arrangeMap([node('r')], undefined, undefined, 'radial')), [['r', 80, 80]]);
+});
+
+test('R-1b: radial rings are at least a column apart and the cards of one depth share a ring around their root', () => {
+  const placed = layout.arrangeMap(sample(), undefined, sampleHeight, radialSpec('standard'));
+  const by = new Map(placed.map(item => [item.id, item]));
+  const rootOf = item => { let n = item; while (n.parentId) n = by.get(n.parentId); return n; };
+  const radius = item => { const c = centreOfCard(rootOf(item), sampleHeight), p = centreOfCard(item, sampleHeight); return Math.hypot(p.x - c.x, p.y - c.y); };
+  assert.ok(placed.filter(item => !item.parentId).length >= 2, 'the sample has several roots');
+  const rings = new Map();
+  for (const item of placed) {
+    if (!item.parentId) continue;
+    const parentRadius = item.parentId === rootOf(item).id ? 0 : radius(by.get(item.parentId));
+    assert.ok(radius(item) >= parentRadius + 360 - 2, `${item.id} is a ring beyond its parent`);
+    const key = `${rootOf(item).id}:${depthOf(placed, item.id)}`, list = rings.get(key) ?? [];
+    list.push(radius(item)); rings.set(key, list);
+  }
+  for (const [key, list] of rings) assert.ok(Math.max(...list) - Math.min(...list) <= 2, `${key} on one ring`);
+});
+
+test('R-2: the angle of a branch is proportional to its leaf count, clockwise from straight up', () => {
+  for (const spacing of SPACINGS)
+    for (const name of ['wide', 'sample', 'sized']) {
+      const [nodes, heightOf] = plainTrees()[name];
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, radialSpec(spacing));
+      const root = placed.find(item => !item.parentId);
+      const centre = centreOfCard(root, heightOf);
+      const topics = placed.filter(item => item.parentId === root.id);
+      const total = topics.reduce((sum, topic) => sum + leavesOf(placed, topic.id), 0);
+      let before = 0;
+      for (const topic of topics) {
+        const share = leavesOf(placed, topic.id);
+        const expected = (TAU * (before + share / 2)) / total;
+        const actual = angleAround(centre, centreOfCard(topic, heightOf));
+        const off = Math.abs(((actual - expected + Math.PI * 3) % TAU) - Math.PI);
+        assert.ok(off < 0.01, `${name} ${spacing} ${topic.id}: ${actual.toFixed(3)} vs ${expected.toFixed(3)}`);
+        before += share;
+      }
+    }
+  // Deeper: the children of one topic spread inside the topic's own slice, in proportion.
+  const placed = layout.arrangeMap(wide(), undefined, wideHeight, radialSpec('standard'));
+  const root = placed.find(item => item.id === 'root'), centre = centreOfCard(root, wideHeight);
+  const total = leavesOf(placed, 'root');
+  let before = 0;
+  for (let i = 0; i < 7; i++) {
+    const kids = placed.filter(item => item.parentId === `t${i}`);
+    const share = leavesOf(placed, `t${i}`);
+    kids.forEach((kid, k) => {
+      const expected = (TAU * (before + k + 0.5)) / total;
+      const actual = angleAround(centre, centreOfCard(kid, wideHeight));
+      assert.ok(Math.abs(((actual - expected + Math.PI * 3) % TAU) - Math.PI) < 0.01, `t${i}-${k}`);
+    });
+    before += share;
+  }
+});
+
+test('R-3: radial edges run between the nearest edge midpoints of parent and child', () => {
+  const box = (x, y, height = 100) => ({ x, y, width: 300, height });
+  const parent = box(500, 500);
+  const cases = [
+    [box(1000, 480), [800, 550], [1000, 530]], // right
+    [box(0, 520), [500, 550], [300, 570]], // left
+    [box(520, 100), [650, 500], [670, 200]], // above
+    [box(480, 900), [650, 600], [630, 900]] // below
+  ];
+  for (const [child, from, to] of cases) {
+    const path = geometry.treeEdgePathData(parent, child, 'radial');
+    assert.deepEqual(firstPoint(path), from, 'start');
+    assert.deepEqual(lastPoint(path), to, 'end');
+  }
+  assert.equal(geometry.treeEdgePathData(parent, box(1000, 480), 'radial'), geometry.relationPathData(parent, box(1000, 480)));
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries(plainTrees())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, radialSpec(spacing));
+      const by = new Map(placed.map(item => [item.id, boxOf(item, heightOf)]));
+      for (const item of placed) {
+        if (!item.parentId) continue;
+        const p = by.get(item.parentId), c = by.get(item.id);
+        const path = geometry.treeEdgePathData(p, c, 'radial');
+        const hGap = Math.max(c.x - (p.x + p.width), p.x - (c.x + c.width));
+        const vGap = Math.max(c.y - (p.y + p.height), p.y - (c.y + c.height));
+        const [x1, y1] = firstPoint(path), [x2, y2] = lastPoint(path);
+        const pc = { x: p.x + p.width / 2, y: p.y + p.height / 2 }, cc = { x: c.x + c.width / 2, y: c.y + c.height / 2 };
+        if (hGap >= vGap) {
+          assert.equal(x1, cc.x >= pc.x ? p.x + p.width : p.x, `${name} ${item.id} leaves a side edge`);
+          assert.equal(x2, cc.x >= pc.x ? c.x : c.x + c.width, `${name} ${item.id} enters the facing side edge`);
+          assert.equal(y1, pc.y); assert.equal(y2, cc.y);
+        } else {
+          assert.equal(y1, cc.y >= pc.y ? p.y + p.height : p.y, `${name} ${item.id} leaves a top or bottom edge`);
+          assert.equal(y2, cc.y >= pc.y ? c.y : c.y + c.height, `${name} ${item.id} enters the facing edge`);
+          assert.equal(x1, pc.x); assert.equal(x2, cc.x);
+        }
+      }
+    }
+});
+
+test('R-4: radial and timeline are accepted by the data format; the other arrangements keep their curves', () => {
+  for (const direction of ['radial', 'timeline'])
+    for (const spacing of [undefined, 'compact', 'spacious']) {
+      const value = spacing ? { direction, spacing } : { direction };
+      assert.deepEqual(plain(roundTrip(value).layout), value);
+      assert.deepEqual(layoutOf({ layout: value }), value);
+      assert.deepEqual(layoutOf({ layout: value, aim: { version: 1 } }), { direction: 'right' });
+    }
+  assert.equal(layout.layoutDirectionOf({ layout: { direction: 'radial' } }), 'right');
+  const a = { x: 0, y: 0, width: 300, height: 100 }, b = { x: 400, y: 200, width: 300, height: 100 };
+  assert.notEqual(geometry.treeEdgePathData(a, b, 'radial'), geometry.treeEdgePathData(a, b, 'right'), 'radial has its own curve');
+});
+
+const topicsOf = (list, rootId = 'root') => list.filter(item => item.parentId === rootId);
+
+test('T-1: timeline puts the root at the left end and the first-level topics left to right in array order', () => {
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries(everyTree())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, timelineSpec(spacing));
+      for (const root of placed.filter(item => !item.parentId)) {
+        const topics = topicsOf(placed, root.id);
+        let last = root.x;
+        for (const topic of topics) {
+          assert.ok(topic.x >= last + WIDTH, `${name} ${spacing} ${topic.id} is right of the previous card`);
+          last = topic.x;
+        }
+        const axisTop = new Set([root, ...topics].map(item => item.y));
+        assert.equal(axisTop.size, 1, `${name} ${spacing} axis cards share one top edge`);
+      }
+    }
+  // Array order, not the old coordinates, decides: shuffle the array and the x order follows.
+  const nodes = [node('root'), ...['t3', 't0', 't6'].map(id => node(id, 'root'))];
+  const placed = layout.arrangeMap(nodes, undefined, undefined, 'timeline');
+  assert.deepEqual(topicsOf(placed).sort((a, b) => a.x - b.x).map(item => item.id), ['t3', 't0', 't6']);
+});
+
+test('T-2: timeline details alternate below and above the axis, growing outward', () => {
+  for (const spacing of SPACINGS)
+    for (const [name, [nodes, heightOf]] of Object.entries(plainTrees())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, timelineSpec(spacing));
+      const by = new Map(placed.map(item => [item.id, item]));
+      const high = heightIn([], heightOf);
+      for (const root of placed.filter(item => !item.parentId))
+        topicsOf(placed, root.id).forEach((topic, index) => {
+          const down = index % 2 === 0;
+          const stack = [];
+          const walk = id => { for (const kid of placed.filter(item => item.parentId === id)) { stack.push(kid); walk(kid.id); } };
+          walk(topic.id);
+          for (const item of stack)
+            if (down) assert.ok(item.y >= topic.y + high(topic.id), `${name} ${spacing} ${item.id} below ${topic.id}`);
+            else assert.ok(item.y + high(item.id) <= topic.y, `${name} ${spacing} ${item.id} above ${topic.id}`);
+          for (const item of stack) {
+            const parent = by.get(item.parentId);
+            if (parent.id === topic.id) continue;
+            if (down) assert.ok(item.y >= parent.y + high(parent.id), `${name} ${item.id} further out than its parent`);
+            else assert.ok(item.y + high(item.id) <= parent.y, `${name} ${item.id} further out than its parent`);
+          }
+        });
+    }
+});
+
+test('T-4: timeline never overlaps on every fixture at three spacings, collapsed topics included', () => {
+  for (const spacing of SPACINGS) {
+    for (const [name, [nodes, heightOf]] of Object.entries(everyTree())) {
+      const placed = layout.arrangeMap(nodes, undefined, heightOf, timelineSpec(spacing));
+      assert.equal(placed.length, nodes.length);
+      assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${name} ${spacing}`);
+      assert.deepEqual(snap(layout.arrangeMap(nodes, undefined, heightOf, timelineSpec(spacing))), snap(placed), `${name} ${spacing} repeatable`);
+      if (nodes.length > 2) assert.notDeepEqual(snap(placed), snap(layout.arrangeMap(nodes, undefined, heightOf, { direction: 'right', spacing })), `${name} ${spacing} is its own arrangement`);
+    }
+    const folded = wide().map(item => (item.id === 't4' ? { ...item, collapsed: true } : item));
+    const hidden = new Set(folded.filter(item => item.parentId === 't4').map(item => item.id));
+    const placed = layout.arrangeMap(folded, hidden, wideHeight, timelineSpec(spacing));
+    assert.ok(noOverlap(placed.filter(item => !hidden.has(item.id)), wideHeight, GAPS[spacing]));
+  }
+  // A larger spacing spreads the topics further apart.
+  const x = spacing => layout.arrangeMap(wide(), undefined, wideHeight, timelineSpec(spacing)).find(item => item.id === 't6').x;
+  assert.ok(x('compact') < x('standard') && x('standard') < x('spacious'));
+  assert.deepEqual(snap(layout.arrangeMap([], undefined, undefined, 'timeline')), []);
+});
+
+const reorderIds = (list, rootId, movedId, dropX) => layout.reorderTopLevel(list, rootId, movedId, dropX).map(item => item.id);
+
+test('T-3: reorderTopLevel moves a first-level topic to where dropX points and changes nothing else', () => {
+  const placed = layout.arrangeMap(wide(), undefined, wideHeight, 'timeline');
+  const before = placed.map(item => item.id);
+  const topicIds = topicsOf(placed).map(item => item.id);
+  const centres = Object.fromEntries(topicsOf(placed).map(item => [item.id, item.x + WIDTH / 2]));
+  const orderOf = list => list.filter(item => topicIds.includes(item.id)).map(item => item.id);
+  // Drop t0 past the centre of t3 and before the centre of t4.
+  const out = layout.reorderTopLevel(placed, 'root', 't0', (centres.t3 + centres.t4) / 2);
+  assert.deepEqual(orderOf(out), ['t1', 't2', 't3', 't0', 't4', 't5', 't6']);
+  // Every non-topic card keeps its index, every card keeps its own coordinates, nothing is lost.
+  placed.forEach((item, index) => { if (!topicIds.includes(item.id)) assert.equal(out[index].id, item.id, `index ${index}`); });
+  assert.deepEqual([...out.map(item => item.id)].sort(), [...before].sort());
+  for (const item of out) assert.equal(item, placed.find(other => other.id === item.id), 'same object');
+  // Dropping far left puts it first, far right last, near its own place changes nothing.
+  assert.deepEqual(orderOf(layout.reorderTopLevel(placed, 'root', 't4', -9999)), ['t4', 't0', 't1', 't2', 't3', 't5', 't6']);
+  assert.deepEqual(orderOf(layout.reorderTopLevel(placed, 'root', 't2', 99999)), ['t0', 't1', 't3', 't4', 't5', 't6', 't2']);
+  assert.deepEqual(orderOf(layout.reorderTopLevel(placed, 'root', 't2', centres.t2 + 20)), topicIds);
+  // The input array is not modified.
+  assert.deepEqual(placed.map(item => item.id), before);
+  // The moved topic keeps its own subtree: after a re-arrange its children follow it.
+  const again = layout.arrangeMap(out, undefined, wideHeight, 'timeline');
+  const t0 = again.find(item => item.id === 't0');
+  assert.ok(t0.x > again.find(item => item.id === 't3').x && t0.x < again.find(item => item.id === 't4').x);
+  // Invalid requests change nothing: unknown ids, a deeper card, the root itself, a non-finite drop.
+  for (const args of [['root', 'nope', 0], ['nope', 't1', 0], ['root', 't0-0', 0], ['root', 'root', 0], ['root', 't1', NaN], ['root', 't1', Infinity]])
+    assert.deepEqual(reorderIds(placed, ...args), before, args.join());
+  // Only the named root's topics are involved: a second root keeps its order.
+  const two = layout.arrangeMap(twoRoots(), undefined, twoRootsHeight, 'timeline');
+  const outTwo = layout.reorderTopLevel(two, 'r', 'c', -9999);
+  assert.deepEqual(topicsOf(outTwo, 'r').map(item => item.id), ['c', 'a', 'b']);
+  assert.deepEqual(topicsOf(outTwo, 'r2').map(item => item.id), ['b1', 'b2', 'b3']);
+  assert.deepEqual(outTwo.filter(item => !['a', 'b', 'c'].includes(item.id)).map(item => item.id), two.filter(item => !['a', 'b', 'c'].includes(item.id)).map(item => item.id));
+});
+
+test('D5: adding topics to a radial or timeline map re-arranges the whole map without overlap, keeping the first root in place', () => {
+  for (const kind of ['radial', 'timeline'])
+    for (const spacing of SPACINGS) {
+      const spec = { direction: kind, spacing };
+      const base = layout.arrangeMap(wide(), undefined, wideHeight, spec);
+      const grown = [...base, node('n1', 'root'), node('n2', 'root'), node('n1a', 'n1')];
+      const heightOf = id => wideHeight(id) ?? 150;
+      const out = layout.arrangeNewBranch(grown, 'root', new Set(['n1', 'n2', 'n1a']), heightOf, undefined, spec);
+      assert.equal(out.length, grown.length);
+      assert.ok(noOverlap(out, heightOf, GAPS[spacing]), `${kind} ${spacing}`);
+      const root = (list) => list.find(item => item.id === 'root');
+      assert.deepEqual([root(out).x, root(out).y], [root(base).x, root(base).y], `${kind} ${spacing} root stays`);
+      // Hand-dragged positions are reset by the re-arrange (D5).
+      const dragged = grown.map(item => (item.id === 't2' ? { ...item, x: 9000, y: 9000 } : item));
+      const reset = layout.arrangeNewBranch(dragged, 'root', new Set(['n1', 'n2', 'n1a']), heightOf, undefined, spec);
+      assert.deepEqual(snap(reset), snap(out), `${kind} ${spacing} dragged positions are reset`);
+      // A new top-level tree goes below everything and nothing moves.
+      const tree = [...base, node('z'), node('z1', 'z')];
+      const placed = layout.arrangeNewTree(tree, 'z', new Set(['z', 'z1']), heightOf, spec);
+      assert.ok(noOverlap(placed, heightOf, GAPS[spacing]), `${kind} ${spacing} new tree`);
+      for (const item of base) assert.deepEqual([placed.find(o => o.id === item.id).x, placed.find(o => o.id === item.id).y], [item.x, item.y]);
+    }
+});
+
+test('P3 navigation: radial and timeline arrow keys follow the right layout', () => {
+  const { neighborKey } = nav();
+  for (const direction of ['radial', 'timeline'])
+    for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
+      assert.equal(neighborKey(direction, key), neighborKey('right', key), `${direction} ${key}`);
 });

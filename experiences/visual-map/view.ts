@@ -463,6 +463,25 @@ let relevancePanelSeq = 0;
 /** Maps whose cards are displayed sorted by relevance. Memory only: never written to a note or Map.md. */
 const relevanceSortedMaps = new Set<string>();
 /** Path data for the curve from a parent card's right edge to a child card's left edge. */
+/** `layoutDirectionFor` for many ids at once: builds the id lookup one time and remembers each answer. */
+function branchDirectionResolver(nodes: MapNode[], mapDirection: string): (id: string) => string {
+  if (!allowsBranchLayout(mapDirection)) return () => mapDirection;
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const known = new Map<string, string>();
+  const resolve = (id: string, seen: Set<string>): string => {
+    const hit = known.get(id);
+    if (hit !== undefined) return hit;
+    const node = byId.get(id);
+    let answer = mapDirection;
+    if (node && !seen.has(id)) {
+      seen.add(id);
+      answer = branchDirectionOf(node) ?? (node.parentId ? resolve(node.parentId, seen) : mapDirection);
+    }
+    known.set(id, answer);
+    return answer;
+  };
+  return id => resolve(id, new Set());
+}
 function edgePathData(x1: number, y1: number, x2: number, y2: number): string {
   const bend = Math.max(60, Math.abs(x2 - x1) / 2);
   return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
@@ -2884,15 +2903,14 @@ export class VisualAgentMapView extends ItemView {
       await this.mapChange(map => {
         if (direction === "right" && spacing === "standard") delete map.layout;
         else map.layout = spacing === "standard" ? { direction } : { direction, spacing };
-        // A new balanced map deals the topics out again: lay them out to the right first so no old x keeps a side.
-        const source =
-          direction === "balanced" && before.direction !== "balanced"
-            ? arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, {
-                ...layoutOf(map),
-                direction: "right"
-              })
-            : map.nodes;
-        map.nodes = arrangeMap(source, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map));
+        // A branch layout that points against the new direction would be dropped on the next parse; drop it now.
+        cleanBranchLayouts(map.nodes, direction);
+        // A new balanced map deals the topics out again instead of keeping the sides they stand on.
+        map.nodes = arrangeMap(map.nodes, supersededAimNodeIds(map), this.cardHeightOf, layoutOf(map), {
+          reset: direction === "balanced" && before.direction !== "balanced"
+        });
+        // A balanced map decides each topic's side while arranging, so check once more with the new sides.
+        if (direction === "balanced") cleanBranchLayouts(map.nodes, direction);
       }, false);
       this.fit();
     });
@@ -13339,6 +13357,7 @@ export class VisualAgentMapView extends ItemView {
     const size = { width: card.offsetWidth, height: card.offsetHeight };
     const mapDirection = layoutOf(this.map).direction;
     const nodes = this.map?.nodes ?? [];
+    const directionOf = branchDirectionResolver(nodes, mapDirection);
     const touching: {
       key: string;
       direction: string;
@@ -13353,7 +13372,7 @@ export class VisualAgentMapView extends ItemView {
       if (!other) continue;
       touching.push({
         key,
-        direction: layoutDirectionFor(nodes, parentId, mapDirection),
+        direction: directionOf(parentId),
         depth: depthOf(nodes, childId),
         dragIsParent: parentId === id,
         far: { x: other.offsetLeft, y: other.offsetTop, width: other.offsetWidth, height: other.offsetHeight }
@@ -13417,6 +13436,7 @@ export class VisualAgentMapView extends ItemView {
     );
     const mapDirection = layoutOf(this.map).direction;
     const allNodes = this.map.nodes;
+    const directionOf = branchDirectionResolver(allNodes, mapDirection);
     for (const node of this.canvasNodes()) {
       const parents = parentIdsForNode(node);
       for (const parentId of parents) {
@@ -13426,7 +13446,7 @@ export class VisualAgentMapView extends ItemView {
         if (parentId === node.parentId && related.has(relationPairKey(parentId, node.id))) continue;
         const path = createSvg("path");
         // The edge follows its parent's arrangement, which a branch of its own may change.
-        const direction = layoutDirectionFor(allNodes, parentId, mapDirection) as LayoutKind;
+        const direction = directionOf(parentId) as LayoutKind;
         path.setAttribute(
           "d",
           direction === "right"

@@ -30,8 +30,8 @@ export function greedySides<T extends { id: string }>(
 
 /**
  * Decides the side of every first-level topic of one root. Topics that already stand on a side keep it, and the rest go
- * to the shorter side, so adding or removing a topic never moves the others across. When the known sides do not use
- * both sides (a map that was not balanced before), every topic is dealt out again from the start.
+ * to the shorter side, so adding or removing a topic never moves the others across, even when one side is emptied.
+ * Dealing every topic out again is the caller's choice (`known` answers undefined for all).
  */
 export function assignSides<T extends { id: string }>(
   topics: T[],
@@ -40,7 +40,6 @@ export function assignSides<T extends { id: string }>(
   known: (topic: T) => BalancedSide | undefined
 ): Map<string, BalancedSide> {
   const sides = topics.map(known);
-  if (!(sides.includes("left") && sides.includes("right"))) return greedySides(topics, sizeOf, gap);
   const loads = { left: 0, right: 0 };
   topics.forEach((topic, index) => {
     const side = sides[index];

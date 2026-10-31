@@ -302,11 +302,12 @@ export function arrangeMap(
   nodes: MapNode[],
   hidden?: Set<string>,
   heightOf?: HeightOf,
-  layout: LayoutKind | MapLayout = "right"
+  layout: LayoutKind | MapLayout = "right",
+  options: { reset?: boolean } = {}
 ): MapNode[] {
   const laidOut = hidden?.size ? nodes.filter(node => !hidden.has(node.id)) : nodes;
   const roots = laidOut.filter(node => !node.parentId);
-  const placed = positions(laidOut, roots, 80, 80, true, heightOf, layout);
+  const placed = positions(laidOut, roots, 80, 80, true, heightOf, layout, options.reset === true);
   return nodes.map(node => ({ ...node, ...placed.get(node.id) }));
 }
 

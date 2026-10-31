@@ -1153,7 +1153,7 @@ const MAP = 'Agent Workspace/Topics/map-pv1/Map.md';
 const RIGHT_TITLE = 'Lay out to the right', LEFT_TITLE = 'Lay out to the left';
 
 /** `spec` is [title, parentTitle|null, x, y] per node; `extra` is merged into the map before it is saved. */
-async function harness(spec, extra = {}) {
+async function harness(spec, extra = {}, layouts = {}) {
   const { repo, app } = support.fixture('en', { linkIndex: true });
   const settings = { ...support.DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -1163,6 +1163,7 @@ async function harness(spec, extra = {}) {
   for (const [title, parentTitle, x, y] of spec) {
     const created = await repo.createNote(title, 'gpt-6-luna', mapDoc, MAP, 'workspace');
     Object.assign(created, { parentId: parentTitle ? byTitle.get(parentTitle).id : null, x, y });
+    if (layouts[title]) created.layout = layouts[title];
     byTitle.set(title, created);
     mapDoc.nodes.push(created);
   }
@@ -1268,7 +1269,8 @@ test('V3: in a down map ArrowDown goes to the child, ArrowUp to the parent, Arro
   await up.choose(UP);
   assert.equal(up.view.keyboardNeighbor(up.named('Root'), 'ArrowUp').id, up.named('A').id, 'up map: ArrowUp goes to the first child');
   assert.equal(up.view.keyboardNeighbor(up.named('A'), 'ArrowDown').id, up.named('Root').id);
-  const bal = await harness([['Root', null, 1000, 80], ['A', 'Root', 0, 0], ['B', 'Root', 0, 0], ['A1', 'A', 0, 0]], { layout: { direction: 'balanced' } });
+  // Starts as a right map: switching to balanced is what deals the topics out again (a balanced map keeps the sides it has).
+  const bal = await harness([['Root', null, 1000, 80], ['A', 'Root', 0, 0], ['B', 'Root', 0, 0], ['A1', 'A', 0, 0]]);
   await bal.choose(BALANCED);
   const sideOf = title => (bal.named(title).x < bal.named('Root').x ? 'left' : 'right');
   assert.notEqual(sideOf('A'), sideOf('B'), 'the two topics are on opposite halves');
@@ -1446,4 +1448,46 @@ test('PV2-V10: the choices leave out the direction opposite to where the parent 
       assert.ok(stored, `${label} is still there after parse`);
     }
   }
+});
+
+// ---- R1 fixes: M1 switching direction cleans branch layouts, M2 balanced keeps sides after one side is emptied. ----
+test('R1-M1: switching the map direction drops branch layouts that would not survive a reopen, so memory equals the parsed file', async () => {
+  const cases = [
+    ['down', 'up', 'down'],
+    ['left', 'right', 'left'],
+    ['right', 'left', 'right']
+  ];
+  const titleOf = { up: UP, left: LEFT_TITLE, right: RIGHT_TITLE };
+  for (const [from, to, branch] of cases) {
+    const h = await harness(tree4, { layout: { direction: from } }, { B: { direction: branch } });
+    assert.deepEqual(plainJson(h.named('B').layout), { direction: branch }, 'the branch layout starts in the file');
+    await h.choose(titleOf[to]);
+    const saved = await h.saved();
+    const layoutsOf = nodes => nodes.map(n => [n.id, n.layout ?? null]);
+    assert.deepEqual(plainJson(layoutsOf(h.view.map.nodes)), plainJson(layoutsOf(saved.nodes)), `${from} to ${to} with a ${branch} branch: memory equals parse`);
+    const again = layout.arrangeMap(saved.nodes, undefined, () => 180, saved.layout ?? 'right');
+    assert.deepEqual(plainJson(h.view.map.nodes.map(n => [n.id, n.x, n.y])), plainJson(again.map(n => [n.id, n.x, n.y])), `${from} to ${to}: auto layout after reopen is the same`);
+  }
+  // A branch that still fits the new direction stays.
+  const keep = await harness(tree4, { layout: { direction: 'down' } }, { B: { direction: 'down' } });
+  await keep.choose(COMPACT);
+  assert.deepEqual(plainJson(keep.named('B').layout), { direction: 'down' });
+});
+
+test('R1-M2: emptying one side of a balanced map does not move the other topics across; switching to balanced still deals again', () => {
+  const H = () => 180, B = { direction: 'balanced' };
+  const side = (nodes, id) => (nodes.find(n => n.id === id).x > nodes.find(n => n.id === 'r').x ? 'right' : 'left');
+  let nodes = layout.arrangeMap([node('r'), node('t0', 'r'), node('t1', 'r'), node('t2', 'r'), node('t3', 'r')], undefined, H, B);
+  assert.deepEqual(['t0', 't1', 't2', 't3'].map(id => side(nodes, id)), ['right', 'left', 'right', 'left']);
+  const fewer = layout.arrangeMap(nodes.filter(n => n.id !== 't1' && n.id !== 't3'), undefined, H, B);
+  assert.equal(side(fewer, 't0'), 'right');
+  assert.equal(side(fewer, 't2'), 'right', 't2 stays on the right');
+  // The other side emptied.
+  const other = layout.arrangeMap(nodes.filter(n => n.id !== 't0' && n.id !== 't2'), undefined, H, B);
+  assert.equal(side(other, 't1'), 'left');
+  assert.equal(side(other, 't3'), 'left');
+  // From a right map, reset deals the topics to both sides; without it they stay where they stand.
+  const right = layout.arrangeMap([node('r'), node('t0', 'r'), node('t1', 'r'), node('t2', 'r'), node('t3', 'r')], undefined, H, 'right');
+  const dealt = layout.arrangeMap(right, undefined, H, B, { reset: true });
+  assert.ok(['t0', 't1', 't2', 't3'].some(id => side(dealt, id) === 'left') && ['t0', 't1', 't2', 't3'].some(id => side(dealt, id) === 'right'));
 });

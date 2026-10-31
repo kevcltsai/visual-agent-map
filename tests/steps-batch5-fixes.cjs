@@ -34,3 +34,46 @@ test('G-2: a pointerdown on a frame label chip does not start a pan; bare canvas
   down({ closest: () => null });
   assert.deepEqual(captured, [7], 'a pointerdown elsewhere on the canvas still pans');
 });
+
+// M1 (0.28 triage #40): the outline window's AI generation under a topic follows that topic's model like the window's
+// default entry says; reasoning stays the current model's (MS-06 D5).
+const { fixture, withExpansionCoordinator } = require('./support.cjs');
+const MAP = 'Agent Workspace/Topics/map-a/Map.md';
+const CURRENT = { model: 'claude-sonnet-5-5', reasoning: 'high' };
+async function outlineHarness() {
+  const { repo, app } = fixture('en');
+  repo.settings = { ...DEFAULT_SETTINGS, language: 'en' };
+  const doc = { id: 'map-a', title: 'A', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
+  const calls = { confirm: [], outline: [] };
+  const plugin = withExpansionCoordinator({
+    repo, settings: repo.settings, running: new Set(), mutate: async work => work(), releaseOutline() {},
+    currentModelChoice: () => ({ ...CURRENT }),
+    confirmAiUsage: async (model, run) => { calls.confirm.push(model); await run(); return true; },
+    outlineGeneration: { generate: async request => { calls.outline.push(request); return { markdown: '# T\n', nodes: [] }; } }
+  });
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const view = new VisualAgentMapView({ app }, plugin);
+  view.path = MAP; view.map = doc; view.render = () => {};
+  const manual = await repo.createNote('Manual', 'gpt-x', doc, MAP, 'manual');
+  const plain = await repo.createNote('Plain', 'settings-model-not-used', doc, MAP, 'workspace');
+  doc.nodes.push(manual, plain);
+  const run = async request => {
+    await view.outlineGenerator('T').generate({ topic: 'T', presetText: 'p', ...request }, new AbortController().signal, () => ({ topic: 'T', presetId: 'k', presetText: 'p', placement: 'under', target: { map: 'editable' }, shallow: false, mode: 'quick' }));
+    return calls.outline.at(-1);
+  };
+  return { run, calls, manual, plain };
+}
+test('M1: under a topic with a manual model the default generates with that model; reasoning stays current', async () => {
+  const h = await outlineHarness();
+  const sent = await h.run({ placement: { kind: 'under', parentId: h.manual.id } });
+  assert.equal(sent.model, 'gpt-x');
+  assert.equal(sent.reasoning, CURRENT.reasoning);
+  assert.deepEqual(h.calls.confirm, ['gpt-x']);
+});
+test('M1: a new tree, an inherited-less parent and a picked model keep their models', async () => {
+  const h = await outlineHarness();
+  assert.equal((await h.run({ placement: { kind: 'tree' } })).model, CURRENT.model);
+  assert.equal((await h.run({ placement: { kind: 'under', parentId: h.plain.id } })).model, CURRENT.model);
+  assert.equal((await h.run({ placement: { kind: 'under', parentId: h.manual.id }, model: 'picked-m' })).model, 'picked-m');
+});

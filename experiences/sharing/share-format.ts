@@ -111,6 +111,8 @@ export interface ShareTextNodePayload {
   text: string;
   x: number;
   y: number;
+  /** Optional (canvas-text-node): ids of the topics a free text block is linked to; present only when it has live links. */
+  links?: string[];
 }
 
 export interface SharePayload {
@@ -195,7 +197,11 @@ function shareTextNodes(map: MapDocument): ShareTextNodePayload[] {
     if (!Number.isFinite(raw.x) || !Number.isFinite(raw.y)) continue;
     seen.add(raw.id);
     const parentId = typeof raw.parentId === "string" && ids.has(raw.parentId) ? raw.parentId : null;
-    out.push({ id: raw.id, parentId, text, x: raw.x, y: raw.y });
+    const links: string[] = [];
+    if (parentId === null && Array.isArray(raw.links))
+      for (const link of raw.links)
+        if (typeof link === "string" && ids.has(link) && !links.includes(link)) links.push(link);
+    out.push({ id: raw.id, parentId, text, x: raw.x, y: raw.y, ...(links.length ? { links } : {}) });
   }
   return out;
 }

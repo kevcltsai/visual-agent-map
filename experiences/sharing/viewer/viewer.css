@@ -169,3 +169,4 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 @media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }
 .vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .vam-text-edge { opacity: 0.8; }
+.vam-text-link { stroke-dasharray: 5 4; opacity: 0.8; }

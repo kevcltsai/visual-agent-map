@@ -364,3 +364,12 @@ test('tree-text-node: a text node is exported as a card with its text escaped, a
   assert.doesNotMatch(svg, /<script|<img/);
   assert.ok(got.scene.cards.some(c => c.x === 600 && c.y === 40), 'the text node box is in the scene');
 });
+
+test('canvas-text-node: a free text link path is exported as a dashed edge, other edges stay solid', async () => {
+  const h = await harness();
+  h.view.edgesEl.children.push(h.path('M 10 10 L 90 90', { stroke: 'rgb(100, 100, 100)', display: 'inline' }, { class: 'vam-text-link' }));
+  const got = await h.view.collectExportScene(() => true);
+  const svg = ex.buildMapSvg(got.scene);
+  assert.match(svg, /<path d="M 10 10 L 90 90"[^>]*stroke-dasharray="5 4"/);
+  assert.doesNotMatch(svg.match(/<path d="M 380 120[^>]*>/)[0], /dasharray/);
+});

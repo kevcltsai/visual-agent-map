@@ -30,6 +30,8 @@ export interface SceneImage {
 export interface SceneEdge {
   d: string;
   stroke?: string;
+  /** canvas-text-node: a free text block's link to a topic is drawn dashed. */
+  dashed?: boolean;
 }
 export interface SceneBoundary {
   x: number;
@@ -158,7 +160,9 @@ export function buildMapSvg(scene: MapScene): string {
   }
   for (const edge of scene.edges ?? []) {
     if (typeof edge?.d !== "string" || !PATH_DATA.test(edge.d) || edge.d.length > 4000) continue;
-    out.push(`<path d="${edge.d.trim()}" fill="none" stroke="${color(edge.stroke, strokeColor)}" stroke-width="1.5"/>`);
+    out.push(
+      `<path d="${edge.d.trim()}" fill="none" stroke="${color(edge.stroke, strokeColor)}" stroke-width="1.5"${edge.dashed === true ? ' stroke-dasharray="5 4"' : ""}/>`
+    );
   }
   for (const image of scene.images ?? []) out.push(imageElement(image));
   for (const card of scene.cards ?? []) {

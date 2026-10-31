@@ -8356,7 +8356,11 @@ export class VisualAgentMapView extends ItemView {
       const style = computed(el);
       const stroke = colorOf(style.stroke);
       if (!d || !stroke || stroke === "none" || style.display === "none") continue;
-      edges.push({ d, stroke });
+      edges.push({
+        d,
+        stroke,
+        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {})
+      });
       try {
         const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();
         if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);

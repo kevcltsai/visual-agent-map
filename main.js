@@ -48936,9 +48936,13 @@ ${request.requirements}` : preset.text,
     this.textEditDraft = null;
     if (draft && !pending2 && this.textEls.has(draft.id)) {
       this.focusItemId = null;
+      this.focusNodeId = null;
+      this.focusResizeNodeId = null;
       this.startTextEdit(draft.id, draft.value);
     } else if (pending2 && this.textEls.has(pending2)) {
       this.focusItemId = null;
+      this.focusNodeId = null;
+      this.focusResizeNodeId = null;
       this.startTextEdit(pending2);
     } else if (wanted && this.textEls.has(wanted)) {
       this.focusItemId = null;

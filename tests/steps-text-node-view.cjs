@@ -194,3 +194,55 @@ test('a render after add (file event, derived data) keeps the new text node in e
   assert.equal(h.view.editingTextId, h.view.map.canvasItems[0].id);
   assert.equal((await h.onDisk())[0].text, 'Text', 'no blur commit wrote the draft early');
 });
+
+// Root cause (diagnosis 2026-11-01): paint opens the editor, then hands focus back to the parent card, which blurs the textarea and commits/closes it.
+function paintLikeHarness(h) {
+  const doc = {
+    _active: null,
+    get activeElement() { return this._active; },
+    set activeElement(next) { const old = this._active; this._active = next; if (old && old !== next) old.fire('blur', {}); }
+  };
+  h.view.stageEl.root = doc;
+  h.view.render = () => {
+    const stage = h.view.stageEl;
+    const hadFocusedCard = doc.activeElement && doc.activeElement.hasClass?.('vam-node') ? doc.activeElement.dataset.nodeId : null;
+    if (hadFocusedCard) h.view.focusNodeId ??= hadFocusedCard; // paint head: remember the focused card
+    stage.children = []; h.view.cardEls.clear(); h.view.textEls.clear();
+    for (const n of h.view.map.nodes) { const c = stage.child('div', 'vam-node'); c.dataset.nodeId = n.id; h.view.cardEls.set(n.id, c); }
+    h.view.renderCanvasItems();
+    if (h.view.focusNodeId) { // paint tail: give focus back to that card
+      h.view.cardEls.get(h.view.focusNodeId)?.focus({ preventScroll: true });
+      h.view.focusNodeId = null;
+    }
+  };
+  return doc;
+}
+
+test('adding a text node while its parent card has focus keeps the editor open (paint must not hand focus back to the card)', async () => {
+  const h = await harness();
+  const doc = paintLikeHarness(h);
+  h.view.render();
+  doc.activeElement = h.view.cardEls.get(h.root.id);
+  h.view.addTextNodeUnder(h.root);
+  await h.settle();
+  const id = h.view.map.canvasItems[0].id;
+  const area = find(h.textEl(id), i => i.tag === 'textarea');
+  assert.ok(area, 'textarea still present');
+  assert.equal(h.view.editingTextId, id);
+  assert.equal(doc.activeElement, area, 'focus is on the textarea');
+  assert.equal((await h.onDisk())[0].text, 'Text', 'nothing committed early');
+});
+
+test('control: with an existing text node already in edit, a repaint keeps the editor and focus', async () => {
+  const h = await harness(({ root }) => [txt({ parentId: root.id })]);
+  const doc = paintLikeHarness(h);
+  h.view.render();
+  h.textEl('t1').fire('dblclick', {});
+  const area = () => find(h.textEl('t1'), i => i.tag === 'textarea');
+  assert.ok(area());
+  doc.activeElement = area();
+  h.view.render();
+  assert.ok(area(), 'editor kept');
+  assert.equal(h.view.editingTextId, 't1');
+  assert.equal(doc.activeElement, area());
+});

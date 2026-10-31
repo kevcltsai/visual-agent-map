@@ -6019,9 +6019,13 @@ export class VisualAgentMapView extends ItemView {
     this.textEditDraft = null;
     if (draft && !pending && this.textEls.has(draft.id)) {
       this.focusItemId = null;
+      this.focusNodeId = null; // the editor owns focus; paint must not hand it back to a card (that blur would commit and close)
+      this.focusResizeNodeId = null;
       this.startTextEdit(draft.id, draft.value);
     } else if (pending && this.textEls.has(pending)) {
       this.focusItemId = null;
+      this.focusNodeId = null; // the editor owns focus; paint must not hand it back to a card (that blur would commit and close)
+      this.focusResizeNodeId = null;
       this.startTextEdit(pending);
     } else if (wanted && this.textEls.has(wanted)) {
       this.focusItemId = null;

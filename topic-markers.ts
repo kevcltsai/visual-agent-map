@@ -34,7 +34,9 @@ export function toggleTopicMarker(raw: unknown, id: TopicMarker): string[] | nul
   let next: unknown[];
   if (current.includes(id)) next = current.filter(v => v !== id);
   else {
-    next = PRIORITIES.includes(id) ? current.filter(v => typeof v !== "string" || !PRIORITIES.includes(v)) : current.slice();
+    next = PRIORITIES.includes(id)
+      ? current.filter(v => typeof v !== "string" || !PRIORITIES.includes(v))
+      : current.slice();
     next.push(id);
   }
   return next.length ? (next as string[]) : null;

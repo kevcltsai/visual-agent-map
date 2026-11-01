@@ -3467,14 +3467,18 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   const toggled = [];
   view.plugin.repo.writeTopicMarkers = async (path, id) => {
     toggled.push(id); const note = view.notes.get(path.replace('.md', '')); const cur = note.markers ?? [];
-    note.markers = cur.includes(id) ? cur.filter(x => x !== id) : [...cur.filter(x => !(id.startsWith('priority') && x.startsWith('priority'))), id];
+    note.markers = load('topic-markers.ts', { obsidian }).toggleTopicMarker(cur, id) ?? [];
   };
   view.refreshAfterSavedChange = async () => {};
   const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
   const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
   const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
-  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, 6);
+  const { TOPIC_MARKERS, TOPIC_MARKER_GROUPS } = load('topic-markers.ts', { obsidian });
+  assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length);
+  const sub = dom.findAll(group(), c => (c.cls ?? '').includes('vam-topic-marker-group') && c.attrs.role === 'group');
+  assert.equal(sub.length, TOPIC_MARKER_GROUPS.length);
+  sub.forEach((box, i) => assert.equal(dom.findAll(box, c => c.tag === 'button').length, TOPIC_MARKER_GROUPS[i].ids.length));
   assert.deepEqual(pressed(), []);
   const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
   click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
@@ -3482,6 +3486,10 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
   click('Done'); await dom.tick();
   assert.equal(pressed().length, 1);
+  click('Progress 25%'); await dom.tick(); click('Progress 50%'); await dom.tick(); click('Red flag'); await dom.tick(); click('Blue flag'); await dom.tick();
+  assert.deepEqual(pressed().map(t => t.replace(/^.*?(Progress|Priority|Red|Blue)/, '$1')).sort(), ['Blue flag', 'Priority 3', 'Progress 50%', 'Red flag'].map(t => t).sort().map(t => t), 'progress is single choice, flags can coexist');
+  assert.ok(sub.every(box => box.attrs['aria-label']), 'every section is a labelled group');
+  assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);
 });
 integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
@@ -3512,7 +3520,13 @@ integrationTest('topic-markers: a toggle is one transaction; one undo restores t
   await view.refreshAfterSavedChange();
   await view.changeTopicMarker(view.map.nodes[0], 'priority-1');
   await view.changeTopicMarker(view.map.nodes[0], 'priority-2');
-  assert.equal(pushed.length, 3); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
+  await view.changeTopicMarker(view.map.nodes[0], 'progress-25'); const mid = contents.get(topic.path);
+  await view.changeTopicMarker(view.map.nodes[0], 'progress-50');
+  assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2', 'progress-50']);
+  await pushed.at(-1).undo(); assert.equal(contents.get(topic.path), mid, 'one undo of a same-group switch restores the previous choice');
+  await pushed.at(-1).redo(); await view.refreshAfterSavedChange();
+  await pushed.at(-1).undo(); await pushed.at(-2).undo(); await view.refreshAfterSavedChange();
+  assert.equal(pushed.length, 5); assert.deepEqual(plain(view.notes.get(view.map.nodes[0].id).markers), ['priority-2']);
 });
 // ---- topic colour (ticket 37, P2b) ----
 const tcLabel = card => dom.find(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));

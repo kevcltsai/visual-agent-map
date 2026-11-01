@@ -3,8 +3,6 @@ import { CANONICAL_LANGUAGES, type NoteStyleLanguage } from "../../ai/note-style
 import { templateFormatHeading } from "./template-block";
 import { builtinPresets } from "../../ai/prompt-presets";
 import { OBSIDIAN_FORMAT, inLanguage } from "../steps/_shared/fragments";
-import PlainTextZH from "./format/plain-text.zh.md";
-import PlainTextEN from "./format/plain-text.en.md";
 import StandardZhTW from "./template/standard.zh-TW.md";
 import StandardZhCN from "./template/standard.zh-CN.md";
 import StandardEn from "./template/standard.en.md";
@@ -17,7 +15,7 @@ import TextbookEn from "./template/textbook.en.md";
  * reuse the existing prompt files (the Obsidian format fragment, the tone presets), so a block's text equals what the
  * prompt carries today. Template bodies are the section files under ./template.
  */
-export type BlockCategory = "template" | "tone" | "format";
+export type BlockCategory = "template" | "tone";
 export interface BuiltinBlock {
   readonly category: BlockCategory;
   readonly id: string;
@@ -75,7 +73,7 @@ const template = (id: string, nameKey: TranslationKey, files: readonly string[])
  * The whole text of a built-in template: the sections, the format rules heading, then today's Obsidian format rules.
  * The text a template editor opens and "restore default" writes.
  */
-export function builtinTemplateText(id: string, language: NoteStyleLanguage): string {
+export function builtinTemplateText(id: string, language: ContentLanguage): string {
   const block = findBuiltinBlock("template", id);
   return `${block.sections?.(language)}\n\n# ${templateFormatHeading(language)}\n\n${block.format?.(language)}`;
 }
@@ -83,18 +81,6 @@ export function builtinTemplateText(id: string, language: NoteStyleLanguage): st
 export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   template("standard", "ui.note_style_standard_short", [StandardZhTW, StandardZhCN, StandardEn]),
   template("textbook", "ui.note_style_textbook_short", [TextbookZhTW, TextbookZhCN, TextbookEn]),
-  {
-    category: "format",
-    id: "standard-obsidian",
-    nameKey: "ui.block_format_standard",
-    body: language => inLanguage(OBSIDIAN_FORMAT, language)
-  },
-  {
-    category: "format",
-    id: "plain-text",
-    nameKey: "ui.block_format_plain",
-    body: language => strip(instructionLanguageOf(language) === "zh" ? PlainTextZH : PlainTextEN)
-  },
   tone("academic", "ui.preset_name_academic"),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine"),

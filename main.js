@@ -1496,8 +1496,6 @@ var en = {
   "ui.note_style_standard_short": "Standard",
   "ui.note_style_textbook": "Textbook (intro, then sections)",
   "ui.note_style_textbook_short": "Textbook",
-  "ui.block_format_standard": "Standard Obsidian format",
-  "ui.block_format_plain": "Plain text",
   "ui.block_template_format_heading": "Format rules",
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
@@ -3700,8 +3698,6 @@ var zhCN = {
   "ui.note_style_standard_short": "\u6807\u51C6",
   "ui.note_style_textbook": "\u6559\u79D1\u4E66\uFF08\u5148\u5BFC\u8BFB\uFF0C\u518D\u5206\u7C7B\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
-  "ui.block_format_standard": "\u6807\u51C6 Obsidian \u683C\u5F0F",
-  "ui.block_format_plain": "\u7EAF\u6587\u672C",
   "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
   "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
   "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
@@ -5904,8 +5900,6 @@ var zhTW = {
   "ui.note_style_standard_short": "\u6A19\u6E96",
   "ui.note_style_textbook": "\u6559\u79D1\u66F8\uFF08\u5148\u5C0E\u8B80\uFF0C\u518D\u5206\u985E\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
-  "ui.block_format_standard": "\u6A19\u6E96 Obsidian \u683C\u5F0F",
-  "ui.block_format_plain": "\u7D14\u6587\u5B57",
   "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
   "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
   "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
@@ -31214,29 +31208,76 @@ function visualGuidance(context, language2) {
   return instructions;
 }
 
-// core/blocks/format/plain-text.zh.md
-var plain_text_zh_default = "detail \u6703\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u9019\u500B\u683C\u5F0F\u53EA\u7528\u4E00\u822C\u6BB5\u843D\u3001\u6E05\u55AE\u8207 #### \u5C0F\u6A19\u984C\uFF0C\u4E0D\u7528\u65B9\u6846\u3001\u8868\u683C\u3001\u5716\u8868\u3001\u4EFB\u52D9\u6E05\u55AE\u6216\u87A2\u5149\u6A19\u8A18\u3002\n\n\u898F\u5247\uFF1A\n1. \u6709\u6307\u5B9A\u9805\u76EE\u6578\u91CF\u7684\u6BB5\u843D\uFF0C\u9805\u76EE\u8981\u5BEB\u6210\u9802\u5C64\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF0C\u4E0D\u8981\u653E\u9032 callout \u6216\u8868\u683C\u3002\n2. \u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF0C\u4E0D\u52A0 callout\u3002\n3. detail \u662F\u7D66\u8B80\u8005\u770B\u7684\u5167\u5BB9\uFF1A\u4E0D\u8981\u5BEB\u5167\u90E8 ID\uFF08\u7BC0\u9EDE\u3001\u8B49\u64DA\u3001\u4F86\u6E90\u6216\u5831\u544A\u7684 ID\uFF09\u3001\u5BE9\u67E5\u610F\u898B\uFF0C\u6216\u5C0D\u8349\u7A3F\u8207\u7814\u7A76\u904E\u7A0B\u672C\u8EAB\u7684\u8A55\u8AD6\u3002\n4. detail \u5167\u7684\u6A19\u984C\u4E00\u5F8B\u5F9E\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\u958B\u59CB\uFF0C\u5F80\u4E0B\u4F9D\u5E8F\u7528 ####\uFF0C\u4E0D\u8DF3\u7D1A\uFF1B\u4E0D\u8981\u7528 # \u6216 ##\u3002\n5. \u6578\u5B78\u5F0F\u53EA\u7528\u5728\u771F\u6B63\u7684\u516C\u5F0F\uFF1A\u884C\u5167\u7528 `$\u2026$`\uFF08\u9322\u5B57\u865F\u5167\u5074\u4E0D\u7559\u7A7A\u767D\uFF09\uFF0C\u7368\u7ACB\u4E00\u884C\u7684\u516C\u5F0F\u7528\u55AE\u7368\u6210\u884C\u7684 `$$`\uFF1B\u4E0D\u8981\u4F7F\u7528 `\\(`\u3001`\\)`\u3001`\\[`\u3001`\\]`\u3002\n";
-
-// core/blocks/format/plain-text.en.md
-var plain_text_en_default = 'The detail is rendered in Obsidian. This format uses only plain paragraphs, lists and #### subheadings; it uses no callouts, tables, diagrams, task lists or highlights.\n\nRules:\n1. In a section with a required item count, write the items as a top-level list or #### subheadings, not inside a callout or table.\n2. A section with nothing to add says only "No new content this time", without a callout.\n3. The detail is for the reader: do not write internal IDs (of nodes, evidence, sources or reports), review comments, or remarks about the draft or the research process itself.\n4. Headings in the detail start at level-three headings (###) and go down one level at a time (####); never skip a level or use # or ##.\n5. Use math only for real formulas: inline math as `$\u2026$` with no spaces just inside the dollars, display math with `$$` on its own lines; never use `\\(`, `\\)`, `\\[` or `\\]`.\n';
+// core/blocks/template-block.ts
+var FORMAT_HEADING_KEY = "ui.block_template_format_heading";
+function templateFormatHeading(language2) {
+  return translate(language2, FORMAT_HEADING_KEY);
+}
+var unify = (text11) => text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+var trimBlankLines = (lines) => {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && !lines[start].trim()) start++;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return lines.slice(start, end).join("\n");
+};
+function splitTemplateZones(text11) {
+  const lines = unify(text11).split("\n");
+  const code = fencedLines(lines);
+  const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
+  const separatorLines = [];
+  lines.forEach((line, index) => {
+    if (code[index]) return;
+    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line);
+    if (heading && names3.has(heading[1])) separatorLines.push(index + 1);
+  });
+  if (!separatorLines.length) return { sections: lines.join("\n"), format: void 0, separatorLines };
+  const first = separatorLines[0] - 1;
+  return {
+    sections: lines.slice(0, first).join("\n"),
+    format: trimBlankLines(lines.slice(first + 1)),
+    separatorLines
+  };
+}
+function parseTemplateBlock(text11, options) {
+  var _a2;
+  const zones = splitTemplateZones(text11);
+  if (zones.separatorLines.length > 1) {
+    const line = zones.separatorLines[1];
+    return {
+      ok: false,
+      issues: [
+        {
+          line,
+          code: "format_heading_repeated",
+          values: [line],
+          message: `Line ${line}: the format rules heading appears a second time.`
+        }
+      ]
+    };
+  }
+  const parsed = parseNoteStyleFile(zones.sections, options);
+  if (!parsed.ok) return parsed;
+  return { ok: true, template: parsed.style.template, format: (_a2 = zones.format) != null ? _a2 : "" };
+}
 
 // core/blocks/template/standard.zh-TW.md
 var standard_zh_TW_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/standard.zh-CN.md
-var standard_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+var standard_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/standard.en.md
-var standard_en_default3 = "## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var standard_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
 
 // core/blocks/template/textbook.zh-TW.md
-var textbook_zh_TW_default3 = "\u5148\u7528 2\u20134 \u6BB5\u6D41\u66A2\u7684\u6BB5\u843D\u5E36\u8B80\u8005\u9032\u5165\u4E3B\u984C\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\u3002\u4F9D\u5E8F\u5BEB\uFF1A\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\uFF1B\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7C21\u77ED\u9EDE\u51FA\u5E38\u898B\u8AA4\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\u6700\u5F8C\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_TW_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.zh-CN.md
-var textbook_zh_CN_default3 = "\u5148\u7528 2\u20134 \u6BB5\u6D41\u7545\u7684\u6BB5\u843D\u5E26\u8BFB\u8005\u8FDB\u5165\u4E3B\u9898\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6807\u9898\u3002\u4F9D\u5E8F\u5199\uFF1A\u4E3A\u4EC0\u4E48\u8FD9\u4E2A\u4E3B\u9898\u503C\u5F97\u5B66\u3001\u8DDF\u8BFB\u8005\u6709\u4EC0\u4E48\u5173\u7CFB\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6D45\u767D\u7684\u8BED\u8A00\u8BF4\u660E\uFF0C\u5FC5\u8981\u65F6\u624D\u4E0B\u4E13\u6709\u540D\u8BCD\u5E76\u7ACB\u523B\u89E3\u91CA\uFF1B\u4E00\u4E2A\u4ECE\u5934\u8D70\u5230\u5C3E\u3001\u542B\u5B9E\u9645\u6570\u5B57\u6216\u6B65\u9AA4\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8BFB\u8005\u53EA\u8BFB\u8FD9\u4E00\u6BB5\uFF0C\u5C31\u5E94\u8BE5\u5DF2\u7ECF\u61C2\u4E2A\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u6838\u5FC3\u7ED3\u8BBA\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u590D\u5BFC\u8BFB\u5DF2\u7ECF\u8BB2\u8FC7\u7684\u53E5\u5B50\u3002\u6CA1\u6709\u53EF\u9760\u5185\u5BB9\u7684\u5206\u7C7B\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B66\u8005\u5E38\u4EE5\u4E3A\u2026\uFF0C\u5176\u5B9E\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7B80\u77ED\u70B9\u51FA\u5E38\u89C1\u8BEF\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\u6700\u540E\u52A0\u4E00\u5C0F\u5757\u300C**\u81EA\u6211\u68C0\u6838**\u300D\uFF08\u7C97\u4F53\u5B57\u5F00\u5934\uFF0C\u4E0D\u7528\u6807\u9898\uFF09\uFF0C\u5217 2\u20133 \u4E2A\u8BA9\u8BFB\u8005\u68C0\u67E5\u81EA\u5DF1\u662F\u5426\u5B66\u4F1A\u7684\u95EE\u9898\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+var textbook_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.en.md
-var textbook_en_default3 = 'Open with 2\u20134 flowing paragraphs that bring the reader into the topic, with no headings. In order: why the topic is worth learning and how it relates to the reader; the core concepts in plain language, using a technical term only when needed and explaining it right away; one complete worked example from start to finish with real numbers or steps. A reader who reads only this part should already get the gist.\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 core conclusions by default, conclusion first and then the reason, without repeating sentences the intro already said. Omit a section entirely when there is no reliable content for it.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n> [!warning]\n> Use the pattern "Beginners often assume \u2026, but actually \u2026" to point out a common misconception briefly.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\nEnd with a short block headed by bold **Self-check** (bold text, not a heading) listing 2\u20133 questions that let the reader check whether they learned it, optionally with a one-line hint.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+var textbook_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
 
 // core/blocks/builtin.ts
 var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
@@ -31266,21 +31307,18 @@ var template = (id, nameKey, files) => {
     format: (language2) => inLanguage(OBSIDIAN_FORMAT, language2)
   };
 };
+function builtinTemplateText(id, language2) {
+  var _a2, _b2;
+  const block = findBuiltinBlock("template", id);
+  return `${(_a2 = block.sections) == null ? void 0 : _a2.call(block, language2)}
+
+# ${templateFormatHeading(language2)}
+
+${(_b2 = block.format) == null ? void 0 : _b2.call(block, language2)}`;
+}
 var BUILTIN_BLOCKS = [
   template("standard", "ui.note_style_standard_short", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
   template("textbook", "ui.note_style_textbook_short", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
-  {
-    category: "format",
-    id: "standard-obsidian",
-    nameKey: "ui.block_format_standard",
-    body: (language2) => inLanguage(OBSIDIAN_FORMAT, language2)
-  },
-  {
-    category: "format",
-    id: "plain-text",
-    nameKey: "ui.block_format_plain",
-    body: (language2) => strip2(instructionLanguageOf(language2) === "zh" ? plain_text_zh_default : plain_text_en_default)
-  },
   tone("academic", "ui.preset_name_academic"),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine"),
@@ -31299,6 +31337,7 @@ function lookupBuiltinBlock(category, id, language2) {
 
 // core/steps/task/assemble.ts
 var CUSTOM_LEGACY_TONE = "custom-legacy";
+var DEFAULT_TONE = "academic";
 var TONE_MARKER = "\0tone\0";
 function promptStepOf(context) {
   if (isQuickTask(context)) return "quick";
@@ -31321,19 +31360,48 @@ function selectionFromContext(context, language2) {
     (id) => lookupBuiltinBlock("tone", id, language2) === toneText
   ) : void 0;
   return {
-    template: { id: templateId, ...context.detailFormat === "adaptive" ? { adaptive: true } : {} },
-    ...toneText ? { tone: builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText } } : {},
-    format: { id: "standard-obsidian", ...context.noteStyle ? { legacyPreferences: context.noteStyle } : {} }
+    template: {
+      id: templateId,
+      ...context.detailFormat === "adaptive" ? { adaptive: true } : {},
+      ...context.noteStyle ? { legacyPreferences: context.noteStyle } : {}
+    },
+    tone: !toneText ? { id: DEFAULT_TONE } : builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText }
   };
+}
+function templateParts(selection, context, language2, topicAnchor, options) {
+  var _a2, _b2, _c, _d, _e;
+  const { id } = selection.template;
+  const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
+  const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
+  const builtin = legacy || body !== void 0 ? BUILTIN_BLOCKS.find((block) => block.category === "template" && block.id === id) : findBuiltinBlock("template", id);
+  const unmodified = body === void 0 || builtin !== void 0 && normalizeStyleContent(body) === normalizeStyleContent(builtinTemplateText(id, language2));
+  const structure2 = (template2) => detailStructurePrompt(template2, language2, (headings) => detailStructure(language2, headings), topicAnchor);
+  if (unmodified) {
+    const today = (_e = context.detailTemplate) != null ? _e : (id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language2));
+    return { sections: structure2(today), format: inLanguage(OBSIDIAN_FORMAT, language2) };
+  }
+  const parsed = parseTemplateBlock(body, { id, name: id });
+  if (!parsed.ok) {
+    const issue2 = parsed.issues[0];
+    throw new Error(`Template block ${id}: line ${issue2.line}: ${issue2.message}`);
+  }
+  return { sections: structure2(parsed.template), format: parsed.format };
+}
+var formatText = (parts, selection, language2) => parts.format ? applyFormatPreferences(parts.format, language2, selection.template.legacyPreferences) : "";
+var CHART_BLOCK = "```mermaid";
+function chartsWanted(selection, context, language2, options = {}) {
+  const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
+  const sections = selection.template.adaptive ? "" : parts.sections;
+  return sections.includes(CHART_BLOCK) || formatText(parts, selection, language2).includes(CHART_BLOCK);
 }
 var fixed = (text11, id) => [text11, { kind: "fixed", id }];
 var input = (text11, id) => [text11, { kind: "input", id }];
 function assembleTaskPrompt(selection, step, context, language2, provider = "codex", options = {}) {
-  var _a2, _b2;
+  var _a2;
   const bodyOf = (category, id) => {
-    var _a3, _b3, _c;
+    var _a3, _b2, _c;
     findBuiltinBlock(category, id);
-    return (_c = (_b3 = (_a3 = options.blocks) == null ? void 0 : _a3[`${category}/${id}`]) == null ? void 0 : _b3.call(_a3, language2)) != null ? _c : lookupBuiltinBlock(category, id, language2);
+    return (_c = (_b2 = (_a3 = options.blocks) == null ? void 0 : _a3[`${category}/${id}`]) == null ? void 0 : _b2.call(_a3, language2)) != null ? _c : lookupBuiltinBlock(category, id, language2);
   };
   const modeFragment = step === "research" || step === "quick" && context.mode === "task" ? GENERAL_TASK : step === "decompose" ? DECOMPOSE : step === "synthesize" ? SYNTHESIZE : step === "merge" ? MERGE : DEFAULT_TASK;
   const quick = step === "quick";
@@ -31352,7 +31420,7 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
     )
   );
   add(fixed(withProviderOutput(inLanguage(JSON_CONTRACT, language2), provider, language2), "json-contract"));
-  if (selection.tone) {
+  {
     const body = (_a2 = selection.tone.body) != null ? _a2 : bodyOf("tone", selection.tone.id);
     if (body) {
       const block = { kind: "block", category: "tone", id: selection.tone.id };
@@ -31363,23 +31431,18 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   add(fixed(inLanguage(modeFragment, language2), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
+    const parts = templateParts(selection, context, language2, topicAnchor, options);
     const pieces = [];
+    const sections = (text11) => [
+      text11,
+      { kind: "block", category: "template", id: selection.template.id, part: "sections" }
+    ];
     if (selection.template.adaptive)
       pieces.push(fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure"));
-    else {
-      const template2 = (_b2 = context.detailTemplate) != null ? _b2 : (selection.template.id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language2));
-      pieces.push([
-        detailStructurePrompt(template2, language2, (headings) => detailStructure(language2, headings), topicAnchor),
-        { kind: "block", category: "template", id: selection.template.id }
-      ]);
-    }
+    else pieces.push(sections(parts.sections));
     if (readerFacingDetail(context) && step !== "merge") {
-      const text11 = applyFormatPreferences(
-        bodyOf("format", selection.format.id),
-        language2,
-        selection.format.legacyPreferences
-      );
-      if (text11) pieces.push([text11, { kind: "block", category: "format", id: selection.format.id }]);
+      const text11 = formatText(parts, selection, language2);
+      if (text11) pieces.push([text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]);
     }
     add(...withSeparators(pieces));
   }
@@ -31418,7 +31481,11 @@ ${context.task}`, "task"));
     if (index > 0) segments.push({ text: "\n\n", source: { kind: "separator" } });
     for (const [text11, source] of pieces) if (text11) segments.push({ text: text11, source });
   });
-  return { text: segments.map((segment) => segment.text).join(""), segments };
+  return {
+    text: segments.map((segment) => segment.text).join(""),
+    segments,
+    charts: chartsWanted(selection, context, language2, options)
+  };
 }
 function withSeparators(pieces) {
   return pieces.flatMap((piece, index) => index > 0 ? [["\n\n", { kind: "separator" }], piece] : [piece]);

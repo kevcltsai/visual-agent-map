@@ -1,10 +1,23 @@
 import { researchGuidance } from "../../../ai/task-policy";
 import type { TaskContext } from "../../../ai/types";
 import { visualGuidance } from "../../../ai/visual-guidance";
-import { detailStructurePrompt, standardTemplate, textbookTemplate } from "../../../ai/detail-templates";
+import {
+  detailStructurePrompt,
+  standardTemplate,
+  textbookTemplate,
+  type DetailTemplate
+} from "../../../ai/detail-templates";
 import { noteLanguageOf, type ContentLanguage, type FollowAnchor } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
-import { findBuiltinBlock, lookupBuiltinBlock, type BlockCategory } from "../../blocks/builtin";
+import { normalizeStyleContent } from "../../../ai/note-style-file";
+import {
+  BUILTIN_BLOCKS,
+  builtinTemplateText,
+  findBuiltinBlock,
+  lookupBuiltinBlock,
+  type BlockCategory
+} from "../../blocks/builtin";
+import { parseTemplateBlock } from "../../blocks/template-block";
 import {
   applyFormatPreferences,
   inLanguage,
@@ -18,6 +31,7 @@ import {
   LABEL_USER_TEXT,
   LOCAL_FIRST,
   NONE,
+  OBSIDIAN_FORMAT,
   REFERENCE_CITATIONS,
   ROLE,
   ROLE_QUICK,
@@ -45,9 +59,12 @@ import { isQuickTask, quickGuidance, readerFacingDetail } from "./render";
 /** Which task step a prompt is for; `default` is a request without a mode. */
 export type PromptStep = "research" | "quick" | "decompose" | "synthesize" | "merge" | "default";
 
+/** The zone of a template block a segment holds: its sections, or its format rules. */
+export type BlockPart = "sections" | "format";
+
 /** Where a piece of the prompt comes from: a style block, a fixed plugin part, the task's own input, or the blank line between parts. */
 export type SegmentSource =
-  | { kind: "block"; category: BlockCategory; id: string }
+  | { kind: "block"; category: BlockCategory; id: string; part?: BlockPart }
   | { kind: "fixed"; id: string }
   | { kind: "input"; id: string }
   | { kind: "separator" };
@@ -59,6 +76,8 @@ export interface PromptSegment {
 export interface AssembledPrompt {
   readonly text: string;
   readonly segments: readonly PromptSegment[];
+  /** Whether the template asks for charts: its sections or format rules hold a mermaid code block. */
+  readonly charts: boolean;
 }
 
 /** One chosen block. `body` is an inline text for a block outside the registry (a tone text from an old style file). */
@@ -67,18 +86,25 @@ export interface BlockChoice {
   readonly body?: string;
 }
 export interface StyleSelection {
-  /** `adaptive`: the detail has no fixed sections, the plugin's adaptive structure text stands in for the template. */
-  readonly template: BlockChoice & { readonly adaptive?: boolean };
-  readonly tone?: BlockChoice;
-  /** `preferences`: the old note style file switches, applied to the format body (moves into real blocks later). */
-  readonly format: BlockChoice & { readonly legacyPreferences?: FormatPreferences };
+  /**
+   * `body` is the whole template text (sections zone, then the format rules zone) when the choice is not the unchanged
+   * built-in. `adaptive`: the detail has no fixed sections, the plugin's adaptive structure text stands in for the
+   * sections. `legacyPreferences`: the old note style file switches, applied to the format rules zone.
+   */
+  readonly template: BlockChoice & {
+    readonly adaptive?: boolean;
+    readonly legacyPreferences?: FormatPreferences;
+  };
+  /** Academic rigor (the empty tone) is the default. */
+  readonly tone: BlockChoice;
 }
 export interface AssembleOptions {
-  /** Test injection: block bodies by `category/id`; the real path uses the built-in registry only. */
+  /** Test injection: block bodies by `category/id` (a template's body is its whole text); the real path uses the built-in registry only. */
   readonly blocks?: Readonly<Record<string, (language: ContentLanguage) => string>>;
 }
 
 const CUSTOM_LEGACY_TONE = "custom-legacy";
+const DEFAULT_TONE = "academic";
 const TONE_MARKER = "\u0000tone\u0000";
 
 export function promptStepOf(context: TaskContext): PromptStep {
@@ -95,7 +121,7 @@ export function promptStepOf(context: TaskContext): PromptStep {
   }
 }
 
-/** The choice today's request fields stand for: template, tone and format blocks, with the old style switches riding on the format. */
+/** The choice today's request fields stand for: a template and a tone block, with the old style switches riding on the template. */
 export function selectionFromContext(context: TaskContext, language: ContentLanguage): StyleSelection {
   const templateId = context.detailTemplate?.id ?? standardTemplate(noteLanguageOf(language)).id;
   const toneText = context.toneText;
@@ -105,10 +131,79 @@ export function selectionFromContext(context: TaskContext, language: ContentLang
       )
     : undefined;
   return {
-    template: { id: templateId, ...(context.detailFormat === "adaptive" ? { adaptive: true } : {}) },
-    ...(toneText ? { tone: builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText } } : {}),
-    format: { id: "standard-obsidian", ...(context.noteStyle ? { legacyPreferences: context.noteStyle } : {}) }
+    template: {
+      id: templateId,
+      ...(context.detailFormat === "adaptive" ? { adaptive: true } : {}),
+      ...(context.noteStyle ? { legacyPreferences: context.noteStyle } : {})
+    },
+    tone: !toneText
+      ? { id: DEFAULT_TONE }
+      : builtinTone
+        ? { id: builtinTone }
+        : { id: CUSTOM_LEGACY_TONE, body: toneText }
   };
+}
+
+/** What the template choice contributes: its sections text, and its format rules text (empty when the template has none). */
+interface TemplateParts {
+  readonly sections: string;
+  readonly format: string;
+}
+
+/**
+ * Resolves the template choice. A built-in template that is not modified (no body, or a body equal to the built-in
+ * text) takes today's path: today's template object and format fragment. A modified body goes through the parser.
+ */
+function templateParts(
+  selection: StyleSelection,
+  context: TaskContext,
+  language: ContentLanguage,
+  topicAnchor: FollowAnchor,
+  options: AssembleOptions
+): TemplateParts {
+  const { id } = selection.template;
+  const legacy = context.detailTemplate?.id === id;
+  const body = selection.template.body ?? options.blocks?.[`template/${id}`]?.(language);
+  // Without a body the id must be a built-in (or the request's own old template); a body may belong to any id.
+  const builtin =
+    legacy || body !== undefined
+      ? BUILTIN_BLOCKS.find(block => block.category === "template" && block.id === id)
+      : findBuiltinBlock("template", id);
+  const unmodified =
+    body === undefined ||
+    (builtin !== undefined && normalizeStyleContent(body) === normalizeStyleContent(builtinTemplateText(id, language)));
+  const structure = (template: DetailTemplate) =>
+    detailStructurePrompt(template, language, headings => detailStructure(language, headings), topicAnchor);
+  if (unmodified) {
+    const today =
+      context.detailTemplate ?? (id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language));
+    return { sections: structure(today), format: inLanguage(OBSIDIAN_FORMAT, language) };
+  }
+  const parsed = parseTemplateBlock(body, { id, name: id });
+  if (!parsed.ok) {
+    const issue = parsed.issues[0];
+    throw new Error(`Template block ${id}: line ${issue.line}: ${issue.message}`);
+  }
+  return { sections: structure(parsed.template), format: parsed.format };
+}
+
+/** The format rules the prompt carries for the template: the zone with the old note style switches applied. */
+const formatText = (parts: TemplateParts, selection: StyleSelection, language: ContentLanguage): string =>
+  parts.format ? applyFormatPreferences(parts.format, language, selection.template.legacyPreferences) : "";
+
+const CHART_BLOCK = "```mermaid";
+
+/** Whether the template (sections and format rules, with the old switches applied) asks for a mermaid diagram. */
+export function chartsWanted(
+  selection: StyleSelection,
+  context: TaskContext,
+  language: ContentLanguage,
+  options: AssembleOptions = {}
+): boolean {
+  const parts = templateParts(selection, context, language, { kind: "topic", text: context.title }, options);
+  // An adaptive detail has no fixed sections: only the format rules can ask for a chart.
+  const sections = selection.template.adaptive ? "" : parts.sections;
+  return sections.includes(CHART_BLOCK) || formatText(parts, selection, language).includes(CHART_BLOCK);
 }
 
 type Piece = readonly [string, SegmentSource];
@@ -158,7 +253,7 @@ export function assembleTaskPrompt(
     )
   );
   add(fixed(withProviderOutput(inLanguage(JSON_CONTRACT, language), provider, language), "json-contract"));
-  if (selection.tone) {
+  {
     const body = selection.tone.body ?? bodyOf("tone", selection.tone.id);
     // An empty tone body (academic rigor) adds nothing, not even the tone rule sentence.
     if (body) {
@@ -170,26 +265,19 @@ export function assembleTaskPrompt(
   add(fixed(inLanguage(modeFragment, language), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
+    const parts = templateParts(selection, context, language, topicAnchor, options);
     const pieces: Piece[] = [];
+    const sections = (text: string): Piece => [
+      text,
+      { kind: "block", category: "template", id: selection.template.id, part: "sections" }
+    ];
     if (selection.template.adaptive)
       pieces.push(fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language), "adaptive-detail-structure"));
-    else {
-      const template =
-        context.detailTemplate ??
-        (selection.template.id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language));
-      pieces.push([
-        detailStructurePrompt(template, language, headings => detailStructure(language, headings), topicAnchor),
-        { kind: "block", category: "template", id: selection.template.id }
-      ]);
-    }
+    else pieces.push(sections(parts.sections));
     // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
     if (readerFacingDetail(context) && step !== "merge") {
-      const text = applyFormatPreferences(
-        bodyOf("format", selection.format.id),
-        language,
-        selection.format.legacyPreferences
-      );
-      if (text) pieces.push([text, { kind: "block", category: "format", id: selection.format.id }]);
+      const text = formatText(parts, selection, language);
+      if (text) pieces.push([text, { kind: "block", category: "template", id: selection.template.id, part: "format" }]);
     }
     add(...withSeparators(pieces));
   }
@@ -219,10 +307,14 @@ export function assembleTaskPrompt(
     if (index > 0) segments.push({ text: "\n\n", source: { kind: "separator" } });
     for (const [text, source] of pieces) if (text) segments.push({ text, source });
   });
-  return { text: segments.map(segment => segment.text).join(""), segments };
+  return {
+    text: segments.map(segment => segment.text).join(""),
+    segments,
+    charts: chartsWanted(selection, context, language, options)
+  };
 }
 
-/** The pieces of one element joined by the template-to-format blank line. */
+/** The pieces of one element joined by the sections-to-format blank line. */
 function withSeparators(pieces: Piece[]): Piece[] {
   return pieces.flatMap((piece, index): Piece[] => (index > 0 ? [["\n\n", { kind: "separator" }], piece] : [piece]));
 }

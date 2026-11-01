@@ -1,11 +1,6 @@
-import { translate } from "../../i18n";
+import { translate, type ContentLanguage } from "../../i18n";
 import { fencedLines } from "../../ai/markdown-blocks";
-import {
-  CANONICAL_LANGUAGES,
-  parseNoteStyleFile,
-  type NoteStyleIssue,
-  type NoteStyleLanguage
-} from "../../ai/note-style-file";
+import { CANONICAL_LANGUAGES, parseNoteStyleFile, type NoteStyleIssue } from "../../ai/note-style-file";
 import type { DetailTemplate } from "../../ai/detail-templates";
 
 /**
@@ -16,7 +11,7 @@ import type { DetailTemplate } from "../../ai/detail-templates";
 const FORMAT_HEADING_KEY = "ui.block_template_format_heading";
 
 /** The format rules heading line in `language`, without the leading "# ". */
-export function templateFormatHeading(language: NoteStyleLanguage): string {
+export function templateFormatHeading(language: ContentLanguage): string {
   return translate(language, FORMAT_HEADING_KEY);
 }
 

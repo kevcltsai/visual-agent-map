@@ -11,12 +11,6 @@ export { translate } from "./i18n";
 `);
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
 
-test('standard Obsidian format block equals the format fragment in all three languages', () => {
-  for (const language of LANGUAGES) {
-    assert.equal(M.lookupBuiltinBlock('format', 'standard-obsidian', language), M.inLanguage(M.OBSIDIAN_FORMAT, language));
-  }
-});
-
 test('academic rigor tone block is empty; the other tones equal the built-in tone presets', () => {
   for (const language of LANGUAGES) {
     assert.equal(M.lookupBuiltinBlock('tone', 'academic', language), '');
@@ -25,24 +19,6 @@ test('academic rigor tone block is empty; the other tones equal the built-in ton
       assert.ok(preset.text.length > 0);
       assert.equal(M.lookupBuiltinBlock('tone', id, language), preset.text);
     }
-  }
-});
-
-test('plain text format has no callout, mermaid, task list or highlight syntax and keeps the shared rules', () => {
-  for (const language of LANGUAGES) {
-    const body = M.lookupBuiltinBlock('format', 'plain-text', language);
-    for (const banned of ['[!', 'mermaid', '- [ ]', '==']) assert.equal(body.includes(banned), false, `${language}: ${banned}`);
-    assert.ok(body.includes('####'));
-    assert.ok(body.endsWith('\\]`。') || body.endsWith('\\]`.'));
-  }
-});
-
-test('plain text rules are verbatim lines of the standard format rules', () => {
-  for (const language of LANGUAGES) {
-    const standard = M.lookupBuiltinBlock('format', 'standard-obsidian', language);
-    const rules = M.lookupBuiltinBlock('format', 'plain-text', language).split('\n').filter(line => /^\d\. /.test(line));
-    assert.equal(rules.length, 5);
-    for (const rule of rules) assert.ok(standard.includes(rule.replace(/^\d\. /, '')), rule);
   }
 });
 
@@ -55,8 +31,9 @@ test('template blocks are registered with names; every block has a name in all l
 });
 
 test('an unknown block id or category throws instead of returning an empty body', () => {
-  assert.throws(() => M.lookupBuiltinBlock('format', 'nope', 'en'), /Unknown built-in block/);
-  assert.throws(() => M.lookupBuiltinBlock('tone', 'standard-obsidian', 'en'), /Unknown built-in block/);
+  assert.throws(() => M.lookupBuiltinBlock('template', 'nope', 'en'), /Unknown built-in block/);
+  assert.throws(() => M.lookupBuiltinBlock('tone', 'standard', 'en'), /Unknown built-in block/);
+  assert.throws(() => M.lookupBuiltinBlock('format', 'standard-obsidian', 'en'), /Unknown built-in block/);
 });
 
 // P2: the assembler behind the regular task prompt. Loaded lazily so a missing module fails only these tests.
@@ -65,7 +42,13 @@ const A = () => assemblerModule ??= loadSource(`
 export { assembleTaskPrompt, promptStepOf, selectionFromContext } from "./core/steps/task/assemble";
 export { generalTaskPrompt } from "./core/steps/task/render";
 export { JSON_CONTRACT, GENERAL_TASK } from "./core/steps/task/fragments";
-export { ROLE, SOURCE_SAFETY, withProviderOutput, inLanguage, toneBlock } from "./core/steps/_shared/fragments";
+export { ROLE, SOURCE_SAFETY, withProviderOutput, inLanguage, toneBlock, OBSIDIAN_FORMAT } from "./core/steps/_shared/fragments";
+export { builtinTemplateText } from "./core/blocks/builtin";
+export { chartsWanted } from "./core/steps/task/assemble";
+export { parseTemplateBlock } from "./core/blocks/template-block";
+export { detailStructurePrompt, standardTemplate, textbookTemplate } from "./ai/detail-templates";
+export { detailStructure } from "./core/steps/task/fragments";
+export { noteLanguageOf } from "./i18n";
 `);
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 const STEP_CONTEXTS = {
@@ -78,31 +61,37 @@ const STEP_CONTEXTS = {
 const stepContexts = language => Object.entries(STEP_CONTEXTS).map(([name, context]) => [name, { ...context, outputLanguage: language }]);
 const dropSummaryLine = body => body.split('\n').filter(line => !line.includes('[!summary]')).join('\n');
 
-test('counter 1: a format block without the summary line produces prompts without [!summary] and keeps the other lines', () => {
+test('counter 1: a template whose format rules lack the summary line produces prompts without [!summary] and keeps the other lines', () => {
   const m = A();
   for (const language of LANGUAGES) {
-    const body = dropSummaryLine(M.lookupBuiltinBlock('format', 'standard-obsidian', language));
-    assert.notEqual(body, M.lookupBuiltinBlock('format', 'standard-obsidian', language));
-    const blocks = { 'format/standard-obsidian': () => body };
+    const full = m.builtinTemplateText('standard', language);
+    const edited = dropSummaryLine(full);
+    assert.notEqual(edited, full);
+    const format = m.parseTemplateBlock(edited, { id: 'standard', name: 'standard' }).format;
+    const blocks = { 'template/standard': () => edited };
     for (const [name, context] of stepContexts(language)) {
-      const { text } = m.assembleTaskPrompt(m.selectionFromContext(context, language), m.promptStepOf(context), context, language, 'codex', { blocks });
+      const { text, segments } = m.assembleTaskPrompt(m.selectionFromContext(context, language), m.promptStepOf(context), context, language, 'codex', { blocks });
       assert.equal(text.includes('[!summary]'), false, `${language} ${name}`);
       if (name !== 'decompose' && name !== 'merge') {
-        assert.ok(text.includes(body), `${language} ${name}: the other format lines stay`);
+        assert.ok(text.includes(format), `${language} ${name}: the other format lines stay`);
         assert.ok(text.includes('[!warning]'), `${language} ${name}`);
+        assert.ok(segments.some(s => s.source.kind === 'block' && s.source.part === 'format'), `${language} ${name}`);
       }
     }
   }
 });
 
-test('counter 2: the plain text format carries no callout, mermaid, task list or highlight syntax; the fixed parts stay', () => {
+test('counter 2: a template without a format rules zone carries no format segment, no callout, mermaid, task list or highlight syntax; the fixed parts stay', () => {
   const m = A();
   for (const language of LANGUAGES) {
+    const sectionsOnly = m.builtinTemplateText('standard', language).split(`\n\n# ${M.translate(language, 'ui.block_template_format_heading')}`)[0];
     for (const [name, context] of stepContexts(language).filter(([step]) => ['research', 'quick', 'synthesize'].includes(step))) {
-      const selection = { ...m.selectionFromContext(context, language), format: { id: 'plain-text' } };
-      const { text, segments } = m.assembleTaskPrompt(selection, m.promptStepOf(context), context, language);
-      for (const banned of ['[!', 'mermaid', '- [ ]', '==']) assert.equal(text.includes(banned), false, `${language} ${name}: ${banned}`);
-      assert.ok(text.includes(M.lookupBuiltinBlock('format', 'plain-text', language)));
+      const selection = { ...m.selectionFromContext(context, language), template: { id: 'standard', body: sectionsOnly } };
+      const { text, segments, charts } = m.assembleTaskPrompt(selection, m.promptStepOf(context), context, language);
+      for (const banned of ['[!', '```mermaid', '- [ ]', '==highlight==']) assert.equal(text.includes(banned), false, `${language} ${name}: ${banned}`);
+      assert.equal(segments.some(s => s.source.kind === 'block' && s.source.part === 'format'), false, `${language} ${name}`);
+      assert.ok(segments.some(s => s.source.kind === 'block' && s.source.part === 'sections'), `${language} ${name}`);
+      assert.equal(charts, false);
       for (const id of ['role', 'source-safety', 'json-contract', 'step']) assert.ok(segments.some(s => s.source.kind === 'fixed' && s.source.id === id), `${language} ${name}: ${id}`);
     }
   }
@@ -113,6 +102,7 @@ test('counter 3: the academic rigor tone equals no tone and adds no tone rule se
   for (const language of LANGUAGES) {
     for (const [name, context] of stepContexts(language)) {
       const none = m.assembleTaskPrompt(m.selectionFromContext(context, language), m.promptStepOf(context), context, language);
+      assert.equal(m.selectionFromContext(context, language).tone.id, 'academic');
       const selection = { ...m.selectionFromContext(context, language), tone: { id: 'academic' } };
       const academic = m.assembleTaskPrompt(selection, m.promptStepOf(context), context, language);
       assert.equal(academic.text, none.text, `${language} ${name}`);
@@ -136,8 +126,12 @@ test('counter 4: segments join into the text, none is empty, each has a source; 
             assert.ok(['block', 'fixed', 'input', 'separator'].includes(segment.source.kind));
           }
           const categories = segments.filter(s => s.source.kind === 'block').map(s => s.source.category);
-          if (context.mode === 'decompose') assert.equal(categories.filter(c => c === 'template' || c === 'format').length, 0);
-          if (context.mode === 'merge') assert.equal(categories.includes('format'), false);
+          const parts = segments.filter(s => s.source.kind === 'block' && s.source.category === 'template').map(s => s.source.part);
+          if (context.mode === 'decompose') assert.equal(categories.includes('template'), false);
+          else assert.ok(parts.includes('sections') || context.detailFormat === 'adaptive');
+          if (context.mode === 'merge') assert.equal(parts.join(), 'sections');
+          if (context.mode === 'synthesize' || context.mode === 'task') assert.ok(parts.includes('format'));
+          if (context.intermediateDetail) assert.equal(parts.includes('format'), false);
         }
       }
     }
@@ -168,7 +162,9 @@ test('counter 6: an unknown block id throws instead of leaving the prompt withou
   const m = A();
   const context = { ...base, outputLanguage: 'en' };
   const selection = m.selectionFromContext(context, 'en');
-  assert.throws(() => m.assembleTaskPrompt({ ...selection, format: { id: 'nope' } }, 'research', context, 'en'), /Unknown built-in block/);
+  assert.throws(() => m.assembleTaskPrompt({ ...selection, template: { id: 'nope' } }, 'research', context, 'en'), /Unknown built-in block/);
+  const broken = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+  assert.throws(() => m.assembleTaskPrompt({ ...selection, template: { id: 'standard', body: broken } }, 'research', context, 'en'), /line 5/i);
   assert.throws(() => m.assembleTaskPrompt({ ...selection, tone: { id: 'nope' } }, 'research', context, 'en'), /Unknown built-in block/);
 });
 
@@ -180,8 +176,12 @@ test('counter 7: selectionFromContext maps a known tone text to its built-in blo
     const custom = m.selectionFromContext({ ...base, toneText: 'my own voice' }, language).tone;
     assert.equal(custom.id, 'custom-legacy');
     assert.equal(custom.body, 'my own voice');
-    assert.equal(m.selectionFromContext(base, language).tone, undefined);
-    assert.equal(m.selectionFromContext(base, language).format.id, 'standard-obsidian');
+    assert.equal(m.selectionFromContext(base, language).tone.id, 'academic');
+    assert.equal(m.selectionFromContext(base, language).tone.body, undefined);
+    assert.equal('format' in m.selectionFromContext(base, language), false);
+    assert.equal(m.selectionFromContext(base, language).template.legacyPreferences, undefined);
+    const noteStyle = { callouts: 'placed', diagrams: false, tables: true, tasks: true, highlight: true };
+    assert.deepEqual(m.selectionFromContext({ ...base, noteStyle }, language).template.legacyPreferences, noteStyle);
     assert.equal(m.selectionFromContext({ ...base, detailFormat: 'adaptive' }, language).template.adaptive, true);
   }
 });
@@ -215,7 +215,6 @@ export { standardTemplate, textbookTemplate } from "./ai/detail-templates";
       assert.equal(reference.ok, true);
       const names = style => style.sections.map(section => section.name);
       assert.deepEqual(names(parsed.style), names(reference.style), `${id} ${language}`);
-      assert.equal(parsed.style.intro, reference.style.intro, `${id} ${language} intro`);
     }
   }
   for (const language of ['zh-TW', 'en']) {
@@ -244,10 +243,32 @@ test('counter 10: a built-in template text parses into the sections of today and
       assert.equal(parsed.ok, true, `${id} ${language} ${JSON.stringify(parsed.issues)}`);
       assert.equal(parsed.format, t.inLanguage(t.OBSIDIAN_FORMAT, language), `${id} ${language} format`);
       const today = (id === 'textbook' ? t.textbookTemplate : t.standardTemplate)(t.noteLanguageOf(language));
-      // The section files word the descriptions differently from today's built-in strings, so the structure (headings and
-      // roles) is compared; the unmodified built-in keeps today's wording by taking today's path in the assembler.
-      const shape = template => template.sections.map(section => `${section.name}|${section.role ?? ''}`).join();
+      // Decision 22: the section files carry today's wording, so every section field the prompt uses is equal.
+      const shape = template => JSON.stringify(template.sections.map(section => [section.name, section.description, section.role, section.count ?? null]));
       assert.equal(shape(parsed.template), shape(today), `${id} ${language} sections`);
+      assert.equal(parsed.template.layout === 'intro', false);
+    }
+  }
+});
+
+test('decision 22: the parsed built-in text gives the same prompt as today, in every step and language, taken through the parser', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    for (const provider of ['codex', 'claude']) {
+      for (const [name, context] of stepContexts(language)) {
+        const step = m.promptStepOf(context);
+        for (const id of ['standard', 'textbook']) {
+          const selection = { ...m.selectionFromContext(context, language), template: { id } };
+          const plain = m.assembleTaskPrompt(selection, step, context, language, provider);
+          const full = m.builtinTemplateText(id, language);
+          const withBody = m.assembleTaskPrompt({ ...selection, template: { id, body: full } }, step, context, language, provider);
+          assert.equal(withBody.text, plain.text, `${language} ${provider} ${name} ${id} (body = built-in text)`);
+          // A comment line makes the text differ from the built-in, so the assembler must parse it; the parser drops the comment.
+          const parsedPath = m.assembleTaskPrompt({ ...selection, template: { id, body: `%% note %%\n${full}` } }, step, context, language, provider);
+          assert.equal(parsedPath.text, plain.text, `${language} ${provider} ${name} ${id} (parsed path)`);
+          assert.equal(JSON.stringify(parsedPath.segments), JSON.stringify(plain.segments));
+        }
+      }
     }
   }
 });
@@ -281,4 +302,19 @@ test('Q1: the sections zone keeps original line numbers in parse issues', () => 
   const t = T();
   const parsed = t.parseTemplateBlock('## A\n數量: x\nbody\n', { id: 'x', name: 'x' });
   if (!parsed.ok) assert.ok(parsed.issues.every(issue => issue.line >= 1));
+});
+
+test('charts: the prompt asks for charts exactly when the template text holds a mermaid code block', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    const context = { ...base, outputLanguage: language };
+    const selection = m.selectionFromContext(context, language);
+    assert.equal(m.assembleTaskPrompt(selection, 'research', context, language).charts, true, language);
+    const without = m.builtinTemplateText('standard', language).split(`\n\n# ${M.translate(language, 'ui.block_template_format_heading')}`)[0];
+    assert.equal(m.assembleTaskPrompt({ ...selection, template: { id: 'standard', body: without } }, 'research', context, language).charts, false, language);
+    assert.equal(m.chartsWanted({ ...selection, template: { id: 'standard', body: without } }, context, language), false);
+    assert.equal(m.chartsWanted(selection, context, language), true);
+    const off = { ...selection, template: { ...selection.template, legacyPreferences: { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true } } };
+    assert.equal(m.chartsWanted(off, context, language), false, `${language}: diagrams off removes the mermaid line`);
+  }
 });

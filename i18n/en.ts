@@ -1537,8 +1537,6 @@ export const en = {
   "ui.note_style_standard_short": "Standard",
   "ui.note_style_textbook": "Textbook (intro, then sections)",
   "ui.note_style_textbook_short": "Textbook",
-  "ui.block_format_standard": "Standard Obsidian format",
-  "ui.block_format_plain": "Plain text",
   "ui.block_template_format_heading": "Format rules",
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",

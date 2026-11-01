@@ -196,3 +196,31 @@ test('counter 8: promptStepOf covers all six values; a quick count repair is a r
   assert.equal(m.promptStepOf({ ...base, mode: undefined }), 'default');
   assert.equal(m.promptStepOf({ ...STEP_CONTEXTS.quick, countRepair: true }), 'research');
 });
+
+test('P3: every template block parses as a note style file and has the canonical v2 section headings', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const S = loadSource(`
+export { parseNoteStyleFile } from "./ai/note-style-file";
+export { standardTemplate, textbookTemplate } from "./ai/detail-templates";
+`);
+  for (const id of ['standard', 'textbook']) {
+    for (const language of LANGUAGES) {
+      const body = M.lookupBuiltinBlock('template', id, language);
+      const parsed = S.parseNoteStyleFile(body, { id, name: id });
+      assert.equal(parsed.ok, true, `${id} ${language} ${JSON.stringify(parsed.issues)}`);
+      assert.equal(/tone:|語氣|语气|%%/.test(body), false, `${id} ${language} keeps no switch or comment`);
+      const canonical = fs.readFileSync(path.join(__dirname, '..', 'core', 'note-styles', 'canonical', 'v2', `${id}.${language}.md`), 'utf8');
+      const reference = S.parseNoteStyleFile(canonical, { id, name: id });
+      assert.equal(reference.ok, true);
+      const names = style => style.sections.map(section => section.name);
+      assert.deepEqual(names(parsed.style), names(reference.style), `${id} ${language}`);
+      assert.equal(parsed.style.intro, reference.style.intro, `${id} ${language} intro`);
+    }
+  }
+  for (const language of ['zh-TW', 'en']) {
+    const standard = S.parseNoteStyleFile(M.lookupBuiltinBlock('template', 'standard', language), { id: 's', name: 's' });
+    const names = standard.style.sections.map(section => section.name);
+    assert.deepEqual(names, S.standardTemplate(language).sections.map(section => section.name), language);
+  }
+});

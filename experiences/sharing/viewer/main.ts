@@ -562,6 +562,26 @@ export function startViewer(doc: Document): void {
       maxX = Math.max(maxX, el.offsetLeft + (el.offsetWidth || 300));
       maxY = Math.max(maxY, el.offsetTop + (el.offsetHeight || 60));
     }
+    // Bracket text sits beyond the brace tip (summary-bracket decision #9); the side's CSS transform is applied by hand.
+    for (const el of Array.from(summaryLayer.querySelectorAll<HTMLElement>(".vam-summary"))) {
+      const text = el.querySelector<HTMLElement>(".vam-summary-text");
+      if (!text) continue;
+      const x = parseFloat(text.style.left),
+        y = parseFloat(text.style.top),
+        w = text.offsetWidth,
+        h = text.offsetHeight;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const left = el.classList.contains("is-side-left")
+        ? x - w
+        : el.classList.contains("is-side-down") || el.classList.contains("is-side-up")
+          ? x - w / 2
+          : x;
+      const top = el.classList.contains("is-side-up") ? y - h : el.classList.contains("is-side-down") ? y : y - h / 2;
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + w);
+      maxY = Math.max(maxY, top + h);
+    }
     view = fitViewport(
       { minX, minY, maxX, maxY },
       { width: viewport.clientWidth, height: viewport.clientHeight },

@@ -115,3 +115,11 @@ function shape(side: BracketSide, e: BracketRect): BracketGeometry {
     extent: e
   };
 }
+
+/** The box the text covers once the side's CSS transform is applied (fit counts it, so narrow maps do not clip it). */
+export function summaryTextBox(side: BracketSide, label: { x: number; y: number }, w: number, h: number): BracketRect {
+  if (side === "left") return { x: label.x - w, y: label.y - h / 2, w, h };
+  if (side === "down") return { x: label.x - w / 2, y: label.y, w, h };
+  if (side === "up") return { x: label.x - w / 2, y: label.y - h, w, h };
+  return { x: label.x, y: label.y - h / 2, w, h };
+}

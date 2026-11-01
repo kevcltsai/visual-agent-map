@@ -42,7 +42,7 @@ import {
   type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
-import { bracketGeometry, type BracketRect, type BracketResult } from "./summary-bracket-geometry";
+import { bracketGeometry, summaryTextBox, type BracketRect, type BracketResult } from "./summary-bracket-geometry";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import {
   EXPORT_MAX_EDGE,
@@ -14558,6 +14558,15 @@ export class VisualAgentMapView extends ItemView {
       if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
       boxes.push({ x: text.x, y: text.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
     }
+    // Summary bracket text (summary-bracket decision #9): it sits beyond the brace tip and would be clipped otherwise.
+    for (const el of this.summaryEls.values()) {
+      const text = el.querySelector<HTMLElement>(".vam-summary-text");
+      const side = (["right", "left", "down", "up"] as const).find(each => el.hasClass(`is-side-${each}`));
+      if (!text || !side) continue;
+      const label = { x: parseFloat(text.style.left), y: parseFloat(text.style.top) };
+      if (!Number.isFinite(label.x) || !Number.isFinite(label.y)) continue;
+      boxes.push(summaryTextBox(side, label, text.offsetWidth, text.offsetHeight));
+    }
     const minX = Math.min(...boxes.map(b => b.x)),
       maxX = Math.max(...boxes.map(b => b.x + b.w));
     const minY = Math.min(...boxes.map(b => b.y)),
@@ -14593,6 +14602,8 @@ export class VisualAgentMapView extends ItemView {
         target.closest(".vam-node") ||
         target.closest(".vam-text-node") ||
         target.closest(".vam-boundary-label") ||
+        target.closest(".vam-summary") ||
+        target.closest(".vam-summary-text") ||
         target.closest(INTERACTIVE_SELECTOR) ||
         !this.map
       )

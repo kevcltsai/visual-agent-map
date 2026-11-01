@@ -346,3 +346,31 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
     assert.equal((await g.onDisk()).length, 1, mode);
   }
 });
+
+test('F1 pan: a pointerdown on the bracket or its text never starts a pan, so a real double-click reaches the text', () => {
+  const fs = require('node:fs');
+  const src = fs.readFileSync(require('node:path').join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const start = src.indexOf('viewport.addEventListener("pointerdown"');
+  assert.ok(start > 0);
+  const guard = src.slice(start, src.indexOf('canvasPointerIntent({', start));
+  for (const cls of ['.vam-summary', '.vam-summary-text', '.vam-boundary-label']) assert.ok(guard.includes(`target.closest("${cls}")`), cls);
+  // The text itself still opens the editor on dblclick (covered by the A3 edit test above).
+  assert.ok(src.includes('label.addEventListener("dblclick"'));
+});
+
+test('F2 fit: the text box of a bracket follows the side transform, and fit counts it (plugin and viewer)', () => {
+  const fs = require('node:fs');
+  const read = f => fs.readFileSync(require('node:path').join(__dirname, '..', f), 'utf8');
+  const at = { x: 100, y: 200 };
+  assert.deepEqual(plain(geometry.summaryTextBox('right', at, 200, 40)), { x: 100, y: 180, w: 200, h: 40 });
+  assert.deepEqual(plain(geometry.summaryTextBox('left', at, 200, 40)), { x: -100, y: 180, w: 200, h: 40 });
+  assert.deepEqual(plain(geometry.summaryTextBox('down', at, 200, 40)), { x: 0, y: 200, w: 200, h: 40 });
+  assert.deepEqual(plain(geometry.summaryTextBox('up', at, 200, 40)), { x: 0, y: 160, w: 200, h: 40 });
+  const view = read('experiences/visual-map/view.ts');
+  const fit = view.slice(view.indexOf('private fit(): void'), view.indexOf('private setupPan'));
+  assert.ok(fit.includes('summaryTextBox(') && fit.includes('this.summaryEls'));
+  const viewer = read('experiences/sharing/viewer/main.ts');
+  const viewerFit = viewer.slice(viewer.indexOf('function fit(): void'), viewer.indexOf('function center('));
+  assert.ok(viewerFit.includes('.vam-summary-text') && viewerFit.includes('is-side-left'));
+  assert.ok(!/import .*summary-bracket-geometry/.test(viewer));
+});

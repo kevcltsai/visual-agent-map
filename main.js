@@ -1502,6 +1502,30 @@ var en = {
   "ui.block_folder_tone": "Tones",
   "ui.block_folder_backup": "Backups",
   "ui.block_copy_name_0": "{0} copy",
+  "ui.block_picker_template": "Template",
+  "ui.block_picker_tone": "Tone",
+  "ui.block_picker_template_aria": "Note style template",
+  "ui.block_picker_tone_aria": "Note style tone",
+  "ui.block_open": "Open",
+  "ui.block_copy": "Copy",
+  "ui.block_restore": "Restore default",
+  "ui.block_modified_0": "{0} (modified)",
+  "ui.block_legacy_0": "{0} (old style file)",
+  "ui.block_status_modified": "Changed from the built-in text. Restore default saves a backup first, then brings back the built-in text.",
+  "ui.block_status_builtin_file": "Built-in, saved as a file with the built-in text. Restore default saves a backup and removes the file.",
+  "ui.block_status_builtin_none": "Built-in, no file yet. Restore default is off because there is nothing to restore.",
+  "ui.block_status_own": "Your own block. Restore default is off because it has no built-in version.",
+  "ui.block_status_issue_0_1_2": "{0} cannot be read (line {1}): {2} Runs use the built-in template instead.",
+  "ui.block_status_legacy_template": "The default is still an old style file. Choose a template to use blocks instead.",
+  "ui.block_status_legacy_tone": "The tone is off because the default is the old style file {0}, which sets its own tone. Choose a template to use blocks instead.",
+  "ui.block_notice_opened_0": "Opened {0}",
+  "ui.block_notice_copied_0": "Copied to {0}",
+  "ui.block_notice_restored_0": "Restored the built-in text. The earlier content is saved at {0}.",
+  "ui.block_notice_open_failed": "Cannot open this block. It may have been renamed or deleted.",
+  "ui.block_notice_copy_failed": "Cannot copy this block. Nothing was overwritten.",
+  "ui.block_notice_restore_not_available": "There is nothing to restore for this block.",
+  "ui.block_notice_restore_backup_failed": "Cannot save a backup, so the file was left as it is.",
+  "ui.block_notice_restore_failed": "Cannot restore this block. Check the Backups folder before trying again.",
   "ui.preview_step_research": "Research a topic",
   "ui.preview_step_quick": "Quick research",
   "ui.preview_step_decompose": "Break into subtopics",
@@ -3736,6 +3760,30 @@ var zhCN = {
   "ui.block_folder_tone": "\u8BED\u6C14",
   "ui.block_folder_backup": "\u5907\u4EFD",
   "ui.block_copy_name_0": "{0} \u526F\u672C",
+  "ui.block_picker_template": "\u6A21\u677F",
+  "ui.block_picker_tone": "\u8BED\u6C14",
+  "ui.block_picker_template_aria": "\u7B14\u8BB0\u98CE\u683C\u7684\u6A21\u677F",
+  "ui.block_picker_tone_aria": "\u7B14\u8BB0\u98CE\u683C\u7684\u8BED\u6C14",
+  "ui.block_open": "\u6253\u5F00",
+  "ui.block_copy": "\u590D\u5236",
+  "ui.block_restore": "\u6062\u590D\u9ED8\u8BA4",
+  "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
+  "ui.block_legacy_0": "{0}\uFF08\u65E7\u98CE\u683C\u6587\u4EF6\uFF09",
+  "ui.block_status_modified": "\u5DF2\u6539\u8FC7\u5185\u7F6E\u5185\u5BB9\u3002\u201C\u6062\u590D\u9ED8\u8BA4\u201D\u4F1A\u5148\u5907\u4EFD\uFF0C\u518D\u8FD8\u539F\u6210\u5185\u7F6E\u5185\u5BB9\u3002",
+  "ui.block_status_builtin_file": "\u5185\u7F6E\u79EF\u6728\uFF0C\u6587\u4EF6\u5185\u5BB9\u4E0E\u5185\u7F6E\u76F8\u540C\u3002\u201C\u6062\u590D\u9ED8\u8BA4\u201D\u4F1A\u5148\u5907\u4EFD\u518D\u79FB\u9664\u8FD9\u4E2A\u6587\u4EF6\u3002",
+  "ui.block_status_builtin_none": "\u5185\u7F6E\u79EF\u6728\uFF0C\u8FD8\u6CA1\u6709\u6587\u4EF6\u3002\u6CA1\u6709\u53EF\u8FD8\u539F\u7684\u5185\u5BB9\uFF0C\u6240\u4EE5\u201C\u6062\u590D\u9ED8\u8BA4\u201D\u5DF2\u505C\u7528\u3002",
+  "ui.block_status_own": "\u8FD9\u662F\u4F60\u81EA\u5DF1\u7684\u79EF\u6728\u3002\u6CA1\u6709\u5185\u7F6E\u7248\u672C\uFF0C\u6240\u4EE5\u201C\u6062\u590D\u9ED8\u8BA4\u201D\u5DF2\u505C\u7528\u3002",
+  "ui.block_status_issue_0_1_2": "\u201C{0}\u201D\u8BFB\u4E0D\u61C2\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u6267\u884C\u65F6\u6539\u7528\u5185\u7F6E\u6A21\u677F\u3002",
+  "ui.block_status_legacy_template": "\u5F53\u524D\u7684\u9ED8\u8BA4\u8FD8\u662F\u65E7\u98CE\u683C\u6587\u4EF6\u3002\u9009\u4E00\u4E2A\u6A21\u677F\u5C31\u4F1A\u6539\u7528\u79EF\u6728\u3002",
+  "ui.block_status_legacy_tone": "\u8BED\u6C14\u5DF2\u505C\u7528\uFF0C\u56E0\u4E3A\u9ED8\u8BA4\u662F\u65E7\u98CE\u683C\u6587\u4EF6 {0}\uFF0C\u8BED\u6C14\u7531\u5B83\u81EA\u5DF1\u51B3\u5B9A\u3002\u9009\u4E00\u4E2A\u6A21\u677F\u5C31\u4F1A\u6539\u7528\u79EF\u6728\u3002",
+  "ui.block_notice_opened_0": "\u5DF2\u6253\u5F00 {0}",
+  "ui.block_notice_copied_0": "\u5DF2\u590D\u5236\u5230 {0}",
+  "ui.block_notice_restored_0": "\u5DF2\u8FD8\u539F\u6210\u5185\u7F6E\u5185\u5BB9\u3002\u5148\u524D\u7684\u5185\u5BB9\u5DF2\u5907\u4EFD\u5728 {0}\u3002",
+  "ui.block_notice_open_failed": "\u65E0\u6CD5\u6253\u5F00\u8FD9\u4E2A\u79EF\u6728\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u5220\u9664\u3002",
+  "ui.block_notice_copy_failed": "\u65E0\u6CD5\u590D\u5236\u8FD9\u4E2A\u79EF\u6728\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u6587\u4EF6\u3002",
+  "ui.block_notice_restore_not_available": "\u8FD9\u4E2A\u79EF\u6728\u6CA1\u6709\u53EF\u8FD8\u539F\u7684\u5185\u5BB9\u3002",
+  "ui.block_notice_restore_backup_failed": "\u65E0\u6CD5\u5199\u5165\u5907\u4EFD\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u8FD9\u4E2A\u6587\u4EF6\u3002",
+  "ui.block_notice_restore_failed": "\u65E0\u6CD5\u8FD8\u539F\u8FD9\u4E2A\u79EF\u6728\u3002\u518D\u8BD5\u4E00\u6B21\u4E4B\u524D\uFF0C\u8BF7\u5148\u770B\u5907\u4EFD\u6587\u4EF6\u5939\u3002",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u9898",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u9898",
@@ -5970,6 +6018,30 @@ var zhTW = {
   "ui.block_folder_tone": "\u8A9E\u6C23",
   "ui.block_folder_backup": "\u5099\u4EFD",
   "ui.block_copy_name_0": "{0} \u526F\u672C",
+  "ui.block_picker_template": "\u6A21\u677F",
+  "ui.block_picker_tone": "\u8A9E\u6C23",
+  "ui.block_picker_template_aria": "\u7B46\u8A18\u98A8\u683C\u7684\u6A21\u677F",
+  "ui.block_picker_tone_aria": "\u7B46\u8A18\u98A8\u683C\u7684\u8A9E\u6C23",
+  "ui.block_open": "\u958B\u555F",
+  "ui.block_copy": "\u8907\u88FD",
+  "ui.block_restore": "\u6062\u5FA9\u9810\u8A2D",
+  "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
+  "ui.block_legacy_0": "{0}\uFF08\u820A\u98A8\u683C\u6A94\uFF09",
+  "ui.block_status_modified": "\u5DF2\u6539\u904E\u5167\u5EFA\u5167\u5BB9\u3002\u300C\u6062\u5FA9\u9810\u8A2D\u300D\u6703\u5148\u5099\u4EFD\uFF0C\u518D\u9084\u539F\u6210\u5167\u5EFA\u5167\u5BB9\u3002",
+  "ui.block_status_builtin_file": "\u5167\u5EFA\u7A4D\u6728\uFF0C\u6A94\u6848\u5167\u5BB9\u8207\u5167\u5EFA\u76F8\u540C\u3002\u300C\u6062\u5FA9\u9810\u8A2D\u300D\u6703\u5148\u5099\u4EFD\u518D\u79FB\u9664\u9019\u500B\u6A94\u6848\u3002",
+  "ui.block_status_builtin_none": "\u5167\u5EFA\u7A4D\u6728\uFF0C\u9084\u6C92\u6709\u6A94\u6848\u3002\u6C92\u6709\u53EF\u9084\u539F\u7684\u5167\u5BB9\uFF0C\u6240\u4EE5\u300C\u6062\u5FA9\u9810\u8A2D\u300D\u5DF2\u505C\u7528\u3002",
+  "ui.block_status_own": "\u9019\u662F\u4F60\u81EA\u5DF1\u7684\u7A4D\u6728\u3002\u6C92\u6709\u5167\u5EFA\u7248\u672C\uFF0C\u6240\u4EE5\u300C\u6062\u5FA9\u9810\u8A2D\u300D\u5DF2\u505C\u7528\u3002",
+  "ui.block_status_issue_0_1_2": "\u300C{0}\u300D\u8B80\u4E0D\u61C2\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u57F7\u884C\u6642\u6539\u7528\u5167\u5EFA\u6A21\u677F\u3002",
+  "ui.block_status_legacy_template": "\u76EE\u524D\u7684\u9810\u8A2D\u9084\u662F\u820A\u98A8\u683C\u6A94\u3002\u9078\u4E00\u500B\u6A21\u677F\u5C31\u6703\u6539\u7528\u7A4D\u6728\u3002",
+  "ui.block_status_legacy_tone": "\u8A9E\u6C23\u5DF2\u505C\u7528\uFF0C\u56E0\u70BA\u9810\u8A2D\u662F\u820A\u98A8\u683C\u6A94 {0}\uFF0C\u8A9E\u6C23\u7531\u5B83\u81EA\u5DF1\u6C7A\u5B9A\u3002\u9078\u4E00\u500B\u6A21\u677F\u5C31\u6703\u6539\u7528\u7A4D\u6728\u3002",
+  "ui.block_notice_opened_0": "\u5DF2\u958B\u555F {0}",
+  "ui.block_notice_copied_0": "\u5DF2\u8907\u88FD\u5230 {0}",
+  "ui.block_notice_restored_0": "\u5DF2\u9084\u539F\u6210\u5167\u5EFA\u5167\u5BB9\u3002\u5148\u524D\u7684\u5167\u5BB9\u5DF2\u5099\u4EFD\u5728 {0}\u3002",
+  "ui.block_notice_open_failed": "\u7121\u6CD5\u958B\u555F\u9019\u500B\u7A4D\u6728\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u522A\u9664\u3002",
+  "ui.block_notice_copy_failed": "\u7121\u6CD5\u8907\u88FD\u9019\u500B\u7A4D\u6728\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u6A94\u6848\u3002",
+  "ui.block_notice_restore_not_available": "\u9019\u500B\u7A4D\u6728\u6C92\u6709\u53EF\u9084\u539F\u7684\u5167\u5BB9\u3002",
+  "ui.block_notice_restore_backup_failed": "\u7121\u6CD5\u5BEB\u5165\u5099\u4EFD\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u9019\u500B\u6A94\u6848\u3002",
+  "ui.block_notice_restore_failed": "\u7121\u6CD5\u9084\u539F\u9019\u500B\u7A4D\u6728\u3002\u518D\u8A66\u4E00\u6B21\u4E4B\u524D\uFF0C\u8ACB\u5148\u770B\u5099\u4EFD\u8CC7\u6599\u593E\u3002",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u984C",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u984C",
@@ -62550,27 +62622,6 @@ function renderNoteStyleSetting(setting, plugin, refresh) {
       text11.inputEl.setAttr("aria-label", t("ui.note_style_folder_path"));
     });
   }
-  setting.addDropdown((dropdown) => {
-    const options = new Map(NOTE_STYLE_PRESETS.map((preset) => [preset.id, t(preset.name)]));
-    const fill2 = () => {
-      var _a2, _b2;
-      for (const item of store.list()) {
-        if (item.kind === "builtin" || item.issues.length) continue;
-        options.set(item.id, item.name);
-      }
-      for (const old of store.unexportedTemplates()) options.set(old.id, old.name);
-      dropdown.selectEl.replaceChildren();
-      for (const [id, name] of options) dropdown.addOption(id, name);
-      const current = (_b2 = (_a2 = settings.defaultNoteStyleId) != null ? _a2 : settings.defaultDetailTemplateId) != null ? _b2 : "standard";
-      dropdown.setValue(options.has(current) ? current : "standard");
-    };
-    fill2();
-    void store.refresh().then(fill2, () => void 0);
-    dropdown.onChange((value) => {
-      settings.defaultNoteStyleId = value;
-      void plugin.saveSettings();
-    });
-  });
   setting.addButton(
     (button) => button.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
       await plugin.openNoteStylesFolder();
@@ -62580,6 +62631,148 @@ function renderNoteStyleSetting(setting, plugin, refresh) {
   setting.addButton(
     (button) => button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl))
   );
+}
+var LEGACY_PICK = "legacy:";
+function shownBlocks(plugin) {
+  var _a2, _b2, _c, _d;
+  const { settings, noteStyles: store } = plugin;
+  const chosen = (_b2 = (_a2 = settings.defaultNoteStyleId) != null ? _a2 : settings.defaultDetailTemplateId) != null ? _b2 : "standard";
+  const preset = NOTE_STYLE_PRESETS.find((item) => item.id === chosen);
+  const standard = NOTE_STYLE_PRESETS[0];
+  const has = (category, ref) => ref !== void 0 && store.listBlocks(category).some((item) => item.ref === ref);
+  const keyed = settings.noteTemplateBlock;
+  let legacyName;
+  if (!keyed && !preset) {
+    const old = store.list().find((item) => item.kind !== "builtin" && item.id === chosen);
+    const unexported = store.unexportedTemplates().find((item) => item.id === chosen);
+    legacyName = (_d = (_c = old && "name" in old ? old.name : void 0) != null ? _c : unexported == null ? void 0 : unexported.name) != null ? _d : chosen.replace(/^style:/, "");
+  }
+  const template2 = keyed ? has("template", keyed) ? keyed : builtinRef(standard.templateId) : preset ? builtinRef(preset.templateId) : builtinRef(standard.templateId);
+  const toneKey = settings.noteToneBlock;
+  const tone2 = toneKey ? has("tone", toneKey) ? toneKey : builtinRef(standard.toneId) : builtinRef((preset != null ? preset : standard).toneId);
+  return {
+    template: legacyName === void 0 ? template2 : LEGACY_PICK,
+    tone: tone2,
+    ...legacyName !== void 0 ? { legacyName } : {}
+  };
+}
+function renderNoteBlockSetting(setting, plugin, category, refresh) {
+  const { settings, noteStyles: store } = plugin;
+  const isTemplate = category === "template";
+  const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
+  setting.setName(label);
+  setting.descEl.setAttr("aria-live", "polite");
+  let busy = false;
+  let picker;
+  let openButton;
+  let copyButton;
+  let restoreButton;
+  const lock = (button, disabled) => {
+    button == null ? void 0 : button.setDisabled(disabled);
+    button == null ? void 0 : button.buttonEl.setAttr("aria-disabled", String(disabled));
+  };
+  const render = () => {
+    var _a2, _b2, _c;
+    if (!picker) return;
+    const shown = shownBlocks(plugin);
+    const legacy = shown.legacyName !== void 0;
+    const items = store.listBlocks(category);
+    picker.selectEl.replaceChildren();
+    if (isTemplate && legacy) picker.addOption(LEGACY_PICK, t("ui.block_legacy_0", (_a2 = shown.legacyName) != null ? _a2 : ""));
+    for (const item2 of items)
+      picker.addOption(item2.ref, item2.modified ? t("ui.block_modified_0", item2.name) : item2.name);
+    const value = shown[category];
+    picker.setValue(value);
+    const item = items.find((entry) => entry.ref === value);
+    const restorable = !legacy && (item == null ? void 0 : item.kind) === "builtin" && item.fileName !== void 0;
+    picker.setDisabled(busy || !isTemplate && legacy);
+    lock(openButton, busy || legacy);
+    lock(copyButton, busy || legacy);
+    lock(restoreButton, busy || !restorable);
+    const parts = [];
+    if (legacy)
+      parts.push(
+        t(isTemplate ? "ui.block_status_legacy_template" : "ui.block_status_legacy_tone", (_b2 = shown.legacyName) != null ? _b2 : "")
+      );
+    else if (item) {
+      const issue2 = item.issues[0];
+      if (issue2)
+        parts.push(t("ui.block_status_issue_0_1_2", (_c = item.fileName) != null ? _c : item.name, issue2.line, styleIssueText(issue2)));
+      if (item.kind === "file") parts.push(t("ui.block_status_own"));
+      else if (item.modified) parts.push(t("ui.block_status_modified"));
+      else parts.push(t(item.fileName === void 0 ? "ui.block_status_builtin_none" : "ui.block_status_builtin_file"));
+    }
+    setting.setDesc(parts.join(" "));
+  };
+  const act = async (action, target) => {
+    var _a2;
+    if (busy) return;
+    busy = true;
+    render();
+    try {
+      const shown = shownBlocks(plugin);
+      if (shown.legacyName === void 0) {
+        settings.noteTemplateBlock = shown.template;
+        settings.noteToneBlock = shown.tone;
+        await plugin.saveSettings();
+        await action(shown[category]);
+      }
+    } catch (e) {
+    } finally {
+      busy = false;
+      render();
+      (_a2 = target()) == null ? void 0 : _a2.focus();
+    }
+  };
+  setting.addDropdown((dropdown) => {
+    picker = dropdown;
+    dropdown.selectEl.setAttr(
+      "aria-label",
+      t(isTemplate ? "ui.block_picker_template_aria" : "ui.block_picker_tone_aria")
+    );
+    dropdown.onChange(async (value) => {
+      const shown = shownBlocks(plugin);
+      if (value === LEGACY_PICK) {
+        delete settings.noteTemplateBlock;
+        delete settings.noteToneBlock;
+      } else {
+        settings.noteTemplateBlock = isTemplate ? value : shown.template;
+        settings.noteToneBlock = isTemplate ? shown.tone : value;
+      }
+      await plugin.saveSettings();
+      if (shown.legacyName !== void 0 || value === LEGACY_PICK) refresh();
+      else render();
+    });
+  });
+  setting.addButton((button) => {
+    openButton = button;
+    button.setButtonText(t("ui.block_open")).onClick(
+      () => act(
+        (ref) => plugin.openBlock(category, ref).then(() => void 0),
+        () => openButton == null ? void 0 : openButton.buttonEl
+      )
+    );
+  });
+  setting.addButton((button) => {
+    copyButton = button;
+    button.setButtonText(t("ui.block_copy")).onClick(
+      () => act(
+        (ref) => plugin.copyBlock(category, ref).then(() => void 0),
+        () => picker == null ? void 0 : picker.selectEl
+      )
+    );
+  });
+  setting.addButton((button) => {
+    restoreButton = button;
+    button.setButtonText(t("ui.block_restore")).onClick(
+      () => act(
+        (ref) => plugin.restoreBlock(category, ref).then(() => void 0),
+        () => (restoreButton == null ? void 0 : restoreButton.buttonEl.getAttribute("aria-disabled")) === "true" ? picker == null ? void 0 : picker.selectEl : restoreButton == null ? void 0 : restoreButton.buttonEl
+      )
+    );
+  });
+  render();
+  void store.refresh().then(render, () => void 0);
 }
 var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 var CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
@@ -62843,6 +63036,14 @@ var VisualAgentMapSettingTab = class extends import_obsidian34.PluginSettingTab 
       {
         name: t("ui.note_style"),
         render: (setting) => renderNoteStyleSetting(setting, this.plugin, () => this.update())
+      },
+      {
+        name: t("ui.block_picker_template"),
+        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "template", () => this.update())
+      },
+      {
+        name: t("ui.block_picker_tone"),
+        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.update())
       },
       {
         name: t("ui.tone_presets"),
@@ -70190,6 +70391,51 @@ ${t("ui.organize_link_wait_hint")}`;
       new import_obsidian41.Notice(error instanceof Error ? error.message : String(error));
       return null;
     }
+  }
+  /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
+  async openBlock(category, ref) {
+    try {
+      const { path } = await this.noteStyles.ensureBlockFile(category, ref);
+      const file = this.app.vault.getAbstractFileByPath((0, import_obsidian41.normalizePath)(path));
+      if (!(file instanceof import_obsidian41.TFile)) throw new Error("not a file");
+      await this.app.workspace.getLeaf("tab").openFile(file);
+      new import_obsidian41.Notice(t("ui.block_notice_opened_0", path));
+      return true;
+    } catch (e) {
+      new import_obsidian41.Notice(t("ui.block_notice_open_failed"));
+      return false;
+    }
+  }
+  /** Copies a block into a new file, which becomes the workspace's choice; it is not opened. Returns the new ref. */
+  async copyBlock(category, ref) {
+    try {
+      const created = await this.noteStyles.copyBlock(category, ref);
+      const { path } = await this.noteStyles.ensureBlockFile(category, created);
+      new import_obsidian41.Notice(t("ui.block_notice_copied_0", path));
+      return created;
+    } catch (e) {
+      new import_obsidian41.Notice(t("ui.block_notice_copy_failed"));
+      return null;
+    }
+  }
+  /** Restores a built-in block after saving a backup of its file; every refusal says why in a Notice. */
+  async restoreBlock(category, ref) {
+    try {
+      const result = await this.noteStyles.restoreBlock(category, ref);
+      if (result.ok) {
+        new import_obsidian41.Notice(t("ui.block_notice_restored_0", result.backup));
+        return true;
+      }
+      const reason = result.reason;
+      new import_obsidian41.Notice(
+        t(
+          reason === "backup-failed" ? "ui.block_notice_restore_backup_failed" : reason === "not-builtin" || reason === "no-override" ? "ui.block_notice_restore_not_available" : "ui.block_notice_restore_failed"
+        )
+      );
+    } catch (e) {
+      new import_obsidian41.Notice(t("ui.block_notice_restore_failed"));
+    }
+    return false;
   }
   async saveSettings() {
     await this.saveData(this.settings);

@@ -50,8 +50,60 @@ test('markers toggle does not mutate its input', () => {
 
 test('markers symbols and label keys: plain text for each id', () => {
   const symbols = own(m.TOPIC_MARKERS).map(m.markerSymbol);
-  assert.deepEqual(symbols, ['✓', '⚠', '★', 'P1', 'P2', 'P3']);
+  assert.deepEqual(symbols.slice(0, 6), ['✓', '⚠', '★', 'P1', 'P2', 'P3'], 'the first six symbols are unchanged');
+  assert.equal(new Set(symbols).size, symbols.length, 'symbols are unique');
+  for (const sym of symbols) assert.match(sym, /^[^<>&"'\s]+$/, 'plain text only');
   for (const id of own(m.TOPIC_MARKERS)) assert.match(m.markerLabelKey(id), /^share\.viewer_marker_[a-z0-9_]+$/);
   assert.equal(m.markerLabelKey('priority-2'), 'share.viewer_marker_priority_2');
-  assert.equal(new Set(own(m.TOPIC_MARKERS).map(m.markerLabelKey)).size, 6);
+  assert.equal(new Set(own(m.TOPIC_MARKERS).map(m.markerLabelKey)).size, own(m.TOPIC_MARKERS).length);
+  assert.equal(m.markerLabelKey('progress-25'), 'share.viewer_marker_progress_25');
+  assert.equal(m.markerLabelKey('flag-red'), 'share.viewer_marker_flag_red');
+});
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { loadSource } = require('./support-replay.cjs');
+const ids = own(m.TOPIC_MARKERS);
+
+test('markers: new ids, groups cover every id once', () => {
+  assert.deepEqual(ids.slice(0, 6), ['done', 'warning', 'star', 'priority-1', 'priority-2', 'priority-3'], 'the old six keep their order');
+  const grouped = own(m.TOPIC_MARKER_GROUPS).flatMap(g => own(g.ids));
+  assert.deepEqual(grouped.slice().sort(), ids.slice().sort());
+  assert.equal(m.markerGroup('priority-5'), 'priority');
+  assert.equal(m.markerGroup('progress-0'), 'progress');
+  assert.equal(m.markerGroup('flag-blue'), 'flag');
+  assert.equal(m.markerGroup('question'), 'face');
+  assert.equal(m.isSingleChoiceMarker('progress-50'), true);
+  assert.equal(m.isSingleChoiceMarker('flag-red'), false);
+  assert.equal(m.isSingleChoiceMarker('sad'), false);
+});
+
+test('markers read: a single-choice group shows only its first whitelisted value, others are kept', () => {
+  assert.deepEqual(own(m.readTopicMarkers({ 'topic-markers': ['priority-4', 'priority-1', 'progress-75', 'progress-25'] })), ['priority-1', 'progress-25']);
+  assert.deepEqual(own(m.readTopicMarkers({ 'topic-markers': ['sad', 'flag-blue', 'flag-red', 'smile'] })), ['flag-red', 'flag-blue', 'smile', 'sad']);
+  assert.deepEqual(own(m.readTopicMarkers({ 'topic-markers': ['Priority-4', 'FLAG-RED', 5, null, 'progress-30'] })), []);
+  const raw = ['priority-4', 'priority-1'];
+  m.readTopicMarkers({ 'topic-markers': raw });
+  assert.deepEqual(raw, ['priority-4', 'priority-1'], 'reading does not change the input');
+});
+
+test('markers toggle: priority and progress are single-choice per group, flags and faces accumulate', () => {
+  assert.deepEqual(own(m.toggleTopicMarker(['priority-1', 'priority-4', 'future-x'], 'priority-5')), ['future-x', 'priority-5'], 'old multi-value is cleared');
+  assert.deepEqual(own(m.toggleTopicMarker(['priority-2', 'progress-25'], 'progress-100')), ['priority-2', 'progress-100']);
+  assert.equal(m.toggleTopicMarker(['progress-50'], 'progress-50'), null);
+  assert.deepEqual(own(m.toggleTopicMarker(['flag-red', 'smile'], 'flag-blue')), ['flag-red', 'smile', 'flag-blue']);
+  assert.deepEqual(own(m.toggleTopicMarker(['flag-red', 'flag-blue'], 'flag-red')), ['flag-blue']);
+  assert.deepEqual(own(m.toggleTopicMarker(['smile'], 'sad')), ['smile', 'sad']);
+});
+
+test('markers compat: the 0.28 module reads a note with new ids without throwing and shows none of them', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'fixtures', 'legacy-topic-markers-0.28.ts.txt'), 'utf8');
+  const legacy = loadSource(`${source.replace(/import type[^\n]*\n/, 'type TranslationKey = string;\n')}\n`);
+  const fm = { 'topic-markers': ['priority-4', 'progress-50', 'flag-red', 'smile', 'star', 'priority-1', 'priority-3'] };
+  assert.deepEqual(own(legacy.readTopicMarkers(fm)), ['star', 'priority-1', 'priority-3'], '0.28 shows its own ids, including multi-value priority');
+  const next = legacy.toggleTopicMarker(fm['topic-markers'], 'done');
+  for (const id of ['priority-4', 'progress-50', 'flag-red', 'smile']) assert.ok(next.includes(id), `0.28 keeps ${id}`);
+  assert.deepEqual(own(legacy.toggleTopicMarker(fm['topic-markers'], 'priority-2')).filter(v => v.startsWith('priority')), ['priority-4', 'priority-2'], '0.28 only drops the priorities it knows');
+  // The current module reads the 0.28 multi-value result as the first priority only.
+  assert.deepEqual(own(m.readTopicMarkers({ 'topic-markers': ['priority-1', 'priority-3'] })), ['priority-1']);
 });

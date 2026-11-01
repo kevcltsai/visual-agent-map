@@ -1006,6 +1006,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "claude.task-merge.en": {
+      "builder": "AiTaskService instructions for Claude: mode merge, local",
+      "language": "en",
+      "schema": true
+    },
+    "claude.task-merge.zh": {
+      "builder": "AiTaskService instructions for Claude: mode merge, local",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "claude.task-merge.zh-CN": {
+      "builder": "AiTaskService instructions for Claude: mode merge, local",
+      "language": "zh-CN",
+      "schema": true
+    },
     "claude.task-quick.en": {
       "builder": "AiTaskService instructions for Claude: Quick AI mode research (StructuredOutput-first sentence, no tools)",
       "language": "en",
@@ -1381,6 +1396,111 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.decompose-style-file-callout-map.en": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-style-file-callout-map.zh": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-style-file-callout-map.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.decompose-style-file-callouts-placed.en": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-style-file-callouts-placed.zh": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-style-file-callouts-placed.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.decompose-style-file-format-off.en": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-style-file-format-off.zh": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-style-file-format-off.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.decompose-style-file-sections.en": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-style-file-sections.zh": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-style-file-sections.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.decompose-style-file-tables-off.en": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-style-file-tables-off.zh": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-style-file-tables-off.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.decompose-textbook.en": {
+      "builder": "AiTaskService instructions: mode decompose with the built-in Textbook template",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-textbook.zh": {
+      "builder": "AiTaskService instructions: mode decompose with the built-in Textbook template",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-textbook.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with the built-in Textbook template",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.decompose-tone.en": {
+      "builder": "AiTaskService instructions: mode decompose with a resolved tone text",
+      "language": "en",
+      "schema": true
+    },
+    "service.decompose-tone.zh": {
+      "builder": "AiTaskService instructions: mode decompose with a resolved tone text",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.decompose-tone.zh-CN": {
+      "builder": "AiTaskService instructions: mode decompose with a resolved tone text",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.default-adaptive.en": {
       "builder": "AiTaskService instructions: no mode, adaptive detail, no sources",
       "language": "en",
@@ -1393,6 +1513,366 @@
     },
     "service.default-adaptive.zh-CN": {
       "builder": "AiTaskService instructions: no mode, adaptive detail, no sources",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-callout-map.en.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-callout-map.en.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-callout-map.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-callout-map.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-callout-map.zh.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-callout-map.zh.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-callouts-placed.en.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-callouts-placed.en.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-callouts-placed.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-callouts-placed.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-callouts-placed.zh.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-callouts-placed.zh.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-format-off.en.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-format-off.en.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-format-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-format-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-format-off.zh.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-format-off.zh.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-sections.en.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-sections.en.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-sections.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-sections.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-sections.zh.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-sections.zh.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-tables-off.en.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-tables-off.en.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-style-file-tables-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-tables-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-style-file-tables-off.zh.1": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-style-file-tables-off.zh.2": {
+      "builder": "AiTaskService instructions: mode merge with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-textbook.en": {
+      "builder": "AiTaskService instructions: mode merge with the built-in Textbook template",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-textbook.zh": {
+      "builder": "AiTaskService instructions: mode merge with the built-in Textbook template",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-textbook.zh-CN": {
+      "builder": "AiTaskService instructions: mode merge with the built-in Textbook template",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.merge-tone.en": {
+      "builder": "AiTaskService instructions: mode merge with a resolved tone text",
+      "language": "en",
+      "schema": true
+    },
+    "service.merge-tone.zh": {
+      "builder": "AiTaskService instructions: mode merge with a resolved tone text",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.merge-tone.zh-CN": {
+      "builder": "AiTaskService instructions: mode merge with a resolved tone text",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-callout-map.en.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-callout-map.en.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-callout-map.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-callout-map.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-callout-map.zh.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-callout-map.zh.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-callouts-placed.en.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-callouts-placed.en.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-callouts-placed.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-callouts-placed.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-callouts-placed.zh.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-callouts-placed.zh.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-format-off.en.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-format-off.en.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-format-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-format-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-format-off.zh.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-format-off.zh.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-sections.en.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-sections.en.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-sections.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-sections.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-sections.zh.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-sections.zh.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-tables-off.en.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-tables-off.en.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-style-file-tables-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-tables-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-style-file-tables-off.zh.1": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-style-file-tables-off.zh.2": {
+      "builder": "AiTaskService instructions: mode quick with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-textbook.en": {
+      "builder": "AiTaskService instructions: mode quick with the built-in Textbook template",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-textbook.zh": {
+      "builder": "AiTaskService instructions: mode quick with the built-in Textbook template",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-textbook.zh-CN": {
+      "builder": "AiTaskService instructions: mode quick with the built-in Textbook template",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.quick-tone.en": {
+      "builder": "AiTaskService instructions: mode quick with a resolved tone text",
+      "language": "en",
+      "schema": true
+    },
+    "service.quick-tone.zh": {
+      "builder": "AiTaskService instructions: mode quick with a resolved tone text",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.quick-tone.zh-CN": {
+      "builder": "AiTaskService instructions: mode quick with a resolved tone text",
       "language": "zh-CN",
       "schema": true
     },
@@ -1441,6 +1921,156 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.synthesize-style-file-callout-map.en.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-callout-map.en.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-callout-map.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-callout-map.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-callout-map.zh.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-callout-map.zh.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file that remaps callouts",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-callouts-placed.en.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-callouts-placed.en.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed only",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-callouts-placed.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-callouts-placed.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed only",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-callouts-placed.zh.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-callouts-placed.zh.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed only",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-format-off.en.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-format-off.en.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-format-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-format-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-format-off.zh.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-format-off.zh.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with callouts placed, diagrams, tables, task lists and highlights off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-sections.en.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-sections.en.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file (sections)",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-sections.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-sections.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file (sections)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-sections.zh.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-sections.zh.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file (sections)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-tables-off.en.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-tables-off.en.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with tables off",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-style-file-tables-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-tables-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with tables off",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-style-file-tables-off.zh.1": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-style-file-tables-off.zh.2": {
+      "builder": "AiTaskService instructions: mode synthesize with a note style file with tables off",
+      "language": "zh-TW",
+      "schema": true
+    },
     "service.synthesize-summary-direction.en": {
       "builder": "AiTaskService instructions: mode synthesize with summary-bracket conclusion directions (summary-bracket P1, read-only)",
       "language": "en",
@@ -1456,6 +2086,51 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.synthesize-textbook.en": {
+      "builder": "AiTaskService instructions: mode synthesize with the built-in Textbook template",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-textbook.zh": {
+      "builder": "AiTaskService instructions: mode synthesize with the built-in Textbook template",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-textbook.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize with the built-in Textbook template",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.synthesize-tone.en": {
+      "builder": "AiTaskService instructions: mode synthesize with a resolved tone text",
+      "language": "en",
+      "schema": true
+    },
+    "service.synthesize-tone.zh": {
+      "builder": "AiTaskService instructions: mode synthesize with a resolved tone text",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.synthesize-tone.zh-CN": {
+      "builder": "AiTaskService instructions: mode synthesize with a resolved tone text",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-intermediate.en": {
+      "builder": "AiTaskService instructions: mode task with intermediate detail",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-intermediate.zh": {
+      "builder": "AiTaskService instructions: mode task with intermediate detail",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-intermediate.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with intermediate detail",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-local-fast.en": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
       "language": "en",
@@ -1468,6 +2143,21 @@
     },
     "service.task-local-fast.zh-CN": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-quick-count-repair.en": {
+      "builder": "AiTaskService instructions: Quick AI mode research with count repair",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-quick-count-repair.zh": {
+      "builder": "AiTaskService instructions: Quick AI mode research with count repair",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-quick-count-repair.zh-CN": {
+      "builder": "AiTaskService instructions: Quick AI mode research with count repair",
       "language": "zh-CN",
       "schema": true
     },
@@ -1501,6 +2191,66 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.task-style-file-callout-all-off.en.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (all four callout keys off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callout-all-off.en.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (all four callout keys off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callout-all-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (all four callout keys off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-callout-all-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (all four callout keys off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-callout-all-off.zh.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (all four callout keys off)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-callout-all-off.zh.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (all four callout keys off)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-callout-map-placed.en.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only plus remapped keys)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callout-map-placed.en.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only plus remapped keys)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callout-map-placed.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only plus remapped keys)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-callout-map-placed.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only plus remapped keys)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-callout-map-placed.zh.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only plus remapped keys)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-callout-map-placed.zh.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only plus remapped keys)",
+      "language": "zh-TW",
+      "schema": true
+    },
     "service.task-style-file-callout-map.en": {
       "builder": "AiTaskService instructions: mode task with a note style file that remaps the summary, risk and tip callouts and turns the question callout off",
       "language": "en",
@@ -1516,6 +2266,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.task-style-file-callouts-placed.en.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callouts-placed.en.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callouts-placed.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-callouts-placed.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-callouts-placed.zh.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-callouts-placed.zh.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (callouts placed only)",
+      "language": "zh-TW",
+      "schema": true
+    },
     "service.task-style-file-format-off.en": {
       "builder": "AiTaskService instructions: mode task with a note style file that turns callouts (placed only), diagrams, tables, task lists and highlights off",
       "language": "en",
@@ -1529,6 +2309,36 @@
     "service.task-style-file-format-off.zh-CN": {
       "builder": "AiTaskService instructions: mode task with a note style file that turns callouts (placed only), diagrams, tables, task lists and highlights off",
       "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-highlight-off.en.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (highlights off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-highlight-off.en.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (highlights off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-highlight-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (highlights off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-highlight-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (highlights off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-highlight-off.zh.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (highlights off)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-highlight-off.zh.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (highlights off)",
+      "language": "zh-TW",
       "schema": true
     },
     "service.task-style-file-intro.en": {
@@ -1573,6 +2383,66 @@
     },
     "service.task-style-file-sections.zh.2": {
       "builder": "AiTaskService instructions: mode task with a parsed note style file (sections layout, count, callout instruction, sources and log roles)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-tables-off.en.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (tables off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-tables-off.en.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (tables off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-tables-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (tables off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-tables-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (tables off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-tables-off.zh.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (tables off)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-tables-off.zh.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (tables off)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-tasks-off.en.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (task lists off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-tasks-off.en.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (task lists off)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-tasks-off.zh-CN.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (task lists off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-tasks-off.zh-CN.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (task lists off)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-style-file-tasks-off.zh.1": {
+      "builder": "AiTaskService instructions: mode task with a note style file (task lists off)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-tasks-off.zh.2": {
+      "builder": "AiTaskService instructions: mode task with a note style file (task lists off)",
       "language": "zh-TW",
       "schema": true
     },

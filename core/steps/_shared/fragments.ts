@@ -216,7 +216,16 @@ const FORMAT_ITEM_NAMES = {
  * Rules 1-10 are never touched.
  */
 export function obsidianFormat(language: ContentLanguage, preferences?: FormatPreferences): string {
-  const original = inLanguage(OBSIDIAN_FORMAT, language);
+  return applyFormatPreferences(inLanguage(OBSIDIAN_FORMAT, language), language, preferences);
+}
+
+/** {@link obsidianFormat} over any format block body: the lines of syntaxes the preferences switch off are removed. */
+export function applyFormatPreferences(
+  body: string,
+  language: ContentLanguage,
+  preferences?: FormatPreferences
+): string {
+  const original = body;
   if (!preferences) return original;
   const { callouts, diagrams, tables, tasks, highlight } = preferences;
   const placed = callouts === "placed";

@@ -49214,7 +49214,10 @@ ${request.requirements}` : preset.text,
       (run) => run.attempts.some((attempt) => attempt.status === "running" || attempt.status === "saving")
     ));
   }
-  /** After "Organize workspace folders" moved maps: follow the open map to its new path (the next synchronize reloads it). */
+  /**
+   * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the
+   * next synchronize reloads it).
+   */
   relocate(moved) {
     const next = moved.get(this.path);
     if (!next) return;
@@ -69020,6 +69023,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         if (!(file instanceof import_obsidian40.TFile) || !this.repo.renameAffectsVam(file, oldPath)) return;
         if (file.path === oldPath) return;
         const external = !this.writing;
+        if (external) for (const view of this.views()) view.relocate(/* @__PURE__ */ new Map([[oldPath, file.path]]));
         this.runMutation(async () => {
           var _a2;
           await this.repo.replaceSourcePath(oldPath, file.path);

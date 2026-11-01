@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { integrationTest, load, core, map, plain, obsidian, fixture, DEFAULT_SETTINGS } = require('../support.cjs');
+const { integrationTest, load, core, map, plain, obsidian, fixture, DEFAULT_SETTINGS, TFile } = require('../support.cjs');
 const repository = load('repository.ts', { obsidian });
 const { createAimMap } = load('experiences/aim/create-map.ts');
 const newAim = async (repo, topic) => (await createAimMap(repo, 'gpt-6-luna', { requestId: `req-${topic}`, topic, context: '' })).mapPath;
@@ -838,4 +838,36 @@ integrationTest('a folder whose disk listing fails is skipped', async () => {
   vault.app.vault.adapter.list = async () => { throw new Error('no listing'); };
   assert.deepEqual(plain(await vault.repo.removeEmptyLegacyFolders()), []);
   assert.deepEqual(plain(vault.trashed), []);
+});
+
+integrationTest('renaming an open map folder in the file explorer keeps the map open, whatever order the file events arrive in', async () => {
+  const { app, repo, files } = fixture('en');
+  const mapPath = await repo.createMap('Golf');
+  const doc = await repo.readMap(mapPath);
+  for (const title of ['Grip', 'Stance']) doc.nodes.push(await repo.createNote(title, 'model-a', doc, mapPath, 'workspace'));
+  await repo.saveMap(mapPath, doc);
+  const handlers = {};
+  app.vault.on = (name, handler) => { handlers[name] = handler; return {}; };
+  app.workspace = { getLeavesOfType: () => [] };
+  const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian });
+  const plugin = new Plugin();
+  Object.assign(plugin, { app, repo, settings: repo.settings, registerEvent: () => {} });
+  // The real view's relocate/renamed/synchronize with drawing stubbed out.
+  const view = Object.assign(Object.create(VisualAgentMapView.prototype), {
+    app, plugin, path: mapPath, map: await repo.readMap(mapPath), notes: new Map(), closed: false, syncHold: 0, dragging: false,
+    history: { clear() {} }, render() {}, hydrate: async () => {}, restoreCrossProxies() {}, typingInField: () => false
+  });
+  plugin.views = () => [view];
+  plugin.registerVaultEvents();
+  const root = 'Agent Workspace/Mind Maps/Golf', moved = 'Agent Workspace/Mind Maps/Golf swing';
+  const oldPaths = [...files.keys()].filter(path => path.startsWith(`${root}/`) && files.get(path) instanceof TFile);
+  await app.fileManager.renameFile(files.get(root), moved);
+  // Obsidian reports each moved file; here the notes come before Map.md, the order that closed the map.
+  for (const old of oldPaths.sort((a, b) => Number(a.endsWith('/Map.md')) - Number(b.endsWith('/Map.md'))))
+    handlers.rename(files.get(`${moved}${old.slice(root.length)}`), old);
+  await plugin.queue;
+  assert.equal(view.path, `${moved}/Map.md`);
+  assert.ok(view.map, 'the map stays open');
+  assert.deepEqual(plain(view.map.nodes.map(node => node.path.startsWith(`${moved}/`))), [true, true]);
+  assert.deepEqual(plain((await repo.readMap(`${moved}/Map.md`)).nodes.map(node => node.path.startsWith(`${moved}/`))), [true, true]);
 });

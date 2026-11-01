@@ -1649,6 +1649,7 @@ export const en = {
   "ui.note_style_issue_frontmatter_unclosed": "The frontmatter opened by --- on line 1 is never closed.",
   "ui.note_style_issue_frontmatter_line": 'This line is not written as "key: value".',
   "ui.note_style_issue_value_invalid": '"{1}" is not a valid value for "{0}".',
+  "ui.note_style_issue_key_duplicate": "The same key is written more than once.",
   "ui.note_style_issue_no_sections": "The file has no ## section.",
   "ui.note_style_issue_count_invalid": "The count is not a number.",
   "ui.note_style_issue_comment_unclosed": "A %% comment is never closed.",

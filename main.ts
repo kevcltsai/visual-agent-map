@@ -6,6 +6,7 @@ import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/t
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
+import { errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { selectionOutputLanguage } from "./experiences/aim/content-language";
@@ -342,7 +343,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       const message = error instanceof Error ? error.message : String(error);
       this.logs.appendLog("error", t("log.operation_failed_0", message));
       console.error("Visual Agent Map", error);
-      new Notice(message);
+      errorNotice(error);
     });
     return result;
   }

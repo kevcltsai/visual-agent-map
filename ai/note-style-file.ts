@@ -16,6 +16,21 @@ import Plainen from "../core/note-styles/canonical/v1/plain.en.md";
 import GuidezhTW from "../core/note-styles/canonical/v1/guide.zh-TW.md";
 import GuidezhCN from "../core/note-styles/canonical/v1/guide.zh-CN.md";
 import Guideen from "../core/note-styles/canonical/v1/guide.en.md";
+import StandardzhTWV2 from "../core/note-styles/canonical/v2/standard.zh-TW.md";
+import StandardzhCNV2 from "../core/note-styles/canonical/v2/standard.zh-CN.md";
+import StandardenV2 from "../core/note-styles/canonical/v2/standard.en.md";
+import TextbookzhTWV2 from "../core/note-styles/canonical/v2/textbook.zh-TW.md";
+import TextbookzhCNV2 from "../core/note-styles/canonical/v2/textbook.zh-CN.md";
+import TextbookenV2 from "../core/note-styles/canonical/v2/textbook.en.md";
+import SummaryzhTWV2 from "../core/note-styles/canonical/v2/summary.zh-TW.md";
+import SummaryzhCNV2 from "../core/note-styles/canonical/v2/summary.zh-CN.md";
+import SummaryenV2 from "../core/note-styles/canonical/v2/summary.en.md";
+import PlainzhTWV2 from "../core/note-styles/canonical/v2/plain.zh-TW.md";
+import PlainzhCNV2 from "../core/note-styles/canonical/v2/plain.zh-CN.md";
+import PlainenV2 from "../core/note-styles/canonical/v2/plain.en.md";
+import GuidezhTWV2 from "../core/note-styles/canonical/v2/guide.zh-TW.md";
+import GuidezhCNV2 from "../core/note-styles/canonical/v2/guide.zh-CN.md";
+import GuideenV2 from "../core/note-styles/canonical/v2/guide.en.md";
 
 /**
  * A note style is one Markdown file the user edits. This module is pure: it parses a file's text, finds out whether the
@@ -47,6 +62,45 @@ export interface NoteStyleSection extends DetailSection {
   /** 1-based line of the section's "##" heading. */
   line: number;
 }
+/** The four callout types a style file can remap (the prompt's summary / warning / question / tip lines). */
+export const CALLOUT_MAP_KEYS = ["summary", "warning", "question", "tip"] as const;
+export type CalloutMapKey = (typeof CALLOUT_MAP_KEYS)[number];
+/** Only entries that differ from the default are present; "off" removes the prompt line. */
+export type CalloutMap = Partial<Record<CalloutMapKey, string>>;
+/**
+ * Obsidian's built-in callout types and aliases, lower-case (source: https://help.obsidian.md/callouts, checked
+ * 2026-11-01). Custom CSS types are not accepted.
+ */
+export const OBSIDIAN_CALLOUT_TYPES: ReadonlySet<string> = new Set([
+  "note",
+  "abstract",
+  "summary",
+  "tldr",
+  "info",
+  "todo",
+  "tip",
+  "hint",
+  "important",
+  "success",
+  "check",
+  "done",
+  "question",
+  "help",
+  "faq",
+  "warning",
+  "caution",
+  "attention",
+  "failure",
+  "fail",
+  "missing",
+  "danger",
+  "error",
+  "bug",
+  "example",
+  "quote",
+  "cite"
+]);
+
 export interface NoteStyle {
   id: string;
   name: string;
@@ -58,6 +112,8 @@ export interface NoteStyle {
   tables: boolean;
   tasks: boolean;
   highlight: boolean;
+  /** Callout type per prompt line, only where the file changes the default; empty when nothing changes. */
+  calloutMap: CalloutMap;
   layout: "intro" | "sections";
   /** Text before the first "##", comments removed and trimmed; empty for the sections layout. */
   intro: string;
@@ -80,7 +136,7 @@ function byLanguage<T>(zhTW: T, zhCN: T, en: T): Record<NoteStyleLanguage, T> {
   ]) as Record<NoteStyleLanguage, T>;
 }
 
-/** Frozen canonical contents. A new version adds a v2 entry here; v1 files never change (the test pins their hashes). */
+/** Frozen canonical contents. A new version adds an entry here; v1 and v2 files never change (the test pins their hashes). */
 export const CANONICAL_VERSIONS: readonly Record<NoteStyleBuiltinId, Record<NoteStyleLanguage, string>>[] = [
   {
     standard: byLanguage(StandardzhTW, StandardzhCN, Standarden),
@@ -88,6 +144,14 @@ export const CANONICAL_VERSIONS: readonly Record<NoteStyleBuiltinId, Record<Note
     summary: byLanguage(SummaryzhTW, SummaryzhCN, Summaryen),
     plain: byLanguage(PlainzhTW, PlainzhCN, Plainen),
     guide: byLanguage(GuidezhTW, GuidezhCN, Guideen)
+  },
+  // v2: v1 plus the four callout-rule keys at their defaults and one explanatory sentence; same prompt as v1.
+  {
+    standard: byLanguage(StandardzhTWV2, StandardzhCNV2, StandardenV2),
+    textbook: byLanguage(TextbookzhTWV2, TextbookzhCNV2, TextbookenV2),
+    summary: byLanguage(SummaryzhTWV2, SummaryzhCNV2, SummaryenV2),
+    plain: byLanguage(PlainzhTWV2, PlainzhCNV2, PlainenV2),
+    guide: byLanguage(GuidezhTWV2, GuidezhCNV2, GuideenV2)
   }
 ];
 
@@ -200,6 +264,19 @@ const FRONTMATTER_KEYS: Record<string, "tone" | "callouts" | "diagrams" | "table
   螢光標記: "highlight",
   荧光标记: "highlight",
   highlight: "highlight"
+};
+const CALLOUT_KEYS: Record<string, CalloutMapKey> = {
+  結論方框: "summary",
+  结论方框: "summary",
+  "summary callout": "summary",
+  風險方框: "warning",
+  风险方框: "warning",
+  "risk callout": "warning",
+  問題方框: "question",
+  问题方框: "question",
+  "question callout": "question",
+  技巧方框: "tip",
+  "tip callout": "tip"
 };
 const ON = new Set(["開", "开", "on", "true"]);
 const OFF = new Set(["關", "关", "off", "false"]);
@@ -320,6 +397,8 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     tasks: true,
     highlight: true
   };
+  const calloutMap: CalloutMap = {};
+  const calloutSeen = new Set<CalloutMapKey>();
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
     const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
@@ -336,11 +415,37 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
           issues.push(issue(index + 1, "frontmatter_line", `Line ${index + 1} is not "key: value".`));
           continue;
         }
-        const field = FRONTMATTER_KEYS[pair[1].trim().toLocaleLowerCase()];
-        if (!field) continue;
+        const keyName = pair[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
         let value = pair[2].trim();
         if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
         const where = index + 1;
+        const calloutField = CALLOUT_KEYS[keyName];
+        if (calloutField) {
+          const lower = value.toLocaleLowerCase();
+          if (calloutSeen.has(calloutField))
+            issues.push(
+              issue(where, "key_duplicate", `Line ${where}: "${pair[1].trim()}" is written twice.`, pair[1].trim())
+            );
+          else {
+            calloutSeen.add(calloutField);
+            if (OFF.has(lower)) calloutMap[calloutField] = "off";
+            else if (OBSIDIAN_CALLOUT_TYPES.has(lower)) {
+              if (lower !== calloutField) calloutMap[calloutField] = lower;
+            } else
+              issues.push(
+                issue(
+                  where,
+                  "value_invalid",
+                  `Line ${where}: "${value}" is not an Obsidian callout type.`,
+                  pair[1].trim(),
+                  value
+                )
+              );
+          }
+          continue;
+        }
+        const field = FRONTMATTER_KEYS[keyName];
+        if (!field) continue;
         if (field === "tone") {
           if (value.length > NOTE_STYLE_LIMITS.tone)
             issues.push(
@@ -453,6 +558,7 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
       tables: flags.tables,
       tasks: flags.tasks,
       highlight: flags.highlight,
+      calloutMap,
       layout: intro ? "intro" : "sections",
       intro,
       sections,

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { loadSource } = require('./support-replay.cjs');
 
 const M = loadSource(`
-export { parseNoteStyleFile } from "./ai/note-style-file";
+export { parseNoteStyleFile, CANONICAL_VERSIONS, CANONICAL_LANGUAGES, NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { detailStructurePrompt, checkCounts, standardTemplate, textbookTemplate, validateTemplate, sectionLookup } from "./ai/detail-templates";
 export { canonicalDetail } from "./ai/result-utils";
 export { obsidianFormat, OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
@@ -63,6 +63,21 @@ test('format preferences: all default is the original text, for both instruction
     assert.equal(M.obsidianFormat(language, undefined), original);
     assert.equal(M.obsidianFormat(language, ON), original);
   }
+});
+
+test('canonical v2 builds exactly the same prompt as v1 for every built-in and language', () => {
+  const pref = style => ({ callouts: style.callouts, diagrams: style.diagrams, tables: style.tables, tasks: style.tasks, highlight: style.highlight, calloutMap: style.calloutMap });
+  for (const id of M.NOTE_STYLE_BUILTIN_IDS)
+    for (const language of M.CANONICAL_LANGUAGES) {
+      const one = parse(M.CANONICAL_VERSIONS[0][id][language]), two = parse(M.CANONICAL_VERSIONS[1][id][language]);
+      for (const instruction of LANGUAGES) {
+        assert.equal(M.obsidianFormat(instruction, pref(two)), M.obsidianFormat(instruction, pref(one)), `${id}.${language}`);
+        assert.equal(structure(two, instruction), structure(one, instruction), `${id}.${language}`);
+      }
+      assert.equal(two.tone, one.tone);
+      assert.equal(two.layout, one.layout);
+      assert.equal(two.intro, one.intro);
+    }
 });
 
 const SENTINELS = {
@@ -164,4 +179,31 @@ test('chartEligible: styleDiagrams false blocks the chart step; absent or true k
   assert.equal(service.chartEligible({ ...base, styleDiagrams: true }), diagrams);
   assert.equal(service.chartEligible({ ...base, styleDiagrams: false }), false);
   assert.equal(service.chartEligible({ ...base, mode: 'synthesize', styleDiagrams: false }), false);
+});
+
+test('callout map (P1): swaps the type, keeps danger, tip line swaps both types, off drops the line, placed overrides, default is byte-identical', () => {
+  for (const language of LANGUAGES) {
+    const original = M.inLanguage(M.OBSIDIAN_FORMAT, language);
+    assert.equal(M.obsidianFormat(language, { ...ON, calloutMap: {} }), original);
+    const mapped = M.obsidianFormat(language, { ...ON, calloutMap: { summary: 'abstract', warning: 'caution', tip: 'example' } });
+    const bullets = mapped.split('\n').filter(line => line.startsWith('- '));
+    assert.ok(!bullets.some(line => line.includes('`> [!summary]`')));
+    assert.ok(bullets.some(line => line.includes('`> [!abstract]`')));
+    assert.ok(bullets.some(line => line.includes('`> [!caution]`') && line.includes('`> [!danger]`') && !line.includes('[!warning]')));
+    assert.ok(bullets.some(line => line.includes('`> [!example]`') && !line.includes('[!tip]')));
+    assert.ok(bullets.some(line => line.includes('`> [!question]`')));
+    assert.equal(bullets.length, original.split('\n').filter(line => line.startsWith('- ')).length);
+    const off = M.obsidianFormat(language, { ...ON, calloutMap: { question: 'off', warning: 'off' } });
+    assert.ok(!off.includes('[!question]') && !off.includes('[!danger]') && !off.includes('[!warning]'));
+    assert.ok(off.includes('`> [!summary]`'));
+    assert.ok(!/這個風格不使用|This style does not use/.test(off));
+    const placed = M.obsidianFormat(language, { ...ON, callouts: 'placed', calloutMap: { summary: 'abstract' } });
+    assert.equal(placed, M.obsidianFormat(language, { ...ON, callouts: 'placed' }));
+  }
+});
+
+test('callout map (P1): a parsed style file carries its map into the prompt', () => {
+  const style = parse('---\n方框: 自動\n結論方框: abstract\n問題方框: 關\n---\n## A\nx\n');
+  const text = M.obsidianFormat('en', style);
+  assert.ok(text.includes('`> [!abstract]`') && !text.includes('[!question]') && !text.includes('`> [!summary]`'));
 });

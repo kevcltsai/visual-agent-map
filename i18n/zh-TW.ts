@@ -1563,6 +1563,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.note_style_issue_frontmatter_unclosed": "第 1 行的 --- 開頭沒有對應的結尾 ---。",
   "ui.note_style_issue_frontmatter_line": "這一行不是「項目: 值」的格式。",
   "ui.note_style_issue_value_invalid": "「{0}」的值「{1}」不合法。",
+  "ui.note_style_issue_key_duplicate": "同一個項目寫了不只一次。",
   "ui.note_style_issue_no_sections": "檔案裡沒有任何 ## 段落。",
   "ui.note_style_issue_count_invalid": "數量不是數字。",
   "ui.note_style_issue_comment_unclosed": "有一段 %% 註解沒有結尾。",

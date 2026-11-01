@@ -324,6 +324,21 @@ test('restore default: trash first, then the standard content; a non-builtin fil
   assert.equal(v.files['WS/S/Textbook.md'], M.canonicalContent('textbook', 'en'));
 });
 
+test('restore default writes v2, and a v1 file is still unmodified (restorable) while a changed one is not', async () => {
+  const v1 = M.CANONICAL_VERSIONS[0].textbook.en;
+  assert.ok(!v1.includes('summary callout'));
+  const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': v1.replace('3–5', '9') });
+  await store.refresh();
+  assert.equal(await store.restoreDefault('WS/S/Textbook.md'), true);
+  assert.equal(v.files['WS/S/Textbook.md'], M.CANONICAL_VERSIONS[1].textbook.en);
+  assert.ok(v.files['WS/S/Textbook.md'].includes('summary callout: summary'));
+  const old = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': v1 });
+  await old.store.refresh();
+  assert.equal(M.matchCanonical(v1).version, 1);
+  assert.equal(old.store.builtinIdOfFile('Textbook.md').id, 'textbook');
+  assert.equal(old.v.writes.length, 0);
+});
+
 test('folder rename follows the folder only; default folder name follows the language', async () => {
   const { store, settings, saves } = makeStore({ noteStylesFolder: 'WS/S' });
   assert.equal(await store.followFolderRename('WS/Other', 'WS/X'), false);

@@ -104,3 +104,24 @@ test('styleRefOf names the style behind a stored pair', () => {
   assert.deepEqual(plain(picker.styleRefOf('u1', undefined, ['u1'])), { kind: 'legacy', id: 'u1' });
   assert.equal(picker.styleRefOf('u1', undefined, []), undefined);
 });
+
+test('plugin.mutate: a style file error from a queued write shows Open this file; other errors stay plain', async () => {
+  const log = [];
+  const Notice = dom.makeNotice(log);
+  const loaded = load('tests/support-main-entry.ts', { obsidian: { ...obsidian, Notice } }, { createFragment: dom.createFragment });
+  const host = { queue: Promise.resolve(), writing: 0, logs: { appendLog() {} }, views: () => [] };
+  const mutate = work => loaded.default.prototype.mutate.call(host, work);
+  const origError = console.error; console.error = () => {};
+  try {
+    let opened = 0;
+    await mutate(async () => { throw new loaded.NoteStyleFileError('The note style file "A.md" cannot be used (line 2): x', () => { opened++; }); }).catch(() => {});
+    await host.queue;
+    const styled = Notice.all[Notice.all.length - 1];
+    const buttons = dom.findAll(styled.message, i => i.tag === 'button');
+    assert.deepEqual(buttons.map(b => b.text), ['Open this file']);
+    buttons[0].click(); assert.equal(opened, 1);
+    await mutate(async () => { throw new Error('boom'); }).catch(() => {});
+    await host.queue;
+    assert.equal(Notice.all[Notice.all.length - 1].message, 'boom');
+  } finally { console.error = origError; }
+});

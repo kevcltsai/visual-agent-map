@@ -38,7 +38,7 @@ import {
 } from "./outline-import";
 import { FOLLOW_DEFAULT_MODEL, syncModelSelect } from "../../core/model-discovery";
 import { aiModeField, fieldLink, linkedField, noteStyleField } from "./research-fields";
-import { stylePickerFor, type StyleRef } from "./note-style-picker";
+import { errorNotice, stylePickerFor, type StyleRef } from "./note-style-picker";
 import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
 import { titleProblemText } from "../../ui/modals/title-check";
 
@@ -737,8 +737,7 @@ export class NextStepModal extends Modal {
         await work();
       } catch (error) {
         // A task already handed to the background can still fail after the dialog closed; say so.
-        if (this.closed && !controller.signal.aborted)
-          new Notice(error instanceof Error ? error.message : String(error));
+        if (this.closed && !controller.signal.aborted) errorNotice(error);
         this.failed(
           panel,
           button,

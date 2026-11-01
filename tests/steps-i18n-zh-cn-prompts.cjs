@@ -95,14 +95,14 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 27 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 28 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
-  assert.equal(lines.length, 27); // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction + the four note style file prompts
+  assert.equal(lines.length, 28); // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction + the four note style file prompts + the note style callout map prompt
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 27 output-language sentences and 27 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 28 output-language sentences and 28 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -110,5 +110,5 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 27 outp
   }
   for (const file of fs.readdirSync(directory).filter(name => /\.zh(\.\d+)?\.txt$/.test(name)))
     assert.equal(fs.readFileSync(path.join(directory, file), 'utf8').includes('固定標題必須逐字'), false, `${file}: zh-TW has no clause`);
-  assert.deepEqual(total, { rules: 27, clauses: 27 });
+  assert.deepEqual(total, { rules: 28, clauses: 28 });
 });

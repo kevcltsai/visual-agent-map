@@ -2036,6 +2036,40 @@ integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values,
   assert.equal(/topic-markers/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
   assert.equal(updatedLine(), before, 'updated is not changed');
 });
+integrationTest('topic-style: readNote reads whitelisted tokens only and a note without style has no style field', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  assert.equal('style' in (await repo.readNote(n.path)), false, 'no style key when none is set');
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ntopic-style: ["BOLD", 3, "text-large", "text-small", "bold"]\n'));
+  assert.deepEqual([...(await repo.readNote(n.path)).style], ['bold', 'text-large']);
+  contents.set(n.path, contents.get(n.path).replace(/^topic-style:.*\n/m, 'topic-style: ["BOLD", 3]\n'));
+  assert.equal('style' in (await repo.readNote(n.path)), false, 'unknown values read as nothing');
+});
+integrationTest('topic-style: writeTopicStyle toggles and sets, keeps unknown values, removes the key when empty, leaves updated and untouched notes alone', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  const updatedLine = () => contents.get(n.path).match(/^updated:.*$/m)?.[0];
+  const before = updatedLine();
+  const pristine = contents.get(n.path);
+  await repo.writeTopicStyle(n.path, { set: [] });
+  assert.equal(contents.get(n.path), pristine, 'no style and nothing to set: bytes unchanged');
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\ntopic-style: [future-x, text-small]\n'));
+  await repo.writeTopicStyle(n.path, { toggle: 'bold' });
+  assert.deepEqual([...(await repo.readNote(n.path)).style], ['bold', 'text-small']);
+  assert.match(contents.get(n.path), /"future-x"/, 'an unknown value is kept');
+  assert.match(contents.get(n.path), /custom: retain me/);
+  await repo.writeTopicStyle(n.path, { toggle: 'text-large' });
+  assert.deepEqual([...(await repo.readNote(n.path)).style], ['bold', 'text-large'], 'text size is one choice');
+  await repo.writeTopicStyle(n.path, { toggle: 'text-large' });
+  await repo.writeTopicStyle(n.path, { toggle: 'bold' });
+  assert.equal('style' in (await repo.readNote(n.path)), false);
+  assert.match(contents.get(n.path), /"future-x"/, 'clearing keeps the unknown value');
+  await repo.writeTopicStyle(n.path, { set: ['line-thick'] });
+  assert.deepEqual([...(await repo.readNote(n.path)).style], ['line-thick']);
+  contents.set(n.path, contents.get(n.path).replace(/^topic-style:\n(  - .*\n)+/m, ''));
+  await repo.writeTopicStyle(n.path, { toggle: 'border-thick' });
+  await repo.writeTopicStyle(n.path, { toggle: 'border-thick' });
+  assert.equal(/topic-style/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
+  assert.equal(updatedLine(), before, 'updated is not changed');
+});
 integrationTest('topic-links: readNote reads only valid http(s) links and a note without links has no links field', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   assert.equal('links' in (await repo.readNote(n.path)), false, 'no links key when none are set');

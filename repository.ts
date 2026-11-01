@@ -1,7 +1,14 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from "obsidian";
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
-import { readTopicColor, type TopicColor } from "./topic-colors";
+import {
+  readTopicColor,
+  readTopicStyle,
+  setTopicStyle,
+  toggleTopicStyle,
+  type TopicColor,
+  type TopicStyle
+} from "./topic-colors";
 import { addTopicLink, readTopicLinks, removeTopicLink, type AddTopicLinkResult } from "./topic-links";
 import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
@@ -113,6 +120,8 @@ export interface Note {
   links?: string[];
   /** From `topic-color` frontmatter, a whitelisted id only; absent when there is none. */
   color?: TopicColor;
+  /** From `topic-style` frontmatter, whitelisted tokens only (one text size at most); absent when there are none. */
+  style?: TopicStyle[];
 }
 export type NotePatch = Partial<Note>;
 export interface Settings {
@@ -1279,6 +1288,7 @@ export class Repository {
       ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
       ...(readTopicLinks(fm).length ? { links: readTopicLinks(fm) } : {}),
       ...(readTopicColor(fm) ? { color: readTopicColor(fm) } : {}),
+      ...(readTopicStyle(fm).length ? { style: readTopicStyle(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
         : [],
@@ -1670,6 +1680,21 @@ export class Repository {
    */
   async writeTopicColor(path: string, id: TopicColor | null): Promise<void> {
     await this.app.vault.process(this.file(path), content => setFrontmatterKeys(content, { "topic-color": id }));
+  }
+
+  /**
+   * Changes `topic-style`, reading the current list inside the same `vault.process` call: `{ toggle }` flips one token,
+   * `{ set }` makes the whitelisted tokens exactly that list. Values this version does not know are kept, no whitelisted
+   * token left removes only those (the key goes when nothing is left), and `updated` is not bumped. A note whose style
+   * would not change is returned as it is, byte for byte.
+   */
+  async writeTopicStyle(path: string, change: { toggle: TopicStyle } | { set: readonly TopicStyle[] }): Promise<void> {
+    await this.app.vault.process(this.file(path), content => {
+      const raw = frontmatter(content)["topic-style"];
+      const next = "toggle" in change ? toggleTopicStyle(raw, change.toggle) : setTopicStyle(raw, change.set);
+      const same = JSON.stringify(next) === JSON.stringify(raw === undefined ? null : raw);
+      return same ? content : setFrontmatterKeys(content, { "topic-style": next });
+    });
   }
 
   /** Sets a hypothesis note's `hypothesis-strength` only: no other key changes, `updated` is not bumped, nothing rebuilds. */

@@ -12,7 +12,7 @@ const WIDTH = 300;
 const GAPS = { compact: 12, standard: 24, spacious: 48 };
 const node = (id, parentId = null, extra = {}) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed: false, ...extra });
 const snap = list => list.map(item => [item.id, item.x, item.y]);
-const sample = () => require('../samples/taiwan-travel/compiled.json').locales['zh-TW'].nodes.map(item => ({ ...item }));
+const sample = () => JSON.parse(/```agent-map\s*\n([\s\S]*?)\n```/.exec(require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures/taiwan-travel-regression/Map.md'), 'utf8'))[1]).nodes.map(item => ({ ...item }));
 const sampleHeight = id => 60 + (id.length % 5) * 37;
 const aim = (id, parentId, aimKind, converges) => node(id, parentId, { aimKind, ...(converges ? { aimConvergesFromNodeIds: converges } : {}) });
 const converging = () => [
@@ -1316,13 +1316,10 @@ test('V4b: a branch with its own direction draws its edges by the parent card\'s
   assert.equal(d(a, a1), 'M 1510 180 C 1510 240, 1510 240, 1510 300', 'inside the branch: down');
 });
 
-test('V5: an AIM map and the built-in sample have none of the new menu items', async () => {
+test('V5: an AIM map has none of the new menu items', async () => {
   const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
   const h = await harness(tree4);
   h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
-  h.view.openLayoutMenu({});
-  assert.deepEqual(h.menuTitles(), original);
-  h.view.map.aim = undefined; h.view.builtIn = true;
   h.view.openLayoutMenu({});
   assert.deepEqual(h.menuTitles(), original);
 });
@@ -1424,8 +1421,6 @@ test('PV2-V9: no branch layout section for a root, a radial/timeline/fishbone ma
   assert.deepEqual(plainJson(branchPanel(h, 'A').labels), [FOLLOW, 'Lay out to the right', 'Lay out downward', 'Lay out upward'], 'balanced: a topic on the right side is not offered left');
   h.view.map.layout = undefined; h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   assert.equal(branchPanel(h, 'A').group, undefined, 'AIM');
-  h.view.map.aim = undefined; h.view.builtIn = true;
-  assert.equal(branchPanel(h, 'A').group, undefined, 'sample');
 });
 
 test('PV2-V10: the choices leave out the direction opposite to where the parent grows (left map, down branch, balanced side) and every offered one survives the parse', async () => {

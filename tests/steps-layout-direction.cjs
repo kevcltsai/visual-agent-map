@@ -6,7 +6,7 @@ const layout = load('map-layout.ts');
 
 const node = (id, parentId = null, extra = {}) => ({ id, parentId, path: `${id}.md`, x: 0, y: 0, collapsed: false, ...extra });
 const snap = list => list.map(item => [item.id, item.x, item.y]);
-const sample = () => require('../samples/taiwan-travel/compiled.json').locales['zh-TW'].nodes.map(item => ({ ...item }));
+const sample = () => JSON.parse(/```agent-map\s*\n([\s\S]*?)\n```/.exec(require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures/taiwan-travel-regression/Map.md'), 'utf8'))[1]).nodes.map(item => ({ ...item }));
 const sampleHeight = id => 60 + (id.length % 5) * 37;
 const folded = () => [
   node('root'),
@@ -384,16 +384,13 @@ test('V4d: in a down map moved and copied topics go below their parent, not to i
   assert.ok(h.named('Src').y > h.named('Target').y && h.named('Leaf').y > h.named('Src').y, 'moveBranches goes down');
 });
 
-test('V5: an AIM map and the built-in sample offer no direction in the Layout menu', async () => {
+test('V5: an AIM map offers no direction in the Layout menu', async () => {
   const original = ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', 'Auto layout'];
   const h = await harness(tree4);
   h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
   h.view.openLayoutMenu({});
   assert.deepEqual(h.menuTitles(), original);
-  h.view.map.aim = undefined; h.view.builtIn = true;
-  h.view.openLayoutMenu({});
-  assert.deepEqual(h.menuTitles(), original);
-  h.view.builtIn = false;
+  h.view.map.aim = undefined;
   h.view.openLayoutMenu({});
   assert.deepEqual(h.menuTitles(), ['Collapse all', 'Expand all', 'Expand to level 1', 'Expand to level 2', 'Expand to level 3', '---', RIGHT_TITLE, LEFT_TITLE, 'Lay out downward', 'Lay out upward', 'Lay out balanced left and right', 'Lay out radially', 'Lay out as a timeline', 'Lay out as a fishbone', '---', 'Compact spacing', 'Standard spacing', 'Spacious spacing', 'Auto layout']);
 });

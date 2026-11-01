@@ -398,7 +398,7 @@ test('hypothesis-evidence: a map without relations serializes byte for byte as b
   const text = core.serializeMap(source);
   assert.equal(text.includes('topicRelations'), false);
   assert.equal(core.serializeMap(core.parseMap(text)), text);
-  const sample = fs.readFileSync(path.join(root, 'samples/taiwan-travel/en/Map.md'), 'utf8');
+  const sample = fs.readFileSync(path.join(root, 'tests/fixtures/taiwan-travel-regression/Map.md'), 'utf8');
   assert.equal(core.serializeMap(core.parseMap(sample)).includes('topicRelations'), false);
 });
 test('hypothesis-evidence: both relation kinds round-trip through serialize and parse', () => {

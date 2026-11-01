@@ -68,6 +68,50 @@ test('collect snapshots: note style files (parsed file sections, intro layout, e
   }
 });
 
+test('collect snapshots: style combinations per step (safety net before the prompt assembler)', async () => {
+  const { parseNoteStyleFile } = loadModule('ai/note-style-file.ts');
+  const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return result.style; };
+  const body = '## 核心結論\n數量: 3\n用 1–3 句講最重要的結論。\n> [!summary]\n> 先講結論。\n\n## 證據與來源\n列出來源。\n\n## 更新紀錄\n一行摘要。\n';
+  const withHead = head => parsed(`---\n${head}\n---\n${body}`);
+  const styles = {
+    sections: parsed('---\n語氣: 親切白話\n---\n' + body),
+    formatOff: withHead('方框: 指定\n圖表: 關\n表格: 關\n待辦清單: 關\n螢光標記: 關'),
+    calloutMap: withHead('方框: 自動\n結論方框: abstract\n風險方框: caution\n問題方框: 關\n技巧方框: example'),
+    tablesOff: withHead('表格: 關'),
+    calloutsPlaced: withHead('方框: 指定'),
+    tasksOff: withHead('待辦清單: 關'),
+    highlightOff: withHead('螢光標記: 關'),
+    calloutAllOff: withHead('結論方框: 關\n風險方框: 關\n問題方框: 關\n技巧方框: 關'),
+    calloutMapPlaced: withHead('方框: 指定\n結論方框: abstract\n風險方框: caution\n問題方框: 關\n技巧方框: example')
+  };
+  const claude = 'claude:sonnet';
+  for (const [language, tag] of LANGUAGES) {
+    const ctx = { ...base, outputLanguage: language };
+    const withStyle = (context, style) => ({ ...context, detailTemplate: style.template, noteStyle: style, toneText: undefined });
+    const textbook = loadModule('ai/detail-templates.ts').textbookTemplate(loadModule('i18n.ts').noteLanguageOf(language));
+    const tone = language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。';
+    // Research (task): the remaining single-preference files.
+    const research = [['tables-off', 'tablesOff', 'tables off'], ['callouts-placed', 'calloutsPlaced', 'callouts placed only'], ['tasks-off', 'tasksOff', 'task lists off'], ['highlight-off', 'highlightOff', 'highlights off'], ['callout-all-off', 'calloutAllOff', 'all four callout keys off'], ['callout-map-placed', 'calloutMapPlaced', 'callouts placed only plus remapped keys']];
+    for (const [name, key, text] of research) await recordContext(`service.task-style-file-${name}.${tag}`, `AiTaskService instructions: mode task with a note style file (${text})`, language, withStyle(ctx, styles[key]));
+    const steps = {
+      quick: { ...ctx, researchMode: 'local', researchDepth: 'normal', visualMode: 'off', mapAiMode: 'quick' },
+      decompose: { ...ctx, mode: 'decompose', researchDepth: 'deep' },
+      synthesize: { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' },
+      merge: { ...ctx, mode: 'merge', researchMode: 'local', visualMode: 'off' }
+    };
+    for (const [step, context] of Object.entries(steps)) {
+      const variants = [['tone', { ...context, toneText: tone }, 'a resolved tone text'], ['textbook', { ...context, detailTemplate: textbook }, 'the built-in Textbook template'],
+        ['style-file-sections', withStyle(context, styles.sections), 'a note style file (sections)'], ['style-file-format-off', withStyle(context, styles.formatOff), 'a note style file with callouts placed, diagrams, tables, task lists and highlights off'],
+        ['style-file-callout-map', withStyle(context, styles.calloutMap), 'a note style file that remaps callouts'], ['style-file-tables-off', withStyle(context, styles.tablesOff), 'a note style file with tables off'],
+        ['style-file-callouts-placed', withStyle(context, styles.calloutsPlaced), 'a note style file with callouts placed only']];
+      for (const [name, variant, text] of variants) await recordContext(`service.${step}-${name}.${tag}`, `AiTaskService instructions: mode ${step} with ${text}`, language, variant);
+    }
+    await recordContext(`claude.task-merge.${tag}`, 'AiTaskService instructions for Claude: mode merge, local', language, steps.merge, claude);
+    await recordContext(`service.task-intermediate.${tag}`, 'AiTaskService instructions: mode task with intermediate detail', language, { ...ctx, intermediateDetail: true });
+    await recordContext(`service.task-quick-count-repair.${tag}`, 'AiTaskService instructions: Quick AI mode research with count repair', language, { ...steps.quick, countRepair: true });
+  }
+});
+
 test('collect snapshots: topics whose language is read from the text (D-2026-10-94)', async () => {
   // The existing snapshots name an explicit language id; these two start from the topic text. An English topic with function
   // words is detected as en (the en path); a French topic keeps the follow-input row, whose clause quotes the topic.

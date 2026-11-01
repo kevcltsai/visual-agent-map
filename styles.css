@@ -55,6 +55,7 @@
 .vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
 .vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .vam-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.5; }
+/* Note style pickers */
 .vam-note-style-custom:not([hidden]) { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--interactive-accent); }
 /* A solid chip like the zoom cluster, so the hint stays readable when it sits over a card. */
 .vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }
@@ -1500,6 +1501,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node[data-topic-style-border="thick"]:not([data-aim-kind]) { border-width: 3px; --vam-kind-width: 3px; }
 .vam-view .vam-node[data-topic-style-border="thick"].is-selected:not([data-aim-kind]), .vam-view .vam-node[data-topic-style-border="thick"].is-relation-end:not([data-aim-kind]) { outline-width: 3px; --vam-kind-width: 4px; }
 .vam-view .vam-edge[data-line-thick] { stroke-width: 4px; }
+/* Note style pickers */
 .vam-note-style-problems { display: flex; flex-direction: column; gap: 4px; }
 .vam-note-style-problems:empty { display: none; }
 .vam-note-style-problem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: var(--font-ui-smaller); color: var(--text-error); overflow-wrap: anywhere; }

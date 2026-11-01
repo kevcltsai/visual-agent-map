@@ -135,6 +135,64 @@ test('tone: the file\'s tone is a name or free text; a same or more specific lev
   assert.equal(store.resolve([{ template: 'style:Own' }]).noteStyle.diagrams, false);
 });
 
+// Scope 5 matrix: topic x map in {none, template only, tone only, template + tone}, x workspace in {none, textbook,
+// defaultNoteStyleId = style:S (S has a tone), old uuid exported and edited}. The oracle below is written from the rule,
+// not from the store: the first level whose template can be used decides the style; a style file takes the tone of its own
+// or a more specific level, else its own `tone`; an old template's file takes the whole chain; no file = today's path.
+test('resolution matrix (topic x map x workspace x file tone): 4 x 4 x 4 x 2 = 128 cells follow Scope 5', async () => {
+  const S = '---\ntone: Pirate\n---\n## A\ntext\n';
+  const T = '---\n---\n## A\ntext\n';
+  const U = FREE;
+  const editedLegacy = M.serializeLegacyV1(LEGACY, 'en').replace('What we found.', 'What we really found.');
+  const files = { 'WS/S/S.md': S, 'WS/S/T.md': T, 'WS/S/U.md': U, 'WS/S/My notes.md': editedLegacy };
+  const fileTone = { S: 'Talk like a pirate.', T: undefined, U: 'Short sentences, friendly.' };
+  const states = file => [
+    {},
+    { template: `style:${file}` },
+    { tone: 'plain' },
+    { template: `style:${file}`, tone: 'plain' }
+  ];
+  const workspaces = [
+    { name: 'none', patch: {} },
+    { name: 'textbook', patch: { defaultDetailTemplateId: 'textbook' } },
+    { name: 'style:S', patch: { defaultNoteStyleId: 'style:S' } },
+    { name: 'old uuid', patch: { defaultDetailTemplateId: 'uuid-1' } }
+  ];
+  let cells = 0;
+  for (const file of ['T', 'U']) for (const topic of states(file)) for (const map of states(file)) for (const ws of workspaces) {
+    const { store, settings } = makeStore({
+      noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' }, ...ws.patch
+    }, files);
+    await store.refresh();
+    const got = store.resolve([topic, map]);
+    // oracle
+    const levels = [topic, map, { template: ws.patch.defaultNoteStyleId ?? ws.patch.defaultDetailTemplateId }];
+    const at = levels.findIndex(level => level.template);
+    const chosen = at < 0 ? undefined : levels[at].template;
+    const tones = levels.map(level => level.tone);
+    const label = `${file} topic=${JSON.stringify(topic)} map=${JSON.stringify(map)} ws=${ws.name}`;
+    if (chosen?.startsWith('style:')) {
+      const base = chosen.slice(6);
+      assert.equal(got.fileName, `${base}.md`, label);
+      assert.ok(got.noteStyle, label);
+      const own = tones.slice(0, at + 1).find(Boolean);
+      assert.equal(got.toneText, own ? M.resolveToneText(PRESETS, [own], 'en') : fileTone[base], label);
+    } else if (chosen === 'uuid-1') {
+      assert.equal(got.fileName, 'My notes.md', label);
+      assert.ok(got.noteStyle, label);
+      assert.equal(got.toneText, M.resolveToneText(PRESETS, tones, 'en'), label);
+    } else {
+      // no style file decides: today's template and tone
+      assert.equal(got.noteStyle, undefined, label);
+      eq(got.template, todayTemplate(settings, [undefined, undefined, chosen]).template);
+      assert.equal(got.toneText, M.resolveToneText(PRESETS, tones, 'en'), label);
+    }
+    eq(got.missing, [], label);
+    cells++;
+  }
+  assert.equal(cells, 128);
+});
+
 test('missing and invalid style files: next level is used, missing names the id, a bad file stops with its line, nothing is written', async () => {
   const { store, v } = makeStore({ noteStylesFolder: 'WS/S', defaultDetailTemplateId: 'textbook' }, { 'WS/S/Bad.md': '---\ntone: x\n---\nno sections here\n' });
   await store.refresh();
@@ -243,15 +301,26 @@ test('lost mapping (downgrade): an unchanged export is adopted again, a changed 
 });
 
 test('restore default: trash first, then the standard content; a non-builtin file is refused', async () => {
-  const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': 'broken', 'WS/S/Mine.md': 'x' });
+  const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': M.canonicalContent('textbook', 'en').replace('3–5', '9'), 'WS/S/Mine.md': 'x', 'WS/S/Standard.md': '---\ntone: mine\n---\n## Mine\nstuff\n', 'WS/S/Plain.md': 'x' });
   const order = [];
   const trash = v.port.trash, create = v.port.create;
   v.port.trash = async path => { order.push('trash'); return trash(path); };
   v.port.create = async (path, content) => { order.push('create'); return create(path, content); };
   assert.equal(await store.restoreDefault('WS/S/Mine.md'), false);
+  // a user's file called like a built-in is a style: file, so it is neither offered nor restored (before and after refresh())
+  assert.equal(await store.restoreDefault('WS/S/Standard.md'), false);
+  assert.equal(await store.restoreDefault('WS/S/Plain.md'), false);
+  assert.equal(order.length, 0);
+  await store.refresh();
+  assert.equal(store.builtinIdOfFile('Standard.md'), undefined);
+  assert.equal(store.builtinIdOfFile('Standard'), undefined);
+  assert.equal(store.builtinIdOfFile('Textbook.md').id, 'textbook');
+  assert.equal(await store.restoreDefault('WS/S/Standard.md'), false);
   assert.equal(await store.restoreDefault('WS/S/Textbook.md'), true);
   eq(order, ['trash', 'create']);
-  eq(v.trashed, [{ path: 'WS/S/Textbook.md', content: 'broken' }]);
+  eq(v.trashed.map(item => item.path), ['WS/S/Textbook.md']);
+  assert.match(v.trashed[0].content, /Textbook|9/);
+  assert.equal(v.files['WS/S/Standard.md'], '---\ntone: mine\n---\n## Mine\nstuff\n');
   assert.equal(v.files['WS/S/Textbook.md'], M.canonicalContent('textbook', 'en'));
 });
 

@@ -45,13 +45,14 @@ const ISSUE_PAIRS = Object.keys(zhTW).filter(key => key.startsWith('ui.detail_co
   const cn = zhCN[key].split(/\{\d+\}/), tw = zhTW[key].split(/\{\d+\}/);
   return cn.map((piece, index) => [piece, tw[index]]).filter(([a, b]) => a && a !== b);
 });
-dictionaryPairs.push(...ISSUE_PAIRS);
-dictionaryPairs.sort((a, b) => b[0].length - a[0].length);
-const toTraditional = text => {
+// Only the snapshots that quote count issues (the repair-counts prompt of a style file) may use these pairs.
+const ISSUE_BASES = /^service\.task-style-file-sections\.\d+$/;
+const pairsFor = base => (ISSUE_BASES.test(base) ? [...dictionaryPairs, ...ISSUE_PAIRS] : dictionaryPairs).sort((a, b) => b[0].length - a[0].length);
+const toTraditional = (text, base) => {
   let result = text;
   CN.forEach(name => { result = result.split(name).join(`\u0000${CN.indexOf(name)}\u0000`); });
   result = result.replace(/\u0000(\d+)\u0000/g, (_, index) => TW[Number(index)] ?? '');
-  for (const [cn, tw] of dictionaryPairs) result = result.split(cn).join(tw);
+  for (const [cn, tw] of pairsFor(base)) result = result.split(cn).join(tw);
   return result;
 };
 
@@ -82,7 +83,7 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
     if (twPositions !== cnPositions) unexplained.push(`${base}: ${twPositions} zh-TW name positions vs ${cnPositions} zh-CN`);
     if (positions(cn, TW) !== 0) unexplained.push(`${base}: zh-CN snapshot still names zh-TW`);
     if (positions(zh, CN) !== 0) unexplained.push(`${base}: zh-TW snapshot names zh-CN`);
-    const restored = toTraditional(cn);
+    const restored = toTraditional(cn, base);
     if (restored !== zh) {
       const left = restored.split('\n'), right = zh.split('\n');
       const line = left.findIndex((value, index) => value !== right[index]);

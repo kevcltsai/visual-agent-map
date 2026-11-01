@@ -25214,11 +25214,22 @@ var NoteStyleStore = class {
     }
     return void 0;
   }
-  /** The built-in a file base name stands for ("restore default" applies to it), when it is a built-in's file. */
+  /**
+   * The built-in a file base name stands for ("restore default" applies to it). The name alone is not enough: a user's own
+   * file that happens to be called "Standard" is a `style:` file. When the snapshot holds the file its content must be a
+   * built-in's file; `restoreDefault` checks the live content again.
+   */
   builtinIdOfFile(baseName3) {
+    const base = stripMd2(baseName3);
+    const key2 = lower(base);
     for (const id of NOTE_STYLE_BUILTIN_IDS)
-      for (const language2 of CANONICAL_LANGUAGES)
-        if (lower(builtinStyleFileName(id, language2)) === lower(stripMd2(baseName3))) return { id, language: language2 };
+      for (const language2 of CANONICAL_LANGUAGES) {
+        const name = lower(builtinStyleFileName(id, language2));
+        if (key2 !== name && !new RegExp(`^${escapeRegExp(name)} \\(\\d+\\)$`).test(key2)) continue;
+        const held = [...this.files.keys()].find((item) => lower(item) === key2);
+        if (held !== void 0 && !this.isBuiltinFile(id, this.files.get(held))) continue;
+        return { id, language: language2 };
+      }
     return void 0;
   }
   legacyUnchanged(template, text11) {
@@ -25447,6 +25458,13 @@ var NoteStyleStore = class {
     const name = (_a2 = path.split("/").pop()) != null ? _a2 : path;
     const builtin = this.builtinIdOfFile(name);
     if (!builtin) return false;
+    let live;
+    try {
+      live = await this.deps.port.read(path);
+    } catch (e) {
+      return false;
+    }
+    if (!this.isBuiltinFile(builtin.id, live)) return false;
     await this.deps.port.trash(path);
     await this.deps.port.create(path, canonicalContent(builtin.id, builtin.language));
     this.files.set(stripMd2(name), canonicalContent(builtin.id, builtin.language));

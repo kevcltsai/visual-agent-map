@@ -31258,7 +31258,13 @@ function parseTemplateBlock(text11, options) {
   }
   const parsed = parseNoteStyleFile(zones.sections, options);
   if (!parsed.ok) return parsed;
-  return { ok: true, template: parsed.style.template, format: (_a2 = zones.format) != null ? _a2 : "" };
+  const { template: template2, intro } = parsed.style;
+  return {
+    ok: true,
+    template: { ...template2, layout: "sections", intro: "" },
+    lead: intro,
+    format: (_a2 = zones.format) != null ? _a2 : ""
+  };
 }
 
 // core/blocks/template/standard.zh-TW.md
@@ -31271,13 +31277,13 @@ var standard_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u
 var standard_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
 
 // core/blocks/template/textbook.zh-TW.md
-var textbook_zh_TW_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_TW_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.zh-CN.md
-var textbook_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_CN_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.en.md
-var textbook_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var textbook_en_default3 = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/builtin.ts
 var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
@@ -31368,24 +31374,67 @@ function selectionFromContext(context, language2) {
     tone: !toneText ? { id: DEFAULT_TONE } : builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText }
   };
 }
+var headingOf = (name) => `### ${name}`;
+var descriptionRule = (section3, language2) => ({
+  text: section3.description.trim(),
+  rule: customDetailRule("description", language2, {
+    heading: headingOf(section3.name),
+    description: section3.description.trim()
+  })
+});
+var describedSections = (template2, language2) => template2.sections.filter((section3) => section3.description.trim()).map((section3) => descriptionRule(section3, language2));
+function leadStructure(template2, lead, language2, anchor) {
+  var _a2;
+  const rules = [];
+  for (const section3 of template2.sections) {
+    const heading = headingOf(section3.name);
+    if (section3.description.trim()) rules.push(descriptionRule(section3, language2).rule);
+    if (section3.count)
+      rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
+    for (const callout of (_a2 = section3.callouts) != null ? _a2 : [])
+      rules.push(
+        customDetailCallout(language2, {
+          heading,
+          type: callout.type,
+          fold: callout.fold,
+          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+        })
+      );
+  }
+  const sections = [lead, ...rules, headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template2.id), anchor)].filter(Boolean).join("\n");
+  return { sections, owned: [{ text: lead }, ...describedSections(template2, language2)] };
+}
 function templateParts(selection, context, language2, topicAnchor, options) {
-  var _a2, _b2, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e, _f;
   const { id } = selection.template;
   const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
   const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
   const builtin = legacy || body !== void 0 ? BUILTIN_BLOCKS.find((block) => block.category === "template" && block.id === id) : findBuiltinBlock("template", id);
   const unmodified = body === void 0 || builtin !== void 0 && normalizeStyleContent(body) === normalizeStyleContent(builtinTemplateText(id, language2));
-  const structure2 = (template2) => detailStructurePrompt(template2, language2, (headings) => detailStructure(language2, headings), topicAnchor);
+  const structure2 = (template3) => detailStructurePrompt(template3, language2, (headings) => detailStructure(language2, headings), topicAnchor);
   if (unmodified) {
     const today = (_e = context.detailTemplate) != null ? _e : (id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language2));
-    return { sections: structure2(today), format: inLanguage(OBSIDIAN_FORMAT, language2) };
+    const owned = describedSections(today, language2);
+    if (today.id === TEXTBOOK_TEMPLATE_ID && today.layout !== "intro") {
+      const log = (_f = today.sections.find((section3) => section3.role === "log")) != null ? _f : today.sections[today.sections.length - 1];
+      owned.unshift({
+        text: textbookDetailStructure(language2, {
+          headings: today.sections.map((section3) => headingOf(section3.name)).join(", "),
+          log: headingOf(log.name)
+        })
+      });
+    }
+    return { sections: structure2(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language2) };
   }
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
     const issue2 = parsed.issues[0];
     throw new Error(`Template block ${id}: line ${issue2.line}: ${issue2.message}`);
   }
-  return { sections: structure2(parsed.template), format: parsed.format };
+  if (parsed.lead)
+    return { ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor), format: parsed.format };
+  const template2 = parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
+  return { sections: structure2(template2), owned: describedSections(template2, language2), format: parsed.format };
 }
 var formatText = (parts, selection, language2) => parts.format ? applyFormatPreferences(parts.format, language2, selection.template.legacyPreferences) : "";
 var CHART_BLOCK = "```mermaid";
@@ -31433,16 +31482,13 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   else {
     const parts = templateParts(selection, context, language2, topicAnchor, options);
     const pieces = [];
-    const sections = (text11) => [
-      text11,
-      { kind: "block", category: "template", id: selection.template.id, part: "sections" }
-    ];
     if (selection.template.adaptive)
-      pieces.push(fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure"));
-    else pieces.push(sections(parts.sections));
+      pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
+    else pieces.push(sectionPieces(parts, selection.template.id));
     if (readerFacingDetail(context) && step !== "merge") {
       const text11 = formatText(parts, selection, language2);
-      if (text11) pieces.push([text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]);
+      if (text11)
+        pieces.push([[text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
     }
     add(...withSeparators(pieces));
   }
@@ -31487,8 +31533,27 @@ ${context.task}`, "task"));
     charts: chartsWanted(selection, context, language2, options)
   };
 }
-function withSeparators(pieces) {
-  return pieces.flatMap((piece, index) => index > 0 ? [["\n\n", { kind: "separator" }], piece] : [piece]);
+function sectionPieces(parts, id) {
+  var _a2;
+  const text11 = parts.sections;
+  const block = (part) => [part, { kind: "block", category: "template", id, part: "sections" }];
+  const pieces = [];
+  let cursor = 0;
+  for (const item of parts.owned) {
+    if (!item.text) continue;
+    const at = text11.indexOf((_a2 = item.rule) != null ? _a2 : item.text, cursor);
+    if (at < 0) continue;
+    const start = item.rule ? at + item.rule.lastIndexOf(item.text) : at;
+    if (start > cursor) pieces.push(fixed(text11.slice(cursor, start), "detail-structure"));
+    pieces.push(block(item.text));
+    cursor = start + item.text.length;
+  }
+  if (!pieces.length) return [block(text11)];
+  if (cursor < text11.length) pieces.push(fixed(text11.slice(cursor), "detail-structure"));
+  return pieces;
+}
+function withSeparators(groups) {
+  return groups.flatMap((group, index) => index > 0 ? [["\n\n", { kind: "separator" }], ...group] : group);
 }
 
 // core/steps/task/render.ts

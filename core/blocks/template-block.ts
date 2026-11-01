@@ -58,6 +58,11 @@ export type TemplateBlockParse =
       ok: true;
       /** The sections zone as a template (frontmatter switches of the style file format are ignored). */
       template: DetailTemplate;
+      /**
+       * The text before the first "##" of the sections zone (comments removed, trimmed), sent as written; empty when
+       * there is none. The template itself stays the sections layout.
+       */
+      lead: string;
       /** The format rules zone; empty when the text has no separator line. */
       format: string;
     }
@@ -82,5 +87,11 @@ export function parseTemplateBlock(text: string, options: { id: string; name: st
   }
   const parsed = parseNoteStyleFile(zones.sections, options);
   if (!parsed.ok) return parsed;
-  return { ok: true, template: parsed.style.template, format: zones.format ?? "" };
+  const { template, intro } = parsed.style;
+  return {
+    ok: true,
+    template: { ...template, layout: "sections", intro: "" },
+    lead: intro,
+    format: zones.format ?? ""
+  };
 }

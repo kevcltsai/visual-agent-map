@@ -129,7 +129,16 @@ test('counter 4: segments join into the text, none is empty, each has a source; 
           const parts = segments.filter(s => s.source.kind === 'block' && s.source.category === 'template').map(s => s.source.part);
           if (context.mode === 'decompose') assert.equal(categories.includes('template'), false);
           else assert.ok(parts.includes('sections') || context.detailFormat === 'adaptive');
-          if (context.mode === 'merge') assert.equal(parts.join(), 'sections');
+          // The sections text is cut into the block's own words (block segments) and the plugin's wrapper sentences (fixed segments).
+          if (context.mode === 'merge') assert.deepEqual([...new Set(parts)], ['sections']);
+          // F2: every block segment is a substring of the block's own text; the wrapper sentences are not in a block segment.
+          const template = m.builtinTemplateText(context.detailTemplate?.id ?? 'standard', language);
+          for (const segment of segments) {
+            if (segment.source.kind !== 'block') continue;
+            if (segment.source.category === 'template') assert.ok(template.includes(segment.text), `${language} ${name} ${segment.source.part}: ${segment.text.slice(0, 40)}`);
+            else assert.equal(segment.text, segment.source.id === 'custom-legacy' ? context.toneText : M.lookupBuiltinBlock('tone', segment.source.id, language));
+          }
+          if (!context.detailFormat && context.mode !== 'decompose') assert.ok(segments.some(s => s.source.kind === 'fixed' && s.source.id === 'detail-structure'));
           if (context.mode === 'synthesize' || context.mode === 'task') assert.ok(parts.includes('format'));
           if (context.intermediateDetail) assert.equal(parts.includes('format'), false);
         }
@@ -316,5 +325,54 @@ test('charts: the prompt asks for charts exactly when the template text holds a 
     assert.equal(m.chartsWanted(selection, context, language), true);
     const off = { ...selection, template: { ...selection.template, legacyPreferences: { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true } } };
     assert.equal(m.chartsWanted(off, context, language), false, `${language}: diagrams off removes the mermaid line`);
+  }
+});
+
+test('counter 4 (F2): the wrapper sentences of every built-in template are fixed segments, the lead and descriptions are block segments', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    for (const id of ['standard', 'textbook']) {
+      const context = { ...base, outputLanguage: language };
+      const full = m.builtinTemplateText(id, language);
+      for (const template of [{ id }, { id, body: `%% note %%\n${full}` }]) {
+        const { segments, text } = m.assembleTaskPrompt({ ...m.selectionFromContext(context, language), template }, 'research', context, language, 'codex');
+        const blocks = segments.filter(s => s.source.kind === 'block' && s.source.category === 'template' && s.source.part === 'sections');
+        assert.ok(blocks.length >= 6, `${language} ${id}`);
+        for (const segment of blocks) assert.ok(full.includes(segment.text), `${language} ${id} ${segment.text.slice(0, 30)}`);
+        assert.equal(segments.map(s => s.text).join(''), text);
+        // Cutting the sections text adds no blank line: only one separator segment lies between the sections and the format rules.
+        const inner = segments.slice(segments.indexOf(blocks[0]), segments.lastIndexOf(blocks[blocks.length - 1]));
+        assert.equal(inner.some(s => s.source.kind === 'separator'), false, `${language} ${id} no separator inside the sections text`);
+        if (id === 'textbook') assert.ok(blocks[0].text.includes('[!warning]'), `${language} the warning rule is block text`);
+      }
+    }
+  }
+});
+
+test('counter 12 (F1): a textbook template without its format zone and lead carries no callout syntax and no self-check in any step', () => {
+  const m = A();
+  const selfCheck = /自我檢核|自我检核|self-check/i;
+  for (const language of LANGUAGES) {
+    const full = m.builtinTemplateText('textbook', language);
+    const withLead = full.split('\n\n# ')[0];
+    // The text before the first section is the lead; the sections start at the first level-two heading.
+    const sectionsOnly = withLead.slice(withLead.search(/^## /m));
+    for (const [name, context] of stepContexts(language)) {
+      const step = m.promptStepOf(context);
+      const selection = { ...m.selectionFromContext(context, language), template: { id: 'textbook', body: sectionsOnly } };
+      const { text, segments } = m.assembleTaskPrompt(selection, step, context, language, 'codex');
+      assert.equal(text.includes('[!'), false, `${language} ${name} no [!`);
+      assert.equal(selfCheck.test(text), false, `${language} ${name} no self-check`);
+      assert.equal(segments.some(s => s.source.kind === 'block' && s.source.part === 'format'), false);
+      // Without the lead the textbook id adds nothing of its own: the generic wrapper stands in.
+      assert.equal(text.includes(withLead.split('\n\n')[0]), false);
+    }
+    // With the lead, the unchanged built-in text still shows the guide, the warning and the self-check.
+    const research = m.assembleTaskPrompt({ ...m.selectionFromContext(stepContexts(language)[0][1], language), template: { id: 'textbook' } }, 'research', stepContexts(language)[0][1], language, 'codex');
+    assert.ok(research.text.includes('[!warning]') && selfCheck.test(research.text));
+    // Editing one word of the lead changes that word only.
+    const edited = full.replace(/\[!warning\]/, '[!tip]');
+    const changed = m.assembleTaskPrompt({ ...m.selectionFromContext(stepContexts(language)[0][1], language), template: { id: 'textbook', body: edited } }, 'research', stepContexts(language)[0][1], language, 'codex');
+    assert.equal(changed.text, research.text.replace('[!warning]', '[!tip]'));
   }
 });

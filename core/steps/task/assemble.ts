@@ -3,8 +3,11 @@ import type { TaskContext } from "../../../ai/types";
 import { visualGuidance } from "../../../ai/visual-guidance";
 import {
   detailStructurePrompt,
+  isBuiltinTemplateId,
   standardTemplate,
+  STANDARD_TEMPLATE_ID,
   textbookTemplate,
+  TEXTBOOK_TEMPLATE_ID,
   type DetailTemplate
 } from "../../../ai/detail-templates";
 import { noteLanguageOf, type ContentLanguage, type FollowAnchor } from "../../../i18n";
@@ -20,6 +23,7 @@ import {
 import { parseTemplateBlock } from "../../blocks/template-block";
 import {
   applyFormatPreferences,
+  headingsVerbatim,
   inLanguage,
   LABEL_ANCESTORS,
   LABEL_RULES,
@@ -43,6 +47,8 @@ import {
 } from "../_shared/fragments";
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
+  customDetailCallout,
+  customDetailRule,
   DECOMPOSE,
   DEFAULT_TASK,
   detailStructure,
@@ -52,7 +58,8 @@ import {
   LABEL_FINDINGS,
   MERGE,
   outputLanguage,
-  SYNTHESIZE
+  SYNTHESIZE,
+  textbookDetailStructure
 } from "./fragments";
 import { isQuickTask, quickGuidance, readerFacingDetail } from "./render";
 
@@ -144,15 +151,68 @@ export function selectionFromContext(context: TaskContext, language: ContentLang
   };
 }
 
+/** A piece of the sections text the template block owns: `rule` is the plugin's sentence that carries `text`, when it wraps it. */
+interface OwnedText {
+  readonly text: string;
+  readonly rule?: string;
+}
+
 /** What the template choice contributes: its sections text, and its format rules text (empty when the template has none). */
 interface TemplateParts {
   readonly sections: string;
+  /** The parts of `sections`, in order, that are the block's own words; the rest is the plugin's wrapper sentences. */
+  readonly owned: readonly OwnedText[];
   readonly format: string;
+}
+
+const headingOf = (name: string): string => `### ${name}`;
+const descriptionRule = (section: DetailTemplate["sections"][number], language: ContentLanguage): OwnedText => ({
+  text: section.description.trim(),
+  rule: customDetailRule("description", language, {
+    heading: headingOf(section.name),
+    description: section.description.trim()
+  })
+});
+const describedSections = (template: DetailTemplate, language: ContentLanguage): OwnedText[] =>
+  template.sections.filter(section => section.description.trim()).map(section => descriptionRule(section, language));
+
+/**
+ * The sections text of a template that opens with its own words (a lead): the lead as written, the rules of each
+ * section's description, count and callouts, and the heading-language clause. The lead says what the log section holds,
+ * so no log rule is added.
+ */
+function leadStructure(
+  template: DetailTemplate,
+  lead: string,
+  language: ContentLanguage,
+  anchor: FollowAnchor
+): { sections: string; owned: OwnedText[] } {
+  const rules: string[] = [];
+  for (const section of template.sections) {
+    const heading = headingOf(section.name);
+    if (section.description.trim()) rules.push(descriptionRule(section, language).rule!);
+    if (section.count)
+      rules.push(customDetailRule(section.count.mode, language, { heading, n: String(section.count.n) }));
+    for (const callout of section.callouts ?? [])
+      rules.push(
+        customDetailCallout(language, {
+          heading,
+          type: callout.type,
+          fold: callout.fold,
+          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+        })
+      );
+  }
+  const sections = [lead, ...rules, headingsVerbatim(language, undefined, !isBuiltinTemplateId(template.id), anchor)]
+    .filter(Boolean)
+    .join("\n");
+  return { sections, owned: [{ text: lead }, ...describedSections(template, language)] };
 }
 
 /**
  * Resolves the template choice. A built-in template that is not modified (no body, or a body equal to the built-in
- * text) takes today's path: today's template object and format fragment. A modified body goes through the parser.
+ * text) takes today's path: today's template object and format fragment. A modified body goes through the parser and is
+ * put together from what the text holds: a lead, the sections, the format rules; the Textbook id has no part in it.
  */
 function templateParts(
   selection: StyleSelection,
@@ -177,14 +237,31 @@ function templateParts(
   if (unmodified) {
     const today =
       context.detailTemplate ?? (id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language));
-    return { sections: structure(today), format: inLanguage(OBSIDIAN_FORMAT, language) };
+    const owned = describedSections(today, language);
+    // Today's Textbook structure text is the text of its template block's lead.
+    if (today.id === TEXTBOOK_TEMPLATE_ID && today.layout !== "intro") {
+      const log = today.sections.find(section => section.role === "log") ?? today.sections[today.sections.length - 1];
+      owned.unshift({
+        text: textbookDetailStructure(language, {
+          headings: today.sections.map(section => headingOf(section.name)).join(", "),
+          log: headingOf(log.name)
+        })
+      });
+    }
+    return { sections: structure(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language) };
   }
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
     const issue = parsed.issues[0];
     throw new Error(`Template block ${id}: line ${issue.line}: ${issue.message}`);
   }
-  return { sections: structure(parsed.template), format: parsed.format };
+  if (parsed.lead)
+    return { ...leadStructure(parsed.template, parsed.lead, language, topicAnchor), format: parsed.format };
+  // No lead: the standard wrapper sentence for the standard id, else the generic one. The generic one must not take the
+  // Textbook id's fixed structure text, so a Textbook-named block is put together under a neutral id.
+  const template =
+    parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
+  return { sections: structure(template), owned: describedSections(template, language), format: parsed.format };
 }
 
 /** The format rules the prompt carries for the template: the zone with the old note style switches applied. */
@@ -266,18 +343,15 @@ export function assembleTaskPrompt(
   if (step === "decompose") add(fixed("", "template"));
   else {
     const parts = templateParts(selection, context, language, topicAnchor, options);
-    const pieces: Piece[] = [];
-    const sections = (text: string): Piece => [
-      text,
-      { kind: "block", category: "template", id: selection.template.id, part: "sections" }
-    ];
+    const pieces: Piece[][] = [];
     if (selection.template.adaptive)
-      pieces.push(fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language), "adaptive-detail-structure"));
-    else pieces.push(sections(parts.sections));
+      pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language), "adaptive-detail-structure")]);
+    else pieces.push(sectionPieces(parts, selection.template.id));
     // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
     if (readerFacingDetail(context) && step !== "merge") {
       const text = formatText(parts, selection, language);
-      if (text) pieces.push([text, { kind: "block", category: "template", id: selection.template.id, part: "format" }]);
+      if (text)
+        pieces.push([[text, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
     }
     add(...withSeparators(pieces));
   }
@@ -314,7 +388,30 @@ export function assembleTaskPrompt(
   };
 }
 
-/** The pieces of one element joined by the sections-to-format blank line. */
-function withSeparators(pieces: Piece[]): Piece[] {
-  return pieces.flatMap((piece, index): Piece[] => (index > 0 ? [["\n\n", { kind: "separator" }], piece] : [piece]));
+/**
+ * The sections text as pieces: the block's own words (lead, descriptions) are block segments, the plugin's wrapper
+ * sentences between them are fixed segments. The text is the same; only the cut differs.
+ */
+function sectionPieces(parts: TemplateParts, id: string): Piece[] {
+  const text = parts.sections;
+  const block = (part: string): Piece => [part, { kind: "block", category: "template", id, part: "sections" }];
+  const pieces: Piece[] = [];
+  let cursor = 0;
+  for (const item of parts.owned) {
+    if (!item.text) continue;
+    const at = text.indexOf(item.rule ?? item.text, cursor);
+    if (at < 0) continue;
+    const start = item.rule ? at + item.rule.lastIndexOf(item.text) : at;
+    if (start > cursor) pieces.push(fixed(text.slice(cursor, start), "detail-structure"));
+    pieces.push(block(item.text));
+    cursor = start + item.text.length;
+  }
+  if (!pieces.length) return [block(text)];
+  if (cursor < text.length) pieces.push(fixed(text.slice(cursor), "detail-structure"));
+  return pieces;
+}
+
+/** The groups of one element joined by the sections-to-format blank line. */
+function withSeparators(groups: Piece[][]): Piece[] {
+  return groups.flatMap((group, index): Piece[] => (index > 0 ? [["\n\n", { kind: "separator" }], ...group] : group));
 }

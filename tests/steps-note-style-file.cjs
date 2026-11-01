@@ -300,3 +300,22 @@ test('normalizeStyleContent', () => {
   assert.equal(S.normalizeStyleContent('﻿a  \r\nb\t\r\n\r\n'), 'a\nb\n');
   assert.equal(S.normalizeStyleContent('a\n'), S.normalizeStyleContent('a'));
 });
+
+test('callout rule keys (P1): three languages, aliases, off, lower-casing, default values omitted', () => {
+  eq(ok('## A\nx').calloutMap, {});
+  eq(ok('---\n結論方框: abstract\n風險方框: Caution\n問題方框: 關\n技巧方框: example\n---\n## A\nx').calloutMap, { summary: 'abstract', warning: 'caution', question: 'off', tip: 'example' });
+  eq(ok('---\n结论方框: tldr\n风险方框: 关\n问题方框: faq\n技巧方框: hint\n---\n## A\nx').calloutMap, { summary: 'tldr', warning: 'off', question: 'faq', tip: 'hint' });
+  eq(ok('---\nsummary callout: abstract\nrisk callout: off\nquestion callout: help\ntip callout: example\n---\n## A\nx').calloutMap, { summary: 'abstract', warning: 'off', question: 'help', tip: 'example' });
+  eq(ok('---\n結論方框: summary\n風險方框: warning\n問題方框: question\n技巧方框: tip\n---\n## A\nx').calloutMap, {});
+  eq(ok('---\n結論方框: abstract\nrisk callout: danger\n问题方框: off\n---\n## A\nx').calloutMap, { summary: 'abstract', warning: 'danger', question: 'off' });
+});
+
+test('callout rule keys (P1): bad values, empty values, duplicates, custom types fail closed with the line', () => {
+  assert.equal(fail('---\n結論方框: banana\n---\n## A', 'value_invalid')[0].line, 2);
+  assert.equal(fail('---\n語氣: x\n問題方框:\n---\n## A', 'value_invalid')[0].line, 3);
+  assert.equal(fail('---\n風險方框: my-custom\n---\n## A', 'value_invalid')[0].line, 2);
+  const dup = fail('---\n結論方框: note\n語氣: x\n结论方框: info\n---\n## A', 'key_duplicate');
+  assert.equal(dup[0].line, 4);
+  assert.equal(fail('---\ntip callout: note\n技巧方框: info\n---\n## A', 'key_duplicate')[0].line, 3);
+  assert.equal(fail('---\n技巧方框: summary callout\n---\n## A', 'value_invalid')[0].line, 2);
+});

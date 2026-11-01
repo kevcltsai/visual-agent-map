@@ -1597,6 +1597,7 @@ var en = {
   "ui.note_style_issue_frontmatter_unclosed": "The frontmatter opened by --- on line 1 is never closed.",
   "ui.note_style_issue_frontmatter_line": 'This line is not written as "key: value".',
   "ui.note_style_issue_value_invalid": '"{1}" is not a valid value for "{0}".',
+  "ui.note_style_issue_key_duplicate": "The same key is written more than once.",
   "ui.note_style_issue_no_sections": "The file has no ## section.",
   "ui.note_style_issue_count_invalid": "The count is not a number.",
   "ui.note_style_issue_comment_unclosed": "A %% comment is never closed.",
@@ -3829,6 +3830,7 @@ var zhCN = {
   "ui.note_style_issue_frontmatter_unclosed": "\u7B2C 1 \u884C\u7684 --- \u5F00\u5934\u6CA1\u6709\u5BF9\u5E94\u7684\u7ED3\u5C3E ---\u3002",
   "ui.note_style_issue_frontmatter_line": "\u8FD9\u4E00\u884C\u4E0D\u662F\u201C\u9879\u76EE: \u503C\u201D\u7684\u683C\u5F0F\u3002",
   "ui.note_style_issue_value_invalid": "\u201C{0}\u201D\u7684\u503C\u201C{1}\u201D\u4E0D\u5408\u6CD5\u3002",
+  "ui.note_style_issue_key_duplicate": "\u540C\u4E00\u4E2A\u9879\u76EE\u5199\u4E86\u4E0D\u6B62\u4E00\u6B21\u3002",
   "ui.note_style_issue_no_sections": "\u6587\u4EF6\u91CC\u6CA1\u6709\u4EFB\u4F55 ## \u6BB5\u843D\u3002",
   "ui.note_style_issue_count_invalid": "\u6570\u91CF\u4E0D\u662F\u6570\u5B57\u3002",
   "ui.note_style_issue_comment_unclosed": "\u6709\u4E00\u6BB5 %% \u6CE8\u91CA\u6CA1\u6709\u7ED3\u5C3E\u3002",
@@ -6061,6 +6063,7 @@ var zhTW = {
   "ui.note_style_issue_frontmatter_unclosed": "\u7B2C 1 \u884C\u7684 --- \u958B\u982D\u6C92\u6709\u5C0D\u61C9\u7684\u7D50\u5C3E ---\u3002",
   "ui.note_style_issue_frontmatter_line": "\u9019\u4E00\u884C\u4E0D\u662F\u300C\u9805\u76EE: \u503C\u300D\u7684\u683C\u5F0F\u3002",
   "ui.note_style_issue_value_invalid": "\u300C{0}\u300D\u7684\u503C\u300C{1}\u300D\u4E0D\u5408\u6CD5\u3002",
+  "ui.note_style_issue_key_duplicate": "\u540C\u4E00\u500B\u9805\u76EE\u5BEB\u4E86\u4E0D\u53EA\u4E00\u6B21\u3002",
   "ui.note_style_issue_no_sections": "\u6A94\u6848\u88E1\u6C92\u6709\u4EFB\u4F55 ## \u6BB5\u843D\u3002",
   "ui.note_style_issue_count_invalid": "\u6578\u91CF\u4E0D\u662F\u6578\u5B57\u3002",
   "ui.note_style_issue_comment_unclosed": "\u6709\u4E00\u6BB5 %% \u8A3B\u89E3\u6C92\u6709\u7D50\u5C3E\u3002",
@@ -8877,11 +8880,13 @@ var FORMAT_ITEM_NAMES = {
   en: ["callouts", "diagrams (mermaid)", "tables", "task lists (- [ ])", "highlights (==highlight==)"]
 };
 function obsidianFormat(language2, preferences) {
+  var _a2;
   const original = inLanguage(OBSIDIAN_FORMAT, language2);
   if (!preferences) return original;
   const { callouts, diagrams, tables, tasks, highlight } = preferences;
   const placed = callouts === "placed";
-  if (!placed && diagrams && tables && tasks && highlight) return original;
+  const calloutMap = (_a2 = preferences.calloutMap) != null ? _a2 : {};
+  if (!placed && diagrams && tables && tasks && highlight && !Object.keys(calloutMap).length) return original;
   const zh = instructionLanguageOf(language2) === "zh";
   const off = [placed, !diagrams, !tables, !tasks, !highlight];
   const lines = [];
@@ -8889,6 +8894,11 @@ function obsidianFormat(language2, preferences) {
   for (let line of original.split("\n")) {
     if (line.startsWith("- ")) {
       if (placed && line.includes("> [!")) continue;
+      const lead = /^- [^`]*`> \[!(summary|warning|question|tip)\]`/.exec(line);
+      const to = lead ? calloutMap[lead[1]] : void 0;
+      if (lead && to === "off") continue;
+      if (lead && to)
+        line = lead[1] === "tip" ? line.replace(zh ? "`> [!tip]` \u6216 `> [!example]`" : "`> [!tip]` or `> [!example]`", `\`> [!${to}]\``) : line.replace(`\`> [!${lead[1]}]\``, `\`> [!${to}]\``);
       if (!diagrams && line.includes("```mermaid```")) continue;
       if (!tasks && line.includes("`- [ ]`")) continue;
       if (!highlight && line.includes("==highlight==")) continue;
@@ -8900,6 +8910,7 @@ function obsidianFormat(language2, preferences) {
       lastBullet = lines.length - 1;
     } else lines.push(line);
   }
+  if (!off.some(Boolean)) return lines.join("\n");
   const names3 = FORMAT_ITEM_NAMES[zh ? "zh" : "en"];
   const list = names3.filter((_, index) => off[index]).join(zh ? "\u3001" : ", ");
   const sentence = [
@@ -24802,6 +24813,35 @@ var guide_en_default2 = '---\ntone: Practical guide\ncallouts: auto\n---\n%% Thi
 
 // ai/note-style-file.ts
 var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
+var OBSIDIAN_CALLOUT_TYPES = /* @__PURE__ */ new Set([
+  "note",
+  "abstract",
+  "summary",
+  "tldr",
+  "info",
+  "todo",
+  "tip",
+  "hint",
+  "important",
+  "success",
+  "check",
+  "done",
+  "question",
+  "help",
+  "faq",
+  "warning",
+  "caution",
+  "attention",
+  "failure",
+  "fail",
+  "missing",
+  "danger",
+  "error",
+  "bug",
+  "example",
+  "quote",
+  "cite"
+]);
 var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
 var CANONICAL_LANGUAGES = ["zh-TW", "zh-CN", "en"];
 function byLanguage(zhTW2, zhCN2, en2) {
@@ -24905,6 +24945,19 @@ var FRONTMATTER_KEYS = {
   \u8367\u5149\u6807\u8BB0: "highlight",
   highlight: "highlight"
 };
+var CALLOUT_KEYS = {
+  \u7D50\u8AD6\u65B9\u6846: "summary",
+  \u7ED3\u8BBA\u65B9\u6846: "summary",
+  "summary callout": "summary",
+  \u98A8\u96AA\u65B9\u6846: "warning",
+  \u98CE\u9669\u65B9\u6846: "warning",
+  "risk callout": "warning",
+  \u554F\u984C\u65B9\u6846: "question",
+  \u95EE\u9898\u65B9\u6846: "question",
+  "question callout": "question",
+  \u6280\u5DE7\u65B9\u6846: "tip",
+  "tip callout": "tip"
+};
 var ON = /* @__PURE__ */ new Set(["\u958B", "\u5F00", "on", "true"]);
 var OFF = /* @__PURE__ */ new Set(["\u95DC", "\u5173", "off", "false"]);
 var COMMENT_MARK = "%%";
@@ -25002,6 +25055,8 @@ function parseNoteStyleFile(text11, options) {
     tasks: true,
     highlight: true
   };
+  const calloutMap = {};
+  const calloutSeen = /* @__PURE__ */ new Set();
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
     const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
@@ -25018,11 +25073,37 @@ function parseNoteStyleFile(text11, options) {
           issues.push(issue(index + 1, "frontmatter_line", `Line ${index + 1} is not "key: value".`));
           continue;
         }
-        const field = FRONTMATTER_KEYS[pair6[1].trim().toLocaleLowerCase()];
-        if (!field) continue;
+        const keyName = pair6[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
         let value = pair6[2].trim();
         if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
         const where = index + 1;
+        const calloutField = CALLOUT_KEYS[keyName];
+        if (calloutField) {
+          const lower2 = value.toLocaleLowerCase();
+          if (calloutSeen.has(calloutField))
+            issues.push(
+              issue(where, "key_duplicate", `Line ${where}: "${pair6[1].trim()}" is written twice.`, pair6[1].trim())
+            );
+          else {
+            calloutSeen.add(calloutField);
+            if (OFF.has(lower2)) calloutMap[calloutField] = "off";
+            else if (OBSIDIAN_CALLOUT_TYPES.has(lower2)) {
+              if (lower2 !== calloutField) calloutMap[calloutField] = lower2;
+            } else
+              issues.push(
+                issue(
+                  where,
+                  "value_invalid",
+                  `Line ${where}: "${value}" is not an Obsidian callout type.`,
+                  pair6[1].trim(),
+                  value
+                )
+              );
+          }
+          continue;
+        }
+        const field = FRONTMATTER_KEYS[keyName];
+        if (!field) continue;
         if (field === "tone") {
           if (value.length > NOTE_STYLE_LIMITS.tone)
             issues.push(
@@ -25124,6 +25205,7 @@ function parseNoteStyleFile(text11, options) {
       tables: flags.tables,
       tasks: flags.tasks,
       highlight: flags.highlight,
+      calloutMap,
       layout: intro ? "intro" : "sections",
       intro,
       sections,
@@ -25633,6 +25715,7 @@ var ISSUE_KEYS = /* @__PURE__ */ new Set([
   "frontmatter_unclosed",
   "frontmatter_line",
   "value_invalid",
+  "key_duplicate",
   "no_sections",
   "count_invalid",
   "comment_unclosed"

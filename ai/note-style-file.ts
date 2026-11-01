@@ -47,6 +47,45 @@ export interface NoteStyleSection extends DetailSection {
   /** 1-based line of the section's "##" heading. */
   line: number;
 }
+/** The four callout types a style file can remap (the prompt's summary / warning / question / tip lines). */
+export const CALLOUT_MAP_KEYS = ["summary", "warning", "question", "tip"] as const;
+export type CalloutMapKey = (typeof CALLOUT_MAP_KEYS)[number];
+/** Only entries that differ from the default are present; "off" removes the prompt line. */
+export type CalloutMap = Partial<Record<CalloutMapKey, string>>;
+/**
+ * Obsidian's built-in callout types and aliases, lower-case (source: https://help.obsidian.md/callouts, checked
+ * 2026-11-01). Custom CSS types are not accepted.
+ */
+export const OBSIDIAN_CALLOUT_TYPES: ReadonlySet<string> = new Set([
+  "note",
+  "abstract",
+  "summary",
+  "tldr",
+  "info",
+  "todo",
+  "tip",
+  "hint",
+  "important",
+  "success",
+  "check",
+  "done",
+  "question",
+  "help",
+  "faq",
+  "warning",
+  "caution",
+  "attention",
+  "failure",
+  "fail",
+  "missing",
+  "danger",
+  "error",
+  "bug",
+  "example",
+  "quote",
+  "cite"
+]);
+
 export interface NoteStyle {
   id: string;
   name: string;
@@ -58,6 +97,8 @@ export interface NoteStyle {
   tables: boolean;
   tasks: boolean;
   highlight: boolean;
+  /** Callout type per prompt line, only where the file changes the default; empty when nothing changes. */
+  calloutMap: CalloutMap;
   layout: "intro" | "sections";
   /** Text before the first "##", comments removed and trimmed; empty for the sections layout. */
   intro: string;
@@ -201,6 +242,19 @@ const FRONTMATTER_KEYS: Record<string, "tone" | "callouts" | "diagrams" | "table
   荧光标记: "highlight",
   highlight: "highlight"
 };
+const CALLOUT_KEYS: Record<string, CalloutMapKey> = {
+  結論方框: "summary",
+  结论方框: "summary",
+  "summary callout": "summary",
+  風險方框: "warning",
+  风险方框: "warning",
+  "risk callout": "warning",
+  問題方框: "question",
+  问题方框: "question",
+  "question callout": "question",
+  技巧方框: "tip",
+  "tip callout": "tip"
+};
 const ON = new Set(["開", "开", "on", "true"]);
 const OFF = new Set(["關", "关", "off", "false"]);
 const COMMENT_MARK = "%%";
@@ -320,6 +374,8 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     tasks: true,
     highlight: true
   };
+  const calloutMap: CalloutMap = {};
+  const calloutSeen = new Set<CalloutMapKey>();
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
     const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
@@ -336,11 +392,37 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
           issues.push(issue(index + 1, "frontmatter_line", `Line ${index + 1} is not "key: value".`));
           continue;
         }
-        const field = FRONTMATTER_KEYS[pair[1].trim().toLocaleLowerCase()];
-        if (!field) continue;
+        const keyName = pair[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
         let value = pair[2].trim();
         if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
         const where = index + 1;
+        const calloutField = CALLOUT_KEYS[keyName];
+        if (calloutField) {
+          const lower = value.toLocaleLowerCase();
+          if (calloutSeen.has(calloutField))
+            issues.push(
+              issue(where, "key_duplicate", `Line ${where}: "${pair[1].trim()}" is written twice.`, pair[1].trim())
+            );
+          else {
+            calloutSeen.add(calloutField);
+            if (OFF.has(lower)) calloutMap[calloutField] = "off";
+            else if (OBSIDIAN_CALLOUT_TYPES.has(lower)) {
+              if (lower !== calloutField) calloutMap[calloutField] = lower;
+            } else
+              issues.push(
+                issue(
+                  where,
+                  "value_invalid",
+                  `Line ${where}: "${value}" is not an Obsidian callout type.`,
+                  pair[1].trim(),
+                  value
+                )
+              );
+          }
+          continue;
+        }
+        const field = FRONTMATTER_KEYS[keyName];
+        if (!field) continue;
         if (field === "tone") {
           if (value.length > NOTE_STYLE_LIMITS.tone)
             issues.push(
@@ -453,6 +535,7 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
       tables: flags.tables,
       tasks: flags.tasks,
       highlight: flags.highlight,
+      calloutMap,
       layout: intro ? "intro" : "sections",
       intro,
       sections,

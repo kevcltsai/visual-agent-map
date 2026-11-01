@@ -57,11 +57,13 @@ test('collect snapshots: note style files (parsed file sections, intro layout, e
   const sectionsStyle = parsed('---\n語氣: 親切白話\n---\n## 核心結論\n數量: 3\n用 1–3 句講最重要的結論。\n> [!summary]\n> 先講結論。\n\n## 證據與來源\n列出來源。\n\n## 更新紀錄\n一行摘要。\n');
   const introStyle = parsed('---\n語氣: 親切白話\n圖表: 關\n---\n先用 2–4 段導讀帶讀者進入主題。\n\n## 核心結論\n> [!summary]\n> 用 1–3 句講最重要的結論。\n\n## 常見誤解\n> [!warning]\n> 用「初學者常以為…，其實…」的句型。\n');
   const offStyle = parsed('---\n方框: 指定\n圖表: 關\n表格: 關\n待辦清單: 關\n螢光標記: 關\n---\n## 核心結論\n講結論。\n');
+  const calloutStyle = parsed('---\n方框: 自動\n結論方框: abstract\n風險方框: caution\n問題方框: 關\n技巧方框: example\n---\n## 核心結論\n講結論。\n');
   for (const [language, tag] of LANGUAGES) {
     const ctx = { ...base, outputLanguage: language };
     const withStyle = style => ({ ...ctx, detailTemplate: style.template, noteStyle: style, toneText: undefined });
     await recordContext(`service.task-style-file-sections.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file (sections layout, count, callout instruction, sources and log roles)', language, withStyle(sectionsStyle));
     await recordContext(`service.task-style-file-intro.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file in the intro layout (lead-in, empty sections omitted, diagrams off)', language, withStyle(introStyle));
+    await recordContext(`service.task-style-file-callout-map.${tag}`, 'AiTaskService instructions: mode task with a note style file that remaps the summary, risk and tip callouts and turns the question callout off', language, withStyle(calloutStyle));
     await recordContext(`service.task-style-file-format-off.${tag}`, 'AiTaskService instructions: mode task with a note style file that turns callouts (placed only), diagrams, tables, task lists and highlights off', language, withStyle(offStyle));
   }
 });

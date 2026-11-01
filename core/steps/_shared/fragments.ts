@@ -197,6 +197,8 @@ export interface FormatPreferences {
   tables: boolean;
   tasks: boolean;
   highlight: boolean;
+  /** Replacement callout type (or "off" to drop the line) for the summary / warning / question / tip lines; absent = default. */
+  calloutMap?: Partial<Record<"summary" | "warning" | "question" | "tip", string>>;
 }
 const FORMAT_PREFERENCES: FragmentPair = { zh: FormatPreferencesZH, en: FormatPreferencesEN };
 const FORMAT_PREFERENCES_PLACED: FragmentPair = {
@@ -218,7 +220,8 @@ export function obsidianFormat(language: ContentLanguage, preferences?: FormatPr
   if (!preferences) return original;
   const { callouts, diagrams, tables, tasks, highlight } = preferences;
   const placed = callouts === "placed";
-  if (!placed && diagrams && tables && tasks && highlight) return original;
+  const calloutMap = preferences.calloutMap ?? {};
+  if (!placed && diagrams && tables && tasks && highlight && !Object.keys(calloutMap).length) return original;
   const zh = instructionLanguageOf(language) === "zh";
   const off = [placed, !diagrams, !tables, !tasks, !highlight];
   const lines: string[] = [];
@@ -226,6 +229,15 @@ export function obsidianFormat(language: ContentLanguage, preferences?: FormatPr
   for (let line of original.split("\n")) {
     if (line.startsWith("- ")) {
       if (placed && line.includes("> [!")) continue;
+      // A remapped callout line (D5): its first callout token names the line; "off" drops it, otherwise the type is swapped.
+      const lead = /^- [^`]*`> \[!(summary|warning|question|tip)\]`/.exec(line);
+      const to = lead ? calloutMap[lead[1] as "summary" | "warning" | "question" | "tip"] : undefined;
+      if (lead && to === "off") continue;
+      if (lead && to)
+        line =
+          lead[1] === "tip"
+            ? line.replace(zh ? "`> [!tip]` 或 `> [!example]`" : "`> [!tip]` or `> [!example]`", `\`> [!${to}]\``)
+            : line.replace(`\`> [!${lead[1]}]\``, `\`> [!${to}]\``);
       if (!diagrams && line.includes("```mermaid```")) continue;
       if (!tasks && line.includes("`- [ ]`")) continue;
       if (!highlight && line.includes("==highlight==")) continue;
@@ -238,6 +250,8 @@ export function obsidianFormat(language: ContentLanguage, preferences?: FormatPr
       lastBullet = lines.length - 1;
     } else lines.push(line);
   }
+  // Only callout lines were remapped or dropped: no syntax is switched off, so no "does not use" sentence.
+  if (!off.some(Boolean)) return lines.join("\n");
   const names = FORMAT_ITEM_NAMES[zh ? "zh" : "en"];
   const list = names.filter((_, index) => off[index]).join(zh ? "、" : ", ");
   const sentence = [

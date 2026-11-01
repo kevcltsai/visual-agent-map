@@ -1501,6 +1501,21 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.task-style-file-callout-map.en": {
+      "builder": "AiTaskService instructions: mode task with a note style file that remaps the summary, risk and tip callouts and turns the question callout off",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-style-file-callout-map.zh": {
+      "builder": "AiTaskService instructions: mode task with a note style file that remaps the summary, risk and tip callouts and turns the question callout off",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-style-file-callout-map.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with a note style file that remaps the summary, risk and tip callouts and turns the question callout off",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-style-file-format-off.en": {
       "builder": "AiTaskService instructions: mode task with a note style file that turns callouts (placed only), diagrams, tables, task lists and highlights off",
       "language": "en",

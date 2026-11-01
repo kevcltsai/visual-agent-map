@@ -165,3 +165,30 @@ test('chartEligible: styleDiagrams false blocks the chart step; absent or true k
   assert.equal(service.chartEligible({ ...base, styleDiagrams: false }), false);
   assert.equal(service.chartEligible({ ...base, mode: 'synthesize', styleDiagrams: false }), false);
 });
+
+test('callout map (P1): swaps the type, keeps danger, tip line swaps both types, off drops the line, placed overrides, default is byte-identical', () => {
+  for (const language of LANGUAGES) {
+    const original = M.inLanguage(M.OBSIDIAN_FORMAT, language);
+    assert.equal(M.obsidianFormat(language, { ...ON, calloutMap: {} }), original);
+    const mapped = M.obsidianFormat(language, { ...ON, calloutMap: { summary: 'abstract', warning: 'caution', tip: 'example' } });
+    const bullets = mapped.split('\n').filter(line => line.startsWith('- '));
+    assert.ok(!bullets.some(line => line.includes('`> [!summary]`')));
+    assert.ok(bullets.some(line => line.includes('`> [!abstract]`')));
+    assert.ok(bullets.some(line => line.includes('`> [!caution]`') && line.includes('`> [!danger]`') && !line.includes('[!warning]')));
+    assert.ok(bullets.some(line => line.includes('`> [!example]`') && !line.includes('[!tip]')));
+    assert.ok(bullets.some(line => line.includes('`> [!question]`')));
+    assert.equal(bullets.length, original.split('\n').filter(line => line.startsWith('- ')).length);
+    const off = M.obsidianFormat(language, { ...ON, calloutMap: { question: 'off', warning: 'off' } });
+    assert.ok(!off.includes('[!question]') && !off.includes('[!danger]') && !off.includes('[!warning]'));
+    assert.ok(off.includes('`> [!summary]`'));
+    assert.ok(!/這個風格不使用|This style does not use/.test(off));
+    const placed = M.obsidianFormat(language, { ...ON, callouts: 'placed', calloutMap: { summary: 'abstract' } });
+    assert.equal(placed, M.obsidianFormat(language, { ...ON, callouts: 'placed' }));
+  }
+});
+
+test('callout map (P1): a parsed style file carries its map into the prompt', () => {
+  const style = parse('---\n方框: 自動\n結論方框: abstract\n問題方框: 關\n---\n## A\nx\n');
+  const text = M.obsidianFormat('en', style);
+  assert.ok(text.includes('`> [!abstract]`') && !text.includes('[!question]') && !text.includes('`> [!summary]`'));
+});

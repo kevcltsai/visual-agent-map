@@ -1561,6 +1561,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.note_style_issue_frontmatter_unclosed": "第 1 行的 --- 开头没有对应的结尾 ---。",
   "ui.note_style_issue_frontmatter_line": "这一行不是“项目: 值”的格式。",
   "ui.note_style_issue_value_invalid": "“{0}”的值“{1}”不合法。",
+  "ui.note_style_issue_key_duplicate": "同一个项目写了不止一次。",
   "ui.note_style_issue_no_sections": "文件里没有任何 ## 段落。",
   "ui.note_style_issue_count_invalid": "数量不是数字。",
   "ui.note_style_issue_comment_unclosed": "有一段 %% 注释没有结尾。",

@@ -98,6 +98,7 @@ const ISSUE_KEYS = new Set([
   "frontmatter_unclosed",
   "frontmatter_line",
   "value_invalid",
+  "key_duplicate",
   "no_sections",
   "count_invalid",
   "comment_unclosed"

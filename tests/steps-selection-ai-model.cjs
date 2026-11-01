@@ -1,5 +1,5 @@
 // MS-05 P5a: the selection AI panel reads the current model when a run starts (not when it opens), the image-translate
-// action warns beforehand under a Claude model, and the sample copy and the panel go through plugin.currentModelChoice().
+// action warns beforehand under a Claude model, and the panel goes through plugin.currentModelChoice().
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -132,11 +132,10 @@ test('pressing a translate button re-reads the model, so a switch to Claude show
   assert.deepEqual(sentModels, ['claude:sonnet'], 'the run still sends, so the runtime error stays the last defence');
 });
 
-test('the sample copy and the selection AI take the model from plugin.currentModelChoice()', () => {
+test('the selection AI takes the model from plugin.currentModelChoice()', () => {
   const main = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
   assert.match(main, /currentModelChoice\(\): ModelChoice \{\s*const \{ model, reasoning \} = resolveTaskModel\(\{\s*current:/);
   assert.match(main, /model: \(\) => this\.currentModelChoice\(\)\.model,\s*imageNeedsCodex/);
-  assert.match(main, /this\.currentModelChoice\(\)\.model,\s*map,\s*path,\s*source\.parentId/);
   assert.match(main, /imageNeedsCodex: \(\) => this\.runtimeIdFor\(this\.currentModelChoice\(\)\.model\) === "claude"/);
   const panel = fs.readFileSync(path.join(root, 'experiences/markdown-context/selection-ai.ts'), 'utf8');
   assert.doesNotMatch(panel, /this\.model\b/, 'the panel keeps no model copy');

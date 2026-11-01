@@ -21,6 +21,7 @@ import {
   type BlockCategory
 } from "../../blocks/builtin";
 import { parseTemplateBlock } from "../../blocks/template-block";
+import type { NoteStyleIssue } from "../../../ai/note-style-file";
 import {
   applyFormatPreferences,
   headingsVerbatim,
@@ -86,12 +87,19 @@ export interface AssembledPrompt {
   readonly segments: readonly PromptSegment[];
   /** Whether the template asks for charts: its sections or format rules hold a mermaid code block. */
   readonly charts: boolean;
+  /** Template blocks that could not be read and were replaced by the built-in one for this prompt; empty normally. */
+  readonly issues: readonly BlockIssue[];
 }
+
+/** A block the assembler could not read: which one (and the file it came from, when known) and what is wrong, with its line. */
+export type BlockIssue = NoteStyleIssue & { category: "template"; id: string; fileName?: string };
 
 /** One chosen block. `body` is an inline text for a block outside the registry (a tone text from an old style file). */
 export interface BlockChoice {
   readonly id: string;
   readonly body?: string;
+  /** The file the body was read from, named in an issue when the body cannot be read. */
+  readonly fileName?: string;
 }
 export interface StyleSelection {
   /**
@@ -164,6 +172,8 @@ interface TemplateParts {
   /** The parts of `sections`, in order, that are the block's own words; the rest is the plugin's wrapper sentences. */
   readonly owned: readonly OwnedText[];
   readonly format: string;
+  /** Why the block was not used and the built-in one stands in; empty when the choice was used as written. */
+  readonly issues: readonly BlockIssue[];
 }
 
 const headingOf = (name: string): string => `### ${name}`;
@@ -257,20 +267,48 @@ function templateParts(
         })
       });
     }
-    return { sections: structure(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language) };
+    return { sections: structure(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language), issues: [] };
   }
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
-    const issue = parsed.issues[0];
-    throw new Error(`Template block ${id}: line ${issue.line}: ${issue.message}`);
+    // A block the user wrote that cannot be read: the built-in one stands in (the same id when it is a built-in, else
+    // Standard) and the problem is reported with the prompt. The adaptive and old-switch choices stay.
+    const issues = parsed.issues.map((issue): BlockIssue => ({
+      ...issue,
+      category: "template",
+      id,
+      ...(selection.template.fileName ? { fileName: selection.template.fileName } : {})
+    }));
+    const fallbackId = BUILTIN_BLOCKS.some(block => block.category === "template" && block.id === id)
+      ? id
+      : STANDARD_TEMPLATE_ID;
+    const { body: _body, fileName: _fileName, ...choice } = selection.template;
+    const detailTemplate = context.detailTemplate?.id === id && fallbackId !== id ? undefined : context.detailTemplate;
+    const fallback = templateParts(
+      { ...selection, template: { ...choice, id: fallbackId } },
+      { ...context, detailTemplate },
+      language,
+      topicAnchor,
+      {}
+    );
+    return { ...fallback, issues };
   }
   if (parsed.lead)
-    return { ...leadStructure(parsed.template, parsed.lead, language, topicAnchor), format: parsed.format };
+    return {
+      ...leadStructure(parsed.template, parsed.lead, language, topicAnchor),
+      format: parsed.format,
+      issues: []
+    };
   // No lead: the standard wrapper sentence for the standard id, else the generic one. The generic one must not take the
   // Textbook id's fixed structure text, so a Textbook-named block is put together under a neutral id.
   const template =
     parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
-  return { sections: structure(template), owned: describedSections(template, language), format: parsed.format };
+  return {
+    sections: structure(template),
+    owned: describedSections(template, language),
+    format: parsed.format,
+    issues: []
+  };
 }
 
 /** The format rules the prompt carries for the template: the zone with the old note style switches applied. */
@@ -287,6 +325,10 @@ export function chartsWanted(
   options: AssembleOptions = {}
 ): boolean {
   const parts = templateParts(selection, context, language, { kind: "topic", text: context.title }, options);
+  return partsAskForCharts(parts, selection, language);
+}
+
+function partsAskForCharts(parts: TemplateParts, selection: StyleSelection, language: ContentLanguage): boolean {
   // An adaptive detail has no fixed sections: only the format rules can ask for a chart.
   const sections = selection.template.adaptive ? "" : parts.sections;
   return sections.includes(CHART_BLOCK) || formatText(parts, selection, language).includes(CHART_BLOCK);
@@ -325,6 +367,8 @@ export function assembleTaskPrompt(
   const quick = step === "quick";
   const none = inLanguage(NONE, language);
   const topicAnchor: FollowAnchor = { kind: "topic", text: context.title };
+  // The template choice is read once: its charts answer and issues come from the same (possibly fallback) parts.
+  const parts = templateParts(selection, context, language, topicAnchor, options);
   // Each element is a list of pieces; elements are joined by a blank line, and an empty element still takes its place.
   const elements: Piece[][] = [];
   const add = (...pieces: Piece[]) => elements.push(pieces);
@@ -351,7 +395,6 @@ export function assembleTaskPrompt(
   add(fixed(inLanguage(modeFragment, language), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
-    const parts = templateParts(selection, context, language, topicAnchor, options);
     const pieces: Piece[][] = [];
     if (selection.template.adaptive)
       pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language), "adaptive-detail-structure")]);
@@ -393,7 +436,9 @@ export function assembleTaskPrompt(
   return {
     text: segments.map(segment => segment.text).join(""),
     segments,
-    charts: chartsWanted(selection, context, language, options)
+    charts: partsAskForCharts(parts, selection, language),
+    // The decompose step carries no template, so a template that could not be read changes nothing there.
+    issues: step === "decompose" ? [] : parts.issues
   };
 }
 

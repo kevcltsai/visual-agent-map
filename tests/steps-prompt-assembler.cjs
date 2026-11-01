@@ -40,7 +40,7 @@ test('an unknown block id or category throws instead of returning an empty body'
 let assemblerModule;
 const A = () => assemblerModule ??= loadSource(`
 export { assembleTaskPrompt, promptStepOf, selectionFromContext } from "./core/steps/task/assemble";
-export { generalTaskPrompt } from "./core/steps/task/render";
+export { generalTaskPrompt, assembledTaskPrompt } from "./core/steps/task/render";
 export { JSON_CONTRACT, GENERAL_TASK } from "./core/steps/task/fragments";
 export { ROLE, SOURCE_SAFETY, withProviderOutput, inLanguage, toneBlock, OBSIDIAN_FORMAT } from "./core/steps/_shared/fragments";
 export { builtinTemplateText } from "./core/blocks/builtin";
@@ -167,13 +167,15 @@ test('counter 5: the fixed parts are present and equal their fragments', () => {
   }
 });
 
+const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+
 test('counter 6: an unknown block id throws instead of leaving the prompt without that block', () => {
   const m = A();
   const context = { ...base, outputLanguage: 'en' };
   const selection = m.selectionFromContext(context, 'en');
   assert.throws(() => m.assembleTaskPrompt({ ...selection, template: { id: 'nope' } }, 'research', context, 'en'), /Unknown built-in block/);
-  const broken = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
-  assert.throws(() => m.assembleTaskPrompt({ ...selection, template: { id: 'standard', body: broken } }, 'research', context, 'en'), /line 5/i);
+  // A template body that cannot be read no longer throws: the built-in stands in and the problem is reported (ticket 05, see the counters below).
+  assert.doesNotThrow(() => m.assembleTaskPrompt({ ...selection, template: { id: 'standard', body: BROKEN } }, 'research', context, 'en'));
   assert.throws(() => m.assembleTaskPrompt({ ...selection, tone: { id: 'nope' } }, 'research', context, 'en'), /Unknown built-in block/);
 });
 
@@ -423,6 +425,109 @@ test('counter 13 (N1, decision 26): a custom template with a lead and no descrip
       const leadSegment = segments.find(s => s.source.kind === 'block' && s.source.part === 'sections');
       assert.equal(leadSegment.text, lead);
       assert.equal(segments.map(s => s.text).join(''), text);
+    }
+  }
+});
+
+// Ticket 05: a template block that cannot be read falls back to the built-in one and is reported with its line.
+const STEPS = ['research', 'quick', 'decompose', 'synthesize', 'merge'];
+
+test('05 counter 1: a broken body of a built-in id gives the built-in text byte for byte, with the line reported (5 steps x 3 languages)', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    for (const [name, raw] of stepContexts(language)) {
+      const context = { ...raw, outputLanguage: language };
+      const selection = m.selectionFromContext(context, language);
+      const step = m.promptStepOf(context);
+      const want = m.assembleTaskPrompt(selection, step, context, language);
+      for (const id of ['standard', 'textbook']) {
+        const got = m.assembleTaskPrompt({ ...selection, template: { ...selection.template, id, body: BROKEN, fileName: 'My.md' } }, step, context, language);
+        const builtin = m.assembleTaskPrompt({ ...selection, template: { ...selection.template, id } }, step, context, language);
+        assert.equal(got.text, builtin.text, `${language} ${name} ${id}`);
+        assert.equal(got.charts, builtin.charts);
+        if (name === 'decompose') assert.equal(got.issues.length, 0, 'the decompose step carries no template');
+        else {
+          assert.equal(got.issues[0].line, 5, `${language} ${name} ${id}`);
+          assert.equal(got.issues[0].category, 'template');
+          assert.equal(got.issues[0].id, id);
+          assert.equal(got.issues[0].fileName, 'My.md');
+          assert.equal(got.issues[0].code, 'format_heading_repeated');
+        }
+      }
+      assert.equal(want.issues.length, 0);
+    }
+  }
+});
+
+test('05 counter 2: a broken body of a non-built-in id falls back to standard and keeps adaptive and the old switches', () => {
+  const m = A();
+  const noteStyle = { callouts: 'placed', diagrams: false, tables: true, tasks: true, highlight: true };
+  for (const language of LANGUAGES) {
+    const context = { ...base, outputLanguage: language, noteStyle };
+    const selection = m.selectionFromContext(context, language);
+    const custom = { ...selection, template: { ...selection.template, id: 'uuid-x', body: BROKEN } };
+    const std = m.assembleTaskPrompt({ ...selection, template: { ...selection.template, id: 'standard' } }, 'research', context, language);
+    const got = m.assembleTaskPrompt(custom, 'research', context, language);
+    assert.equal(got.text, std.text);
+    assert.equal(got.issues[0].id, 'uuid-x');
+    assert.equal(got.issues[0].fileName, undefined);
+    // the old switches ride on: the same text differs from one without them
+    const without = m.assembleTaskPrompt({ ...custom, template: { id: 'uuid-x', body: BROKEN } }, 'research', { ...base, outputLanguage: language }, language);
+    assert.notEqual(without.text, got.text);
+    // adaptive: no sections text, the adaptive structure text instead
+    const adaptive = m.assembleTaskPrompt({ ...custom, template: { ...custom.template, adaptive: true } }, 'research', context, language);
+    const adaptiveStd = m.assembleTaskPrompt({ ...selection, template: { id: 'standard', adaptive: true, legacyPreferences: noteStyle } }, 'research', context, language);
+    assert.equal(adaptive.text, adaptiveStd.text);
+    assert.equal(adaptive.issues.length, 1);
+    // an old custom template object of the same id is not used either
+    const old = { id: 'uuid-x', name: 'Old', sections: [{ id: 's', name: 'Only', description: '', role: 'none', aliases: [] }] };
+    const withOld = m.assembleTaskPrompt(custom, 'research', { ...context, detailTemplate: old }, language);
+    assert.equal(withOld.text, std.text);
+  }
+});
+
+test('05 counter 3: chartsWanted does not throw on a broken body and equals the fallback answer', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    const context = { ...base, outputLanguage: language };
+    const selection = m.selectionFromContext(context, language);
+    for (const id of ['standard', 'textbook', 'uuid-y']) {
+      const broken = { ...selection, template: { ...selection.template, id, body: BROKEN } };
+      const fallback = { ...selection, template: { ...selection.template, id: id === 'uuid-y' ? 'standard' : id } };
+      assert.equal(m.chartsWanted(broken, context, language), m.chartsWanted(fallback, context, language));
+    }
+  }
+});
+
+test('05 counter 4: an id without a body that is not a built-in still throws', () => {
+  const m = A();
+  const context = { ...base, outputLanguage: 'en' };
+  const selection = m.selectionFromContext(context, 'en');
+  for (const step of STEPS) assert.throws(() => m.assembleTaskPrompt({ ...selection, template: { id: 'nope' } }, step === 'decompose' ? 'research' : step, context, 'en'), /Unknown built-in block/);
+  assert.throws(() => m.chartsWanted({ ...selection, template: { id: 'nope' } }, context, 'en'), /Unknown built-in block/);
+});
+
+test('05 counter 5: a valid edited body reports no issue (no false alarm)', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    const edited = m.builtinTemplateText('standard', language).split('\n').filter(line => !line.includes('[!summary]')).join('\n');
+    for (const [name, context] of stepContexts(language)) {
+      const selection = m.selectionFromContext(context, language);
+      const got = m.assembleTaskPrompt({ ...selection, template: { ...selection.template, body: edited } }, m.promptStepOf(context), context, language);
+      assert.equal(got.issues.length, 0, `${language} ${name}`);
+      assert.equal(m.assembleTaskPrompt(selection, m.promptStepOf(context), context, language).issues.length, 0);
+    }
+  }
+});
+
+test('05: assembledTaskPrompt carries the segments and issues, and generalTaskPrompt returns its text', () => {
+  const m = A();
+  for (const language of LANGUAGES) {
+    for (const [name, context] of stepContexts(language)) {
+      const assembled = m.assembledTaskPrompt(context, language, 'claude');
+      assert.equal(assembled.text, m.generalTaskPrompt(context, language, 'claude'), `${language} ${name}`);
+      assert.equal(assembled.segments.map(s => s.text).join(''), assembled.text);
+      assert.equal(assembled.issues.length, 0);
     }
   }
 });

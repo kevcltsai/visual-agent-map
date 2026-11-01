@@ -36,6 +36,7 @@ import {
 } from "obsidian";
 import { NoteStyleStore, type StyleFilePort } from "./ai/note-style-store";
 import { ChoiceModal } from "./ui/modals/choice-modal";
+import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import {
   AiUsageModal,
@@ -521,6 +522,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       }),
       key: "ui.context_ai_open"
     });
+    this.addLocalizedCommand("preview-full-prompt", "ui.preview_prompt_command", () => this.openPromptPreview());
     this.logs.appendLog("info", t("log.plugin_loaded_0", this.manifest.version || "unknown"));
     if (this.app.vault.adapter instanceof FileSystemAdapter && this.manifest.dir) {
       const adapter = this.app.vault.adapter;
@@ -1078,6 +1080,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.settings.cliModel = model.trim();
     await this.saveSettings();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
+  }
+  /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
+  openPromptPreview(trigger?: HTMLElement): void {
+    const provider = this.runtimeIdFor(this.currentModelChoice().model);
+    new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger).open();
   }
   /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice(): ModelChoice {

@@ -7,7 +7,6 @@ export const en = {
   "ui.proposal_name": "Proposal name",
   "ui.proposal_task": "Proposal task",
   "ui.no_map_open": "No mind map is open",
-  "ui.sample_outline_hint": "The read-only sample has no editable outline. Duplicate it from the map to begin.",
   "ui.empty_outline_hint": "This map has no topics yet. Add the first topic from the map.",
   "ui.clear_search": "Clear search",
   "ui.restore_deleted_map": "Restore the deleted mind map",
@@ -38,8 +37,6 @@ export const en = {
   "ui.open_coffee_tables": "Open Coffee Tables",
   "ui.model_discovery_summary_0_1": "Codex: {0} · Claude CLI candidates: {1}",
   "ui.my_editable_mind_map": "My editable mind map",
-  "ui.sample_start_hint":
-    "Duplicate this sample or create an empty mind map to start. An AI provider is only needed for AI tasks.",
   "ui.language_changed_content_preserved":
     "VAM and Coffee Tables are now in English. Existing notes and conversation text are unchanged.",
   "ui.language_change_save_failed": "Could not save the language setting. The previous language is still active.",
@@ -338,9 +335,6 @@ export const en = {
   "ui.aim_research_not_generated": "Research subtopics have not been generated for this answer.",
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.card_resize_label": "Card width",
-  "ui.start_using_vam": "Start using VAM",
-  "ui.check_codex": "Check Codex",
-  "ui.check_claude_code": "Check Claude Code",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
     "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
@@ -871,7 +865,6 @@ export const en = {
   "ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open":
     "Drag empty space to pan · Shift-drag to box-select · Scroll to zoom · Arrow keys move between topics",
   "ui.clear": "Clear",
-  "ui.next": "Next",
   "ui.select_topics": "Select several topics",
   "ui.finish_topic_selection": "Done selecting",
   "ui.prompt_select_topics": "Select topics",
@@ -1124,32 +1117,6 @@ export const en = {
   "ui.topic_note_display_repaired": "Topic note display repaired.",
   "ui.map_saved_but_reference_update_failed_0": "Map saved, but reference update failed: {0}",
   "ui.0_1_notes": "{0} ({1} notes)",
-  "ui.official_sample_read_only": "Official sample · Read-only",
-  "ui.sample_taiwan_travel_plan": "Sample: Planning a Taiwan Journey",
-  "ui.official_read_only_sample": "Official read-only sample",
-  "ui.duplicate_to_my_workspace": "Duplicate to my workspace",
-  "ui.tour_1_title": "1 / 5  Each card is one question",
-  "ui.tour_1_body":
-    "The map breaks a fuzzy goal into topics you can research separately. Drag empty space to move around; scroll to zoom.",
-  "ui.tour_2_title": "2 / 5  Click a card to work on it",
-  "ui.tour_2_body":
-    "Its toolbar appears above the card: Collapse, Structure, Rename, Details and ✦ AI explore. This sample is read-only, so only Details shows here.",
-  "ui.tour_3_title": "3 / 5  Findings live in Details",
-  "ui.tour_3_body":
-    "Details opens the topic's note on the right, with text, images and tables. Hover a card for a quick preview.",
-  "ui.tour_4_title": "4 / 5  Combine topics into a conclusion",
-  "ui.tour_4_body":
-    "In your own map, press Select several topics at the top left, pick cards, then synthesize them. The result is a new root that cites the sources it used.",
-  "ui.tour_5_title": "5 / 5  Make it yours",
-  "ui.tour_5_body":
-    "Duplicate this sample to edit it, or create an empty mind map. Add topics with ＋ Topic; its ▾ takes a pasted or AI-generated outline. AI runs only when you press an AI button.",
-  "ui.back": "Back",
-  "ui.skip_tour": "Skip tour",
-  "ui.finish_tour": "Finish tour",
-  "ui.sample_cleanup_failed": "{0}; cleanup failed for {1}: {2}",
-  "ui.sample_cleanup_folder_changed": "The folder was replaced; it has been preserved.",
-  "ui.created_an_editable_copy_of_the_sample": "Created an editable copy of the sample.",
-  "ui.show_tour_again": "Show tour again",
   "ui.agent_workspace_is_missing": "Agent Workspace is missing",
   "ui.the_base_folders_can_be_safely_recreated_existing_notes_will":
     "The base folders can be safely recreated. Existing notes will not be overwritten.",
@@ -1454,15 +1421,11 @@ export const en = {
     "Choosing a Workspace only reconnects the setting; it does not move or rewrite content.",
   "ui.reconnected_workspace_0": "Reconnected Workspace: {0}",
   "ui.create_a_new_mind_map": "Create a new mind map",
-  "ui.view_sample": "View sample",
-  "ui.view_sample_content": "View sample content",
-  "ui.sample_content": "Sample content",
   "ui.creates_only_missing_base_folders_it_never_restores_moves_or":
     "Creates only missing base folders. It never restores, moves, or overwrites notes or mind maps.",
   "ui.repair": "Repair",
   "ui.agent_workspace_is_ready": "Agent Workspace is ready.",
   "ui.map_unreadable_skipped_0_1": "Skipped an unreadable mind map: {0} ({1}). Other maps were updated.",
-  "ui.open_the_taiwan_travel_sample": "Open the Taiwan travel sample",
   "ui.open_debug_log": "Open Debug Log",
   "ui.debug_log": "Debug log",
   "ui.logs_are_kept_in_memory_only_and_disappear_when_the_plugin_r":
@@ -2426,7 +2389,6 @@ export const en = {
   "share.publish_instructions":
     'Please publish a VAM share file (.html) to GitHub Pages and give me a link I can share.\nShare file path: {0}\n1. Check the environment: make sure git and the GitHub CLI (gh) are installed and that I am signed in (`gh auth status`). If not, tell me how to install or sign in, and wait until I am done before continuing.\n2. Prepare the repo (vam-shared-maps): if it does not exist yet, first warn me "this creates a public repo, and anyone can see the maps in it"; after I agree, create it with a README and an empty .nojekyll. If it already exists, clone it or pull the latest.\n3. Add the share file: first skim it, and if you see private information such as an email, phone number, address, account name, password or a file path on my computer, list it and ask me. Copy it into maps/ with a name made of "a short English name + 6 random letters or digits"; if I say this updates an older map, overwrite the original file name. Commit only this file (the first time, also the README and .nojekyll) and push to main.\n4. Turn on GitHub Pages (first time only): gh api -X POST repos/[my-account]/vam-shared-maps/pages -f "source[branch]=main" -f "source[path]=/"\n5. Wait for the site to go live: every 10 seconds check https://[my-account].github.io/vam-shared-maps/maps/[file-name].html until it returns 200, for at most 5 minutes; use gh api repos/[my-account]/vam-shared-maps/pages/builds/latest to see the status, and report the error if it is errored.\n6. Report: give me the final link, remind me that everyone who has the link can see the content; to stop sharing, delete the file from maps/ and push again.',
   "share.unavailable_no_map": "Open a mind map first, then share it.",
-  "share.unavailable_sample": "The built-in sample is read-only and cannot be shared.",
   "share.unavailable_aim": "AI research maps cannot be shared yet.",
   "share.unavailable_empty": "This map has no topics to share yet.",
   "share.translate_section": "Translated versions",

@@ -110,7 +110,7 @@ export interface MapChatContextInput {
   detailBudget?: number;
   /** Titles of the maps the user has (untrusted text); at most {@link MAP_CHAT_MAP_TITLE_LIMIT} are sent. */
   mapTitles?: string[];
-  /** There is no map the reply could edit (the read-only sample, a map that cannot be changed): it has to start with `create_map`. */
+  /** There is no map the reply could edit (a map that cannot be changed): it has to start with `create_map`. */
   noEditableMap?: boolean;
 }
 export interface MapChatContext {

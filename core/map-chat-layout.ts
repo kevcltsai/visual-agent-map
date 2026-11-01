@@ -29,7 +29,7 @@ export function clampMapChatWidth(value: unknown): number {
 /**
  * Whether the side window folds to a narrow edge: only when even the narrowest window (280px) would leave the canvas less than
  * 360px. The set width does not matter (a docked window gives way down to 280), and neither does the width the canvas has right
- * now (folding widens it, and judging by that would unfold the window again at once). `inspector` is the width of the sample's
+ * now (folding widens it, and judging by that would unfold the window again at once). `inspector` is the width of the
  * inspector beside the canvas. A window that is folded stays folded until the pane is a little wider than the limit.
  */
 export function isChatNarrow(paneWidth: number, inspector = 0, wasNarrow = false): boolean {

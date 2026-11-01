@@ -402,6 +402,7 @@ var en = {
   "ui.aim_research_not_generated": "Research subtopics have not been generated for this answer.",
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.card_resize_label": "Card width",
+  "ui.card_height_label": "Card height",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
   "ui.understand_and_run": "Understand and run",
@@ -2603,6 +2604,7 @@ var zhCN = {
   "ui.aim_research_not_generated": "\u8FD9\u4E2A\u56DE\u7B54\u5C1A\u672A\u4EA7\u751F\u7814\u7A76\u5B50\u8BAE\u9898\u3002",
   "ui.aim_retry_subtopics": "\u91CD\u65B0\u4EA7\u751F\u5B50\u8BAE\u9898",
   "ui.card_resize_label": "\u5361\u7247\u5BBD\u5EA6",
+  "ui.card_height_label": "\u5361\u7247\u9AD8\u5EA6",
   "ui.codex_allowance_notice": "Codex \u989D\u5EA6\u63D0\u9192",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u4F1A\u901A\u8FC7\u4F60\u5F53\u524D\u767B\u5F55\u7684 Codex \u8D26\u53F7\u8FD0\u884C AI \u4EFB\u52A1\uFF0C\u5E76\u4F7F\u7528\u8BE5\u8D26\u53F7\u7684 Codex \u4F7F\u7528\u989D\u5EA6\u3002\u53EF\u7528\u989D\u5EA6\u4E0E\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.understand_and_run": "\u4E86\u89E3\u5E76\u8FD0\u884C",
@@ -4804,6 +4806,7 @@ var zhTW = {
   "ui.aim_research_not_generated": "\u9019\u500B\u56DE\u7B54\u5C1A\u672A\u7522\u751F\u7814\u7A76\u5B50\u8B70\u984C\u3002",
   "ui.aim_retry_subtopics": "\u91CD\u65B0\u7522\u751F\u5B50\u8B70\u984C",
   "ui.card_resize_label": "\u5361\u7247\u5BEC\u5EA6",
+  "ui.card_height_label": "\u5361\u7247\u9AD8\u5EA6",
   "ui.codex_allowance_notice": "Codex \u984D\u5EA6\u63D0\u9192",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u": "VAM \u6703\u900F\u904E\u4F60\u76EE\u524D\u767B\u5165\u7684 Codex \u5E33\u865F\u57F7\u884C AI \u4EFB\u52D9\uFF0C\u4E26\u4F7F\u7528\u8A72\u5E33\u865F\u7684 Codex \u4F7F\u7528\u984D\u5EA6\u3002\u53EF\u7528\u984D\u5EA6\u8207\u9650\u5236\u4F9D\u4F60\u7684 ChatGPT \u65B9\u6848\u800C\u5B9A\u3002",
   "ui.understand_and_run": "\u4E86\u89E3\u4E26\u57F7\u884C",
@@ -17876,6 +17879,7 @@ function clampCardWidth(value) {
 }
 var CARD_HEIGHT_MIN = 80;
 var CARD_HEIGHT_MAX = 720;
+var CARD_HEIGHT_STEP = 40;
 function clampCardHeight(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return void 0;
   return Math.min(CARD_HEIGHT_MAX, Math.max(CARD_HEIGHT_MIN, Math.round(value)));
@@ -45511,6 +45515,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     __publicField(this, "focusNodeId", null);
     /** After a render, the resize handle of this card takes focus back (keyboard resizing rebuilds the canvas). */
     __publicField(this, "focusResizeNodeId", null);
+    /** Which of the card's two splitters takes the focus back: the width one (right edge) or the height one (bottom edge). */
+    __publicField(this, "focusResizeAxis", "width");
     /** Space held down: a drag pans the map even while selecting topics. */
     __publicField(this, "spaceHeld", false);
     /** The single card in the tab order (roving tabindex); arrows move between the rest. */
@@ -45519,9 +45525,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     __publicField(this, "cardEls", /* @__PURE__ */ new Map());
     /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
     __publicField(this, "cardHeightOf", (id) => {
-      var _a2, _b2;
-      return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || // A text node is no card: its own rendered height, or the default while it is not drawn yet.
-      (this.isTextId(id) ? ((_b2 = this.textEls.get(id)) == null ? void 0 : _b2.offsetHeight) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
+      var _a2, _b2, _c, _d;
+      return ((_a2 = this.cardEls.get(id)) == null ? void 0 : _a2.offsetHeight) || // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
+      ((_c = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((node) => node.id === id)) == null ? void 0 : _c.height) || // A text node is no card: its own rendered height, or the default while it is not drawn yet.
+      (this.isTextId(id) ? ((_d = this.textEls.get(id)) == null ? void 0 : _d.offsetHeight) || TEXT_NODE_HEIGHT : medianHeight([...this.cardEls.values()].map((card) => card.offsetHeight)));
     });
     /** Text node element per id (tree-attached and free), rebuilt on every render. */
     __publicField(this, "textEls", /* @__PURE__ */ new Map());
@@ -53198,7 +53205,7 @@ ${request.requirements}` : preset.text,
     this.paint();
   }
   paint() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     if (this.dragging && !this.closed) {
       if (!this.dragStale()) {
         this.renderAfterDrag = true;
@@ -53229,22 +53236,26 @@ ${request.requirements}` : preset.text,
     }
     const focusedCard = (_d = activeDocument.activeElement) == null ? void 0 : _d.closest(".vam-node");
     if (focusedCard && this.contentEl.contains(focusedCard)) {
-      if ((_e = activeDocument.activeElement) == null ? void 0 : _e.classList.contains("vam-card-resize"))
-        (_g = this.focusResizeNodeId) != null ? _g : this.focusResizeNodeId = (_f = focusedCard.dataset.nodeId) != null ? _f : null;
-      else (_i = this.focusNodeId) != null ? _i : this.focusNodeId = (_h = focusedCard.dataset.nodeId) != null ? _h : null;
+      const focused = activeDocument.activeElement;
+      if ((focused == null ? void 0 : focused.classList.contains("vam-card-resize")) || (focused == null ? void 0 : focused.classList.contains("vam-card-resize-y"))) {
+        if (!this.focusResizeNodeId) {
+          this.focusResizeNodeId = (_e = focusedCard.dataset.nodeId) != null ? _e : null;
+          this.focusResizeAxis = focused.classList.contains("vam-card-resize-y") ? "height" : "width";
+        }
+      } else (_g = this.focusNodeId) != null ? _g : this.focusNodeId = (_f = focusedCard.dataset.nodeId) != null ? _f : null;
     }
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
     const restoreSearch = this.holdMapSearch();
     this.relevancePanelGen++;
-    (_j = this.relevancePanelCleanup) == null ? void 0 : _j.call(this);
+    (_h = this.relevancePanelCleanup) == null ? void 0 : _h.call(this);
     this.relevancePanelCleanup = null;
     this.relevancePanelEl = null;
     this.contentEl.empty();
     const toolbar = this.contentEl.createDiv("vam-toolbar");
     const switcher = toolbar.createEl("button", { cls: "vam-map-switcher" });
     switcher.setAttr("aria-label", t("ui.switch_mind_map"));
-    switcher.createSpan({ text: (_l = (_k = this.map) == null ? void 0 : _k.title) != null ? _l : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
+    switcher.createSpan({ text: (_j = (_i = this.map) == null ? void 0 : _i.title) != null ? _j : "Visual Agent Map", cls: "vam-map-title", attr: { dir: "auto" } });
     (0, import_obsidian32.setIcon)(switcher.createSpan("vam-map-switcher-icon"), "chevrons-up-down");
     switcher.addEventListener("click", () => this.openMapSwitcher());
     if (this.map && !this.map.aim && this.map.nodes.length) this.renderResearchProgress(toolbar);
@@ -53272,8 +53283,8 @@ ${request.requirements}` : preset.text,
       this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
-    const selectedNode = (_m = this.map) == null ? void 0 : _m.nodes.find((node) => node.id === this.selected);
-    if ((_n = this.map) == null ? void 0 : _n.aim) {
+    const selectedNode = (_k = this.map) == null ? void 0 : _k.nodes.find((node) => node.id === this.selected);
+    if ((_l = this.map) == null ? void 0 : _l.aim) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
       const data = this.map.aim;
@@ -53289,19 +53300,19 @@ ${request.requirements}` : preset.text,
       let stateText;
       let stateClass;
       if (this.aimBusy) {
-        const activeTitle = (_q = (_p = this.notes.get((_o = this.aimActiveQuestionNodeId) != null ? _o : "")) == null ? void 0 : _p.title) != null ? _q : this.map.title;
+        const activeTitle = (_o = (_n = this.notes.get((_m = this.aimActiveQuestionNodeId) != null ? _m : "")) == null ? void 0 : _n.title) != null ? _o : this.map.title;
         const planning = this.aimActivityKind === "planning";
         stateText = this.aimActivityKind === "clarifying" ? t("ui.aim_preparing_clarification") : this.aimProgress ? this.aimStageText() : t(planning ? "ui.aim_status_planning_0" : "ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (runningBranch) {
-        const activeTitle = (_s = (_r = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _r.title) != null ? _s : this.map.title;
+        const activeTitle = (_q = (_p = this.notes.get(runningBranch.questionNodeId)) == null ? void 0 : _p.title) != null ? _q : this.map.title;
         stateText = t("ui.aim_status_researching_0", activeTitle);
         stateClass = "running";
       } else if (!questions.length) {
         stateText = t("ui.aim_status_ready");
         stateClass = "idea";
       } else if (pendingQuestion) {
-        stateText = t("ui.aim_status_waiting_answer_0", (_u = (_t = this.notes.get(pendingQuestion.id)) == null ? void 0 : _t.title) != null ? _u : "");
+        stateText = t("ui.aim_status_waiting_answer_0", (_s = (_r = this.notes.get(pendingQuestion.id)) == null ? void 0 : _r.title) != null ? _s : "");
         stateClass = "idea";
       } else if (data.branches.some((branch) => branch.results.some((result) => result.kind === "conclusion"))) {
         stateText = t("ui.aim_status_complete");
@@ -53321,7 +53332,7 @@ ${request.requirements}` : preset.text,
           var _a3;
           (_a3 = this.aimController) == null ? void 0 : _a3.abort();
         });
-        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_w = (_v = this.aimProgress) == null ? void 0 : _v.branchId) != null ? _w : null };
+        const from = { nodeId: this.aimActiveQuestionNodeId, branchId: (_u = (_t = this.aimProgress) == null ? void 0 : _t.branchId) != null ? _u : null };
         const steer = this.button(
           statusbar,
           t("ui.aim_steer"),
@@ -53342,7 +53353,7 @@ ${request.requirements}` : preset.text,
         attr: { target: "_blank", rel: "noopener noreferrer" }
       });
     }
-    if ((_x = this.map) == null ? void 0 : _x.aim) {
+    if ((_v = this.map) == null ? void 0 : _v.aim) {
       const data = this.map.aim;
       const isAnswered = (node) => data.branches.some((branch) => branch.questionNodeId === node.id);
       const pending2 = this.map.nodes.find((node) => node.aimKind === "question" && node.aimQuestion && !isAnswered(node));
@@ -53396,10 +53407,10 @@ ${request.requirements}` : preset.text,
       redo.dataset.history = "redo";
       this.updateHistoryButtons();
     }
-    if ((_y = this.deletedMap) == null ? void 0 : _y.deleted)
+    if ((_w = this.deletedMap) == null ? void 0 : _w.deleted)
       this.button(toolbar, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
     const startingSelection = this.startingTasks.get(this.selectionTaskKey());
-    if (startingSelection && !(((_z = this.integrationTask) == null ? void 0 : _z.mapPath) === this.path && this.integrationTask.state === "running")) {
+    if (startingSelection && !(((_x = this.integrationTask) == null ? void 0 : _x.mapPath) === this.path && this.integrationTask.state === "running")) {
       const state = this.contentEl.createDiv("vam-integration-progress");
       state.setAttr("aria-live", "polite");
       state.createSpan({ text: t("ui.integration_running") });
@@ -53450,7 +53461,7 @@ ${request.requirements}` : preset.text,
       }
       this.button(actions, t("ui.create_a_new_mind_map"), () => this.openNewMindMapModal()).addClass("mod-cta");
       this.button(actions, t("ui.aim_create_map"), () => this.openAimStart());
-      if ((_A = this.deletedMap) == null ? void 0 : _A.deleted)
+      if ((_y = this.deletedMap) == null ? void 0 : _y.deleted)
         this.button(actions, t("ui.restore_deleted_map"), () => this.enqueue(() => this.restoreDeletedMapFromUi()));
       return;
     }
@@ -53549,7 +53560,7 @@ ${request.requirements}` : preset.text,
     if (this.focusNodeId) {
       this.restoringFocus = true;
       try {
-        (_B = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _B.focus({ preventScroll: true });
+        (_z = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusNodeId)}"]`)) == null ? void 0 : _z.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -53558,7 +53569,9 @@ ${request.requirements}` : preset.text,
     if (this.focusResizeNodeId) {
       this.restoringFocus = true;
       try {
-        (_C = this.stageEl.querySelector(`[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .vam-card-resize`)) == null ? void 0 : _C.focus({ preventScroll: true });
+        (_A = this.stageEl.querySelector(
+          `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
+        )) == null ? void 0 : _A.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
       }
@@ -53650,6 +53663,7 @@ ${request.requirements}` : preset.text,
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
+    if (shownNode.height) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
     card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
@@ -54069,8 +54083,11 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.integrationMode && !this.presentation && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind)
+    if (!this.integrationMode && !this.presentation && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
+      this.attachHeightHandle(card, node);
+      this.attachCornerHandle(card, node);
+    }
     card.addEventListener("click", (event) => {
       if (Date.now() < this.suppressClickUntil) return;
       if (event.target.closest("button")) return;
@@ -54141,7 +54158,7 @@ ${request.requirements}` : preset.text,
       }, 700);
     });
     card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
-    const toolButtons = () => Array.from(card.querySelectorAll("button, .vam-card-resize"));
+    const toolButtons = () => Array.from(card.querySelectorAll("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", (event) => {
       for (const button of toolButtons()) button.tabIndex = 0;
       if (this.restoringFocus || event.target !== card || !note || this.integrationMode || !card.matches(":focus-visible"))
@@ -54156,6 +54173,7 @@ ${request.requirements}` : preset.text,
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    if (shownNode.height) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
   /**
@@ -54165,9 +54183,44 @@ ${request.requirements}` : preset.text,
    * left with the stylesheet's fallback padding and fitted by the next resize.
    */
   fitKindShape(card, kind) {
+    this.fitKindShapeBody(card, kind);
+    this.refreshCardHeightState(card);
+  }
+  /**
+   * Called after every fit (so after every render and text change, when the card is laid out): a card with a set height is
+   * marked .is-clipped while its content does not fit (the fade and the ellipsis show), and a card without one tells the
+   * height handle its real height, which only exists once it is laid out.
+   */
+  refreshCardHeightState(card) {
+    var _a2, _b2;
+    const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => {
+      var _a3;
+      return item.id === ((_a3 = card.dataset) == null ? void 0 : _a3.nodeId);
+    });
+    if (!node) return;
+    if (node.height) card.toggleClass("is-clipped", card.scrollHeight > card.clientHeight + 1);
+    else if (card.offsetHeight)
+      (_b2 = card.querySelector(".vam-card-resize-y")) == null ? void 0 : _b2.setAttribute("aria-valuenow", String(clampCardHeight(card.offsetHeight)));
+  }
+  /** The fade and the ellipsis of a fixed-height card are real elements (the card's ::after is the running scan line). */
+  ensureClipParts(card) {
+    if (card.querySelector(":scope > .vam-card-fade")) return;
+    card.createSpan({ cls: "vam-card-fade", attr: { "aria-hidden": "true" } });
+    card.createSpan({ cls: "vam-card-more", text: "\u2026", attr: { "aria-hidden": "true" } });
+  }
+  fitKindShapeBody(card, kind) {
     if (!hasSvgShape(kind)) return;
     const width = card.offsetWidth;
     if (!width) return;
+    const fixedHeight = card.style.height;
+    if (fixedHeight) card.style.removeProperty("height");
+    try {
+      this.fitKindShapePadding(card, kind, width);
+    } finally {
+      if (fixedHeight) card.style.height = fixedHeight;
+    }
+  }
+  fitKindShapePadding(card, kind, width) {
     const sides = shapeInsets(kind, { width, height: 0 });
     card.style.padding = `0 ${sides.right}px 0 ${sides.left}px`;
     const height = card.clientHeight;
@@ -60278,7 +60331,8 @@ ${addition}` : addition });
     sync(widthOf());
     const commit = (width) => {
       this.focusResizeNodeId = node.id;
-      this.enqueue(() => this.resizeCard(node.id, width));
+      this.focusResizeAxis = "width";
+      this.enqueue(() => this.resizeCard(node.id, { width }));
     };
     handle.addEventListener("pointerdown", (event) => {
       var _a2, _b2;
@@ -60349,16 +60403,229 @@ ${addition}` : addition });
       commit(width === CARD_WIDTH ? void 0 : width);
     });
   }
-  /** Sets (or, with undefined, clears) one card's custom width as one undo step. */
-  async resizeCard(id, width) {
+  /**
+   * Sets (or, with undefined, clears) one card's custom width and/or height as one undo step. Only the keys present change,
+   * so a horizontal-only corner drag never writes a height.
+   */
+  async resizeCard(id, change) {
     var _a2;
     if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.id === id))) return;
     await this.mapChange((map) => {
       const node = map.nodes.find((item) => item.id === id);
       if (!node) return;
-      if (width === void 0 || width === CARD_WIDTH) delete node.width;
-      else node.width = clampCardWidth(width);
+      if ("width" in change) {
+        if (change.width === void 0 || change.width === CARD_WIDTH) delete node.width;
+        else node.width = clampCardWidth(change.width);
+      }
+      if ("height" in change) {
+        const height = change.height === void 0 ? void 0 : clampCardHeight(change.height);
+        if (height === void 0) delete node.height;
+        else node.height = height;
+      }
     }, false);
+  }
+  /**
+   * The height handle on a card's bottom edge, also an ARIA (horizontal) splitter. It behaves like the width handle: a drag
+   * writes once on release, Up/Down step by CARD_HEIGHT_STEP, Home/End jump to the limits, Enter or a double click goes
+   * back to "as tall as the content" (the field is removed). Without a set height the value is the card's real height,
+   * read when the handle is used (a card may not be laid out yet at render).
+   */
+  attachHeightHandle(card, node) {
+    var _a2;
+    const handle = card.createSpan({
+      cls: "vam-card-resize-y",
+      attr: {
+        role: "separator",
+        "aria-orientation": "horizontal",
+        "aria-label": t("ui.card_height_label"),
+        "aria-valuemin": String(CARD_HEIGHT_MIN),
+        "aria-valuemax": String(CARD_HEIGHT_MAX)
+      }
+    });
+    const setHeight = () => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes.find((item) => item.id === node.id)) == null ? void 0 : _b2.height;
+    };
+    const heightOf = () => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = setHeight()) != null ? _a3 : clampCardHeight(card.offsetHeight)) != null ? _b2 : CARD_HEIGHT_MIN;
+    };
+    const sync = (height) => handle.setAttr("aria-valuenow", String(height));
+    handle.tabIndex = -1;
+    const known = (_a2 = setHeight()) != null ? _a2 : card.offsetHeight ? heightOf() : void 0;
+    if (known !== void 0) sync(known);
+    handle.addEventListener("focus", () => sync(heightOf()));
+    const commit = (height) => {
+      this.focusResizeNodeId = node.id;
+      this.focusResizeAxis = "height";
+      this.enqueue(() => this.resizeCard(node.id, { height }));
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      var _a3, _b2;
+      if (event.button !== 0 || !this.map) return;
+      event.stopPropagation();
+      event.preventDefault();
+      this.clearHoverTimer();
+      (_a3 = this.hoverCard) == null ? void 0 : _a3.remove();
+      this.hoverCard = null;
+      const startY = event.clientY, zoom = this.map.viewport.zoom || 1, before = setHeight(), from = heightOf();
+      let height = from, done = false;
+      (_b2 = handle.setPointerCapture) == null ? void 0 : _b2.call(handle, event.pointerId);
+      const show = () => {
+        if (height === from && before === void 0) card.style.removeProperty("height");
+        else {
+          card.style.height = `${height}px`;
+          this.ensureClipParts(card);
+        }
+        card.toggleClass("is-clipped", card.scrollHeight > card.clientHeight + 1 && card.style.height !== "");
+        sync(height);
+      };
+      const move = (e) => {
+        var _a4;
+        height = (_a4 = clampCardHeight(from + (e.clientY - startY) / zoom)) != null ? _a4 : from;
+        show();
+      };
+      const settle = () => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = () => {
+        height = from;
+        if (before === void 0) card.style.removeProperty("height");
+        else card.style.height = `${before}px`;
+        card.toggleClass("is-clipped", before !== void 0 && card.scrollHeight > card.clientHeight + 1);
+        sync(from);
+      };
+      const up = () => {
+        if (done) return;
+        settle();
+        if (height === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(height);
+      };
+      const cancel = () => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", (event) => event.stopPropagation());
+    handle.addEventListener("dblclick", (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (setHeight() !== void 0) commit(void 0);
+    });
+    handle.addEventListener("keydown", (event) => {
+      var _a3;
+      const current = heightOf();
+      let next = null;
+      if (event.key === "ArrowDown") next = current + CARD_HEIGHT_STEP;
+      else if (event.key === "ArrowUp") next = current - CARD_HEIGHT_STEP;
+      else if (event.key === "Home") next = CARD_HEIGHT_MIN;
+      else if (event.key === "End") next = CARD_HEIGHT_MAX;
+      else if (event.key === "Enter") next = void 0;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next === void 0) {
+        if (setHeight() !== void 0) commit(void 0);
+        return;
+      }
+      const height = (_a3 = clampCardHeight(next)) != null ? _a3 : current;
+      if (height === current) return;
+      commit(height);
+    });
+  }
+  /**
+   * The corner handle (bottom right): a mouse-only shortcut that drags width and height together and writes once on
+   * release (one undo step). It is not in the tab order (the two splitters are the keyboard way) and the screen reader skips it.
+   * Only the dimension that changed is written; a double click clears both.
+   */
+  attachCornerHandle(card, node) {
+    const handle = card.createSpan({ cls: "vam-card-resize-corner", attr: { "aria-hidden": "true" } });
+    const nodeNow = () => {
+      var _a2;
+      return (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === node.id);
+    };
+    handle.addEventListener("pointerdown", (event) => {
+      var _a2, _b2, _c, _d, _e;
+      if (event.button !== 0 || !this.map) return;
+      event.stopPropagation();
+      event.preventDefault();
+      this.clearHoverTimer();
+      (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
+      this.hoverCard = null;
+      const startX = event.clientX, startY = event.clientY, zoom = this.map.viewport.zoom || 1, beforeWidth = (_b2 = nodeNow()) == null ? void 0 : _b2.width, beforeHeight = (_c = nodeNow()) == null ? void 0 : _c.height, fromWidth = beforeWidth != null ? beforeWidth : CARD_WIDTH, fromHeight = (_d = beforeHeight != null ? beforeHeight : clampCardHeight(card.offsetHeight)) != null ? _d : CARD_HEIGHT_MIN;
+      let width = fromWidth, height = fromHeight, done = false;
+      (_e = handle.setPointerCapture) == null ? void 0 : _e.call(handle, event.pointerId);
+      const paint = () => {
+        if (width === fromWidth && beforeWidth === void 0) card.style.removeProperty("width");
+        else card.style.width = `${width}px`;
+        if (height === fromHeight && beforeHeight === void 0) card.style.removeProperty("height");
+        else {
+          card.style.height = `${height}px`;
+          this.ensureClipParts(card);
+        }
+        card.toggleClass("is-clipped", card.style.height !== "" && card.scrollHeight > card.clientHeight + 1);
+      };
+      const move = (e) => {
+        var _a3, _b3;
+        width = (_a3 = clampCardWidth(fromWidth + (e.clientX - startX) / zoom)) != null ? _a3 : fromWidth;
+        height = (_b3 = clampCardHeight(fromHeight + (e.clientY - startY) / zoom)) != null ? _b3 : fromHeight;
+        paint();
+      };
+      const settle = () => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = () => {
+        width = fromWidth;
+        height = fromHeight;
+        paint();
+      };
+      const up = () => {
+        if (done) return;
+        settle();
+        const change = {};
+        if (width !== fromWidth) change.width = width === CARD_WIDTH ? void 0 : width;
+        if (height !== fromHeight) change.height = height;
+        if (!("width" in change) && !("height" in change)) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        this.focusResizeNodeId = null;
+        this.enqueue(() => this.resizeCard(node.id, change));
+      };
+      const cancel = () => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", (event) => event.stopPropagation());
+    handle.addEventListener("dblclick", (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      const current = nodeNow();
+      const change = {};
+      if ((current == null ? void 0 : current.width) !== void 0) change.width = void 0;
+      if ((current == null ? void 0 : current.height) !== void 0) change.height = void 0;
+      if (!("width" in change) && !("height" in change)) return;
+      this.focusResizeNodeId = null;
+      this.enqueue(() => this.resizeCard(node.id, change));
+    });
   }
   enableDrag(card, node) {
     card.addEventListener("pointerdown", (event) => {
@@ -64097,13 +64364,18 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node.is-clipped { overflow: hidden; }
 .vam-node.is-clipped > .vam-card-resize { right: 0; }
 .vam-node.is-clipped:not([data-aim-kind])[data-status="running"]::after { top: 0; }
-.vam-node.is-clipped > .vam-kind-shape { inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
 .vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
 .vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
+.vam-card-resize-y { position: absolute; left: 14px; right: 22px; bottom: 2px; z-index: 1; height: 10px; border-radius: 5px; cursor: ns-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
+.vam-node:hover > .vam-card-resize-y, .vam-node:focus-within > .vam-card-resize-y { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
+.vam-card-resize-y:hover, .vam-card-resize-y:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
+.vam-card-resize-corner { position: absolute; right: 2px; bottom: 2px; z-index: 1; width: 14px; height: 14px; border-radius: 3px; cursor: nwse-resize; opacity: 0; transition: opacity 120ms ease-out; touch-action: none; background: linear-gradient(135deg, transparent 55%, var(--interactive-accent) 55%); }
+.vam-node:hover > .vam-card-resize-corner, .vam-node:focus-within > .vam-card-resize-corner { opacity: 0.6; }
+.vam-card-resize-corner:hover { opacity: 1; }
 .vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }
 .vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }
 .vam-node:active { cursor: grabbing; }

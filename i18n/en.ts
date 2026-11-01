@@ -335,6 +335,7 @@ export const en = {
   "ui.aim_research_not_generated": "Research subtopics have not been generated for this answer.",
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.card_resize_label": "Card width",
+  "ui.card_height_label": "Card height",
   "ui.codex_allowance_notice": "Codex allowance notice",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
     "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",

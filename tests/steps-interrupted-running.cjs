@@ -16,7 +16,7 @@ const { topicStatusLabel } = load('i18n.ts');
 const dictionaries = [['en', load('i18n/en.ts').en], ['zh-TW', load('i18n/zh-TW.ts').zhTW], ['zh-CN', load('i18n/zh-CN.ts').zhCN]];
 const KEY = 'ui.ai_task_interrupted_by_reload';
 
-async function harness({ count = 1, builtIn = false } = {}) {
+async function harness({ count = 1 } = {}) {
   const { repo, app } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -157,15 +157,6 @@ test('notes that are already error or completed are not written', async () => {
   const before = [await h.text(h.nodes[0].path), await h.text(h.nodes[1].path)];
   await h.open();
   assert.deepEqual([await h.text(h.nodes[0].path), await h.text(h.nodes[1].path)], before);
-});
-
-test('built-in sample map is not written', async () => {
-  const h = await harness();
-  h.view.builtIn = true;
-  const calls = [];
-  h.repo.markInterruptedRun = async (...a) => { calls.push(a); return true; };
-  await h.view.recoverInterruptedNotes(() => true);
-  assert.equal(calls.length, 0);
 });
 
 test('a disposed repository does not stop the map from opening', async () => {

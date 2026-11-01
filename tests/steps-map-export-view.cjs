@@ -21,7 +21,7 @@ const png = (w = 40, h = 20) => {
 const style = values => ({ getPropertyValue: name => values[name] ?? '', ...values });
 const THEME = { '--background-primary': '#ffffff', '--text-normal': '#222222', '--background-modifier-border': '#cccccc' };
 
-async function harness({ aim = false, builtIn = false } = {}) {
+async function harness({ aim = false } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -77,7 +77,7 @@ async function harness({ aim = false, builtIn = false } = {}) {
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = element('div'); view.stageEl = element('div');
   view.viewportEl = element('div'); view.viewportEl.computed = style(THEME);
   if (aim) view.map.aim = { version: 1 };
-  view.builtIn = builtIn; view.integrationMode = false;
+  view.integrationMode = false;
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
   // The drawn DOM: two cards, a parent edge, the fishbone spine, a relation with an arrowhead marker, and a marker def.
@@ -317,8 +317,8 @@ test('svgToPngBlob draws once at the scaled size and releases the decode, and fa
   assert.equal(released, 2);
 });
 
-test('AIM, built-in sample and integration mode can all export', async () => {
-  for (const mode of [{ aim: true }, { builtIn: true }]) {
+test('AIM and integration mode can all export', async () => {
+  for (const mode of [{ aim: true }]) {
     const h = await harness(mode);
     await h.view.exportMap('svg', 'vault');
     await h.settle();

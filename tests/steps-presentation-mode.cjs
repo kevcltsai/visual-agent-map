@@ -308,14 +308,11 @@ test('42: switching maps or closing the view ends the presentation without resto
   assert.equal(g.view.contentEl.dataset.presenting, undefined, 'a late render does not revive it');
 });
 
-test('42: the same map reopened (refresh) keeps the presentation; the sample map is a different map', async () => {
+test('42: the same map reopened (refresh) keeps the presentation', async () => {
   const h = await harness();
   h.view.startPresentation();
   await h.view.openMap(MAP).catch(() => {});
   assert.notEqual(h.view.presentation, null, 'same path: kept');
-  h.view.openBuiltInSample?.call(h.view);
-  await h.settle();
-  assert.equal(h.view.presentation, null, 'the sample replaces the map: ended');
 });
 
 test('42: the order follows the layout direction: vertical layouts sort siblings by x', async () => {

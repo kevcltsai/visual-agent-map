@@ -321,7 +321,7 @@ test('A5 wiring: the integration context gets the brackets of that parent only; 
   assert.equal(plainMap.view.chatSummaries(), undefined);
 });
 
-test('entries: right-click on a card offers the bracket for the multi-selection (or that card); AIM, the sample and presentation get none', async () => {
+test('entries: right-click on a card offers the bracket for the multi-selection (or that card); AIM and presentation get none', async () => {
   const h = await harness();
   const card = h.view.cardEls.get(h.ids.b);
   const event = () => ({ clientX: 1, clientY: 1, preventDefault() {}, target: { closest: selector => (selector === '.vam-node' ? card : null) } });
@@ -330,10 +330,9 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
   h.menus.at(-1).items[0].click();
   assert.ok(h.area(), 'one card is enough; the editor opens');
   assert.deepEqual(plain(h.view.pendingSummary.members), [h.ids.b]);
-  for (const mode of ['aim', 'builtIn', 'presentation']) {
+  for (const mode of ['aim', 'presentation']) {
     const g = await harness({ build: ids => [{ id: 's1', kind: 'summary', parentId: ids.root, members: [ids.b], text: 'x' }] });
     if (mode === 'aim') g.view.map.aim = { branches: [] };
-    if (mode === 'builtIn') g.view.builtIn = true;
     if (mode === 'presentation') g.view.presentation = { order: [], currentId: 'x' };
     g.view.render();
     g.view.multiSelected = new Set([g.ids.c]);

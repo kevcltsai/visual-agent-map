@@ -303,7 +303,7 @@ test('after quick research the untouched batch cards are re-spaced against measu
   const heights = { p: 180, s: 180, c1: 180, c2: 180, c3: 180 };
   const writes = [];
   const view = bareView({ mutate: async fn => fn(), repo: { updateMap: async (p, fn) => { const doc = { nodes: JSON.parse(JSON.stringify(view.map.nodes)) }; fn(doc); writes.push(doc.nodes); } } },
-    { map: { nodes }, closed: false, builtIn: false, path: 'Map.md', cardHeightOf: id => heights[id] });
+    { map: { nodes }, closed: false, path: 'Map.md', cardHeightOf: id => heights[id] });
   const placed = new Map(['c1', 'c2', 'c3'].map(id => [id, { x: 340, y: nodes.find(n => n.id === id).y }]));
   Object.assign(heights, { c1: 500, c2: 500, c3: 500 }); // research filled the cards
   nodes.find(n => n.id === 'c3').y = 1234; // the user dragged c3
@@ -325,7 +325,7 @@ test('re-space race: a drag queued before the re-space wins, and memory and disk
   const disk = { nodes: JSON.parse(JSON.stringify(nodes)) };
   let chain = Promise.resolve();
   const plugin = { mutate: fn => { const run = chain.then(fn); chain = run.catch(() => {}); return run; }, repo: { updateMap: async (_p, fn) => { fn(disk); } } };
-  const view = bareView(plugin, { map: { nodes }, closed: false, builtIn: false, path: 'Map.md', cardHeightOf: () => 500 });
+  const view = bareView(plugin, { map: { nodes }, closed: false, path: 'Map.md', cardHeightOf: () => 500 });
   const placed = new Map([['c1', { x: 340, y: 0 }], ['c2', { x: 340, y: 220 }]]);
   // The user drags c2: the drag is queued first and lands in memory and on disk before the re-space runs.
   const drag = plugin.mutate(async () => { nodes[2].y = 900; disk.nodes[2].y = 900; });

@@ -48,6 +48,7 @@ import {
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
   customDetailCallout,
+  customDetailStructure,
   customDetailRule,
   DECOMPOSE,
   DEFAULT_TASK,
@@ -177,9 +178,10 @@ const describedSections = (template: DetailTemplate, language: ContentLanguage):
   template.sections.filter(section => section.description.trim()).map(section => descriptionRule(section, language));
 
 /**
- * The sections text of a template that opens with its own words (a lead): the lead as written, the rules of each
- * section's description, count and callouts, and the heading-language clause. The lead says what the log section holds,
- * so no log rule is added.
+ * The sections text of a template that opens with its own words (a lead): the lead as written, then the plugin's fixed
+ * structure text (heading list, count, update log, description, count and callout rules, heading-language clause), the
+ * same as a template without a lead (decision 26). It never takes the Textbook id's own wording, because the lead is
+ * the block's own words.
  */
 function leadStructure(
   template: DetailTemplate,
@@ -190,6 +192,7 @@ function leadStructure(
   const rules: string[] = [];
   for (const section of template.sections) {
     const heading = headingOf(section.name);
+    if (section.role === "log") rules.push(customDetailRule("log", language, { heading }));
     if (section.description.trim()) rules.push(descriptionRule(section, language).rule!);
     if (section.count)
       rules.push(customDetailRule(section.count.mode, language, { heading, n: String(section.count.n) }));
@@ -203,10 +206,16 @@ function leadStructure(
         })
       );
   }
-  const sections = [lead, ...rules, headingsVerbatim(language, undefined, !isBuiltinTemplateId(template.id), anchor)]
-    .filter(Boolean)
-    .join("\n");
-  return { sections, owned: [{ text: lead }, ...describedSections(template, language)] };
+  const structure = customDetailStructure(language, {
+    count: String(template.sections.length),
+    headings: template.sections.map(section => headingOf(section.name)).join(", "),
+    rules: rules.length ? `\n${rules.join("\n")}` : ""
+  });
+  const verbatim = headingsVerbatim(language, undefined, !isBuiltinTemplateId(template.id), anchor);
+  return {
+    sections: [lead, structure, verbatim].filter(Boolean).join("\n"),
+    owned: [{ text: lead }, ...describedSections(template, language)]
+  };
 }
 
 /**

@@ -47,7 +47,7 @@ export { builtinTemplateText } from "./core/blocks/builtin";
 export { chartsWanted } from "./core/steps/task/assemble";
 export { parseTemplateBlock } from "./core/blocks/template-block";
 export { detailStructurePrompt, standardTemplate, textbookTemplate } from "./ai/detail-templates";
-export { detailStructure } from "./core/steps/task/fragments";
+export { detailStructure, customDetailStructure, customDetailRule } from "./core/steps/task/fragments";
 export { noteLanguageOf } from "./i18n";
 `);
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
@@ -274,8 +274,29 @@ test('decision 22: the parsed built-in text gives the same prompt as today, in e
           assert.equal(withBody.text, plain.text, `${language} ${provider} ${name} ${id} (body = built-in text)`);
           // A comment line makes the text differ from the built-in, so the assembler must parse it; the parser drops the comment.
           const parsedPath = m.assembleTaskPrompt({ ...selection, template: { id, body: `%% note %%\n${full}` } }, step, context, language, provider);
-          assert.equal(parsedPath.text, plain.text, `${language} ${provider} ${name} ${id} (parsed path)`);
-          assert.equal(JSON.stringify(parsedPath.segments), JSON.stringify(plain.segments));
+          if (id === 'standard') {
+            assert.equal(parsedPath.text, plain.text, `${language} ${provider} ${name} ${id} (parsed path)`);
+            assert.equal(JSON.stringify(parsedPath.segments), JSON.stringify(plain.segments));
+          } else {
+            // Decision 26: a modified textbook body has a lead, so the plugin's fixed heading list, count and update log
+            // rule follow it. Taking those two fixed pieces out of the parsed path gives today's text, byte for byte;
+            // the block segments are the same ones.
+            const template = m.textbookTemplate(m.noteLanguageOf(language));
+            const log = template.sections.find(section => section.role === 'log');
+            const added = [
+              '\n' + m.customDetailStructure(language, { count: String(template.sections.length), headings: template.sections.map(x => `### ${x.name}`).join(', '), rules: '' }),
+              '\n' + m.customDetailRule('log', language, { heading: `### ${log.name}` })
+            ];
+            const hasSections = parsedPath.text.includes(added[0]);
+            if (step === 'decompose') assert.equal(parsedPath.text, plain.text);
+            else {
+              assert.ok(hasSections, `${language} ${provider} ${name} ${id} the fixed structure text is added`);
+              const stripped = added.reduce((text, piece) => text.replace(piece, ''), parsedPath.text);
+              assert.equal(stripped, plain.text, `${language} ${provider} ${name} ${id} (parsed path, fixed segment excluded)`);
+              const blocks = result => JSON.stringify(result.segments.filter(segment => segment.source.kind === 'block'));
+              assert.equal(blocks(parsedPath), blocks(plain));
+            }
+          }
         }
       }
     }
@@ -373,6 +394,34 @@ test('counter 12 (F1): a textbook template without its format zone and lead carr
     // Editing one word of the lead changes that word only.
     const edited = full.replace(/\[!warning\]/, '[!tip]');
     const changed = m.assembleTaskPrompt({ ...m.selectionFromContext(stepContexts(language)[0][1], language), template: { id: 'textbook', body: edited } }, 'research', stepContexts(language)[0][1], language, 'codex');
-    assert.equal(changed.text, research.text.replace('[!warning]', '[!tip]'));
+    // Decision 26: both go through the parser, so the plugin's fixed heading list is in both; the edit changes that word only.
+    const parsedSame = m.assembleTaskPrompt({ ...m.selectionFromContext(stepContexts(language)[0][1], language), template: { id: 'textbook', body: `%% note %%\n${full}` } }, 'research', stepContexts(language)[0][1], language, 'codex');
+    assert.equal(changed.text, parsedSame.text.replace('[!warning]', '[!tip]'));
+  }
+});
+
+test('counter 13 (N1, decision 26): a custom template with a lead and no descriptions still carries the heading list, count and log rule', () => {
+  const m = A();
+  const cases = [
+    ['en', 'Write warmly for kids.\n\n## Story\n\n## Facts\n\n## Log', 'Write warmly for kids.'],
+    ['zh-TW', '用溫暖的語氣寫給小朋友。\n\n## 故事\n\n## 事實\n\n## 紀錄', '用溫暖的語氣寫給小朋友。'],
+    // The update log rule belongs to the section the parser knows as the update log (as before the block files).
+    ['en', 'Write warmly for kids.\n\n## Story\n\n## Facts\n\n## Update log', 'Write warmly for kids.', /### Update log gets only one new line/],
+    ['zh-TW', '用溫暖的語氣寫給小朋友。\n\n## 故事\n\n## 事實\n\n## 更新紀錄', '用溫暖的語氣寫給小朋友。', /### 更新紀錄 只新增一行/]
+  ];
+  for (const [language, body, lead, logRule] of cases) {
+    const names = body.match(/^## (.+)$/gm).map(line => line.slice(3));
+    for (const [name, context] of stepContexts(language)) {
+      const step = m.promptStepOf(context);
+      if (step === 'decompose') continue; // a decompose prompt carries no template
+      const selection = { ...m.selectionFromContext(context, language), template: { id: 'kids-note', body } };
+      const { text, segments } = m.assembleTaskPrompt(selection, step, context, language, 'codex');
+      for (const heading of names) assert.ok(text.includes(`### ${heading}`), `${language} ${name} lists ### ${heading}`);
+      assert.ok(text.includes(`${names.length}`) && text.includes(names.map(n => `### ${n}`).join(', ')), `${language} ${name} count and ordered list`);
+      if (logRule) assert.match(text, logRule, `${language} ${name} log rule`);
+      const leadSegment = segments.find(s => s.source.kind === 'block' && s.source.part === 'sections');
+      assert.equal(leadSegment.text, lead);
+      assert.equal(segments.map(s => s.text).join(''), text);
+    }
   }
 });

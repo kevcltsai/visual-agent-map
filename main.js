@@ -31388,6 +31388,7 @@ function leadStructure(template2, lead, language2, anchor) {
   const rules = [];
   for (const section3 of template2.sections) {
     const heading = headingOf(section3.name);
+    if (section3.role === "log") rules.push(customDetailRule("log", language2, { heading }));
     if (section3.description.trim()) rules.push(descriptionRule(section3, language2).rule);
     if (section3.count)
       rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
@@ -31401,8 +31402,17 @@ function leadStructure(template2, lead, language2, anchor) {
         })
       );
   }
-  const sections = [lead, ...rules, headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template2.id), anchor)].filter(Boolean).join("\n");
-  return { sections, owned: [{ text: lead }, ...describedSections(template2, language2)] };
+  const structure2 = customDetailStructure(language2, {
+    count: String(template2.sections.length),
+    headings: template2.sections.map((section3) => headingOf(section3.name)).join(", "),
+    rules: rules.length ? `
+${rules.join("\n")}` : ""
+  });
+  const verbatim = headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template2.id), anchor);
+  return {
+    sections: [lead, structure2, verbatim].filter(Boolean).join("\n"),
+    owned: [{ text: lead }, ...describedSections(template2, language2)]
+  };
 }
 function templateParts(selection, context, language2, topicAnchor, options) {
   var _a2, _b2, _c, _d, _e, _f;

@@ -14,6 +14,7 @@ const plain = value => structuredClone(value);
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
 const root = path.resolve(__dirname, '..');
 const v1 = path.join(root, 'core/note-styles/canonical/v1');
+const v2 = path.join(root, 'core/note-styles/canonical/v2');
 const parse = (text, name = 'A') => S.parseNoteStyleFile(text, { id: `style:${name}`, name });
 const ok = text => {
   const result = parse(text);
@@ -68,8 +69,55 @@ test('frozen canonical v1: the file list and every sha256 are pinned', () => {
     assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(v1, file))).digest('hex'), hash, file);
 });
 
+const HASHES_V2 = {
+  'guide.en.md': '0f880ed794fa8f5881c60de0fc170ed7b1c3e98204116d2099ae87cdef2a647b',
+  'guide.zh-CN.md': 'd4c96a17e206deebbb9bf13d8fe19fee65afc714432452b582443dac9a82f16d',
+  'guide.zh-TW.md': '4a43014029571dadb29e2f9f668634e3144b7ffa024f8d2544ad3778531be36a',
+  'plain.en.md': '0011bdc39123812bbb8b44137382f6e630e7c1f464c8e82c7c1f5a101fc2fc19',
+  'plain.zh-CN.md': '2e1319abb5549a8fbd340c585569757fce0992b0885f5e9acc7651b0a982fc0e',
+  'plain.zh-TW.md': '783fbfe39f6b7bd96865b5542d1cbc07da8fbb7395930b5a5c2527640ccc5e37',
+  'standard.en.md': '436c6cb331b64d8c9c61e6923276be19f6e439ffe9b94344eadc265d5e80a245',
+  'standard.zh-CN.md': '25f0a6c412117a291d0ca809a2ec038cdcf017e28746ac9d29accb87950997bc',
+  'standard.zh-TW.md': '9f5259b7394c1900041a04b38d06c6cc8ef9b9906ca659e32340a40922543cc8',
+  'summary.en.md': 'b0a2bfc2d07670c43500a544ac46cf7ab27e4956b25a926dea232d859ad33c93',
+  'summary.zh-CN.md': '29f6cce4b1a6dfd42ebb8d0885a5e7430a396e0077d03e323714b26e21ae3eca',
+  'summary.zh-TW.md': '6a69601965be95ef08ca4302b5518d8066ee839e586deba7a4174f235a921fca',
+  'textbook.en.md': '4d41ad78d6a38887da5e6fab66ebc0ed24574b910b9f93b47a762cb2b9cc471a',
+  'textbook.zh-CN.md': 'c88b5810acfb31373f9309c2dd0d1509b75f1f36e1ccd423963d1d41172dc1cb',
+  'textbook.zh-TW.md': '94e2ed48eeccf9386f6fe7cdfdc3f47bced61678b18b9d35e48b8444ebba63bd'
+};
+
+test('frozen canonical v2: the file list and every sha256 are pinned; the module exposes them; v1 and v2 both count as unmodified', () => {
+  eq(fs.readdirSync(v2).sort(), Object.keys(HASHES_V2).sort());
+  for (const [file, hash] of Object.entries(HASHES_V2))
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(v2, file))).digest('hex'), hash, file);
+  for (const id of S.NOTE_STYLE_BUILTIN_IDS)
+    for (const language of S.CANONICAL_LANGUAGES) {
+      const content = fs.readFileSync(path.join(v2, `${id}.${language}.md`), 'utf8');
+      assert.equal(S.CANONICAL_VERSIONS[1][id][language], content);
+      assert.equal(S.canonicalContent(id, language), content);
+      eq({ ...S.matchCanonical(content) }, { id, language, version: 2 });
+      eq({ ...S.matchCanonical(S.CANONICAL_VERSIONS[0][id][language]) }, { id, language, version: 1 });
+      assert.equal(S.matchCanonical(content.replace('summary', 'abstract')), undefined);
+    }
+});
+
+test('canonical v2: shows the four keys at their defaults, explains that they only apply with auto callouts, and parses to no change', () => {
+  const keys = { 'zh-TW': ['結論方框', '風險方框', '問題方框', '技巧方框'], 'zh-CN': ['结论方框', '风险方框', '问题方框', '技巧方框'], en: ['summary callout', 'risk callout', 'question callout', 'tip callout'] };
+  const auto = { 'zh-TW': '方框: 自動', 'zh-CN': '方框: 自动', en: 'callouts: auto' };
+  for (const id of S.NOTE_STYLE_BUILTIN_IDS)
+    for (const language of S.CANONICAL_LANGUAGES) {
+      const content = S.canonicalContent(id, language);
+      const front = content.split('\n---\n')[0].split('\n');
+      eq(front.slice(front.indexOf(auto[language]) + 1), keys[language].map((key, i) => `${key}: ${['summary', 'warning', 'question', 'tip'][i]}`));
+      assert.ok(content.split('\n')[front.length + 1].includes(auto[language]), 'comment names the auto-only rule');
+      eq(ok(content).calloutMap, {});
+      assert.equal(ok(content).callouts, 'auto');
+    }
+});
+
 test('frozen canonical v1: the module exposes exactly the files, and each is recognised as unmodified', () => {
-  assert.equal(S.CANONICAL_VERSIONS.length, 1);
+  assert.equal(S.CANONICAL_VERSIONS.length, 2);
   for (const id of S.NOTE_STYLE_BUILTIN_IDS)
     for (const language of S.CANONICAL_LANGUAGES) {
       const content = fs.readFileSync(path.join(v1, `${id}.${language}.md`), 'utf8');

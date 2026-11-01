@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { loadSource } = require('./support-replay.cjs');
 
 const M = loadSource(`
-export { parseNoteStyleFile } from "./ai/note-style-file";
+export { parseNoteStyleFile, CANONICAL_VERSIONS, CANONICAL_LANGUAGES, NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { detailStructurePrompt, checkCounts, standardTemplate, textbookTemplate, validateTemplate, sectionLookup } from "./ai/detail-templates";
 export { canonicalDetail } from "./ai/result-utils";
 export { obsidianFormat, OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
@@ -63,6 +63,21 @@ test('format preferences: all default is the original text, for both instruction
     assert.equal(M.obsidianFormat(language, undefined), original);
     assert.equal(M.obsidianFormat(language, ON), original);
   }
+});
+
+test('canonical v2 builds exactly the same prompt as v1 for every built-in and language', () => {
+  const pref = style => ({ callouts: style.callouts, diagrams: style.diagrams, tables: style.tables, tasks: style.tasks, highlight: style.highlight, calloutMap: style.calloutMap });
+  for (const id of M.NOTE_STYLE_BUILTIN_IDS)
+    for (const language of M.CANONICAL_LANGUAGES) {
+      const one = parse(M.CANONICAL_VERSIONS[0][id][language]), two = parse(M.CANONICAL_VERSIONS[1][id][language]);
+      for (const instruction of LANGUAGES) {
+        assert.equal(M.obsidianFormat(instruction, pref(two)), M.obsidianFormat(instruction, pref(one)), `${id}.${language}`);
+        assert.equal(structure(two, instruction), structure(one, instruction), `${id}.${language}`);
+      }
+      assert.equal(two.tone, one.tone);
+      assert.equal(two.layout, one.layout);
+      assert.equal(two.intro, one.intro);
+    }
 });
 
 const SENTINELS = {

@@ -16,6 +16,21 @@ import Plainen from "../core/note-styles/canonical/v1/plain.en.md";
 import GuidezhTW from "../core/note-styles/canonical/v1/guide.zh-TW.md";
 import GuidezhCN from "../core/note-styles/canonical/v1/guide.zh-CN.md";
 import Guideen from "../core/note-styles/canonical/v1/guide.en.md";
+import StandardzhTWV2 from "../core/note-styles/canonical/v2/standard.zh-TW.md";
+import StandardzhCNV2 from "../core/note-styles/canonical/v2/standard.zh-CN.md";
+import StandardenV2 from "../core/note-styles/canonical/v2/standard.en.md";
+import TextbookzhTWV2 from "../core/note-styles/canonical/v2/textbook.zh-TW.md";
+import TextbookzhCNV2 from "../core/note-styles/canonical/v2/textbook.zh-CN.md";
+import TextbookenV2 from "../core/note-styles/canonical/v2/textbook.en.md";
+import SummaryzhTWV2 from "../core/note-styles/canonical/v2/summary.zh-TW.md";
+import SummaryzhCNV2 from "../core/note-styles/canonical/v2/summary.zh-CN.md";
+import SummaryenV2 from "../core/note-styles/canonical/v2/summary.en.md";
+import PlainzhTWV2 from "../core/note-styles/canonical/v2/plain.zh-TW.md";
+import PlainzhCNV2 from "../core/note-styles/canonical/v2/plain.zh-CN.md";
+import PlainenV2 from "../core/note-styles/canonical/v2/plain.en.md";
+import GuidezhTWV2 from "../core/note-styles/canonical/v2/guide.zh-TW.md";
+import GuidezhCNV2 from "../core/note-styles/canonical/v2/guide.zh-CN.md";
+import GuideenV2 from "../core/note-styles/canonical/v2/guide.en.md";
 
 /**
  * A note style is one Markdown file the user edits. This module is pure: it parses a file's text, finds out whether the
@@ -121,7 +136,7 @@ function byLanguage<T>(zhTW: T, zhCN: T, en: T): Record<NoteStyleLanguage, T> {
   ]) as Record<NoteStyleLanguage, T>;
 }
 
-/** Frozen canonical contents. A new version adds a v2 entry here; v1 files never change (the test pins their hashes). */
+/** Frozen canonical contents. A new version adds an entry here; v1 and v2 files never change (the test pins their hashes). */
 export const CANONICAL_VERSIONS: readonly Record<NoteStyleBuiltinId, Record<NoteStyleLanguage, string>>[] = [
   {
     standard: byLanguage(StandardzhTW, StandardzhCN, Standarden),
@@ -129,6 +144,14 @@ export const CANONICAL_VERSIONS: readonly Record<NoteStyleBuiltinId, Record<Note
     summary: byLanguage(SummaryzhTW, SummaryzhCN, Summaryen),
     plain: byLanguage(PlainzhTW, PlainzhCN, Plainen),
     guide: byLanguage(GuidezhTW, GuidezhCN, Guideen)
+  },
+  // v2: v1 plus the four callout-rule keys at their defaults and one explanatory sentence; same prompt as v1.
+  {
+    standard: byLanguage(StandardzhTWV2, StandardzhCNV2, StandardenV2),
+    textbook: byLanguage(TextbookzhTWV2, TextbookzhCNV2, TextbookenV2),
+    summary: byLanguage(SummaryzhTWV2, SummaryzhCNV2, SummaryenV2),
+    plain: byLanguage(PlainzhTWV2, PlainzhCNV2, PlainenV2),
+    guide: byLanguage(GuidezhTWV2, GuidezhCNV2, GuideenV2)
   }
 ];
 

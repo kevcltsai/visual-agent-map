@@ -158,6 +158,25 @@ test('a cover and a free canvas image become data URIs read with readBinary; a f
   assert.equal(h.counts.readBinary, 3, 'cover, free image, fake image; the missing file is never read');
 });
 
+test('card-style: a styled card and a thick line carry size, weight, border and edge width into the scene; an unstyled card has none', async () => {
+  const h = await harness();
+  const rootEl = h.view.cardEls.get(h.root.id);
+  Object.assign(rootEl.dataset, { topicStyleBold: 'true', topicStyleSize: 'large', topicStyleBorder: 'thick' });
+  rootEl.computed = style({ backgroundColor: 'rgb(255, 255, 255)', borderTopColor: 'rgb(204, 204, 204)', borderTopWidth: '3px' });
+  rootEl.children.find(c => c.classes.includes('vam-card-title')).computed = style({ color: 'rgb(34, 34, 34)', fontSize: '18px' });
+  h.view.edgesEl.children.push(h.path('M 10 10 L 20 20', { stroke: 'rgb(100, 100, 100)', display: 'inline', strokeWidth: '4px' }, { 'data-line-thick': '' }));
+  const { scene } = await h.view.collectExportScene(() => true);
+  const styled = scene.cards.find(c => c.title.join ? c.title.join('').includes('Root') : String(c.title).includes('Root'));
+  const plainCard = scene.cards.find(c => c !== styled && !(c.title.join ? c.title.join('') : String(c.title)).includes('Root'));
+  assert.equal(styled.titleSize, Math.round((18 * 13) / 15));
+  assert.equal(styled.titleWeight, 800);
+  assert.equal(styled.strokeWidth, 3);
+  for (const key of ['titleSize', 'titleWeight', 'strokeWidth']) assert.ok(!(key in plainCard), `an unstyled card has no ${key}`);
+  const thick = scene.edges.filter(e => e.width !== undefined);
+  assert.equal(JSON.stringify(thick.map(e => [e.d, e.width])), JSON.stringify([['M 10 10 L 20 20', 4]]));
+  assert.ok(scene.edges.length > 1 && scene.edges.some(e => e.width === undefined), 'ordinary edges carry no width');
+});
+
 test('counterexample 1: no http text from the scene ever reaches the SVG', async () => {
   const h = await harness();
   h.view.map.canvasItems = [{ id: 'i2', kind: 'image', path: 'http://evil.example/a.png', x: 0, y: 0, w: 30, h: 30 }];

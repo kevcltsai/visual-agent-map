@@ -966,7 +966,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch,
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
@@ -3236,9 +3236,9 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Links', 'Color', 'Topic cover', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the cover switch after the colour (decision 0.28-triage#36)');
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Links', 'Color', 'Style', 'Topic cover', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the style section after the colour (card-style), the cover switch after the style (decision 0.28-triage#36)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Links', 'Color', 'Topic cover', 'Parent topic'], 'no strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Links', 'Color', 'Style', 'Topic cover', 'Parent topic'], 'no strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
   const css = heCss();
@@ -3684,6 +3684,120 @@ integrationTest('topic-color: applying to a branch is one transaction that write
   assert.deepEqual(writes, [], 'choosing the colour it already has writes nothing'); assert.equal(pushed.length, count, 'and adds no history entry');
   await view.changeTopicColor(view.map.nodes.find(n => n.id === root.id), null, false);
   assert.doesNotMatch(contents.get(root.path), /topic-color/, 'clearing removes the key');
+});
+// ---- topic style (card-style P2) ----
+integrationTest('topic-style: a card carries only whitelisted data-topic-style-* values and "Style: ..." in its name; hostile values and an AIM card add nothing; redraws never double it', () => {
+  const notes = heNotes([['fact', { style: ['bold', 'text-large', 'border-thick', 'line-thick'] }], ['hyp', { style: ['"><script>', 'BOLD'] }], ['other', {}]]);
+  const f = tmRender({ notes }, 'fact');
+  assert.equal(f.card.dataset.topicStyleBold, 'true'); assert.equal(f.card.dataset.topicStyleSize, 'large'); assert.equal(f.card.dataset.topicStyleBorder, 'thick');
+  assert.match(tcLabel(f.card).text, /Style: Bold, Large, Thick border, Thick line$/); assert.equal(f.card.attrs['aria-labelledby'], tcLabel(f.card).id);
+  for (const id of ['hyp', 'other']) {
+    const shown = tmRender({ notes }, id);
+    for (const key of ['topicStyleBold', 'topicStyleSize', 'topicStyleBorder', 'styleText']) assert.equal(key in shown.card.dataset, false, `${id} ${key}`);
+    assert.doesNotMatch(tcLabel(shown.card).text, /Style/, id);
+  }
+  const aim = tmRender({ aim: true, topics: [{ ...node('fact'), aimKind: 'research' }], notes }, 'fact');
+  for (const key of ['topicStyleBold', 'topicStyleSize', 'topicStyleBorder']) assert.equal(key in aim.card.dataset, false, `AIM ${key}`);
+  assert.doesNotMatch(tcLabel(aim.card).text, /Style/);
+  const g = heFixture({ notes: heNotes([['fact', { color: 'blue', style: ['bold'] }], ['hyp', {}], ['other', {}]]) });
+  g.view.stageEl = hePatch(dom.element('stage')); g.view.cardEls = new Map(); g.view.renderNode(g.view.map.nodes[0]);
+  const node0 = g.view.map.nodes[0], card = g.view.stageEl.children[0], note = g.view.notes.get('fact');
+  g.view.stageEl.querySelector = () => card; g.view.drawEdges = () => {};
+  const count = re => (tcLabel(card).text.match(re) ?? []).length;
+  assert.equal(count(/Style:/g), 1); assert.equal(count(/Color:/g), 1);
+  g.view.refreshCard(node0, false); assert.equal(count(/Style:/g), 1, 'refresh again');
+  note.style = ['text-small']; g.view.refreshCard(node0, false);
+  assert.equal(count(/Style:/g), 1); assert.match(tcLabel(card).text, /Style: Small/); assert.doesNotMatch(tcLabel(card).text, /Bold/); assert.equal('topicStyleBold' in card.dataset, false); assert.equal(card.dataset.topicStyleSize, 'small'); assert.equal(count(/Color:/g), 1);
+  note.style = undefined; g.view.refreshCard(node0, false);
+  assert.equal(count(/Style:/g), 0); assert.equal('styleText' in card.dataset, false); assert.equal(count(/Color:/g), 1);
+});
+integrationTest('topic-style: the sample, an AIM map and select mode have no style menu and refuse a change', async () => {
+  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+    const { view, writes } = heFixture(options);
+    if (options.integration) view.integrationMode = true;
+    const panel = dom.element('panel'); view.renderStyleSection(panel, view.map.nodes[2]);
+    assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
+    view.beginMapTransaction = () => assert.fail('no transaction');
+    await view.changeTopicStyle(view.map.nodes[2], ['bold'], true);
+    assert.deepEqual(writes, []);
+  }
+});
+integrationTest('topic-style: bold, thick border and thick line are aria-pressed switches; text size is a radiogroup that arrow keys move; the branch button applies what is shown', async () => {
+  const { view } = heFixture({ topics: [node('fact'), { ...node('kid'), parentId: 'fact' }], notes: heNotes([['fact', {}], ['kid', {}]]) });
+  view.enqueue = work => work();
+  const calls = [];
+  view.changeTopicStyle = async (n, styles, branch) => { calls.push([n.id, [...styles], !!branch]); const note = view.notes.get(n.id); note.style = [...styles]; };
+  const panel = dom.element('panel'); view.renderStyleSection(panel, view.map.nodes[0]);
+  const pressed = () => dom.findAll(panel, c => c.tag === 'button' && c.attrs['aria-pressed'] !== undefined);
+  assert.deepEqual(pressed().map(b => [b.text, b.attrs['aria-pressed']]), [['Bold', 'false'], ['Thick border', 'false'], ['Thick line', 'false']]);
+  const group = () => dom.find(panel, c => c.attrs.role === 'radiogroup');
+  assert.equal(group().attrs['aria-label'], 'Text size');
+  const radios = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs.role === 'radio');
+  assert.deepEqual(radios().map(r => [r.text, r.attrs['aria-checked']]), [['Standard', 'true'], ['Small', 'false'], ['Large', 'false']]);
+  pressed()[0].click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', ['bold'], false]); assert.equal(pressed()[0].attrs['aria-pressed'], 'true');
+  pressed()[0].click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', [], false], 'pressing the set value again turns it off');
+  radios()[2].click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', ['text-large'], false]); assert.deepEqual(radios().map(r => r.attrs['aria-checked']), ['false', 'false', 'true']);
+  radios()[2].keydown({ key: 'ArrowRight', preventDefault() {} });
+  await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', [], false], 'ArrowRight wraps to Standard and clears the size');
+  pressed()[1].click(); await dom.tick(); radios()[1].click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', ['border-thick', 'text-small'], false], 'a size keeps the other switches');
+  const leaf = dom.element('leaf'); view.renderStyleSection(leaf, view.map.nodes[1]); assert.equal(dom.button(leaf, 'Apply to whole branch').disabled, true);
+  const sizeLabels = () => dom.findAll(panel, c => c.cls && c.cls.split(' ').includes('vam-topic-style-size-label'));
+  assert.deepEqual(sizeLabels().map(l => l.text), ['Text size'], 'the size label survives every repaint');
+  const styleApply = dom.button(panel, 'Apply to whole branch'); assert.equal(styleApply.attrs['aria-label'], 'Apply style to whole branch');
+  view.renderColorSection = Object.getPrototypeOf(view).renderColorSection;
+  const both = dom.element('both'); view.renderColorSection(both, view.map.nodes[0]); view.renderStyleSection(both, view.map.nodes[0]);
+  const applies = dom.findAll(both, c => c.tag === 'button' && c.text === 'Apply to whole branch').map(b => b.attrs['aria-label']);
+  assert.deepEqual(applies, ['Apply colour to whole branch', 'Apply style to whole branch'], 'the two apply buttons have distinct names');
+  dom.button(panel, 'Apply to whole branch').click(); await dom.tick();
+  assert.deepEqual(calls.at(-1), ['fact', ['text-small', 'border-thick'], true]);
+});
+integrationTest('topic-style: a branch change is one transaction writing only the notes that differ, folded ones included; one undo restores all; a single topic leaves children alone; unknown tokens stay', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-s/Map.md';
+  const doc = { id: 'map-s', title: 's', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-s');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const root = await repo.createNote('Root', 'gpt-6-luna', doc, MAP, 'workspace');
+  const child = await repo.createNote('Child', 'gpt-6-luna', doc, MAP, 'workspace');
+  const same = await repo.createNote('Same', 'gpt-6-luna', doc, MAP, 'workspace');
+  const sibling = await repo.createNote('Sibling', 'gpt-6-luna', doc, MAP, 'workspace');
+  child.parentId = root.id; child.collapsed = true; same.parentId = root.id;
+  doc.nodes.push(root, child, same, sibling); await repo.saveMap(MAP, doc);
+  await repo.writeTopicStyle(root.path, { set: ['bold'] });
+  await repo.writeTopicStyle(same.path, { set: ['bold'] });
+  const { view } = heFixture({ topics: [root] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  await view.refreshAfterSavedChange();
+  const writes = []; const original = repo.writeTopicStyle.bind(repo);
+  repo.writeTopicStyle = async (p, c) => { writes.push(p); return original(p, c); };
+  const snapshot = () => Object.fromEntries([root, child, same, sibling].map(n => [n.path, contents.get(n.path)]));
+  const before = snapshot(), mapBefore = contents.get(MAP);
+  const rootNode = () => view.map.nodes.find(n => n.id === root.id);
+  await view.changeTopicStyle(rootNode(), ['bold'], true);
+  assert.equal(pushed.length, 1); assert.deepEqual(writes, [child.path], 'only the folded child differs');
+  assert.deepEqual([...view.notes.get(child.id).style], ['bold']); assert.equal(contents.get(MAP), mapBefore);
+  assert.equal(contents.get(sibling.path), before[sibling.path]);
+  await pushed[0].undo(); assert.deepEqual(snapshot(), before, 'one undo gives back every note');
+  await view.refreshAfterSavedChange(); writes.length = 0;
+  await view.changeTopicStyle(rootNode(), ['bold', 'text-large'], false);
+  assert.deepEqual(writes, [root.path]); assert.equal(view.notes.get(child.id).style, undefined, 'no inheritance');
+  const count = pushed.length; writes.length = 0;
+  await view.changeTopicStyle(rootNode(), ['text-large', 'bold'], false);
+  assert.deepEqual(writes, []); assert.equal(pushed.length, count, 'the same styles write nothing and add no history entry');
+  await view.changeTopicStyle(rootNode(), [], false);
+  assert.doesNotMatch(contents.get(root.path), /topic-style/, 'clearing removes the key');
 });
 // Topic links (P2): card button, menu, panel section, undo and outline.
 integrationTest('topic-links: opening re-validates, refuses an unsafe href with a Notice, and opens a valid one without opener or referrer', () => {

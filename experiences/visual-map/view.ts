@@ -102,7 +102,16 @@ import {
   type TopicMarker
 } from "../../topic-markers";
 import { normalizeTopicLink, readTopicLinks, TOPIC_LINKS_MAX, type AddTopicLinkResult } from "../../topic-links";
-import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
+import {
+  TOPIC_COLORS,
+  TOPIC_STYLES,
+  branchNoteIds,
+  colorLabelKey,
+  readTopicStyle,
+  styleLabelKey,
+  type TopicColor,
+  type TopicStyle
+} from "../../topic-colors";
 import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { createHash, randomUUID } from "node:crypto";
@@ -8709,6 +8718,17 @@ export class VisualAgentMapView extends ItemView {
         textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
         accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
       };
+      // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
+      if (card.dataset.topicStyleSize) {
+        const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
+        // The screen's small / large title relative to the 13 px export default (medium is 15 px on screen).
+        if (Number.isFinite(size) && size > 0) item.titleSize = Math.round((size * 13) / 15);
+      }
+      if (card.dataset.topicStyleBold) item.titleWeight = 800;
+      if (card.dataset.topicStyleBorder) {
+        const width = parseFloat(style.borderTopWidth);
+        if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
+      }
       const frame = card.querySelector<HTMLElement>(".vam-card-cover");
       const coverPath = frame ? this.exportCoverPath(node.path) : null;
       if (frame && coverPath) {
@@ -8826,7 +8846,10 @@ export class VisualAgentMapView extends ItemView {
       edges.push({
         d,
         stroke,
-        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {})
+        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {}),
+        ...((el.getAttribute("data-line-thick") ?? null) !== null
+          ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 }
+          : {})
       });
       try {
         const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();
@@ -9975,6 +9998,7 @@ export class VisualAgentMapView extends ItemView {
     this.paintModelTag(card, header, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
     this.paintCardColor(card, note, !!node.aimKind);
+    this.paintCardStyle(card, note, !!node.aimKind);
     // Failure reasons are shown on the card, not only in a hover tooltip.
     const errorDetails: string[] = [];
     if (note?.detailFormatIssues?.length) {
@@ -10840,6 +10864,37 @@ export class VisualAgentMapView extends ItemView {
       if (named) this.labelCard(card, named);
     }
   }
+  /**
+   * Sets the whitelisted `data-topic-style-*` attributes (bold, size small or large, border thick) and adds "Style: Bold, ..."
+   * to the card's accessible name, replacing the old part in place so a redraw never doubles it. Only whitelisted tokens
+   * are written, never the note's own text. An AIM card shows no topic style. Safe to call again.
+   */
+  private paintCardStyle(card: HTMLElement, note: Note | undefined, aim: boolean): void {
+    const previous = card.dataset.styleText ?? "";
+    let named = cardLabels.get(card)?.textContent;
+    if (named && previous && named.includes(previous)) {
+      const stripped = named.replace(t("ui.topic_card_label_0_1", "", previous), "");
+      named = stripped === named ? named.replace(previous, "") : stripped;
+    }
+    const ids = aim ? [] : TOPIC_STYLES.filter(id => note?.style?.includes(id));
+    const flag = (name: "topicStyleBold" | "topicStyleBorder", value: string | undefined): void => {
+      if (value) card.dataset[name] = value;
+      else delete card.dataset[name];
+    };
+    flag("topicStyleBold", ids.includes("bold") ? "true" : undefined);
+    flag("topicStyleBorder", ids.includes("border-thick") ? "thick" : undefined);
+    const size = ids.includes("text-small") ? "small" : ids.includes("text-large") ? "large" : undefined;
+    if (size) card.dataset.topicStyleSize = size;
+    else delete card.dataset.topicStyleSize;
+    if (ids.length) {
+      const text = t("ui.topic_style_aria_0", ids.map(id => t(styleLabelKey(id))).join(", "));
+      card.dataset.styleText = text;
+      if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, text));
+    } else {
+      delete card.dataset.styleText;
+      if (named) this.labelCard(card, named);
+    }
+  }
   /** Names a card for assistive tech without Obsidian showing `aria-label` as a hover tooltip beside the preview. */
   private labelCard(card: HTMLElement, text: string): void {
     let label = cardLabels.get(card);
@@ -11080,6 +11135,7 @@ export class VisualAgentMapView extends ItemView {
       this.paintModelTag(card, header, note);
     }
     this.paintCardColor(card, note, !!node.aimKind);
+    this.paintCardStyle(card, note, !!node.aimKind);
     // A new title or summary changes the text's height, and the shape's padding follows it.
     this.fitKindShape(card, kind);
     if (redrawEdges) this.drawEdges();
@@ -11391,6 +11447,7 @@ export class VisualAgentMapView extends ItemView {
     if (note) this.renderMarkerSection(panel, node);
     if (note) this.renderLinkSection(panel, node);
     if (note) this.renderColorSection(panel, node);
+    if (note) this.renderStyleSection(panel, node);
     if (note) this.renderCoverSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
     const relationship = panel.createDiv("vam-inspector-section");
@@ -12414,7 +12471,7 @@ export class VisualAgentMapView extends ItemView {
       t("ui.topic_color_apply_branch"),
       () => this.enqueue(() => this.changeTopicColor(node, current(), true)),
       branchNoteIds(this.map!.nodes, node.id).length < 2
-    );
+    ).setAttr("aria-label", t("ui.topic_color_apply_branch_aria"));
   }
   /**
    * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
@@ -12438,6 +12495,115 @@ export class VisualAgentMapView extends ItemView {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.topic_color") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+  }
+  /** The styles a topic note shows now (whitelisted tokens only). */
+  private styleOf(id: string): TopicStyle[] {
+    return TOPIC_STYLES.filter(style => this.notes.get(id)?.style?.includes(style));
+  }
+  /**
+   * The style menu of the topic panel: bold, thick border and thick line as pressed-state switches, the text size as a
+   * radiogroup (arrow keys choose), and a button that gives the branch the same styles.
+   */
+  private renderStyleSection(panel: HTMLElement, node: MapNode): void {
+    if (!this.markersEditable(node)) return;
+    const section = panel.createDiv("vam-inspector-section vam-style-section");
+    section.createEl("strong", { text: t("ui.topic_style"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const switches = section.createDiv("vam-topic-style-switches vam-choice-group");
+    switches.setAttr("role", "group");
+    switches.setAttr("aria-label", t("ui.topic_style"));
+    const sizes: (TopicStyle | null)[] = [null, "text-small", "text-large"];
+    const sizeOf = (): TopicStyle | null => sizes.find(id => id && this.styleOf(node.id).includes(id)) ?? null;
+    const withSize = (size: TopicStyle | null): TopicStyle[] => [
+      ...this.styleOf(node.id).filter(id => id !== "text-small" && id !== "text-large"),
+      ...(size ? [size] : [])
+    ];
+    const paint = (focus?: { toggle?: TopicStyle; size?: TopicStyle | null }): void => {
+      switches.empty();
+      for (const id of ["bold", "border-thick", "line-thick"] as const) {
+        const on = this.styleOf(node.id).includes(id);
+        const choice = this.button(switches, t(styleLabelKey(id)), () => {
+          const current = this.styleOf(node.id);
+          this.enqueue(async () => {
+            await this.changeTopicStyle(node, on ? current.filter(item => item !== id) : [...current, id]);
+            paint({ toggle: id });
+          });
+        });
+        choice.setAttr("aria-pressed", String(on));
+        if (on) choice.addClass("is-pressed");
+        if (focus?.toggle === id) choice.focus();
+      }
+      group.empty();
+      const active = sizeOf();
+      sizes.forEach((id, index) => {
+        const text = id ? t(styleLabelKey(id)) : t("ui.topic_style_size_standard");
+        const choice = this.button(group, text, () => {
+          this.enqueue(async () => {
+            await this.changeTopicStyle(node, withSize(id));
+            paint({ size: id });
+          });
+        });
+        const on = id === active;
+        choice.setAttr("role", "radio");
+        choice.setAttr("aria-checked", String(on));
+        if (on) choice.addClass("is-pressed");
+        if (!this.renderingCard) choice.tabIndex = on ? 0 : -1;
+        choice.addEventListener("keydown", event => {
+          const step =
+            event.key === "ArrowRight" || event.key === "ArrowDown"
+              ? 1
+              : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                ? -1
+                : 0;
+          if (!step) return;
+          event.preventDefault();
+          const next = (index + step + sizes.length) % sizes.length;
+          this.enqueue(async () => {
+            await this.changeTopicStyle(node, withSize(sizes[next]));
+            paint({ size: sizes[next] });
+          });
+        });
+        if (focus && focus.size !== undefined && id === focus.size) choice.focus();
+      });
+    };
+    section.createDiv({ text: t("ui.topic_style_size"), cls: "vam-topic-style-size-label" });
+    const group = section.createDiv("vam-topic-style-sizes vam-choice-group");
+    group.setAttr("role", "radiogroup");
+    group.setAttr("aria-label", t("ui.topic_style_size"));
+    paint();
+    this.button(
+      section,
+      t("ui.topic_style_apply_branch"),
+      () => this.enqueue(() => this.changeTopicStyle(node, this.styleOf(node.id), true)),
+      branchNoteIds(this.map!.nodes, node.id).length < 2
+    ).setAttr("aria-label", t("ui.topic_style_apply_branch_aria"));
+  }
+  /**
+   * Sets the whitelisted styles of one topic, or of the topic and all its descendants (folded ones too), in one undoable
+   * step. Only the notes whose styles really change are written (unknown frontmatter values stay); Map.md changes only
+   * its viewport. A child never inherits.
+   */
+  private async changeTopicStyle(node: MapNode, styles: readonly TopicStyle[], branch = false): Promise<void> {
+    if (!this.map || !this.markersEditable(node)) return;
+    const wanted = readTopicStyle({ "topic-style": styles });
+    const ids = branch ? branchNoteIds(this.map.nodes, node.id) : [node.id];
+    const targets = ids
+      .map(id => this.map!.nodes.find(item => item.id === id))
+      .filter((item): item is MapNode => !!item && !item.aimKind && !!this.notes.get(item.id))
+      .filter(item => this.styleOf(item.id).join() !== wanted.join());
+    if (!targets.length) return;
+    const viewport = clone(this.map.viewport);
+    let transaction = this.beginMapTransaction();
+    for (const target of targets)
+      transaction = transaction.rewriteNote(target.path, path =>
+        this.plugin.repo.writeTopicStyle(path, { set: wanted })
+      );
+    const entry = await transaction
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_style") });
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
@@ -17600,6 +17766,7 @@ export class VisualAgentMapView extends ItemView {
             : treeEdgePathData(boxOf(parent), boxOf(child), direction, depthOf(allNodes, node.id))
         );
         path.addClass("vam-edge");
+        if (!node.aimKind && this.styleOf(node.id).includes("line-thick")) path.setAttribute("data-line-thick", "");
         if (parentId !== node.parentId) path.addClass("vam-edge-convergence");
         if (!this.map.aim && !this.builtIn && this.notes.get(node.id)?.relevance?.tier === "side")
           path.addClass("vam-edge-side");

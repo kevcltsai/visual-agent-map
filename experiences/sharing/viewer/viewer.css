@@ -29,6 +29,7 @@
   --font-ui-smaller: 12px;
   --font-ui-small: 13px;
   --font-ui-medium: 15px;
+  --font-ui-large: 20px;
   --input-height: 30px;
   --size-4-3: 12px;
   --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;
@@ -129,6 +130,13 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node.vam-node[data-relevance="side"] { opacity: 1; }
 .vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }
 .vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }
+/* Topic style (card-style): the same attributes and rules as the map view; every value comes from the viewer's own whitelist, never from the payload text. */
+.vam-node[data-topic-style-bold] .vam-card-title { font-weight: 800; }
+.vam-node[data-topic-style-size="small"] .vam-card-title, .vam-node[data-topic-style-size="small"] .vam-card-summary { font-size: var(--font-ui-small); }
+.vam-node[data-topic-style-size="large"] .vam-card-title, .vam-node[data-topic-style-size="large"] .vam-card-summary { font-size: var(--font-ui-large); }
+.vam-node[data-topic-style-border="thick"] { border-width: 3px; --vam-kind-width: 3px; }
+.vam-node[data-topic-style-border="thick"].is-selected { outline-width: 3px; --vam-kind-width: 4px; }
+.vam-edge[data-line-thick] { stroke-width: 4px; }
 /* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */
 .vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }
 .vam-outline-item .vam-markers { margin-left: 6px; }

@@ -899,7 +899,7 @@ integrationTest('structure review: cancelled confirm for reduce and merge: sugge
   await apply(3, false); await tick(); await h.choose('Remove entire branch');
   assert.equal((await h.saved()).some(n => n.id === h.ids.d), false);
 });
-integrationTest('structure review entries: leaf, AIM map, builtin sample, outside topics folder', async () => {
+integrationTest('structure review entries: leaf, AIM map, outside topics folder', async () => {
   const h = await viewHarness({ suggestions: [] });
   const entry = id => h.view.structureReviewEntry(h.view.map.nodes.find(n => n.id === id));
   assert.equal(entry(h.ids.c), undefined); assert.equal(entry(h.ids.f), undefined);
@@ -907,10 +907,6 @@ integrationTest('structure review entries: leaf, AIM map, builtin sample, outsid
   h.view.map.aim = { kind: 'aim' };
   assert.equal(entry(h.ids.root), undefined, 'aim: root'); assert.equal(entry(h.ids.a), undefined, 'aim: branch');
   delete h.view.map.aim;
-  h.view.builtIn = true;
-  assert.equal(entry(h.ids.root), undefined, 'sample root'); assert.equal(entry(h.ids.a), undefined);
-  h.view.openStructureReview(null); assert.equal(h.opened.length, 0, 'direct open refused on sample');
-  h.view.builtIn = false;
   h.view.openStructureReview(null); assert.equal(h.opened.length, 1);
   const p = h.view.path; h.view.path = 'Other/Map.md';
   assert.equal(entry(h.ids.root), undefined);

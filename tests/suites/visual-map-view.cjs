@@ -952,7 +952,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const view = {
     renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderStyleSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch,
-    builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
+    map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
     button(parent, text, click) { const b = parent.createEl('button', { text }); b.click = click; return b; },
     mergeUnlocked: () => !merging, confirmRemoveNode() { removed++; }, enqueue(work) { work(); }, mapChange(change) { const copy = { nodes: nodes.map(n => ({ ...n })) }; change(copy); changes.push(copy.nodes.find(n => n.id === 'c').parentId); }
@@ -1438,10 +1438,10 @@ integrationTest('startup opens no topic outline, including on first install, whi
 const outlineFixture = () => {
   const { default: Plugin, VisualAgentMapView } = load('main.ts', { obsidian });
   const handlers = {}, titled = title => ({ ...map([node('a')]), title });
-  const mapView = (plugin, title) => { const view = Object.create(VisualAgentMapView.prototype); Object.assign(view, { plugin, map: titled(title), notes: new Map(), builtIn: false }); return view; };
+  const mapView = (plugin, title) => { const view = Object.create(VisualAgentMapView.prototype); Object.assign(view, { plugin, map: titled(title), notes: new Map() }); return view; };
   const plugin = Object.create(Plugin.prototype), state = { views: [], active: null };
   const leaf = { setViewState: async () => {} };
-  Object.assign(plugin, { outlineTitles: new Map(), outlineSample: false, outlineSourceView: null, coffeeOutlineActive: false, coffeeOutlineSource: null, logs: { appendLog() {} },
+  Object.assign(plugin, { outlineTitles: new Map(), outlineSourceView: null, coffeeOutlineActive: false, coffeeOutlineSource: null, logs: { appendLog() {} },
     app: { workspace: { getLeavesOfType: type => type === 'visual-agent-map' ? state.views.map(view => ({ view })) : [], getActiveViewOfType: () => state.active, getLeftLeaf: () => leaf, revealLeaf: async () => {} } } });
   plugin.views = () => state.views;
   const a = mapView(plugin, 'Map A'), b = mapView(plugin, 'Map B');
@@ -1493,10 +1493,8 @@ integrationTest('card tools: labelled actions wait for hover, focus or selection
   assert.equal(buttons.filter(button => button.classes.has('vam-ai-explore')).length, 1, 'one AI button');
   assert.equal(buttons[1].attrs['aria-label'], 'Structure and links'); assert.equal(buttons[3].attrs['aria-label'], 'Select every direct subtopic of this topic'); assert.equal(buttons[5].attrs['aria-label'], 'Open details in right sidebar');
   assert.equal(buttons[2].attrs['aria-label'], undefined);
-  // A leaf has no Collapse; the sample keeps only Details; select mode keeps only Details.
+  // A leaf has no Collapse; select mode keeps only Details.
   assert.deepEqual(toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); }).map(button => button.text), ['Structure', 'Rename', 'Add text', 'Details', 'AI explore']);
-  const sample = toolsOf(({ view }) => { view.builtIn = true; });
-  assert.deepEqual(sample.map(button => button.text), ['Details']); assert.equal(sample[0].attrs.title, 'View sample content');
   assert.deepEqual(toolsOf(({ view }) => { view.integrationMode = true; }).map(button => button.text), ['Collapse', 'Details']);
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '結構', '改名', '詳情', 'AI 探索']);
@@ -1653,16 +1651,6 @@ integrationTest('map stylesheet: no :has() on the map surface, reduced motion be
   for (const dead of ['.vam-next-web', '.vam-next-usage', '.vam-next-sources', '.vam-rule-preview']) assert.equal(css.includes(dead), false, `${dead} is removed`);
   assert.equal((css.match(/^\.vam-toolbar \.vam-map-switcher \{/gm) ?? []).length, 1, 'the switcher rule is not duplicated');
 });
-integrationTest('sample inspector marks its workspace so the overlay can move without :has()', () => {
-  const fixture = selectionView(load, {}, { ...obsidian, MarkdownRenderer: { render: async () => {} } });
-  const { view } = fixture;
-  view.builtIn = true; view.notes.get('root').sourcePaths = []; view.notes.get('root').detail = '';
-  const make = selectionDom();
-  const parent = make('div');
-  view.renderInspector(parent, fixture.doc.nodes[0]);
-  assert.ok(parent.classes.has('has-inspector'));
-  assert.ok(parent.children.some(child => child.classes.has('vam-inspector')));
-});
 integrationTest('outline toggles report aria-expanded and the open topic row reports aria-current', () => {
   const { OutlineView } = load('ui/outline-view.ts', { obsidian });
   const element = (tag, options = {}) => ({ tag, text: options.text, cls: options.cls ?? '', children: [], style: {},
@@ -1794,7 +1782,6 @@ integrationTest('Select subtopics: shown only for an unfolded, non-AIM card that
   assert.equal(has(undefined, 'b'), false, 'a leaf has none');
   assert.equal(has(({ doc, view }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; }), false, 'a folded card hides its subtopics and offers Expand instead');
   assert.equal(has(({ view }) => { view.integrationMode = true; }), false, 'not while selecting');
-  assert.equal(has(({ view }) => { view.builtIn = true; }), false, 'not in the sample');
   assert.equal(has(({ view }) => { view.map.aim = { branches: [] }; }), false, 'not in an AIM map');
   // Root has direct children a and b but not grandchild c; the button replaces any earlier selection.
   const { fixture, buttons } = toolTexts(undefined, 'root');
@@ -1947,8 +1934,8 @@ integrationTest('merge dialog offers AI only when a selected card has Detail, an
   view.mergeTasks.set(view.path, { mapPath: view.path, state: 'running', sources: [{ id: 'a', path: 'a' }, { id: 'b', path: 'b' }], controller: new AbortController() });
   view.openMerge(); assert.equal(opened.length, 2, 'no second dialog while a merge is running');
 });
-integrationTest('the read-only sample and AIM maps never enter selection mode from Shift+drag or Cmd/Ctrl+click', () => {
-  for (const [name, setup] of [['sample', view => { view.builtIn = true; }], ['AIM', view => { view.map.aim = { branches: [] }; }]]) {
+integrationTest('AIM maps never enter selection mode from Shift+drag or Cmd/Ctrl+click', () => {
+  for (const [name, setup] of [['AIM', view => { view.map.aim = { branches: [] }; }]]) {
     const fixture = selectionView(load); const { view } = fixture; setup(view);
     fixture.build();
     const cards = fixture.cards(); const target = { closest: () => null };
@@ -2039,7 +2026,7 @@ function heFixture(options = {}) {
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
   plugin.currentModelChoice = () => ({ model: plugin.settings.cliModel, reasoning: plugin.settings.cliReasoning });
   const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.app = { vault: { getAbstractFileByPath: () => null }, metadataCache: { getFileCache: () => null } }; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
+  view.app = { vault: { getAbstractFileByPath: () => null }, metadataCache: { getFileCache: () => null } }; view.path = 'Map.md'; view.map = doc;
   view.notes = options.notes ?? heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}]]);
   return { VisualAgentMapView, view, doc, opened, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
 }
@@ -2152,11 +2139,9 @@ integrationTest('hypothesis-evidence: a non-ordinary topic sets data-topic-kind 
   assert.equal('topicKind' in plainCard.card.dataset, false, 'an ordinary topic has no data-topic-kind'); assert.doesNotMatch(plainCard.label.text, /Evidence|Hypothesis|Action|Conclusion|Atomic/);
   const aim = render({ aim: true, notes }, 'fact');
   assert.equal('topicKind' in aim.card.dataset, false); assert.doesNotMatch(aim.label.text, /Evidence/);
-  const builtIn = render({ builtIn: true, notes }, 'fact');
-  assert.equal('topicKind' in builtIn.card.dataset, false);
 });
-integrationTest('hypothesis-evidence: an AIM map and the built-in sample have no type menu, no add-subtopic entry, no type control, and refuse a switch', async () => {
-  for (const options of [{ aim: true }, { builtIn: true }]) {
+integrationTest('hypothesis-evidence: an AIM map has no type menu, no add-subtopic entry, no type control, and refuse a switch', async () => {
+  for (const options of [{ aim: true }]) {
     const { view, menus, writes } = heFixture(options);
     view.openTopicMenu({});
     assert.deepEqual(menus.flatMap(m => m.titles).filter(title => heKindNames.includes(title)), [], `toolbar ${JSON.stringify(options)}`);
@@ -2501,7 +2486,7 @@ integrationTest('hypothesis-evidence: a prerequisite line runs from A to B along
   const drag = view.dragEdges('other', view.cardEls.get('other')); drag.update(0, 400);
   assert.match(aToB.attrs.d, /^M 140 400 C /, 'dragging A moves the prerequisite line');
 });
-integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is, and an AIM map or the built-in sample draws no prerequisite', () => {
+integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn as it is, and an AIM map draws no prerequisite', () => {
   const relations = [{ kind: 'prerequisite', from: 'fact', to: 'other' }, { kind: 'prerequisite', from: 'other', to: 'hyp' }, { kind: 'prerequisite', from: 'hyp', to: 'fact' }]; // a three-topic cycle: a two-topic one is a same pair (decision #37)
   const { view, logs } = heFixture({ relations });
   const kids = heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] });
@@ -2509,8 +2494,6 @@ integrationTest('hypothesis-evidence: a hand-written prerequisite cycle is drawn
   assert.equal(view.map.topicRelations.length, 3);
   view.map.aim = { mode: 'x' };
   assert.equal(heDrawn(view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
-  const sample = heFixture({ relations, builtIn: true });
-  assert.equal(heDrawn(sample.view, { fact: [0, 0], hyp: [500, 40], other: [0, 200] }).length, 0);
   const collapsed = heFixture({ relations }); assert.equal(heDrawn(collapsed.view, { fact: [0, 0], hyp: [500, 40] }).filter(k => k.classes.includes('vam-relation-prerequisite')).length, 1, 'an off-screen end is skipped: only hyp -> fact has both ends on screen');
 });
 integrationTest('hypothesis-evidence: styles.css gives the prerequisite line its long-short pattern, unlike contradicts, AIM and the solid parent line', () => {
@@ -2685,7 +2668,7 @@ integrationTest('hypothesis-evidence: renderShapeBackground draws a stretchable,
   }
   assert.equal(mod.draw('evidence').drawn.children.length, 2, 'evidence has the fold line too'); assert.equal(mod.draw('conclusion').drawn.attrs.viewBox && mod.draw('conclusion').drawn.children[0].attrs.points, '25,0 75,0 100,50 75,100 25,100 0,50', 'the AIM conclusion hexagon points');
 });
-integrationTest('hypothesis-evidence: a card draws its type shape as its first child; an ordinary topic, an AIM card and the built-in sample draw none', () => {
+integrationTest('hypothesis-evidence: a card draws its type shape as its first child; an ordinary topic, an AIM card draw none', () => {
   const draws = (options, id) => {
     const f = heFixture(options); f.view.stageEl = hePatch(dom.element('stage')); f.view.renderNode(f.view.map.nodes.find(n => n.id === id));
     return { shapes: f.svgCreated.filter(el => el.classes.includes('vam-kind-shape')), card: f.view.stageEl.children[0] };
@@ -2697,7 +2680,6 @@ integrationTest('hypothesis-evidence: a card draws its type shape as its first c
   for (const kind of ['action', 'topic']) assert.equal(draws({ notes: heNotes([['fact', kind === 'topic' ? {} : { topicKind: kind }], ['hyp', {}], ['other', {}]]) }, 'fact').shapes.length, 0, `${kind} draws none`);
   const typed = heNotes([['fact', { topicKind: 'hypothesis' }], ['hyp', {}], ['other', {}]]);
   assert.equal(draws({ aim: true, notes: typed }, 'fact').shapes.length, 0, 'an AIM map draws no type shape (no vam-kind-shape)');
-  assert.equal(draws({ builtIn: true, notes: typed }, 'fact').shapes.length, 0, 'the built-in sample draws none');
 });
 integrationTest('hypothesis-evidence: fitKindShape sets the side padding from the width, then top and bottom from the measured text height; a hidden card is left alone', () => {
   const f = heFixture({}), mod = heShapeModule();
@@ -2978,8 +2960,8 @@ integrationTest('hypothesis-evidence: a note like <img src=x onerror=alert(1)> i
   const editor = src.slice(src.indexOf('private renderRelationEditor'), src.indexOf('/** `focus` false leaves the camera'));
   assert.equal(/innerHTML|outerHTML|insertAdjacentHTML/.test(editor), false, 'the editor and the panel rows never parse markup');
 });
-integrationTest('hypothesis-evidence: an AIM map and the built-in sample have no relation section, no add entry and no editor', () => {
-  for (const options of [{ aim: true, relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }, { builtIn: true, relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }]) {
+integrationTest('hypothesis-evidence: an AIM map has no relation section, no add entry and no editor', () => {
+  for (const options of [{ aim: true, relations: [{ kind: 'supports', from: 'fact', to: 'hyp' }] }]) {
     const fx = heFixture(options);
     const panel = dom.element('panel'); fx.view.renderHypothesisSection(panel, fx.view.map.nodes[0]);
     assert.equal(panel.children.length, 0, 'nothing is rendered');
@@ -3138,7 +3120,7 @@ integrationTest('hypothesis-evidence: the end cards of a selected line outline t
   assert.match(css, /^\.is-relation-end\.vam-node \{ outline: 2px solid var\(--interactive-accent\)/m);
 });
 // ---- hypothesis-evidence (P19, decision 35): visual polish of cards and lines ----
-integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM, the built-in sample and a skippable branch keep the plain accent edge (A1)', () => {
+integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries data-parent-line; AIM and a skippable branch keep the plain accent edge (A1)', () => {
   const topics = [node('root'), node('kid', 'root'), node('skip', 'root')];
   const notes = heNotes([['root', {}], ['kid', {}], ['skip', { relevance: { tier: 'side' } }]]);
   const edges = options => { const fx = heFixture({ topics, notes, ...options }); return heDrawn(fx.view, { root: [0, 0], kid: [400, 0], skip: [400, 200] }); };
@@ -3147,7 +3129,7 @@ integrationTest('hypothesis-evidence: only a mind map\'s own parent line carries
   const kid = plain.find(p => !p.classes.includes('vam-edge-side')), skip = plain.find(p => p.classes.includes('vam-edge-side'));
   assert.ok(kid.classes.includes('vam-edge') && 'data-parent-line' in kid.attrs, 'an ordinary parent line is marked');
   assert.equal('data-parent-line' in skip.attrs, false, 'a skippable branch keeps its own muted edge');
-  for (const options of [{ aim: true }, { builtIn: true }]) for (const p of edges(options)) { assert.equal('data-parent-line' in p.attrs, false); assert.deepEqual(p.classes.filter(c => c !== 'vam-edge'), []); }
+  for (const options of [{ aim: true }]) for (const p of edges(options)) { assert.equal('data-parent-line' in p.attrs, false); assert.deepEqual(p.classes.filter(c => c !== 'vam-edge'), []); }
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /^path\[data-parent-line\] \{ stroke: color-mix\(in srgb, var\(--interactive-accent\) 35%, var\(--text-muted\)\); stroke-width: 1\.5px; \}/m);
   assert.match(css, /^\.vam-edge \{ fill: none; stroke: var\(--interactive-accent\); stroke-width: 2; opacity: 1; \}/m, 'the shared .vam-edge rule is untouched');
@@ -3166,7 +3148,6 @@ integrationTest('hypothesis-evidence: atomic, evidence, conclusion and action ca
   const hyp = render('hypothesis'); assert.equal(hyp.length, 1); assert.equal(hyp[0].text, 'Hypothesis · Medium'); assert.doesNotMatch(hyp[0].cls, /vam-kind-tag/, 'the hypothesis tag is the existing one');
   assert.equal(render('topic').length, 0, 'an ordinary topic has no tag');
   assert.equal(render('evidence', { aim: true }).length, 0, 'AIM has no tag');
-  assert.equal(render('evidence', { builtIn: true }).length, 0, 'the built-in sample has no tag');
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) assert.ok(css.includes(`[data-topic-kind="${kind}"].vam-node .vam-hypothesis-tag`), `${kind} tag rule`);
   assert.match(css, /\.vam-hypothesis-tag \{ color: color-mix\(in srgb, var\(--vam-kind-hue\) \d+%, var\(--text-normal\)\); \}/, 'the tag takes the type hue');
@@ -3432,8 +3413,8 @@ integrationTest('topic-markers: refreshCard keeps the marker row where it was (a
   f.view.refreshCard(node, false);
   assert.ok(order().indexOf('vam-card-markers') > order().indexOf('vam-kind-tag'), 'a row added later goes after the type tag');
 });
-integrationTest('topic-markers: the sample, an AIM map and select mode have no marker menu and refuse a toggle', async () => {
-  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+integrationTest('topic-markers: an AIM map and select mode have no marker menu and refuse a toggle', async () => {
+  for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
     if (options.integration) view.integrationMode = true;
     const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[2]);
@@ -3552,8 +3533,8 @@ integrationTest('topic-color: the colour name sits with the marker and model par
   const spans = dom.findAll(card, c => (c.cls ?? '').split(/\s+/).includes('vam-card-label'));
   assert.equal(spans.length, 1, 'one label element, replaced in place');
 });
-integrationTest('topic-color: the sample, an AIM map and select mode have no colour menu and refuse a change', async () => {
-  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+integrationTest('topic-color: an AIM map and select mode have no colour menu and refuse a change', async () => {
+  for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
     if (options.integration) view.integrationMode = true;
     const panel = dom.element('panel'); view.renderColorSection(panel, view.map.nodes[2]);
@@ -3695,8 +3676,8 @@ integrationTest('topic-style: a card carries only whitelisted data-topic-style-*
   note.style = undefined; g.view.refreshCard(node0, false);
   assert.equal(count(/Style:/g), 0); assert.equal('styleText' in card.dataset, false); assert.equal(count(/Color:/g), 1);
 });
-integrationTest('topic-style: the sample, an AIM map and select mode have no style menu and refuse a change', async () => {
-  for (const options of [{ aim: true }, { builtIn: true }, { integration: true }]) {
+integrationTest('topic-style: an AIM map and select mode have no style menu and refuse a change', async () => {
+  for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
     if (options.integration) view.integrationMode = true;
     const panel = dom.element('panel'); view.renderStyleSection(panel, view.map.nodes[2]);
@@ -3827,7 +3808,7 @@ integrationTest('topic-links: the card header shows a button whose label lists t
 });
 integrationTest('topic-links: the panel section lists and opens links in read-only cases, hides editing, and shows errors in an aria-live region', async () => {
   {
-    for (const options of [{ builtIn: true }, { aim: true }, { integration: true }]) {
+    for (const options of [{ aim: true }, { integration: true }]) {
       const f = heFixture({ ...options, notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', {}], ['other', {}]]) });
       if (options.integration) f.view.integrationMode = true;
       const panel = dom.element('panel'); f.view.renderLinkSection(panel, f.view.map.nodes[0]);

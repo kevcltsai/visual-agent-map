@@ -399,12 +399,10 @@ integrationTest('relevance: an existing goal prefills the field and the goal is 
   assert.equal((await h.repo.readRelevanceGoal(MAP)).length, 200);
 });
 
-integrationTest('relevance: AIM maps and the built-in sample have no goal entry and never grade', async () => {
+integrationTest('relevance: AIM maps have no goal entry and never grade', async () => {
   const h = await harness();
   h.view.map.aim = { runs: [] };
   await h.view.submitRelevanceGoal('Goal'); assert.equal(h.control.calls.length, 0); assert.equal(h.run(), undefined); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined);
-  h.view.map.aim = undefined; h.view.builtIn = true;
-  await h.view.submitRelevanceGoal('Goal'); assert.equal(h.control.calls.length, 0); assert.equal(await h.repo.readRelevanceGoal(MAP), undefined);
   // The toolbar entry and the bar sit behind the same guards in the real render.
   const source = fs.readFileSync(path.join(projectRoot, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /if \(!aimMode\) \{[\s\S]{0,1400}this\.renderRelevanceGoalControl\(tools\);/);
@@ -810,7 +808,7 @@ const manualKeys = /^relevance-(tier|reason|manual):.*\n/gm;
 // Draws one real card on a stage, the way render does, and returns its tag button.
 const paintCard = (h, key) => {
   h.plugin.expansionBatches ??= new Map(); h.plugin.pendingSuggestions ??= new Map(); h.plugin.detailsShown ??= () => false;
-  h.view.builtIn = false; h.view.labelCard = () => {}; h.view.stageEl = element('stage'); h.view.cardEls = new Map(); h.view.tabStopId = null;
+  h.view.labelCard = () => {}; h.view.stageEl = element('stage'); h.view.cardEls = new Map(); h.view.tabStopId = null;
   h.view.renderNode(h.view.map.nodes.find(n => n.id === h.ids[key]));
   const card = h.view.stageEl.children[0];
   card.matches = () => false;
@@ -1374,15 +1372,6 @@ integrationTest('relevance: a recalibration counts changes received, without a t
   waiting.control.confirmGate = deferred().promise;
   await waiting.enter('Goal'); await until(() => waiting.control.usageAsks === 1);
   assert.equal(receivedEl(waiting), undefined); assert.equal(elapsedEl(waiting), undefined);
-});
-
-integrationTest('relevance: switching to the built-in sample with the panel open kills the pre-started CLI', async () => {
-  const h = await harness();
-  h.plugin.closeStaleDetails = () => {}; h.view.app.workspace = { requestSaveLayout() {} };
-  h.chip().click();
-  const open = h.control.releases;
-  await h.view.openBuiltInSample();
-  assert.equal(h.control.releases, open + 1);
 });
 
 // Goal-grading entry and its panel: named for what it does, and the panel survives a repaint or a dialog handing focus back (a null

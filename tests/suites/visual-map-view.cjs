@@ -1424,14 +1424,14 @@ integrationTest('lostpointercapture, pointercancel, a render mid-drag and closin
     await view.onClose();
     assert.equal(view.dragging, false); assert.deepEqual(cancelled, [1], 'closing the view cancels the pending frame'); }
 });
-integrationTest('startup opens no topic outline, including on first install, while the outline command stays', async () => {
+integrationTest('N4: startup opens no topic outline; first install opens only its blank map, while the outline command stays', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   for (const firstInstall of [false, true]) {
     const plugin = Object.create(Plugin.prototype), calls = [];
-    Object.assign(plugin, { app: { workspace: { getLeavesOfType: () => [] } }, ready: Promise.resolve(), workspaceRecoveryCandidates: [], firstInstallSamplePending: firstInstall,
-      activateOutline: async () => { calls.push('outline'); }, styleNodeLeaf() {}, logs: { appendLog() {} } });
+    Object.assign(plugin, { app: { workspace: { getLeavesOfType: () => [] } }, ready: Promise.resolve(), workspaceRecoveryCandidates: [], firstInstallMapPath: firstInstall ? 'Agent Workspace/Mind Maps/New mind map/Map.md' : null,
+      activateView: async path => { calls.push(['view', path]); }, activateOutline: async () => { calls.push('outline'); }, styleNodeLeaf() {}, logs: { appendLog() {} } });
     await plugin.finishStartup();
-    assert.deepEqual(calls, [], 'nothing opens at startup, never the outline');
+    assert.deepEqual(calls, firstInstall ? [['view', 'Agent Workspace/Mind Maps/New mind map/Map.md']] : [], 'at most the first-install map opens, never the outline');
   }
   assert.match(fs.readFileSync(path.join(root, 'main.ts'), 'utf8'), /addLocalizedCommand\("open-topic-outline"/);
 });
@@ -3910,4 +3910,53 @@ integrationTest('topic-links: the outline marks a row with an aria-hidden arrow 
   const fresh = css.split('\n').filter(line => /vam-topic-link|vam-card-links|vam-outline-links/.test(line));
   assert.ok(fresh.length >= 8 && fresh.every(line => /^\.(vam-view|vam-topic-modal|vam-outline) /.test(line)), 'new rules are scoped');
   assert.ok(!/@media/.test(fresh.join('\n')));
+});
+integrationTest('N2: an old view state carrying sample opens no map by itself, is not written back, and a file beside it still opens', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  const opened = [];
+  const view = Object.create(VisualAgentMapView.prototype);
+  Object.assign(view, { path: '', map: null, openMap: async file => { opened.push(file); } });
+  await view.setState({ sample: 'taiwan-travel' }, { history: false });
+  assert.deepEqual(opened, [], 'a stale sample key opens nothing');
+  assert.equal(view.map, null);
+  assert.ok(!('sample' in view.getState()), 'getState never writes sample back');
+  await view.setState({ sample: 'taiwan-travel', file: 'X/Map.md' }, { history: false });
+  assert.deepEqual(opened, ['X/Map.md']);
+});
+integrationTest('N2: onOpen after a stale sample state opens the ordinary map, or renders the empty state when there is none', async () => {
+  const { VisualAgentMapView } = load('main.ts', { obsidian });
+  for (const files of [[{ path: 'AIM/Q/Map.md' }, { path: 'Agent Workspace/Mind Maps/A/Map.md' }], []]) {
+    const opened = [];
+    const plugin = { ready: Promise.resolve(), repo: { workspaceExists: () => true, mapFiles: async () => files, readMap: async file => (file === 'AIM/Q/Map.md' ? { aim: {} } : {}) } };
+    const view = new VisualAgentMapView({ app: {} }, plugin);
+    view.contentEl = { addClass() {} }; view.registerDomEvent = () => {}; view.render = () => {};
+    view.openMap = async file => { opened.push(file); };
+    await view.setState({ sample: 'taiwan-travel' }, { history: false });
+    await view.onOpen();
+    assert.deepEqual(opened, files.length ? ['Agent Workspace/Mind Maps/A/Map.md'] : [], 'the AIM map is never picked by default');
+    assert.equal(view.map ?? null, null);
+  }
+});
+test('N5: the empty state offers "Create a new mind map" and no "View sample" (source level: the real paint needs the Obsidian-only activeDocument global)', () => {
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  const start = source.indexOf('if (!this.map) {\n      const empty = this.contentEl.createDiv("vam-empty-state")');
+  assert.ok(start > 0, 'the empty-state block exists');
+  const block = source.slice(start, source.indexOf('return;', start));
+  assert.match(block, /t\("ui\.create_a_new_mind_map"\)/);
+  assert.doesNotMatch(block, /view_sample|sample/i);
+  assert.doesNotMatch(source, /ui\.view_sample/);
+});
+integrationTest('N6: the map switcher lists exactly the topics and no "Sample:" entry', async () => {
+  const opened = [];
+  class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal } });
+  const topics = [{ title: 'Alpha', mapPath: 'A/Map.md' }, { title: 'Beta', mapPath: 'B/Map.md' }];
+  const view = Object.create(VisualAgentMapView.prototype);
+  Object.assign(view, { app: {}, plugin: { repo: { topics: async () => topics } }, enqueue: work => work() });
+  await view.openMapSwitcher();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(opened.length, 1);
+  const labels = opened[0].choices.map(choice => choice.label);
+  assert.deepEqual(plain(labels), ['Alpha', 'Beta']);
+  assert.ok(!labels.some(label => label.startsWith('Sample:')));
 });

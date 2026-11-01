@@ -195,7 +195,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
     addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-    sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0,
     canvasHintSeen: saved?.canvasHintSeen === true
   };
 }
@@ -315,6 +314,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   private externalReconcileTimer: number | null = null;
   private readonly externalReconcilePaths = new Set<string>();
   private workspaceRecoveryCandidates: string[] = [];
+  /** The blank map made on first install; finishStartup opens it. Null on every other start. */
+  private firstInstallMapPath: string | null = null;
   languageSwitchPending = false;
   recordFailure(context: string, error: unknown): string {
     const message = error instanceof Error ? error.message : String(error);
@@ -551,19 +552,7 @@ export default class VisualAgentMapPlugin extends Plugin {
             this.settings.migrated = true;
           })
     ).then(async () => {
-      if (!saved) {
-        if (this.repo.workspaceExists()) {
-          this.settings.workspaceInitialized = true;
-          await this.saveSettings();
-        } else {
-          this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
-          if (!this.workspaceRecoveryCandidates.length) {
-            await this.repo.ensureWorkspace();
-            this.settings.workspaceInitialized = true;
-            await this.saveSettings();
-          }
-        }
-      }
+      await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
@@ -758,6 +747,29 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.registerVaultEvents();
   }
+  /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
+  private async initializeFirstInstall(hasSaved: boolean): Promise<void> {
+    if (hasSaved) return;
+    if (this.repo.workspaceExists()) {
+      this.settings.workspaceInitialized = true;
+      await this.saveSettings();
+      return;
+    }
+    this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
+    if (this.workspaceRecoveryCandidates.length) return;
+    await this.repo.ensureWorkspace();
+    this.settings.workspaceInitialized = true;
+    try {
+      this.firstInstallMapPath = await this.repo.createMap(t("ui.new_mind_map_from_sample"));
+    } catch (error) {
+      this.firstInstallMapPath = null;
+      this.logs.appendLog(
+        "warn",
+        `First-install map was not created: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    await this.saveSettings();
+  }
   /** Vault modify/delete/rename handlers; kept separate so tests can drive the real handlers on a fake vault. */
   /**
    * Work after Obsidian's layout is ready. The topic outline is deliberately not opened here: it opens only through
@@ -768,6 +780,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     try {
       await this.ready;
       if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
+      else if (this.firstInstallMapPath) await this.activateView(this.firstInstallMapPath);
     } catch (error) {
       this.logs.appendLog(
         "warn",

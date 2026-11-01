@@ -169,7 +169,6 @@ export interface Settings {
   /** Add diagrams after research (default on): the chart step after a note or an AIM conclusion is written. */
   addDiagramsAfterResearch: boolean;
   workspaceInitialized: boolean;
-  sampleTourVersionSeen: number;
   canvasHintSeen: boolean;
 }
 export interface TopicInfo {
@@ -268,7 +267,6 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownSelectionAiAutoOpen: true,
   addDiagramsAfterResearch: true,
   workspaceInitialized: false,
-  sampleTourVersionSeen: 0,
   canvasHintSeen: false
 };
 

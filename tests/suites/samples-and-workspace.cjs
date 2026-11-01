@@ -96,3 +96,49 @@ test('missing Codex opens an in-product setup guide with official installation a
   assert.match(source, /if \(showGuide\) this\.openCodexSetupGuide\(\)/);
   assert.match(source, /this\.recheckCodex\(false\)/);
 });
+const firstInstallFixture = ({ workspace = false, candidates = [], failCreate = false } = {}) => {
+  const { default: Plugin } = load('main.ts', { obsidian });
+  const plugin = Object.create(Plugin.prototype), created = [], logs = [], opened = [];
+  let saves = 0;
+  Object.assign(plugin, { settings: { workspaceInitialized: false }, workspaceRecoveryCandidates: [], firstInstallMapPath: null, logs: { appendLog: (level, message) => logs.push({ level, message }) },
+    repo: { workspaceExists: () => workspace, workspaceCandidates: async () => candidates, ensureWorkspace: async () => {},
+      createMap: async title => { created.push(title); if (failCreate) throw new Error('disk full'); return 'Agent Workspace/Mind Maps/New mind map/Map.md'; } },
+    saveSettings: async () => { saves++; }, activateView: async path => { opened.push(path); }, offerWorkspaceReconnect: async () => { opened.push('reconnect'); },
+    app: { workspace: { getLeavesOfType: () => [] } }, ready: Promise.resolve(), styleNodeLeaf() {} });
+  return { plugin, created, logs, opened, saves: () => saves };
+};
+integrationTest('N3: first install (no saved data, no workspace, no candidates) creates one blank map and opens it', async () => {
+  const { plugin, created, opened, saves } = firstInstallFixture();
+  await plugin.initializeFirstInstall(false);
+  assert.deepEqual(created, ['New mind map']);
+  assert.equal(plugin.firstInstallMapPath, 'Agent Workspace/Mind Maps/New mind map/Map.md');
+  assert.equal(plugin.settings.workspaceInitialized, true);
+  assert.equal(saves(), 1);
+  await plugin.finishStartup();
+  assert.deepEqual(opened, ['Agent Workspace/Mind Maps/New mind map/Map.md']);
+});
+integrationTest('N3: saved settings, an existing workspace, or recovery candidates never create a map', async () => {
+  const saved = firstInstallFixture(); await saved.plugin.initializeFirstInstall(true);
+  assert.deepEqual(saved.created, []); assert.equal(saved.plugin.firstInstallMapPath, null);
+  const existing = firstInstallFixture({ workspace: true }); await existing.plugin.initializeFirstInstall(false);
+  assert.deepEqual(existing.created, []); assert.equal(existing.plugin.settings.workspaceInitialized, true);
+  const found = firstInstallFixture({ candidates: ['Research/My Maps'] }); await found.plugin.initializeFirstInstall(false);
+  assert.deepEqual(found.created, []); assert.deepEqual(found.plugin.workspaceRecoveryCandidates, ['Research/My Maps']);
+  await found.plugin.finishStartup();
+  assert.deepEqual(found.opened, ['reconnect'], 'candidates offer reconnect and open no map');
+});
+integrationTest('N3: a failing createMap only warns, leaves the path null and opens nothing', async () => {
+  const { plugin, logs, opened } = firstInstallFixture({ failCreate: true });
+  await plugin.initializeFirstInstall(false);
+  assert.equal(plugin.firstInstallMapPath, null);
+  assert.equal(logs.filter(entry => entry.level === 'warn').length, 1);
+  await plugin.finishStartup();
+  assert.deepEqual(opened, []);
+});
+integrationTest('N3: the second start (saved settings now exist) does not create another map', async () => {
+  const first = firstInstallFixture(); await first.plugin.initializeFirstInstall(false);
+  const second = firstInstallFixture({ workspace: true }); await second.plugin.initializeFirstInstall(true);
+  assert.deepEqual(first.created.length + second.created.length, 1);
+  await second.plugin.finishStartup();
+  assert.deepEqual(second.opened, []);
+});

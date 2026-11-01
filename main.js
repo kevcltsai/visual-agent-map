@@ -21480,7 +21480,6 @@ var DEFAULT_SETTINGS = {
   markdownSelectionAiAutoOpen: true,
   addDiagramsAfterResearch: true,
   workspaceInitialized: false,
-  sampleTourVersionSeen: 0,
   canvasHintSeen: false
 };
 var REFERENCE_START = "<!-- visual-agent-map:references:start -->";
@@ -68145,7 +68144,7 @@ function hasLegacyChatModel(saved) {
   return !!saved && typeof saved === "object" && "mapChatModel" in saved;
 }
 function settingsFromSaved(saved) {
-  var _a2, _b2;
+  var _a2;
   const legacy = saved;
   const savedWorkspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
   return {
@@ -68189,7 +68188,6 @@ function settingsFromSaved(saved) {
     markdownSelectionAiAutoOpen: (saved == null ? void 0 : saved.markdownSelectionAiAutoOpen) !== false,
     addDiagramsAfterResearch: (saved == null ? void 0 : saved.addDiagramsAfterResearch) !== false,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-    sampleTourVersionSeen: (_b2 = saved == null ? void 0 : saved.sampleTourVersionSeen) != null ? _b2 : 0,
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
@@ -68307,6 +68305,8 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     __publicField(this, "externalReconcileTimer", null);
     __publicField(this, "externalReconcilePaths", /* @__PURE__ */ new Set());
     __publicField(this, "workspaceRecoveryCandidates", []);
+    /** The blank map made on first install; finishStartup opens it. Null on every other start. */
+    __publicField(this, "firstInstallMapPath", null);
     __publicField(this, "languageSwitchPending", false);
     __publicField(this, "unreadableReported", /* @__PURE__ */ new Map());
   }
@@ -68540,19 +68540,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       await this.repo.rebuildDerivedData();
       this.settings.migrated = true;
     })).then(async () => {
-      if (!saved) {
-        if (this.repo.workspaceExists()) {
-          this.settings.workspaceInitialized = true;
-          await this.saveSettings();
-        } else {
-          this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
-          if (!this.workspaceRecoveryCandidates.length) {
-            await this.repo.ensureWorkspace();
-            this.settings.workspaceInitialized = true;
-            await this.saveSettings();
-          }
-        }
-      }
+      await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
@@ -68745,6 +68733,29 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     });
     this.registerVaultEvents();
   }
+  /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
+  async initializeFirstInstall(hasSaved) {
+    if (hasSaved) return;
+    if (this.repo.workspaceExists()) {
+      this.settings.workspaceInitialized = true;
+      await this.saveSettings();
+      return;
+    }
+    this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
+    if (this.workspaceRecoveryCandidates.length) return;
+    await this.repo.ensureWorkspace();
+    this.settings.workspaceInitialized = true;
+    try {
+      this.firstInstallMapPath = await this.repo.createMap(t("ui.new_mind_map_from_sample"));
+    } catch (error) {
+      this.firstInstallMapPath = null;
+      this.logs.appendLog(
+        "warn",
+        `First-install map was not created: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    await this.saveSettings();
+  }
   /** Vault modify/delete/rename handlers; kept separate so tests can drive the real handlers on a fake vault. */
   /**
    * Work after Obsidian's layout is ready. The topic outline is deliberately not opened here: it opens only through
@@ -68755,6 +68766,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     try {
       await this.ready;
       if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
+      else if (this.firstInstallMapPath) await this.activateView(this.firstInstallMapPath);
     } catch (error) {
       this.logs.appendLog(
         "warn",

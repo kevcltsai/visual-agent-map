@@ -87,20 +87,18 @@
 .vam-boundary-label.is-empty { min-width: 28px; min-height: 12px; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
-/* Fixed-height cards (card-height). Obsidian's review forbids clip-path (scripts/check-css.mjs), so a card whose content does not fit (.is-clipped, set by the view and the share viewer after layout) uses overflow: hidden, and everything that used to sit on or beyond the border is moved inside it while clipped: the width handle (right:-5px), the running scan line (top:-1px) and the typed shape's outline (the SVG is inset 2px so its stroke is not cut). The fade and the ellipsis are real elements because ::after is the scan line. */
-.vam-node.is-clipped { overflow: hidden; }
-.vam-node.is-clipped > .vam-card-resize { right: 0; }
-.vam-node.is-clipped:not([data-aim-kind])[data-status="running"]::after { top: 0; }
-[data-topic-kind="atomic"].vam-node.is-clipped > .vam-kind-shape, [data-topic-kind="hypothesis"].vam-node.is-clipped > .vam-kind-shape, [data-topic-kind="evidence"].vam-node.is-clipped > .vam-kind-shape, [data-topic-kind="conclusion"].vam-node.is-clipped > .vam-kind-shape { inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
+/* Fixed-height cards (card-height). Obsidian's review forbids clip-path (scripts/check-css.mjs), and overflow on the card itself would also cut what is drawn outside its box (the tool row above it, the "+", the handles, the scan line, the shape outline). So a card whose content does not fit (.is-clipped, set by the view and the share viewer after layout, measured with the class off) becomes a flex column and its content children shrink and cut themselves; nothing else changes. The fade and the ellipsis are real elements because ::after is the scan line. */
+.vam-node.is-clipped { display: flex; flex-direction: column; }
+.vam-node.is-clipped > h3, .vam-node.is-clipped > p, .vam-node.is-clipped > .vam-card-cover { flex: 0 1 auto; min-height: 0; overflow: hidden; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
 [data-topic-kind="atomic"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="hypothesis"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="evidence"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="conclusion"].vam-node.is-clipped > .vam-card-fade { display: none; }
-/* The width handle on a card's right edge (card-resize). Quiet until the card is hovered or focused; the share viewer does not collect these classes. */
+/* The width handle on a card's right edge (card-resize). Quiet until the card is hovered or focused. The share viewer's stylesheet carries these rules too (the vam-card- prefix is collected) but the viewer never builds the handles. */
 .vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
 .vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }
-/* The height handle on the bottom edge and the corner handle (card-height). Both sit inside the border: a clipped card (overflow: hidden) would cut anything beyond it. The corner is mouse-only. */
+/* The height handle on the bottom edge and the corner handle (card-height). Both sit inside the border. The corner is mouse-only. */
 .vam-card-resize-y { position: absolute; left: 14px; right: 22px; bottom: 2px; z-index: 1; height: 10px; border-radius: 5px; cursor: ns-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
 .vam-node:hover > .vam-card-resize-y, .vam-node:focus-within > .vam-card-resize-y { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }
 .vam-card-resize-y:hover, .vam-card-resize-y:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }

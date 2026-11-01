@@ -844,6 +844,7 @@ export function startViewer(doc: Document): void {
   function markClipped(): void {
     for (const [id, card] of cards) {
       if (!byId.get(id)?.height) continue;
+      card.classList.remove("is-clipped");
       card.classList.toggle("is-clipped", card.scrollHeight > card.clientHeight + 1);
     }
   }

@@ -10381,11 +10381,25 @@ export class VisualAgentMapView extends ItemView {
     const node = this.map?.nodes.find(item => item.id === card.dataset?.nodeId);
     if (!node) return;
     // A card that loses its height is rebuilt by the repaint, so only a set height has a state to refresh here.
-    if (node.height) card.toggleClass("is-clipped", card.scrollHeight > card.clientHeight + 1);
+    if (node.height) this.measureClipped(card);
     else if (card.offsetHeight)
       card
         .querySelector<HTMLElement>(".vam-card-resize-y")
         ?.setAttribute("aria-valuenow", String(clampCardHeight(card.offsetHeight)));
+  }
+  /**
+   * Whether a fixed-height card cuts its content. The clipped layout shrinks the content to fit, so the check runs with
+   * the class off (the card then overflows by the hidden part) and puts it back when it does.
+   */
+  private measureClipped(card: HTMLElement): boolean {
+    card.toggleClass("is-clipped", false);
+    const clipped = card.scrollHeight > card.clientHeight + 1;
+    card.toggleClass("is-clipped", clipped);
+    return clipped;
+  }
+  private markClipped(card: HTMLElement, fixed: boolean): void {
+    if (fixed) this.measureClipped(card);
+    else card.toggleClass("is-clipped", false);
   }
   /** The fade and the ellipsis of a fixed-height card are real elements (the card's ::after is the running scan line). */
   private ensureClipParts(card: HTMLElement): void {
@@ -17132,7 +17146,7 @@ export class VisualAgentMapView extends ItemView {
           card.style.height = `${height}px`;
           this.ensureClipParts(card);
         }
-        card.toggleClass("is-clipped", card.scrollHeight > card.clientHeight + 1 && card.style.height !== "");
+        this.markClipped(card, card.style.height !== "");
         sync(height);
       };
       const move = (e: PointerEvent): void => {
@@ -17150,7 +17164,7 @@ export class VisualAgentMapView extends ItemView {
         height = from;
         if (before === undefined) card.style.removeProperty("height");
         else card.style.height = `${before}px`;
-        card.toggleClass("is-clipped", before !== undefined && card.scrollHeight > card.clientHeight + 1);
+        this.markClipped(card, before !== undefined);
         sync(from);
       };
       const up = (): void => {
@@ -17232,7 +17246,7 @@ export class VisualAgentMapView extends ItemView {
           card.style.height = `${height}px`;
           this.ensureClipParts(card);
         }
-        card.toggleClass("is-clipped", card.style.height !== "" && card.scrollHeight > card.clientHeight + 1);
+        this.markClipped(card, card.style.height !== "");
       };
       const move = (e: PointerEvent): void => {
         width = clampCardWidth(fromWidth + (e.clientX - startX) / zoom) ?? fromWidth;

@@ -66,20 +66,36 @@ test('A4 the viewer cleans the height, applies it in place() and marks clipped c
   assert.match(source, /vam-card-more/);
 });
 
-test('A4 the clip rules are in the viewer stylesheet and keep the handles, scan line and shapes visible', () => {
+test('A4 the clip rules are in the viewer stylesheet; only the content is cut, never the card box (R1 Medium 1)', () => {
   const bundle = load('experiences/sharing/viewer-bundle.generated.ts');
   const css = bundle.SHARE_VIEWER_CSS;
-  assert.ok(css.includes('.vam-node.is-clipped { overflow: hidden; }'));
-  assert.ok(css.includes('.vam-node.is-clipped > .vam-card-resize { right: 0; }'), 'the width handle moves inside the border while clipped');
   assert.ok(css.includes('.vam-node.is-clipped > .vam-card-fade'));
   assert.ok(css.includes('.vam-node.is-clipped > .vam-card-more'));
-  const own = styles();
-  // Obsidian's review rejects clip-path (scripts/check-css.mjs): the clip is overflow: hidden, so what sits on or past the border must move inside it while clipped.
-  assert.doesNotMatch(own, /clip-path\s*:/);
-  assert.ok(own.includes('.vam-node.is-clipped:not([data-aim-kind])[data-status="running"]::after { top: 0; }'), 'the scan line stays visible');
-  assert.ok(own.includes('[data-topic-kind="hypothesis"].vam-node.is-clipped > .vam-kind-shape'), 'the shape outline stays visible');
   assert.equal(css.includes('.vam-kind-shape'), false, 'the viewer stylesheet carries no shape rule');
-  assert.match(own, /\.vam-card-resize \{[^}]*right: -5px/, 'the unclipped width handle is unchanged');
+  const own = styles();
+  // Obsidian's review rejects clip-path (scripts/check-css.mjs). overflow on the card itself would also cut what is drawn outside it: the tool row above (bottom: calc(100% - 6px)), the "+" (right: -14px), the handles, the scan line and the shape outline.
+  assert.doesNotMatch(own, /clip-path\s*:/);
+  for (const sheet of [own, css]) {
+    for (const rule of sheet.matchAll(/^([^{}\n]*\.is-clipped[^{}\n]*)\{([^}]*)\}/gm)) {
+      const selector = rule[1].trim();
+      if (!/overflow\s*:\s*(hidden|clip|auto|scroll)/.test(rule[2])) continue;
+      assert.ok(/>\s*[.a-z]/.test(selector) && !/^\.vam-node\.is-clipped\s*$/.test(selector), `overflow is only on content children, not on the card: ${selector}`);
+    }
+  }
+  assert.ok(css.includes('.vam-node.is-clipped { display: flex; flex-direction: column; }'), 'the content shrinks inside the card instead of overflowing it');
+  assert.match(css, /\.vam-node\.is-clipped > h3, \.vam-node\.is-clipped > p, \.vam-node\.is-clipped > \.vam-card-cover \{[^}]*min-height: 0; overflow: hidden;/);
+  assert.doesNotMatch(own, /\.is-clipped > \.vam-card-resize \{ right: 0/, 'handles keep their place outside the border');
+  assert.doesNotMatch(own, /is-clipped[^{]*::after \{ top: 0/, 'the scan line keeps its place');
+  assert.doesNotMatch(own, /is-clipped > \.vam-kind-shape/, 'the shape outline is not inset');
+  assert.match(own, /\.vam-card-resize \{[^}]*right: -5px/, 'the width handle is unchanged');
+  assert.match(own, /\.vam-node-tools \{[^}]*bottom: calc\(100% - 6px\)/, 'the tool row still sits above the card');
+});
+
+test('R1 the clipped state is measured with the clip class off, since the clipped layout never overflows', () => {
+  const view = fs.readFileSync(path.join(root, 'experiences', 'visual-map', 'view.ts'), 'utf8');
+  assert.equal((view.match(/card\.scrollHeight > card\.clientHeight/g) || []).length, 1, 'one measuring helper in the view');
+  assert.match(view, /private measureClipped\(card: HTMLElement\): boolean \{\s*card\.toggleClass\("is-clipped", false\);/);
+  assert.match(viewerSource(), /classList\.remove\("is-clipped"\);\s*card\.classList\.toggle\("is-clipped", card\.scrollHeight > card\.clientHeight \+ 1\)/);
 });
 
 // ---- View: heights of cards not drawn yet (A3) ---------------------------------------------------------------------------

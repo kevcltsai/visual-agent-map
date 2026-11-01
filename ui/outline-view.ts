@@ -18,7 +18,6 @@ export class OutlineView extends ItemView {
   private collapsed = new Set<string>();
   private query = "";
   private activePath = "";
-  private sample = false;
   private coffee: CoffeeNavigationSnapshot | null = null;
   private coffeeActive = false;
   private locateCoffee: ((item: string) => boolean) | null = null;
@@ -44,7 +43,6 @@ export class OutlineView extends ItemView {
   setMap(
     map: MapDocument | null,
     titles: Map<string, string>,
-    sample = false,
     markers: Map<string, TopicMarker[]> = new Map(),
     links: Map<string, string[]> = new Map()
   ): void {
@@ -52,7 +50,6 @@ export class OutlineView extends ItemView {
     const restoreFocus = !!search && search === document.activeElement;
     const selection = restoreFocus ? ([search.selectionStart, search.selectionEnd] as const) : null;
     this.map = map;
-    this.sample = sample;
     this.titles = titles;
     this.markers = markers;
     this.links = links;
@@ -112,7 +109,7 @@ export class OutlineView extends ItemView {
     if (!this.map) {
       this.contentEl.createDiv({
         cls: "vam-outline-empty",
-        text: t(this.sample ? "ui.sample_outline_hint" : "ui.open_a_mind_map_to_see_its_topic_hierarchy_here")
+        text: t("ui.open_a_mind_map_to_see_its_topic_hierarchy_here")
       });
       return;
     }

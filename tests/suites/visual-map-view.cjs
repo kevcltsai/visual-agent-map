@@ -1429,9 +1429,9 @@ integrationTest('startup opens no topic outline, including on first install, whi
   for (const firstInstall of [false, true]) {
     const plugin = Object.create(Plugin.prototype), calls = [];
     Object.assign(plugin, { app: { workspace: { getLeavesOfType: () => [] } }, ready: Promise.resolve(), workspaceRecoveryCandidates: [], firstInstallSamplePending: firstInstall,
-      activateBuiltInSample: async () => { calls.push('sample'); }, activateOutline: async () => { calls.push('outline'); }, styleNodeLeaf() {}, logs: { appendLog() {} } });
+      activateOutline: async () => { calls.push('outline'); }, styleNodeLeaf() {}, logs: { appendLog() {} } });
     await plugin.finishStartup();
-    assert.deepEqual(calls, firstInstall ? ['sample'] : [], 'only the sample may open at startup, never the outline');
+    assert.deepEqual(calls, [], 'nothing opens at startup, never the outline');
   }
   assert.match(fs.readFileSync(path.join(root, 'main.ts'), 'utf8'), /addLocalizedCommand\("open-topic-outline"/);
 });
@@ -3900,7 +3900,7 @@ integrationTest('topic-links: the outline marks a row with an aria-hidden arrow 
   const { OutlineView } = load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } });
   const view = new OutlineView({ app: {} }, async () => {});
   const map = { title: 'M', nodes: [{ id: 'a', parentId: null, path: 'a.md' }, { id: 'b', parentId: 'a', path: 'b.md' }] };
-  view.setMap(map, new Map([['a', 'Alpha'], ['b', 'Beta']]), false, new Map([['a', ['done']]]), new Map([['a', ['https://a.example', 'https://b.example']], ['b', ['javascript:1']]]));
+  view.setMap(map, new Map([['a', 'Alpha'], ['b', 'Beta']]), new Map([['a', ['done']]]), new Map([['a', ['https://a.example', 'https://b.example']], ['b', ['javascript:1']]]));
   const [alpha, beta] = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-note'));
   const arrow = dom.findAll(alpha, i => dom.hasCls(i, 'vam-outline-links'));
   assert.equal(arrow.length, 1); assert.equal(arrow[0].text, '↗'); assert.equal(arrow[0].attrs['aria-hidden'], 'true');

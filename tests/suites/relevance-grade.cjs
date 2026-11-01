@@ -406,7 +406,7 @@ integrationTest('relevance: AIM maps have no goal entry and never grade', async 
   // The toolbar entry and the bar sit behind the same guards in the real render.
   const source = fs.readFileSync(path.join(projectRoot, 'experiences/visual-map/view.ts'), 'utf8');
   assert.match(source, /if \(!aimMode\) \{[\s\S]{0,1400}this\.renderRelevanceGoalControl\(tools\);/);
-  assert.match(source, /if \(!this\.builtIn && !this\.map\.aim\) this\.renderRelevanceStatus\(this\.contentEl\);/);
+  assert.match(source, /if \(!this\.map\.aim\) this\.renderRelevanceStatus\(this\.contentEl\);/);
 });
 
 integrationTest('relevance: grading changes only frontmatter of the graded notes, never a body, and the map structure stays', async () => {

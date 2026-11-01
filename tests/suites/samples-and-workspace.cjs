@@ -20,25 +20,24 @@ integrationTest('workspace rediscovery finds valid custom VAM workspaces without
   assert.deepEqual(Array.from(await repo.workspaceCandidates()), ['Research/My Maps']);
   assert.equal(repo.workspaceExists(), false);
 });
-test('first-use map view waits for async initialization and opens the official Sample once', async () => {
+test('first-use map view waits for async initialization before reading the workspace and opens no sample', async () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });
-  let resolveReady, pending = true, opened = 0;
+  let resolveReady, reads = 0, renders = 0;
   const ready = new Promise(resolve => { resolveReady = resolve; });
   const plugin = {
     ready,
-    consumeFirstInstallSample() { const value = pending; pending = false; return value; },
-    repo: { workspaceExists: () => false, mapFiles: async () => [] }
+    repo: { workspaceExists: () => { reads++; return false; }, mapFiles: async () => [] }
   };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.contentEl = { addClass() {} }; view.registerDomEvent = () => {};
-  view.openBuiltInSample = async () => { opened++; view.builtIn = true; };
+  view.render = () => { renders++; };
   const opening = view.onOpen();
   await Promise.resolve();
-  assert.equal(opened, 0, 'the view must not read workspace data before initialization completes');
+  assert.equal(reads, 0, 'the view must not read workspace data before initialization completes');
   resolveReady(); await opening;
-  assert.equal(pending, false);
-  assert.equal(opened, 1);
-  assert.equal(view.builtIn, true);
+  assert.equal(reads, 1);
+  assert.equal(renders, 1);
+  assert.equal(view.path, '', 'no map and no sample is opened by the view itself');
 });
 test('the first AI task shows a provider-specific usage acknowledgement only once', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');

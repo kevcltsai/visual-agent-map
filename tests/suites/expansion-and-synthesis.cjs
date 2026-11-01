@@ -1320,7 +1320,7 @@ async function templateHarness({ language = 'zh-TW', settings = {}, mapTemplate,
   let view;
   const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, language, ...settings }, running: new Set(), abortChartJobs: path => chartAborts.push(path), addChartsAfterWrite: job => chartJobs.push(job), activeTasks: new Map(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), views: () => [view], recordFailure: (_label, error) => error.message,
     askModel: async (context, _model, _reasoning, _signal, _exchange, onAccepted) => { contexts.push(context); onAccepted?.(); return (reply ?? (() => ({ summary: 'Saved summary', detail: 'Saved detail', visualReferences: [], suggestions: [] })))(context, contexts.length); } });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } } } });
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class { constructor(message) { notices.push(message); } hide() {} } } }, { createFragment: require('../support-dom.cjs').createFragment });
   view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = doc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.ancestorContext = async () => '';
   const run = async (target = topic) => { const handle = await view.runAgent(target); await handle?.finished; await until(() => !plugin.running.size); };
   return { repo, app, contents, view, plugin, doc, mapPath, topic, notices, contexts, run, chartJobs, chartAborts };
@@ -1337,6 +1337,29 @@ integrationTest('runAgent: context carries the resolved template (topic > map > 
   assert.equal(bare.contexts[0].detailTemplate.id, 'standard');
   assert.equal(bare.contexts[0].detailTemplate.sections[0].name, 'Core conclusions');
   assert.equal((await bare.repo.readNote(bare.topic.path)).detailTemplateId, undefined, 'resolution never writes the topic');
+});
+integrationTest('runAgent: a topic whose style file is missing keeps its note unchanged, says which file is missing and offers another style; an old template id is still cleared', async () => {
+  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
+  await h.repo.updateNote(h.topic.path, { detailTemplateId: 'style:Gone', toneId: 'plain' });
+  await h.run();
+  assert.equal(h.contexts.at(-1).detailTemplate.id, 'standard', 'falls back to the next level');
+  assert.equal(h.notices.length, 1); assert.match(String(h.notices[0]), /"Gone\.md"/);
+  const buttons = require('../support-dom.cjs').findAll(h.notices[0], i => i.tag === 'button');
+  assert.deepEqual(buttons.map(b => b.text), ['Use another style']);
+  const note = await h.repo.readNote(h.topic.path);
+  assert.equal(note.detailTemplateId, 'style:Gone', 'the note is not rewritten: the file may come back');
+  await h.repo.updateNote(h.topic.path, { detailTemplateId: 'old-gone' });
+  await h.run();
+  assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, undefined, 'an old template id that is gone is cleared as before');
+});
+integrationTest('runAgent: choosing a style file for a run writes it as the topic template and deletes the topic tone; an old template keeps the tone', async () => {
+  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
+  await h.repo.updateNote(h.topic.path, { toneId: 'plain' });
+  await h.view.detailTemplateFor({ path: h.topic.path }, 'A');
+  assert.deepEqual([(await h.repo.readNote(h.topic.path)).detailTemplateId, (await h.repo.readNote(h.topic.path)).toneId], ['A', 'plain']);
+  await h.view.detailTemplateFor({ path: h.topic.path }, 'style:Mine');
+  const note = await h.repo.readNote(h.topic.path);
+  assert.equal(note.detailTemplateId, 'style:Mine'); assert.equal(note.toneId, undefined, 'the style file decides the tone');
 });
 integrationTest('runAgent saves detail with the template order and stores formatIssues text; clears it when met', async () => {
   const template = { id: 'T', name: 'Counted', sections: [templateSection('t0', '結論'), templateSection('t1', '範例', { count: { mode: 'exact', n: 3 } }), templateSection('t2', '來源', { role: 'sources' })] };
@@ -1583,173 +1606,23 @@ integrationTest('multi research with a chosen template records it on each starte
   assert.equal((await h.repo.readNote(second.path)).detailTemplateId, 'A');
   assert.equal((await h.repo.readNote(third.path)).detailTemplateId, undefined);
 });
-integrationTest('map action: the default content template for this map is set and cleared through mapChange', async () => {
+integrationTest('map action: an old custom template is chosen in the map style list; it is written and the map tone is deleted; the default clears both', async () => {
   const opened = [];
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
   const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {}; view.enqueue = work => work();
-  view.chooseMapTemplate();
+  view.chooseMapStyle();
   const choices = opened.at(-1).choices;
-  assert.deepEqual(plain(choices.map(choice => choice.label)), ['Use the workspace default', 'Standard', 'Textbook', 'Template A', 'Template B', 'Template C']);
-  assert.deepEqual(plain(choices.map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '']);
-  await choices[4].action();
+  assert.deepEqual(plain(choices.map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
+  assert.deepEqual(plain(choices.map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', '']);
+  await choices[7].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'B');
   assert.equal(view.map.detailTemplateId, 'B');
-  view.chooseMapTemplate();
-  assert.deepEqual(plain(opened.at(-1).choices.map(choice => choice.description ?? '')), ['', '', '', '', 'Current setting', ''], 'the current map value is marked');
+  view.chooseMapStyle();
+  assert.deepEqual(plain(opened.at(-1).choices.map(choice => choice.description ?? '')), ['', '', '', '', '', '', '', 'Current setting', ''], 'the current map value is marked');
   await choices[0].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === undefined);
   assert.equal(view.map.detailTemplateId, undefined);
-});
-integrationTest('map actions offer the default content template only on non-AIM maps', async () => {
-  const opened = [];
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
-  const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
-  const labels = () => { view.openMapActions(); return opened.at(-1).choices.map(choice => choice.label); };
-  const regular = labels();
-  assert.ok(regular.includes('Default note style for this map'), 'one note style entry replaces the template and tone entries');
-  assert.ok(!regular.includes('Default content template for this map') && !regular.includes('Default writing tone for this map'));
-  view.map = { ...h.doc, aim: { runs: [] } };
-  const aim = labels();
-  assert.ok(!aim.includes('Default note style for this map') && !aim.includes('Default content template for this map'), 'templates do not apply to AIM maps');
-  assert.ok(aim.includes('Default writing tone for this map'), 'AIM maps keep their tone-only entry');
-});
-
-test('coordinator counts succeeded and failed children with failed paths; aborted children count as neither', async () => {
-  const { ShallowExpansionCoordinator } = load('experiences/visual-map/expansion-batch.ts');
-  const states = new Map(), coordinator = new ShallowExpansionCoordinator(new Map(), states);
-  await coordinator.start('parent.md', [node('a'), node('b'), node('c'), node('skip')], async (child, _signal, accepted) => {
-    accepted(); if (child.id === 'b') throw new Error('Selected model is at capacity'); if (child.id === 'skip') return 'skipped';
-  }, () => {});
-  await until(() => states.get('parent.md').status !== 'running');
-  const done = states.get('parent.md');
-  assert.equal(done.completed, 4); assert.equal(done.succeeded, 2);
-  assert.deepEqual(plain(done.failedPaths), ['b.md']); assert.equal(done.failures.length, 1); assert.match(done.failures[0], /at capacity/);
-  const aborting = new Map(), second = new ShallowExpansionCoordinator(new Map(), aborting);
-  const releases = []; await second.start('p.md', [node('x'), node('y')], async (child, signal, accepted) => {
-    accepted(); await new Promise(resolve => releases.push(resolve)); if (child.id === 'y') throw new Error('late'); if (signal.aborted) return;
-  }, () => {});
-  await until(() => releases.length === 2); second.stop('p.md'); releases.forEach(r => r());
-  await until(() => aborting.get('p.md').status !== 'running');
-  const stopped = aborting.get('p.md'); assert.equal(stopped.status, 'stopped'); assert.equal(stopped.succeeded, 0); assert.deepEqual(plain(stopped.failedPaths), []);
-});
-function badgeElement(spans = [], buttons = []) {
-  const make = (tag, options = {}) => { const el = { tag, text: options.text ?? '', cls: options.cls ?? '', attrs: {}, listeners: {}, children: [], style: {}, dataset: {},
-    createDiv(v) { const c = make('div', typeof v === 'string' ? { cls: v } : v); this.children.push(c); return c; }, createSpan(v = {}) { const c = make('span', v); this.children.push(c); spans.push(c); return c; },
-    createEl(name, v = {}) { const c = make(name, v); this.children.push(c); if (name === 'button') buttons.push(c); return c; }, appendChild(c) { this.children.push(c); return c; },
-    setAttr(name, value) { this.attrs[name] = value; }, setAttribute(name, value) { this.attrs[name] = value; }, addClass(n) { this.cls = `${this.cls} ${n}`.trim(); }, removeClass() {}, toggleClass() {}, addEventListener(n, fn) { this.listeners[n] = fn; }, removeEventListener() {}, setPointerCapture() {}, empty() {}, setText(v) { this.text = v; } }; return el; };
-  return make('stage');
-}
-async function nodeBadgeHarness(language, outcome) {
-  const h = await multiResearchHarness(['Parent', 'A', 'B', 'C'], { language });
-  const [parent, a, b, c] = h.nodes; const spans = [], buttons = [];
-  h.view.stageEl = badgeElement(spans, buttons); h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id === parent.id ? 'Parent' : n.id === a.id ? 'A' : n.id === b.id ? 'B' : 'C', status: 'completed', summary: '' }]));
-  const release = new Map(); const children = [a, b, c];
-  await h.plugin.expansionCoordinator.start(parent.path, children, async (child, _signal, accepted) => { accepted(); await new Promise(resolve => release.set(child.id, resolve)); if (child.id === b.id && outcome !== 'ok') throw new Error('Selected model is at capacity'); }, () => {});
-  const paint = () => { spans.length = 0; buttons.length = 0; h.view.stageEl = badgeElement(spans, buttons); h.view.renderNode(parent); };
-  const text = () => spans.map(s => s.text).join(' | ');
-  return { h, parent, a, b, c, spans, buttons, release, paint, text };
-}
-integrationTest('shallow research badge: failure badge, stopped marker and retry after stop; zh-TW strings', async () => {
-  const { translate } = load('i18n.ts'); const z = (key, ...v) => translate('zh-TW', key, ...v);
-  assert.equal([z('ui.shallow_research_counts', 0, 3), z('ui.batch_failed_count', 1), z('ui.shallow_research_current', 'B')].join(' · '), '簡短研究：完成 0／3 · 失敗 1 · 研究中：B');
-  assert.equal([z('ui.shallow_research_counts', 2, 3), z('ui.batch_failed_count', 1), z('ui.shallow_research_stopped')].join(' · '), '簡短研究：完成 2／3 · 失敗 1 · 已停止');
-  assert.equal(z('ui.multi_research_progress', 1, 5), '研究中：完成 1／5'); assert.equal(z('ui.retry_failed_topics', 2), '重試失敗的議題（2）'); assert.equal(z('ui.dismiss'), '關閉');
-  const x = await nodeBadgeHarness('en', 'fail');
-  x.release.get(x.b.id)(); await until(() => x.h.plugin.expansionBatches.get(x.parent.path).failedPaths.length === 1);
-  x.paint(); assert.ok(x.spans.some(s => s.text === '1 failed'), x.text());
-  x.h.plugin.expansionCoordinator.stop(x.parent.path); x.release.get(x.a.id)(); x.release.get(x.c.id)();
-  await until(() => x.h.plugin.expansionBatches.get(x.parent.path).status === 'stopped');
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 0 of 3 done · 1 failed · stopped'), x.text());
-  assert.ok(x.buttons.some(b => b.text === 'Retry failed topics (1)'));
-});
-integrationTest('shallow research badge in English: running, finished with a failure, and retry only when not running', async () => {
-  const x = await nodeBadgeHarness('en', 'fail');
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 0 of 3 done · researching: A'), x.text());
-  assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false);
-  x.release.get(x.b.id)(); await until(() => x.h.plugin.expansionBatches.get(x.parent.path).failedPaths.length === 1);
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 0 of 3 done · 1 failed · researching: A'), x.text());
-  assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false, 'no retry while running');
-  x.release.get(x.a.id)(); x.release.get(x.c.id)(); await until(() => x.h.plugin.expansionBatches.get(x.parent.path).status === 'completed');
-  x.paint(); assert.ok(x.spans.some(s => s.text === 'Short research: 2 of 3 done · 1 failed'), x.text());
-  assert.ok(x.buttons.some(b => b.text === 'Retry failed topics (1)'));
-  x.h.view.map.nodes = x.h.view.map.nodes.filter(n => n.id !== x.b.id); x.paint();
-  assert.equal(x.buttons.some(b => /^Retry failed topics/.test(b.text)), false, 'failed topic removed from the map');
-});
-integrationTest('retry failed topics selects exactly them, opens the modal and starts only them with the chosen model (for this run only)', async () => {
-  const x = await nodeBadgeHarness('en', 'fail'); const h = x.h;
-  x.release.get(x.a.id)(); x.release.get(x.b.id)(); x.release.get(x.c.id)(); await until(() => h.plugin.expansionBatches.get(x.parent.path).status === 'completed');
-  h.view.notes.set(x.b.id, { title: 'B', status: 'error', summary: '' });
-  x.paint(); x.buttons.find(b => /^Retry failed topics/.test(b.text)).listeners.click({ stopPropagation() {} });
-  assert.deepEqual(plain([...h.view.multiSelected]), [x.b.id]); assert.equal(h.opened.length, 1); assert.deepEqual(plain(h.opened[0].names), ['B']);
-  assert.ok(h.plugin.expansionBatches.has(x.parent.path), 'old state kept until the retry starts');
-  h.opened[0].submit({ ...h.request, model: 'model-b' });
-  await until(() => h.runs.length === 1); assert.equal(h.runs[0].title, 'B'); assert.deepEqual(plain(h.confirms), ['model-b']);
-  assert.deepEqual(plain(h.runs[0].runOnce), { model: 'model-b' }, 'MS-06: the retry uses the picked model for this run only');
-  assert.equal((await h.repo.readNote(x.b.path)).modelSource, 'workspace', 'MS-06: and does not turn the topic into an override');
-  assert.equal(h.plugin.expansionBatches.has(x.parent.path), false, 'old failure state cleared');
-  h.finish.get('B')(); await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
-});
-integrationTest('multi research status bar stays after failures with retry and dismiss, and hides without failures', async () => {
-  const h = await multiResearchHarness(['A', 'B', 'C']);
-  h.view.notes = new Map(h.nodes.map((n, i) => [n.id, { title: 'ABC'[i], status: 'completed', summary: '' }]));
-  const spans = [], buttons = []; const bar = () => { spans.length = 0; buttons.length = 0; const root = badgeElement(spans, buttons); h.view.renderMultiResearchStatus(root); return root; };
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id)); await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 3);
-  h.finish.get('A')(); h.finish.get('B')('Selected model is at capacity'); h.finish.get('C')();
-  await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
-  bar(); assert.ok(spans.some(s => /Research finished: 2 of 3 done · 1 failed/.test(s.text)), spans.map(s => s.text).join('|'));
-  const retry = buttons.find(b => b.text === 'Retry failed topics (1)'); assert.ok(retry); const dismiss = buttons.find(b => b.attrs['aria-label'] === 'Dismiss'); assert.ok(dismiss);
-  retry.listeners.click({ stopPropagation() {} }); assert.deepEqual(plain([...h.view.multiSelected]), [h.nodes[1].id]); assert.deepEqual(plain(h.opened[0].names), ['B']);
-  dismiss.listeners.click({ stopPropagation() {} }); assert.equal(h.plugin.expansionBatches.has(h.key), false);
-  const clean = await multiResearchHarness(['A']); clean.view.notes = new Map(clean.nodes.map(n => [n.id, { title: n.id, status: 'completed', summary: '' }]));
-  clean.view.multiSelected = new Set([clean.nodes[0].id]); await clean.view.startMultiResearch(clean.request); await until(() => clean.runs.length === 1);
-  clean.finish.get('A')(); await until(() => clean.plugin.expansionBatches.get(clean.key).status === 'completed');
-  const root = badgeElement(); clean.view.renderMultiResearchStatus(root); assert.equal(root.children.length, 0);
-});
-async function staleModelView(sources, askModel) {
-  const { repo, app } = fixture(); repo.settings.cliModel = 'claude:sonnet';
-  const mapPath = 'Agent Workspace/Topics/map-a/Map.md', mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
-  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a'); await app.vault.create(mapPath, core.serializeMap(mapDoc));
-  const nodes = [];
-  for (const [index, [source, model]] of sources.entries()) { const created = await repo.createNote(`T${index}`, model ?? 'gpt-5.6-luna', mapDoc, mapPath, source); created.parentId = index ? nodes[index - 1].id : null; mapDoc.nodes.push(created); nodes.push(created); }
-  await repo.saveMap(mapPath, mapDoc);
-  const plugin = withExpansionCoordinator({ repo, settings: { ...DEFAULT_SETTINGS, cliModel: 'claude:sonnet' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), askModel });
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {}; view.focusNode = () => {}; view.ancestorContext = async () => '';
-  return { repo, view, nodes, mapDoc };
-}
-integrationTest('expand and integrate call the runtime with the resolved model, not the stale stored snapshot', async () => {
-  const models = [];
-  const f = await staleModelView([['workspace'], ['workspace']], async (_context, model) => { models.push(model); return { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'S', task: 'Explore', contribution: '', parentTitle: '' }] }; });
-  const options = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] };
-  await f.view.proposeChildren(f.nodes[0], options, '', () => {}, message => assert.fail(message));
-  await f.view.proposeIntegrationDirections(f.nodes[0], options, () => {}, message => assert.fail(message));
-  assert.deepEqual(plain(models), ['claude:sonnet', 'claude:sonnet']);
-});
-integrationTest('expand under a manual ancestor runs on the manual model; a new subtopic of a manual topic inherits it', async () => {
-  const models = [];
-  const f = await staleModelView([['manual', 'claude:haiku'], ['inherited']], async (_context, model) => { models.push(model); return { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'S', task: 'Explore', contribution: '', parentTitle: '' }] }; });
-  await f.view.proposeChildren(f.nodes[1], { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] }, '', () => {}, message => assert.fail(message));
-  assert.deepEqual(plain(models), ['claude:haiku']);
-  await f.view.addNode(f.mapDoc.nodes[1], 'Fresh child');
-  const added = f.view.map.nodes.at(-1), note = await f.repo.readNote(added.path);
-  assert.equal(note.modelSource, 'inherited'); assert.equal(note.model, 'claude:haiku');
-  const workspaceParent = await staleModelView([['workspace']], async () => ({}));
-  await workspaceParent.view.addNode(workspaceParent.mapDoc.nodes[0], 'Fresh child');
-  assert.equal((await workspaceParent.repo.readNote(workspaceParent.view.map.nodes.at(-1).path)).model, 'claude:sonnet');
-});
-integrationTest('hydrate resolves inherited models from the loaded map without scanning maps per node', async () => {
-  const f = await staleModelView([['workspace'], ['manual', 'claude:haiku'], ['inherited'], ['inherited']], async () => ({}));
-  let mapReads = 0, scans = 0;
-  const readMap = f.repo.readMap.bind(f.repo), mapFiles = f.repo.mapFiles.bind(f.repo);
-  f.repo.readMap = async path => { mapReads++; return readMap(path); };
-  f.repo.mapFiles = async () => { scans++; return mapFiles(); };
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  f.view.builtIn = false; f.view.hydrateFailedReportTargets = async () => {};
-  await VisualAgentMapView.prototype.hydrate.call(f.view);
-  assert.equal(mapReads, 0); assert.equal(scans, 0);
-  assert.deepEqual(plain(f.mapDoc.nodes.map(n => f.view.notes.get(n.id).model)), ['claude:sonnet', 'claude:haiku', 'claude:haiku', 'claude:haiku']);
 });
 integrationTest('map action: one default note style sets or clears the template and tone together; AIM keeps its tone-only entry', async () => {
   const opened = [];
@@ -1759,28 +1632,43 @@ integrationTest('map action: one default note style sets or clears the template 
   view.chooseMapStyle();
   let modal = opened.at(-1);
   assert.equal(modal.titleText, 'Default note style for this map'); assert.equal(modal.description, 'New topics, and topics without their own style, use it.');
-  assert.deepEqual(plain(modal.choices.map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Custom…']);
-  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', 'Pick the template and tone separately'], 'no value stored: the default is current');
+  assert.deepEqual(plain(modal.choices.map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
+  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', ''], 'no value stored: the default is current');
   await modal.choices[2].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'textbook');
   let saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, 'textbook'); assert.equal(saved.toneId, 'academic', 'a preset always stores both values');
   view.chooseMapStyle(); modal = opened.at(-1);
-  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['', '', 'Current setting', '', '', '', 'Pick the template and tone separately'], 'the matching preset is marked');
+  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['', '', 'Current setting', '', '', '', '', '', ''], 'the matching preset is marked');
   await modal.choices[3].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).toneId === 'summary');
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, 'standard'); assert.equal(saved.toneId, 'summary');
-  // A pair that is not a preset is marked on Custom….
+  // An old template with a tone of its own is marked on the old template's row.
   await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
   view.chooseMapStyle(); modal = opened.at(-1);
-  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['', '', '', '', '', '', 'Current setting']);
-  // Custom… opens a small dialog with the two original pickers.
-  const before = opened.length; modal.choices[6].action();
-  const custom = opened.at(-1); assert.equal(opened.length, before + 1);
-  assert.deepEqual(plain(custom.choices.map(choice => choice.label)), ['Default content template for this map', 'Default writing tone for this map']);
-  custom.choices[0].action(); assert.equal(opened.at(-1).titleText, 'Default content template for this map');
-  custom.choices[1].action(); assert.equal(opened.at(-1).titleText, 'Default writing tone for this map');
+  assert.deepEqual(plain(modal.choices.filter(choice => choice.description).map(choice => [choice.label, choice.description])), [['Template A', 'Current setting']]);
+  // Choosing an old template keeps the map's tone; only a style file deletes the layer's tone (see the style: case below).
+  await modal.choices.find(choice => choice.label === 'Template B').action();
+  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'B');
+  saved = await h.repo.readMap(h.mapPath);
+  assert.equal(saved.toneId, 'magazine', 'an old template keeps the tone');
+  view.chooseMapStyle(); await opened.at(-1).choices.find(choice => choice.label === 'Textbook (intro, then sections)').action();
+  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'textbook');
+  // A style file from the folder is written as the template and deletes the map's tone; a file that does not parse can only be opened.
+  const bad = { kind: 'file', id: 'style:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 3, message: 'No ## section.' }] };
+  const good = { kind: 'file', id: 'style:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] };
+  const edited = [];
+  h.plugin.noteStyles = { refresh: async () => {}, list: () => [bad, good], unexportedTemplates: () => [], ensureStyleFolder: async () => 'F' };
+  await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
+  view.chooseMapStyle(); await new Promise(resolve => setTimeout(resolve, 0)); modal = opened.at(-1);
+  const brokenRow = modal.choices.find(choice => choice.label === 'Broken');
+  assert.match(brokenRow.description, /Broken\.md.*line 3.*No ## section/); assert.equal(brokenRow.buttonLabel, 'Open this file');
+  await modal.choices.find(choice => choice.label === 'Mine').action();
+  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'style:Mine');
+  saved = await h.repo.readMap(h.mapPath);
+  assert.equal(saved.toneId, undefined, 'choosing a style file deletes the map tone'); assert.equal(edited.length, 0);
+  delete h.plugin.noteStyles;
   // Default clears both.
   view.chooseMapStyle(); await opened.at(-1).choices[0].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).toneId === undefined);

@@ -234,7 +234,18 @@ import {
   resolvePreset,
   resolveToneText
 } from "../../ai/prompt-presets";
-import { matchPreset, NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
+import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
+import {
+  errorNotice,
+  actionNotice,
+  NoteStyleFileError,
+  openStyleChooser,
+  openStyleFile,
+  stylePickerFor,
+  styleRefOf,
+  type StylePicker,
+  type StyleRef
+} from "./note-style-picker";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import { previewMetrics } from "../../ui/preview-utils";
 import { BUILTIN_SAMPLE_ID, builtInSample, SAMPLE_TOUR_VERSION } from "../../builtin-sample";
@@ -1880,7 +1891,7 @@ export class VisualAgentMapView extends ItemView {
           ...aiModeOptions("standard", "research")
         });
       });
-    })().catch(error => new Notice(errorMessage(error)));
+    })().catch(error => errorNotice(error));
   }
   private async persist(): Promise<void> {
     if (!this.builtIn && this.map && this.path) await this.plugin.repo.saveMap(this.path, this.map);
@@ -2179,7 +2190,9 @@ export class VisualAgentMapView extends ItemView {
       manageTemplates: (selected, refreshed) =>
         new DetailTemplatesModal(this.app, this.plugin, () => refreshed(this.templateChoices()), selected).open(),
       manageTones: (selected, refreshed) =>
-        new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open()
+        new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
+      styles: this.stylePicker(),
+      ...(this.defaultStyleRef() ? { currentStyleRef: this.defaultStyleRef() } : {})
     };
   }
   /** Built-in Standard and Textbook plus the workspace's custom templates, for the template selects. */
@@ -2191,6 +2204,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   private currentStyleLabel(templateId: string, toneId: string): string {
+    if (templateId.startsWith("style:")) return templateId.slice("style:".length);
     const names = (list: { id: string; name: string }[]) => (id: string) =>
       list.find(item => item.id === id)?.name ?? id;
     return styleLabel(
@@ -2202,10 +2216,33 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Name of the workspace default note style (default template, academic tone) for "Use the default (…)". */
   private defaultStyleLabel(): string {
+    const chosen = this.plugin.settings.defaultNoteStyleId;
+    const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
+    if (preset) return t(preset.short);
     return this.currentStyleLabel(
-      this.plugin.settings.defaultDetailTemplateId ?? STANDARD_TEMPLATE_ID,
+      chosen ?? this.plugin.settings.defaultDetailTemplateId ?? STANDARD_TEMPLATE_ID,
       DEFAULT_TONE_ID
     );
+  }
+  /** The style folder for the pickers; a plugin without a style store (a test double) has none. */
+  private stylePicker(): StylePicker | undefined {
+    return stylePickerFor(this.app, this.plugin);
+  }
+  /** The style behind a stored pair, for "Edit this style" on the first option of a picker. */
+  private styleRefFor(templateId: string | undefined, toneId: string | undefined): StyleRef | undefined {
+    return styleRefOf(
+      templateId,
+      toneId,
+      this.plugin.settings.detailTemplates.map(item => item.id)
+    );
+  }
+  private defaultStyleRef(): StyleRef | undefined {
+    const chosen = this.plugin.settings.defaultNoteStyleId;
+    if (chosen) {
+      const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
+      return preset ? { kind: "builtin", id: preset.id } : this.styleRefFor(chosen, undefined);
+    }
+    return this.styleRefFor(this.plugin.settings.defaultDetailTemplateId ?? STANDARD_TEMPLATE_ID, DEFAULT_TONE_ID);
   }
   /** The tone id a topic resolves to now (topic override, else map default, else academic), as toneLabelFor names it. */
   private effectiveToneId(note: Pick<Note, "toneId">): string {
@@ -3744,7 +3781,7 @@ export class VisualAgentMapView extends ItemView {
     } catch (error) {
       // Once the map folder exists the import window must close, so a retry cannot create a second map.
       if (!(error as { mapCreated?: unknown } | null)?.mapCreated) throw error;
-      new Notice(errorMessage(error));
+      errorNotice(error);
       return;
     }
     // From here on the map exists: failures only notify and never reject, so the import window closes.
@@ -3758,6 +3795,7 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.repo.updateMap(result.mapPath, map => {
             if (chosenTemplate) map.detailTemplateId = chosenTemplate;
             if (chosenTone) map.toneId = chosenTone;
+            else if (chosenTemplate?.startsWith("style:")) delete map.toneId;
           });
         // Notes and Map.md were written directly; derive their Reference Links (map, parent, children) like any map change.
         await this.plugin.rebuildDerivedData();
@@ -3781,7 +3819,7 @@ export class VisualAgentMapView extends ItemView {
           referenceGroups: []
         })
       )
-      .catch(error => new Notice(errorMessage(error)));
+      .catch(error => errorNotice(error));
   }
   /** Adds the outline to the open map, as a new top-level tree or under the selected topic; existing nodes stay put. */
   private async importOutlineIntoMap(
@@ -3966,7 +4004,7 @@ export class VisualAgentMapView extends ItemView {
           ...(request.toneId ? { toneId: request.toneId } : {})
         })
       )
-      .catch(error => new Notice(errorMessage(error)));
+      .catch(error => errorNotice(error));
   }
   private openNewMindMapModal(): void {
     new NameModal(this.app, t("ui.new_mind_map"), t("ui.new_mind_map_from_sample"), title =>
@@ -7271,7 +7309,7 @@ export class VisualAgentMapView extends ItemView {
         first = false;
         await this.refreshAfterSavedChange();
       } catch (error) {
-        new Notice(errorMessage(error));
+        errorNotice(error);
       }
     }
   }
@@ -7421,7 +7459,7 @@ export class VisualAgentMapView extends ItemView {
         offset += 24;
       } catch (error) {
         this.focusItemId = null;
-        new Notice(errorMessage(error));
+        errorNotice(error);
       }
     }
   }
@@ -7898,7 +7936,7 @@ export class VisualAgentMapView extends ItemView {
     void this.importOutlineIntoMap(
       { nodes: parsed.nodes, source: null, shallowResearch: false },
       target ? { kind: "under", parentId: target.id } : { kind: "tree" }
-    ).catch(error => new Notice(errorMessage(error)));
+    ).catch(error => errorNotice(error));
   }
   private pasteTextRefusal(reason: IndentedTextRejection, line?: number): string {
     const at = line ?? 0;
@@ -9017,6 +9055,7 @@ export class VisualAgentMapView extends ItemView {
         this.mapChange(map => {
           if (templateId) map.detailTemplateId = templateId;
           else delete map.detailTemplateId;
+          // A style file decides its own tone: choosing one deletes this layer's tone.
           if (toneId) map.toneId = toneId;
           else delete map.toneId;
         }, false)
@@ -9024,37 +9063,32 @@ export class VisualAgentMapView extends ItemView {
     const templateId = this.map?.detailTemplateId;
     const toneId = this.map?.toneId;
     const unset = !templateId && !toneId;
-    const matched = unset ? undefined : matchPreset(templateId, toneId);
-    const current = { description: t("ui.detail_template_current") };
-    new ChoiceModal(this.app, t("ui.note_style_map_default"), t("ui.note_style_map_default_desc"), [
-      {
-        label: t("ui.note_style_use_default_0", this.defaultStyleLabel()),
-        ...(unset ? current : {}),
-        action: () => apply(undefined, undefined)
-      },
-      ...NOTE_STYLE_PRESETS.map(preset => ({
-        label: t(preset.name),
-        ...(matched?.id === preset.id ? current : {}),
-        action: () => apply(preset.templateId, preset.toneId)
-      })),
-      {
-        label: t("ui.note_style_custom"),
-        description: unset || matched ? t("ui.note_style_custom_choose") : current.description,
-        action: () =>
-          new ChoiceModal(this.app, t("ui.note_style_custom"), t("ui.note_style_custom_choose"), [
-            {
-              label: t("ui.detail_template_map_default"),
-              description: t("ui.detail_template_map_default_desc"),
-              action: () => this.chooseMapTemplate()
-            },
-            {
-              label: t("ui.tone_map_default"),
-              description: t("ui.tone_map_default_desc"),
-              action: () => this.chooseMapTone()
-            }
-          ]).open()
-      }
-    ]).open();
+    const known = unset ? undefined : this.styleRefFor(templateId, toneId);
+    void openStyleChooser(this.app, this.stylePicker(), {
+      title: t("ui.note_style_map_default"),
+      description: t("ui.note_style_map_default_desc"),
+      leading: [
+        {
+          label: t("ui.note_style_use_default_0", this.defaultStyleLabel()),
+          ...(unset ? { description: t("ui.detail_template_current") } : {}),
+          action: () => apply(undefined, undefined)
+        },
+        // An older template-and-tone pair that is none of the listed styles stays as it is and can be kept.
+        ...(!unset && !known
+          ? [
+              {
+                label: this.currentStyleLabel(templateId ?? STANDARD_TEMPLATE_ID, toneId ?? DEFAULT_TONE_ID),
+                description: t("ui.detail_template_current"),
+                action: () => apply(templateId, toneId)
+              }
+            ]
+          : [])
+      ],
+      oldTemplates: this.plugin.settings.detailTemplates.map(({ id, name }) => ({ id, name })),
+      ...(known ? { current: known } : {}),
+      // Only a style file deletes the layer's tone; an old template keeps the tone the map already has.
+      pick: (template, tone) => apply(template, tone ?? (template.startsWith("style:") ? undefined : toneId))
+    });
   }
   private chooseMapTone(): void {
     const apply = (id: string | undefined): void =>
@@ -9069,21 +9103,6 @@ export class VisualAgentMapView extends ItemView {
     new ChoiceModal(this.app, t("ui.tone_map_default"), t("ui.tone_map_default_desc"), [
       { label: t("ui.tone_use_default"), ...mark(undefined), action: () => apply(undefined) },
       ...this.toneChoices().map(({ id, name }) => ({ label: name, ...mark(id), action: () => apply(id) }))
-    ]).open();
-  }
-  private chooseMapTemplate(): void {
-    const apply = (id: string | undefined): void =>
-      this.enqueue(() =>
-        this.mapChange(map => {
-          if (id) map.detailTemplateId = id;
-          else delete map.detailTemplateId;
-        }, false)
-      );
-    const current = this.map?.detailTemplateId;
-    const mark = (id: string | undefined) => (id === current ? { description: t("ui.detail_template_current") } : {});
-    new ChoiceModal(this.app, t("ui.detail_template_map_default"), t("ui.detail_template_map_default_desc"), [
-      { label: t("ui.detail_template_use_workspace"), ...mark(undefined), action: () => apply(undefined) },
-      ...this.templateChoices().map(({ id, name }) => ({ label: name, ...mark(id), action: () => apply(id) }))
     ]).open();
   }
   private aimActiveForPath(path: string): boolean {
@@ -11338,6 +11357,7 @@ export class VisualAgentMapView extends ItemView {
           tones: this.toneChoices(),
           currentTone: this.toneLabelFor(note),
           currentStyle: this.currentStyleLabel(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
+          currentStyleRef: this.styleRefFor(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
           currentSummary: note.summary,
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
@@ -13413,7 +13433,7 @@ export class VisualAgentMapView extends ItemView {
         }
       });
     } catch (error) {
-      new Notice(errorMessage(error));
+      errorNotice(error);
     }
   }
   /** Counts that cannot be misread: succeeded of total, failures, optional current topic and stopped marker. */
@@ -14233,6 +14253,7 @@ export class VisualAgentMapView extends ItemView {
           tones: this.toneChoices(),
           currentTone: this.toneLabelFor({}),
           currentStyle: this.currentStyleLabel(this.mapDetailTemplate(settings.language).id, this.effectiveToneId({})),
+          currentStyleRef: this.styleRefFor(this.mapDetailTemplate(settings.language).id, this.effectiveToneId({})),
           ...this.outputLanguageMemory()
         },
         ...(pending
@@ -14460,7 +14481,7 @@ export class VisualAgentMapView extends ItemView {
           );
         })
       )
-      .catch(error => new Notice(errorMessage(error)));
+      .catch(error => errorNotice(error));
   }
   /**
    * The model for a run over several cards: when every card has the same manual model (its own or an ancestor's) that
@@ -16623,7 +16644,7 @@ export class VisualAgentMapView extends ItemView {
     const map = this.map;
     if (!map) return skipped("ui.map_chat_skip_map_changed");
     const launch = (work: unknown): void => {
-      void Promise.resolve(work).catch(error => new Notice(errorMessage(error)));
+      void Promise.resolve(work).catch(error => errorNotice(error));
     };
     const known = (ids: string[]): string[] => ids.filter(id => this.map?.nodes.some(node => node.id === id));
     if (action.kind === "select_topics") {
@@ -18086,13 +18107,23 @@ export class VisualAgentMapView extends ItemView {
    */
   private async detailTemplateFor(node: MapNode, chosenId?: string, chosenToneId?: string): Promise<DetailTemplate> {
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
+    // Choosing a style file writes it as the topic's template and deletes the topic's own tone; the file decides the tone.
+    else if (chosenId?.startsWith("style:")) await this.plugin.repo.updateNote(node.path, { toneId: "" });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     await this.noteStyles.refresh();
     const { template, missing } = this.resolveTopicTemplate(note, chosenId);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      new Notice(this.missingTemplateMessage(note.detailTemplateId));
-      await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
+      if (note.detailTemplateId.startsWith("style:")) {
+        // The file may come back (moved back, restored): the note is not rewritten. The Notice offers another style.
+        const missingId = note.detailTemplateId;
+        actionNotice(this.missingTemplateMessage(missingId), t("ui.note_style_switch"), () =>
+          this.switchNoteStyle(node)
+        );
+      } else {
+        new Notice(this.missingTemplateMessage(note.detailTemplateId));
+        await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
+      }
     }
     return template;
   }
@@ -18109,7 +18140,14 @@ export class VisualAgentMapView extends ItemView {
     const resolved = this.noteStyles.resolve(levels);
     if (resolved.invalid) {
       const first = resolved.invalid.issues[0];
-      throw new Error(t("ui.note_style_file_invalid_0_1_2", resolved.invalid.fileName, first.line, first.message));
+      const { fileName } = resolved.invalid;
+      const base = fileName.replace(/\.md$/i, "");
+      const builtin = NOTE_STYLE_PRESETS.find(item => this.noteStyles.builtinIdOfFile(base)?.id === item.id);
+      const ref: StyleRef = builtin ? { kind: "builtin", id: builtin.id } : { kind: "file", id: `style:${base}` };
+      throw new NoteStyleFileError(
+        t("ui.note_style_file_invalid_0_1_2", fileName, first.line, first.message),
+        () => void openStyleFile(this.app, this.noteStyles, ref)
+      );
     }
     return resolved;
   }
@@ -18121,6 +18159,20 @@ export class VisualAgentMapView extends ItemView {
     );
   }
   private noStyleFiles?: NoteStyleStore;
+  /** From the "style not found" Notice: pick another style for this topic (a file style also deletes the topic's tone). */
+  private switchNoteStyle(node: MapNode): void {
+    void openStyleChooser(this.app, this.stylePicker(), {
+      title: t("ui.note_style"),
+      description: t("ui.note_style_switch"),
+      pick: (templateId, toneId) =>
+        this.enqueue(async () => {
+          await this.plugin.repo.updateNote(node.path, {
+            detailTemplateId: templateId,
+            ...(toneId !== undefined ? { toneId } : templateId.startsWith("style:") ? { toneId: "" } : {})
+          });
+        })
+    });
+  }
   private missingTemplateMessage(id: string): string {
     return id.startsWith("style:")
       ? t("ui.note_style_file_missing_0", `${id.slice("style:".length)}.md`)

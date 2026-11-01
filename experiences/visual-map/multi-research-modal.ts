@@ -34,7 +34,7 @@ export class MultiResearchModal extends Modal {
     private templates: { id: string; name: string }[],
     private submit: (request: MultiResearchRequest) => void,
     private tones: { id: string; name: string }[] = [],
-    private manageTones?: ManageTones,
+    _manageTones?: ManageTones,
     private links: FieldLinks = {},
     /** The mode each listed topic will run in (parallel to `names`), shown beside its name. */
     private modes: MapAiMode[] = []
@@ -60,14 +60,12 @@ export class MultiResearchModal extends Modal {
     const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
     const style = noteStyleField(this.contentEl, {
+      styles: this.links.styles,
       templates: this.templates,
       tones: this.tones,
-      keepLabel: t("ui.note_style_keep_each"),
-      templateDefault: t("ui.detail_template_keep_each"),
-      toneDefault: t("ui.tone_keep_each"),
-      manageTemplates: this.links.manageTemplates,
-      manageTones: this.manageTones
+      keepLabel: t("ui.note_style_keep_each")
     });
+    void style.reload();
     const requirementsLabel = this.contentEl.createEl("label", { cls: "vam-field" });
     requirementsLabel.createSpan({ text: t("ui.additional_requirements") });
     const requirements = requirementsLabel.createEl("textarea");

@@ -139,12 +139,12 @@ test('outline import: the note style chosen when AI starts is kept in the draft 
   assert.equal(h.startedInputs[0].template, 'textbook'); assert.equal(h.startedInputs[0].tone, 'academic');
   const reopened = importHarness({ prefill: { inputs: h.startedInputs[0], markdown: '# Sleep\n## Stages' } });
   assert.equal(byLabel(reopened.modal.contentEl, 'Note style').value, 'preset:textbook');
-  assert.equal(find(reopened.modal.contentEl, i => hasCls(i, 'vam-note-style-custom')).hidden, true);
-  // A pair that is not a preset comes back under Custom…, with its template restored.
+  // An old custom template comes back selected in the Note style select; a pair that is none of the styles shows as "Custom: X · Y".
   const custom = importHarness({ prefill: { inputs: { ...h.startedInputs[0], template: 't1', tone: undefined }, markdown: '# Sleep\n## Stages' } });
-  assert.equal(byLabel(custom.modal.contentEl, 'Note style').value, 'custom');
-  assert.equal(find(custom.modal.contentEl, i => hasCls(i, 'vam-note-style-custom')).hidden, false);
-  assert.equal(byLabel(custom.modal.contentEl, 'Content template').value, 't1');
+  assert.equal(byLabel(custom.modal.contentEl, 'Note style').value, 'legacy:t1');
+  const odd = importHarness({ prefill: { inputs: { ...h.startedInputs[0], template: 't1', tone: 'plain' }, markdown: '# Sleep\n## Stages' } });
+  assert.equal(byLabel(odd.modal.contentEl, 'Note style').value, 'custom');
+  assert.match(find(odd.modal.contentEl, i => i.tag === 'option' && i.value === 'custom').text, /^Custom: .* · /);
   // Nothing chosen: the first option, and the draft inputs carry no style.
   const none = importHarness(); button(none.ai, 'Generate outline').click(); await tick();
   assert.equal('template' in none.startedInputs[0], false); assert.equal('tone' in none.startedInputs[0], false);

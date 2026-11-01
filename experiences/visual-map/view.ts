@@ -101,6 +101,7 @@ import {
   markerSymbol,
   type TopicMarker
 } from "../../topic-markers";
+import { normalizeTopicLink, readTopicLinks, TOPIC_LINKS_MAX, type AddTopicLinkResult } from "../../topic-links";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
 import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
@@ -579,6 +580,8 @@ const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImage
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
+/** The link button drawn in each card header, so a refresh can replace it. */
+const cardLinkButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
 /** Identifies one relevance grading run, so a late result can tell it is no longer the current one. */
 let relevanceRunToken = 0;
 let relevancePanelSeq = 0;
@@ -928,6 +931,8 @@ export class VisualAgentMapView extends ItemView {
   /** True while the Map.md conflict window of this view is open. */
   private conflictOpen = false;
   private hoverTimer: number | null = null;
+  /** The open menu of a card's several links, if any. */
+  private topicLinkMenu: { menu: HTMLElement; trigger: HTMLElement; cleanup: () => void } | null = null;
   private hoverCard: HTMLElement | null = null;
   /** The unsaved-answer block of the open hover card, repainted as the preview grows. */
   private hoverResearch: { path: string; block: HTMLElement; summary: HTMLElement; detail: HTMLElement } | null = null;
@@ -1704,6 +1709,7 @@ export class VisualAgentMapView extends ItemView {
     ).open();
   }
   async onClose(): Promise<void> {
+    this.closeTopicLinkMenu();
     this.closed = true;
     this.closeMapSearch(false);
     this.exitPresentation(false);
@@ -9964,6 +9970,7 @@ export class VisualAgentMapView extends ItemView {
     }
     // Markers (done, warning, star, priority): decorative symbols in the header, named in the card's accessible name.
     this.paintCardMarkers(card, header, node.id);
+    this.paintCardLinks(card, header, node.id);
     // The model tag follows the marker row (see paintModelTag).
     this.paintModelTag(card, header, note);
     // The topic colour comes last: its attribute and its name part (see paintCardColor).
@@ -11069,6 +11076,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (header) {
       this.paintCardMarkers(card, header, node.id);
+      this.paintCardLinks(card, header, node.id);
       this.paintModelTag(card, header, note);
     }
     this.paintCardColor(card, note, !!node.aimKind);
@@ -11381,6 +11389,7 @@ export class VisualAgentMapView extends ItemView {
     // Order (decision 35): type and strength, relations, then the parent topic, then the footer.
     if (note) this.renderHypothesisSection(panel, node, close);
     if (note) this.renderMarkerSection(panel, node);
+    if (note) this.renderLinkSection(panel, node);
     if (note) this.renderColorSection(panel, node);
     if (note) this.renderCoverSection(panel, node);
     this.renderBranchLayoutSection(panel, node);
@@ -12096,6 +12105,215 @@ export class VisualAgentMapView extends ItemView {
       }
     };
     paint();
+  }
+  /** The valid http(s) links of a topic, re-checked on every read (the note may have been edited by hand). */
+  private linksOf(id: string): string[] {
+    return readTopicLinks({ "topic-links": this.notes.get(id)?.links });
+  }
+  /** The only way a topic link is opened: validated again, then handed to the system browser without opener or referrer. */
+  private openTopicLink(href: string): boolean {
+    const clean = normalizeTopicLink(href);
+    if (!clean) {
+      new Notice(t("ui.topic_link_blocked"));
+      return false;
+    }
+    window.open(clean, "_blank", "noopener,noreferrer");
+    return true;
+  }
+  private linkHost(href: string): string {
+    try {
+      return new URL(href).host || href;
+    } catch {
+      return href;
+    }
+  }
+  /** Draws the link button in the card header: `↗` (with the count when several); its aria-label lists the hosts. */
+  private paintCardLinks(card: HTMLElement, header: HTMLElement, id: string): void {
+    const old = cardLinkButtons.get(card);
+    cardLinkButtons.delete(card);
+    const links = this.linksOf(id);
+    if (!links.length) {
+      old?.remove();
+      return;
+    }
+    const hosts = links.map(href => this.linkHost(href)).join(t("ui.list_separator"));
+    const button = header.createEl("button", {
+      cls: "vam-card-links",
+      text: links.length > 1 ? `↗${links.length}` : "↗"
+    });
+    button.type = "button";
+    button.tabIndex = -1;
+    button.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
+    button.setAttr("title", hosts);
+    // A press on the button is not a card gesture: no selection, no drag, no hover preview.
+    button.addEventListener("pointerdown", event => event.stopPropagation());
+    button.addEventListener("dblclick", event => event.stopPropagation());
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      event.preventDefault();
+      const current = this.linksOf(id);
+      if (current.length === 1) this.openTopicLink(current[0]);
+      else if (current.length) this.showTopicLinkMenu(button, current);
+    });
+    if (old) old.replaceWith(button);
+    else {
+      const row = cardMarkerRows.get(card);
+      if (row && row.parentElement === header) row.after(button);
+    }
+    cardLinkButtons.set(card, button);
+  }
+  /** A small menu of the topic's links (one item per host); arrow keys move, Enter opens, Escape closes and returns focus. */
+  private showTopicLinkMenu(trigger: HTMLElement, links: string[]): void {
+    this.closeTopicLinkMenu();
+    const menu = this.contentEl.createDiv("vam-topic-link-menu");
+    menu.setAttr("role", "menu");
+    menu.setAttr("aria-label", t("ui.topic_links"));
+    const items = links.map(href => {
+      const item = menu.createEl("button", { text: this.linkHost(href), cls: "vam-topic-link-item" });
+      item.type = "button";
+      item.setAttr("role", "menuitem");
+      item.setAttr("title", href);
+      item.setAttr("aria-label", t("ui.topic_link_open_0", this.linkHost(href)));
+      item.addEventListener("click", event => {
+        event.stopPropagation();
+        this.closeTopicLinkMenu(false);
+        this.openTopicLink(href);
+      });
+      return item;
+    });
+    const box = this.contentEl.getBoundingClientRect(),
+      at = trigger.getBoundingClientRect();
+    menu.style.left = `${Math.max(0, at.left - box.left)}px`;
+    menu.style.top = `${Math.max(0, at.bottom - box.top + 2)}px`;
+    menu.addEventListener("keydown", event => {
+      const index = items.indexOf(event.target as HTMLButtonElement);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeTopicLinkMenu(true);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopPropagation();
+        items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+      } else if (event.key === "Tab") this.closeTopicLinkMenu(true);
+      else event.stopPropagation();
+    });
+    const doc = this.contentEl.ownerDocument;
+    const outside = (event: Event): void => {
+      if (!menu.contains(event.target as Node) && event.target !== trigger) this.closeTopicLinkMenu(false);
+    };
+    doc.addEventListener("pointerdown", outside, true);
+    this.topicLinkMenu = { menu, trigger, cleanup: () => doc.removeEventListener("pointerdown", outside, true) };
+    items[0]?.focus();
+  }
+  private closeTopicLinkMenu(restoreFocus = false): void {
+    const open = this.topicLinkMenu;
+    if (!open) return;
+    this.topicLinkMenu = null;
+    open.cleanup();
+    open.menu.remove();
+    if (restoreFocus) open.trigger.focus();
+  }
+  /** The topic panel's link section: every link can be opened; adding and removing need an editable map. */
+  private renderLinkSection(panel: HTMLElement, node: MapNode): void {
+    const editable = this.markersEditable(node);
+    if (!editable && !this.linksOf(node.id).length) return;
+    const section = panel.createDiv("vam-inspector-section vam-link-section");
+    section.createEl("strong", { text: t("ui.topic_links"), cls: "vam-topic-tree-heading vam-section-heading" });
+    const status = section.createDiv({ cls: "vam-hint vam-topic-link-status" });
+    status.setAttr("role", "status");
+    status.setAttr("aria-live", "polite");
+    const list = section.createEl("ul", { cls: "vam-topic-link-list" });
+    const say = (text: string): void => {
+      status.setText(text);
+    };
+    const paint = (focus?: "input" | number): void => {
+      list.empty();
+      this.linksOf(node.id).forEach((href, index) => {
+        const row = list.createEl("li", { cls: "vam-topic-link-row" });
+        const open = row.createEl("button", { text: href, cls: "vam-topic-link-open" });
+        open.type = "button";
+        open.setAttr("title", t("ui.topic_link_open"));
+        open.setAttr("aria-label", t("ui.topic_link_open_0", this.linkHost(href)));
+        open.addEventListener("click", () => this.openTopicLink(href));
+        if (editable) {
+          const remove = row.createEl("button", { text: "×", cls: "vam-topic-link-remove" });
+          remove.type = "button";
+          remove.setAttr("aria-label", t("ui.topic_link_remove_0", this.linkHost(href)));
+          remove.addEventListener("click", () =>
+            this.enqueue(async () => {
+              const result = await this.changeTopicLinks(node, { remove: { index, href } });
+              if (result?.ok) say(t("ui.topic_link_removed"));
+              paint(Math.min(index, this.linksOf(node.id).length - 1));
+            })
+          );
+        }
+      });
+      if (focus === "input") input?.focus();
+      else if (typeof focus === "number" && focus >= 0)
+        list.querySelectorAll<HTMLElement>(".vam-topic-link-open")[focus]?.focus();
+      else if (typeof focus === "number") input?.focus();
+    };
+    let input: HTMLInputElement | null = null;
+    if (editable) {
+      const form = section.createDiv("vam-topic-link-form");
+      const field = form.createEl("input", { cls: "vam-topic-link-input" });
+      input = field;
+      field.type = "text";
+      field.setAttr("aria-label", t("ui.topic_link_input_label"));
+      field.setAttr("placeholder", t("ui.topic_link_input_placeholder"));
+      field.setAttr("maxlength", "2048");
+      field.setAttr("inputmode", "url");
+      const submit = (): void => {
+        const value = field.value;
+        this.enqueue(async () => {
+          const result = await this.changeTopicLinks(node, { add: value });
+          if (!result) say(t("ui.topic_link_readonly"));
+          else if (result.ok) {
+            field.value = "";
+            say(t("ui.topic_link_added"));
+          } else
+            say(
+              result.reason === "invalid"
+                ? t("ui.topic_link_invalid")
+                : result.reason === "duplicate"
+                  ? t("ui.topic_link_duplicate")
+                  : t("ui.topic_link_too_many_0", String(TOPIC_LINKS_MAX))
+            );
+          paint("input");
+        });
+      };
+      const add = this.button(form, t("ui.topic_link_add"), submit);
+      add.type = "button";
+      field.addEventListener("keydown", event => {
+        event.stopPropagation();
+        if (event.key === "Enter" && !event.isComposing) {
+          event.preventDefault();
+          submit();
+        }
+      });
+    } else say(t("ui.topic_link_readonly"));
+    paint();
+  }
+  /** Adds or removes one link: the note's `topic-links` and Map.md (viewport only) in one undoable step. Null when not editable. */
+  private async changeTopicLinks(
+    node: MapNode,
+    change: { add: string } | { remove: { index: number; href: string } }
+  ): Promise<AddTopicLinkResult | null> {
+    if (!this.map || !this.markersEditable(node)) return null;
+    const viewport = clone(this.map.viewport);
+    let result: AddTopicLinkResult = { ok: true, next: [] };
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, async path => {
+        result = await this.plugin.repo.writeTopicLinks(path, change);
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_links") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return result;
   }
   /** Toggles one marker: the note's `topic-markers` and Map.md (viewport only) in one undoable step. */
   private async changeTopicMarker(node: MapNode, id: TopicMarker): Promise<void> {

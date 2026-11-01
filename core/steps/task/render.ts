@@ -1,45 +1,9 @@
+import { assembleTaskPrompt, promptStepOf, selectionFromContext } from "./assemble";
 import { aimPhase, buildAimPrompt, readerFacingAimPhase } from "../aim/shell";
-import { researchGuidance } from "../../../ai/task-policy";
 import type { TaskContext } from "../../../ai/types";
-import { visualGuidance } from "../../../ai/visual-guidance";
-import { noteLanguageOf, translate, type ContentLanguage, type FollowAnchor } from "../../../i18n";
+import { translate, type ContentLanguage } from "../../../i18n";
 import type { AiProviderId } from "../../../ai/providers/provider";
-import { detailStructurePrompt, standardTemplate } from "../../../ai/detail-templates";
-import {
-  inLanguage,
-  LABEL_ANCESTORS,
-  LABEL_RULES,
-  LABEL_SOURCES,
-  LABEL_SUMMARY,
-  LABEL_SUMMARY_DIRECTION,
-  LABEL_TASK,
-  LABEL_TOPIC,
-  LABEL_USER_TEXT,
-  LOCAL_FIRST,
-  NONE,
-  obsidianFormat,
-  REFERENCE_CITATIONS,
-  quickKnowledge,
-  ROLE,
-  ROLE_QUICK,
-  SOURCE_SAFETY,
-  SOURCE_SAFETY_QUICK,
-  toneBlock,
-  withProviderOutput
-} from "../_shared/fragments";
-import {
-  ADAPTIVE_DETAIL_STRUCTURE,
-  DECOMPOSE,
-  DEFAULT_TASK,
-  detailStructure,
-  GENERAL_TASK,
-  JSON_CONTRACT,
-  LABEL_DETAIL,
-  LABEL_FINDINGS,
-  MERGE,
-  outputLanguage,
-  SYNTHESIZE
-} from "./fragments";
+import { quickKnowledge } from "../_shared/fragments";
 
 /** Whether the request's detail is written for the reader, so it gets the Obsidian syntax rules and heading levels. */
 export function readerFacingDetail(context: TaskContext): boolean {
@@ -64,7 +28,7 @@ export function isQuickTask(context: TaskContext): boolean {
 }
 
 /** `researchGuidance` for a Quick task: the depth sentence as usual, then the Quick knowledge rule instead of `research.local`. */
-function quickGuidance(context: TaskContext, language: ContentLanguage): string {
+export function quickGuidance(context: TaskContext, language: ContentLanguage): string {
   const depth = translate(
     language,
     context.researchDepth === "fast"
@@ -76,65 +40,14 @@ function quickGuidance(context: TaskContext, language: ContentLanguage): string 
   return `${depth} ${quickKnowledge(language)}`;
 }
 
-/** The regular (non-AIM) task prompt. Empty blocks are kept, so the blank-line layout matches the original builder. */
+/** The regular (non-AIM) task prompt: the style selection today's request fields stand for, assembled step by step. */
 export function generalTaskPrompt(
   context: TaskContext,
   language: ContentLanguage,
   provider: AiProviderId = "codex"
 ): string {
-  const modeFragment =
-    context.mode === "task"
-      ? GENERAL_TASK
-      : context.mode === "decompose"
-        ? DECOMPOSE
-        : context.mode === "synthesize"
-          ? SYNTHESIZE
-          : context.mode === "merge"
-            ? MERGE
-            : DEFAULT_TASK;
-  const quick = isQuickTask(context);
-  const none = inLanguage(NONE, language);
-  const topicAnchor: FollowAnchor = { kind: "topic", text: context.title };
-  return [
-    outputLanguage(language, topicAnchor),
-    inLanguage(quick ? ROLE_QUICK : ROLE, language),
-    inLanguage(quick ? SOURCE_SAFETY_QUICK : SOURCE_SAFETY, language),
-    context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language) : "",
-    context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language) : "",
-    withProviderOutput(inLanguage(JSON_CONTRACT, language), provider, language),
-    ...(context.toneText ? [toneBlock(context.toneText, language)] : []),
-    inLanguage(modeFragment, language),
-    context.mode !== "decompose"
-      ? [
-          context.detailFormat === "adaptive"
-            ? inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language)
-            : detailStructurePrompt(
-                context.detailTemplate ?? standardTemplate(noteLanguageOf(language)),
-                language,
-                headings => detailStructure(language, headings),
-                topicAnchor
-              ),
-          // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
-          readerFacingDetail(context) && context.mode !== "merge" ? obsidianFormat(language, context.noteStyle) : ""
-        ]
-          .filter(Boolean)
-          .join("\n\n")
-      : "",
-    quick ? quickGuidance(context, language) : researchGuidance(context, language),
-    ...visualGuidance(context, language),
-    `${inLanguage(LABEL_TOPIC, language)}:\n${context.title}`,
-    `${inLanguage(LABEL_SUMMARY, language)}:\n${context.summary}`,
-    context.mode !== "decompose" ? `${inLanguage(LABEL_DETAIL, language)}:\n${context.detail || none}` : "",
-    `${inLanguage(LABEL_RULES, language)}:\n${context.rules || none}`,
-    context.workingFindings ? `${inLanguage(LABEL_FINDINGS, language)}:\n${context.workingFindings}` : "",
-    context.sourceContext ? `${inLanguage(LABEL_SOURCES, language)}:\n${context.sourceContext}` : "",
-    ...(context.userTexts ? [`${inLanguage(LABEL_USER_TEXT, language)}:\n${context.userTexts}`] : []),
-    ...(context.summaryDirections
-      ? [`${inLanguage(LABEL_SUMMARY_DIRECTION, language)}:\n${context.summaryDirections}`]
-      : []),
-    `${inLanguage(LABEL_ANCESTORS, language)}:\n${context.ancestors || none}`,
-    `${inLanguage(LABEL_TASK, language)}:\n${context.task}`
-  ].join("\n\n");
+  return assembleTaskPrompt(selectionFromContext(context, language), promptStepOf(context), context, language, provider)
+    .text;
 }
 
 /** AIM requests use the AIM prompt shell in core/steps/aim; its templates are Markdown files there. */

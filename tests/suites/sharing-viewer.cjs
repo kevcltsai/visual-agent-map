@@ -16,6 +16,8 @@ const scan = load('experiences/sharing/share-leak-scan.ts');
 const edge = load('experiences/sharing/viewer/edge-path.ts');
 const { parseMap } = load('map-model.ts');
 const language = load('experiences/sharing/viewer/language.ts');
+const viewerDetail = load('experiences/sharing/viewer/detail.ts');
+const topicLinks = load('topic-links.ts');
 const dictionaries = load('experiences/sharing/share-viewer-dictionaries.ts');
 const build = load('experiences/sharing/share-build.ts');
 const cssTools = import(pathToFileURL(path.join(root, 'scripts', 'viewer-css.mjs')).href);
@@ -1123,4 +1125,50 @@ test('sharing viewer topic-color contrast: card text on every colour meets WCAG 
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
   }
+});
+
+// topic-links P3: the viewer has its own http(s) check (no plugin import); it must agree with the plugin on the shared cases.
+test('sharing viewer links: viewerLinkHref and normalizeTopicLink accept and refuse the same cases', () => {
+  const cases = JSON.parse(read('tests/fixtures/topic-link-cases.json'));
+  for (const bad of [...cases.rejected, 3, null, undefined, {}, [], ['https://example.com'], true]) {
+    assert.equal(viewerDetail.viewerLinkHref(bad), null, `viewer refuses ${JSON.stringify(bad)?.slice(0, 40)}`);
+    assert.equal(topicLinks.normalizeTopicLink(bad), null);
+  }
+  for (const [input, href] of cases.accepted) {
+    assert.equal(viewerDetail.viewerLinkHref(input), href);
+    assert.equal(topicLinks.normalizeTopicLink(input), href);
+  }
+  assert.deepEqual(plain(viewerDetail.viewerLinksOf(['javascript:x', 'https://a.example/p', 'HTTPS://A.example/p', 'https://b.example:81/'])), [{ href: 'https://a.example/p', host: 'a.example' }, { href: 'https://b.example:81/', host: 'b.example:81' }]);
+  assert.deepEqual(plain(viewerDetail.viewerLinksOf('https://a.example/')), [], 'a non-list reads as nothing');
+  assert.equal(viewerDetail.viewerLinksOf(Array.from({ length: 30 }, (_, i) => `https://e${i}.example/`)).length, 20);
+});
+
+test('sharing viewer links: linkRow builds anchors with rel/referrer, host as text, and nothing for tampered values', () => {
+  const makeEl = tag => ({ tag, attrs: {}, children: [], className: '', textContent: '', setAttribute(k, v) { this.attrs[k] = v; }, append(...c) { this.children.push(...c); } });
+  const doc = { createElement: makeEl };
+  const ui = { linksLabel: 'Links: {0}', linkOpen: 'Open link: {0}' };
+  assert.equal(viewerDetail.linkRow(doc, ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', ' \tjavascript:x', 'data:text/html,x', 3, null, 'https://u:p@h.example/', 'https://x.example/' + 'a'.repeat(2100)], ui), null);
+  assert.equal(viewerDetail.linkRow(doc, undefined, ui), null);
+  const row = viewerDetail.linkRow(doc, ['javascript:x', 'https://a.example/p?q=1', 'http://b.example:8080/'], ui);
+  assert.equal(row.children.length, 2);
+  const [first, second] = row.children;
+  assert.equal(first.tag, 'a');
+  assert.equal(first.attrs.href, 'https://a.example/p?q=1');
+  assert.equal(first.attrs.target, '_blank');
+  assert.equal(first.attrs.rel, 'noopener noreferrer');
+  assert.equal(first.attrs.referrerpolicy, 'no-referrer');
+  assert.equal(first.textContent, 'a.example');
+  assert.equal(second.textContent, 'b.example:8080');
+  assert.equal(row.attrs['aria-label'], 'Links: a.example, b.example:8080');
+  assert.equal(first.attrs['aria-label'], 'Open link: a.example');
+});
+
+test('sharing viewer links: link text exists in every language and the viewer imports no new module', () => {
+  for (const lang of ['en', 'zh-TW', 'zh-CN', 'ja', 'ko', 'es']) {
+    const ui = text.shareViewerUiFor(lang) ?? dictionaries.SHARE_VIEWER_UI_EXTRA[lang];
+    assert.match(ui.linksLabel, /\{0\}/, `${lang}.linksLabel`);
+    assert.match(ui.linkOpen, /\{0\}/, `${lang}.linkOpen`);
+  }
+  assert.equal(text.shareViewerUiFor('zh-TW').linksLabel, '網址：{0}');
+  assert.equal(/from\s+["'][^"']*topic-links["']/.test(read('experiences/sharing/viewer/detail.ts') + read('experiences/sharing/viewer/main.ts')), false, 'the viewer sources do not import topic-links');
 });

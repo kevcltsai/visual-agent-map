@@ -10,20 +10,8 @@ const m = load('topic-links.ts');
 const own = value => (value === null ? null : [...value]);
 const read = value => own(m.readTopicLinks({ 'topic-links': value }));
 
-/** The shared rejection cases; the P3 viewer test runs the same list through the viewer's own check. */
-const REJECTED = [
-  'javascript:alert(1)', 'JaVaScRiPt:alert(1)', '  javascript:alert(1)', '\tjavascript:alert(1)', 'java\nscript:alert(1)',
-  'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)', 'file:///etc/passwd', 'obsidian://open?vault=x',
-  'mailto:a@b', 'example.com', '//example.com', 'http:/x', 'http:\\\\x', 'https:/\\example.com', 'https://', 'https://user:pw@host', 'https://user@host/',
-  'https://exa mple.com', 'https://example.com/a b', 'https://example.com/\u0000', 'https://example.com/\nx',
-  'https://example.com/\u0085x', '', '   ', 'ftp://example.com/',
-  'https://example.com/' + 'a'.repeat(2048)
-];
-const ACCEPTED = [
-  ['  https://Example.com/a  ', 'https://example.com/a'],
-  ['HTTPS://Example.com', 'https://example.com/'],
-  ['http://example.com:8080/x?y=1#z', 'http://example.com:8080/x?y=1#z']
-];
+/** The shared cases; the sharing-viewer test runs the same file through the viewer's own check. */
+const { rejected: REJECTED, accepted: ACCEPTED } = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'topic-link-cases.json'), 'utf8'));
 
 test('links normalize: only http(s) passes, with the trimmed URL.href', () => {
   for (const bad of REJECTED) assert.equal(m.normalizeTopicLink(bad), null, JSON.stringify(bad.slice(0, 40)));
@@ -88,16 +76,16 @@ test('links add does not mutate its input', () => {
   assert.deepEqual(raw, ['https://a.example/']);
 });
 
-test('links remove: by index and href, unknown values kept, null when empty', () => {
+test('links remove: by normalized href, duplicates and spelling variants go, invalid and non-string values stay, null when empty', () => {
   const raw = ['future-x', 'https://a.example/', ' https://b.example/ '];
-  assert.deepEqual(own(m.removeTopicLink(raw, 1, 'https://a.example/')), ['future-x', ' https://b.example/ ']);
-  assert.deepEqual(own(m.removeTopicLink(raw, 2, 'https://b.example/')), ['future-x', 'https://a.example/']);
-  assert.deepEqual(own(m.removeTopicLink(raw, 0, 'https://a.example/')), raw, 'index and href must match');
-  assert.deepEqual(own(m.removeTopicLink(raw, 1, 'https://b.example/')), raw);
-  assert.deepEqual(own(m.removeTopicLink(raw, 9, 'https://a.example/')), raw);
-  assert.equal(m.removeTopicLink(['https://a.example/'], 0, 'https://a.example/'), null);
-  assert.equal(m.removeTopicLink('https://a.example/', 0, 'https://a.example/'), null);
-  assert.equal(m.removeTopicLink(undefined, 0, 'https://a.example/'), null);
+  assert.deepEqual(own(m.removeTopicLink(raw, 'https://a.example/')), ['future-x', ' https://b.example/ ']);
+  assert.deepEqual(own(m.removeTopicLink(raw, 'https://b.example/')), ['future-x', 'https://a.example/']);
+  assert.deepEqual(own(m.removeTopicLink(raw, 'https://none.example/')), raw);
+  const messy = ['javascript:alert(1)', 7, 'https://a.example', null, 'HTTPS://A.example/', { x: 1 }, 'https://a.example/', 'https://c.example/'];
+  assert.deepEqual(own(m.removeTopicLink(messy, 'https://a.example/')), ['javascript:alert(1)', 7, null, { x: 1 }, 'https://c.example/'], 'invalid, duplicate and non-string items: all matches go, the rest stay');
+  assert.equal(m.removeTopicLink(['https://a.example/', 'https://A.example'], 'https://a.example/'), null);
+  assert.equal(m.removeTopicLink('https://a.example/', 'https://a.example/'), null);
+  assert.equal(m.removeTopicLink(undefined, 'https://a.example/'), null);
   assert.deepEqual(raw, ['future-x', 'https://a.example/', ' https://b.example/ ']);
 });
 

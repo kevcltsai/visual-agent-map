@@ -106,6 +106,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }
 .vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }
 .vam-inspector-empty { color: var(--text-muted); }
+.vam-inspector-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 12px; font-size: var(--font-ui-small); }
+.vam-inspector-links a { overflow-wrap: anywhere; }
 .vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
 .vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }
 .vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }

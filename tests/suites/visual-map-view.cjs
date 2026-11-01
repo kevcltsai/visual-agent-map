@@ -3753,7 +3753,7 @@ integrationTest('topic-links: the panel section lists and opens links in read-on
     assert.equal(status.text, 'Link added.'); assert.equal(input.value, '');
     assert.equal(dom.findAll(panel, c => (c.cls ?? '').includes('vam-topic-link-row')).length, 2);
     dom.findAll(panel, c => c.tag === 'button').find(b => b.attrs['aria-label'] === 'Remove link a.example').click(); await dom.tick();
-    assert.equal(status.text, 'Link removed.'); assert.deepEqual(plain(calls.at(-1)), { remove: { index: 0, href: 'https://a.example/x' } });
+    assert.equal(status.text, 'Link removed.'); assert.deepEqual(plain(calls.at(-1)), { remove: { href: 'https://a.example/x' } });
   }
 });
 integrationTest('topic-links: adding is one transaction; one undo restores the exact note text, redo reapplies it, and removing the last link drops the key', async () => {
@@ -3783,7 +3783,7 @@ integrationTest('topic-links: adding is one transaction; one undo restores the e
   await view.refreshAfterSavedChange();
   assert.equal((await view.changeTopicLinks(at(), { add: 'javascript:alert(1)' })).ok, false);
   assert.doesNotMatch(contents.get(topic.path), /javascript/);
-  await view.changeTopicLinks(at(), { remove: { index: 0, href: 'https://example.com/p' } });
+  await view.changeTopicLinks(at(), { remove: { href: 'https://example.com/p' } });
   assert.doesNotMatch(contents.get(topic.path), /topic-links/, 'emptied list removes the key');
 });
 integrationTest('topic-links: the outline marks a row with an aria-hidden arrow and adds the link count to its name; it opens nothing', () => {

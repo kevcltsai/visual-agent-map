@@ -387,6 +387,23 @@ test('sharing markers: the payload carries only whitelisted marker ids in fixed 
   assert.ok(format.serializeShareJson(payload).includes('"markers":["done","star","priority-3"]'));
 });
 
+// topic-links P3: topic links in the share payload. Optional field, same version, valid http(s) only.
+test('sharing links: the payload carries only valid deduplicated http(s) hrefs, and no key when there are none', () => {
+  const { notesById } = cleanedNotes();
+  const hostile = ['https://b.example/x', 'javascript:alert(1)', 'JaVaScRiPt:alert(1)', '  javascript:x', 'data:text/html,x', 'https://u:p@h.example/', 3, null, { href: 'https://c.example' }, ' HTTPS://A.example ', 'https://a.example/', 'https://e.example/' + 'a'.repeat(2100)];
+  const firstId = Object.keys(notesById)[0];
+  const payload = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, links: hostile }, [firstId]: { ...notesById[firstId], links: [] } }, options());
+  assert.equal(payload.version, 1, 'no version bump');
+  assert.deepEqual(plain(payload.nodes.find(n => n.id === 'rich').links), ['https://b.example/x', 'https://a.example/']);
+  assert.ok(!JSON.stringify(payload).includes('javascript'), 'unsafe values never reach the file');
+  for (const node of payload.nodes.filter(n => n.id !== 'rich')) assert.equal('links' in node, false, `${node.id} has no links key`);
+  const notList = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, links: { 0: 'https://a.example/' } } }, options());
+  assert.equal('links' in notList.nodes.find(n => n.id === 'rich'), false, 'a non-list value reads as nothing');
+  assert.ok(format.serializeShareJson(payload).includes('"links":["https://b.example/x","https://a.example/"]'));
+  const plainPayload = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.equal(JSON.stringify(plainPayload).includes('"links":["'), false, 'a map without topic links is unchanged');
+});
+
 // Ticket 37 P3: topic colour in the share payload. Optional field, same version, whitelist only.
 test('sharing topic-color: the payload carries only a whitelisted colour id, and no key when there is none', () => {
   const { notesById } = cleanedNotes();

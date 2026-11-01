@@ -660,7 +660,8 @@ export class ShareExporter {
         status: note.status,
         ...(note.relevance ? { relevance: note.relevance } : {}),
         ...(note.markers?.length ? { markers: note.markers } : {}),
-        ...(note.color ? { color: note.color } : {})
+        ...(note.color ? { color: note.color } : {}),
+        ...(note.links?.length ? { links: note.links } : {})
       };
       const rendered = this.rendered.get(node.id);
       if (note.detail?.trim()) notesWithContent++;

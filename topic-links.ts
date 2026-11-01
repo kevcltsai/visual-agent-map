@@ -57,11 +57,11 @@ export function addTopicLink(raw: unknown, input: string): AddTopicLinkResult {
 }
 
 /**
- * The list to write after removing the item at `index` of the stored list when it still normalizes to `href`
- * (otherwise the list changed under the caller and nothing is removed). Null means remove the key.
+ * The list to write after removing `href`: every string item that normalizes to it (duplicates included) goes; invalid
+ * and non-string values stay. Null means remove the key.
  */
-export function removeTopicLink(raw: unknown, index: number, href: string): string[] | null {
+export function removeTopicLink(raw: unknown, href: string): string[] | null {
   const current: unknown[] = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const next = normalizeTopicLink(current[index]) === href ? current.filter((_, i) => i !== index) : current;
+  const next = current.filter(item => typeof item !== "string" || normalizeTopicLink(item) !== href);
   return next.length ? (next as string[]) : null;
 }

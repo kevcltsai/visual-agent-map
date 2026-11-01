@@ -6,6 +6,7 @@ import { CARD_WIDTH, clampCardWidth } from "../../map-graph";
 import { layoutDirectionFor } from "../../layouts/compose";
 import { layoutOf } from "../../map-layout";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
+import { readTopicLinks } from "../../topic-links";
 
 /** The `vam-share` v1 file format: one self-contained HTML file carrying this payload in `<script id="vam-map">`. */
 export const SHARE_FORMAT = "vam-share";
@@ -97,6 +98,8 @@ export interface ShareNodePayload {
   markers?: TopicMarker[];
   /** Optional (ticket 37): a whitelisted topic colour id. Absent means none; `version` stays 1. */
   color?: TopicColor;
+  /** Optional (topic-links): normalized http(s) hrefs of the topic. Absent means none; `version` stays 1. The viewer checks each again. */
+  links?: string[];
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
   detailHtml?: string;
   /** Optional (D-2026-10-116): this note's text per translated language, keyed by language id. The original stays in the fields above. */
@@ -167,6 +170,8 @@ export interface ShareNoteInput {
   markers?: readonly unknown[];
   /** Topic colour id from the note; anything not on the whitelist is dropped when the payload is built. */
   color?: unknown;
+  /** Topic link list from the note; only valid http(s) addresses survive when the payload is built. */
+  links?: readonly unknown[];
   /** Rendered, sanitized HTML (supplied by the Obsidian-side exporter). */
   detailHtml?: string;
 }
@@ -292,6 +297,8 @@ export function buildSharePayload(
     if (markers.length) out.markers = markers;
     const color = readTopicColor({ "topic-color": note?.color });
     if (color) out.color = color;
+    const links = readTopicLinks({ "topic-links": note?.links });
+    if (links.length) out.links = links;
     if (options.includeDetail) {
       if (note?.detailHtml?.trim()) out.detailHtml = note.detailHtml;
     }

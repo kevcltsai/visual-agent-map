@@ -4,7 +4,7 @@ import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "..
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
 import { SHARE_VIEWER_UI_DEFAULT, type ShareViewerUi } from "../share-viewer-ui";
 import { isCompactEntry } from "../share-translate-compact";
-import { fillDetail, fillTranslatedDetail } from "./detail";
+import { fillDetail, fillTranslatedDetail, linkRow } from "./detail";
 import { edgePathData } from "./edge-path";
 import { createViewerElement } from "./dom";
 import { readTopicColor, TOPIC_COLORS, type TopicColor } from "../../../topic-colors";
@@ -977,6 +977,8 @@ export function startViewer(doc: Document): void {
     }
     if (typeof item.summary === "string" && item.summary.trim())
       inspector.append(make("p", "vam-sample-summary", item.summary));
+    const linksRow = linkRow(doc, item.links, ui);
+    if (linksRow) inspector.append(linksRow);
     const detail = make("div", "vam-sample-detail");
     if (typeof item.detailHtml === "string" && item.detailHtml.trim()) {
       if (item.compact) fillTranslatedDetail(doc, detail, item.detailHtml, item.compact, assets, ui);

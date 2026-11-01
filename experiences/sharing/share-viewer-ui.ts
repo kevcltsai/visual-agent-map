@@ -59,6 +59,10 @@ export interface ShareViewerUi {
   imageTextUntranslated: string;
   /** Accessible-name part of a topic that has markers; `{0}` is the marker names joined (ticket 33). */
   markerLabel: string;
+  /** Accessible name of the topic's link row; `{0}` is the link hosts joined. */
+  linksLabel: string;
+  /** Accessible name of one link; `{0}` is its host. */
+  linkOpen: string;
   /** The name of each topic marker, read by screen readers instead of the symbol. */
   markerNames: Record<TopicMarker, string>;
   /** Accessible-name part of a topic that has a colour; `{0}` is the colour name (ticket 37). */
@@ -116,6 +120,8 @@ export const SHARE_VIEWER_UI_DEFAULT: Readonly<ShareViewerUi> = {
   originalText: "Original",
   imageTextUntranslated: "Text inside images is not translated.",
   markerLabel: "Markers: {0}",
+  linksLabel: "Links: {0}",
+  linkOpen: "Open link: {0}",
   markerNames: {
     done: "Done",
     warning: "Warning",

@@ -1642,13 +1642,13 @@ export class Repository {
   }
 
   /**
-   * Adds (`{ add }`) or removes (`{ remove: { index, href } }`) one `topic-links` item, reading the current list inside the
+   * Adds (`{ add }`) or removes (`{ remove: { href } }`) one `topic-links` item, reading the current list inside the
    * same `vault.process` call. An invalid, duplicate or over-limit address writes nothing and returns the reason; values
    * this version does not understand are kept, an emptied list removes the key, and `updated` is not bumped.
    */
   async writeTopicLinks(
     path: string,
-    change: { add: string } | { remove: { index: number; href: string } }
+    change: { add: string } | { remove: { href: string } }
   ): Promise<AddTopicLinkResult> {
     let result: AddTopicLinkResult = { ok: true, next: [] };
     await this.app.vault.process(this.file(path), content => {
@@ -1657,7 +1657,7 @@ export class Repository {
         result = addTopicLink(raw, change.add);
         return result.ok ? setFrontmatterKeys(content, { "topic-links": result.next }) : content;
       }
-      const next = removeTopicLink(raw, change.remove.index, change.remove.href);
+      const next = removeTopicLink(raw, change.remove.href);
       result = { ok: true, next: next ?? [] };
       return setFrontmatterKeys(content, { "topic-links": next });
     });

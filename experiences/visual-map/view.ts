@@ -12242,7 +12242,7 @@ export class VisualAgentMapView extends ItemView {
           remove.setAttr("aria-label", t("ui.topic_link_remove_0", this.linkHost(href)));
           remove.addEventListener("click", () =>
             this.enqueue(async () => {
-              const result = await this.changeTopicLinks(node, { remove: { index, href } });
+              const result = await this.changeTopicLinks(node, { remove: { href } });
               if (result?.ok) say(t("ui.topic_link_removed"));
               paint(Math.min(index, this.linksOf(node.id).length - 1));
             })
@@ -12298,7 +12298,7 @@ export class VisualAgentMapView extends ItemView {
   /** Adds or removes one link: the note's `topic-links` and Map.md (viewport only) in one undoable step. Null when not editable. */
   private async changeTopicLinks(
     node: MapNode,
-    change: { add: string } | { remove: { index: number; href: string } }
+    change: { add: string } | { remove: { href: string } }
   ): Promise<AddTopicLinkResult | null> {
     if (!this.map || !this.markersEditable(node)) return null;
     const viewport = clone(this.map.viewport);

@@ -744,23 +744,6 @@ integrationTest('Next Step modal: the content template choice goes into research
   const bare = open('bare', undefined);
   assert.deepEqual(plain(templateSelect(bare).children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
 });
-test('templateField: keep option first, returns the chosen template id or undefined for keep', () => {
-  const element = (tag, options = {}) => ({ tag, text: options.text, value: options.value ?? '', children: [],
-    createEl(name, value = {}) { const child = element(name, value); this.children.push(child); return child; },
-    createDiv(value = {}) { return this.createEl('div', typeof value === 'string' ? { cls: value } : value); },
-    createSpan(value = {}) { const child = element('span', value); this.children.push(child); return child; },
-    replaceChildren() { this.children = []; },
-    setAttr(name, value) { this[name] = value; } });
-  const { templateField } = load('experiences/visual-map/research-fields.ts', { obsidian });
-  const parent = element('div');
-  const read = templateField(parent, [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha' }], 'Keep it');
-  const select = parent.children[0].children.find(child => child.tag === 'select');
-  assert.equal(select['aria-label'], 'Content template');
-  assert.deepEqual(plain(select.children.map(c => [c.value, c.text])), [['', 'Keep it'], ['standard', 'Standard'], ['A', 'Alpha']]);
-  assert.equal(read(), undefined);
-  select.value = 'A'; assert.equal(read(), 'A');
-  select.value = ''; assert.equal(read(), undefined);
-});
 integrationTest('draft review renders the draft, edits on demand and keeps the dialog open when saving fails', async () => {
   const element = (tag, options = {}) => ({
     tag, text: options.text, value: options.text ?? '', cls: options.cls ?? '', attr: options.attr ?? {}, children: [], hidden: false,

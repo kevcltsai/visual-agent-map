@@ -2,10 +2,75 @@ import type VisualAgentMapPlugin from "../main";
 import { SUPPORTED_LANGUAGES, t } from "../i18n";
 import { normalizeReasoningLevel } from "../repository";
 import { modelDiscoverySummary, syncModelSelect } from "../core/model-discovery";
-import { renderDetailTemplatesSetting } from "./modals/detail-templates-modal";
+import { NOTE_STYLE_PRESETS } from "../experiences/visual-map/note-style";
 import { renderTonePresetsSetting } from "./modals/prompt-presets-modal";
 import { clampPreviewScale } from "./preview-utils";
-import { App, Modal, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Modal, normalizePath, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+
+/**
+ * "Note style" row: the workspace default (a built-in, a style file or an old template) and the style folder. A folder that
+ * is gone (renamed while the plugin was off) shows "Style folder not found" and lets the user pick it again.
+ */
+export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapPlugin, refresh: () => void): void {
+  const store = plugin.noteStyles;
+  const settings = plugin.settings;
+  const missing = !store.folderExists();
+  setting
+    .setName(t("ui.note_style"))
+    .setDesc(missing ? t("ui.note_style_folder_missing_desc_0", store.folder()) : t("ui.note_style_setting_desc"));
+  if (missing) {
+    setting.nameEl.setText(`${t("ui.note_style")} · ${t("ui.note_style_folder_missing")}`);
+    let input = "";
+    setting.addText(text => {
+      input = store.folder();
+      text.setPlaceholder(t("ui.note_style_folder_choose_prompt")).setValue(input);
+      text.inputEl.setAttr("aria-label", t("ui.note_style_folder_choose_prompt"));
+      text.onChange(value => {
+        input = value;
+      });
+    });
+    setting.addButton(button =>
+      button.setButtonText(t("ui.note_style_folder_choose")).onClick(async () => {
+        const value = normalizePath(input.trim());
+        if (!input.trim() || value === ".") return;
+        settings.noteStylesFolder = value;
+        await plugin.saveSettings();
+        refresh();
+      })
+    );
+  } else {
+    setting.addText(text => {
+      text.setValue(store.folder()).setDisabled(true);
+      text.inputEl.setAttr("aria-label", t("ui.note_style_folder_path"));
+    });
+  }
+  setting.addDropdown(dropdown => {
+    const options = new Map<string, string>(NOTE_STYLE_PRESETS.map(preset => [preset.id, t(preset.name)]));
+    const fill = (): void => {
+      for (const item of store.list()) {
+        if (item.kind === "builtin" || item.issues.length) continue;
+        options.set(item.id, item.name);
+      }
+      for (const old of store.unexportedTemplates()) options.set(old.id, old.name);
+      dropdown.selectEl.replaceChildren();
+      for (const [id, name] of options) dropdown.addOption(id, name);
+      const current = settings.defaultNoteStyleId ?? settings.defaultDetailTemplateId ?? "standard";
+      dropdown.setValue(options.has(current) ? current : "standard");
+    };
+    fill();
+    void store.refresh().then(fill, () => undefined);
+    dropdown.onChange(value => {
+      settings.defaultNoteStyleId = value;
+      void plugin.saveSettings();
+    });
+  });
+  setting.addButton(button =>
+    button.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
+      await plugin.openNoteStylesFolder();
+      refresh();
+    })
+  );
+}
 
 export const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 export const CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
@@ -343,8 +408,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         }
       },
       {
-        name: t("ui.detail_templates"),
-        render: setting => renderDetailTemplatesSetting(setting, this.app, this.plugin, () => this.update())
+        name: t("ui.note_style"),
+        render: setting => renderNoteStyleSetting(setting, this.plugin, () => this.update())
       },
       {
         name: t("ui.tone_presets"),

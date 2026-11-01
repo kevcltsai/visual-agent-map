@@ -135,46 +135,6 @@ export function modelField(
   };
 }
 
-/**
- * Content template select whose first option (empty value) is `defaultLabel`; returns the chosen template id, or
- * undefined when that first option is selected. With `manage`, an edit link beside it opens the template library;
- * `templates` is updated in place.
- */
-export function templateField(
-  parent: HTMLElement,
-  templates: { id: string; name: string }[],
-  defaultLabel: string,
-  manage?: ManageChoices,
-  /** Runs after the list was refreshed, so a summary that names the template stays current. */
-  changed: () => void = () => {}
-): (() => string | undefined) & { set: (id: string | undefined) => void } {
-  const { field, head } = linkedField(parent, t("ui.detail_template"));
-  const select = field.createEl("select");
-  select.setAttr("aria-label", t("ui.detail_template"));
-  const fill = (): void => {
-    const selected = select.value;
-    select.replaceChildren();
-    select.createEl("option", { value: "", text: defaultLabel });
-    for (const template of templates) select.createEl("option", { value: template.id, text: template.name });
-    select.value = templates.some(template => template.id === selected) ? selected : "";
-  };
-  fill();
-  if (manage)
-    fieldLink(head, t("ui.template_edit"), () =>
-      manage(select.value || undefined, next => {
-        templates.splice(0, templates.length, ...next);
-        fill();
-        changed();
-      })
-    );
-  const read = (): string | undefined => select.value || undefined;
-  return Object.assign(read, {
-    set: (id: string | undefined): void => {
-      select.value = id && templates.some(template => template.id === id) ? id : "";
-    }
-  });
-}
-
 /** Opens a library (tones, templates) at `selected` when given, and reports the refreshed list once it closes. */
 export type ManageChoices = (
   selected: string | undefined,
@@ -184,51 +144,11 @@ export type ManageTones = ManageChoices;
 /** The small links a research dialog can show beside its model and template fields. */
 export interface FieldLinks {
   repair?: (model: string | undefined) => void;
-  manageTemplates?: ManageChoices;
   manageTones?: ManageChoices;
   /** The style folder for the note-style field. */
   styles?: StylePicker;
   /** The style in force, for "Edit this style" while the first option is selected. */
   currentStyleRef?: StyleRef;
-}
-
-/**
- * Writing tone select whose first option (empty value) is `defaultLabel`; returns the chosen preset id, or undefined when
- * that first option is selected. With `manage`, an edit link beside it opens the tone library; `tones` is updated in place.
- */
-export function toneField(
-  parent: HTMLElement,
-  tones: { id: string; name: string }[],
-  defaultLabel: string,
-  manage?: ManageTones,
-  /** Runs after the list was refreshed, so a summary that names the tone stays current. */
-  changed: () => void = () => {}
-): (() => string | undefined) & { set: (id: string | undefined) => void } {
-  const { field, head } = linkedField(parent, t("ui.tone"));
-  const select = field.createEl("select");
-  select.setAttr("aria-label", t("ui.tone"));
-  const fill = (): void => {
-    const selected = select.value;
-    select.replaceChildren();
-    select.createEl("option", { value: "", text: defaultLabel });
-    for (const tone of tones) select.createEl("option", { value: tone.id, text: tone.name });
-    select.value = tones.some(tone => tone.id === selected) ? selected : "";
-  };
-  fill();
-  if (manage)
-    fieldLink(head, t("ui.tone_edit"), () =>
-      manage(select.value || undefined, next => {
-        tones.splice(0, tones.length, ...next);
-        fill();
-        changed();
-      })
-    );
-  const read = (): string | undefined => select.value || undefined;
-  return Object.assign(read, {
-    set: (id: string | undefined): void => {
-      select.value = id && tones.some(tone => tone.id === id) ? id : "";
-    }
-  });
 }
 
 const STYLE_KEEP = "";

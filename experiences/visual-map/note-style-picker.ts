@@ -2,7 +2,8 @@ import { Notice, normalizePath, TFile, type App } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
 import { STANDARD_TEMPLATE_ID } from "../../ai/detail-templates";
 import { builtinPairOf, type NoteStyleStore, type StyleListItem } from "../../ai/note-style-store";
-import { t } from "../../i18n";
+import { t, type TranslationKey } from "../../i18n";
+import type { NoteStyleIssue } from "../../ai/note-style-file";
 import { backgroundResultNotice } from "../../ui/background-run";
 import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
 import { NOTE_STYLE_PRESETS } from "./note-style";
@@ -91,11 +92,28 @@ export function styleRefOf(
   return undefined;
 }
 
+const ISSUE_KEYS = new Set([
+  "file_long",
+  "tone_long",
+  "frontmatter_unclosed",
+  "frontmatter_line",
+  "value_invalid",
+  "no_sections",
+  "count_invalid",
+  "comment_unclosed"
+]);
+
+/** The translated reason of one parse problem: a file-format code or a template error key. */
+export function styleIssueText(issue: NoteStyleIssue): string {
+  if (ISSUE_KEYS.has(issue.code)) return t(`ui.note_style_issue_${issue.code}` as TranslationKey, ...issue.values);
+  return t(issue.code as TranslationKey, ...issue.values);
+}
+
 /** The first problem of an unusable file, as one line for the picker. */
 export function styleProblem(item: StyleListItem): string | undefined {
   const first = item.issues[0];
   if (!first) return undefined;
-  return t("ui.note_style_unusable_0_1_2", item.fileName, first.line, first.message);
+  return t("ui.note_style_unusable_0_1_2", item.fileName, first.line, styleIssueText(first));
 }
 
 export interface StyleChooserOptions {

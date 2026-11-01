@@ -1656,14 +1656,14 @@ integrationTest('map action: one default note style sets or clears the template 
   view.chooseMapStyle(); await opened.at(-1).choices.find(choice => choice.label === 'Textbook (intro, then sections)').action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'textbook');
   // A style file from the folder is written as the template and deletes the map's tone; a file that does not parse can only be opened.
-  const bad = { kind: 'file', id: 'style:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 3, message: 'No ## section.' }] };
+  const bad = { kind: 'file', id: 'style:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 3, code: 'no_sections', values: [], message: 'x' }] };
   const good = { kind: 'file', id: 'style:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] };
   const edited = [];
   h.plugin.noteStyles = { refresh: async () => {}, list: () => [bad, good], unexportedTemplates: () => [], ensureStyleFolder: async () => 'F' };
   await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
   view.chooseMapStyle(); await new Promise(resolve => setTimeout(resolve, 0)); modal = opened.at(-1);
   const brokenRow = modal.choices.find(choice => choice.label === 'Broken');
-  assert.match(brokenRow.description, /Broken\.md.*line 3.*No ## section/); assert.equal(brokenRow.buttonLabel, 'Open this file');
+  assert.match(brokenRow.description, /Broken\.md.*line 3.*The file has no ## section/); assert.equal(brokenRow.buttonLabel, 'Open this file');
   await modal.choices.find(choice => choice.label === 'Mine').action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'style:Mine');
   saved = await h.repo.readMap(h.mapPath);

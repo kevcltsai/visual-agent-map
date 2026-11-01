@@ -12,8 +12,8 @@ const Notice = dom.makeNotice(noticeLog);
 const picker = load('experiences/visual-map/note-style-picker.ts', { obsidian: { ...obsidian, Notice } }, { createFragment: dom.createFragment });
 
 const good = { kind: 'file', id: 'style:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] };
-const bad = { kind: 'file', id: 'style:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 4, message: 'Section "A" is repeated.' }] };
-const badBuiltin = { kind: 'builtin', id: 'plain', fileName: 'Plain language.md', issues: [{ line: 1, message: 'No ## section.' }] };
+const bad = { kind: 'file', id: 'style:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 4, code: 'ui.detail_template_error_section_name_taken', values: [2], message: 'x' }] };
+const badBuiltin = { kind: 'builtin', id: 'plain', fileName: 'Plain language.md', issues: [{ line: 1, code: 'no_sections', values: [], message: 'x' }] };
 const legacy = { kind: 'legacy', id: 'uuid-1', name: 'Old one', fileName: 'Old one.md', issues: [] };
 
 function build(items, extra = {}) {
@@ -53,7 +53,7 @@ test('note style field: a file that does not parse cannot be chosen and shows it
   assert.equal(option('file:style:Mine').disabled, false);
   const rows = dom.findAll(h.parent, i => dom.hasCls(i, 'vam-note-style-problem'));
   assert.equal(rows.length, 2); assert.equal(rows[0].attrs?.role ?? rows[0].role, 'status');
-  assert.match(rows.map(r => dom.texts ? dom.texts(r).join(' ') : r.children.map(c => c.text).join(' ')).join('|'), /"Broken\.md" cannot be chosen \(line 4\): Section "A" is repeated\./);
+  assert.match(rows.map(r => dom.texts ? dom.texts(r).join(' ') : r.children.map(c => c.text).join(' ')).join('|'), /"Broken\.md" cannot be chosen \(line 4\): Section 2: another section already uses this name\./);
   const open = dom.findAll(h.parent, i => i.tag === 'button' && i.text === 'Open this file');
   open[0].click(); open[1].click();
   assert.deepEqual(h.edited, [{ kind: 'builtin', id: 'plain' }, { kind: 'file', id: 'style:Broken' }]);

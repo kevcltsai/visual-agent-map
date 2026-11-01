@@ -33,9 +33,6 @@ test('built-in templates: the display name follows the interface language, the h
 test('built-in template names of every registered interface language are reserved', () => {
   const taken = i18n.LANGUAGES.flatMap(({ id }) => templates.builtinTemplates(i18n.noteLanguageOf(id), id).map(template => template.name));
   for (const expected of ['Standard', 'Textbook', '標準', '教科書', '标准', '教科书']) assert.ok(taken.includes(expected), expected);
-  const source = fs.readFileSync(path.join(root, 'ui/modals/detail-templates-modal.ts'), 'utf8');
-  assert.match(source, /LANGUAGES\.flatMap\(/, 'the reserved-name check walks the registry, not a fixed language list');
-  assert.doesNotMatch(source, /NOTE_LANGUAGES/);
 });
 
 test('frontmatter format issues are written in the note language, never the interface language', () => {

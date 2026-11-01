@@ -244,7 +244,8 @@ import {
   stylePickerFor,
   styleRefOf,
   type StylePicker,
-  type StyleRef
+  type StyleRef,
+  styleIssueText
 } from "./note-style-picker";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import { previewMetrics } from "../../ui/preview-utils";
@@ -382,7 +383,6 @@ import type { FieldLinks, ModelChoices } from "./research-fields";
 import { aiModeOptions, hasKnowledgeGapMarker, noteAiMode, type MapAiMode } from "./ai-mode";
 import type { ResearchObserver } from "../../ai/research-observer";
 import type { ResearchProgress } from "./research-progress";
-import { DetailTemplatesModal } from "../../ui/modals/detail-templates-modal";
 import type { ExpansionBatchState } from "./expansion-batch";
 import { AimStartModal } from "../../ui/modals/aim-start-modal";
 import { AimAnswerModal } from "../../ui/modals/aim-answer-modal";
@@ -2187,8 +2187,6 @@ export class VisualAgentMapView extends ItemView {
   private fieldLinks(): FieldLinks {
     return {
       repair: model => this.plugin.repairConnection(model),
-      manageTemplates: (selected, refreshed) =>
-        new DetailTemplatesModal(this.app, this.plugin, () => refreshed(this.templateChoices()), selected).open(),
       manageTones: (selected, refreshed) =>
         new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
       styles: this.stylePicker(),
@@ -18145,7 +18143,7 @@ export class VisualAgentMapView extends ItemView {
       const builtin = NOTE_STYLE_PRESETS.find(item => this.noteStyles.builtinIdOfFile(base)?.id === item.id);
       const ref: StyleRef = builtin ? { kind: "builtin", id: builtin.id } : { kind: "file", id: `style:${base}` };
       throw new NoteStyleFileError(
-        t("ui.note_style_file_invalid_0_1_2", fileName, first.line, first.message),
+        t("ui.note_style_file_invalid_0_1_2", fileName, first.line, styleIssueText(first)),
         () => void openStyleFile(this.app, this.noteStyles, ref)
       );
     }

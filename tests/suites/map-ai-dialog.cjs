@@ -146,10 +146,6 @@ integrationTest('template and model pickers: the edit link opens the template li
   const bare = new MultiResearchModal({}, ['A'], models, templates, () => {}); bare.open();
   assert.equal(button(bare.contentEl, 'Edit this style').hidden, true, 'no edit link without a style folder');
   assert.equal(button(bare.contentEl, 'Fix connection…'), undefined);
-  const library = load('ui/modals/detail-templates-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const host = { settings: { language: 'en', detailTemplates: [{ id: 'mine', name: 'Mine', sections: [] }] }, saveSettings: async () => {} };
-  const editor = new library.DetailTemplatesModal({}, host, () => {}, 'mine'); editor.open();
-  assert.ok(findAll(editor.contentEl, i => i.tag === 'input' && i.value === 'Mine').length, 'opens straight into the editor of the chosen template');
 });
 integrationTest('Next Step: the model field offers Fix connection and the template field offers Edit templates', () => {
   const repaired = [];

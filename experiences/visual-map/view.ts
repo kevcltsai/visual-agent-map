@@ -12142,7 +12142,8 @@ export class VisualAgentMapView extends ItemView {
       text: links.length > 1 ? `↗${links.length}` : "↗"
     });
     button.type = "button";
-    button.tabIndex = -1;
+    // Same rule as the card's other tools (focusin/focusout): in the tab order only while the card has focus.
+    button.tabIndex = card.matches(":focus-within") ? 0 : -1;
     button.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
     button.setAttr("title", hosts);
     // A press on the button is not a card gesture: no selection, no drag, no hover preview.
@@ -12205,6 +12206,10 @@ export class VisualAgentMapView extends ItemView {
     doc.addEventListener("pointerdown", outside, true);
     this.topicLinkMenu = { menu, trigger, cleanup: () => doc.removeEventListener("pointerdown", outside, true) };
     items[0]?.focus();
+    // After a pointer click the app blurs the clicked button once the event finishes; take focus back once it has.
+    window.setTimeout(() => {
+      if (this.topicLinkMenu?.menu === menu && !menu.contains(doc.activeElement)) items[0]?.focus();
+    }, 0);
   }
   private closeTopicLinkMenu(restoreFocus = false): void {
     const open = this.topicLinkMenu;
@@ -12311,7 +12316,8 @@ export class VisualAgentMapView extends ItemView {
         map.viewport = clone(viewport);
       })
       .commit({ deferRebuild: true, label: t("ui.topic_links") });
-    this.history.push(entry);
+    // A refused write changed nothing, so there is nothing to undo.
+    if (result.ok) this.history.push(entry);
     await this.refreshAfterSavedChange();
     return result;
   }

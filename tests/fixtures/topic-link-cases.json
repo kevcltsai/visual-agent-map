@@ -40,6 +40,18 @@
     [
       "http://example.com:8080/x?y=1#z",
       "http://example.com:8080/x?y=1#z"
+    ],
+    [
+      "https://例子.測試/",
+      "https://xn--fsqu00a.xn--g6w251d/"
+    ],
+    [
+      "　https://example.com/a　",
+      "https://example.com/a"
+    ],
+    [
+      "﻿https://example.com/a﻿",
+      "https://example.com/a"
     ]
   ]
 }

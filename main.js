@@ -55253,7 +55253,7 @@ ${request.requirements}` : preset.text,
       text: links.length > 1 ? `\u2197${links.length}` : "\u2197"
     });
     button.type = "button";
-    button.tabIndex = -1;
+    button.tabIndex = card.matches(":focus-within") ? 0 : -1;
     button.setAttr("aria-label", t("ui.topic_links_aria_0", hosts));
     button.setAttr("title", hosts);
     button.addEventListener("pointerdown", (event) => event.stopPropagation());
@@ -55315,6 +55315,10 @@ ${request.requirements}` : preset.text,
     doc.addEventListener("pointerdown", outside, true);
     this.topicLinkMenu = { menu, trigger, cleanup: () => doc.removeEventListener("pointerdown", outside, true) };
     (_a2 = items[0]) == null ? void 0 : _a2.focus();
+    window.setTimeout(() => {
+      var _a3, _b2;
+      if (((_a3 = this.topicLinkMenu) == null ? void 0 : _a3.menu) === menu && !menu.contains(doc.activeElement)) (_b2 = items[0]) == null ? void 0 : _b2.focus();
+    }, 0);
   }
   closeTopicLinkMenu(restoreFocus = false) {
     const open = this.topicLinkMenu;
@@ -55413,7 +55417,7 @@ ${request.requirements}` : preset.text,
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_links") });
-    this.history.push(entry);
+    if (result.ok) this.history.push(entry);
     await this.refreshAfterSavedChange();
     return result;
   }

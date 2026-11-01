@@ -2041,7 +2041,7 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
 const heNotes = (list) => new Map(list.map(([id, extra]) => [id, { title: id.toUpperCase(), summary: '', status: 'completed', ...extra }]));
 const heHyp = (strength) => ({ topicKind: 'hypothesis', ...(strength ? { hypothesisStrength: strength } : {}) });
 // The shared DOM stand-in has a read-only textContent; labelCard writes it.
-const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); }; el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
+const hePatch = el => { el.matches ??= () => false; Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); }; el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
 function heFixture(options = {}) {
   const modals = [], notices = [], menus = [], logs = [], undone = [], opened = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
@@ -3707,6 +3707,9 @@ integrationTest('topic-links: the card header shows a button whose label lists t
     assert.equal(button(0).text, '↗'); assert.equal(button(0).attrs['aria-label'], 'Links: a.example');
     assert.equal(button(1).text, '↗2'); assert.equal(button(1).attrs['aria-label'], 'Links: a.example, b.example');
     assert.equal(button(2), undefined, 'an unsafe stored value shows nothing');
+    assert.equal(button(0).tabIndex, -1, 'out of the tab order until the card has focus (the focusin handler adds every card button)');
+    const card0 = view.stageEl.children[0]; card0.matches = q => q === ':focus-within'; view.paintCardLinks(card0, header(0), 'fact');
+    assert.equal(button(0).tabIndex, 0, 'repainted while the card is focused: stays reachable by Tab');
     let stopped = 0;
     button(0).fire('pointerdown', { stopPropagation() { stopped++; } }); assert.equal(stopped, 1, 'a press is not a card gesture');
     button(0).click();
@@ -3755,6 +3758,34 @@ integrationTest('topic-links: the panel section lists and opens links in read-on
     dom.findAll(panel, c => c.tag === 'button').find(b => b.attrs['aria-label'] === 'Remove link a.example').click(); await dom.tick();
     assert.equal(status.text, 'Link removed.'); assert.deepEqual(plain(calls.at(-1)), { remove: { href: 'https://a.example/x' } });
   }
+});
+integrationTest('topic-links: a refused write leaves no undo step; the link menu takes focus again after the pointer click that opened it blurred it', async () => {
+  const f = heFixture({ notes: heNotes([['fact', { links: [] }], ['hyp', {}], ['other', {}]]) });
+  const { view } = f; const pushed = [];
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.history = { push: e => pushed.push(e) }; view.refreshAfterSavedChange = async () => {};
+  for (const reason of ['invalid', 'duplicate', 'too-many']) {
+    view.plugin.repo.writeTopicLinks = async () => ({ ok: false, reason });
+    assert.deepEqual({ ...(await view.changeTopicLinks(view.map.nodes[0], { add: 'x' })) }, { ok: false, reason });
+  }
+  assert.equal(pushed.length, 0, 'refused writes push no history');
+  view.plugin.repo.writeTopicLinks = async () => ({ ok: true, next: ['https://a.example/'] });
+  assert.equal((await view.changeTopicLinks(view.map.nodes[0], { add: 'https://a.example/' })).ok, true); assert.equal(pushed.length, 1);
+  // The menu: the app blurs focus after the click; a deferred focus puts it back on the first item.
+  const timers = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian }, { setTimeout: run => { timers.push(run); return timers.length; }, clearTimeout() {} });
+  const menuView = Object.create(VisualAgentMapView.prototype);
+  const doc = { activeElement: null, addEventListener() {}, removeEventListener() {} };
+  const focusable = () => ({ attrs: {}, listeners: {}, setAttr(n, v) { this.attrs[n] = v; }, addEventListener(n, fn) { this.listeners[n] = fn; }, focus() { doc.activeElement = this; }, remove() {}, contains(x) { return x === this || (this.kids ?? []).includes(x); }, getBoundingClientRect: () => ({ left: 0, top: 0, bottom: 0 }), style: {}, createEl() { const el = focusable(); (this.kids ??= []).push(el); return el; }, createDiv() { return focusable(); } });
+  menuView.contentEl = Object.assign(focusable(), { ownerDocument: doc });
+  menuView.linkHost = href => href; menuView.topicLinkMenu = null;
+  const trigger = focusable();
+  menuView.showTopicLinkMenu(trigger, ['https://a.example/', 'https://b.example/']);
+  const first = menuView.topicLinkMenu.menu.kids[0];
+  assert.equal(doc.activeElement, first, 'focus on the first item at once (keyboard open)');
+  doc.activeElement = { body: true };
+  assert.equal(timers.length, 1); timers[0]();
+  assert.equal(doc.activeElement, first, 'focus returns after the pointer blur');
 });
 integrationTest('topic-links: adding is one transaction; one undo restores the exact note text, redo reapplies it, and removing the last link drops the key', async () => {
   const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');

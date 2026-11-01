@@ -1519,6 +1519,8 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-field-head > .vam-field-link:disabled { color: var(--text-faint); cursor: default; text-decoration: none; }
 .vam-field-head > .vam-field-link:focus-visible, .vam-note-style-problem > .vam-field-link:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; border-radius: var(--radius-s); }
 .vam-field > select { max-width: 100%; }
+/* Template and Tone rows of the settings page: the picker and three buttons wrap in a narrow window instead of overflowing. */
+.vam-block-row > .setting-item-control { flex-wrap: wrap; justify-content: flex-end; }
 /* Full-prompt preview (read-only dialog). */
 .vam-prompt-preview { max-width: 100%; }
 .vam-prompt-preview-label { display: block; margin: 8px 0 4px; font-weight: 600; }

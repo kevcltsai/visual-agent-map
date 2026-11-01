@@ -1,4 +1,4 @@
-import { instructionLanguageOf, type ContentLanguage, type TranslationKey } from "../../i18n";
+import { instructionLanguageOf, noteLanguageOf, type ContentLanguage, type TranslationKey } from "../../i18n";
 import { CANONICAL_LANGUAGES, type NoteStyleLanguage } from "../../ai/note-style-file";
 import { templateFormatHeading } from "./template-block";
 import { builtinPresets } from "../../ai/prompt-presets";
@@ -75,7 +75,7 @@ const template = (id: string, nameKey: TranslationKey, files: readonly string[])
  */
 export function builtinTemplateText(id: string, language: ContentLanguage): string {
   const block = findBuiltinBlock("template", id);
-  return `${block.sections?.(language)}\n\n# ${templateFormatHeading(language)}\n\n${block.format?.(language)}`;
+  return `${block.sections?.(language)}\n\n# ${templateFormatHeading(noteLanguageOf(language))}\n\n${block.format?.(language)}`;
 }
 
 export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [

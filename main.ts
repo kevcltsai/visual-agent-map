@@ -35,6 +35,7 @@ import {
   type Command
 } from "obsidian";
 import { NoteStyleStore, type StyleFilePort } from "./ai/note-style-store";
+import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
@@ -147,6 +148,10 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     ...(typeof saved?.defaultNoteStyleId === "string" && saved.defaultNoteStyleId
       ? { defaultNoteStyleId: saved.defaultNoteStyleId }
       : {}),
+    ...(typeof saved?.noteTemplateBlock === "string" && saved.noteTemplateBlock
+      ? { noteTemplateBlock: saved.noteTemplateBlock }
+      : {}),
+    ...(typeof saved?.noteToneBlock === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
       : {}),
@@ -1324,6 +1329,55 @@ export default class VisualAgentMapPlugin extends Plugin {
       new Notice(error instanceof Error ? error.message : String(error));
       return null;
     }
+  }
+  /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
+  async openBlock(category: BlockCategory, ref: string): Promise<boolean> {
+    try {
+      const { path } = await this.noteStyles.ensureBlockFile(category, ref);
+      const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+      if (!(file instanceof TFile)) throw new Error("not a file");
+      await this.app.workspace.getLeaf("tab").openFile(file);
+      new Notice(t("ui.block_notice_opened_0", path));
+      return true;
+    } catch {
+      new Notice(t("ui.block_notice_open_failed"));
+      return false;
+    }
+  }
+  /** Copies a block into a new file, which becomes the workspace's choice; it is not opened. Returns the new ref. */
+  async copyBlock(category: BlockCategory, ref: string): Promise<string | null> {
+    try {
+      const created = await this.noteStyles.copyBlock(category, ref);
+      const { path } = await this.noteStyles.ensureBlockFile(category, created);
+      new Notice(t("ui.block_notice_copied_0", path));
+      return created;
+    } catch {
+      new Notice(t("ui.block_notice_copy_failed"));
+      return null;
+    }
+  }
+  /** Restores a built-in block after saving a backup of its file; every refusal says why in a Notice. */
+  async restoreBlock(category: BlockCategory, ref: string): Promise<boolean> {
+    try {
+      const result = await this.noteStyles.restoreBlock(category, ref);
+      if (result.ok) {
+        new Notice(t("ui.block_notice_restored_0", result.backup));
+        return true;
+      }
+      const reason = result.reason;
+      new Notice(
+        t(
+          reason === "backup-failed"
+            ? "ui.block_notice_restore_backup_failed"
+            : reason === "not-builtin" || reason === "no-override"
+              ? "ui.block_notice_restore_not_available"
+              : "ui.block_notice_restore_failed"
+        )
+      );
+    } catch {
+      new Notice(t("ui.block_notice_restore_failed"));
+    }
+    return false;
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);

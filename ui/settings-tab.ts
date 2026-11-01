@@ -6,9 +6,13 @@ import { NOTE_STYLE_PRESETS } from "../experiences/visual-map/note-style";
 import { renderTonePresetsSetting } from "./modals/prompt-presets-modal";
 import { clampPreviewScale } from "./preview-utils";
 import { App, Modal, normalizePath, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import type { ButtonComponent, DropdownComponent } from "obsidian";
+import { builtinRef } from "../core/blocks/block-files";
+import type { BlockCategory } from "../core/blocks/builtin";
+import { styleIssueText } from "../experiences/visual-map/note-style-picker";
 
 /**
- * "Note style" row: the workspace default (a built-in, a style file or an old template) and the style folder. A folder that
+ * "Note style" row: the style folder (the Template and Tone rows below it pick the workspace default). A folder that
  * is gone (renamed while the plugin was off) shows "Style folder not found" and lets the user pick it again.
  */
 export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapPlugin, refresh: () => void): void {
@@ -44,26 +48,6 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
       text.inputEl.setAttr("aria-label", t("ui.note_style_folder_path"));
     });
   }
-  setting.addDropdown(dropdown => {
-    const options = new Map<string, string>(NOTE_STYLE_PRESETS.map(preset => [preset.id, t(preset.name)]));
-    const fill = (): void => {
-      for (const item of store.list()) {
-        if (item.kind === "builtin" || item.issues.length) continue;
-        options.set(item.id, item.name);
-      }
-      for (const old of store.unexportedTemplates()) options.set(old.id, old.name);
-      dropdown.selectEl.replaceChildren();
-      for (const [id, name] of options) dropdown.addOption(id, name);
-      const current = settings.defaultNoteStyleId ?? settings.defaultDetailTemplateId ?? "standard";
-      dropdown.setValue(options.has(current) ? current : "standard");
-    };
-    fill();
-    void store.refresh().then(fill, () => undefined);
-    dropdown.onChange(value => {
-      settings.defaultNoteStyleId = value;
-      void plugin.saveSettings();
-    });
-  });
   setting.addButton(button =>
     button.setButtonText(t("ui.note_style_open_folder")).onClick(async () => {
       await plugin.openNoteStylesFolder();
@@ -73,6 +57,192 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
   setting.addButton(button =>
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl))
   );
+}
+
+/** The value of the template picker's "old style file" item; it is not a block ref, so it never reaches a setting. */
+export const LEGACY_PICK = "legacy:";
+
+/** What the two pickers show now: a block ref for each, or an old default (a style file or old template) in place of the template. */
+export interface ShownBlocks {
+  template: string;
+  tone: string;
+  /** Set when the workspace default is still an old style file or old template: its name. */
+  legacyName?: string;
+}
+
+/**
+ * The choice the pickers show, in the terms the run uses: the new settings when set (a block that is gone shows as the
+ * standard template or the academic tone, as the run falls back), else what the old `defaultNoteStyleId` stands for.
+ */
+export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
+  const { settings, noteStyles: store } = plugin;
+  const chosen = settings.defaultNoteStyleId ?? settings.defaultDetailTemplateId ?? "standard";
+  const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
+  const standard = NOTE_STYLE_PRESETS[0];
+  const has = (category: BlockCategory, ref: string | undefined): ref is string =>
+    ref !== undefined && store.listBlocks(category).some(item => item.ref === ref);
+  const keyed = settings.noteTemplateBlock;
+  let legacyName: string | undefined;
+  if (!keyed && !preset) {
+    const old = store.list().find(item => item.kind !== "builtin" && item.id === chosen);
+    const unexported = store.unexportedTemplates().find(item => item.id === chosen);
+    legacyName = (old && "name" in old ? old.name : undefined) ?? unexported?.name ?? chosen.replace(/^style:/, "");
+  }
+  const template = keyed
+    ? has("template", keyed)
+      ? keyed
+      : builtinRef(standard.templateId)
+    : preset
+      ? builtinRef(preset.templateId)
+      : builtinRef(standard.templateId);
+  const toneKey = settings.noteToneBlock;
+  const tone = toneKey
+    ? has("tone", toneKey)
+      ? toneKey
+      : builtinRef(standard.toneId)
+    : builtinRef((preset ?? standard).toneId);
+  return {
+    template: legacyName === undefined ? template : LEGACY_PICK,
+    tone,
+    ...(legacyName !== undefined ? { legacyName } : {})
+  };
+}
+
+/**
+ * The "Template" or "Tone" row of the note style setting: a picker over the built-in and the user's own blocks, and the
+ * buttons Open, Copy and Restore default. The first action writes both shown values into the settings, so what the rows
+ * show is what runs use. Buttons are off while an action runs; focus stays on the button used, or on the picker when the
+ * choice changed.
+ */
+export function renderNoteBlockSetting(
+  setting: Setting,
+  plugin: VisualAgentMapPlugin,
+  category: BlockCategory,
+  refresh: () => void
+): void {
+  const { settings, noteStyles: store } = plugin;
+  const isTemplate = category === "template";
+  const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
+  setting.setName(label);
+  setting.descEl.setAttr("aria-live", "polite");
+  setting.settingEl.addClass("vam-block-row");
+  // The description is a live region: it is written only when its text changes, so a screen reader does not repeat it.
+  let shownDesc: string | undefined;
+  let busy = false;
+  let picker: DropdownComponent | undefined;
+  let openButton: ButtonComponent | undefined;
+  let copyButton: ButtonComponent | undefined;
+  let restoreButton: ButtonComponent | undefined;
+  const lock = (button: ButtonComponent | undefined, disabled: boolean): void => {
+    button?.setDisabled(disabled);
+    button?.buttonEl.setAttr("aria-disabled", String(disabled));
+  };
+  const render = (): void => {
+    if (!picker) return;
+    const shown = shownBlocks(plugin);
+    const legacy = shown.legacyName !== undefined;
+    const items = store.listBlocks(category);
+    picker.selectEl.replaceChildren();
+    if (isTemplate && legacy) picker.addOption(LEGACY_PICK, t("ui.block_legacy_0", shown.legacyName ?? ""));
+    for (const item of items)
+      picker.addOption(item.ref, item.modified ? t("ui.block_modified_0", item.name) : item.name);
+    const value = shown[category];
+    picker.setValue(value);
+    const item = items.find(entry => entry.ref === value);
+    const restorable = !legacy && item?.kind === "builtin" && item.fileName !== undefined;
+    picker.setDisabled(busy || (!isTemplate && legacy));
+    lock(openButton, busy || legacy);
+    lock(copyButton, busy || legacy);
+    lock(restoreButton, busy || !restorable);
+    const parts: string[] = [];
+    if (legacy)
+      parts.push(
+        t(isTemplate ? "ui.block_status_legacy_template" : "ui.block_status_legacy_tone", shown.legacyName ?? "")
+      );
+    else if (item) {
+      const issue = item.issues[0];
+      if (issue)
+        parts.push(t("ui.block_status_issue_0_1_2", item.fileName ?? item.name, issue.line, styleIssueText(issue)));
+      if (item.kind === "file") parts.push(t("ui.block_status_own"));
+      else if (item.modified) parts.push(t("ui.block_status_modified"));
+      else parts.push(t(item.fileName === undefined ? "ui.block_status_builtin_none" : "ui.block_status_builtin_file"));
+    }
+    const desc = parts.join(" ");
+    if (desc === shownDesc) return;
+    shownDesc = desc;
+    setting.setDesc(desc);
+  };
+  /** Writes the two shown values into the settings (not when an old default still decides), then runs `action`. */
+  const act = async (action: (ref: string) => Promise<void>, target: () => HTMLElement | undefined): Promise<void> => {
+    if (busy) return;
+    busy = true;
+    render();
+    try {
+      const shown = shownBlocks(plugin);
+      if (shown.legacyName === undefined) {
+        settings.noteTemplateBlock = shown.template;
+        settings.noteToneBlock = shown.tone;
+        await plugin.saveSettings();
+        await action(shown[category]);
+      }
+    } catch {
+      /* The plugin methods report their failures in a Notice. */
+    } finally {
+      busy = false;
+      render();
+      target()?.focus();
+    }
+  };
+  setting.addDropdown(dropdown => {
+    picker = dropdown;
+    dropdown.selectEl.setAttr(
+      "aria-label",
+      t(isTemplate ? "ui.block_picker_template_aria" : "ui.block_picker_tone_aria")
+    );
+    dropdown.onChange(async value => {
+      const shown = shownBlocks(plugin);
+      if (value === LEGACY_PICK) {
+        delete settings.noteTemplateBlock;
+        delete settings.noteToneBlock;
+      } else {
+        settings.noteTemplateBlock = isTemplate ? value : shown.template;
+        settings.noteToneBlock = isTemplate ? shown.tone : value;
+      }
+      await plugin.saveSettings();
+      if (shown.legacyName !== undefined || value === LEGACY_PICK) refresh();
+      else render();
+    });
+  });
+  setting.addButton(button => {
+    openButton = button;
+    button.setButtonText(t("ui.block_open")).onClick(() =>
+      act(
+        ref => plugin.openBlock(category, ref).then(() => undefined),
+        () => openButton?.buttonEl
+      )
+    );
+  });
+  setting.addButton(button => {
+    copyButton = button;
+    button.setButtonText(t("ui.block_copy")).onClick(() =>
+      act(
+        ref => plugin.copyBlock(category, ref).then(() => undefined),
+        () => picker?.selectEl
+      )
+    );
+  });
+  setting.addButton(button => {
+    restoreButton = button;
+    button.setButtonText(t("ui.block_restore")).onClick(() =>
+      act(
+        ref => plugin.restoreBlock(category, ref).then(() => undefined),
+        () =>
+          restoreButton?.buttonEl.getAttribute("aria-disabled") === "true" ? picker?.selectEl : restoreButton?.buttonEl
+      )
+    );
+  });
+  render();
+  void store.refresh().then(render, () => undefined);
 }
 
 export const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
@@ -413,6 +583,14 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       {
         name: t("ui.note_style"),
         render: setting => renderNoteStyleSetting(setting, this.plugin, () => this.update())
+      },
+      {
+        name: t("ui.block_picker_template"),
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "template", () => this.update())
+      },
+      {
+        name: t("ui.block_picker_tone"),
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.update())
       },
       {
         name: t("ui.tone_presets"),

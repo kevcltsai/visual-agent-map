@@ -137,26 +137,30 @@ export function promptStepOf(context: TaskContext): PromptStep {
   }
 }
 
-/** The choice today's request fields stand for: a template and a tone block, with the old style switches riding on the template. */
-export function selectionFromContext(context: TaskContext, language: ContentLanguage): StyleSelection {
-  const templateId = context.detailTemplate?.id ?? standardTemplate(noteLanguageOf(language)).id;
-  const toneText = context.toneText;
+/** The tone choice a tone text stands for: nothing is academic rigor, a built-in tone's text is that tone, any other text is sent as written. */
+export function toneChoiceFromText(toneText: string | undefined, language: ContentLanguage): BlockChoice {
   const builtinTone = toneText
     ? ["plain", "magazine", "summary", "guide", "auto"].find(
         id => lookupBuiltinBlock("tone", id, language) === toneText
       )
     : undefined;
+  return !toneText
+    ? { id: DEFAULT_TONE }
+    : builtinTone
+      ? { id: builtinTone }
+      : { id: CUSTOM_LEGACY_TONE, body: toneText };
+}
+
+/** The choice today's request fields stand for: a template and a tone block, with the old style switches riding on the template. */
+export function selectionFromContext(context: TaskContext, language: ContentLanguage): StyleSelection {
+  const templateId = context.detailTemplate?.id ?? standardTemplate(noteLanguageOf(language)).id;
   return {
     template: {
       id: templateId,
       ...(context.detailFormat === "adaptive" ? { adaptive: true } : {}),
       ...(context.noteStyle ? { legacyPreferences: context.noteStyle } : {})
     },
-    tone: !toneText
-      ? { id: DEFAULT_TONE }
-      : builtinTone
-        ? { id: builtinTone }
-        : { id: CUSTOM_LEGACY_TONE, body: toneText }
+    tone: toneChoiceFromText(context.toneText, language)
   };
 }
 

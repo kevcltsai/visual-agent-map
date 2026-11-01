@@ -45,7 +45,7 @@ export { JSON_CONTRACT, GENERAL_TASK } from "./core/steps/task/fragments";
 export { ROLE, SOURCE_SAFETY, withProviderOutput, inLanguage, toneBlock, OBSIDIAN_FORMAT } from "./core/steps/_shared/fragments";
 export { builtinTemplateText } from "./core/blocks/builtin";
 export { chartsWanted } from "./core/steps/task/assemble";
-export { parseTemplateBlock } from "./core/blocks/template-block";
+export { parseTemplateBlock, splitTemplateZones } from "./core/blocks/template-block";
 export { detailStructurePrompt, standardTemplate, textbookTemplate } from "./ai/detail-templates";
 export { detailStructure, customDetailStructure, customDetailRule } from "./core/steps/task/fragments";
 export { noteLanguageOf } from "./i18n";
@@ -84,7 +84,7 @@ test('counter 1: a template whose format rules lack the summary line produces pr
 test('counter 2: a template without a format rules zone carries no format segment, no callout, mermaid, task list or highlight syntax; the fixed parts stay', () => {
   const m = A();
   for (const language of LANGUAGES) {
-    const sectionsOnly = m.builtinTemplateText('standard', language).split(`\n\n# ${M.translate(language, 'ui.block_template_format_heading')}`)[0];
+    const sectionsOnly = m.splitTemplateZones(m.builtinTemplateText('standard', language)).sections.replace(/\n+$/, '');
     for (const [name, context] of stepContexts(language).filter(([step]) => ['research', 'quick', 'synthesize'].includes(step))) {
       const selection = { ...m.selectionFromContext(context, language), template: { id: 'standard', body: sectionsOnly } };
       const { text, segments, charts } = m.assembleTaskPrompt(selection, m.promptStepOf(context), context, language);
@@ -343,7 +343,7 @@ test('charts: the prompt asks for charts exactly when the template text holds a 
     const context = { ...base, outputLanguage: language };
     const selection = m.selectionFromContext(context, language);
     assert.equal(m.assembleTaskPrompt(selection, 'research', context, language).charts, true, language);
-    const without = m.builtinTemplateText('standard', language).split(`\n\n# ${M.translate(language, 'ui.block_template_format_heading')}`)[0];
+    const without = m.splitTemplateZones(m.builtinTemplateText('standard', language)).sections.replace(/\n+$/, '');
     assert.equal(m.assembleTaskPrompt({ ...selection, template: { id: 'standard', body: without } }, 'research', context, language).charts, false, language);
     assert.equal(m.chartsWanted({ ...selection, template: { id: 'standard', body: without } }, context, language), false);
     assert.equal(m.chartsWanted(selection, context, language), true);

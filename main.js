@@ -54089,7 +54089,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.integrationMode && !this.presentation && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
+    if (!this.integrationMode && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -64387,7 +64387,10 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
 .vam-node.is-clipped { display: flex; flex-direction: column; }
-.vam-node.is-clipped > h3, .vam-node.is-clipped > p, .vam-node.is-clipped > .vam-card-cover { flex: 0 1 auto; min-height: 0; overflow: hidden; }
+.vam-node.is-clipped > h3, .vam-node.is-clipped > p, .vam-node.is-clipped > .vam-card-cover { min-height: 0; overflow: hidden; }
+.vam-node.is-clipped > p { flex: 0 10000 auto; }
+.vam-node.is-clipped > .vam-card-cover { flex: 0 100 auto; }
+.vam-node.is-clipped > h3 { flex: 0 1 auto; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }

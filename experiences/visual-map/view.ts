@@ -10259,7 +10259,8 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     this.enableDrag(card, node);
-    if (!this.integrationMode && !this.presentation && !this.map?.aim && !node.aimKind) {
+    // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
+    if (!this.integrationMode && !this.map?.aim && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);

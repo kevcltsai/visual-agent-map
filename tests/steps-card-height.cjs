@@ -302,7 +302,7 @@ test('A6 the corner handle is hidden from assistive tech and not a tab stop; the
   assert.equal(h.corner.attrs['aria-hidden'], 'true');
   assert.equal(h.corner.attrs.role, undefined);
   const source = require('node:fs').readFileSync(path.join(root, 'experiences', 'visual-map', 'view.ts'), 'utf8');
-  assert.match(source, /!this\.integrationMode && !this\.presentation && !this\.map\?\.aim && !node\.aimKind\) \{\s*this\.attachResizeHandle\(card, node\);\s*this\.attachHeightHandle\(card, node\);\s*this\.attachCornerHandle\(card, node\);/);
+  assert.match(source, /!this\.integrationMode && !this\.map\?\.aim && !node\.aimKind\) \{\s*this\.attachResizeHandle\(card, node\);\s*this\.attachHeightHandle\(card, node\);\s*this\.attachCornerHandle\(card, node\);/);
 });
 
 test('A8 the view marks a scene card clipped only for a fixed-height card the view shows as clipped', () => {
@@ -360,4 +360,43 @@ test('P4 export: a clipped card keeps its image and text inside its frame; a sce
   assert.ok(inside.includes('<image ') && inside.includes('>one…<'), 'image and text are inside the clip');
   assert.ok(svg.indexOf('<rect x="10" y="20" width="100" height="60"') < open, 'the frame is drawn outside the clip');
   assert.ok(!/url\(|clipPath/.test(svg), 'no url() reference: the whitelist is unchanged');
+});
+
+// ---- P6: shrink order of a clipped card, handles built during a presentation ---------------------------------------------
+const { obsidian } = support;
+const renderedSpans = (setup) => {
+  const { VisualAgentMapView: View } = support.load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const spans = [];
+  const element = tag => ({ tag, children: [], dataset: {}, style: {},
+    createDiv(options) { const child = element('div'); child.cls = options?.cls ?? options; this.children.push(child); return child; },
+    createEl(name, options) { const child = element(name); child.text = options?.text; this.children.push(child); return child; },
+    createSpan(options) { const child = element('span'); child.cls = options?.cls; spans.push(child.cls); this.children.push(child); return child; },
+    setAttr(name, value) { this[name] = value; }, addClass(name) { this.cls = name; }, toggleClass() {}, setPointerCapture() {},
+    addEventListener() {}, removeEventListener() {}
+  });
+  const topic = support.node('parent');
+  const view = new View({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} });
+  view.stageEl = element('stage'); view.map = support.map([topic]);
+  view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
+  view.render = () => {};
+  setup(view);
+  view.renderNode(topic);
+  return spans.filter(cls => /^vam-card-resize/.test(cls));
+};
+
+test('P6 a card rendered during a presentation still has all three handles; they are inert and hidden by CSS, so ending it needs no repaint', () => {
+  assert.deepEqual(renderedSpans(() => {}), ['vam-card-resize', 'vam-card-resize-y', 'vam-card-resize-corner']);
+  assert.deepEqual(renderedSpans(view => { view.presentation = { currentId: 'parent' }; }), ['vam-card-resize', 'vam-card-resize-y', 'vam-card-resize-corner']);
+  assert.deepEqual(renderedSpans(view => { view.integrationMode = true; }), [], 'selection mode keeps its own rule');
+  assert.deepEqual(renderedSpans(view => { view.map.aim = { version: 1 }; }), [], 'AIM keeps its own rule');
+});
+
+test('P6 a clipped card shrinks its summary first, then the cover, and the title last (flex weights)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const shrink = selector => Number(css.match(new RegExp(`^\\.vam-node\\.is-clipped > ${selector.replace(/[.]/g, '\\.')} \\{ flex: 0 ([0-9.]+) auto;`, 'm'))?.[1]);
+  const [p, cover, title] = [shrink('p'), shrink('.vam-card-cover'), shrink('h3')];
+  assert.ok(p > cover && cover > title && title >= 1, `shrink weights p ${p} > cover ${cover} > title ${title} >= 1 (a sum under 1 would also scale the free space down)`);
+  assert.ok(p / cover >= 10 && cover / title >= 10, 'the weights are far apart so the earlier item reaches 0 before the next one gives up much');
+  assert.match(css, /^\.vam-node\.is-clipped > h3, \.vam-node\.is-clipped > p, \.vam-node\.is-clipped > \.vam-card-cover \{ min-height: 0; overflow: hidden; \}/m);
+  assert.doesNotMatch(css, /\.vam-node\.is-clipped \{[^}]*overflow/);
 });

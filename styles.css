@@ -89,7 +89,11 @@
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
 /* Fixed-height cards (card-height). Obsidian's review forbids clip-path (scripts/check-css.mjs), and overflow on the card itself would also cut what is drawn outside its box (the tool row above it, the "+", the handles, the scan line, the shape outline). So a card whose content does not fit (.is-clipped, set by the view and the share viewer after layout, measured with the class off) becomes a flex column and its content children shrink and cut themselves; nothing else changes. The fade and the ellipsis are real elements because ::after is the scan line. */
 .vam-node.is-clipped { display: flex; flex-direction: column; }
-.vam-node.is-clipped > h3, .vam-node.is-clipped > p, .vam-node.is-clipped > .vam-card-cover { flex: 0 1 auto; min-height: 0; overflow: hidden; }
+.vam-node.is-clipped > h3, .vam-node.is-clipped > p, .vam-node.is-clipped > .vam-card-cover { min-height: 0; overflow: hidden; }
+/* Shrink order when the card is short: flex takes the missing height from the items in proportion to weight x size and freezes an item once it reaches 0, so with weights this far apart the summary goes first, then the cover, and the title only at the very end. The title keeps weight 1, not less: a weight sum under 1 would also scale the missing height down. Each item is cut from its own bottom. */
+.vam-node.is-clipped > p { flex: 0 10000 auto; }
+.vam-node.is-clipped > .vam-card-cover { flex: 0 100 auto; }
+.vam-node.is-clipped > h3 { flex: 0 1 auto; }
 .vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
 .vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
 .vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }

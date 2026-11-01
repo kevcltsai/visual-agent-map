@@ -45,8 +45,35 @@ const ISSUE_PAIRS = Object.keys(zhTW).filter(key => key.startsWith('ui.detail_co
   const cn = zhCN[key].split(/\{\d+\}/), tw = zhTW[key].split(/\{\d+\}/);
   return cn.map((piece, index) => [piece, tw[index]]).filter(([a, b]) => a && a !== b);
 });
-// Only the snapshots that quote count issues (the repair-counts prompt of a style file) may use these pairs.
-const ISSUE_BASES = /^service\.task-style-file-sections\.\d+$/;
+// Only the snapshots that quote count issues (the repair-counts prompt of a style file) may use these pairs. The list
+// is exact: service.task-style-file-sections plus the 21 style-file snapshots the prompt-assembler safety net added
+// (commit 3190387: task, quick, synthesize and merge variants, each with its numbered repair-counts prompt). Their
+// repair-counts line has the same shape as the original one. Decompose has no count repair, so it is not listed.
+const ISSUE_BASE_LIST = new Set([
+  'service.merge-style-file-callout-map.2',
+  'service.merge-style-file-callouts-placed.2',
+  'service.merge-style-file-format-off.2',
+  'service.merge-style-file-sections.2',
+  'service.merge-style-file-tables-off.2',
+  'service.quick-style-file-callout-map.2',
+  'service.quick-style-file-callouts-placed.2',
+  'service.quick-style-file-format-off.2',
+  'service.quick-style-file-sections.2',
+  'service.quick-style-file-tables-off.2',
+  'service.synthesize-style-file-callout-map.2',
+  'service.synthesize-style-file-callouts-placed.2',
+  'service.synthesize-style-file-format-off.2',
+  'service.synthesize-style-file-sections.2',
+  'service.synthesize-style-file-tables-off.2',
+  'service.task-style-file-callout-all-off.2',
+  'service.task-style-file-callout-map-placed.2',
+  'service.task-style-file-callouts-placed.2',
+  'service.task-style-file-highlight-off.2',
+  'service.task-style-file-sections.2',
+  'service.task-style-file-tables-off.2',
+  'service.task-style-file-tasks-off.2'
+]);
+const ISSUE_BASES = { test: base => ISSUE_BASE_LIST.has(base) };
 const pairsFor = base => (ISSUE_BASES.test(base) ? [...dictionaryPairs, ...ISSUE_PAIRS] : dictionaryPairs).sort((a, b) => b[0].length - a[0].length);
 const toTraditional = (text, base) => {
   let result = text;
@@ -95,14 +122,17 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 28 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 86 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
-  assert.equal(lines.length, 28); // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction + the four note style file prompts + the note style callout map prompt
+  // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction + the four note style file prompts + the note style callout map prompt = 28
+  // at 49c1005; + 58 lines in the 58 snapshot files the prompt-assembler safety net added (3190387, none of them existed
+  // at 49c1005; no earlier hit moved) = 86.
+  assert.equal(lines.length, 86);
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 28 output-language sentences and 28 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 86 output-language sentences and 79 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -110,5 +140,7 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 28 outp
   }
   for (const file of fs.readdirSync(directory).filter(name => /\.zh(\.\d+)?\.txt$/.test(name)))
     assert.equal(fs.readFileSync(path.join(directory, file), 'utf8').includes('固定標題必須逐字'), false, `${file}: zh-TW has no clause`);
-  assert.deepEqual(total, { rules: 28, clauses: 28 });
+  // 28 and 28 at 49c1005; the 58 snapshots added by 3190387 bring 58 more sentences and 51 more clauses (the 7 decompose
+  // snapshots have the sentence but no detail structure, so no clause).
+  assert.deepEqual(total, { rules: 86, clauses: 79 });
 });

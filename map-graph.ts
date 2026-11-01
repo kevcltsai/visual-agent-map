@@ -8,6 +8,8 @@ export interface MapNode {
   collapsed: boolean;
   /** Custom card width in canvas units; absent means the standard CARD_WIDTH. Only 200-560 values other than 280 are stored. */
   width?: number;
+  /** Custom card height in canvas units; absent means "as tall as the content". Any value in 80-720 is stored (there is no default to compare against). */
+  height?: number;
   /** This branch's own arrangement, instead of the map's; only right, left, down and up are stored (decision D9). */
   layout?: { direction: "right" | "left" | "down" | "up" };
   aimKind?: AimNodeKind;
@@ -34,6 +36,17 @@ export const CARD_WIDTH_STEP = 40;
 export function clampCardWidth(value: unknown): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
   return Math.min(CARD_WIDTH_MAX, Math.max(CARD_WIDTH_MIN, Math.round(value)));
+}
+
+/** The range a user can resize a card's height to, in canvas units. There is no standard height: absent means fit the content. */
+export const CARD_HEIGHT_MIN = 80;
+export const CARD_HEIGHT_MAX = 720;
+export const CARD_HEIGHT_STEP = 40;
+
+/** Rounds and clamps a height into the allowed range; undefined for anything that is not a finite number. */
+export function clampCardHeight(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(CARD_HEIGHT_MAX, Math.max(CARD_HEIGHT_MIN, Math.round(value)));
 }
 
 export function parentIdsForNode(node: MapNode): string[] {

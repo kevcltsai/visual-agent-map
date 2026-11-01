@@ -114,3 +114,24 @@ test('card-style export: a styled card and edge carry size, weight and widths; a
   const hostile = ex.buildMapSvg({ ...base, cards: [{ ...card, titleSize: '9" onload="x', titleWeight: NaN, strokeWidth: Infinity }], edges: [{ d: 'M 0 0 L 5 5', width: 'x' }] });
   assert.ok(!hostile.includes('onload') && hostile.includes('font-size="13"') && hostile.includes('stroke-width="1.5"'));
 });
+
+test('card-height export: a clipped card ends its last drawn line with an ellipsis; a scene without clipped is byte-identical', () => {
+  const lines = ['one', 'two', 'three', 'four', 'five'];
+  const card = { x: 0, y: 0, w: 200, h: 60, title: lines };
+  const before = ex.buildMapSvg({ ...base, cards: [card] });
+  assert.equal(ex.buildMapSvg({ ...base, cards: [{ ...card, clipped: false }] }), before, 'clipped false changes nothing');
+  assert.equal(ex.buildMapSvg({ ...base, cards: [{ ...card, clipped: 'yes' }] }), before, 'only the boolean true counts');
+  assert.ok(!before.includes('…'));
+  const svg = ex.buildMapSvg({ ...base, cards: [{ ...card, clipped: true }] });
+  const drawn = [...svg.matchAll(/<text [^>]*font-size="13"[^>]*>([^<]*)<\/text>/g)].map(m => m[1]).filter(text => lines.some(line => text.startsWith(line)));
+  assert.deepEqual(drawn, ['one', 'two…'], 'a 60px card fits two lines and only the last drawn one is marked');
+  assert.ok(!svg.includes('three') && !svg.includes('four'), 'the cut lines are not drawn');
+  assertSafe(svg);
+});
+
+test('card-height export: a clipped card whose lines all fit still ends with an ellipsis (the cut text is the summary); an empty title draws nothing', () => {
+  const svg = ex.buildMapSvg({ ...base, cards: [{ x: 0, y: 0, w: 200, h: 200, title: ['short'], clipped: true }] });
+  assert.match(svg, />short…</);
+  const none = ex.buildMapSvg({ ...base, cards: [{ x: 0, y: 0, w: 200, h: 200, title: [], clipped: true }] });
+  assert.ok(!none.includes('…'));
+});

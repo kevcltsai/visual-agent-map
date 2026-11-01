@@ -307,6 +307,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.aim_research_not_generated": "这个回答尚未产生研究子议题。",
   "ui.aim_retry_subtopics": "重新产生子议题",
   "ui.card_resize_label": "卡片宽度",
+  "ui.card_height_label": "卡片高度",
   "ui.codex_allowance_notice": "Codex 额度提醒",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
     "VAM 会通过你当前登录的 Codex 账号运行 AI 任务，并使用该账号的 Codex 使用额度。可用额度与限制依你的 ChatGPT 方案而定。",

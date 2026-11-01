@@ -169,7 +169,17 @@ import {
   type TopicRelationKind,
   visibleNodes
 } from "../../map-model";
-import { CARD_WIDTH, CARD_WIDTH_MAX, CARD_WIDTH_MIN, CARD_WIDTH_STEP, clampCardWidth } from "../../map-graph";
+import {
+  CARD_HEIGHT_MAX,
+  CARD_HEIGHT_MIN,
+  CARD_HEIGHT_STEP,
+  CARD_WIDTH,
+  CARD_WIDTH_MAX,
+  CARD_WIDTH_MIN,
+  CARD_WIDTH_STEP,
+  clampCardHeight,
+  clampCardWidth
+} from "../../map-graph";
 import {
   arrangeNewBranch,
   arrangeNewTree,
@@ -1004,6 +1014,8 @@ export class VisualAgentMapView extends ItemView {
   private focusNodeId: string | null = null;
   /** After a render, the resize handle of this card takes focus back (keyboard resizing rebuilds the canvas). */
   private focusResizeNodeId: string | null = null;
+  /** Which of the card's two splitters takes the focus back: the width one (right edge) or the height one (bottom edge). */
+  private focusResizeAxis: "width" | "height" = "width";
   /** Space held down: a drag pans the map even while selecting topics. */
   private spaceHeld = false;
   /** The single card in the tab order (roving tabindex); arrows move between the rest. */
@@ -1013,6 +1025,8 @@ export class VisualAgentMapView extends ItemView {
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
   private cardHeightOf = (id: string): number | undefined =>
     this.cardEls.get(id)?.offsetHeight ||
+    // card-height: a card that is not drawn yet is as tall as the user set it, before the median guess.
+    this.map?.nodes.find(node => node.id === id)?.height ||
     // A text node is no card: its own rendered height, or the default while it is not drawn yet.
     (this.isTextId(id)
       ? this.textEls.get(id)?.offsetHeight || TEXT_NODE_HEIGHT
@@ -8687,6 +8701,8 @@ export class VisualAgentMapView extends ItemView {
         textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
         accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
       };
+      // card-height: only a fixed-height card that cuts its content says so, so a map without heights exports unchanged.
+      if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
       // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
@@ -9265,9 +9281,13 @@ export class VisualAgentMapView extends ItemView {
     }
     const focusedCard = activeDocument.activeElement?.closest<HTMLElement>(".vam-node");
     if (focusedCard && this.contentEl.contains(focusedCard)) {
-      if (activeDocument.activeElement?.classList.contains("vam-card-resize"))
-        this.focusResizeNodeId ??= focusedCard.dataset.nodeId ?? null;
-      else this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
+      const focused = activeDocument.activeElement;
+      if (focused?.classList.contains("vam-card-resize") || focused?.classList.contains("vam-card-resize-y")) {
+        if (!this.focusResizeNodeId) {
+          this.focusResizeNodeId = focusedCard.dataset.nodeId ?? null;
+          this.focusResizeAxis = focused.classList.contains("vam-card-resize-y") ? "height" : "width";
+        }
+      } else this.focusNodeId ??= focusedCard.dataset.nodeId ?? null;
     }
     const restoreRelevanceFocus = this.keepRelevanceBarFocus();
     const restoreChatFocus = this.detachMapChat();
@@ -9625,7 +9645,9 @@ export class VisualAgentMapView extends ItemView {
       this.restoringFocus = true;
       try {
         this.stageEl
-          .querySelector<HTMLElement>(`[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .vam-card-resize`)
+          .querySelector<HTMLElement>(
+            `[data-node-id="${CSS.escape(this.focusResizeNodeId)}"] .${this.focusResizeAxis === "height" ? "vam-card-resize-y" : "vam-card-resize"}`
+          )
           ?.focus({ preventScroll: true });
       } finally {
         this.restoringFocus = false;
@@ -9729,6 +9751,7 @@ export class VisualAgentMapView extends ItemView {
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
+    if (shownNode.height) card.style.height = `${shownNode.height}px`;
     card.tabIndex = node.id === this.tabStopId ? 0 : -1;
     card.addEventListener("dragover", event => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
@@ -10236,8 +10259,12 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     this.enableDrag(card, node);
-    if (!this.integrationMode && !this.presentation && !this.map?.aim && !node.aimKind)
+    // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
+    if (!this.integrationMode && !this.map?.aim && !node.aimKind) {
       this.attachResizeHandle(card, node);
+      this.attachHeightHandle(card, node);
+      this.attachCornerHandle(card, node);
+    }
     card.addEventListener("click", event => {
       if (Date.now() < this.suppressClickUntil) return;
       if ((event.target as Element).closest("button")) return;
@@ -10311,7 +10338,8 @@ export class VisualAgentMapView extends ItemView {
     });
     card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     // Keyboard users reach the hover preview by focusing a card; its tools join the tab order only while it is focused.
-    const toolButtons = (): HTMLElement[] => Array.from(card.querySelectorAll<HTMLElement>("button, .vam-card-resize"));
+    const toolButtons = (): HTMLElement[] =>
+      Array.from(card.querySelectorAll<HTMLElement>("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", event => {
       for (const button of toolButtons()) button.tabIndex = 0;
       if (
@@ -10332,6 +10360,7 @@ export class VisualAgentMapView extends ItemView {
       for (const button of toolButtons()) button.tabIndex = -1;
       this.hideHoverCardSoon();
     });
+    if (shownNode.height) this.ensureClipParts(card);
     this.fitKindShape(card, kind);
   }
   /**
@@ -10341,9 +10370,58 @@ export class VisualAgentMapView extends ItemView {
    * left with the stylesheet's fallback padding and fitted by the next resize.
    */
   private fitKindShape(card: HTMLElement, kind: TopicKind): void {
+    this.fitKindShapeBody(card, kind);
+    this.refreshCardHeightState(card);
+  }
+  /**
+   * Called after every fit (so after every render and text change, when the card is laid out): a card with a set height is
+   * marked .is-clipped while its content does not fit (the fade and the ellipsis show), and a card without one tells the
+   * height handle its real height, which only exists once it is laid out.
+   */
+  private refreshCardHeightState(card: HTMLElement): void {
+    const node = this.map?.nodes.find(item => item.id === card.dataset?.nodeId);
+    if (!node) return;
+    // A card that loses its height is rebuilt by the repaint, so only a set height has a state to refresh here.
+    if (node.height) this.measureClipped(card);
+    else if (card.offsetHeight)
+      card
+        .querySelector<HTMLElement>(".vam-card-resize-y")
+        ?.setAttribute("aria-valuenow", String(clampCardHeight(card.offsetHeight)));
+  }
+  /**
+   * Whether a fixed-height card cuts its content. The clipped layout shrinks the content to fit, so the check runs with
+   * the class off (the card then overflows by the hidden part) and puts it back when it does.
+   */
+  private measureClipped(card: HTMLElement): boolean {
+    card.toggleClass("is-clipped", false);
+    const clipped = card.scrollHeight > card.clientHeight + 1;
+    card.toggleClass("is-clipped", clipped);
+    return clipped;
+  }
+  private markClipped(card: HTMLElement, fixed: boolean): void {
+    if (fixed) this.measureClipped(card);
+    else card.toggleClass("is-clipped", false);
+  }
+  /** The fade and the ellipsis of a fixed-height card are real elements (the card's ::after is the running scan line). */
+  private ensureClipParts(card: HTMLElement): void {
+    if (card.querySelector(":scope > .vam-card-fade")) return;
+    card.createSpan({ cls: "vam-card-fade", attr: { "aria-hidden": "true" } });
+    card.createSpan({ cls: "vam-card-more", text: "…", attr: { "aria-hidden": "true" } });
+  }
+  private fitKindShapeBody(card: HTMLElement, kind: TopicKind): void {
     if (!hasSvgShape(kind)) return;
     const width = card.offsetWidth;
     if (!width) return;
+    // A set height must not feed the measure below: the padding follows the text's natural height.
+    const fixedHeight = card.style.height;
+    if (fixedHeight) card.style.removeProperty("height");
+    try {
+      this.fitKindShapePadding(card, kind, width);
+    } finally {
+      if (fixedHeight) card.style.height = fixedHeight;
+    }
+  }
+  private fitKindShapePadding(card: HTMLElement, kind: TopicKind, width: number): void {
     const sides = shapeInsets(kind, { width, height: 0 });
     card.style.padding = `0 ${sides.right}px 0 ${sides.left}px`;
     const height = card.clientHeight;
@@ -16922,10 +17000,11 @@ export class VisualAgentMapView extends ItemView {
     sync(widthOf());
     const commit = (width: number | undefined): void => {
       this.focusResizeNodeId = node.id;
-      this.enqueue(() => this.resizeCard(node.id, width));
+      this.focusResizeAxis = "width";
+      this.enqueue(() => this.resizeCard(node.id, { width }));
     };
     handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       // The card's own pointerdown starts a move; the handle only resizes.
       event.stopPropagation();
       event.preventDefault();
@@ -16974,11 +17053,13 @@ export class VisualAgentMapView extends ItemView {
     });
     handle.addEventListener("click", event => event.stopPropagation());
     handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       if (widthOf() !== CARD_WIDTH) commit(undefined);
     });
     handle.addEventListener("keydown", event => {
+      if (this.presentation) return;
       const current = widthOf();
       let next: number | undefined | null = null;
       if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
@@ -16994,15 +17075,231 @@ export class VisualAgentMapView extends ItemView {
       commit(width === CARD_WIDTH ? undefined : width);
     });
   }
-  /** Sets (or, with undefined, clears) one card's custom width as one undo step. */
-  private async resizeCard(id: string, width: number | undefined): Promise<void> {
+  /**
+   * Sets (or, with undefined, clears) one card's custom width and/or height as one undo step. Only the keys present change,
+   * so a horizontal-only corner drag never writes a height.
+   */
+  private async resizeCard(
+    id: string,
+    change: { width?: number | undefined; height?: number | undefined }
+  ): Promise<void> {
     if (!this.map?.nodes.some(node => node.id === id)) return;
     await this.mapChange(map => {
       const node = map.nodes.find(item => item.id === id);
       if (!node) return;
-      if (width === undefined || width === CARD_WIDTH) delete node.width;
-      else node.width = clampCardWidth(width);
+      if ("width" in change) {
+        if (change.width === undefined || change.width === CARD_WIDTH) delete node.width;
+        else node.width = clampCardWidth(change.width);
+      }
+      if ("height" in change) {
+        const height = change.height === undefined ? undefined : clampCardHeight(change.height);
+        if (height === undefined) delete node.height;
+        else node.height = height;
+      }
     }, false);
+  }
+  /**
+   * The height handle on a card's bottom edge, also an ARIA (horizontal) splitter. It behaves like the width handle: a drag
+   * writes once on release, Up/Down step by CARD_HEIGHT_STEP, Home/End jump to the limits, Enter or a double click goes
+   * back to "as tall as the content" (the field is removed). Without a set height the value is the card's real height,
+   * read when the handle is used (a card may not be laid out yet at render).
+   */
+  private attachHeightHandle(card: HTMLElement, node: MapNode): void {
+    const handle = card.createSpan({
+      cls: "vam-card-resize-y",
+      attr: {
+        role: "separator",
+        "aria-orientation": "horizontal",
+        "aria-label": t("ui.card_height_label"),
+        "aria-valuemin": String(CARD_HEIGHT_MIN),
+        "aria-valuemax": String(CARD_HEIGHT_MAX)
+      }
+    });
+    const setHeight = (): number | undefined => this.map?.nodes.find(item => item.id === node.id)?.height;
+    const heightOf = (): number => setHeight() ?? clampCardHeight(card.offsetHeight) ?? CARD_HEIGHT_MIN;
+    const sync = (height: number): void => handle.setAttr("aria-valuenow", String(height));
+    handle.tabIndex = -1;
+    const known = setHeight() ?? (card.offsetHeight ? heightOf() : undefined);
+    if (known !== undefined) sync(known);
+    handle.addEventListener("focus", () => sync(heightOf()));
+    const commit = (height: number | undefined): void => {
+      this.focusResizeNodeId = node.id;
+      this.focusResizeAxis = "height";
+      this.enqueue(() => this.resizeCard(node.id, { height }));
+    };
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.map || this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      this.clearHoverTimer();
+      this.hoverCard?.remove();
+      this.hoverCard = null;
+      const startY = event.clientY,
+        zoom = this.map.viewport.zoom || 1,
+        before = setHeight(),
+        from = heightOf();
+      let height = from,
+        done = false;
+      handle.setPointerCapture?.(event.pointerId);
+      const show = (): void => {
+        if (height === from && before === undefined) card.style.removeProperty("height");
+        else {
+          card.style.height = `${height}px`;
+          this.ensureClipParts(card);
+        }
+        this.markClipped(card, card.style.height !== "");
+        sync(height);
+      };
+      const move = (e: PointerEvent): void => {
+        height = clampCardHeight(from + (e.clientY - startY) / zoom) ?? from;
+        show();
+      };
+      const settle = (): void => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        height = from;
+        if (before === undefined) card.style.removeProperty("height");
+        else card.style.height = `${before}px`;
+        this.markClipped(card, before !== undefined);
+        sync(from);
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        if (height === from) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        commit(height);
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", event => event.stopPropagation());
+    handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      if (setHeight() !== undefined) commit(undefined);
+    });
+    handle.addEventListener("keydown", event => {
+      if (this.presentation) return;
+      const current = heightOf();
+      let next: number | undefined | null = null;
+      if (event.key === "ArrowDown") next = current + CARD_HEIGHT_STEP;
+      else if (event.key === "ArrowUp") next = current - CARD_HEIGHT_STEP;
+      else if (event.key === "Home") next = CARD_HEIGHT_MIN;
+      else if (event.key === "End") next = CARD_HEIGHT_MAX;
+      else if (event.key === "Enter") next = undefined;
+      else return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (next === undefined) {
+        if (setHeight() !== undefined) commit(undefined);
+        return;
+      }
+      const height = clampCardHeight(next) ?? current;
+      if (height === current) return;
+      commit(height);
+    });
+  }
+  /**
+   * The corner handle (bottom right): a mouse-only shortcut that drags width and height together and writes once on
+   * release (one undo step). It is not in the tab order (the two splitters are the keyboard way) and the screen reader skips it.
+   * Only the dimension that changed is written; a double click clears both.
+   */
+  private attachCornerHandle(card: HTMLElement, node: MapNode): void {
+    const handle = card.createSpan({ cls: "vam-card-resize-corner", attr: { "aria-hidden": "true" } });
+    const nodeNow = (): MapNode | undefined => this.map?.nodes.find(item => item.id === node.id);
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !this.map || this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      this.clearHoverTimer();
+      this.hoverCard?.remove();
+      this.hoverCard = null;
+      const startX = event.clientX,
+        startY = event.clientY,
+        zoom = this.map.viewport.zoom || 1,
+        beforeWidth = nodeNow()?.width,
+        beforeHeight = nodeNow()?.height,
+        fromWidth = beforeWidth ?? CARD_WIDTH,
+        fromHeight = beforeHeight ?? clampCardHeight(card.offsetHeight) ?? CARD_HEIGHT_MIN;
+      let width = fromWidth,
+        height = fromHeight,
+        done = false;
+      handle.setPointerCapture?.(event.pointerId);
+      const paint = (): void => {
+        if (width === fromWidth && beforeWidth === undefined) card.style.removeProperty("width");
+        else card.style.width = `${width}px`;
+        if (height === fromHeight && beforeHeight === undefined) card.style.removeProperty("height");
+        else {
+          card.style.height = `${height}px`;
+          this.ensureClipParts(card);
+        }
+        this.markClipped(card, card.style.height !== "");
+      };
+      const move = (e: PointerEvent): void => {
+        width = clampCardWidth(fromWidth + (e.clientX - startX) / zoom) ?? fromWidth;
+        height = clampCardHeight(fromHeight + (e.clientY - startY) / zoom) ?? fromHeight;
+        paint();
+      };
+      const settle = (): void => {
+        done = true;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", cancel);
+        handle.removeEventListener("lostpointercapture", cancel);
+      };
+      const restore = (): void => {
+        width = fromWidth;
+        height = fromHeight;
+        paint();
+      };
+      const up = (): void => {
+        if (done) return;
+        settle();
+        const change: { width?: number | undefined; height?: number | undefined } = {};
+        if (width !== fromWidth) change.width = width === CARD_WIDTH ? undefined : width;
+        if (height !== fromHeight) change.height = height;
+        if (!("width" in change) && !("height" in change)) return restore();
+        this.suppressClickUntil = Date.now() + 250;
+        this.focusResizeNodeId = null;
+        this.enqueue(() => this.resizeCard(node.id, change));
+      };
+      const cancel = (): void => {
+        if (done) return;
+        settle();
+        restore();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", cancel);
+      handle.addEventListener("lostpointercapture", cancel);
+    });
+    handle.addEventListener("click", event => event.stopPropagation());
+    handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const current = nodeNow();
+      const change: { width?: undefined; height?: undefined } = {};
+      if (current?.width !== undefined) change.width = undefined;
+      if (current?.height !== undefined) change.height = undefined;
+      if (!("width" in change) && !("height" in change)) return;
+      this.focusResizeNodeId = null;
+      this.enqueue(() => this.resizeCard(node.id, change));
+    });
   }
   private enableDrag(card: HTMLElement, node: MapNode): void {
     card.addEventListener("pointerdown", event => {

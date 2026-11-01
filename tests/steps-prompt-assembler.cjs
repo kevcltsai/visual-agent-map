@@ -49,6 +49,7 @@ export { parseTemplateBlock, splitTemplateZones } from "./core/blocks/template-b
 export { detailStructurePrompt, standardTemplate, textbookTemplate } from "./ai/detail-templates";
 export { detailStructure, customDetailStructure, customDetailRule } from "./core/steps/task/fragments";
 export { noteLanguageOf } from "./i18n";
+export { legacyObsidianFormat } from "./ai/note-style-upgrade";
 `);
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 const STEP_CONTEXTS = {
@@ -190,9 +191,10 @@ test('counter 7: selectionFromContext maps a known tone text to its built-in blo
     assert.equal(m.selectionFromContext(base, language).tone.id, 'academic');
     assert.equal(m.selectionFromContext(base, language).tone.body, undefined);
     assert.equal('format' in m.selectionFromContext(base, language), false);
-    assert.equal(m.selectionFromContext(base, language).template.legacyPreferences, undefined);
+    // P2: the old note style switches no longer ride on the selection (they are written into the block by the upgrade).
+    assert.equal('legacyPreferences' in m.selectionFromContext(base, language).template, false);
     const noteStyle = { callouts: 'placed', diagrams: false, tables: true, tasks: true, highlight: true };
-    assert.deepEqual(m.selectionFromContext({ ...base, noteStyle }, language).template.legacyPreferences, noteStyle);
+    assert.deepEqual(m.selectionFromContext({ ...base, noteStyle }, language), m.selectionFromContext(base, language));
     assert.equal(m.selectionFromContext({ ...base, detailFormat: 'adaptive' }, language).template.adaptive, true);
   }
 });
@@ -347,8 +349,15 @@ test('charts: the prompt asks for charts exactly when the template text holds a 
     assert.equal(m.assembleTaskPrompt({ ...selection, template: { id: 'standard', body: without } }, 'research', context, language).charts, false, language);
     assert.equal(m.chartsWanted({ ...selection, template: { id: 'standard', body: without } }, context, language), false);
     assert.equal(m.chartsWanted(selection, context, language), true);
-    const off = { ...selection, template: { ...selection.template, legacyPreferences: { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true } } };
-    assert.equal(m.chartsWanted(off, context, language), false, `${language}: diagrams off removes the mermaid line`);
+    // What the old diagrams switch did, as the upgrade writes it: a block whose format zone lacks the mermaid line.
+    const format = m.inLanguage(m.OBSIDIAN_FORMAT, language);
+    const builtin = m.builtinTemplateText('standard', language);
+    assert.ok(builtin.includes(format));
+    const offBody = builtin.replace(format, () => m.legacyObsidianFormat(language, { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true }));
+    assert.ok(!offBody.includes('```mermaid'));
+    const off = { ...selection, template: { id: 'standard', body: offBody } };
+    assert.equal(m.chartsWanted(off, context, language), false, `${language}: a format zone without the mermaid line asks for no chart`);
+    assert.equal(m.assembleTaskPrompt(off, 'research', context, language).charts, false);
   }
 });
 
@@ -429,6 +438,22 @@ test('counter 13 (N1, decision 26): a custom template with a lead and no descrip
   }
 });
 
+test('06 P2 (decision 18): the request\'s own old template in the intro layout keeps the intro structure text next to a block body; a block with a lead and no such template keeps the lead layout', () => {
+  const m = A();
+  const old = { id: 'style:S', name: 'S', layout: 'intro', intro: 'Open with a short guide.', sections: [{ id: 's1', name: 'Story', description: '', role: 'none', aliases: [] }] };
+  const body = 'Open with a short guide.\n\n## Story\n';
+  for (const language of ['en', 'zh-TW']) {
+    const context = { ...base, outputLanguage: language };
+    const selection = { ...m.selectionFromContext(context, language), template: { id: 'style:S', body } };
+    const lead = m.assembleTaskPrompt(selection, 'research', context, language).text;
+    const intro = m.assembleTaskPrompt(selection, 'research', { ...context, detailTemplate: old }, language).text;
+    const sentence = m.detailStructurePrompt(old, language, () => '');
+    assert.ok(intro.includes(sentence) && sentence.includes('Open with a short guide.'), `${language}: the intro structure text`);
+    assert.ok(!lead.includes(sentence), `${language}: a lead block has the lead layout`);
+    assert.notEqual(intro, lead);
+  }
+});
+
 // Ticket 05: a template block that cannot be read falls back to the built-in one and is reported with its line.
 const STEPS = ['research', 'quick', 'decompose', 'synthesize', 'merge'];
 
@@ -459,7 +484,7 @@ test('05 counter 1: a broken body of a built-in id gives the built-in text byte 
   }
 });
 
-test('05 counter 2: a broken body of a non-built-in id falls back to standard and keeps adaptive and the old switches', () => {
+test('05 counter 2: a broken body of a non-built-in id falls back to standard and keeps adaptive (the old switches no longer exist: a noteStyle in the context changes nothing)', () => {
   const m = A();
   const noteStyle = { callouts: 'placed', diagrams: false, tables: true, tasks: true, highlight: true };
   for (const language of LANGUAGES) {
@@ -471,12 +496,12 @@ test('05 counter 2: a broken body of a non-built-in id falls back to standard an
     assert.equal(got.text, std.text);
     assert.equal(got.issues[0].id, 'uuid-x');
     assert.equal(got.issues[0].fileName, undefined);
-    // the old switches ride on: the same text differs from one without them
+    // the old switches are gone: the same text with and without a noteStyle in the context
     const without = m.assembleTaskPrompt({ ...custom, template: { id: 'uuid-x', body: BROKEN } }, 'research', { ...base, outputLanguage: language }, language);
-    assert.notEqual(without.text, got.text);
+    assert.equal(without.text, got.text);
     // adaptive: no sections text, the adaptive structure text instead
     const adaptive = m.assembleTaskPrompt({ ...custom, template: { ...custom.template, adaptive: true } }, 'research', context, language);
-    const adaptiveStd = m.assembleTaskPrompt({ ...selection, template: { id: 'standard', adaptive: true, legacyPreferences: noteStyle } }, 'research', context, language);
+    const adaptiveStd = m.assembleTaskPrompt({ ...selection, template: { id: 'standard', adaptive: true } }, 'research', context, language);
     assert.equal(adaptive.text, adaptiveStd.text);
     assert.equal(adaptive.issues.length, 1);
     // an old custom template object of the same id is not used either

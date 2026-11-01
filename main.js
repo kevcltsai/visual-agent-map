@@ -8872,18 +8872,6 @@ var headings_verbatim_custom_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\
 // core/steps/_shared/headings-verbatim-custom.en.md
 var headings_verbatim_custom_en_default = "Write the headings exactly as listed above and add no second set of headings; only the content under the headings is written in {{language}}.\n";
 
-// core/steps/_shared/format-preferences.zh.md
-var format_preferences_zh_default = "\u9019\u500B\u98A8\u683C\u4E0D\u4F7F\u7528\uFF1A{{list}}\uFF1B\u4E0B\u5217\u898F\u5247\u8981\u6C42\u9019\u4E9B\u8A9E\u6CD5\u6642\u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF1B\u5176\u4ED6\u9650\u5236\u7167\u5E38\u9069\u7528\u3002\n";
-
-// core/steps/_shared/format-preferences.en.md
-var format_preferences_en_default = "This style does not use: {{list}}; where the rules below ask for this syntax, use a plain list or a #### subheading instead; the other limits still apply.\n";
-
-// core/steps/_shared/format-preferences-placed.zh.md
-var format_preferences_placed_zh_default = "callout \u53EA\u7528\u5728\u98A8\u683C\u6307\u5B9A\u7684\u4F4D\u7F6E\uFF1B\u898F\u5247 5 \u7684\u53EF\u647A\u758A callout \u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\u3002\n";
-
-// core/steps/_shared/format-preferences-placed.en.md
-var format_preferences_placed_en_default = "Use callouts only where the style places them; the foldable callout in rule 5 becomes a plain list or a #### subheading.\n";
-
 // core/steps/_shared/tone.zh.md
 var tone_zh_default = "\u8A9E\u6C23\u898F\u5247\uFF1A\u8A9E\u6C23\u53EA\u6539\u8B8A\u63AA\u8FAD\u8207\u5448\u73FE\u65B9\u5F0F\uFF0C\u7D55\u4E0D\u964D\u4F4E\u4F86\u6E90\u3001\u5F15\u7528\u8207\u6E96\u78BA\u6027\u7684\u8981\u6C42\uFF1B\u5176\u4ED6\u6240\u6709\u898F\u5247\uFF08\u4F86\u6E90\u6A19\u793A\u3001\u5F15\u7528\u3001\u4E8B\u5BE6\u67E5\u6838\u3001JSON \u5951\u7D04\uFF09\u7167\u5E38\u9069\u7528\u3002\n{{tone}}\n";
 
@@ -8959,61 +8947,6 @@ function headingsVerbatim(output, instruction, custom = false, anchor) {
     note: languagePromptName(note, spelled, "plain"),
     language: language2
   });
-}
-var FORMAT_PREFERENCES = { zh: format_preferences_zh_default, en: format_preferences_en_default };
-var FORMAT_PREFERENCES_PLACED = {
-  zh: text2(format_preferences_placed_zh_default),
-  en: text2(format_preferences_placed_en_default)
-};
-var FORMAT_ITEM_NAMES = {
-  zh: ["callout", "\u5716\u8868\uFF08mermaid\uFF09", "\u8868\u683C", "\u5F85\u8FA6\u6E05\u55AE\uFF08- [ ]\uFF09", "\u87A2\u5149\u6A19\u8A18\uFF08==highlight==\uFF09"],
-  en: ["callouts", "diagrams (mermaid)", "tables", "task lists (- [ ])", "highlights (==highlight==)"]
-};
-function applyFormatPreferences(body, language2, preferences) {
-  var _a2;
-  const original = body;
-  if (!preferences) return original;
-  const { callouts, diagrams, tables, tasks, highlight } = preferences;
-  const placed = callouts === "placed";
-  const calloutMap = (_a2 = preferences.calloutMap) != null ? _a2 : {};
-  if (!placed && diagrams && tables && tasks && highlight && !Object.keys(calloutMap).length) return original;
-  const zh = instructionLanguageOf(language2) === "zh";
-  const off = [placed, !diagrams, !tables, !tasks, !highlight];
-  const lines = [];
-  let lastBullet = 0;
-  for (let line of original.split("\n")) {
-    if (line.startsWith("- ")) {
-      if (placed && line.includes("> [!")) continue;
-      const lead = /^- [^`]*`> \[!(summary|warning|question|tip)\]`/.exec(line);
-      const to = lead ? calloutMap[lead[1]] : void 0;
-      if (lead && to === "off") continue;
-      if (lead && to)
-        line = lead[1] === "tip" ? line.replace(zh ? "`> [!tip]` \u6216 `> [!example]`" : "`> [!tip]` or `> [!example]`", `\`> [!${to}]\``) : line.replace(`\`> [!${lead[1]}]\``, `\`> [!${to}]\``);
-      if (!diagrams && line.includes("```mermaid```")) continue;
-      if (!tasks && line.includes("`- [ ]`")) continue;
-      if (!highlight && line.includes("==highlight==")) continue;
-      if (line.includes(zh ? "Markdown \u8868\u683C" : "a Markdown table")) {
-        if (!tables) continue;
-        if (!diagrams) line = line.slice(0, line.indexOf(zh ? "\u8868\u683C\u88E1\u6709" : " When the table holds")).trimEnd();
-      }
-      lines.push(line);
-      lastBullet = lines.length - 1;
-    } else lines.push(line);
-  }
-  if (!off.some(Boolean)) return lines.join("\n");
-  const names3 = FORMAT_ITEM_NAMES[zh ? "zh" : "en"];
-  const list = names3.filter((_, index) => off[index]).join(zh ? "\u3001" : ", ");
-  const sentence = [
-    renderTemplate(inLanguage(FORMAT_PREFERENCES, language2), { list }),
-    placed ? inLanguage(FORMAT_PREFERENCES_PLACED, language2) : ""
-  ].filter(Boolean).join(zh ? "" : " ");
-  if (lastBullet) lines.splice(lastBullet + 1, 0, "", sentence);
-  else {
-    const rest = lines.slice(1).filter((line, index, all) => line || all[index - 1] !== "");
-    lines.splice(1, lines.length - 1, ...rest);
-    lines.splice(2, 0, sentence, "");
-  }
-  return lines.join("\n");
 }
 
 // experiences/coffee-tables/prompt-parts.ts
@@ -24979,35 +24912,6 @@ var guide_en_default3 = '---\ntone: Practical guide\ncallouts: auto\nsummary cal
 
 // ai/note-style-file.ts
 var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
-var OBSIDIAN_CALLOUT_TYPES = /* @__PURE__ */ new Set([
-  "note",
-  "abstract",
-  "summary",
-  "tldr",
-  "info",
-  "todo",
-  "tip",
-  "hint",
-  "important",
-  "success",
-  "check",
-  "done",
-  "question",
-  "help",
-  "faq",
-  "warning",
-  "caution",
-  "attention",
-  "failure",
-  "fail",
-  "missing",
-  "danger",
-  "error",
-  "bug",
-  "example",
-  "quote",
-  "cite"
-]);
 var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
 var CANONICAL_LANGUAGES = ["zh-TW", "zh-CN", "en"];
 function byLanguage(zhTW2, zhCN2, en2) {
@@ -25101,39 +25005,7 @@ var issue = (line, code, message, ...values) => ({
   values,
   message
 });
-var FRONTMATTER_KEYS = {
-  \u8A9E\u6C23: "tone",
-  \u8BED\u6C14: "tone",
-  tone: "tone",
-  \u65B9\u6846: "callouts",
-  callouts: "callouts",
-  \u5716\u8868: "diagrams",
-  \u56FE\u8868: "diagrams",
-  diagrams: "diagrams",
-  \u8868\u683C: "tables",
-  tables: "tables",
-  \u5F85\u8FA6\u6E05\u55AE: "tasks",
-  \u5F85\u529E\u6E05\u5355: "tasks",
-  tasks: "tasks",
-  \u87A2\u5149\u6A19\u8A18: "highlight",
-  \u8367\u5149\u6807\u8BB0: "highlight",
-  highlight: "highlight"
-};
-var CALLOUT_KEYS = {
-  \u7D50\u8AD6\u65B9\u6846: "summary",
-  \u7ED3\u8BBA\u65B9\u6846: "summary",
-  "summary callout": "summary",
-  \u98A8\u96AA\u65B9\u6846: "warning",
-  \u98CE\u9669\u65B9\u6846: "warning",
-  "risk callout": "warning",
-  \u554F\u984C\u65B9\u6846: "question",
-  \u95EE\u9898\u65B9\u6846: "question",
-  "question callout": "question",
-  \u6280\u5DE7\u65B9\u6846: "tip",
-  "tip callout": "tip"
-};
-var ON = /* @__PURE__ */ new Set(["\u958B", "\u5F00", "on", "true"]);
-var OFF = /* @__PURE__ */ new Set(["\u95DC", "\u5173", "off", "false"]);
+var TONE_KEYS = /* @__PURE__ */ new Set(["\u8A9E\u6C23", "\u8BED\u6C14", "tone"]);
 var COMMENT_MARK = "%%";
 function stripNoteStyleComments(text11) {
   const lines = text11.split("\n");
@@ -25222,15 +25094,7 @@ function parseNoteStyleFile(text11, options) {
       issue(1, "file_long", `The file is over ${NOTE_STYLE_LIMITS.file} characters.`, NOTE_STYLE_LIMITS.file)
     );
   const lines = all.split("\n");
-  const flags = {
-    callouts: "placed",
-    diagrams: true,
-    tables: true,
-    tasks: true,
-    highlight: true
-  };
-  const calloutMap = {};
-  const calloutSeen = /* @__PURE__ */ new Set();
+  let tone2;
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
     const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
@@ -25243,69 +25107,19 @@ function parseNoteStyleFile(text11, options) {
         const raw = lines[index];
         if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
         const pair6 = /^([^:：]+?)\s*[:：]\s*(.*)$/.exec(raw);
-        if (!pair6) {
-          issues.push(issue(index + 1, "frontmatter_line", `Line ${index + 1} is not "key: value".`));
-          continue;
-        }
-        const keyName = pair6[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
+        if (!pair6 || !TONE_KEYS.has(pair6[1].trim().toLocaleLowerCase().replace(/\s+/g, " "))) continue;
         let value = pair6[2].trim();
         if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
-        const where = index + 1;
-        const calloutField = CALLOUT_KEYS[keyName];
-        if (calloutField) {
-          const lower4 = value.toLocaleLowerCase();
-          if (calloutSeen.has(calloutField))
-            issues.push(
-              issue(where, "key_duplicate", `Line ${where}: "${pair6[1].trim()}" is written twice.`, pair6[1].trim())
-            );
-          else {
-            calloutSeen.add(calloutField);
-            if (OFF.has(lower4)) calloutMap[calloutField] = "off";
-            else if (OBSIDIAN_CALLOUT_TYPES.has(lower4)) {
-              if (lower4 !== calloutField) calloutMap[calloutField] = lower4;
-            } else
-              issues.push(
-                issue(
-                  where,
-                  "value_invalid",
-                  `Line ${where}: "${value}" is not an Obsidian callout type.`,
-                  pair6[1].trim(),
-                  value
-                )
-              );
-          }
-          continue;
-        }
-        const field = FRONTMATTER_KEYS[keyName];
-        if (!field) continue;
-        if (field === "tone") {
-          if (value.length > NOTE_STYLE_LIMITS.tone)
-            issues.push(
-              issue(
-                where,
-                "tone_long",
-                `The tone is over ${NOTE_STYLE_LIMITS.tone} characters.`,
-                NOTE_STYLE_LIMITS.tone
-              )
-            );
-          else flags.tone = value || void 0;
-        } else if (field === "callouts") {
-          const key2 = value.toLocaleLowerCase();
-          if (key2 === "\u81EA\u52D5" || key2 === "\u81EA\u52A8" || key2 === "auto") flags.callouts = "auto";
-          else if (key2 === "\u6307\u5B9A" || key2 === "placed") flags.callouts = "placed";
-          else
-            issues.push(
-              issue(where, "value_invalid", `Line ${where}: "${value}" is not auto or placed.`, pair6[1].trim(), value)
-            );
-        } else {
-          const key2 = value.toLocaleLowerCase();
-          if (ON.has(key2)) flags[field] = true;
-          else if (OFF.has(key2)) flags[field] = false;
-          else
-            issues.push(
-              issue(where, "value_invalid", `Line ${where}: "${value}" is not on or off.`, pair6[1].trim(), value)
-            );
-        }
+        if (value.length > NOTE_STYLE_LIMITS.tone)
+          issues.push(
+            issue(
+              index + 1,
+              "tone_long",
+              `The tone is over ${NOTE_STYLE_LIMITS.tone} characters.`,
+              NOTE_STYLE_LIMITS.tone
+            )
+          );
+        else tone2 = value || void 0;
       }
     }
   }
@@ -25373,13 +25187,7 @@ function parseNoteStyleFile(text11, options) {
     style: {
       id: options.id,
       name: options.name,
-      ...flags.tone ? { tone: flags.tone } : {},
-      callouts: flags.callouts,
-      diagrams: flags.diagrams,
-      tables: flags.tables,
-      tasks: flags.tasks,
-      highlight: flags.highlight,
-      calloutMap,
+      ...tone2 ? { tone: tone2 } : {},
       layout: intro ? "intro" : "sections",
       intro,
       sections,
@@ -25794,8 +25602,7 @@ function selectionFromContext(context, language2) {
   return {
     template: {
       id: templateId,
-      ...context.detailFormat === "adaptive" ? { adaptive: true } : {},
-      ...context.noteStyle ? { legacyPreferences: context.noteStyle } : {}
+      ...context.detailFormat === "adaptive" ? { adaptive: true } : {}
     },
     tone: toneChoiceFromText(context.toneText, language2)
   };
@@ -25841,7 +25648,7 @@ ${rules.join("\n")}` : ""
   };
 }
 function templateParts(selection, context, language2, topicAnchor, options) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const { id } = selection.template;
   const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
   const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
@@ -25882,13 +25689,14 @@ function templateParts(selection, context, language2, topicAnchor, options) {
     );
     return { ...fallback, issues };
   }
-  if (parsed.lead)
+  const introTemplate = legacy && ((_h = context.detailTemplate) == null ? void 0 : _h.layout) === "intro" ? context.detailTemplate : void 0;
+  if (parsed.lead && !introTemplate)
     return {
       ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor),
       format: parsed.format,
       issues: []
     };
-  const template2 = parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
+  const template2 = introTemplate != null ? introTemplate : parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
   return {
     sections: structure2(template2),
     owned: describedSections(template2, language2),
@@ -25896,15 +25704,14 @@ function templateParts(selection, context, language2, topicAnchor, options) {
     issues: []
   };
 }
-var formatText = (parts, selection, language2) => parts.format ? applyFormatPreferences(parts.format, language2, selection.template.legacyPreferences) : "";
 var CHART_BLOCK = "```mermaid";
 function chartsWanted(selection, context, language2, options = {}) {
   const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, language2);
+  return partsAskForCharts(parts, selection);
 }
-function partsAskForCharts(parts, selection, language2) {
+function partsAskForCharts(parts, selection) {
   const sections = selection.template.adaptive ? "" : parts.sections;
-  return sections.includes(CHART_BLOCK) || formatText(parts, selection, language2).includes(CHART_BLOCK);
+  return sections.includes(CHART_BLOCK) || parts.format.includes(CHART_BLOCK);
 }
 var fixed = (text11, id) => [text11, { kind: "fixed", id }];
 var input = (text11, id) => [text11, { kind: "input", id }];
@@ -25949,7 +25756,7 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
       pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
     else pieces.push(sectionPieces(parts, selection.template.id));
     if (readerFacingDetail(context) && step !== "merge") {
-      const text11 = formatText(parts, selection, language2);
+      const text11 = parts.format;
       if (text11)
         pieces.push([[text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
     }
@@ -25993,7 +25800,7 @@ ${context.task}`, "task"));
   return {
     text: segments.map((segment) => segment.text).join(""),
     segments,
-    charts: partsAskForCharts(parts, selection, language2),
+    charts: partsAskForCharts(parts, selection),
     // The decompose step carries no template, so a template that could not be read changes nothing there.
     issues: step === "decompose" ? [] : parts.issues
   };
@@ -26082,6 +25889,18 @@ function backupName(name, now, taken) {
   const takenBases = new Set([...taken].map((item) => stripMd2(item)));
   return `${uniqueBlockName(`${name} ${stamp}`, takenBases)}.md`;
 }
+
+// core/steps/_shared/format-preferences.zh.md
+var format_preferences_zh_default = "\u9019\u500B\u98A8\u683C\u4E0D\u4F7F\u7528\uFF1A{{list}}\uFF1B\u4E0B\u5217\u898F\u5247\u8981\u6C42\u9019\u4E9B\u8A9E\u6CD5\u6642\u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF1B\u5176\u4ED6\u9650\u5236\u7167\u5E38\u9069\u7528\u3002\n";
+
+// core/steps/_shared/format-preferences.en.md
+var format_preferences_en_default = "This style does not use: {{list}}; where the rules below ask for this syntax, use a plain list or a #### subheading instead; the other limits still apply.\n";
+
+// core/steps/_shared/format-preferences-placed.zh.md
+var format_preferences_placed_zh_default = "callout \u53EA\u7528\u5728\u98A8\u683C\u6307\u5B9A\u7684\u4F4D\u7F6E\uFF1B\u898F\u5247 5 \u7684\u53EF\u647A\u758A callout \u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\u3002\n";
+
+// core/steps/_shared/format-preferences-placed.en.md
+var format_preferences_placed_en_default = "Use callouts only where the style places them; the foldable callout in rule 5 becomes a plain list or a #### subheading.\n";
 
 // ai/note-style-upgrade.ts
 var NOTE_STYLE_UPGRADE_VERSION = 1;
@@ -26188,8 +26007,172 @@ function styleFileBody(text11) {
   const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
   return trimBlankLines2(lines.slice(end < 0 ? lines.length : end + 1).join("\n"));
 }
-function formatZone(language2, style) {
-  return trimBlankLines2(applyFormatPreferences(inLanguage(OBSIDIAN_FORMAT, language2), language2, style));
+var OBSIDIAN_CALLOUT_TYPES = /* @__PURE__ */ new Set([
+  "note",
+  "abstract",
+  "summary",
+  "tldr",
+  "info",
+  "todo",
+  "tip",
+  "hint",
+  "important",
+  "success",
+  "check",
+  "done",
+  "question",
+  "help",
+  "faq",
+  "warning",
+  "caution",
+  "attention",
+  "failure",
+  "fail",
+  "missing",
+  "danger",
+  "error",
+  "bug",
+  "example",
+  "quote",
+  "cite"
+]);
+var FORMAT_PREFERENCES = { zh: format_preferences_zh_default, en: format_preferences_en_default };
+var FORMAT_PREFERENCES_PLACED = {
+  zh: renderTemplate(format_preferences_placed_zh_default, {}),
+  en: renderTemplate(format_preferences_placed_en_default, {})
+};
+var FORMAT_ITEM_NAMES = {
+  zh: ["callout", "\u5716\u8868\uFF08mermaid\uFF09", "\u8868\u683C", "\u5F85\u8FA6\u6E05\u55AE\uFF08- [ ]\uFF09", "\u87A2\u5149\u6A19\u8A18\uFF08==highlight==\uFF09"],
+  en: ["callouts", "diagrams (mermaid)", "tables", "task lists (- [ ])", "highlights (==highlight==)"]
+};
+function legacyObsidianFormat(language2, preferences) {
+  return applyFormatPreferences(inLanguage(OBSIDIAN_FORMAT, language2), language2, preferences);
+}
+function applyFormatPreferences(body, language2, preferences) {
+  var _a2;
+  const original = body;
+  if (!preferences) return original;
+  const { callouts, diagrams, tables, tasks, highlight } = preferences;
+  const placed = callouts === "placed";
+  const calloutMap = (_a2 = preferences.calloutMap) != null ? _a2 : {};
+  if (!placed && diagrams && tables && tasks && highlight && !Object.keys(calloutMap).length) return original;
+  const zh = instructionLanguageOf(language2) === "zh";
+  const off = [placed, !diagrams, !tables, !tasks, !highlight];
+  const lines = [];
+  let lastBullet = 0;
+  for (let line of original.split("\n")) {
+    if (line.startsWith("- ")) {
+      if (placed && line.includes("> [!")) continue;
+      const lead = /^- [^`]*`> \[!(summary|warning|question|tip)\]`/.exec(line);
+      const to = lead ? calloutMap[lead[1]] : void 0;
+      if (lead && to === "off") continue;
+      if (lead && to)
+        line = lead[1] === "tip" ? line.replace(zh ? "`> [!tip]` \u6216 `> [!example]`" : "`> [!tip]` or `> [!example]`", `\`> [!${to}]\``) : line.replace(`\`> [!${lead[1]}]\``, `\`> [!${to}]\``);
+      if (!diagrams && line.includes("```mermaid```")) continue;
+      if (!tasks && line.includes("`- [ ]`")) continue;
+      if (!highlight && line.includes("==highlight==")) continue;
+      if (line.includes(zh ? "Markdown \u8868\u683C" : "a Markdown table")) {
+        if (!tables) continue;
+        if (!diagrams) line = line.slice(0, line.indexOf(zh ? "\u8868\u683C\u88E1\u6709" : " When the table holds")).trimEnd();
+      }
+      lines.push(line);
+      lastBullet = lines.length - 1;
+    } else lines.push(line);
+  }
+  if (!off.some(Boolean)) return lines.join("\n");
+  const names3 = FORMAT_ITEM_NAMES[instructionLanguageOf(language2)];
+  const list = names3.filter((_, index) => off[index]).join(zh ? "\u3001" : ", ");
+  const sentence = [
+    renderTemplate(inLanguage(FORMAT_PREFERENCES, language2), { list }),
+    placed ? inLanguage(FORMAT_PREFERENCES_PLACED, language2) : ""
+  ].filter(Boolean).join(zh ? "" : " ");
+  if (lastBullet) lines.splice(lastBullet + 1, 0, "", sentence);
+  else {
+    const rest = lines.slice(1).filter((line, index, all) => line || all[index - 1] !== "");
+    lines.splice(1, lines.length - 1, ...rest);
+    lines.splice(2, 0, sentence, "");
+  }
+  return lines.join("\n");
+}
+var ON = /* @__PURE__ */ new Set(["\u958B", "\u5F00", "on", "true"]);
+var OFF = /* @__PURE__ */ new Set(["\u95DC", "\u5173", "off", "false"]);
+var SWITCH_KEYS = {
+  \u65B9\u6846: "callouts",
+  callouts: "callouts",
+  \u5716\u8868: "diagrams",
+  \u56FE\u8868: "diagrams",
+  diagrams: "diagrams",
+  \u8868\u683C: "tables",
+  tables: "tables",
+  \u5F85\u8FA6\u6E05\u55AE: "tasks",
+  \u5F85\u529E\u6E05\u5355: "tasks",
+  tasks: "tasks",
+  \u87A2\u5149\u6A19\u8A18: "highlight",
+  \u8367\u5149\u6807\u8BB0: "highlight",
+  highlight: "highlight"
+};
+var CALLOUT_KEYS = {
+  \u7D50\u8AD6\u65B9\u6846: "summary",
+  \u7ED3\u8BBA\u65B9\u6846: "summary",
+  "summary callout": "summary",
+  \u98A8\u96AA\u65B9\u6846: "warning",
+  \u98CE\u9669\u65B9\u6846: "warning",
+  "risk callout": "warning",
+  \u554F\u984C\u65B9\u6846: "question",
+  \u95EE\u9898\u65B9\u6846: "question",
+  "question callout": "question",
+  \u6280\u5DE7\u65B9\u6846: "tip",
+  "tip callout": "tip"
+};
+function readLegacyFormatPreferences(text11) {
+  const lines = text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+  const preferences = {
+    callouts: "placed",
+    diagrams: true,
+    tables: true,
+    tasks: true,
+    highlight: true
+  };
+  const calloutMap = {};
+  const seen = /* @__PURE__ */ new Set();
+  if (lines[0].trimEnd() !== "---") return preferences;
+  const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
+  if (end < 0) return void 0;
+  for (let index = 1; index < end; index++) {
+    const raw = lines[index];
+    if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
+    const pair6 = /^([^:：]+?)\s*[:：]\s*(.*)$/.exec(raw);
+    if (!pair6) return void 0;
+    const keyName = pair6[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
+    let value = pair6[2].trim();
+    if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
+    const calloutField = CALLOUT_KEYS[keyName];
+    if (calloutField) {
+      const lowerValue = value.toLocaleLowerCase();
+      if (seen.has(calloutField)) return void 0;
+      seen.add(calloutField);
+      if (OFF.has(lowerValue)) calloutMap[calloutField] = "off";
+      else if (OBSIDIAN_CALLOUT_TYPES.has(lowerValue)) {
+        if (lowerValue !== calloutField) calloutMap[calloutField] = lowerValue;
+      } else return void 0;
+      continue;
+    }
+    const field = SWITCH_KEYS[keyName];
+    if (!field) continue;
+    const key2 = value.toLocaleLowerCase();
+    if (field === "callouts") {
+      if (key2 === "\u81EA\u52D5" || key2 === "\u81EA\u52A8" || key2 === "auto") preferences.callouts = "auto";
+      else if (key2 === "\u6307\u5B9A" || key2 === "placed") preferences.callouts = "placed";
+      else return void 0;
+    } else if (ON.has(key2)) preferences[field] = true;
+    else if (OFF.has(key2)) preferences[field] = false;
+    else return void 0;
+  }
+  if (Object.keys(calloutMap).length) preferences.calloutMap = calloutMap;
+  return preferences;
+}
+function formatZone(language2, preferences) {
+  return trimBlankLines2(legacyObsidianFormat(language2, preferences));
 }
 var templateText = (body, format, language2) => `${body}
 
@@ -26260,7 +26243,12 @@ function planNoteStyleUpgrade(input2) {
       continue;
     }
     const style = parsed.style;
-    const format = formatZone(language2, style);
+    const preferences = readLegacyFormatPreferences(text11);
+    if (!preferences) {
+      skipped2.push(base);
+      continue;
+    }
+    const format = formatZone(language2, preferences);
     const full = templateText(styleFileBody(text11), format, language2);
     const check = parseTemplateBlock(full, { id: fileRef(base), name: base });
     if (!check.ok || check.lead !== style.intro || check.format !== format || check.template.sections.length !== style.sections.length || check.template.sections.some((section3, index) => sectionShape(section3) !== sectionShape(style.sections[index]))) {
@@ -26543,14 +26531,12 @@ var NoteStyleStore = class {
     return copy;
   }
   /**
-   * Fields to spread into a TaskContext: the style snapshot, `styleDiagrams: false` only when the file turns charts off,
-   * and, when the template is the workspace's changed or own block, `styleSelection` (its text, and the tone choice of
-   * `toneText`). A call that names no tone and no language gets what it got before.
+   * Fields to spread into a TaskContext: when the template is the workspace's changed or own block, `styleSelection`
+   * (its text, and the tone choice of `toneText`). A call that names no tone and no language gets what it got before.
    */
   contextFields(template2, toneText, language2) {
     const resolution = this.resolutionOf(template2);
-    const style = resolution == null ? void 0 : resolution.noteStyle;
-    const fields = style ? { noteStyle: style, ...style.diagrams ? {} : { styleDiagrams: false } } : {};
+    const fields = {};
     if (resolution == null ? void 0 : resolution.block)
       fields.styleSelection = {
         template: resolution.block,
@@ -33107,7 +33093,7 @@ var AiTaskService = class {
   chartEligible(input2) {
     var _a2, _b2;
     const language2 = (_a2 = input2.outputLanguage) != null ? _a2 : this.options.language();
-    return !!input2.addCharts && this.diagramsOn() && input2.styleDiagrams !== false && !input2.countRepair && !input2.intermediateDetail && input2.promptProfile !== "aim" && (input2.mode === "task" || input2.mode === "synthesize") && // The template decides: no mermaid block in its sections or format rules, no chart step.
+    return !!input2.addCharts && this.diagramsOn() && !input2.countRepair && !input2.intermediateDetail && input2.promptProfile !== "aim" && (input2.mode === "task" || input2.mode === "synthesize") && // The template decides: no mermaid block in its sections or format rules, no chart step.
     chartsWanted((_b2 = input2.styleSelection) != null ? _b2 : selectionFromContext(input2, language2), input2, language2);
   }
   /**

@@ -177,10 +177,7 @@ export function runToneText(
 /** The style fields of a request that names no style of its own (the workspace default), or the style file that stops it. */
 export type WorkspaceStyleFields =
   | { invalid: NonNullable<StyleResolution["invalid"]> }
-  | ({ invalid?: undefined } & Pick<
-      TaskContext,
-      "detailTemplate" | "toneText" | "noteStyle" | "styleDiagrams" | "styleSelection"
-    >);
+  | ({ invalid?: undefined } & Pick<TaskContext, "detailTemplate" | "toneText" | "styleSelection">);
 
 export function defaultStylesFolderName(language: UiLanguage): string {
   return translate(language, "ui.note_styles_folder_name");
@@ -435,20 +432,16 @@ export class NoteStyleStore {
   }
 
   /**
-   * Fields to spread into a TaskContext: the style snapshot, `styleDiagrams: false` only when the file turns charts off,
-   * and, when the template is the workspace's changed or own block, `styleSelection` (its text, and the tone choice of
-   * `toneText`). A call that names no tone and no language gets what it got before.
+   * Fields to spread into a TaskContext: when the template is the workspace's changed or own block, `styleSelection`
+   * (its text, and the tone choice of `toneText`). A call that names no tone and no language gets what it got before.
    */
   contextFields(
     template: DetailTemplate | undefined,
     toneText?: string,
     language?: ContentLanguage
-  ): { noteStyle?: NoteStyle; styleDiagrams?: false; styleSelection?: StyleSelection } {
+  ): { styleSelection?: StyleSelection } {
     const resolution = this.resolutionOf(template);
-    const style = resolution?.noteStyle;
-    const fields: { noteStyle?: NoteStyle; styleDiagrams?: false; styleSelection?: StyleSelection } = style
-      ? { noteStyle: style, ...(style.diagrams ? {} : { styleDiagrams: false as const }) }
-      : {};
+    const fields: { styleSelection?: StyleSelection } = {};
     if (resolution?.block)
       fields.styleSelection = {
         template: resolution.block,

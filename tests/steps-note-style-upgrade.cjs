@@ -1,6 +1,8 @@
-// Ticket 06 P1: the one-time upgrade of the old note style data (style files, exported templates, custom tone presets,
-// the workspace default) into template and tone blocks. In P1 the old path is still in the code, so every case compares
-// the prompt of the old path (a store that has not upgraded) with the prompt of the upgraded blocks, byte for byte.
+// Ticket 06 P1/P2: the one-time upgrade of the old note style data (style files, exported templates, custom tone presets,
+// the workspace default) into template and tone blocks. From P2 the old switches no longer reach the prompt, so the
+// "old prompt" each case compares with is what the old path sent: the old path's sections with the frozen switch
+// function (applyFormatPreferences, kept in the upgrade module) applied to the built-in format text, and charts off when
+// the file turned diagrams off. The upgraded prompt must equal it byte for byte.
 // Unit and integration level over an in-memory vault; the plugin wiring is covered by one onload check at the end.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,7 +14,7 @@ const S = require('./support.cjs');
 const M = loadSource(`
 export * from "./ai/note-style-store";
 export * from "./ai/note-style-file";
-export { planNoteStyleUpgrade, normalizeNoteStyleAliases } from "./ai/note-style-upgrade";
+export { planNoteStyleUpgrade, normalizeNoteStyleAliases, readLegacyFormatPreferences, legacyObsidianFormat } from "./ai/note-style-upgrade";
 export { normalizeTemplates } from "./ai/detail-templates";
 export { previewPrompt, sampleTaskContext, PREVIEW_STEPS } from "./core/blocks/prompt-preview";
 export { parseTemplateBlock } from "./core/blocks/template-block";
@@ -84,6 +86,19 @@ function promptsOf(store, language, scenario) {
   const context = { ...M.sampleTaskContext('research', language, fields), addCharts: true };
   return { prompts, charts: service.chartEligible(context), resolved, fields };
 }
+/**
+ * What the old path sent for a scenario: the prompts of a store that has not upgraded (the file's sections and tone), with
+ * the built-in format text replaced by the frozen switches applied to it, and the chart answer ANDed with the file's
+ * diagrams switch (the old `styleDiagrams` gate).
+ */
+function oldPromptsOf(w, language, scenario) {
+  const got = promptsOf(w.store, language, scenario);
+  const file = got.resolved.fileName && w.v.files[`${FOLDER}/${got.resolved.fileName}`];
+  const preferences = file ? M.readLegacyFormatPreferences(file) : undefined;
+  if (!preferences) return got;
+  const plainFormat = M.inLanguage(M.OBSIDIAN_FORMAT, language), switched = M.legacyObsidianFormat(language, preferences);
+  return { ...got, prompts: got.prompts.map(prompt => prompt.replace(plainFormat, () => switched)), charts: preferences.diagrams && got.charts };
+}
 const SCENARIOS = {
   map: { levels: [{}, {}, { template: 'style:S' }], ids: [undefined, undefined, undefined] },
   'map with its tone': { levels: [{}, {}, { template: 'style:S', tone: 'plain' }], ids: [undefined, undefined, 'plain'] },
@@ -102,7 +117,7 @@ async function compareStyleFile(text, language, label, scenarios = SCENARIOS, pa
     const result = await after.store.upgradeLegacy();
     assert.equal(result.status, 'done', label);
     await after.store.refresh();
-    const old = promptsOf(before.store, language, scenario);
+    const old = oldPromptsOf(before, language, scenario);
     const upgraded = promptsOf(after.store, language, scenario);
     assert.ok(old.resolved.noteStyle, `${label}/${name}: the old path read the file`);
     assert.ok(upgraded.resolved.block && !upgraded.resolved.noteStyle, `${label}/${name}: the upgraded run uses a block`);
@@ -126,7 +141,8 @@ test('charts off: chartsWanted is false before and after the upgrade (the format
     const after = world({ language }, { 'S.md': fixture('charts-off.md') });
     await after.store.upgradeLegacy();
     await after.store.refresh();
-    for (const w of [before, after]) assert.equal(promptsOf(w.store, language, SCENARIOS.map).charts, false, language);
+    assert.equal(oldPromptsOf(before, language, SCENARIOS.map).charts, false, language);
+    assert.equal(promptsOf(after.store, language, SCENARIOS.map).charts, false, language);
     const block = Object.values(inDir(after.v, dirs(language).template))[0];
     assert.ok(!block.includes('```mermaid'));
   }
@@ -153,7 +169,7 @@ test('counter 3: diagrams off but the user\'s own section holds a mermaid block:
   const after = world({ language: 'en' }, { 'S.md': text });
   await after.store.upgradeLegacy();
   await after.store.refresh();
-  assert.equal(promptsOf(before.store, 'en', SCENARIOS.map).charts, false);
+  assert.equal(oldPromptsOf(before, 'en', SCENARIOS.map).charts, false);
   assert.equal(promptsOf(after.store, 'en', SCENARIOS.map).charts, true);
 });
 
@@ -177,7 +193,7 @@ test('counter 5: the format zone is written in the interface language of the upg
   const after = world({ language: 'zh-TW' }, { 'S.md': text });
   await after.store.upgradeLegacy();
   await after.store.refresh();
-  const old = promptsOf(before.store, 'en', SCENARIOS.map).prompts[0];
+  const old = oldPromptsOf(before, 'en', SCENARIOS.map).prompts[0];
   const upgraded = promptsOf(after.store, 'en', SCENARIOS.map).prompts[0];
   const zhFormat = M.inLanguage(M.OBSIDIAN_FORMAT, 'zh-TW');
   assert.ok(upgraded.includes('Markdown 表格') || upgraded.includes(zhFormat.split('\n')[0]), 'the zone stays zh');
@@ -196,7 +212,7 @@ test('counter 6 and 7: a file with no tone gives no tone even when the workspace
     await after.store.upgradeLegacy();
     await after.store.refresh();
     for (const [name, scenario] of Object.entries(scenarios)) {
-      const old = promptsOf(before.store, language, scenario), upgraded = promptsOf(after.store, language, scenario);
+      const old = oldPromptsOf(before, language, scenario), upgraded = promptsOf(after.store, language, scenario);
       assert.deepEqual(upgraded.prompts, old.prompts, `${language} ${name}`);
     }
     assert.equal(after.store.toneTextFor(after.store.resolve(SCENARIOS.map.levels).template, [undefined, undefined, undefined], language), undefined);
@@ -221,7 +237,7 @@ test('intro layout (locked): a file with a lead-in becomes a block with a lead; 
   const after = world({ language: 'en' }, { 'S.md': text });
   await after.store.upgradeLegacy();
   await after.store.refresh();
-  const old = promptsOf(before.store, 'en', SCENARIOS.map).prompts[0], upgraded = promptsOf(after.store, 'en', SCENARIOS.map).prompts[0];
+  const old = oldPromptsOf(before, 'en', SCENARIOS.map).prompts[0], upgraded = promptsOf(after.store, 'en', SCENARIOS.map).prompts[0];
   assert.match(old, /lead-in paragraphs with no heading/);
   assert.ok(upgraded.includes('先用 2–4 段導讀\n帶讀者進入主題。'));
   assert.doesNotMatch(upgraded, /lead-in paragraphs with no heading/);
@@ -299,7 +315,7 @@ test('failure: a write that fails at any step sets no marker, changes no key, tr
   const scenario = { levels: [{}, {}, { template: 'style:table-off' }], ids: [undefined, undefined, undefined] };
   const reference = world({ language: 'en', promptPresets: EDITS.presets, defaultNoteStyleId: 'style:table-off' }, EDITS.files);
   await reference.store.refresh();
-  const wanted = promptsOf(reference.store, 'en', scenario).prompts;
+  const wanted = oldPromptsOf(reference, 'en', scenario).prompts;
   const modes = [...Array(totalCreates).keys()].map(index => ({ failCreateAt: index + 1 })).concat([{ failSave: true }]);
   for (const mode of modes) {
     const w = world({ language: 'en', promptPresets: EDITS.presets, defaultNoteStyleId: 'style:table-off' }, EDITS.files);
@@ -402,7 +418,7 @@ test('workspace default: the old default becomes the new keys and the workspace 
     assert.equal(after.settings.noteTemplateBlock, item.template, JSON.stringify(item.patch));
     assert.equal(after.settings.noteToneBlock, item.tone, JSON.stringify(item.patch));
     for (const scenario of [{ levels: [{}, {}, {}], ids: [] }, { levels: [{}, {}, { tone: 'plain' }], ids: [undefined, undefined, 'plain'] }]) {
-      const old = promptsOf(before.store, language, scenario), upgraded = promptsOf(after.store, language, scenario);
+      const old = oldPromptsOf(before, language, scenario), upgraded = promptsOf(after.store, language, scenario);
       const same = item.patch.defaultNoteStyleId === 'style:Gone' || item.patch.defaultNoteStyleId === undefined && item.patch.defaultDetailTemplateId === undefined;
       assert.deepEqual(upgraded.prompts, old.prompts, `${language} ${JSON.stringify(item.patch)} ${same ? '(nothing to carry)' : ''}`);
     }
@@ -425,7 +441,7 @@ test('old custom templates: standard-named sections upgrade to the same prompt (
       const before = world(patch, files); await before.store.refresh();
       const after = world(patch, files); await after.store.upgradeLegacy(); await after.store.refresh();
       for (const item of [scenario, withTone]) {
-        const old = promptsOf(before.store, language, item), upgraded = promptsOf(after.store, language, item);
+        const old = oldPromptsOf(before, language, item), upgraded = promptsOf(after.store, language, item);
         assert.deepEqual(upgraded.prompts, old.prompts, `${language} exported=${exported}`);
         assert.equal(upgraded.charts, old.charts);
         assert.ok(upgraded.resolved.block && !upgraded.resolved.noteStyle);
@@ -440,7 +456,7 @@ test('old custom templates: standard-named sections upgrade to the same prompt (
   const before = world({ language: 'en', detailTemplates: custom }, {}); await before.store.refresh();
   const after = world({ language: 'en', detailTemplates: custom }, {}); await after.store.upgradeLegacy(); await after.store.refresh();
   const one = { levels: [{}, {}, { template: 'uuid-2' }], ids: [] };
-  const old = promptsOf(before.store, 'en', one).prompts[0], upgraded = promptsOf(after.store, 'en', one).prompts[0];
+  const old = oldPromptsOf(before, 'en', one).prompts[0], upgraded = promptsOf(after.store, 'en', one).prompts[0];
   const logRule = M.customDetailRule('log', 'en', { heading: '### History' });
   assert.ok(old.includes(logRule));
   assert.ok(!upgraded.includes(logRule));
@@ -483,14 +499,14 @@ test('tones: a custom preset becomes a tone block (cleaned name, never a built-i
     eq(Object.keys(inDir(after.v, dirs(language).template)).length, 6);
     for (const base of ['Builtin', 'ById', 'Academic', 'Custom', 'Free', 'OtherLanguage']) {
       const scenario = { levels: [{}, {}, { template: `style:${base}` }], ids: [] };
-      assert.deepEqual(promptsOf(after.store, language, scenario).prompts, promptsOf(before.store, language, scenario).prompts, `${language} ${base}`);
+      assert.deepEqual(promptsOf(after.store, language, scenario).prompts, oldPromptsOf(before, language, scenario).prompts, `${language} ${base}`);
     }
     // the custom tone preset's id, chosen on a map or a topic, keeps its text through the alias
     for (const scenario of [
       { levels: [{}, {}, { tone: 'custom-tone-1' }], ids: [undefined, undefined, 'custom-tone-1'] },
       { levels: [{}, { template: 'style:Free', tone: 'custom-tone-2' }, {}], ids: [undefined, 'custom-tone-2', undefined] },
       { levels: [{}, {}, { template: 'textbook', tone: 'custom-tone-1' }], ids: [undefined, undefined, 'custom-tone-1'] }
-    ]) assert.deepEqual(promptsOf(after.store, language, scenario).prompts, promptsOf(before.store, language, scenario).prompts, `${language} ${JSON.stringify(scenario)}`);
+    ]) assert.deepEqual(promptsOf(after.store, language, scenario).prompts, oldPromptsOf(before, language, scenario).prompts, `${language} ${JSON.stringify(scenario)}`);
   }
 });
 
@@ -562,7 +578,7 @@ test('built-in style files: unchanged canonical files (v1 and v2, any language) 
     ]) {
       const a = world({ language, ...(scenario.settings ?? {}) }, files); await a.store.refresh();
       const b = world({ language, ...(scenario.settings ?? {}) }, files); await b.store.upgradeLegacy(); await b.store.refresh();
-      const old = promptsOf(a.store, language, scenario), upgraded = promptsOf(b.store, language, scenario);
+      const old = oldPromptsOf(a, language, scenario), upgraded = promptsOf(b.store, language, scenario);
       assert.deepEqual(upgraded.prompts, old.prompts, `${language} ${JSON.stringify(scenario)}`);
     }
   }
@@ -591,6 +607,18 @@ test('a style file that does not read stays where it is, is not backed up or tra
   assert.equal(w.settings.noteStyleAliases['style:Bad'], undefined);
   eq(w.events, [{ kind: 'skipped', names: ['Bad'] }]);
   assert.equal(Object.keys(inDir(w.v, dirs('en').backup)).length, 1);
+});
+
+test('counter 18 (P2): the parser skips old switches and callout keys; the upgrade still skips a file whose switches the old parser refused', async () => {
+  // the parser reads the sections of a file with a bad value; the frozen reader refuses it, so the file is skipped as before
+  const text = '---\n圖表: maybe\n---\n## A\nx\n';
+  assert.equal(M.parseNoteStyleFile(text, { id: 'style:Bad', name: 'Bad' }).ok, true);
+  assert.equal(M.readLegacyFormatPreferences(text), undefined);
+  const w = world({ language: 'en' }, { 'Bad.md': text, 'S.md': fixture('table-off.md') });
+  const result = await w.store.upgradeLegacy();
+  eq(result.skipped, ['Bad']);
+  assert.ok(w.v.files[`${FOLDER}/Bad.md`]);
+  assert.equal(w.settings.noteStyleAliases['style:Bad'], undefined);
 });
 
 test('the upgrade module does not branch on a language id (language gate)', () => {

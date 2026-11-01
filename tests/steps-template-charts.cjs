@@ -1,5 +1,6 @@
 // Q3: the template decides whether the background chart step runs. A template (sections or format rules) without a
-// ```mermaid block gets no chart call; the built-in templates still get one; the old `圖表: 關` line still stops it.
+// ```mermaid block gets no chart call; the built-in templates still get one; the old `圖表: 關` line, now written into the
+// upgraded block's format rules (P2), still stops it, and a mermaid block the user wrote in a section still gets its chart step.
 // Runs the real AiTaskService and the plugin's addChartsAfterWrite over a scripted runtime.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,6 +13,9 @@ export { AiTaskService } from "./core/ai-task-service";
 export { builtinTemplateText } from "./core/blocks/builtin";
 export { selectionFromContext, assembleTaskPrompt, promptStepOf } from "./core/steps/task/assemble";
 export { generalTaskPrompt } from "./core/steps/task/render";
+export { splitTemplateZones } from "./core/blocks/template-block";
+export { inLanguage, OBSIDIAN_FORMAT } from "./core/steps/_shared/fragments";
+export { legacyObsidianFormat } from "./ai/note-style-upgrade";
 `);
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const P1 = 'The larva stage lasts 3 days at 25°C and reaches 160–180 mm.';
@@ -53,6 +57,8 @@ async function run(mode, extra = {}) {
 }
 
 const noMermaid = body => body.split('\n').filter(line => !line.includes('```mermaid')).join('\n');
+/** The built-in format rules with the old diagrams switch applied, the way the upgrade writes it into a block. */
+const diagramsOff = body => body.replace(M.inLanguage(M.OBSIDIAN_FORMAT, 'en'), () => M.legacyObsidianFormat('en', { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true }));
 const withTemplate = (body, id = 'standard') => ({ styleSelection: { ...M.selectionFromContext(base('task'), 'en'), template: { id, body } } });
 
 for (const mode of ['task', 'synthesize']) {
@@ -76,10 +82,23 @@ for (const mode of ['task', 'synthesize']) {
     const r = await run(mode);
     assert.equal(r.calls.length, 2);
   });
-  test(`${mode}: the old 圖表 off switch still stops the chart step`, async () => {
-    const r = await run(mode, { styleDiagrams: false });
+  test(`${mode}: the old 圖表 off switch, as the upgrade writes it into the format rules, still stops the chart step`, async () => {
+    const r = await run(mode, withTemplate(diagramsOff(M.builtinTemplateText('standard', 'en'))));
     assert.equal(r.calls.length, 1);
     assert.ok(!r.detail.includes('```mermaid'));
+    assert.ok(!r.prompt.includes('```mermaid'));
+  });
+  test(`${mode}: the old styleDiagrams flag is gone and changes nothing`, async () => {
+    const r = await run(mode, { styleDiagrams: false });
+    assert.equal(r.calls.length, 2);
+  });
+  test(`${mode}: charts off in the format rules but a mermaid block in the user's own section: the chart step still runs (locked behaviour, counter 3)`, async () => {
+    const own = '## 流程\n畫一張流程圖：\n```mermaid\nflowchart TD\n  A --> B\n```\n';
+    const body = diagramsOff(`${own}\n# Format rules\n\n${M.inLanguage(M.OBSIDIAN_FORMAT, 'en')}\n`);
+    assert.ok(M.splitTemplateZones(body).format.length > 0 && !M.splitTemplateZones(body).format.includes('```mermaid'));
+    assert.equal(new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => true }).chartEligible({ ...base(mode), ...withTemplate(body) }), true);
+    const r = await run(mode, withTemplate(body));
+    assert.equal(r.calls.length, 2, 'main call plus the chart call');
   });
 }
 

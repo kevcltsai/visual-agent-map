@@ -132,7 +132,7 @@ test('tone: the file\'s tone is a name or free text; a same or more specific lev
   assert.equal(ws.toneText, M.resolveToneText(PRESETS, ['plain'], 'en'));
   // academic at a specific level means no tone text and beats the file
   assert.equal(store.resolve([{ template: 'style:Free', tone: 'academic' }]).toneText, undefined);
-  assert.equal(store.resolve([{ template: 'style:Own' }]).noteStyle.diagrams, false);
+  assert.equal(store.resolve([{ template: 'style:Own' }]).noteStyle.diagrams, undefined, 'the switches are not part of the parsed file any more (P2); the upgrade reads them');
 });
 
 // Scope 5 matrix: topic x map in {none, template only, tone only, template + tone}, x workspace in {none, textbook,
@@ -350,19 +350,22 @@ test('folder rename follows the folder only; default folder name follows the lan
   assert.equal(store.folderExists(), false);
 });
 
-test('diagrams off: the context carries styleDiagrams false and no chart step is eligible (research and synthesis)', async () => {
+test('diagrams off (P2: through the upgrade): the old flag is not in the context; after the upgrade the block has no mermaid line and no chart step is eligible (research and synthesis)', async () => {
   const { store } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Own.md': OWNER, 'WS/S/Free.md': FREE });
   await store.refresh();
   const service = new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => true });
   const base = { title: 'T', summary: 's', rules: '', detail: '', task: 'x', ancestors: '', addCharts: true };
+  // before the upgrade the old path carries no switch: neither styleDiagrams nor noteStyle is in the context any more
+  eq(store.contextFields(store.resolve([{ template: 'style:Own' }]).template), {});
+  assert.equal((await store.upgradeLegacy()).status, 'done');
+  await store.refresh();
   for (const mode of ['task', 'synthesize']) {
     const off = store.resolve([{ template: 'style:Own' }]);
     const fields = store.contextFields(off.template);
-    assert.equal(fields.styleDiagrams, false);
-    assert.ok(fields.noteStyle);
+    eq(Object.keys(fields), ['styleSelection']);
+    assert.ok(!fields.styleSelection.template.body.includes('```mermaid'));
     assert.equal(service.chartEligible({ ...base, mode, ...fields }), false);
     const on = store.resolve([{ template: 'style:Free' }]);
-    eq(Object.keys(store.contextFields(on.template)), ['noteStyle']);
     assert.equal(service.chartEligible({ ...base, mode, ...store.contextFields(on.template) }), true);
   }
   eq(store.contextFields(store.resolve([{ template: 'standard' }]).template), {});

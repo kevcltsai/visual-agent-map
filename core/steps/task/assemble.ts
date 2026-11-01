@@ -23,7 +23,6 @@ import {
 import { parseTemplateBlock } from "../../blocks/template-block";
 import type { NoteStyleIssue } from "../../../ai/note-style-file";
 import {
-  applyFormatPreferences,
   headingsVerbatim,
   inLanguage,
   LABEL_ANCESTORS,
@@ -43,8 +42,7 @@ import {
   SOURCE_SAFETY,
   SOURCE_SAFETY_QUICK,
   toneBlock,
-  withProviderOutput,
-  type FormatPreferences
+  withProviderOutput
 } from "../_shared/fragments";
 import {
   ADAPTIVE_DETAIL_STRUCTURE,
@@ -105,11 +103,10 @@ export interface StyleSelection {
   /**
    * `body` is the whole template text (sections zone, then the format rules zone) when the choice is not the unchanged
    * built-in. `adaptive`: the detail has no fixed sections, the plugin's adaptive structure text stands in for the
-   * sections. `legacyPreferences`: the old note style file switches, applied to the format rules zone.
+   * sections.
    */
   readonly template: BlockChoice & {
     readonly adaptive?: boolean;
-    readonly legacyPreferences?: FormatPreferences;
   };
   /** Academic rigor (the empty tone) is the default. */
   readonly tone: BlockChoice;
@@ -157,8 +154,7 @@ export function selectionFromContext(context: TaskContext, language: ContentLang
   return {
     template: {
       id: templateId,
-      ...(context.detailFormat === "adaptive" ? { adaptive: true } : {}),
-      ...(context.noteStyle ? { legacyPreferences: context.noteStyle } : {})
+      ...(context.detailFormat === "adaptive" ? { adaptive: true } : {})
     },
     tone: toneChoiceFromText(context.toneText, language)
   };
@@ -276,7 +272,7 @@ function templateParts(
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
     // A block the user wrote that cannot be read: the built-in one stands in (the same id when it is a built-in, else
-    // Standard) and the problem is reported with the prompt. The adaptive and old-switch choices stay.
+    // Standard) and the problem is reported with the prompt. The adaptive choice stays.
     const issues = parsed.issues.map((issue): BlockIssue => ({
       ...issue,
       category: "template",
@@ -297,7 +293,10 @@ function templateParts(
     );
     return { ...fallback, issues };
   }
-  if (parsed.lead)
+  // The request's own old template object in the intro layout (its lead-in is a sentence of the intro structure text) keeps
+  // that structure text, with the format rules the block holds (decision 18 of ticket 06: the snapshots pin it).
+  const introTemplate = legacy && context.detailTemplate?.layout === "intro" ? context.detailTemplate : undefined;
+  if (parsed.lead && !introTemplate)
     return {
       ...leadStructure(parsed.template, parsed.lead, language, topicAnchor),
       format: parsed.format,
@@ -306,7 +305,8 @@ function templateParts(
   // No lead: the standard wrapper sentence for the standard id, else the generic one. The generic one must not take the
   // Textbook id's fixed structure text, so a Textbook-named block is put together under a neutral id.
   const template =
-    parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
+    introTemplate ??
+    (parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` });
   return {
     sections: structure(template),
     owned: describedSections(template, language),
@@ -315,13 +315,9 @@ function templateParts(
   };
 }
 
-/** The format rules the prompt carries for the template: the zone with the old note style switches applied. */
-const formatText = (parts: TemplateParts, selection: StyleSelection, language: ContentLanguage): string =>
-  parts.format ? applyFormatPreferences(parts.format, language, selection.template.legacyPreferences) : "";
-
 const CHART_BLOCK = "```mermaid";
 
-/** Whether the template (sections and format rules, with the old switches applied) asks for a mermaid diagram. */
+/** Whether the template (sections and format rules) asks for a mermaid diagram. */
 export function chartsWanted(
   selection: StyleSelection,
   context: TaskContext,
@@ -329,13 +325,13 @@ export function chartsWanted(
   options: AssembleOptions = {}
 ): boolean {
   const parts = templateParts(selection, context, language, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, language);
+  return partsAskForCharts(parts, selection);
 }
 
-function partsAskForCharts(parts: TemplateParts, selection: StyleSelection, language: ContentLanguage): boolean {
+function partsAskForCharts(parts: TemplateParts, selection: StyleSelection): boolean {
   // An adaptive detail has no fixed sections: only the format rules can ask for a chart.
   const sections = selection.template.adaptive ? "" : parts.sections;
-  return sections.includes(CHART_BLOCK) || formatText(parts, selection, language).includes(CHART_BLOCK);
+  return sections.includes(CHART_BLOCK) || parts.format.includes(CHART_BLOCK);
 }
 
 type Piece = readonly [string, SegmentSource];
@@ -405,7 +401,7 @@ export function assembleTaskPrompt(
     else pieces.push(sectionPieces(parts, selection.template.id));
     // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
     if (readerFacingDetail(context) && step !== "merge") {
-      const text = formatText(parts, selection, language);
+      const text = parts.format;
       if (text)
         pieces.push([[text, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
     }
@@ -440,7 +436,7 @@ export function assembleTaskPrompt(
   return {
     text: segments.map(segment => segment.text).join(""),
     segments,
-    charts: partsAskForCharts(parts, selection, language),
+    charts: partsAskForCharts(parts, selection),
     // The decompose step carries no template, so a template that could not be read changes nothing there.
     issues: step === "decompose" ? [] : parts.issues
   };

@@ -9,6 +9,7 @@ const { loadSource } = require('./support-replay.cjs');
 const S = loadSource(`
 export * from "./ai/note-style-file";
 export { sectionLookup, checkCounts, standardTemplate, textbookTemplate } from "./ai/detail-templates";
+export { readLegacyFormatPreferences } from "./ai/note-style-upgrade";
 `);
 const plain = value => structuredClone(value);
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
@@ -21,6 +22,9 @@ const ok = text => {
   assert.equal(result.ok, true, JSON.stringify(result.issues));
   return result.style;
 };
+// The old switches are no longer part of the parsed file: the frozen reader of the upgrade module reads them (P2).
+const prefs = text => S.readLegacyFormatPreferences(text);
+const ALL_ON = { callouts: 'placed', diagrams: true, tables: true, tasks: true, highlight: true };
 const fail = (text, code) => {
   const result = parse(text);
   assert.equal(result.ok, false);
@@ -111,8 +115,8 @@ test('canonical v2: shows the four keys at their defaults, explains that they on
       const front = content.split('\n---\n')[0].split('\n');
       eq(front.slice(front.indexOf(auto[language]) + 1), keys[language].map((key, i) => `${key}: ${['summary', 'warning', 'question', 'tip'][i]}`));
       assert.ok(content.split('\n')[front.length + 1].includes(auto[language]), 'comment names the auto-only rule');
-      eq(ok(content).calloutMap, {});
-      assert.equal(ok(content).callouts, 'auto');
+      eq(prefs(content), { ...ALL_ON, callouts: 'auto' });
+      assert.equal(ok(content).calloutMap, undefined);
     }
 });
 
@@ -142,7 +146,7 @@ test('canonical files: first line after frontmatter is the usage comment in thre
       assert.ok(after.includes(marks[language]), after);
       assert.ok(after.includes(S.builtinStyleName ? '' : ''));
       const style = ok(content);
-      assert.equal(style.callouts, 'auto');
+      assert.equal(prefs(content).callouts, 'auto');
       assert.equal(style.sections.length, 6);
       assert.equal(style.layout, id === 'textbook' ? 'intro' : 'sections');
       eq(style.sections.map(section => section.role), ['none', 'none', 'sources', 'none', 'none', 'log']);
@@ -159,7 +163,7 @@ test('canonical files: textbook carries the teaching requirements; the other fou
   for (const id of ['standard', 'summary', 'plain', 'guide']) {
     const s = ok(S.canonicalContent(id, 'en'));
     assert.equal(s.intro, '');
-    assert.equal(s.callouts, 'auto');
+    assert.equal(prefs(S.canonicalContent(id, 'en')).callouts, 'auto');
   }
   assert.equal(ok(S.canonicalContent('summary', 'zh-TW')).tone, '重點摘要');
 });
@@ -183,9 +187,7 @@ test('builtin file names', () => {
 test('owner example parses into the expected structure', () => {
   const style = ok(OWNER_EXAMPLE);
   assert.equal(style.tone, '親切白話，短句；專有名詞第一次出現先用一句話解釋');
-  assert.equal(style.diagrams, false);
-  assert.equal(style.tables, true);
-  assert.equal(style.callouts, 'placed');
+  eq(prefs(OWNER_EXAMPLE), { ...ALL_ON, diagrams: false });
   assert.equal(style.layout, 'intro');
   assert.equal(style.intro, '先用 2–4 段導讀帶讀者進入主題。');
   eq(style.sections.map(s => s.name), ['核心結論', '常見誤解']);
@@ -200,17 +202,22 @@ test('owner example parses into the expected structure', () => {
 
 test('frontmatter: keys in three languages, toggles, defaults, ignored keys and lists', () => {
   const s = ok('---\ntags:\n  - a\n- b\nfoo: bar\n语气: x\n方框: 指定\n图表: off\ntables: FALSE\n待辦清單: 關\nhighlight: 開\n---\n## A\nbody');
-  eq([s.tone, s.callouts, s.diagrams, s.tables, s.tasks, s.highlight], ['x', 'placed', false, false, false, true]);
+  const text = '---\ntags:\n  - a\n- b\nfoo: bar\n语气: x\n方框: 指定\n图表: off\ntables: FALSE\n待辦清單: 關\nhighlight: 開\n---\n## A\nbody';
+  eq(prefs(text), { callouts: 'placed', diagrams: false, tables: false, tasks: false, highlight: true });
+  eq([s.tone, s.layout], ['x', 'sections']);
   const d = ok('## A\nx');
-  eq([d.tone, d.callouts, d.diagrams, d.tables, d.tasks, d.highlight, d.layout], [undefined, 'placed', true, true, true, true, 'sections']);
-  assert.equal(ok('---\ncallouts: auto\n---\n## A').callouts, 'auto');
+  eq([d.tone, d.layout], [undefined, 'sections']);
+  eq(prefs('## A\nx'), ALL_ON);
+  eq(prefs('---\ncallouts: auto\n---\n## A'), { ...ALL_ON, callouts: 'auto' });
   assert.equal(ok('---\n語氣: "quoted"\n---\n## A').tone, 'quoted');
 });
 
 test('fail closed with line numbers and no repair', () => {
   const sections = n => Array.from({ length: n }, (_, i) => `## S${i}\nx`).join('\n');
   assert.equal(fail('---\n語氣: x\n## A', 'frontmatter_unclosed')[0].line, 1);
-  assert.equal(fail('---\n語氣: x\nnot a pair\n---\n## A', 'frontmatter_line')[0].line, 3);
+  // The old switches no longer fail the parser (P2: skipped); the frozen reader of the upgrade still refuses such files.
+  ok('---\n語氣: x\nnot a pair\n---\n## A');
+  assert.equal(prefs('---\n語氣: x\nnot a pair\n---\n## A'), undefined);
   assert.equal(fail('just text, no heading', 'no_sections').length, 1);
   assert.equal(fail('# only h1\ntext\n### h3', 'no_sections')[0].code, 'no_sections');
   fail(sections(13), 'ui.detail_template_error_section_count');
@@ -220,8 +227,10 @@ test('fail closed with line numbers and no repair', () => {
   fail(`## ${'a'.repeat(41)}\nx`, 'ui.detail_template_error_section_name_long');
   fail(`## A\n${'x'.repeat(8000)}`, 'file_long');
   fail(`---\n語氣: ${'x'.repeat(1001)}\n---\n## A`, 'tone_long');
-  assert.equal(fail('---\n圖表: maybe\n---\n## A', 'value_invalid')[0].line, 2);
-  assert.equal(fail('---\n方框: sometimes\n---\n## A', 'value_invalid')[0].line, 2);
+  ok('---\n圖表: maybe\n---\n## A');
+  ok('---\n方框: sometimes\n---\n## A');
+  assert.equal(prefs('---\n圖表: maybe\n---\n## A'), undefined);
+  assert.equal(prefs('---\n方框: sometimes\n---\n## A'), undefined);
   fail('## 證據與來源\nx\n## Evidence and sources\ny', 'ui.detail_template_error_role_taken');
   fail('## 更新紀錄\nx\n## 更新记录\ny', 'ui.detail_template_error_role_taken');
   fail('## A\n數量: 0', 'ui.detail_template_error_count_range');
@@ -333,7 +342,7 @@ test('a legacy export parses back to the same sections, counts, roles and the us
   for (const language of ['zh-TW', 'zh-CN', 'en']) {
     const text = S.serializeLegacyV1(LEGACY, language);
     const style = ok(text);
-    assert.equal(style.callouts, 'auto');
+    assert.equal(prefs(text).callouts, 'auto');
     assert.equal(style.layout, 'sections');
     eq(style.sections.map(s => s.name), LEGACY.sections.map(s => s.name));
     eq(style.sections.map(s => s.count), LEGACY.sections.map(s => s.count));
@@ -349,21 +358,24 @@ test('normalizeStyleContent', () => {
   assert.equal(S.normalizeStyleContent('a\n'), S.normalizeStyleContent('a'));
 });
 
-test('callout rule keys (P1): three languages, aliases, off, lower-casing, default values omitted', () => {
-  eq(ok('## A\nx').calloutMap, {});
-  eq(ok('---\n結論方框: abstract\n風險方框: Caution\n問題方框: 關\n技巧方框: example\n---\n## A\nx').calloutMap, { summary: 'abstract', warning: 'caution', question: 'off', tip: 'example' });
-  eq(ok('---\n结论方框: tldr\n风险方框: 关\n问题方框: faq\n技巧方框: hint\n---\n## A\nx').calloutMap, { summary: 'tldr', warning: 'off', question: 'faq', tip: 'hint' });
-  eq(ok('---\nsummary callout: abstract\nrisk callout: off\nquestion callout: help\ntip callout: example\n---\n## A\nx').calloutMap, { summary: 'abstract', warning: 'off', question: 'help', tip: 'example' });
-  eq(ok('---\n結論方框: summary\n風險方框: warning\n問題方框: question\n技巧方框: tip\n---\n## A\nx').calloutMap, {});
-  eq(ok('---\n結論方框: abstract\nrisk callout: danger\n问题方框: off\n---\n## A\nx').calloutMap, { summary: 'abstract', warning: 'danger', question: 'off' });
+test('callout rule keys (P1, now the frozen reader of the upgrade): three languages, aliases, off, lower-casing, default values omitted', () => {
+  const map = text => prefs(text).calloutMap ?? {};
+  eq(map('## A\nx'), {});
+  eq(map('---\n結論方框: abstract\n風險方框: Caution\n問題方框: 關\n技巧方框: example\n---\n## A\nx'), { summary: 'abstract', warning: 'caution', question: 'off', tip: 'example' });
+  eq(map('---\n结论方框: tldr\n风险方框: 关\n问题方框: faq\n技巧方框: hint\n---\n## A\nx'), { summary: 'tldr', warning: 'off', question: 'faq', tip: 'hint' });
+  eq(map('---\nsummary callout: abstract\nrisk callout: off\nquestion callout: help\ntip callout: example\n---\n## A\nx'), { summary: 'abstract', warning: 'off', question: 'help', tip: 'example' });
+  eq(map('---\n結論方框: summary\n風險方框: warning\n問題方框: question\n技巧方框: tip\n---\n## A\nx'), {});
+  eq(map('---\n結論方框: abstract\nrisk callout: danger\n问题方框: off\n---\n## A\nx'), { summary: 'abstract', warning: 'danger', question: 'off' });
 });
 
-test('callout rule keys (P1): bad values, empty values, duplicates, custom types fail closed with the line', () => {
-  assert.equal(fail('---\n結論方框: banana\n---\n## A', 'value_invalid')[0].line, 2);
-  assert.equal(fail('---\n語氣: x\n問題方框:\n---\n## A', 'value_invalid')[0].line, 3);
-  assert.equal(fail('---\n風險方框: my-custom\n---\n## A', 'value_invalid')[0].line, 2);
-  const dup = fail('---\n結論方框: note\n語氣: x\n结论方框: info\n---\n## A', 'key_duplicate');
-  assert.equal(dup[0].line, 4);
-  assert.equal(fail('---\ntip callout: note\n技巧方框: info\n---\n## A', 'key_duplicate')[0].line, 3);
-  assert.equal(fail('---\n技巧方框: summary callout\n---\n## A', 'value_invalid')[0].line, 2);
+test('callout rule keys (P1, now the frozen reader of the upgrade): bad values, empty values, duplicates, custom types are refused; the parser itself skips them (counter 18)', () => {
+  for (const text of ['---\n結論方框: banana\n---\n## A', '---\n語氣: x\n問題方框:\n---\n## A', '---\n風險方框: my-custom\n---\n## A',
+    '---\n結論方框: note\n語氣: x\n结论方框: info\n---\n## A', '---\ntip callout: note\n技巧方框: info\n---\n## A', '---\n技巧方框: summary callout\n---\n## A']) {
+    assert.equal(prefs(text), undefined, text);
+    assert.equal(ok(text).sections.length, 1, 'the parser skips the line and reads the sections');
+  }
+  assert.equal(ok('---\n語氣: x\n問題方框:\n---\n## A').tone, 'x');
+  // the only frontmatter error left is one that never closes
+  assert.equal(fail('---\n結論方框: note\n## A', 'frontmatter_unclosed')[0].line, 1);
+  assert.equal(prefs('---\n結論方框: note\n## A'), undefined);
 });

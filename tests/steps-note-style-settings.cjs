@@ -221,8 +221,7 @@ test('every style-file problem has a translated message in en, zh-TW and zh-CN, 
     file_long: `---\n圖表: 關\n---\n## A\n${'x'.repeat(8100)}`,
     tone_long: `---\n語氣: ${'x'.repeat(1100)}\n---\n## A\nx`,
     frontmatter_unclosed: '---\n圖表: 關\n## A\nx',
-    frontmatter_line: '---\nno colon here\n---\n## A\nx',
-    value_invalid: '---\n圖表: maybe\n---\n## A\nx',
+    // P2: frontmatter_line and value_invalid are no longer raised by the parser (the old switches are skipped there)
     no_sections: 'just text',
     count_invalid: '## A\n數量: abc\nx',
     comment_unclosed: '## A\n%% never closed\nx'

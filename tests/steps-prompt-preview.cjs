@@ -123,8 +123,8 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
     const workspaceTone = { summary: 'summary', plain: 'plain', guide: 'guide' }[patch.defaultNoteStyleId];
     const tone = workspaceTone ? M.lookupBuiltinBlock('tone', workspaceTone, language) : M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
     assert.equal(got.toneText, tone, label);
-    assert.deepEqual(plain(got.noteStyle), plain(store.contextFields(resolved.template).noteStyle), label);
-    assert.equal(got.styleDiagrams, store.contextFields(resolved.template).styleDiagrams, label);
+    assert.equal(got.noteStyle, undefined, label);
+    assert.equal(got.styleDiagrams, undefined, label);
     if (resolved.noteStyle) assert.equal(got.toneText, resolved.toneText, label);
     // the preview of these fields is the prompt a run with the same fields renders
     const preview = M.previewPrompt('research', language, 'codex', got);
@@ -133,7 +133,7 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
   }
   const store = makeStore({ defaultNoteStyleId: 'style:Own' }, { 'WS/S/Own.md': OWN });
   await store.refresh();
-  assert.equal(store.workspaceStyleFields('en').noteStyle.tone, '簡明');
+  assert.equal(store.workspaceStyleFields('en').toneText, '簡明');
 });
 
 test('counter 9: a default style file that does not parse is returned as invalid, not thrown', async () => {

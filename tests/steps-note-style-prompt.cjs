@@ -8,7 +8,10 @@ const M = loadSource(`
 export { parseNoteStyleFile, CANONICAL_VERSIONS, CANONICAL_LANGUAGES, NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { detailStructurePrompt, checkCounts, standardTemplate, textbookTemplate, validateTemplate, sectionLookup } from "./ai/detail-templates";
 export { canonicalDetail } from "./ai/result-utils";
-export { obsidianFormat, OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
+export { OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
+// P2: the switches moved into the upgrade module and are frozen there (only the upgrade applies them to the format zone).
+export { legacyObsidianFormat as obsidianFormat, readLegacyFormatPreferences } from "./ai/note-style-upgrade";
+export { translate } from "./i18n";
 export { AiTaskService } from "./core/ai-task-service";
 `);
 const parse = text => {
@@ -66,12 +69,12 @@ test('format preferences: all default is the original text, for both instruction
 });
 
 test('canonical v2 builds exactly the same prompt as v1 for every built-in and language', () => {
-  const pref = style => ({ callouts: style.callouts, diagrams: style.diagrams, tables: style.tables, tasks: style.tasks, highlight: style.highlight, calloutMap: style.calloutMap });
+  const pref = text => M.readLegacyFormatPreferences(text);
   for (const id of M.NOTE_STYLE_BUILTIN_IDS)
     for (const language of M.CANONICAL_LANGUAGES) {
       const one = parse(M.CANONICAL_VERSIONS[0][id][language]), two = parse(M.CANONICAL_VERSIONS[1][id][language]);
       for (const instruction of LANGUAGES) {
-        assert.equal(M.obsidianFormat(instruction, pref(two)), M.obsidianFormat(instruction, pref(one)), `${id}.${language}`);
+        assert.equal(M.obsidianFormat(instruction, pref(M.CANONICAL_VERSIONS[1][id][language])), M.obsidianFormat(instruction, pref(M.CANONICAL_VERSIONS[0][id][language])), `${id}.${language}`);
         assert.equal(structure(two, instruction), structure(one, instruction), `${id}.${language}`);
       }
       assert.equal(two.tone, one.tone);
@@ -171,14 +174,21 @@ test('count syntax reaches checkCounts; validateTemplate and sectionLookup still
   assert.equal(M.sectionLookup(style.template).get('核心結論'), 0);
 });
 
-test('chartEligible: styleDiagrams false blocks the chart step; absent or true keeps the old result', () => {
+test('chartEligible (was: styleDiagrams false blocks the chart step): the upgraded block decides; the old flag is gone and ignored', () => {
   const service = new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false });
   const base = { title: 'T', summary: 's', rules: '', detail: '', task: 'x', ancestors: '', mode: 'task', addCharts: true };
   const diagrams = service.diagramsOn();
   assert.equal(service.chartEligible(base), diagrams);
-  assert.equal(service.chartEligible({ ...base, styleDiagrams: true }), diagrams);
-  assert.equal(service.chartEligible({ ...base, styleDiagrams: false }), false);
-  assert.equal(service.chartEligible({ ...base, mode: 'synthesize', styleDiagrams: false }), false);
+  // The old gate no longer exists: the flag changes nothing.
+  assert.equal(service.chartEligible({ ...base, styleDiagrams: false }), diagrams);
+  // What the old switch did, as the upgrade writes it: a block whose format zone lacks the mermaid line.
+  const block = format => ({ template: { id: 'file:X', body: `## A\nx\n\n# ${M.translate('en', 'ui.block_template_format_heading')}\n\n${format}\n` }, tone: { id: 'academic' } });
+  const off = block(M.obsidianFormat('en', { ...ON, diagrams: false }));
+  const on = block(M.obsidianFormat('en', ON));
+  for (const mode of ['task', 'synthesize']) {
+    assert.equal(service.chartEligible({ ...base, mode, styleSelection: off }), false, mode);
+    assert.equal(service.chartEligible({ ...base, mode, styleSelection: on }), diagrams, mode);
+  }
 });
 
 test('callout map (P1): swaps the type, keeps danger, tip line swaps both types, off drops the line, placed overrides, default is byte-identical', () => {
@@ -204,6 +214,7 @@ test('callout map (P1): swaps the type, keeps danger, tip line swaps both types,
 
 test('callout map (P1): a parsed style file carries its map into the prompt', () => {
   const style = parse('---\n方框: 自動\n結論方框: abstract\n問題方框: 關\n---\n## A\nx\n');
-  const text = M.obsidianFormat('en', style);
+  const text = M.obsidianFormat('en', M.readLegacyFormatPreferences('---\n方框: 自動\n結論方框: abstract\n問題方框: 關\n---\n## A\nx\n'));
+  assert.ok(style.sections.length === 1);
   assert.ok(text.includes('`> [!abstract]`') && !text.includes('[!question]') && !text.includes('`> [!summary]`'));
 });

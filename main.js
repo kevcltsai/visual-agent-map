@@ -24233,6 +24233,7 @@ var ChoiceModal = class extends import_obsidian14.Modal {
     this.chosen = true;
   }
   onOpen() {
+    var _a2;
     this.titleEl.setText(this.titleText);
     this.contentEl.createEl("p", { text: this.description, cls: "vam-modal-intro" });
     for (const choice2 of this.choices) {
@@ -24242,10 +24243,10 @@ var ChoiceModal = class extends import_obsidian14.Modal {
         this.close();
         choice2.action();
       };
-      if (choice2.description)
-        setting.setName(choice2.label).setDesc(choice2.description).addButton((b) => {
-          var _a2;
-          b.setButtonText((_a2 = choice2.buttonLabel) != null ? _a2 : t("ui.select")).onClick(run);
+      if (choice2.description || choice2.named)
+        setting.setName(choice2.label).setDesc((_a2 = choice2.description) != null ? _a2 : "").addButton((b) => {
+          var _a3;
+          b.setButtonText((_a3 = choice2.buttonLabel) != null ? _a3 : t("ui.select")).onClick(run);
           if (choice2.warning) b.setDestructive();
         });
       else
@@ -25646,7 +25647,7 @@ function styleProblem(item) {
   return t("ui.note_style_unusable_0_1_2", item.fileName, first.line, styleIssueText(first));
 }
 async function openStyleChooser(app, picker, options) {
-  var _a2, _b2, _c, _d;
+  var _a2, _b2, _c, _d, _e;
   if (picker) await picker.refresh();
   const items = (_a2 = picker == null ? void 0 : picker.list()) != null ? _a2 : [];
   const same = (ref) => {
@@ -25689,14 +25690,20 @@ async function openStyleChooser(app, picker, options) {
       action: () => options.pick(old.id, void 0)
     });
   }
-  if (options.current && picker)
+  const editRef = (_e = options.current) != null ? _e : options.editRef;
+  if (editRef && picker)
     choices.push({
       label: t("ui.note_style_edit"),
       description: t("ui.note_style_edit_current_desc"),
       buttonLabel: t("ui.note_style_edit_button"),
-      action: () => void picker.edit(options.current)
+      action: () => void picker.edit(editRef)
     });
-  new ChoiceModal(app, options.title, options.description, choices).open();
+  new ChoiceModal(
+    app,
+    options.title,
+    options.description,
+    choices.map((choice2) => ({ ...choice2, named: true }))
+  ).open();
 }
 
 // ui/preview-utils.ts
@@ -53048,6 +53055,7 @@ ${request.requirements}` : preset.text,
       ],
       oldTemplates: this.plugin.settings.detailTemplates.map(({ id, name }) => ({ id, name })),
       ...known ? { current: known } : {},
+      ...unset ? { editRef: this.defaultStyleRef() } : {},
       // Only a style file deletes the layer's tone; an old template keeps the tone the map already has.
       pick: (template, tone) => apply(template, tone != null ? tone : template.startsWith("style:") ? void 0 : toneId)
     });

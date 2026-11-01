@@ -123,6 +123,8 @@ export interface StyleChooserOptions {
   leading?: Choice[];
   /** Marks the row of the style in force. */
   current?: StyleRef;
+  /** The style "Edit this style" opens when none is set (e.g. the workspace default); falls back to current. */
+  editRef?: StyleRef;
   /** Old custom templates to list when there is no style folder (a plugin without a store). */
   oldTemplates?: { id: string; name: string }[];
   /** The pair to store for the chosen style; a file style comes without a tone (the caller deletes the layer's tone). */
@@ -178,12 +180,18 @@ export async function openStyleChooser(
       action: () => options.pick(old.id, undefined)
     });
   }
-  if (options.current && picker)
+  const editRef = options.current ?? options.editRef;
+  if (editRef && picker)
     choices.push({
       label: t("ui.note_style_edit"),
       description: t("ui.note_style_edit_current_desc"),
       buttonLabel: t("ui.note_style_edit_button"),
-      action: () => void picker.edit(options.current!)
+      action: () => void picker.edit(editRef)
     });
-  new ChoiceModal(app, options.title, options.description, choices).open();
+  new ChoiceModal(
+    app,
+    options.title,
+    options.description,
+    choices.map(choice => ({ ...choice, named: true }))
+  ).open();
 }

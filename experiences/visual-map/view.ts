@@ -9084,6 +9084,7 @@ export class VisualAgentMapView extends ItemView {
       ],
       oldTemplates: this.plugin.settings.detailTemplates.map(({ id, name }) => ({ id, name })),
       ...(known ? { current: known } : {}),
+      ...(unset ? { editRef: this.defaultStyleRef() } : {}),
       // Only a style file deletes the layer's tone; an old template keeps the tone the map already has.
       pick: (template, tone) => apply(template, tone ?? (template.startsWith("style:") ? undefined : toneId))
     });

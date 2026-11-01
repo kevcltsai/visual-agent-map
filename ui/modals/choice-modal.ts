@@ -8,6 +8,8 @@ export interface Choice {
   buttonLabel?: string;
   /** Destructive: styled as a warning so it never looks like the safe default. */
   warning?: boolean;
+  /** Shows the label in the name column even without a description (the button then reads buttonLabel or Select). */
+  named?: boolean;
   action: () => void;
 }
 
@@ -37,10 +39,10 @@ export class ChoiceModal extends Modal {
         this.close();
         choice.action();
       };
-      if (choice.description)
+      if (choice.description || choice.named)
         setting
           .setName(choice.label)
-          .setDesc(choice.description)
+          .setDesc(choice.description ?? "")
           .addButton(b => {
             b.setButtonText(choice.buttonLabel ?? t("ui.select")).onClick(run);
             if (choice.warning) b.setDestructive();

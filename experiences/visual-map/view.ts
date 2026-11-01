@@ -225,7 +225,7 @@ import {
   type CountIssue,
   type DetailTemplate
 } from "../../ai/detail-templates";
-import { emptyNoteStyleStore, runToneText, type NoteStyleStore, type StyleLevel } from "../../ai/note-style-store";
+import { emptyNoteStyleStore, type NoteStyleStore, type StyleLevel } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
 import {
@@ -2104,18 +2104,30 @@ export class VisualAgentMapView extends ItemView {
       }
     };
   }
+  /**
+   * `toneText` and the note style fields for a TaskContext, from one resolution so a template block and its tone choice
+   * (`styleSelection`) agree with the tone text. Spread `tone` where the tone belongs and `style` after the template.
+   */
+  private styleFields(
+    note: Pick<Note, "toneId"> | undefined,
+    options?: Pick<TaskOptions, "toneId" | "outputLanguage">,
+    template?: DetailTemplate
+  ): { tone: { toneText: string } | Record<string, never>; style: ReturnType<NoteStyleStore["contextFields"]> } {
+    const language = options?.outputLanguage ?? this.plugin.settings.language;
+    const toneText = this.toneTextFor(note, options?.toneId, language, template);
+    return {
+      tone: toneText ? { toneText } : {},
+      style: this.noteStyles.contextFields(template, toneText, language)
+    };
+  }
   /** `{ toneText }` for a TaskContext, or nothing when the resolved tone is academic. */
   private toneField(
     note: Pick<Note, "toneId"> | undefined,
     options?: Pick<TaskOptions, "toneId" | "outputLanguage">,
     template?: DetailTemplate
   ): { toneText: string } | Record<string, never> {
-    const toneText = this.toneTextFor(
-      note,
-      options?.toneId,
-      options?.outputLanguage ?? this.plugin.settings.language,
-      template
-    );
+    const language = options?.outputLanguage ?? this.plugin.settings.language;
+    const toneText = this.toneTextFor(note, options?.toneId, language, template);
     return toneText ? { toneText } : {};
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
@@ -2143,13 +2155,8 @@ export class VisualAgentMapView extends ItemView {
     language: ContentLanguage = this.plugin.settings.language,
     template?: DetailTemplate
   ): string | undefined {
-    // A note style file decides its own tone (the answer was made with the template, see NoteStyleStore.resolve).
-    return runToneText(
-      this.noteStyles.resolutionOf(template),
-      this.plugin.settings.promptPresets,
-      [chosenId, note?.toneId, this.map?.toneId],
-      language
-    );
+    // A note style file decides its own tone, else the run, topic and map choices, then the workspace tone (see the store).
+    return this.noteStyles.toneTextFor(template, [chosenId, note?.toneId, this.map?.toneId], language);
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   private fieldLinks(): FieldLinks {
@@ -13588,7 +13595,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const language = this.plugin.settings.language;
     const task = direction || synthesisGoalTask(language);
-    const detailTemplate = templateInLanguage(
+    const detailTemplate = this.templateForRun(
       await this.detailTemplateFor(node, options?.detailTemplateId, options?.toneId),
       options?.outputLanguage ?? language
     );
@@ -13601,6 +13608,7 @@ export class VisualAgentMapView extends ItemView {
     // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
     try {
+      const synthesisStyle = this.styleFields(note, options, detailTemplate);
       const synthesisContext: TaskContext = withThinkingOrigin(
         {
           title: note.title,
@@ -13620,13 +13628,13 @@ export class VisualAgentMapView extends ItemView {
           referenceDelivery: "direct",
           onProgress: options?.onProgress,
           outputLanguage: options?.outputLanguage,
-          ...this.toneField(note, options, detailTemplate),
+          ...synthesisStyle.tone,
           mode: "synthesize",
           researchMode: options?.researchMode ?? "local",
           researchDepth: options?.researchDepth ?? "normal",
           visualMode: options?.visualMode ?? note.visualMode,
           detailTemplate,
-          ...this.noteStyles.contextFields(detailTemplate),
+          ...synthesisStyle.style,
           addCharts: true
         },
         note
@@ -14350,6 +14358,7 @@ export class VisualAgentMapView extends ItemView {
     await this.noteStyles.refresh();
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
     try {
+      const integrationStyle = this.styleFields(undefined, options, detailTemplate);
       const integrationContext: TaskContext = {
         title,
         summary: translateNote(options?.outputLanguage ?? language, "note.no_conclusion_yet"),
@@ -14367,13 +14376,13 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         },
         outputLanguage: options?.outputLanguage,
-        ...this.toneField(undefined, options, detailTemplate),
+        ...integrationStyle.tone,
         mode: "synthesize",
         researchMode: options?.researchMode ?? "local",
         researchDepth: options?.researchDepth ?? "normal",
         visualMode: options?.visualMode ?? "auto",
         detailTemplate,
-        ...this.noteStyles.contextFields(detailTemplate),
+        ...integrationStyle.style,
         addCharts: true
       };
       const result = await this.plugin.askModel(
@@ -17887,7 +17896,10 @@ export class VisualAgentMapView extends ItemView {
       { template: this.map?.detailTemplateId, tone: this.map?.toneId }
     ]);
   }
-  /** The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and line. */
+  /**
+   * The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and
+   * line. A template block that does not parse only shows a Notice (file, line, reason) and the run uses the built-in one.
+   */
   private styleOrThrow(levels: StyleLevel[]): { template: DetailTemplate; missing: string[] } {
     const resolved = this.noteStyles.resolve(levels);
     if (resolved.invalid) {
@@ -17901,7 +17913,17 @@ export class VisualAgentMapView extends ItemView {
         () => void openStyleFile(this.app, this.noteStyles, ref)
       );
     }
+    // A template block that cannot be read does not stop the run: the built-in template stands in, and the user is told once.
+    const issue = resolved.blockIssues?.[0];
+    if (issue) new Notice(t("ui.preview_issue_0_1_2", issue.fileName ?? issue.id, issue.line, styleIssueText(issue)));
     return resolved;
+  }
+  /**
+   * The template a run uses, in the run's language. A template the store resolved from a block (a changed built-in or the
+   * user's own) is kept as it is: swapping in a fresh built-in object would drop its block text from the run.
+   */
+  private templateForRun(template: DetailTemplate, language: ContentLanguage): DetailTemplate {
+    return this.noteStyles.resolutionOf(template)?.block ? template : templateInLanguage(template, language);
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   private get noteStyles(): NoteStyleStore {
@@ -17935,7 +17957,7 @@ export class VisualAgentMapView extends ItemView {
    * choice comes first.
    */
   private mapDetailTemplate(language: ContentLanguage, chosenId?: string): DetailTemplate {
-    return templateInLanguage(
+    return this.templateForRun(
       this.styleOrThrow([{ template: chosenId }, { template: this.map?.detailTemplateId, tone: this.map?.toneId }])
         .template,
       language
@@ -17975,10 +17997,11 @@ export class VisualAgentMapView extends ItemView {
       failed?.(t("ui.ai_running_ai"));
       return null;
     }
-    const detailTemplate = templateInLanguage(
+    const detailTemplate = this.templateForRun(
       overrides?.detailTemplate ?? (await this.detailTemplateFor(node)),
       overrides?.outputLanguage ?? this.plugin.settings.language
     );
+    const style = this.styleFields(note, overrides, detailTemplate);
     const context: TaskContext = withThinkingOrigin(
       {
         title: note.title,
@@ -17994,10 +18017,10 @@ export class VisualAgentMapView extends ItemView {
         researchMode: note.researchMode,
         researchDepth: "normal",
         visualMode: note.visualMode,
-        ...this.toneField(note, overrides, detailTemplate),
+        ...style.tone,
         ...overrides,
         detailTemplate,
-        ...this.noteStyles.contextFields(detailTemplate),
+        ...style.style,
         addCharts: overrides?.addCharts ?? true
       },
       note

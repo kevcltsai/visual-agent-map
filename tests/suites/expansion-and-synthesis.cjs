@@ -1352,6 +1352,34 @@ integrationTest('runAgent: a topic whose style file is missing keeps its note un
   await h.run();
   assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, undefined, 'an old template id that is gone is cleared as before');
 });
+integrationTest('runAgent: a template block with two format headings still runs on the built-in template, with one Notice naming file and line, and the context carries the block text (04 counter 4)', async () => {
+  const broken = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'file:Bad' } });
+  const files = { 'WS/S/Blocks/Templates/Bad.md': broken };
+  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
+  await h.plugin.noteStyles.refresh();
+  await h.run();
+  assert.equal(h.contexts.length, 1, 'the run is not stopped');
+  assert.equal(h.contexts[0].detailTemplate.id, 'standard', 'the built-in template stands in');
+  assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
+  assert.equal(h.notices.length, 1, 'exactly one Notice');
+  assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 5/);
+  assert.match(String(h.notices[0]), /built-in template is used/);
+});
+integrationTest('runAgent: a changed built-in block keeps its text in the run context (the template is not swapped for a fresh built-in) and raises no Notice (04)', async () => {
+  const changed = '## Alpha\nDescribe alpha.\n\n## Beta\nDescribe beta.\n\n# Format rules\n\nFORMAT-LINE-MINE\n';
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'builtin:standard' } });
+  const files = { 'WS/S/Blocks/Templates/Standard.md': changed };
+  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
+  await h.plugin.noteStyles.refresh();
+  await h.run();
+  assert.equal(h.contexts[0].styleSelection.template.body, changed);
+  assert.deepEqual(h.notices, []);
+});
 integrationTest('runAgent: choosing a style file for a run writes it as the topic template and deletes the topic tone; an old template keeps the tone', async () => {
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
   await h.repo.updateNote(h.topic.path, { toneId: 'plain' });

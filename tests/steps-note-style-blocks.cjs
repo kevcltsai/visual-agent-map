@@ -512,3 +512,73 @@ test('block-files: folder names are found by any spelling (existing first), buil
   assert.equal(b.parseBlockRef('file:'), undefined);
   assert.equal(b.parseBlockRef('x'), undefined);
 });
+
+// ---- ticket 04 P2: the preview modal (counter 4 preview part, counter 14) ----
+function openPreviewModal(store, language = 'en') {
+  const S = require('./support.cjs');
+  const dom = require('./support-dom.cjs');
+  const { PromptPreviewModal } = S.load('ui/modals/prompt-preview-modal.ts', { obsidian: { ...S.obsidian, Modal: dom.makeModal() } });
+  const modal = new PromptPreviewModal({}, store, language, 'codex');
+  modal.open();
+  const select = dom.find(modal.contentEl, item => item.tag === 'select');
+  const region = () => dom.find(modal.contentEl, item => item.attrs['aria-live'] === 'polite');
+  return { modal, select, region, dom };
+}
+
+test('counter 4 (preview part): the modal names the same file and line the run reports, in one polite region', async () => {
+  const { store } = makeStore({ noteTemplateBlock: 'file:Bad' }, { [`${TPL}/Bad.md`]: BROKEN });
+  await store.refresh();
+  const { modal, region } = openPreviewModal(store);
+  const shown = region().children.map(item => item.text);
+  assert.equal(shown.length, 1);
+  assert.match(shown[0], /Bad\.md/);
+  assert.match(shown[0], /\b5\b/);
+  const issue = store.resolve([{}, {}]).blockIssues[0];
+  assert.equal(issue.fileName, 'Bad.md');
+  assert.equal(issue.line, 5);
+  modal.close();
+});
+
+test('counter 14: changing the step does not touch the live region while the problem is the same; a changed problem updates it; headings never skip a level', async () => {
+  const { store, v } = makeStore({ noteTemplateBlock: 'file:Bad' }, { [`${TPL}/Bad.md`]: BROKEN });
+  await store.refresh();
+  const { modal, select, region, dom } = openPreviewModal(store);
+  const everything = () => dom.findAll(modal.contentEl, () => true);
+  assert.equal(region().attrs['aria-live'], 'polite');
+  assert.equal(everything().some(item => item.attrs.role === 'alert'), false, 'no role=alert anywhere');
+  assert.equal(everything().filter(item => item.attrs['aria-live']).length, 1, 'one live region only');
+  const first = region().children[0];
+  const fields = store.workspaceStyleFields('en');
+  const withIssue = M.PREVIEW_STEPS.filter(step => M.previewPrompt(step.id, 'en', 'codex', fields).issues.length > 0);
+  const without = M.PREVIEW_STEPS.filter(step => !withIssue.includes(step));
+  assert.ok(withIssue.length >= 2, 'several steps show the same problem');
+  for (const step of withIssue.slice(1)) {
+    select.value = step.id;
+    select.fire('change');
+    assert.equal(region().children[0], first, `step ${step.id}: the same problem element stays, so nothing is announced again`);
+    const levels = new Set(everything().filter(item => /^h\d$/.test(item.tag)).map(item => item.tag));
+    assert.deepEqual([...levels], ['h2'], `step ${step.id}: headings start at h2 and do not jump`);
+    assert.ok(dom.findAll(modal.contentEl, item => item.tag === 'h2').length > 0);
+  }
+  // a step the problem does not touch shows no problem, so the text did change
+  for (const step of without) {
+    select.value = step.id;
+    select.fire('change');
+    assert.equal(region().children.length, 0, `step ${step.id}: nothing to report`);
+  }
+  select.value = withIssue[0].id;
+  select.fire('change');
+  assert.equal(region().children.length, 1);
+  // the problem is fixed: the region is updated (emptied) on the next render
+  v.files[`${TPL}/Bad.md`] = MINE;
+  await store.refresh();
+  select.fire('change');
+  assert.equal(region().children.length, 0);
+  // and a new problem is written once
+  v.files[`${TPL}/Bad.md`] = BROKEN;
+  await store.refresh();
+  select.fire('change');
+  assert.equal(region().children.length, 1);
+  assert.notEqual(region().children[0], first);
+  modal.close();
+});

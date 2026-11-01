@@ -20,6 +20,8 @@ const GROUP_KEYS: Record<PreviewGroup, TranslationKey> = {
 export class PromptPreviewModal extends Modal {
   private step: PreviewStep = PREVIEW_STEPS[0].id;
   private bodyEl: HTMLElement | undefined;
+  private problemsEl: HTMLElement | undefined;
+  private problemText = "";
 
   constructor(
     app: App,
@@ -49,6 +51,10 @@ export class PromptPreviewModal extends Modal {
       this.step = select.value as PreviewStep;
       this.renderBody();
     });
+    // One polite live region for the problems: it is written only when their text changes, so changing the step does not
+    // make a screen reader repeat the same problem.
+    this.problemText = "";
+    this.problemsEl = contentEl.createDiv({ cls: "vam-prompt-preview-problems", attr: { "aria-live": "polite" } });
     this.bodyEl = contentEl.createDiv({ cls: "vam-prompt-preview-body" });
     this.renderBody();
     select.focus();
@@ -57,8 +63,20 @@ export class PromptPreviewModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
     this.bodyEl = undefined;
+    this.problemsEl = undefined;
     const trigger = this.trigger;
     if (trigger?.isConnected) trigger.focus();
+  }
+
+  /** Shows the problems when their text differs from what is shown; the live region is left alone otherwise. */
+  private showProblems(lines: string[]): void {
+    const region = this.problemsEl;
+    if (!region) return;
+    const text = lines.join("\n");
+    if (text === this.problemText) return;
+    this.problemText = text;
+    region.empty();
+    for (const line of lines) region.createEl("p", { text: line, cls: "vam-prompt-preview-problem" });
   }
 
   private renderBody(): void {
@@ -69,24 +87,19 @@ export class PromptPreviewModal extends Modal {
     if (fields.invalid) {
       const first = fields.invalid.issues[0];
       const reason = first ? styleIssueText(first) : "";
-      body.createEl("p", {
-        text: t("ui.preview_style_invalid_0_1_2", fields.invalid.fileName, first?.line ?? 1, reason),
-        cls: "vam-prompt-preview-problem",
-        attr: { role: "alert" }
-      });
+      this.showProblems([t("ui.preview_style_invalid_0_1_2", fields.invalid.fileName, first?.line ?? 1, reason)]);
       return;
     }
     const preview = previewPrompt(this.step, this.language, this.provider, fields);
-    for (const issue of preview.issues) {
-      body.createEl("p", {
-        text: t("ui.preview_issue_0_1_2", issue.fileName ?? issue.id, issue.line, styleIssueText(issue)),
-        cls: "vam-prompt-preview-problem",
-        attr: { role: "alert" }
-      });
-    }
+    this.showProblems(
+      preview.issues.map(issue =>
+        t("ui.preview_issue_0_1_2", issue.fileName ?? issue.id, issue.line, styleIssueText(issue))
+      )
+    );
+    // The modal title is not a heading element, so the section titles start at h2 and never skip a level.
     for (const section of preview.sections) {
       const title = t(GROUP_KEYS[section.group]);
-      body.createEl("h4", { text: title });
+      body.createEl("h2", { text: title });
       const pre = body.createEl("pre", { cls: "vam-prompt-preview-text" });
       pre.setText(section.text);
       pre.setAttr("tabindex", "0");

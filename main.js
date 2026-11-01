@@ -47403,15 +47403,24 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
       }
     };
   }
+  /**
+   * `toneText` and the note style fields for a TaskContext, from one resolution so a template block and its tone choice
+   * (`styleSelection`) agree with the tone text. Spread `tone` where the tone belongs and `style` after the template.
+   */
+  styleFields(note, options, template2) {
+    var _a2;
+    const language2 = (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language;
+    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, language2, template2);
+    return {
+      tone: toneText ? { toneText } : {},
+      style: this.noteStyles.contextFields(template2, toneText, language2)
+    };
+  }
   /** `{ toneText }` for a TaskContext, or nothing when the resolved tone is academic. */
   toneField(note, options, template2) {
     var _a2;
-    const toneText = this.toneTextFor(
-      note,
-      options == null ? void 0 : options.toneId,
-      (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language,
-      template2
-    );
+    const language2 = (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language;
+    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, language2, template2);
     return toneText ? { toneText } : {};
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
@@ -47436,12 +47445,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
    */
   toneTextFor(note, chosenId, language2 = this.plugin.settings.language, template2) {
     var _a2;
-    return runToneText(
-      this.noteStyles.resolutionOf(template2),
-      this.plugin.settings.promptPresets,
-      [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId],
-      language2
-    );
+    return this.noteStyles.toneTextFor(template2, [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId], language2);
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   fieldLinks() {
@@ -58060,7 +58064,7 @@ ${request.requirements}` : preset.text,
     }
     const language2 = this.plugin.settings.language;
     const task = direction || synthesisGoalTask(language2);
-    const detailTemplate = templateInLanguage(
+    const detailTemplate = this.templateForRun(
       await this.detailTemplateFor(node, options == null ? void 0 : options.detailTemplateId, options == null ? void 0 : options.toneId),
       (_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2
     );
@@ -58072,6 +58076,7 @@ ${request.requirements}` : preset.text,
     const progress = this.startTaskProgress(node.path, used.model);
     let findingsSent = false;
     try {
+      const synthesisStyle = this.styleFields(note, options, detailTemplate);
       const synthesisContext = withThinkingOrigin(
         {
           title: note.title,
@@ -58091,13 +58096,13 @@ ${request.requirements}` : preset.text,
           referenceDelivery: "direct",
           onProgress: options == null ? void 0 : options.onProgress,
           outputLanguage: options == null ? void 0 : options.outputLanguage,
-          ...this.toneField(note, options, detailTemplate),
+          ...synthesisStyle.tone,
           mode: "synthesize",
           researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
           researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
           visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : note.visualMode,
           detailTemplate,
-          ...this.noteStyles.contextFields(detailTemplate),
+          ...synthesisStyle.style,
           addCharts: true
         },
         note
@@ -58748,6 +58753,7 @@ ${note.detail.trim()}` : "",
     await this.noteStyles.refresh();
     const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId);
     try {
+      const integrationStyle = this.styleFields(void 0, options, detailTemplate);
       const integrationContext = {
         title,
         summary: translateNote((_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2, "note.no_conclusion_yet"),
@@ -58766,13 +58772,13 @@ ${note.detail.trim()}` : "",
           this.render();
         },
         outputLanguage: options == null ? void 0 : options.outputLanguage,
-        ...this.toneField(void 0, options, detailTemplate),
+        ...integrationStyle.tone,
         mode: "synthesize",
         researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
         researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
         visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : "auto",
         detailTemplate,
-        ...this.noteStyles.contextFields(detailTemplate),
+        ...integrationStyle.style,
         addCharts: true
       };
       const result = await this.plugin.askModel(
@@ -61990,16 +61996,20 @@ ${addition}` : addition });
       { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }
     ]);
   }
-  /** The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and line. */
+  /**
+   * The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and
+   * line. A template block that does not parse only shows a Notice (file, line, reason) and the run uses the built-in one.
+   */
   styleOrThrow(levels) {
+    var _a2, _b2;
     const resolved = this.noteStyles.resolve(levels);
     if (resolved.invalid) {
       const first = resolved.invalid.issues[0];
       const { fileName } = resolved.invalid;
       const base = fileName.replace(/\.md$/i, "");
       const builtin = NOTE_STYLE_PRESETS.find((item) => {
-        var _a2;
-        return ((_a2 = this.noteStyles.builtinIdOfFile(base)) == null ? void 0 : _a2.id) === item.id;
+        var _a3;
+        return ((_a3 = this.noteStyles.builtinIdOfFile(base)) == null ? void 0 : _a3.id) === item.id;
       });
       const ref = builtin ? { kind: "builtin", id: builtin.id } : { kind: "file", id: `style:${base}` };
       throw new NoteStyleFileError(
@@ -62007,7 +62017,17 @@ ${addition}` : addition });
         () => void openStyleFile(this.app, this.noteStyles, ref)
       );
     }
+    const issue2 = (_a2 = resolved.blockIssues) == null ? void 0 : _a2[0];
+    if (issue2) new import_obsidian32.Notice(t("ui.preview_issue_0_1_2", (_b2 = issue2.fileName) != null ? _b2 : issue2.id, issue2.line, styleIssueText(issue2)));
     return resolved;
+  }
+  /**
+   * The template a run uses, in the run's language. A template the store resolved from a block (a changed built-in or the
+   * user's own) is kept as it is: swapping in a fresh built-in object would drop its block text from the run.
+   */
+  templateForRun(template2, language2) {
+    var _a2;
+    return ((_a2 = this.noteStyles.resolutionOf(template2)) == null ? void 0 : _a2.block) ? template2 : templateInLanguage(template2, language2);
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {
@@ -62036,7 +62056,7 @@ ${addition}` : addition });
    */
   mapDetailTemplate(language2, chosenId) {
     var _a2, _b2;
-    return templateInLanguage(
+    return this.templateForRun(
       this.styleOrThrow([{ template: chosenId }, { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }]).template,
       language2
     );
@@ -62066,10 +62086,11 @@ ${addition}` : addition });
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return null;
     }
-    const detailTemplate = templateInLanguage(
+    const detailTemplate = this.templateForRun(
       (_c = overrides == null ? void 0 : overrides.detailTemplate) != null ? _c : await this.detailTemplateFor(node),
       (_d = overrides == null ? void 0 : overrides.outputLanguage) != null ? _d : this.plugin.settings.language
     );
+    const style = this.styleFields(note, overrides, detailTemplate);
     const context = withThinkingOrigin(
       {
         title: note.title,
@@ -62085,10 +62106,10 @@ ${addition}` : addition });
         researchMode: note.researchMode,
         researchDepth: "normal",
         visualMode: note.visualMode,
-        ...this.toneField(note, overrides, detailTemplate),
+        ...style.tone,
         ...overrides,
         detailTemplate,
-        ...this.noteStyles.contextFields(detailTemplate),
+        ...style.style,
         addCharts: (_g = overrides == null ? void 0 : overrides.addCharts) != null ? _g : true
       },
       note
@@ -62419,6 +62440,8 @@ var PromptPreviewModal = class extends import_obsidian33.Modal {
     this.trigger = trigger;
     __publicField(this, "step", PREVIEW_STEPS[0].id);
     __publicField(this, "bodyEl");
+    __publicField(this, "problemsEl");
+    __publicField(this, "problemText", "");
   }
   onOpen() {
     this.titleEl.setText(t("ui.preview_prompt_title"));
@@ -62438,6 +62461,8 @@ var PromptPreviewModal = class extends import_obsidian33.Modal {
       this.step = select.value;
       this.renderBody();
     });
+    this.problemText = "";
+    this.problemsEl = contentEl.createDiv({ cls: "vam-prompt-preview-problems", attr: { "aria-live": "polite" } });
     this.bodyEl = contentEl.createDiv({ cls: "vam-prompt-preview-body" });
     this.renderBody();
     select.focus();
@@ -62445,11 +62470,22 @@ var PromptPreviewModal = class extends import_obsidian33.Modal {
   onClose() {
     this.contentEl.empty();
     this.bodyEl = void 0;
+    this.problemsEl = void 0;
     const trigger = this.trigger;
     if (trigger == null ? void 0 : trigger.isConnected) trigger.focus();
   }
+  /** Shows the problems when their text differs from what is shown; the live region is left alone otherwise. */
+  showProblems(lines) {
+    const region = this.problemsEl;
+    if (!region) return;
+    const text11 = lines.join("\n");
+    if (text11 === this.problemText) return;
+    this.problemText = text11;
+    region.empty();
+    for (const line of lines) region.createEl("p", { text: line, cls: "vam-prompt-preview-problem" });
+  }
   renderBody() {
-    var _a2, _b2;
+    var _a2;
     const body = this.bodyEl;
     if (!body) return;
     body.empty();
@@ -62457,24 +62493,21 @@ var PromptPreviewModal = class extends import_obsidian33.Modal {
     if (fields.invalid) {
       const first = fields.invalid.issues[0];
       const reason = first ? styleIssueText(first) : "";
-      body.createEl("p", {
-        text: t("ui.preview_style_invalid_0_1_2", fields.invalid.fileName, (_a2 = first == null ? void 0 : first.line) != null ? _a2 : 1, reason),
-        cls: "vam-prompt-preview-problem",
-        attr: { role: "alert" }
-      });
+      this.showProblems([t("ui.preview_style_invalid_0_1_2", fields.invalid.fileName, (_a2 = first == null ? void 0 : first.line) != null ? _a2 : 1, reason)]);
       return;
     }
     const preview = previewPrompt(this.step, this.language, this.provider, fields);
-    for (const issue2 of preview.issues) {
-      body.createEl("p", {
-        text: t("ui.preview_issue_0_1_2", (_b2 = issue2.fileName) != null ? _b2 : issue2.id, issue2.line, styleIssueText(issue2)),
-        cls: "vam-prompt-preview-problem",
-        attr: { role: "alert" }
-      });
-    }
+    this.showProblems(
+      preview.issues.map(
+        (issue2) => {
+          var _a3;
+          return t("ui.preview_issue_0_1_2", (_a3 = issue2.fileName) != null ? _a3 : issue2.id, issue2.line, styleIssueText(issue2));
+        }
+      )
+    );
     for (const section3 of preview.sections) {
       const title = t(GROUP_KEYS[section3.group]);
-      body.createEl("h4", { text: title });
+      body.createEl("h2", { text: title });
       const pre = body.createEl("pre", { cls: "vam-prompt-preview-text" });
       pre.setText(section3.text);
       pre.setAttr("tabindex", "0");

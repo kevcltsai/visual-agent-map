@@ -222,11 +222,11 @@ import {
   countIssueText,
   builtinTemplates,
   isBuiltinTemplateId,
-  resolveTemplate,
   STANDARD_TEMPLATE_ID,
   type CountIssue,
   type DetailTemplate
 } from "../../ai/detail-templates";
+import { emptyNoteStyleStore, type NoteStyleStore, type StyleLevel } from "../../ai/note-style-store";
 import {
   DEFAULT_OUTLINE_PRESET_ID,
   DEFAULT_TONE_ID,
@@ -2131,9 +2131,15 @@ export class VisualAgentMapView extends ItemView {
   /** `{ toneText }` for a TaskContext, or nothing when the resolved tone is academic. */
   private toneField(
     note: Pick<Note, "toneId"> | undefined,
-    options?: Pick<TaskOptions, "toneId" | "outputLanguage">
+    options?: Pick<TaskOptions, "toneId" | "outputLanguage">,
+    template?: DetailTemplate
   ): { toneText: string } | Record<string, never> {
-    const toneText = this.toneTextFor(note, options?.toneId, options?.outputLanguage ?? this.plugin.settings.language);
+    const toneText = this.toneTextFor(
+      note,
+      options?.toneId,
+      options?.outputLanguage ?? this.plugin.settings.language,
+      template
+    );
     return toneText ? { toneText } : {};
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
@@ -2158,8 +2164,12 @@ export class VisualAgentMapView extends ItemView {
   private toneTextFor(
     note: Pick<Note, "toneId"> | undefined,
     chosenId?: string,
-    language: ContentLanguage = this.plugin.settings.language
+    language: ContentLanguage = this.plugin.settings.language,
+    template?: DetailTemplate
   ): string | undefined {
+    // A note style file decides its own tone (the answer was made with the template, see NoteStyleStore.resolve).
+    const resolved = this.noteStyles.resolutionOf(template);
+    if (resolved?.noteStyle) return resolved.toneText;
     return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note?.toneId, this.map?.toneId], language);
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
@@ -3718,12 +3728,8 @@ export class VisualAgentMapView extends ItemView {
     // A model chosen for the shallow research becomes the new topics' model, so later work on them uses it too.
     const currentModel = this.plugin.currentModelChoice().model;
     const model = (request.shallowResearch && request.model) || currentModel;
-    const settings = this.plugin.settings;
-    const { template } = resolveTemplate(
-      settings.detailTemplates,
-      [request.detailTemplateId, settings.defaultDetailTemplateId],
-      noteLanguageOf(settings.language)
-    );
+    await this.noteStyles.refresh();
+    const { template } = this.styleOrThrow([{ template: request.detailTemplateId }]);
     let result: Awaited<ReturnType<typeof createOutlineMap>>;
     try {
       result = await createOutlineMap(
@@ -3822,6 +3828,7 @@ export class VisualAgentMapView extends ItemView {
           : currentModel;
         model = (request.shallowResearch && request.model) || baseModel;
         // A template chosen here is recorded on each new topic: an import never changes this map's default.
+        await this.noteStyles.refresh();
         const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
         const result = await addOutlineToMap(
           repo,
@@ -4885,9 +4892,10 @@ export class VisualAgentMapView extends ItemView {
   }
   private researchStageText(progress: ResearchProgress): string {
     const stage = this.researchStageName(progress);
-    return progress.model
+    const withModel = progress.model
       ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model))
       : stage;
+    return progress.style ? `${withModel} · ${t("ui.progress_note_style_0", progress.style)}` : withModel;
   }
   private researchStageName(progress: ResearchProgress): string {
     switch (progress.stage) {
@@ -13056,6 +13064,7 @@ export class VisualAgentMapView extends ItemView {
     const historyMark = this.history.mark();
     const createdByTitle = new Map<string, MapNode>(),
       newNodes: MapNode[] = [];
+    await this.noteStyles.refresh();
     const contributionTemplate = this.mapDetailTemplate(this.plugin.settings.language, detailTemplateId);
     try {
       for (const item of items) {
@@ -13830,12 +13839,13 @@ export class VisualAgentMapView extends ItemView {
           referenceDelivery: "direct",
           onProgress: options?.onProgress,
           outputLanguage: options?.outputLanguage,
-          ...this.toneField(note, options),
+          ...this.toneField(note, options, detailTemplate),
           mode: "synthesize",
           researchMode: options?.researchMode ?? "local",
           researchDepth: options?.researchDepth ?? "normal",
           visualMode: options?.visualMode ?? note.visualMode,
           detailTemplate,
+          ...this.noteStyles.contextFields(detailTemplate),
           addCharts: true
         },
         note
@@ -14555,6 +14565,7 @@ export class VisualAgentMapView extends ItemView {
     const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
     const model = chosen.model;
     const language = this.plugin.settings.language;
+    await this.noteStyles.refresh();
     const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
     try {
       const integrationContext: TaskContext = {
@@ -14574,12 +14585,13 @@ export class VisualAgentMapView extends ItemView {
           this.render();
         },
         outputLanguage: options?.outputLanguage,
-        ...this.toneField(undefined, options),
+        ...this.toneField(undefined, options, detailTemplate),
         mode: "synthesize",
         researchMode: options?.researchMode ?? "local",
         researchDepth: options?.researchDepth ?? "normal",
         visualMode: options?.visualMode ?? "auto",
         detailTemplate,
+        ...this.noteStyles.contextFields(detailTemplate),
         addCharts: true
       };
       const result = await this.plugin.askModel(
@@ -18076,34 +18088,52 @@ export class VisualAgentMapView extends ItemView {
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
+    await this.noteStyles.refresh();
     const { template, missing } = this.resolveTopicTemplate(note, chosenId);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      new Notice(t("ui.detail_template_missing_0", note.detailTemplateId));
+      new Notice(this.missingTemplateMessage(note.detailTemplateId));
       await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
     }
     return template;
   }
   /** Resolves the topic's content template without notifying or writing anything (see detailTemplateFor). */
   private resolveTopicTemplate(note: Note, chosenId?: string): { template: DetailTemplate; missing: string[] } {
-    const settings = this.plugin.settings;
-    return resolveTemplate(
-      settings.detailTemplates,
-      [chosenId, note.detailTemplateId, this.map?.detailTemplateId, settings.defaultDetailTemplateId],
-      noteLanguageOf(settings.language)
+    return this.styleOrThrow([
+      { template: chosenId },
+      { template: note.detailTemplateId, tone: note.toneId },
+      { template: this.map?.detailTemplateId, tone: this.map?.toneId }
+    ]);
+  }
+  /** The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and line. */
+  private styleOrThrow(levels: StyleLevel[]): { template: DetailTemplate; missing: string[] } {
+    const resolved = this.noteStyles.resolve(levels);
+    if (resolved.invalid) {
+      const first = resolved.invalid.issues[0];
+      throw new Error(t("ui.note_style_file_invalid_0_1_2", resolved.invalid.fileName, first.line, first.message));
+    }
+    return resolved;
+  }
+  /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
+  private get noteStyles(): NoteStyleStore {
+    return (
+      (this.plugin as { noteStyles?: NoteStyleStore }).noteStyles ??
+      (this.noStyleFiles ??= emptyNoteStyleStore(() => this.plugin.settings))
     );
+  }
+  private noStyleFiles?: NoteStyleStore;
+  private missingTemplateMessage(id: string): string {
+    return id.startsWith("style:")
+      ? t("ui.note_style_file_missing_0", `${id.slice("style:".length)}.md`)
+      : t("ui.detail_template_missing_0", id);
   }
   /**
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
   private mapDetailTemplate(language: ContentLanguage, chosenId?: string): DetailTemplate {
-    const settings = this.plugin.settings;
     return templateInLanguage(
-      resolveTemplate(
-        settings.detailTemplates,
-        [chosenId, this.map?.detailTemplateId, settings.defaultDetailTemplateId],
-        noteLanguageOf(settings.language)
-      ).template,
+      this.styleOrThrow([{ template: chosenId }, { template: this.map?.detailTemplateId, tone: this.map?.toneId }])
+        .template,
       language
     );
   }
@@ -18160,9 +18190,10 @@ export class VisualAgentMapView extends ItemView {
         researchMode: note.researchMode,
         researchDepth: "normal",
         visualMode: note.visualMode,
-        ...this.toneField(note, overrides),
+        ...this.toneField(note, overrides, detailTemplate),
         ...overrides,
         detailTemplate,
+        ...this.noteStyles.contextFields(detailTemplate),
         addCharts: overrides?.addCharts ?? true
       },
       note
@@ -18180,7 +18211,13 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now(), used.model);
+    progress?.begin(
+      taskPath,
+      progressAttempt,
+      Date.now(),
+      used.model,
+      this.noteStyles.resolutionOf(detailTemplate)?.fileName
+    );
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;

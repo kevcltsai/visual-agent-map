@@ -29,11 +29,12 @@ import {
   Notice,
   Plugin,
   TFile,
-  type TFolder,
+  TFolder,
   View,
   WorkspaceLeaf,
   type Command
 } from "obsidian";
+import { NoteStyleStore, type StyleFilePort } from "./ai/note-style-store";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
 import {
@@ -143,6 +144,19 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     promptPresets: normalizePresets(saved?.promptPresets),
     defaultDetailTemplateId:
       typeof saved?.defaultDetailTemplateId === "string" ? saved.defaultDetailTemplateId : undefined,
+    ...(typeof saved?.defaultNoteStyleId === "string" && saved.defaultNoteStyleId
+      ? { defaultNoteStyleId: saved.defaultNoteStyleId }
+      : {}),
+    ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
+      ? { noteStylesFolder: saved.noteStylesFolder }
+      : {}),
+    ...(saved?.noteStyleFiles && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles)
+      ? {
+          noteStyleFiles: Object.fromEntries(
+            Object.entries(saved.noteStyleFiles).filter(([, name]) => typeof name === "string" && name)
+          )
+        }
+      : {}),
     coffeeStyles: Array.isArray(saved?.coffeeStyles)
       ? saved.coffeeStyles.filter(
           (item: unknown): item is { id: string; name: string; prompt: string } =>
@@ -195,6 +209,12 @@ export default class VisualAgentMapPlugin extends Plugin {
   mermaidZoom: MermaidZoomHandle | null = null;
   settings: Settings = { ...DEFAULT_SETTINGS };
   repo!: Repository;
+  /** Reads the note style files once per run and resolves a topic's style; writes files only on a user action. */
+  readonly noteStyles = new NoteStyleStore({
+    settings: () => this.settings,
+    port: this.noteStylePort(),
+    save: () => this.saveSettings()
+  });
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
@@ -726,6 +746,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     );
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
+    this.registerNoteStyleEntrypoints();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof TFile && this.isMap(file))
@@ -1270,6 +1291,102 @@ export default class VisualAgentMapPlugin extends Plugin {
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;
     this.aiRuntime.dispose();
+  }
+  /** The vault operations of the note style store (Vault and FileManager APIs only). */
+  private noteStylePort(): StyleFilePort {
+    const folderAt = (path: string) => {
+      const found = this.app.vault.getAbstractFileByPath(normalizePath(path));
+      return found instanceof TFolder ? found : null;
+    };
+    return {
+      list: async folder =>
+        (folderAt(folder)?.children ?? [])
+          .filter((child): child is TFile => child instanceof TFile && child.extension === "md")
+          .map(child => child.name),
+      read: path => {
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+        if (!(file instanceof TFile)) return Promise.reject(new Error(path));
+        return this.app.vault.read(file);
+      },
+      folderExists: path => folderAt(path) !== null,
+      createFolder: async path => {
+        let current = "";
+        for (const part of normalizePath(path).split("/")) {
+          current = current ? `${current}/${part}` : part;
+          if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+        }
+      },
+      create: async (path, content) => {
+        await this.app.vault.create(normalizePath(path), content);
+      },
+      trash: async path => {
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+        if (file instanceof TFile) await this.app.fileManager.trashFile(file);
+      }
+    };
+  }
+  /** Folder rename, "restore default" in the file menu, and the two commands. Nothing here creates a file on load. */
+  private registerNoteStyleEntrypoints(): void {
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof TFolder)
+          void this.noteStyles.followFolderRename(normalizePath(oldPath), file.path).catch(() => undefined);
+      })
+    );
+    const restore = async (file: TFile): Promise<void> => {
+      try {
+        if (await this.noteStyles.restoreDefault(file.path)) new Notice(t("ui.note_style_restored_0", file.basename));
+      } catch (error) {
+        new Notice(error instanceof Error ? error.message : String(error));
+      }
+    };
+    const isBuiltinStyleFile = (file: unknown): file is TFile =>
+      file instanceof TFile &&
+      file.extension === "md" &&
+      file.parent?.path === normalizePath(this.noteStyles.folder()) &&
+      !!this.noteStyles.builtinIdOfFile(file.name);
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (isBuiltinStyleFile(file))
+          menu.addItem(item =>
+            item
+              .setTitle(t("ui.note_style_restore_menu"))
+              .setIcon("rotate-ccw")
+              .onClick(() => {
+                void restore(file);
+              })
+          );
+      })
+    );
+    this.addLocalizedCommand("open-note-styles-folder", "ui.note_style_open_folder_command", () => {
+      void this.openNoteStylesFolder();
+    });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "restore-note-style-default",
+        name: t("ui.note_style_restore_command"),
+        callback: () => {
+          const file = this.app.workspace.getActiveFile();
+          if (isBuiltinStyleFile(file)) void restore(file);
+          else new Notice(t("ui.note_style_restore_not_builtin"));
+        }
+      }),
+      key: "ui.note_style_restore_command"
+    });
+  }
+  /** Creates the style folder and files (idempotent), shows where they are and opens the first style file. */
+  async openNoteStylesFolder(): Promise<string | null> {
+    try {
+      const folder = await this.noteStyles.ensureStyleFolder();
+      new Notice(t("ui.note_style_folder_opened_0", folder));
+      const first = this.noteStyles.list()[0];
+      const file = first && this.app.vault.getAbstractFileByPath(normalizePath(`${folder}/${first.fileName}`));
+      if (file instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(file);
+      return folder;
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
+      return null;
+    }
   }
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);

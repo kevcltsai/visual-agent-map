@@ -1582,6 +1582,16 @@ var en = {
   "ui.detail_count_issue_exact": "{0}: needs exactly {1}, has {2}",
   "ui.detail_count_issue_min": "{0}: needs at least {1}, has {2}",
   "ui.detail_template_missing_0": 'The content template "{0}" no longer exists; this topic now uses the next default.',
+  "ui.note_styles_folder_name": "Note styles",
+  "ui.note_style_file_missing_0": 'The note style file "{0}" is missing; this topic now uses the next default.',
+  "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" cannot be used (line {1}): {2}',
+  "ui.note_style_open_folder_command": "Open the note styles folder",
+  "ui.note_style_restore_command": "Restore the default content of this note style",
+  "ui.note_style_restore_menu": "Restore default content",
+  "ui.note_style_restored_0": 'Restored "{0}". The earlier content is in the trash.',
+  "ui.note_style_restore_not_builtin": "Open one of the built-in note style files first.",
+  "ui.note_style_folder_opened_0": "Note styles folder: {0}",
+  "ui.progress_note_style_0": "Style: {0}",
   "ui.detail_format_unmet": "Format not met",
   "ui.detail_template_error_name_required": "Template name is required.",
   "ui.detail_template_error_name_taken": 'A template named "{0}" already exists.',
@@ -3831,6 +3841,16 @@ var zhCN = {
   "ui.detail_count_issue_exact": "{0}\uFF1A\u8981\u6C42\u521A\u597D {1} \u4E2A\uFF0C\u5B9E\u9645 {2} \u4E2A",
   "ui.detail_count_issue_min": "{0}\uFF1A\u8981\u6C42\u81F3\u5C11 {1} \u4E2A\uFF0C\u5B9E\u9645 {2} \u4E2A",
   "ui.detail_template_missing_0": "\u5185\u5BB9\u6A21\u677F\u201C{0}\u201D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u6A21\u677F\u3002",
+  "ui.note_styles_folder_name": "\u7B14\u8BB0\u98CE\u683C",
+  "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u3002",
+  "ui.note_style_file_invalid_0_1_2": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u65E0\u6CD5\u4F7F\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
+  "ui.note_style_open_folder_command": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
+  "ui.note_style_restore_command": "\u6062\u590D\u8FD9\u4E2A\u7B14\u8BB0\u98CE\u683C\u7684\u9ED8\u8BA4\u5185\u5BB9",
+  "ui.note_style_restore_menu": "\u6062\u590D\u9ED8\u8BA4\u5185\u5BB9",
+  "ui.note_style_restored_0": "\u5DF2\u6062\u590D\u201C{0}\u201D\uFF0C\u4E4B\u524D\u7684\u5185\u5BB9\u5728\u5E9F\u7EB8\u7BD3\u3002",
+  "ui.note_style_restore_not_builtin": "\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A\u5185\u7F6E\u7684\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u3002",
+  "ui.note_style_folder_opened_0": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A{0}",
+  "ui.progress_note_style_0": "\u98CE\u683C\uFF1A{0}",
   "ui.detail_format_unmet": "\u683C\u5F0F\u672A\u8FBE\u8981\u6C42",
   "ui.detail_template_error_name_required": "\u8BF7\u8F93\u5165\u6A21\u677F\u540D\u79F0\u3002",
   "ui.detail_template_error_name_taken": "\u5DF2\u6709\u540D\u4E3A\u201C{0}\u201D\u7684\u6A21\u677F\u3002",
@@ -6080,6 +6100,16 @@ var zhTW = {
   "ui.detail_count_issue_exact": "{0}\uFF1A\u8981\u6C42\u525B\u597D {1} \u500B\uFF0C\u5BE6\u969B {2} \u500B",
   "ui.detail_count_issue_min": "{0}\uFF1A\u8981\u6C42\u81F3\u5C11 {1} \u500B\uFF0C\u5BE6\u969B {2} \u500B",
   "ui.detail_template_missing_0": "\u5167\u5BB9\u6A21\u677F\u300C{0}\u300D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u6A21\u677F\u3002",
+  "ui.note_styles_folder_name": "\u7B46\u8A18\u98A8\u683C",
+  "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u3002",
+  "ui.note_style_file_invalid_0_1_2": "\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u7121\u6CD5\u4F7F\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
+  "ui.note_style_open_folder_command": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
+  "ui.note_style_restore_command": "\u6062\u5FA9\u9019\u500B\u7B46\u8A18\u98A8\u683C\u7684\u9810\u8A2D\u5167\u5BB9",
+  "ui.note_style_restore_menu": "\u6062\u5FA9\u9810\u8A2D\u5167\u5BB9",
+  "ui.note_style_restored_0": "\u5DF2\u6062\u5FA9\u300C{0}\u300D\uFF0C\u5148\u524D\u7684\u5167\u5BB9\u5728\u5783\u573E\u6876\u3002",
+  "ui.note_style_restore_not_builtin": "\u8ACB\u5148\u958B\u555F\u4E00\u500B\u5167\u5EFA\u7684\u7B46\u8A18\u98A8\u683C\u6A94\u3002",
+  "ui.note_style_folder_opened_0": "\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A{0}",
+  "ui.progress_note_style_0": "\u98A8\u683C\uFF1A{0}",
   "ui.detail_format_unmet": "\u683C\u5F0F\u672A\u9054\u8981\u6C42",
   "ui.detail_template_error_name_required": "\u8ACB\u8F38\u5165\u6A21\u677F\u540D\u7A31\u3002",
   "ui.detail_template_error_name_taken": "\u5DF2\u6709\u540D\u70BA\u300C{0}\u300D\u7684\u6A21\u677F\u3002",
@@ -7201,11 +7231,11 @@ function cleanStyle(value) {
 function cleanAttributes(node) {
   var _a2;
   for (const { name, value } of Array.from(node.attributes)) {
-    const lower = name.toLowerCase();
-    if (lower.startsWith("on")) node.removeAttribute(name);
-    else if ((lower === "href" || lower === "xlink:href" || lower === "src") && unsafeUrl(value))
+    const lower2 = name.toLowerCase();
+    if (lower2.startsWith("on")) node.removeAttribute(name);
+    else if ((lower2 === "href" || lower2 === "xlink:href" || lower2 === "src") && unsafeUrl(value))
       node.removeAttribute(name);
-    else if (lower === "style") {
+    else if (lower2 === "style") {
       if (HARD_TO_VET.test(value)) node.removeAttribute(name);
       else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
     } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
@@ -20707,6 +20737,9 @@ function copyTemplate(source, name, id) {
     }))
   };
 }
+function sectionKeys(section3) {
+  return [section3.name, ...section3.aliases].map((value) => value.trim().toLocaleLowerCase()).filter(Boolean);
+}
 var headingKey = (value) => value.trim().toLocaleLowerCase();
 function sectionLookup(template) {
   const lookup = /* @__PURE__ */ new Map();
@@ -20862,9 +20895,9 @@ function checkCounts(detail, template) {
   });
   return issues;
 }
-function countIssueText(issue, language2) {
-  const key2 = issue.mode === "exact" ? "ui.detail_count_issue_exact" : "ui.detail_count_issue_min";
-  return translate(language2, key2, issue.section, issue.n, issue.actual);
+function countIssueText(issue2, language2) {
+  const key2 = issue2.mode === "exact" ? "ui.detail_count_issue_exact" : "ui.detail_count_issue_min";
+  return translate(language2, key2, issue2.section, issue2.n, issue2.actual);
 }
 function detailStructurePrompt(template, language2, standardText, anchor) {
   return [
@@ -21221,8 +21254,8 @@ function guardMapChatWrite(check) {
   const path = normalizeVaultPath(check.path);
   if (path === null) return { ok: false, code: "outside_vault" };
   const configDir = normalizeVaultPath(check.configDir);
-  const lower = path.toLowerCase();
-  const inside2 = (dir) => !!dir && (lower === dir.toLowerCase() || lower.startsWith(`${dir.toLowerCase()}/`));
+  const lower2 = path.toLowerCase();
+  const inside2 = (dir) => !!dir && (lower2 === dir.toLowerCase() || lower2.startsWith(`${dir.toLowerCase()}/`));
   if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
@@ -24810,6 +24843,742 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
     ...end < lines.length && lines[end].trim() ? [""] : [],
     ...lines.slice(end)
   ].join("\n");
+}
+
+// core/note-styles/canonical/v1/standard.zh-TW.md
+var standard_zh_TW_default = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6A19\u6E96\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/note-styles/canonical/v1/standard.zh-CN.md
+var standard_zh_CN_default = "---\n\u8BED\u6C14: \u5B66\u672F\u4E25\u8C28\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u6807\u51C6\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+
+// core/note-styles/canonical/v1/standard.en.md
+var standard_en_default = '---\ntone: Academic\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Standard" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// core/note-styles/canonical/v1/textbook.zh-TW.md
+var textbook_zh_TW_default = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6559\u79D1\u66F8\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n\u5148\u7528 2\u20134 \u6BB5\u6D41\u66A2\u7684\u6BB5\u843D\u5E36\u8B80\u8005\u9032\u5165\u4E3B\u984C\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\u3002\u4F9D\u5E8F\u5BEB\uFF1A\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\uFF1B\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7C21\u77ED\u9EDE\u51FA\u5E38\u898B\u8AA4\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\u6700\u5F8C\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/note-styles/canonical/v1/textbook.zh-CN.md
+var textbook_zh_CN_default = "---\n\u8BED\u6C14: \u5B66\u672F\u4E25\u8C28\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u6559\u79D1\u4E66\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n\u5148\u7528 2\u20134 \u6BB5\u6D41\u7545\u7684\u6BB5\u843D\u5E26\u8BFB\u8005\u8FDB\u5165\u4E3B\u9898\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6807\u9898\u3002\u4F9D\u5E8F\u5199\uFF1A\u4E3A\u4EC0\u4E48\u8FD9\u4E2A\u4E3B\u9898\u503C\u5F97\u5B66\u3001\u8DDF\u8BFB\u8005\u6709\u4EC0\u4E48\u5173\u7CFB\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6D45\u767D\u7684\u8BED\u8A00\u8BF4\u660E\uFF0C\u5FC5\u8981\u65F6\u624D\u4E0B\u4E13\u6709\u540D\u8BCD\u5E76\u7ACB\u523B\u89E3\u91CA\uFF1B\u4E00\u4E2A\u4ECE\u5934\u8D70\u5230\u5C3E\u3001\u542B\u5B9E\u9645\u6570\u5B57\u6216\u6B65\u9AA4\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8BFB\u8005\u53EA\u8BFB\u8FD9\u4E00\u6BB5\uFF0C\u5C31\u5E94\u8BE5\u5DF2\u7ECF\u61C2\u4E2A\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u6838\u5FC3\u7ED3\u8BBA\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u590D\u5BFC\u8BFB\u5DF2\u7ECF\u8BB2\u8FC7\u7684\u53E5\u5B50\u3002\u6CA1\u6709\u53EF\u9760\u5185\u5BB9\u7684\u5206\u7C7B\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B66\u8005\u5E38\u4EE5\u4E3A\u2026\uFF0C\u5176\u5B9E\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7B80\u77ED\u70B9\u51FA\u5E38\u89C1\u8BEF\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\u6700\u540E\u52A0\u4E00\u5C0F\u5757\u300C**\u81EA\u6211\u68C0\u6838**\u300D\uFF08\u7C97\u4F53\u5B57\u5F00\u5934\uFF0C\u4E0D\u7528\u6807\u9898\uFF09\uFF0C\u5217 2\u20133 \u4E2A\u8BA9\u8BFB\u8005\u68C0\u67E5\u81EA\u5DF1\u662F\u5426\u5B66\u4F1A\u7684\u95EE\u9898\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+
+// core/note-styles/canonical/v1/textbook.en.md
+var textbook_en_default = '---\ntone: Academic\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Textbook" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\nOpen with 2\u20134 flowing paragraphs that bring the reader into the topic, with no headings. In order: why the topic is worth learning and how it relates to the reader; the core concepts in plain language, using a technical term only when needed and explaining it right away; one complete worked example from start to finish with real numbers or steps. A reader who reads only this part should already get the gist.\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 core conclusions by default, conclusion first and then the reason, without repeating sentences the intro already said. Omit a section entirely when there is no reliable content for it.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n> [!warning]\n> Use the pattern "Beginners often assume \u2026, but actually \u2026" to point out a common misconception briefly.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\nEnd with a short block headed by bold **Self-check** (bold text, not a heading) listing 2\u20133 questions that let the reader check whether they learned it, optionally with a one-line hint.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// core/note-styles/canonical/v1/summary.zh-TW.md
+var summary_zh_TW_default = "---\n\u8A9E\u6C23: \u91CD\u9EDE\u6458\u8981\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u7CBE\u7C21\u91CD\u9EDE\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/note-styles/canonical/v1/summary.zh-CN.md
+var summary_zh_CN_default = "---\n\u8BED\u6C14: \u91CD\u70B9\u6458\u8981\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u7CBE\u7B80\u91CD\u70B9\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+
+// core/note-styles/canonical/v1/summary.en.md
+var summary_en_default2 = '---\ntone: Key-point summary\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Key points" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// core/note-styles/canonical/v1/plain.zh-TW.md
+var plain_zh_TW_default = "---\n\u8A9E\u6C23: \u767D\u8A71\u8AAA\u660E\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u767D\u8A71\u8AAA\u660E\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/note-styles/canonical/v1/plain.zh-CN.md
+var plain_zh_CN_default = "---\n\u8BED\u6C14: \u767D\u8BDD\u8BF4\u660E\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u767D\u8BDD\u8BF4\u660E\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+
+// core/note-styles/canonical/v1/plain.en.md
+var plain_en_default2 = '---\ntone: Plain explanation\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Plain language" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// core/note-styles/canonical/v1/guide.zh-TW.md
+var guide_zh_TW_default = "---\n\u8A9E\u6C23: \u5BE6\u7528\u6307\u5357\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u5BE6\u7528\u6307\u5357\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/note-styles/canonical/v1/guide.zh-CN.md
+var guide_zh_CN_default = "---\n\u8BED\u6C14: \u5B9E\u7528\u6307\u5357\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u5B9E\u7528\u6307\u5357\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
+
+// core/note-styles/canonical/v1/guide.en.md
+var guide_en_default2 = '---\ntone: Practical guide\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Practical guide" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// ai/note-style-file.ts
+var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
+var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
+var CANONICAL_LANGUAGES = ["zh-TW", "zh-CN", "en"];
+var CANONICAL_VERSIONS = [
+  {
+    standard: { "zh-TW": standard_zh_TW_default, "zh-CN": standard_zh_CN_default, en: standard_en_default },
+    textbook: { "zh-TW": textbook_zh_TW_default, "zh-CN": textbook_zh_CN_default, en: textbook_en_default },
+    summary: { "zh-TW": summary_zh_TW_default, "zh-CN": summary_zh_CN_default, en: summary_en_default2 },
+    plain: { "zh-TW": plain_zh_TW_default, "zh-CN": plain_zh_CN_default, en: plain_en_default2 },
+    guide: { "zh-TW": guide_zh_TW_default, "zh-CN": guide_zh_CN_default, en: guide_en_default2 }
+  }
+];
+function builtinStyleFileName(id, language2) {
+  const key2 = {
+    standard: "ui.note_style_standard_short",
+    textbook: "ui.note_style_textbook_short",
+    summary: "ui.note_style_summary",
+    plain: "ui.note_style_plain",
+    guide: "ui.note_style_guide"
+  };
+  return translate(language2, key2[id]);
+}
+function canonicalContent(id, language2) {
+  return CANONICAL_VERSIONS[CANONICAL_VERSIONS.length - 1][id][language2];
+}
+function normalizeStyleContent(text11) {
+  return text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+$/, "")).join("\n").replace(/\n+$/, "") + "\n";
+}
+function matchCanonical(text11) {
+  const normalized = normalizeStyleContent(text11);
+  for (let version = 0; version < CANONICAL_VERSIONS.length; version++)
+    for (const id of NOTE_STYLE_BUILTIN_IDS)
+      for (const language2 of CANONICAL_LANGUAGES)
+        if (normalizeStyleContent(CANONICAL_VERSIONS[version][id][language2]) === normalized)
+          return { id, language: language2, version: version + 1 };
+  return void 0;
+}
+var LEGACY_V1 = {
+  "zh-TW": {
+    callouts: "\u65B9\u6846: \u81EA\u52D5",
+    count: "\u6578\u91CF: ",
+    atLeast: "\u81F3\u5C11 ",
+    comment: (name) => `%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C${name}\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002 %%`
+  },
+  "zh-CN": {
+    callouts: "\u65B9\u6846: \u81EA\u52A8",
+    count: "\u6570\u91CF: ",
+    atLeast: "\u81F3\u5C11 ",
+    comment: (name) => `%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C${name}\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002 %%`
+  },
+  en: {
+    callouts: "callouts: auto",
+    count: "Count: ",
+    atLeast: "at least ",
+    comment: (name) => `%% This file decides how the AI writes notes in the "${name}" style. Save your edits and the next AI update follows them; notes already written do not change. %%`
+  }
+};
+function serializeLegacyV1(template, language2) {
+  const words2 = LEGACY_V1[language2];
+  const sections = template.sections.map((section3) => {
+    const lines = [`## ${section3.name}`];
+    if (section3.count)
+      lines.push(`${words2.count}${section3.count.mode === "min" ? words2.atLeast : ""}${section3.count.n}`);
+    if (section3.description.trim()) lines.push(section3.description.replace(/\r\n?/g, "\n").trim());
+    return lines.join("\n") + "\n";
+  });
+  return `---
+${words2.callouts}
+---
+${words2.comment(template.name)}
+
+${sections.join("\n")}`;
+}
+var issue = (line, code, message, ...values) => ({
+  line,
+  code,
+  values,
+  message
+});
+var FRONTMATTER_KEYS = {
+  \u8A9E\u6C23: "tone",
+  \u8BED\u6C14: "tone",
+  tone: "tone",
+  \u65B9\u6846: "callouts",
+  callouts: "callouts",
+  \u5716\u8868: "diagrams",
+  \u56FE\u8868: "diagrams",
+  diagrams: "diagrams",
+  \u8868\u683C: "tables",
+  tables: "tables",
+  \u5F85\u8FA6\u6E05\u55AE: "tasks",
+  \u5F85\u529E\u6E05\u5355: "tasks",
+  tasks: "tasks",
+  \u87A2\u5149\u6A19\u8A18: "highlight",
+  \u8367\u5149\u6807\u8BB0: "highlight",
+  highlight: "highlight"
+};
+var ON = /* @__PURE__ */ new Set(["\u958B", "\u5F00", "on", "true"]);
+var OFF = /* @__PURE__ */ new Set(["\u95DC", "\u5173", "off", "false"]);
+var COMMENT_MARK = "%%";
+function stripNoteStyleComments(text11) {
+  const lines = text11.split("\n");
+  const out = [];
+  let fence = null;
+  let open;
+  lines.forEach((line, index) => {
+    if (open === void 0) {
+      if (fence) {
+        const close = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+        if (close && close[1][0] === fence[0] && close[1].length >= fence.length) fence = null;
+        out.push(line);
+        return;
+      }
+      const fenceOpen = /^\s*(`{3,}|~{3,})/.exec(line);
+      if (fenceOpen) {
+        fence = fenceOpen[1];
+        out.push(line);
+        return;
+      }
+    }
+    let kept = "";
+    let at = 0;
+    let touched = false;
+    while (at < line.length) {
+      const mark = line.indexOf(COMMENT_MARK, at);
+      if (open !== void 0) {
+        touched = true;
+        if (mark < 0) break;
+        open = void 0;
+        at = mark + COMMENT_MARK.length;
+      } else {
+        if (mark < 0) {
+          kept += line.slice(at);
+          break;
+        }
+        kept += line.slice(at, mark);
+        open = index + 1;
+        touched = true;
+        at = mark + COMMENT_MARK.length;
+      }
+    }
+    out.push(touched && !kept.trim() ? "" : kept);
+  });
+  return { text: out.join("\n"), ...open !== void 0 ? { unclosed: open } : {} };
+}
+var NAME_LANGUAGES = ["zh-TW", "zh-CN", "en"];
+var lowered = (value) => value.trim().toLocaleLowerCase();
+function standardKeyOf(heading) {
+  const key2 = lowered(heading);
+  return STANDARD.findIndex(([, name]) => NAME_LANGUAGES.some((language2) => lowered(translate(language2, name)) === key2));
+}
+function parseCount(line) {
+  const head = /^(?:數量|数量|count)\s*[:：]\s*(.*)$/i.exec(line.trim());
+  if (!head) return void 0;
+  const value = /^(至少|at\s+least)?\s*(\d{1,6})$/i.exec(head[1].trim());
+  return value ? { mode: value[1] ? "min" : "exact", n: Number(value[2]) } : "invalid";
+}
+function parseCallouts(lines, code) {
+  var _a2, _b2;
+  const callouts = [];
+  const rest = [];
+  for (let index = 0; index < lines.length; index++) {
+    const head = code[index] ? null : /^>[ \t]?\[!([A-Za-z][\w-]*)\]([+-])?(?:[ \t]+(.*))?$/.exec(lines[index]);
+    if (!head) {
+      rest.push(lines[index]);
+      continue;
+    }
+    const body = [];
+    while (index + 1 < lines.length && !code[index + 1] && /^>/.test(lines[index + 1]))
+      body.push(lines[++index].replace(/^>[ \t]?/, ""));
+    callouts.push({
+      type: head[1].toLowerCase(),
+      fold: (_a2 = head[2]) != null ? _a2 : "",
+      title: ((_b2 = head[3]) != null ? _b2 : "").trim(),
+      body: body.join("\n").trim()
+    });
+  }
+  return { callouts, rest };
+}
+function parseNoteStyleFile(text11, options) {
+  const issues = [];
+  const all = text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+  if (all.length > NOTE_STYLE_LIMITS.file)
+    issues.push(
+      issue(1, "file_long", `The file is over ${NOTE_STYLE_LIMITS.file} characters.`, NOTE_STYLE_LIMITS.file)
+    );
+  const lines = all.split("\n");
+  const flags = {
+    callouts: "placed",
+    diagrams: true,
+    tables: true,
+    tasks: true,
+    highlight: true
+  };
+  let bodyStart = 0;
+  if (lines[0].trimEnd() === "---") {
+    const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
+    if (end < 0) {
+      issues.push(issue(1, "frontmatter_unclosed", "The frontmatter opened by --- on line 1 is never closed."));
+      bodyStart = lines.length;
+    } else {
+      bodyStart = end + 1;
+      for (let index = 1; index < end; index++) {
+        const raw = lines[index];
+        if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
+        const pair6 = /^([^:：]+?)\s*[:：]\s*(.*)$/.exec(raw);
+        if (!pair6) {
+          issues.push(issue(index + 1, "frontmatter_line", `Line ${index + 1} is not "key: value".`));
+          continue;
+        }
+        const field = FRONTMATTER_KEYS[pair6[1].trim().toLocaleLowerCase()];
+        if (!field) continue;
+        let value = pair6[2].trim();
+        if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
+        const where = index + 1;
+        if (field === "tone") {
+          if (value.length > NOTE_STYLE_LIMITS.tone)
+            issues.push(
+              issue(
+                where,
+                "tone_long",
+                `The tone is over ${NOTE_STYLE_LIMITS.tone} characters.`,
+                NOTE_STYLE_LIMITS.tone
+              )
+            );
+          else flags.tone = value || void 0;
+        } else if (field === "callouts") {
+          const key2 = value.toLocaleLowerCase();
+          if (key2 === "\u81EA\u52D5" || key2 === "\u81EA\u52A8" || key2 === "auto") flags.callouts = "auto";
+          else if (key2 === "\u6307\u5B9A" || key2 === "placed") flags.callouts = "placed";
+          else
+            issues.push(
+              issue(where, "value_invalid", `Line ${where}: "${value}" is not auto or placed.`, pair6[1].trim(), value)
+            );
+        } else {
+          const key2 = value.toLocaleLowerCase();
+          if (ON.has(key2)) flags[field] = true;
+          else if (OFF.has(key2)) flags[field] = false;
+          else
+            issues.push(
+              issue(where, "value_invalid", `Line ${where}: "${value}" is not on or off.`, pair6[1].trim(), value)
+            );
+        }
+      }
+    }
+  }
+  const body = lines.slice(bodyStart).join("\n");
+  const stripped = stripNoteStyleComments(body);
+  if (stripped.unclosed !== void 0)
+    issues.push(issue(bodyStart + stripped.unclosed, "comment_unclosed", "A %% comment is never closed."));
+  const bodyLines = stripped.text.split("\n");
+  const code = fencedLines(bodyLines);
+  const headings = [];
+  bodyLines.forEach((line, index) => {
+    var _a2;
+    if (code[index]) return;
+    const heading = /^##(?:[ \t]+(.*?))?[ \t]*$/.exec(line);
+    if (heading) headings.push({ index, name: ((_a2 = heading[1]) != null ? _a2 : "").trim() });
+  });
+  if (!headings.length) issues.push(issue(Math.max(1, bodyStart + 1), "no_sections", "The file has no ## section."));
+  const intro = bodyLines.slice(0, headings.length ? headings[0].index : 0).join("\n").trim();
+  const sections = headings.map((heading, position) => {
+    const end = position + 1 < headings.length ? headings[position + 1].index : bodyLines.length;
+    let content = bodyLines.slice(heading.index + 1, end);
+    const sectionCode = code.slice(heading.index + 1, end);
+    const line = bodyStart + heading.index + 1;
+    let count;
+    const first = content.findIndex((entry) => entry.trim());
+    if (first >= 0 && !sectionCode[first]) {
+      const parsed = parseCount(content[first]);
+      if (parsed === "invalid")
+        issues.push(issue(line + 1 + first, "count_invalid", `Line ${line + 1 + first}: the count is not a number.`));
+      else if (parsed) count = parsed;
+      if (parsed) {
+        content = content.filter((_, index) => index !== first);
+        sectionCode.splice(first, 1);
+      }
+    }
+    const { callouts, rest } = parseCallouts(content, sectionCode);
+    const standard = standardKeyOf(heading.name);
+    const role = standard === 2 ? "sources" : standard === 5 ? "log" : "none";
+    const aliases = standard >= 0 ? NOTE_LANGUAGES.map((locale) => translate(locale, STANDARD[standard][1])).filter((alias) => alias !== heading.name) : [];
+    return {
+      id: standard >= 0 ? STANDARD[standard][0] : `s${position + 1}`,
+      name: heading.name,
+      description: rest.join("\n").trim(),
+      role,
+      ...count ? { count } : {},
+      aliases,
+      callouts,
+      line
+    };
+  });
+  if (sections.length) {
+    const checked = {
+      id: options.id,
+      name: "style",
+      sections: sections.map((section3) => ({ ...section3, description: "" }))
+    };
+    for (const found of validateTemplate(checked, [])) {
+      const target = found.section ? sections[found.section - 1].line : sections[0].line;
+      issues.push(issue(target, found.key, translate("en", found.key, ...found.values), ...found.values));
+    }
+  }
+  if (issues.length) return { ok: false, issues: issues.sort((a, b) => a.line - b.line) };
+  return {
+    ok: true,
+    style: {
+      id: options.id,
+      name: options.name,
+      ...flags.tone ? { tone: flags.tone } : {},
+      callouts: flags.callouts,
+      diagrams: flags.diagrams,
+      tables: flags.tables,
+      tasks: flags.tasks,
+      highlight: flags.highlight,
+      layout: intro ? "intro" : "sections",
+      intro,
+      sections,
+      template: { id: options.id, name: options.name, sections, layout: intro ? "intro" : "sections", intro }
+    }
+  };
+}
+
+// ai/note-style-store.ts
+var stripMd2 = (name) => name.replace(/\.md$/i, "");
+var lower = (value) => value.toLocaleLowerCase();
+var SAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
+var BUILTIN_PAIRS = {
+  standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
+  textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
+  summary: { template: STANDARD_TEMPLATE_ID, tone: "summary" },
+  plain: { template: STANDARD_TEMPLATE_ID, tone: "plain" },
+  guide: { template: STANDARD_TEMPLATE_ID, tone: "guide" }
+};
+function builtinPairOf(templateId, toneId) {
+  const template = templateId || STANDARD_TEMPLATE_ID;
+  const tone = toneId || DEFAULT_TONE_ID;
+  return NOTE_STYLE_BUILTIN_IDS.find((id) => BUILTIN_PAIRS[id].template === template && BUILTIN_PAIRS[id].tone === tone);
+}
+function defaultStylesFolderName(language2) {
+  return translate(language2, "ui.note_styles_folder_name");
+}
+var NoteStyleStore = class {
+  constructor(deps) {
+    this.deps = deps;
+    /** File text by base name (no ".md"), as of the last `refresh()`. */
+    __publicField(this, "files", /* @__PURE__ */ new Map());
+    __publicField(this, "resolutions", /* @__PURE__ */ new WeakMap());
+  }
+  get settings() {
+    return this.deps.settings();
+  }
+  /** The style folder: the saved setting, else `<workspace>/<localized name>`. */
+  folder() {
+    const settings = this.settings;
+    return settings.noteStylesFolder || `${settings.workspaceFolder}/${defaultStylesFolderName(settings.language)}`;
+  }
+  /** Reads every style file of the folder once. Call at the start of a run; later calls in the run see this snapshot. */
+  async refresh() {
+    const folder = this.folder();
+    const next = /* @__PURE__ */ new Map();
+    let names3 = [];
+    try {
+      names3 = await this.deps.port.list(folder);
+    } catch (e) {
+      names3 = [];
+    }
+    for (const name of names3) {
+      try {
+        next.set(stripMd2(name), await this.deps.port.read(`${folder}/${name}`));
+      } catch (e) {
+      }
+    }
+    this.files = next;
+  }
+  // ---- identification of files ----
+  builtinNames(id) {
+    const preferred = this.settings.language;
+    const languages = [preferred, ...CANONICAL_LANGUAGES.filter((language2) => language2 !== preferred)];
+    return [...new Set(languages.map((language2) => builtinStyleFileName(id, language2)))];
+  }
+  /** True when `text` is a built-in's file (canonical, or edited but still carrying its usage comment). */
+  isBuiltinFile(id, text11) {
+    var _a2, _b2;
+    if (((_a2 = matchCanonical(text11)) == null ? void 0 : _a2.id) === id) return true;
+    for (const version of CANONICAL_VERSIONS)
+      for (const language2 of CANONICAL_LANGUAGES) {
+        const canonical = version[id][language2];
+        const comment = (_b2 = /%%[^\n]*/.exec(canonical)) == null ? void 0 : _b2[0];
+        const name = builtinStyleFileName(id, language2);
+        const at = comment ? comment.indexOf(name) : -1;
+        if (comment && at >= 0 && text11.includes(comment.slice(0, at + name.length + 1))) return true;
+      }
+    return false;
+  }
+  /** The base name of the file that holds a built-in style now, if one is in the folder. */
+  builtinFile(id) {
+    for (const name of this.builtinNames(id)) {
+      const matches = [...this.files.keys()].filter(
+        (base) => lower(base) === lower(name) || new RegExp(`^${escapeRegExp(lower(name))} \\(\\d+\\)$`).test(lower(base))
+      ).sort();
+      const found = matches.find((base) => this.isBuiltinFile(id, this.files.get(base)));
+      if (found) return found;
+    }
+    return void 0;
+  }
+  /** The built-in a file base name stands for ("restore default" applies to it), when it is a built-in's file. */
+  builtinIdOfFile(baseName3) {
+    for (const id of NOTE_STYLE_BUILTIN_IDS)
+      for (const language2 of CANONICAL_LANGUAGES)
+        if (lower(builtinStyleFileName(id, language2)) === lower(stripMd2(baseName3))) return { id, language: language2 };
+    return void 0;
+  }
+  legacyUnchanged(template, text11) {
+    if (!template) return false;
+    const normalized = normalizeStyleContent(text11);
+    return CANONICAL_LANGUAGES.some(
+      (language2) => normalizeStyleContent(serializeLegacyV1(template, language2)) === normalized
+    );
+  }
+  // ---- resolution ----
+  /**
+   * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
+   * added here. Records the answer for `resolutionOf(template)` so tone and context fields follow the same choice.
+   */
+  resolve(levels) {
+    var _a2;
+    const settings = this.settings;
+    const noteLanguage = noteLanguageOf(settings.language);
+    const all = [...levels, this.workspaceLevel()];
+    const toneChain = all.map((level) => level.tone);
+    const missing = [];
+    for (let index = 0; index < all.length; index++) {
+      const id = all[index].template;
+      if (!id) continue;
+      const found = this.tryId(id, index, all, toneChain, noteLanguage);
+      if (found) return this.remember({ ...found, missing });
+      missing.push(id);
+    }
+    const standard = (_a2 = this.tryId(STANDARD_TEMPLATE_ID, all.length, all, toneChain, noteLanguage)) != null ? _a2 : this.legacyResult(STANDARD_TEMPLATE_ID, toneChain, noteLanguage);
+    return this.remember({ ...standard, missing });
+  }
+  /** The resolution made for a template object returned by `resolve` (only style-file templates keep their identity). */
+  resolutionOf(template) {
+    return template ? this.resolutions.get(template) : void 0;
+  }
+  /** Fields to spread into a TaskContext: the style snapshot, and `styleDiagrams: false` only when the file turns charts off. */
+  contextFields(template) {
+    var _a2;
+    const style = (_a2 = this.resolutionOf(template)) == null ? void 0 : _a2.noteStyle;
+    if (!style) return {};
+    return { noteStyle: style, ...style.diagrams ? {} : { styleDiagrams: false } };
+  }
+  remember(resolution) {
+    if (resolution.noteStyle) this.resolutions.set(resolution.template, resolution);
+    return resolution;
+  }
+  workspaceLevel() {
+    const settings = this.settings;
+    const chosen = settings.defaultNoteStyleId;
+    if (chosen) {
+      const preset = NOTE_STYLE_BUILTIN_IDS.find((id) => id === chosen);
+      if (preset) return { template: BUILTIN_PAIRS[preset].template, tone: BUILTIN_PAIRS[preset].tone };
+      return { template: chosen };
+    }
+    return { template: settings.defaultDetailTemplateId };
+  }
+  legacyResult(id, toneChain, noteLanguage) {
+    const settings = this.settings;
+    const { template, missing } = resolveTemplate(settings.detailTemplates, [id], noteLanguage);
+    if (missing.length) return void 0;
+    return {
+      template,
+      missing: [],
+      toneText: resolveToneText(settings.promptPresets, toneChain, settings.language)
+    };
+  }
+  tryId(id, level, all, toneChain, noteLanguage) {
+    var _a2, _b2, _c;
+    const settings = this.settings;
+    if (id.startsWith("style:")) {
+      const base = id.slice("style:".length);
+      const text11 = this.files.get(base);
+      if (text11 === void 0) return void 0;
+      return this.fromFile(parseNoteStyleFile(text11, { id, name: base }), `${base}.md`, level, toneChain, "user");
+    }
+    const exported = (_a2 = settings.noteStyleFiles) == null ? void 0 : _a2[id];
+    if (exported) {
+      const base = stripMd2(exported);
+      const text11 = this.files.get(base);
+      const original = settings.detailTemplates.find((template) => template.id === id);
+      if (text11 !== void 0 && !this.legacyUnchanged(original, text11)) {
+        const parsed = parseNoteStyleFile(text11, { id, name: (_b2 = original == null ? void 0 : original.name) != null ? _b2 : base });
+        if (parsed.ok && original) inheritRoles(parsed.style.template, original);
+        return this.fromFile(parsed, `${base}.md`, level, toneChain, "legacy");
+      }
+    }
+    if (id === STANDARD_TEMPLATE_ID || id === TEXTBOOK_TEMPLATE_ID) {
+      const tone = toneChain.find((toneId) => findPreset(settings.promptPresets, "tone", toneId, settings.language));
+      const builtin = builtinPairOf(id, tone);
+      const base = builtin ? this.builtinFile(builtin) : void 0;
+      if (builtin && base !== void 0) {
+        const text11 = this.files.get(base);
+        if (((_c = matchCanonical(text11)) == null ? void 0 : _c.id) !== builtin)
+          return this.fromFile(
+            parseNoteStyleFile(text11, { id: `style:${base}`, name: base }),
+            `${base}.md`,
+            level,
+            toneChain,
+            "builtin"
+          );
+      }
+    }
+    return this.legacyResult(id, toneChain, noteLanguage);
+  }
+  fromFile(parsed, fileName, level, toneChain, kind) {
+    const settings = this.settings;
+    if (!parsed.ok)
+      return {
+        template: resolveTemplate(settings.detailTemplates, [], noteLanguageOf(settings.language)).template,
+        missing: [],
+        invalid: { fileName, issues: parsed.issues }
+      };
+    const style = parsed.style;
+    let toneText;
+    if (kind !== "builtin") {
+      const chain = kind === "legacy" ? toneChain : toneChain.slice(0, level + 1);
+      const known = chain.find((toneId) => findPreset(settings.promptPresets, "tone", toneId, settings.language));
+      if (known !== void 0) toneText = resolveToneText(settings.promptPresets, chain, settings.language);
+      else if (style.tone) toneText = this.toneFromFile(style.tone);
+    } else if (style.tone) toneText = this.toneFromFile(style.tone);
+    return { template: style.template, missing: [], ...toneText ? { toneText } : {}, noteStyle: style, fileName };
+  }
+  /** `語氣` is the name or id of an existing tone (its full text is used), else free text. */
+  toneFromFile(raw) {
+    const settings = this.settings;
+    const key2 = lower(raw.trim());
+    const pools = [settings.language, ...LANGUAGES.map((language2) => language2.id)].map(
+      (language2) => listPresets(settings.promptPresets, "tone", language2)
+    );
+    for (const pool of pools) {
+      const found = pool.find((item) => lower(item.id) === key2 || lower(item.name) === key2);
+      if (found) return found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0;
+    }
+    return raw.trim() || void 0;
+  }
+  // ---- lists for the entries ----
+  /** Every style in the folder with its parse result, for the pickers (call `refresh()` first). */
+  list() {
+    var _a2;
+    const settings = this.settings;
+    const exportedBy = new Map(
+      Object.entries((_a2 = settings.noteStyleFiles) != null ? _a2 : {}).map(([uuid, name]) => [lower(stripMd2(name)), uuid])
+    );
+    const items = [];
+    for (const [base, text11] of [...this.files].sort(([a], [b]) => a.localeCompare(b))) {
+      const builtin = NOTE_STYLE_BUILTIN_IDS.find((id2) => this.builtinFile(id2) === base);
+      const uuid = exportedBy.get(lower(base));
+      const id = builtin ? builtin : uuid != null ? uuid : `style:${base}`;
+      const parsed = parseNoteStyleFile(text11, { id: typeof id === "string" ? id : base, name: base });
+      const issues = parsed.ok ? [] : parsed.issues;
+      if (builtin) items.push({ kind: "builtin", id: builtin, fileName: `${base}.md`, issues });
+      else if (uuid) items.push({ kind: "legacy", id: uuid, name: base, fileName: `${base}.md`, issues });
+      else items.push({ kind: "file", id: `style:${base}`, name: base, fileName: `${base}.md`, issues });
+    }
+    return items;
+  }
+  /** Old custom templates that have no style file yet (still pickable as before). */
+  unexportedTemplates() {
+    var _a2;
+    const map = (_a2 = this.settings.noteStyleFiles) != null ? _a2 : {};
+    return this.settings.detailTemplates.filter((template) => !map[template.id]);
+  }
+  // ---- writing files (only on a user action) ----
+  uniqueName(base, taken) {
+    let name = base;
+    for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
+    return name;
+  }
+  /**
+   * Creates the folder and the files that do not exist yet: the five built-ins, and an export of every old custom template.
+   * Safe to run again. Never overwrites: a name taken by another file gets a unique name instead.
+   */
+  async ensureStyleFolder() {
+    var _a2, _b2;
+    const settings = this.settings;
+    const { port } = this.deps;
+    const folder = this.folder();
+    let dirty = false;
+    if (!settings.noteStylesFolder) {
+      settings.noteStylesFolder = folder;
+      dirty = true;
+    }
+    await port.createFolder(folder);
+    await this.refresh();
+    const taken = new Set([...this.files.keys()].map(lower));
+    const write = async (base, content) => {
+      await port.create(`${folder}/${base}.md`, content);
+      this.files.set(base, content);
+      taken.add(lower(base));
+    };
+    for (const id of NOTE_STYLE_BUILTIN_IDS) {
+      if (this.builtinFile(id) !== void 0) continue;
+      await write(
+        this.uniqueName(builtinStyleFileName(id, settings.language), taken),
+        canonicalContent(id, settings.language)
+      );
+    }
+    const map = { ...(_a2 = settings.noteStyleFiles) != null ? _a2 : {} };
+    const claimed = new Set(Object.values(map).map((name) => lower(stripMd2(name))));
+    for (const template of settings.detailTemplates) {
+      if (map[template.id]) continue;
+      const wanted = template.name.replace(SAFE_NAME, " ").replace(/\s+/g, " ").trim() || "Style";
+      const existing = [...this.files.keys()].find((base2) => lower(base2) === lower(wanted));
+      if (existing !== void 0 && !claimed.has(lower(existing)) && this.legacyUnchanged(template, this.files.get(existing))) {
+        map[template.id] = `${existing}.md`;
+        claimed.add(lower(existing));
+        dirty = true;
+        continue;
+      }
+      const base = this.uniqueName(wanted, taken);
+      await write(base, serializeLegacyV1(template, settings.language));
+      map[template.id] = `${base}.md`;
+      claimed.add(lower(base));
+      dirty = true;
+    }
+    if (Object.keys(map).length && JSON.stringify(map) !== JSON.stringify((_b2 = settings.noteStyleFiles) != null ? _b2 : {})) {
+      settings.noteStyleFiles = map;
+      dirty = true;
+    }
+    if (dirty) await this.deps.save();
+    return folder;
+  }
+  /** Moves the built-in's file to the trash, then writes its standard content again. */
+  async restoreDefault(path) {
+    var _a2;
+    const name = (_a2 = path.split("/").pop()) != null ? _a2 : path;
+    const builtin = this.builtinIdOfFile(name);
+    if (!builtin) return false;
+    await this.deps.port.trash(path);
+    await this.deps.port.create(path, canonicalContent(builtin.id, builtin.language));
+    this.files.set(stripMd2(name), canonicalContent(builtin.id, builtin.language));
+    return true;
+  }
+  /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */
+  async followFolderRename(oldPath, newPath) {
+    if (oldPath !== this.folder()) return false;
+    this.settings.noteStylesFolder = newPath;
+    await this.deps.save();
+    return true;
+  }
+  /** Whether the style folder exists (settings page shows "folder not found" when it does not). */
+  folderExists() {
+    return this.deps.port.folderExists(this.folder());
+  }
+};
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function inheritRoles(parsed, original) {
+  for (const section3 of parsed.sections) {
+    const key2 = lower(section3.name.trim());
+    const match = original.sections.find((item) => sectionKeys(item).includes(key2));
+    if (!match) continue;
+    if (section3.role === "none" && match.role !== "none" && !parsed.sections.some((other) => other.role === match.role))
+      section3.role = match.role;
+    const names3 = new Set(parsed.sections.map((item) => lower(item.name.trim())));
+    for (const alias of [match.name, ...match.aliases]) {
+      if (!alias.trim() || names3.has(lower(alias.trim())) || section3.aliases.some((a) => lower(a) === lower(alias)))
+        continue;
+      section3.aliases.push(alias);
+    }
+  }
+}
+function emptyNoteStyleStore(settings) {
+  return new NoteStyleStore({
+    settings,
+    port: {
+      list: async () => [],
+      read: () => Promise.reject(new Error("no style files")),
+      folderExists: () => false,
+      createFolder: async () => void 0,
+      create: async () => void 0,
+      trash: async () => void 0
+    },
+    save: async () => void 0
+  });
 }
 
 // experiences/visual-map/note-style.ts
@@ -30724,7 +31493,7 @@ var AiTaskService = class {
                 summary: result.summary,
                 task: repairCounts(
                   outputLanguage2,
-                  issues.map((issue) => `- ### ${issue.section}: ${countIssueText(issue, outputLanguage2)}`).join("\n")
+                  issues.map((issue2) => `- ### ${issue2.section}: ${countIssueText(issue2, outputLanguage2)}`).join("\n")
                 ),
                 workingFindings: "",
                 sourceContext: "",
@@ -33515,8 +34284,8 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
       };
     }
   }
-  issueText(issue) {
-    return t(issue.key, ...issue.values);
+  issueText(issue2) {
+    return t(issue2.key, ...issue2.values);
   }
   refresh() {
     this.preview.empty();
@@ -33530,9 +34299,9 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     }
     const parse = parseOutline(text11);
     this.nodes = parse.errors.length ? [] : parse.nodes;
-    for (const issue of parse.errors)
-      this.preview.createEl("p", { text: this.issueText(issue), cls: "vam-outline-error" });
-    for (const issue of parse.warnings) this.preview.createEl("p", { text: this.issueText(issue), cls: "vam-hint" });
+    for (const issue2 of parse.errors)
+      this.preview.createEl("p", { text: this.issueText(issue2), cls: "vam-outline-error" });
+    for (const issue2 of parse.warnings) this.preview.createEl("p", { text: this.issueText(issue2), cls: "vam-hint" });
     if (!parse.errors.length) {
       const depth = /* @__PURE__ */ new Map();
       for (const node of parse.nodes) depth.set(node.index, node.parent === null ? 1 : depth.get(node.parent) + 1);
@@ -34994,12 +35763,12 @@ var DetailTemplatesModal = class extends import_obsidian23.Modal {
       const issues = check();
       topIssues.empty();
       const bySection = draft.sections.map(() => []);
-      for (const issue of issues) {
-        const values = issue.values.map(
-          (value) => issue.key === "ui.detail_template_error_role_taken" && typeof value === "string" ? t(value) : value
+      for (const issue2 of issues) {
+        const values = issue2.values.map(
+          (value) => issue2.key === "ui.detail_template_error_role_taken" && typeof value === "string" ? t(value) : value
         );
-        const text11 = t(issue.key, ...values);
-        const target = issue.section ? bySection[issue.section - 1] : void 0;
+        const text11 = t(issue2.key, ...values);
+        const target = issue2.section ? bySection[issue2.section - 1] : void 0;
         if (target) target.push(text11);
         else topIssues.createDiv({ text: text11, cls: "vam-template-issue" });
       }
@@ -44729,7 +45498,7 @@ function templateInLanguage(template, language2) {
   return isBuiltinTemplateId(template.id) ? builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === template.id) : template;
 }
 function formatIssuesPatch(issues, language2) {
-  return { detailFormatIssues: (issues != null ? issues : []).map((issue) => countIssueText(issue, noteLanguageOf(language2))) };
+  return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
 }
 var originBaseline = (origin) => (0, import_node_crypto14.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
@@ -45145,6 +45914,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
+    __publicField(this, "noStyleFiles");
     this.installUndoScope();
     this.aimRuns = new AimRunStore(plugin.repo);
     this.aimManual = new AimManualFlow(
@@ -46165,9 +46935,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     };
   }
   /** `{ toneText }` for a TaskContext, or nothing when the resolved tone is academic. */
-  toneField(note, options) {
+  toneField(note, options, template) {
     var _a2;
-    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language);
+    const toneText = this.toneTextFor(
+      note,
+      options == null ? void 0 : options.toneId,
+      (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language,
+      template
+    );
     return toneText ? { toneText } : {};
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
@@ -46190,8 +46965,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
    * Writing tone for an AI run on `note`: this run's choice, then the topic override, then the map default. Academic
    * (and nothing chosen) yields undefined so prompts stay unchanged.
    */
-  toneTextFor(note, chosenId, language2 = this.plugin.settings.language) {
+  toneTextFor(note, chosenId, language2 = this.plugin.settings.language, template) {
     var _a2;
+    const resolved = this.noteStyles.resolutionOf(template);
+    if (resolved == null ? void 0 : resolved.noteStyle) return resolved.toneText;
     return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId], language2);
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
@@ -47646,12 +48423,8 @@ ${request.requirements}` : preset.text,
     if (placement.kind !== "new") return this.importOutlineIntoMap(request, placement);
     const currentModel = this.plugin.currentModelChoice().model;
     const model = request.shallowResearch && request.model || currentModel;
-    const settings = this.plugin.settings;
-    const { template } = resolveTemplate(
-      settings.detailTemplates,
-      [request.detailTemplateId, settings.defaultDetailTemplateId],
-      noteLanguageOf(settings.language)
-    );
+    await this.noteStyles.refresh();
+    const { template } = this.styleOrThrow([{ template: request.detailTemplateId }]);
     let result;
     try {
       result = await createOutlineMap(
@@ -47735,6 +48508,7 @@ ${request.requirements}` : preset.text,
         const { map, path, parent } = current;
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
+        await this.noteStyles.refresh();
         const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
         const result = await addOutlineToMap(
           repo,
@@ -48730,7 +49504,8 @@ ${request.requirements}` : preset.text,
   }
   researchStageText(progress) {
     const stage = this.researchStageName(progress);
-    return progress.model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model)) : stage;
+    const withModel = progress.model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model)) : stage;
+    return progress.style ? `${withModel} \xB7 ${t("ui.progress_note_style_0", progress.style)}` : withModel;
   }
   researchStageName(progress) {
     switch (progress.stage) {
@@ -53443,8 +54218,8 @@ ${request.requirements}` : preset.text,
     this.paintCardStyle(card, note, !!node.aimKind);
     const errorDetails = [];
     if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
-      const issue = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
-      issue.setAttr("title", note.detailFormatIssues.join("\n"));
+      const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
+      issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
     if ((note == null ? void 0 : note.status) === "error" && note.lastError) errorDetails.push(note.lastError);
@@ -56298,6 +57073,7 @@ ${request.requirements}` : preset.text,
     let created = 0;
     const historyMark = this.history.mark();
     const createdByTitle = /* @__PURE__ */ new Map(), newNodes = [];
+    await this.noteStyles.refresh();
     const contributionTemplate = this.mapDetailTemplate(this.plugin.settings.language, detailTemplateId);
     try {
       for (const item of items) {
@@ -57018,12 +57794,13 @@ ${request.requirements}` : preset.text,
           referenceDelivery: "direct",
           onProgress: options == null ? void 0 : options.onProgress,
           outputLanguage: options == null ? void 0 : options.outputLanguage,
-          ...this.toneField(note, options),
+          ...this.toneField(note, options, detailTemplate),
           mode: "synthesize",
           researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
           researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
           visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : note.visualMode,
           detailTemplate,
+          ...this.noteStyles.contextFields(detailTemplate),
           addCharts: true
         },
         note
@@ -57670,6 +58447,7 @@ ${note.detail.trim()}` : "",
     const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
     const model = chosen.model;
     const language2 = this.plugin.settings.language;
+    await this.noteStyles.refresh();
     const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId);
     try {
       const integrationContext = {
@@ -57690,12 +58468,13 @@ ${note.detail.trim()}` : "",
           this.render();
         },
         outputLanguage: options == null ? void 0 : options.outputLanguage,
-        ...this.toneField(void 0, options),
+        ...this.toneField(void 0, options, detailTemplate),
         mode: "synthesize",
         researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
         researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
         visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : "auto",
         detailTemplate,
+        ...this.noteStyles.contextFields(detailTemplate),
         addCharts: true
       };
       const result = await this.plugin.askModel(
@@ -60894,36 +61673,48 @@ ${addition}` : addition });
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
+    await this.noteStyles.refresh();
     const { template, missing } = this.resolveTopicTemplate(note, chosenId);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      new import_obsidian32.Notice(t("ui.detail_template_missing_0", note.detailTemplateId));
+      new import_obsidian32.Notice(this.missingTemplateMessage(note.detailTemplateId));
       await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
     }
     return template;
   }
   /** Resolves the topic's content template without notifying or writing anything (see detailTemplateFor). */
   resolveTopicTemplate(note, chosenId) {
-    var _a2;
-    const settings = this.plugin.settings;
-    return resolveTemplate(
-      settings.detailTemplates,
-      [chosenId, note.detailTemplateId, (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, settings.defaultDetailTemplateId],
-      noteLanguageOf(settings.language)
-    );
+    var _a2, _b2;
+    return this.styleOrThrow([
+      { template: chosenId },
+      { template: note.detailTemplateId, tone: note.toneId },
+      { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }
+    ]);
+  }
+  /** The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and line. */
+  styleOrThrow(levels) {
+    const resolved = this.noteStyles.resolve(levels);
+    if (resolved.invalid) {
+      const first = resolved.invalid.issues[0];
+      throw new Error(t("ui.note_style_file_invalid_0_1_2", resolved.invalid.fileName, first.line, first.message));
+    }
+    return resolved;
+  }
+  /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
+  get noteStyles() {
+    var _a2, _b2;
+    return (_b2 = this.plugin.noteStyles) != null ? _b2 : (_a2 = this.noStyleFiles) != null ? _a2 : this.noStyleFiles = emptyNoteStyleStore(() => this.plugin.settings);
+  }
+  missingTemplateMessage(id) {
+    return id.startsWith("style:") ? t("ui.note_style_file_missing_0", `${id.slice("style:".length)}.md`) : t("ui.detail_template_missing_0", id);
   }
   /**
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
   mapDetailTemplate(language2, chosenId) {
-    var _a2;
-    const settings = this.plugin.settings;
+    var _a2, _b2;
     return templateInLanguage(
-      resolveTemplate(
-        settings.detailTemplates,
-        [chosenId, (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, settings.defaultDetailTemplateId],
-        noteLanguageOf(settings.language)
-      ).template,
+      this.styleOrThrow([{ template: chosenId }, { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }]).template,
       language2
     );
   }
@@ -60938,7 +61729,7 @@ ${addition}` : addition });
     return { model, reasoning };
   }
   async runAgent(node, done, failed, overrides, onLaunchAccepted, runOnce) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     const used = await this.modelFor(note, node.path, runOnce);
@@ -60971,9 +61762,10 @@ ${addition}` : addition });
         researchMode: note.researchMode,
         researchDepth: "normal",
         visualMode: note.visualMode,
-        ...this.toneField(note, overrides),
+        ...this.toneField(note, overrides, detailTemplate),
         ...overrides,
         detailTemplate,
+        ...this.noteStyles.contextFields(detailTemplate),
         addCharts: (_g = overrides == null ? void 0 : overrides.addCharts) != null ? _g : true
       },
       note
@@ -60989,7 +61781,13 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model);
+    progress == null ? void 0 : progress.begin(
+      taskPath,
+      progressAttempt,
+      Date.now(),
+      used.model,
+      (_j = this.noteStyles.resolutionOf(detailTemplate)) == null ? void 0 : _j.fileName
+    );
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -62421,23 +63219,23 @@ function allowedUrl(tag, name, value) {
   return false;
 }
 function cssIsInert(css) {
-  const lower = css.toLowerCase();
-  if (lower.includes("@import") || lower.includes("expression(") || lower.includes("javascript:")) return false;
-  if (lower.includes("behavior:") || lower.includes("-moz-binding")) return false;
-  for (const match of lower.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
+  const lower2 = css.toLowerCase();
+  if (lower2.includes("@import") || lower2.includes("expression(") || lower2.includes("javascript:")) return false;
+  if (lower2.includes("behavior:") || lower2.includes("-moz-binding")) return false;
+  for (const match of lower2.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
     if (!match[2].trim().startsWith("#")) return false;
-  return !FORBIDDEN_SCHEMES.test(lower);
+  return !FORBIDDEN_SCHEMES.test(lower2);
 }
 function scrubAttributes(element, tag, report) {
   var _a2;
   for (const name of element.getAttributeNames()) {
-    const lower = name.toLowerCase();
+    const lower2 = name.toLowerCase();
     const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
     let drop = false;
-    if (lower.startsWith("on") || lower === "srcdoc") drop = true;
-    else if (lower.startsWith("data-") && !lower.startsWith("data-callout")) drop = true;
-    else if (URL_ATTRIBUTES.has(lower)) drop = !allowedUrl(tag, lower, value);
-    else if (lower === "style") drop = !cssIsInert(value);
+    if (lower2.startsWith("on") || lower2 === "srcdoc") drop = true;
+    else if (lower2.startsWith("data-") && !lower2.startsWith("data-callout")) drop = true;
+    else if (URL_ATTRIBUTES.has(lower2)) drop = !allowedUrl(tag, lower2, value);
+    else if (lower2 === "style") drop = !cssIsInert(value);
     else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
     if (drop) {
       element.removeAttribute(name);
@@ -66019,7 +66817,7 @@ var ResearchProgressStore = class {
     __publicField(this, "lastNotified", /* @__PURE__ */ new Map());
     __publicField(this, "pending", /* @__PURE__ */ new Map());
   }
-  begin(path, attemptId, now, model) {
+  begin(path, attemptId, now, model, style) {
     this.cancelPending(path);
     this.entries.set(path, {
       attemptId,
@@ -66027,7 +66825,8 @@ var ResearchProgressStore = class {
       stage: "waiting",
       stageAt: now,
       slow: false,
-      ...model ? { model } : {}
+      ...model ? { model } : {},
+      ...style ? { style } : {}
     });
     this.notify(path);
   }
@@ -67715,6 +68514,13 @@ function settingsFromSaved(saved) {
     detailTemplates: normalizeTemplates(saved == null ? void 0 : saved.detailTemplates),
     promptPresets: normalizePresets(saved == null ? void 0 : saved.promptPresets),
     defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
+    ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
+    ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
+    ...(saved == null ? void 0 : saved.noteStyleFiles) && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles) ? {
+      noteStyleFiles: Object.fromEntries(
+        Object.entries(saved.noteStyleFiles).filter(([, name]) => typeof name === "string" && name)
+      )
+    } : {},
     coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter(
       (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
     ) : [],
@@ -67756,6 +68562,12 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     __publicField(this, "mermaidZoom", null);
     __publicField(this, "settings", { ...DEFAULT_SETTINGS });
     __publicField(this, "repo");
+    /** Reads the note style files once per run and resolves a topic's style; writes files only on a user action. */
+    __publicField(this, "noteStyles", new NoteStyleStore({
+      settings: () => this.settings,
+      port: this.noteStylePort(),
+      save: () => this.saveSettings()
+    }));
     __publicField(this, "ready", Promise.resolve());
     __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "quickExpandPending", /* @__PURE__ */ new Set());
@@ -68283,6 +69095,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     );
     this.settingTab = new VisualAgentMapSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
+    this.registerNoteStyleEntrypoints();
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (file instanceof import_obsidian40.TFile && this.isMap(file))
@@ -68784,6 +69597,98 @@ ${t("ui.organize_link_wait_hint")}`;
     this.resetCodexRuntime();
     this.unloaded = true;
     this.aiRuntime.dispose();
+  }
+  /** The vault operations of the note style store (Vault and FileManager APIs only). */
+  noteStylePort() {
+    const folderAt = (path) => {
+      const found = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
+      return found instanceof import_obsidian40.TFolder ? found : null;
+    };
+    return {
+      list: async (folder) => {
+        var _a2, _b2;
+        return ((_b2 = (_a2 = folderAt(folder)) == null ? void 0 : _a2.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian40.TFile && child.extension === "md").map((child) => child.name);
+      },
+      read: (path) => {
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
+        if (!(file instanceof import_obsidian40.TFile)) return Promise.reject(new Error(path));
+        return this.app.vault.read(file);
+      },
+      folderExists: (path) => folderAt(path) !== null,
+      createFolder: async (path) => {
+        let current = "";
+        for (const part of (0, import_obsidian40.normalizePath)(path).split("/")) {
+          current = current ? `${current}/${part}` : part;
+          if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+        }
+      },
+      create: async (path, content) => {
+        await this.app.vault.create((0, import_obsidian40.normalizePath)(path), content);
+      },
+      trash: async (path) => {
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
+        if (file instanceof import_obsidian40.TFile) await this.app.fileManager.trashFile(file);
+      }
+    };
+  }
+  /** Folder rename, "restore default" in the file menu, and the two commands. Nothing here creates a file on load. */
+  registerNoteStyleEntrypoints() {
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof import_obsidian40.TFolder)
+          void this.noteStyles.followFolderRename((0, import_obsidian40.normalizePath)(oldPath), file.path).catch(() => void 0);
+      })
+    );
+    const restore = async (file) => {
+      try {
+        if (await this.noteStyles.restoreDefault(file.path)) new import_obsidian40.Notice(t("ui.note_style_restored_0", file.basename));
+      } catch (error) {
+        new import_obsidian40.Notice(error instanceof Error ? error.message : String(error));
+      }
+    };
+    const isBuiltinStyleFile = (file) => {
+      var _a2;
+      return file instanceof import_obsidian40.TFile && file.extension === "md" && ((_a2 = file.parent) == null ? void 0 : _a2.path) === (0, import_obsidian40.normalizePath)(this.noteStyles.folder()) && !!this.noteStyles.builtinIdOfFile(file.name);
+    };
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (isBuiltinStyleFile(file))
+          menu.addItem(
+            (item) => item.setTitle(t("ui.note_style_restore_menu")).setIcon("rotate-ccw").onClick(() => {
+              void restore(file);
+            })
+          );
+      })
+    );
+    this.addLocalizedCommand("open-note-styles-folder", "ui.note_style_open_folder_command", () => {
+      void this.openNoteStylesFolder();
+    });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "restore-note-style-default",
+        name: t("ui.note_style_restore_command"),
+        callback: () => {
+          const file = this.app.workspace.getActiveFile();
+          if (isBuiltinStyleFile(file)) void restore(file);
+          else new import_obsidian40.Notice(t("ui.note_style_restore_not_builtin"));
+        }
+      }),
+      key: "ui.note_style_restore_command"
+    });
+  }
+  /** Creates the style folder and files (idempotent), shows where they are and opens the first style file. */
+  async openNoteStylesFolder() {
+    try {
+      const folder = await this.noteStyles.ensureStyleFolder();
+      new import_obsidian40.Notice(t("ui.note_style_folder_opened_0", folder));
+      const first = this.noteStyles.list()[0];
+      const file = first && this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(`${folder}/${first.fileName}`));
+      if (file instanceof import_obsidian40.TFile) await this.app.workspace.getLeaf("tab").openFile(file);
+      return folder;
+    } catch (error) {
+      new import_obsidian40.Notice(error instanceof Error ? error.message : String(error));
+      return null;
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);

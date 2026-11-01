@@ -127,6 +127,12 @@ export type NotePatch = Partial<Note>;
 export interface Settings {
   detailTemplates: DetailTemplate[];
   defaultDetailTemplateId?: string;
+  /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
+  defaultNoteStyleId?: string;
+  /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
+  noteStylesFolder?: string;
+  /** Old custom template id -> the style file it was exported to (with ".md"). */
+  noteStyleFiles?: Record<string, string>;
   coffeeStyles?: CoffeeStyle[];
   /** Custom tone/outline presets; built-ins live in ai/prompt-presets.ts. Absent = none. */
   promptPresets?: PromptPreset[];

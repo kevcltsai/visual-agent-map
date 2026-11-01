@@ -16859,7 +16859,9 @@ function buildMapSvg(scene) {
     const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
     const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
-    textLines(card.title).slice(0, fits).forEach((line, i) => {
+    const shown = textLines(card.title).slice(0, fits);
+    if (card.clipped === true && shown.length) shown[shown.length - 1] += "\u2026";
+    shown.forEach((line, i) => {
       out.push(
         `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
       );
@@ -52681,6 +52683,7 @@ ${request.requirements}` : preset.text,
         textColor: colorOf(titleEl ? computed(titleEl).color : void 0),
         accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : void 0
       };
+      if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
         if (Number.isFinite(size) && size > 0) item.titleSize = Math.round(size * 13 / 15);

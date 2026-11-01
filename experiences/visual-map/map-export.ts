@@ -22,6 +22,8 @@ export interface SceneCard {
   titleWeight?: number;
   /** card-style: the border width in px, only when the topic has a thick border (default 1). */
   strokeWidth?: number;
+  /** card-height: set only when the card is a fixed height that cuts its text; the last drawn line then ends with an ellipsis. Absent leaves the SVG unchanged. */
+  clipped?: boolean;
   cover?: SceneImage | null;
 }
 export interface SceneImage {
@@ -210,13 +212,13 @@ export function buildMapSvg(scene: MapScene): string {
     const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
     const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
     const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
-    textLines(card.title)
-      .slice(0, fits)
-      .forEach((line, i) => {
-        out.push(
-          `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
-        );
-      });
+    const shown = textLines(card.title).slice(0, fits);
+    if (card.clipped === true && shown.length) shown[shown.length - 1] += "…";
+    shown.forEach((line, i) => {
+      out.push(
+        `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
+      );
+    });
     out.push("</g>");
   }
   for (const summary of scene.summaries ?? []) {

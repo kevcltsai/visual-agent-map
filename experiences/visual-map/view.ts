@@ -8701,6 +8701,8 @@ export class VisualAgentMapView extends ItemView {
         textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
         accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
       };
+      // card-height: only a fixed-height card that cuts its content says so, so a map without heights exports unchanged.
+      if (node.height && card.classList.contains("is-clipped")) item.clipped = true;
       // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
       if (card.dataset.topicStyleSize) {
         const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");

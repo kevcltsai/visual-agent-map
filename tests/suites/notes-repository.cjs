@@ -2036,6 +2036,20 @@ integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values,
   assert.equal(/topic-markers/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
   assert.equal(updatedLine(), before, 'updated is not changed');
 });
+integrationTest('topic-markers: new ids read in whitelist order, one per single-choice group, and toggling keeps other groups and unknown values', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ntopic-markers: [smile, future-x, flag-blue, progress-75, progress-25, priority-4, priority-1]\n'));
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['priority-1', 'progress-25', 'flag-blue', 'smile']);
+  await repo.writeTopicMarkers(n.path, 'progress-100');
+  const after = (await repo.readNote(n.path)).markers;
+  assert.deepEqual([...after], ['priority-1', 'progress-100', 'flag-blue', 'smile']);
+  assert.match(contents.get(n.path), /"future-x"/, 'unknown value kept');
+  assert.equal(/progress-75|progress-25/.test(contents.get(n.path)), false, 'the group is cleared on toggle');
+  await repo.writeTopicMarkers(n.path, 'priority-5');
+  assert.equal(/"priority-1"|"priority-4"/.test(contents.get(n.path)), false, 'old multi-value priority is cleared');
+  await repo.writeTopicMarkers(n.path, 'flag-red');
+  assert.deepEqual([...(await repo.readNote(n.path)).markers], ['priority-5', 'progress-100', 'flag-red', 'flag-blue', 'smile']);
+});
 integrationTest('topic-color: readNote reads only an exact whitelisted string and a note without a colour has no color field', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   assert.equal('color' in (await repo.readNote(n.path)), false, 'no color key when none is set');

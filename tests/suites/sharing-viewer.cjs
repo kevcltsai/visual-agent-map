@@ -991,7 +991,7 @@ test('sharing viewer colour: every text and icon in the outline, toolbar, cards 
 });
 
 test('sharing viewer: marker text exists in every language, names and the "markers: {0}" label', () => {
-  const markers = ['done', 'warning', 'star', 'priority-1', 'priority-2', 'priority-3'];
+  const markers = ['done', 'warning', 'star', 'priority-1', 'priority-2', 'priority-3', 'priority-4', 'priority-5', 'progress-0', 'progress-25', 'progress-50', 'progress-75', 'progress-100', 'flag-red', 'flag-yellow', 'flag-green', 'flag-blue', 'smile', 'neutral', 'sad', 'question'];
   const everyUi = [...LANGUAGES.map(lang => text.shareViewerUiFor(lang)), ...Object.values(dictionaries.SHARE_VIEWER_UI_EXTRA)];
   assert.equal(everyUi.length, 6);
   for (const ui of everyUi) {
@@ -1011,7 +1011,7 @@ test('sharing viewer markers: cards and outline show aria-hidden symbols and a n
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-markers-'));
   try {
     const data = payload();
-    data.nodes[0].markers = ['star', 'done', '<img src=x onerror="document.title=1">', 'Done', 'priority-2', 'future-x'];
+    data.nodes[0].markers = ['star', 'done', '<img src=x onerror="document.title=1">', 'Done', 'priority-2', 'future-x', 'flag-red', 'progress-50', '<b>x</b>'];
     data.nodes[1].markers = 'done';
     const out = path.join(directory, 'markers.html');
     fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('zh-TW')));
@@ -1027,12 +1027,12 @@ test('sharing viewer markers: cards and outline show aria-hidden symbols and a n
         return { card: marks(card), label: card.getAttribute('aria-label'), otherMarks: other ? other.querySelectorAll('.vam-marker').length : -1, otherLabel: other && other.getAttribute('aria-label'), row: marks(row), rowLabel: row.getAttribute('aria-label'), images: document.querySelectorAll('img[src="x"]').length, title: document.title };
       })()`);
     });
-    assert.deepEqual(plain(report.card.map(m => m.text)), ['✓', '★', 'P2']);
+    assert.deepEqual(plain(report.card.map(m => m.text)), ['✓', '★', 'P2', '◑', '⚑R']);
     assert.ok(report.card.every(m => m.hidden === 'true'), 'symbols are aria-hidden');
-    assert.match(report.label, /標記：完成、星號、優先 2$/);
-    assert.deepEqual(plain(report.row.map(m => m.text)), ['✓', '★', 'P2']);
+    assert.match(report.label, /標記：完成、星號、優先 2、進度 50%、紅旗$/);
+    assert.deepEqual(plain(report.row.map(m => m.text)), ['✓', '★', 'P2', '◑', '⚑R']);
     assert.ok(report.row.every(m => m.hidden === 'true'));
-    assert.match(report.rowLabel, /標記：完成、星號、優先 2$/);
+    assert.match(report.rowLabel, /標記：完成、星號、優先 2、進度 50%、紅旗$/);
     assert.equal(report.otherMarks, 0, 'a non-list value draws nothing');
     assert.ok(!/標記/.test(report.otherLabel ?? ''), 'no marker text without markers');
     assert.equal(report.images, 0, 'a hostile id is never turned into markup');

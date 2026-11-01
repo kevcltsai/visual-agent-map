@@ -94,7 +94,13 @@ import {
   treeEdgePathData,
   type RelationBox
 } from "./relation-geometry";
-import { TOPIC_MARKERS, markerLabelKey, markerSymbol, type TopicMarker } from "../../topic-markers";
+import {
+  TOPIC_MARKER_GROUPS,
+  markerLabelKey,
+  readTopicMarkers,
+  markerSymbol,
+  type TopicMarker
+} from "../../topic-markers";
 import { TOPIC_COLORS, branchNoteIds, colorLabelKey, type TopicColor } from "../../topic-colors";
 import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
@@ -10668,7 +10674,7 @@ export class VisualAgentMapView extends ItemView {
   /** The markers to show for a topic: only whitelisted ids, in the fixed order (an AIM card shows them too). */
   private markersOf(id: string): TopicMarker[] {
     const raw = this.notes.get(id)?.markers;
-    return raw ? TOPIC_MARKERS.filter(marker => raw.includes(marker)) : [];
+    return raw ? readTopicMarkers({ "topic-markers": raw }) : [];
   }
   /** "Markers: Done, Star" in the language of the UI, or "" when the topic has none. */
   private markersText(markers: readonly TopicMarker[]): string {
@@ -11995,25 +12001,33 @@ export class VisualAgentMapView extends ItemView {
     if (!this.markersEditable(node)) return;
     const section = panel.createDiv("vam-inspector-section vam-marker-section");
     section.createEl("strong", { text: t("ui.topic_markers"), cls: "vam-topic-tree-heading vam-section-heading" });
-    const group = section.createDiv("vam-topic-markers vam-choice-group");
+    const group = section.createDiv("vam-topic-markers");
     group.setAttr("role", "group");
     group.setAttr("aria-label", t("ui.topic_markers"));
     const paint = (focusId?: TopicMarker): void => {
       group.empty();
       const active = this.markersOf(node.id);
-      for (const id of TOPIC_MARKERS) {
-        const choice = this.button(group, t(markerLabelKey(id)), () => {
-          this.enqueue(async () => {
-            await this.changeTopicMarker(node, id);
-            paint(id);
+      for (const def of TOPIC_MARKER_GROUPS) {
+        const title = t(`ui.topic_marker_group_${def.group}` as TranslationKey);
+        group.createSpan({ text: title, cls: "vam-topic-marker-group-title" });
+        const box = group.createDiv(`vam-choice-group vam-topic-marker-group is-${def.single ? "single" : "multi"}`);
+        box.setAttr("role", "group");
+        box.setAttr("aria-label", def.single ? t("ui.topic_marker_group_single", title) : title);
+        for (const id of def.ids) {
+          const choice = this.button(box, t(markerLabelKey(id)), () => {
+            this.enqueue(async () => {
+              await this.changeTopicMarker(node, id);
+              paint(id);
+            });
           });
-        });
-        choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
-        const on = active.includes(id);
-        choice.setAttr("aria-pressed", String(on));
-        if (on) choice.addClass("is-pressed");
-        // Repainting replaced the button; keep the keyboard focus on the one just toggled.
-        if (id === focusId) choice.focus();
+          choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
+          choice.dataset.marker = id;
+          const on = active.includes(id);
+          choice.setAttr("aria-pressed", String(on));
+          if (on) choice.addClass("is-pressed");
+          // Repainting replaced the button; keep the keyboard focus on the one just toggled.
+          if (id === focusId) choice.focus();
+        }
       }
     };
     paint();

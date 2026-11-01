@@ -145,6 +145,13 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-topic-modal .vam-choice-group button:hover { background: var(--background-modifier-hover); }
 .vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }
 .vam-topic-modal .vam-choice-group button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-topic-modal .vam-topic-markers { display: flex; flex-direction: column; gap: 6px; }
+.vam-topic-modal .vam-topic-marker-group-title { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-topic-modal .vam-topic-marker-group { margin-bottom: 4px; }
+.vam-topic-modal .vam-marker[data-marker="flag-red"] { color: var(--color-red); }
+.vam-topic-modal .vam-marker[data-marker="flag-yellow"] { color: var(--color-yellow); }
+.vam-topic-modal .vam-marker[data-marker="flag-green"] { color: var(--color-green); }
+.vam-topic-modal .vam-marker[data-marker="flag-blue"] { color: var(--color-blue); }
 .vam-topic-modal .vam-type-swatch { order: -1; position: relative; isolation: isolate; display: inline-flex; flex: none; width: 18px; height: 18px; --vam-kind-hue: var(--text-muted); --vam-kind-width: 1.5px; --vam-kind-dash: none; --vam-kind-line: color-mix(in srgb, var(--vam-kind-hue) 75%, var(--text-normal)); --vam-kind-fill: color-mix(in srgb, var(--vam-kind-hue) 14%, transparent); }
 .vam-topic-modal .vam-type-swatch[data-kind="atomic"] { --vam-kind-hue: var(--color-cyan); }
 .vam-topic-modal .vam-type-swatch[data-kind="hypothesis"] { --vam-kind-hue: var(--color-purple); }
@@ -1524,3 +1531,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-summary.is-side-left .vam-summary-text, .vam-view .vam-summary.is-side-left .vam-summary-input { transform: translate(-100%, -50%); text-align: right; }
 .vam-view .vam-summary.is-side-down .vam-summary-text, .vam-view .vam-summary.is-side-down .vam-summary-input { transform: translate(-50%, 0); text-align: center; }
 .vam-view .vam-summary.is-side-up .vam-summary-text, .vam-view .vam-summary.is-side-up .vam-summary-input { transform: translate(-50%, -100%); text-align: center; }
+.vam-view .vam-marker[data-marker="flag-red"] { color: var(--color-red); }
+.vam-view .vam-marker[data-marker="flag-yellow"] { color: var(--color-yellow); }
+.vam-view .vam-marker[data-marker="flag-green"] { color: var(--color-green); }
+.vam-view .vam-marker[data-marker="flag-blue"] { color: var(--color-blue); }

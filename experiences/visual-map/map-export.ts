@@ -41,6 +41,17 @@ export interface SceneBoundary {
   label?: string;
   stroke?: string;
 }
+/** summary-bracket: a brace (path data) with its text lines; `side` tells which edge of the text sits on (x, y). */
+export interface SceneSummary {
+  d: string;
+  x: number;
+  y: number;
+  side: "right" | "left" | "down" | "up";
+  /** One string per line. */
+  text: string | string[];
+  stroke?: string;
+  textColor?: string;
+}
 export interface SceneTheme {
   background?: string;
   text?: string;
@@ -57,6 +68,7 @@ export interface MapScene {
   theme?: SceneTheme;
   boundaries?: SceneBoundary[];
   edges?: SceneEdge[];
+  summaries?: SceneSummary[];
   cards?: SceneCard[];
   images?: SceneImage[];
 }
@@ -187,6 +199,32 @@ export function buildMapSvg(scene: MapScene): string {
           `<text x="${box[0] + 14}" y="${top + i * 16}" font-family="${FONT}" font-size="13" fill="${fill}">${escapeXml(line)}</text>`
         );
       });
+    out.push("</g>");
+  }
+  for (const summary of scene.summaries ?? []) {
+    if (typeof summary?.d !== "string" || !PATH_DATA.test(summary.d) || summary.d.length > 4000) continue;
+    const [x, y] = [num(summary.x), num(summary.y)];
+    if (x === null || y === null) continue;
+    const stroke = color(summary.stroke, strokeColor);
+    out.push(
+      `<g><path d="${summary.d.trim()}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`
+    );
+    const lines = textLines(summary.text);
+    const anchor = summary.side === "left" ? "end" : summary.side === "right" ? "start" : "middle";
+    const lineHeight = 17;
+    // The text block is centred on the tip beside a right or left brace, hangs below a down brace and stands above an up brace.
+    const first =
+      summary.side === "up"
+        ? y - (lines.length - 1) * lineHeight - 4
+        : summary.side === "down"
+          ? y + 13
+          : y - ((lines.length - 1) * lineHeight) / 2 + 4;
+    const fill = color(summary.textColor, textColor);
+    lines.forEach((line, i) => {
+      out.push(
+        `<text x="${x}" y="${Math.round((first + i * lineHeight) * 100) / 100}" text-anchor="${anchor}" font-family="${FONT}" font-size="13" fill="${fill}">${escapeXml(line)}</text>`
+      );
+    });
     out.push("</g>");
   }
   out.push("</svg>");

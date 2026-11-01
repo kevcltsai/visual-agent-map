@@ -123,6 +123,52 @@ function storageSet(key: string, value: string): void {
   }
 }
 
+type SummarySide = "right" | "left" | "down" | "up";
+interface BraceRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+/**
+ * The brace around the rectangles and where its text starts. The same shape as `shape()` in
+ * experiences/visual-map/summary-bracket-geometry.ts (gap 14, depth 12, label gap 8); copied, not imported, so the viewer
+ * bundle takes in no new module. A unit test keeps the two equal.
+ */
+function braceFor(side: SummarySide, rects: readonly BraceRect[]): { path: string; x: number; y: number } {
+  const left = Math.min(...rects.map(r => r.x)),
+    top = Math.min(...rects.map(r => r.y)),
+    right = Math.max(...rects.map(r => r.x + r.w)),
+    bottom = Math.max(...rects.map(r => r.y + r.h));
+  const gap = 14,
+    d = 12,
+    labelGap = 8;
+  const horizontalRun = side === "down" || side === "up";
+  const u1 = horizontalRun ? left : top,
+    u2 = horizontalRun ? right : bottom;
+  const base =
+    side === "right" ? right + gap : side === "left" ? left - gap : side === "down" ? bottom + gap : top - gap;
+  const sign = side === "right" || side === "down" ? 1 : -1;
+  const mid = (u1 + u2) / 2;
+  const r = Math.min(d, Math.max(0, (u2 - u1) / 4));
+  const round = (n: number): number => Math.round(n * 100) / 100;
+  const at = (u: number, v: number): string => (horizontalRun ? `${round(u)} ${round(v)}` : `${round(v)} ${round(u)}`);
+  const v0 = base,
+    v1 = base + sign * d,
+    v2 = base + sign * 2 * d;
+  const path = [
+    `M ${at(u1, v0)}`,
+    `Q ${at(u1, v1)} ${at(u1 + r, v1)}`,
+    `L ${at(mid - r, v1)}`,
+    `Q ${at(mid, v1)} ${at(mid, v2)}`,
+    `Q ${at(mid, v1)} ${at(mid + r, v1)}`,
+    `L ${at(u2 - r, v1)}`,
+    `Q ${at(u2, v1)} ${at(u2, v0)}`
+  ].join(" ");
+  const tip = v2 + sign * labelGap;
+  return horizontalRun ? { path, x: round(mid), y: round(tip) } : { path, x: round(tip), y: round(mid) };
+}
+
 const isNarrow = (): boolean => window.matchMedia(NARROW_QUERY).matches;
 
 export function startViewer(doc: Document): void {
@@ -177,6 +223,24 @@ export function startViewer(doc: Document): void {
             ? Array.from(new Set(item.links.filter((id): id is string => typeof id === "string" && byId.has(id))))
             : []
       });
+    }
+  }
+  // Summary brackets (summary-bracket): plain text and one SVG path per bracket; the run is the payload's member list.
+  const sideOf = (value: unknown): SummarySide | null =>
+    value === "right" || value === "left" || value === "down" || value === "up" ? value : null;
+  const summaries: Array<{ id: string; members: string[]; side: SummarySide; text: string }> = [];
+  if (Array.isArray(data.summaries)) {
+    const seenSummary = new Set<string>();
+    for (const item of data.summaries) {
+      const side = sideOf(item?.side);
+      if (!item || typeof item.id !== "string" || seenSummary.has(item.id) || !side) continue;
+      if (typeof item.text !== "string" || !item.text.trim() || !Array.isArray(item.members)) continue;
+      const members = Array.from(
+        new Set(item.members.filter((id): id is string => typeof id === "string" && byId.has(id)))
+      );
+      if (!members.length) continue;
+      seenSummary.add(item.id);
+      summaries.push({ id: item.id, members, side, text: item.text });
     }
   }
   const textEls = new Map<string, HTMLElement>();
@@ -388,6 +452,10 @@ export function startViewer(doc: Document): void {
   edges.setAttribute("class", "vam-edges");
   edges.setAttribute("aria-hidden", "true");
   stage.append(edges);
+  const summaryLayer = make("div", "vam-summaries");
+  summaryLayer.setAttribute("role", "group");
+  // Only a file with brackets gets the layer: a plain file's page stays exactly as it was.
+  if (summaries.length) stage.append(summaryLayer);
   viewport.append(stage);
   const overlay = make("div", "vam-canvas-overlay");
   const tools = make("div", "vam-map-tools");
@@ -494,6 +562,26 @@ export function startViewer(doc: Document): void {
       maxX = Math.max(maxX, el.offsetLeft + (el.offsetWidth || 300));
       maxY = Math.max(maxY, el.offsetTop + (el.offsetHeight || 60));
     }
+    // Bracket text sits beyond the brace tip (summary-bracket decision #9); the side's CSS transform is applied by hand.
+    for (const el of Array.from(summaryLayer.querySelectorAll<HTMLElement>(".vam-summary"))) {
+      const text = el.querySelector<HTMLElement>(".vam-summary-text");
+      if (!text) continue;
+      const x = parseFloat(text.style.left),
+        y = parseFloat(text.style.top),
+        w = text.offsetWidth,
+        h = text.offsetHeight;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const left = el.classList.contains("is-side-left")
+        ? x - w
+        : el.classList.contains("is-side-down") || el.classList.contains("is-side-up")
+          ? x - w / 2
+          : x;
+      const top = el.classList.contains("is-side-up") ? y - h : el.classList.contains("is-side-down") ? y : y - h / 2;
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + w);
+      maxY = Math.max(maxY, top + h);
+    }
     view = fitViewport(
       { minX, minY, maxX, maxY },
       { width: viewport.clientWidth, height: viewport.clientHeight },
@@ -569,6 +657,44 @@ export function startViewer(doc: Document): void {
         path.setAttribute("class", "vam-edge vam-text-link");
         edges.append(path);
       }
+    }
+    drawSummaries();
+  }
+  /** One bracket per drawn run, from the cards as laid out now: the brace follows the outer edge of the run and everything shown under it. */
+  function drawSummaries(): void {
+    summaryLayer.replaceChildren();
+    for (const summary of summaries) {
+      const rects: BraceRect[] = [];
+      for (const id of summary.members) {
+        for (const each of [id, ...descendants(nodes, id)]) {
+          const card = cards.get(each);
+          if (card)
+            rects.push({
+              x: card.offsetLeft,
+              y: card.offsetTop,
+              w: card.offsetWidth || CARD_WIDTH,
+              h: card.offsetHeight
+            });
+        }
+      }
+      if (!rects.length) continue;
+      const brace = braceFor(summary.side, rects);
+      const el = make("div", `vam-summary is-side-${summary.side}`);
+      el.setAttribute("role", "note");
+      const svg = doc.createElementNS(SVG_NS, "svg");
+      svg.setAttribute("class", "vam-summary-brace");
+      svg.setAttribute("aria-hidden", "true");
+      const path = doc.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", brace.path);
+      path.setAttribute("fill", "none");
+      svg.append(path);
+      el.append(svg);
+      const label = make("div", "vam-summary-text");
+      label.textContent = summary.text;
+      label.style.left = `${brace.x}px`;
+      label.style.top = `${brace.y}px`;
+      el.append(label);
+      summaryLayer.append(el);
     }
   }
   let edgeFrame = 0;

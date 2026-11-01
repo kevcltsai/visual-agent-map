@@ -68,7 +68,7 @@ function makeView() {
   ];
   Object.assign(view, {
     map: { nodes, viewport: { x: 40, y: 40, zoom: 1 } },
-    builtIn: false, integrationMode: false, multiSelected: new Set(), selected: 'a', cardEls: new Map(),
+    builtIn: false, integrationMode: false, multiSelected: new Set(), selected: 'a', cardEls: new Map(), summaryEls: new Map(),
     plugin: { repo: { updateMap: async (...args) => { writes.push(args); } }, mutate: async fn => { await fn(); } },
     viewportEl: { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) },
     stageEl: { style: {}, querySelector: () => null },

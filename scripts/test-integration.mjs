@@ -30,6 +30,6 @@ export async function runParts(list) {
 }
 
 async function main() {
-  process.exit((await runParts(parts)).length ? 1 : 0);
+  process.exitCode = (await runParts(parts)).length ? 1 : 0; // not process.exit: it can cut off piped output
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

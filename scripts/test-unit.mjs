@@ -45,7 +45,8 @@ async function main() {
   const failed = await runParts(runnable(parts));
   if (failed.length) {
     process.stdout.write(`\ntest:unit FAILED in: ${failed.join(", ")}\n`);
-    process.exit(1);
+    process.exitCode = 1; // not process.exit(1): on a pipe it can cut off the part output still being written
+    return;
   }
   process.stdout.write("\ntest:unit: every part passed.\n");
 }

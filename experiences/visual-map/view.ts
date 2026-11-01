@@ -9,17 +9,26 @@ import {
 import {
   addFreeTextNode,
   addImage,
+  addSummary,
   addTextNode,
   boundaryBounds,
+  checkSummaryMembers,
   cleanText,
+  effectiveSummaryRange,
   linkTextNode,
   moveItem,
   moveTextNode,
   pruneBoundaries,
+  pruneSummaries,
   removeItem,
   removeLinksTo,
+  removeSummary,
+  removeSummaryMembers,
   removeTextNode,
   resizeKeepRatio,
+  setSummaryMembers,
+  setSummaryText,
+  summaryDirectionContext,
   treeTextNodes,
   unlinkTextNode,
   updateTextNode,
@@ -29,8 +38,11 @@ import {
   type BoundaryItem,
   type CanvasItem,
   type ImageItem,
+  type SummaryItem,
+  type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
+import { bracketGeometry, summaryTextBox, type BracketRect, type BracketResult } from "./summary-bracket-geometry";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import {
   EXPORT_MAX_EDGE,
@@ -47,6 +59,7 @@ import {
   wrapText,
   type MapScene,
   type SceneBoundary,
+  type SceneSummary,
   type SceneCard,
   type SceneEdge,
   type SceneImage
@@ -252,6 +265,7 @@ import {
 import { loadableImages } from "../../ui/image-candidates";
 import {
   buildMapChatContext,
+  type MapChatSummary,
   type MapChatUserText,
   contentHash,
   isMdStale,
@@ -982,6 +996,13 @@ export class VisualAgentMapView extends ItemView {
       : medianHeight([...this.cardEls.values()].map(card => card.offsetHeight)));
   /** Text node element per id (tree-attached and free), rebuilt on every render. */
   private textEls = new Map<string, HTMLElement>();
+  /** A summary bracket being created: nothing is written until it has text, so Esc or an empty text leaves no trace (Critical Path). */
+  private pendingSummary: { id: string; members: string[] } | null = null;
+  private editingSummaryId: string | null = null;
+  /** Detaches the open bracket editor without saving and returns its draft, so a repaint can reopen it. */
+  private suspendSummaryEdit: (() => { id: string; value: string }) | null = null;
+  private summaryEditDraft: { id: string; value: string } | null = null;
+  private summaryEls = new Map<string, HTMLElement>();
   /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
   private pendingTextEditId: string | null = null;
   private editingTextId: string | null = null;
@@ -1001,7 +1022,17 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Drops the links of every free text block to the removed cards, in the same map edit (decision #2); no `canvasItems` appears out of nothing. */
   private dropTextLinks(map: MapDocument, ids: Iterable<string>): void {
-    if (map.canvasItems?.length) map.canvasItems = removeLinksTo(map.canvasItems, new Set(ids));
+    if (!map.canvasItems?.length) return;
+    const gone = new Set(ids);
+    // Summary brackets lose these members (and go when empty or when their parent is removed) in the same edit, so one undo restores both.
+    map.canvasItems = removeSummaryMembers(removeLinksTo(map.canvasItems, gone), gone);
+    if (!map.canvasItems.length) delete map.canvasItems;
+  }
+  /** After any map edit: brackets whose members were moved to another parent or removed are cleaned in the same transaction (decision #2). */
+  private pruneSummariesIn(map: MapDocument): void {
+    if (!map.canvasItems?.some(item => item.kind === "summary")) return;
+    map.canvasItems = pruneSummaries(map.canvasItems, map.nodes);
+    if (!map.canvasItems.length) delete map.canvasItems;
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   private arrangeAll(map: MapDocument, options: { reset?: boolean } = {}): void {
@@ -1668,9 +1699,12 @@ export class VisualAgentMapView extends ItemView {
   }
   async onClose(): Promise<void> {
     this.closed = true;
-    this.cancelLinking(false);
     this.closeMapSearch(false);
     this.exitPresentation(false);
+    this.cancelLinking(false);
+    this.suspendSummaryEdit?.();
+    this.pendingSummary = null;
+    this.summaryEditDraft = null;
     this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
@@ -5098,6 +5132,7 @@ export class VisualAgentMapView extends ItemView {
           map.viewport = clone(viewport);
           before = clone(map);
           change(map, attachmentPath);
+          this.pruneSummariesIn(map);
           after = clone(map);
         })
         .commit({ deferRebuild: true });
@@ -5900,9 +5935,11 @@ export class VisualAgentMapView extends ItemView {
    */
   private renderCanvasItems(): void {
     const stage = this.stageEl,
-      items = this.map?.canvasItems;
-    if (!stage || !items?.length) {
+      items = this.map?.canvasItems ?? [];
+    if (!stage || (!items?.length && !this.pendingSummary)) {
       if (this.linkingTextId) this.cancelLinking(false); // the block it was waiting for is gone
+      if (this.suspendSummaryEdit) this.suspendSummaryEdit();
+      this.summaryEditDraft = null;
       return;
     }
     const editable = this.canEditCanvasItems();
@@ -5955,6 +5992,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.renderTextNodes(stage, items);
     this.renderBoundaries(stage, items, editable);
+    this.renderSummaries(stage, items);
     this.focusItemId = null;
   }
   /** Text nodes change only on a map the user may edit, and never while presenting. */
@@ -6431,6 +6469,25 @@ export class VisualAgentMapView extends ItemView {
       .map(text => `- ${text.text.replace(/\n/g, "\n  ")}`)
       .join("\n");
   }
+  /** The brackets under `nodeId` as the "direction from the user" block of an integration prompt; nothing at all when it has none (decision #6). */
+  private summaryDirections(nodeId: string): { summaryDirections?: string } {
+    const items = this.map?.canvasItems;
+    if (!items?.some(item => item.kind === "summary") || !this.map) return {};
+    const titles = new Map(this.map.nodes.map(node => [node.id, this.notes.get(node.id)?.title ?? ""]));
+    const text = summaryDirectionContext(items, this.map.nodes, nodeId, id => titles.get(id) ?? "");
+    return text ? { summaryDirections: text } : {};
+  }
+  /** Every bracket of the map for the chat context: the effective range, so the AI reads what the canvas shows (decision #6). */
+  private chatSummaries(): MapChatSummary[] | undefined {
+    const map = this.map;
+    if (!map?.canvasItems?.some(item => item.kind === "summary")) return undefined;
+    return map.canvasItems
+      .filter((item): item is SummaryItem => item.kind === "summary")
+      .flatMap(summary => {
+        const members = effectiveSummaryRange(summary, map.nodes);
+        return members.length ? [{ id: summary.id, parentId: summary.parentId, members, text: summary.text }] : [];
+      });
+  }
   /** Every text node of the map for the chat context; a free one (its topic is gone) goes with `parentId: null` (decision #4). */
   private chatUserTexts(): MapChatUserText[] {
     const items = this.map?.canvasItems ?? [];
@@ -6556,6 +6613,343 @@ export class VisualAgentMapView extends ItemView {
         el.focus({ preventScroll: true });
       }
     }
+  }
+  // ---- Summary brackets (summary-bracket plan, decisions #1, #2, #4) -------------------------------------------------
+  /** Brackets change on a map the user may edit (topic selection mode included, where they are created), never while presenting. */
+  private canEditSummary(): boolean {
+    return !!this.map && !this.builtIn && !this.map.aim && !this.presentation;
+  }
+  /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
+  private summaryGeometry(parentId: string, range: readonly string[]): BracketResult | null {
+    if (!this.map || !range.length) return null;
+    const nodes = this.map.nodes,
+      children = new Map<string, string[]>();
+    for (const node of nodes)
+      if (node.parentId) children.set(node.parentId, [...(children.get(node.parentId) ?? []), node.id]);
+    const rectOf = (id: string): BracketRect | null => {
+      const card = this.cardEls.get(id);
+      if (!card) return null;
+      const box = boxOf(card);
+      return { x: box.x, y: box.y, w: box.width, h: box.height };
+    };
+    const rangeRects: BracketRect[] = [],
+      all: BracketRect[] = [];
+    for (const id of range) {
+      const own = rectOf(id);
+      if (!own) continue;
+      rangeRects.push(own);
+      const stack = [id],
+        seen = new Set<string>();
+      while (stack.length) {
+        const current = stack.pop()!;
+        if (seen.has(current)) continue;
+        seen.add(current);
+        const rect = rectOf(current);
+        if (rect) all.push(rect);
+        stack.push(...(children.get(current) ?? []));
+      }
+    }
+    if (!rangeRects.length) return null;
+    const parentCard = rectOf(parentId),
+      direction = layoutDirectionFor(nodes, range[0], layoutOf(this.map).direction);
+    return bracketGeometry(direction, all, parentCard, rangeRects);
+  }
+  /** Whether these topics can be bracketed now; a refusal carries the i18n key that says why (shown, announced, and the button's title). */
+  private summaryEntryCheck(
+    ids: readonly string[]
+  ): { ok: true; parentId: string; members: string[] } | { ok: false; reason: TranslationKey } {
+    if (!this.map || !this.canEditSummary()) return { ok: false, reason: "ui.summary_unavailable" };
+    if (!ids.length) return { ok: false, reason: "ui.summary_select_first" };
+    const check = checkSummaryMembers(ids, this.map.nodes);
+    if (!check.ok) return { ok: false, reason: this.summaryRefusalKey(check.reason) };
+    const geometry = this.summaryGeometry(check.parentId, check.members);
+    if (geometry && !geometry.ok) {
+      if (geometry.reason === "unsupported") return { ok: false, reason: "ui.summary_layout_unsupported" };
+      if (geometry.reason === "cross-side") return { ok: false, reason: "ui.summary_cross_side" };
+    }
+    return check;
+  }
+  private summaryRefusalKey(reason: SummaryRefusal): TranslationKey {
+    switch (reason) {
+      case "root":
+        return "ui.summary_refused_root";
+      case "cross-parent":
+        return "ui.summary_refused_cross_parent";
+      case "not-adjacent":
+        return "ui.summary_refused_not_adjacent";
+      case "too-many":
+        return "ui.summary_refused_too_many";
+      default:
+        return "ui.summary_refused_unknown";
+    }
+  }
+  /** The topics a summary entry acts on: the multi-selection, or the one selected topic. */
+  private summaryTargets(): string[] {
+    return this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+  }
+  /** Entry for the toolbar, command and context menu: starts a bracket over the topics and opens its text editor (nothing is written yet). */
+  addSummaryOver(ids: readonly string[] = this.summaryTargets()): void {
+    const check = this.summaryEntryCheck(ids);
+    if (!check.ok) {
+      this.announcer?.setText(t(check.reason));
+      new Notice(t(check.reason));
+      return;
+    }
+    if (this.suspendSummaryEdit) this.suspendSummaryEdit();
+    this.summaryEditDraft = null;
+    this.pendingSummary = { id: `sum-${randomUUID().slice(0, 8)}`, members: check.members };
+    this.render();
+  }
+  /**
+   * Draws the brackets: a brace beyond the outer edge of the framed subtrees and the text beyond the brace. Measured from the cards
+   * drawn now, so layout changes, moves and folding are followed without writing anything; a bracket whose cards are all hidden
+   * (or whose arrangement cannot draw it) is not drawn but kept. Text goes in through textContent only.
+   */
+  private renderSummaries(stage: HTMLElement, items: readonly CanvasItem[]): void {
+    if (this.suspendSummaryEdit) this.summaryEditDraft = this.suspendSummaryEdit();
+    const map = this.map;
+    const entries: { summary: SummaryItem; isNew: boolean }[] = items
+      .filter((item): item is SummaryItem => item.kind === "summary")
+      .map(summary => ({ summary, isNew: false }));
+    if (this.pendingSummary) {
+      const check = map ? checkSummaryMembers(this.pendingSummary.members, map.nodes) : null;
+      if (check?.ok && this.canEditSummary())
+        entries.push({
+          summary: {
+            id: this.pendingSummary.id,
+            kind: "summary",
+            parentId: check.parentId,
+            members: check.members,
+            text: ""
+          },
+          isNew: true
+        });
+      else {
+        // The cards it framed are gone (or the map can no longer be edited): nothing half-written is left.
+        this.pendingSummary = null;
+        this.summaryEditDraft = null;
+      }
+    }
+    if (!map || !entries.length) {
+      this.summaryEditDraft = null;
+      return;
+    }
+    const editable = this.canEditSummary();
+    const layer = stage.createDiv("vam-summaries");
+    layer.setAttr("role", "group");
+    layer.setAttr("aria-label", t("ui.summaries_group"));
+    for (const { summary, isNew } of entries) {
+      const range = effectiveSummaryRange(summary, map.nodes),
+        geometry = this.summaryGeometry(summary.parentId, range);
+      if (!geometry?.ok) continue;
+      const el = layer.createDiv(`vam-summary is-side-${geometry.side}`);
+      el.dataset.itemId = summary.id;
+      el.setAttr("role", "group");
+      el.setAttr("aria-label", isNew ? t("ui.summary_new_label") : t("ui.summary_label", summary.text.slice(0, 60)));
+      el.tabIndex = 0;
+      const svg = createSvg("svg");
+      svg.addClass("vam-summary-brace");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      const path = createSvg("path");
+      path.setAttribute("d", geometry.path);
+      path.setAttribute("fill", "none");
+      svg.appendChild(path);
+      el.appendChild(svg);
+      const label = el.createDiv({ cls: "vam-summary-text", text: summary.text });
+      label.style.left = `${geometry.label.x}px`;
+      label.style.top = `${geometry.label.y}px`;
+      this.summaryEls.set(summary.id, el);
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      label.addEventListener("pointerdown", event => {
+        if (event.button === 0 && !this.editingSummaryId) el.focus({ preventScroll: true });
+      });
+      if (!editable || isNew) continue;
+      label.addEventListener("dblclick", event => {
+        event.stopPropagation();
+        this.startSummaryEdit(summary.id);
+      });
+      label.addEventListener("contextmenu", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new Menu();
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.summary_edit"))
+            .setIcon("pencil")
+            .onClick(() => this.startSummaryEdit(summary.id))
+        );
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.summary_use_selection"))
+            .setIcon("brackets")
+            .onClick(() => this.enqueue(() => this.changeSummaryRange(summary.id)))
+        );
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.summary_remove"))
+            .setIcon("trash")
+            .onClick(() => this.enqueue(() => this.removeSummaryItem(summary.id)))
+        );
+        menu.showAtMouseEvent(event);
+      });
+      el.addEventListener("keydown", event => {
+        if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (!event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeSummaryItem(summary.id));
+        } else if (!event.shiftKey && (event.key === "Enter" || event.key === "F2")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startSummaryEdit(summary.id);
+        }
+      });
+    }
+    const draft = this.summaryEditDraft;
+    this.summaryEditDraft = null;
+    const pending = this.pendingSummary?.id ?? null;
+    if (draft && this.summaryEls.has(draft.id)) {
+      this.focusItemId = null;
+      this.focusNodeId = null; // the editor owns focus; paint must not hand it back to a card (that blur would commit and close)
+      this.focusResizeNodeId = null;
+      this.startSummaryEdit(draft.id, draft.value);
+    } else if (pending && this.summaryEls.has(pending)) {
+      this.focusItemId = null;
+      this.focusNodeId = null;
+      this.focusResizeNodeId = null;
+      this.startSummaryEdit(pending);
+    } else if (this.focusItemId && this.summaryEls.has(this.focusItemId)) {
+      this.summaryEls.get(this.focusItemId)?.focus({ preventScroll: true });
+      this.focusItemId = null;
+    }
+  }
+  /**
+   * Opens the text editor in place of a bracket's text: Cmd/Ctrl+Enter or leaving it saves, Esc cancels. For a bracket still being
+   * created, an empty text or Esc writes nothing; for a stored one an empty text removes it (one undo step each).
+   */
+  private startSummaryEdit(id: string, draft?: string): void {
+    const el = this.summaryEls.get(id);
+    const stored = (this.map?.canvasItems ?? []).find(
+      (item): item is SummaryItem => item.kind === "summary" && item.id === id
+    );
+    const isNew = !stored && this.pendingSummary?.id === id;
+    if (!el || (!stored && !isNew) || !this.canEditSummary() || this.editingSummaryId) return;
+    this.editingSummaryId = id;
+    const body = el.querySelector<HTMLElement>(".vam-summary-text");
+    body?.addClass("vam-sr-only");
+    const input = el.createEl("textarea", {
+      cls: "vam-summary-input",
+      attr: { rows: "3", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.summary_edit_label") }
+    });
+    // Same place as the text; the shape of the side decides which edge sits on the anchor.
+    input.style.left = body?.style.left ?? "0px";
+    input.style.top = body?.style.top ?? "0px";
+    input.value = draft ?? stored?.text ?? "";
+    let done = false;
+    const close = (): void => {
+      done = true;
+      this.editingSummaryId = null;
+      this.suspendSummaryEdit = null;
+      input.remove();
+      body?.removeClass("vam-sr-only");
+    };
+    this.suspendSummaryEdit = () => {
+      done = true;
+      this.editingSummaryId = null;
+      this.suspendSummaryEdit = null;
+      return { id, value: input.value };
+    };
+    const commit = (): void => {
+      if (done) return;
+      const value = input.value;
+      close();
+      const members = this.pendingSummary?.members ?? [];
+      if (isNew) this.pendingSummary = null;
+      this.enqueue(() => this.saveSummaryItem(id, value, isNew ? members : null));
+    };
+    const cancel = (): void => {
+      close();
+      if (isNew) {
+        const first = this.pendingSummary?.members[0] ?? null;
+        this.pendingSummary = null;
+        this.focusNodeId = first;
+        this.render();
+        this.focusNodeId = null;
+      } else el.focus({ preventScroll: true });
+    };
+    input.addEventListener("keydown", event => {
+      // The field owns its keys: Delete, arrows and shortcuts must not reach the canvas.
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cancel();
+      } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        commit();
+      }
+    });
+    input.addEventListener("blur", commit);
+    input.focus({ preventScroll: true });
+    input.select?.();
+  }
+  /** Writes a new bracket (`members` given) or new text for a stored one, as one undo step; empty text writes nothing / removes. */
+  private async saveSummaryItem(id: string, value: string, members: readonly string[] | null): Promise<void> {
+    if (!this.map) return;
+    if (members) {
+      if (cleanText(value) === null) {
+        this.render();
+        return;
+      }
+      this.focusItemId = id;
+      try {
+        await this.mapChange(map => {
+          const result = addSummary(map.canvasItems ?? [], { id, members, text: value }, map.nodes);
+          if (!result.ok) throw new Error(t(this.summaryRefusalKey(result.reason)));
+          map.canvasItems = result.items;
+        }, false);
+        this.announcer?.setText(t("ui.summary_added"));
+      } catch (error) {
+        this.focusItemId = null;
+        this.render();
+        new Notice(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
+    const current = (this.map.canvasItems ?? []).find(
+      (item): item is SummaryItem => item.kind === "summary" && item.id === id
+    );
+    if (!current) return;
+    this.focusItemId = id;
+    if (cleanText(value) === null) {
+      this.focusItemId = null;
+      await this.changeCanvasItems(id, items => removeSummary(items, id));
+      this.announcer?.setText(t("ui.summary_removed"));
+    } else if (cleanText(value) !== current.text)
+      await this.changeCanvasItems(id, items => setSummaryText(items, id, value));
+  }
+  private async removeSummaryItem(id: string): Promise<void> {
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, items => removeSummary(items, id));
+    this.announcer?.setText(t("ui.summary_removed"));
+  }
+  /** Replaces a bracket's range with the selected topics (same rules as creating one); one undo step. */
+  private async changeSummaryRange(id: string): Promise<void> {
+    if (!this.map) return;
+    const check = this.summaryEntryCheck(this.summaryTargets());
+    if (!check.ok) {
+      this.announcer?.setText(t(check.reason));
+      new Notice(t(check.reason));
+      return;
+    }
+    this.focusItemId = id;
+    await this.changeCanvasItems(id, items => {
+      const result = setSummaryMembers(items, id, check.members, this.map?.nodes ?? []);
+      return result.ok ? result.items : [...items];
+    });
+    this.announcer?.setText(t("ui.summary_range_changed"));
   }
   /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
   private editBoundaryLabel(id: string): void {
@@ -6853,11 +7247,30 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private onCanvasContextMenu(event: MouseEvent): void {
+    const hit = event.target as Element | null;
+    const card = hit?.closest?.<HTMLElement>(".vam-node");
+    if (card && !hit?.closest?.(INTERACTIVE_SELECTOR) && this.canEditSummary()) {
+      const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
+      if (cardId) {
+        event.preventDefault();
+        const ids = this.multiSelected.has(cardId) ? [...this.multiSelected] : [cardId];
+        const menu = new Menu();
+        menu.addItem(item =>
+          item
+            .setTitle(t("ui.summary_add"))
+            .setIcon("brackets")
+            .onClick(() => this.addSummaryOver(ids))
+        );
+        menu.showAtMouseEvent(event);
+      }
+      return;
+    }
     if (!this.canEditCanvasItems()) return;
     const target = event.target as Element | null;
     if (
       !target?.closest ||
       target.closest(".vam-node") ||
+      target.closest(".vam-summary-text") ||
       target.closest(".vam-canvas-image") ||
       target.closest(".vam-text-node") ||
       target.closest(".vam-boundary-label") ||
@@ -8356,6 +8769,41 @@ export class VisualAgentMapView extends ItemView {
         stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted"))
       });
     }
+    // Summary brackets as drawn (summary-bracket): the brace path and the text wrapped to its box width, beside the tip.
+    const summaryScenes: SceneSummary[] = [];
+    for (const item of map.canvasItems ?? []) {
+      if (item.kind !== "summary") continue;
+      const summary = item as SummaryItem;
+      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes));
+      if (!geometry?.ok) continue;
+      const lines = wrapText(summary.text, 200 - 12);
+      grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
+      // Make room for the text beside the brace tip.
+      const across = geometry.side === "right" || geometry.side === "left";
+      grow(
+        geometry.side === "left"
+          ? geometry.label.x - 200
+          : geometry.side === "right"
+            ? geometry.label.x
+            : geometry.label.x - 100,
+        across
+          ? geometry.label.y - lines.length * 9
+          : geometry.side === "up"
+            ? geometry.label.y - lines.length * 17
+            : geometry.label.y,
+        200,
+        across ? lines.length * 18 : lines.length * 17
+      );
+      summaryScenes.push({
+        d: geometry.path,
+        x: geometry.label.x,
+        y: geometry.label.y,
+        side: geometry.side,
+        text: lines,
+        stroke: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-muted")),
+        textColor: colorOf(computed(this.viewportEl ?? this.contentEl).getPropertyValue("--text-normal"))
+      });
+    }
     const edges: SceneEdge[] = [];
     for (const el of Array.from(this.edgesEl?.children ?? [])) {
       if (el.tagName?.toLowerCase() !== "path") continue;
@@ -8393,6 +8841,7 @@ export class VisualAgentMapView extends ItemView {
       },
       boundaries,
       edges,
+      summaries: summaryScenes,
       cards,
       images
     };
@@ -9235,6 +9684,7 @@ export class VisualAgentMapView extends ItemView {
     this.releaseCovers();
     this.cardEls.clear();
     this.textEls.clear();
+    this.summaryEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
     this.edgesEl = createSvg("svg");
@@ -12694,6 +13144,15 @@ export class VisualAgentMapView extends ItemView {
     // Frames are added from here (the only multi-selection surface); AIM maps and the built-in sample get no entry (D11).
     if (!this.map?.aim && !this.builtIn)
       this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
+    if (!this.map?.aim && !this.builtIn) {
+      // Not natively disabled (like Merge): a disabled button cannot take focus, so the reason would stay unreadable.
+      const check = this.summaryEntryCheck(this.summaryTargets()),
+        bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
+      if (!check.ok) {
+        bracket.setAttr("aria-disabled", "true");
+        bracket.setAttr("title", t(check.reason));
+      }
+    }
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
@@ -12834,6 +13293,7 @@ export class VisualAgentMapView extends ItemView {
             task: [task, options?.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node, promptLanguage),
             userTexts: this.userTextContext(node.id),
+            ...this.summaryDirections(node.id),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -12956,6 +13416,7 @@ export class VisualAgentMapView extends ItemView {
           task: [task, options?.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
           userTexts: this.userTextContext(node.id),
+          ...this.summaryDirections(node.id),
           workingFindings: note.newFindings,
           onWorkingFindingsSent: sent => {
             findingsSent = sent === note.newFindings;
@@ -14097,6 +14558,15 @@ export class VisualAgentMapView extends ItemView {
       if (!el?.hasClass("is-free")) continue; // attached blocks follow their topic; a folded one is not drawn
       boxes.push({ x: text.x, y: text.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
     }
+    // Summary bracket text (summary-bracket decision #9): it sits beyond the brace tip and would be clipped otherwise.
+    for (const el of this.summaryEls.values()) {
+      const text = el.querySelector<HTMLElement>(".vam-summary-text");
+      const side = (["right", "left", "down", "up"] as const).find(each => el.hasClass(`is-side-${each}`));
+      if (!text || !side) continue;
+      const label = { x: parseFloat(text.style.left), y: parseFloat(text.style.top) };
+      if (!Number.isFinite(label.x) || !Number.isFinite(label.y)) continue;
+      boxes.push(summaryTextBox(side, label, text.offsetWidth, text.offsetHeight));
+    }
     const minX = Math.min(...boxes.map(b => b.x)),
       maxX = Math.max(...boxes.map(b => b.x + b.w));
     const minY = Math.min(...boxes.map(b => b.y)),
@@ -14132,6 +14602,8 @@ export class VisualAgentMapView extends ItemView {
         target.closest(".vam-node") ||
         target.closest(".vam-text-node") ||
         target.closest(".vam-boundary-label") ||
+        target.closest(".vam-summary") ||
+        target.closest(".vam-summary-text") ||
         target.closest(INTERACTIVE_SELECTOR) ||
         !this.map
       )
@@ -14657,6 +15129,7 @@ export class VisualAgentMapView extends ItemView {
       snippets,
       files,
       userTexts: this.chatUserTexts(),
+      summaries: this.chatSummaries(),
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns()
     });

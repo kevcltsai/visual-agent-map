@@ -37,6 +37,8 @@ export interface TaskContext {
   ancestors: string;
   /** Text nodes the user wrote under this topic (read-only context); empty or absent adds nothing to the prompt. */
   userTexts?: string;
+  /** Summary brackets under this topic: framed child titles and the user's conclusion text, read-only; empty or absent adds nothing. */
+  summaryDirections?: string;
   workingFindings?: string;
   sourceContext?: string;
   referenceGroups?: ReferenceGroup[];

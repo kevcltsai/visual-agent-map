@@ -456,6 +456,66 @@ test('sharing viewer fit: the first view and Show all include a free text block 
   }
 });
 
+test('sharing viewer summaries: brackets are drawn from textContent and one SVG path equal to the plugin geometry, hostile text stays text (headless Chrome)', async t => {
+  const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
+  const chrome = candidates.find(file => fs.existsSync(file));
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const geometry = load('experiences/visual-map/summary-bracket-geometry.ts');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-summary-'));
+  try {
+    const evil = '<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>';
+    const data = payload();
+    data.summaries = [
+      { id: 'sum1', parentId: 'root', members: ['heat', 'water'], side: 'right', text: evil },
+      { id: 'sum2', parentId: 'root', members: ['nope'], side: 'right', text: 'dangling run' },
+      { id: 'sum3', parentId: 'root', members: ['heat'], side: 'sideways', text: 'bad side' }
+    ];
+    const source = path.join(directory, 'payload.json');
+    fs.writeFileSync(source, JSON.stringify(data));
+    const out = path.join(directory, 'summary.html');
+    execFileSync(process.execPath, [path.join(root, 'scripts', 'make-share-demo.mjs'), '--out', out, '--lang', 'en', '--payload', source], { cwd: root });
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      await new Promise(resolve => setTimeout(resolve, 600));
+      return evaluate(`(() => {
+        const items = [...document.querySelectorAll('.vam-summary')];
+        return {
+          count: items.length,
+          text: items[0]?.querySelector('.vam-summary-text')?.textContent,
+          d: items[0]?.querySelector('path')?.getAttribute('d'),
+          imgs: document.querySelectorAll('.vam-summary img, .vam-summary script').length,
+          pwned: window.__pwned ?? null,
+          tags: [...(items[0]?.querySelectorAll('*') ?? [])].map(e => e.tagName.toLowerCase()),
+          rects: [...document.querySelectorAll('.vam-node')].map(c => ({ id: c.dataset.nodeId, x: c.offsetLeft, y: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight }))
+        };
+      })()`);
+    });
+    assert.equal(report.count, 1, 'a dangling run and an unknown side draw nothing');
+    assert.equal(report.text, evil);
+    assert.equal(report.imgs, 0);
+    assert.equal(report.pwned, null);
+    assert.deepEqual(report.tags.sort(), ['div', 'path', 'svg']);
+    // The brace follows the outer edge of heat, water and everything under them.
+    const children = new Map(data.nodes.map(n => [n.id, data.nodes.filter(c => c.parentId === n.id).map(c => c.id)]));
+    const below = id => [id, ...children.get(id).flatMap(below)];
+    const ids = new Set(['heat', 'water'].flatMap(below));
+    const rects = report.rects.filter(r => ids.has(r.id));
+    const expected = geometry.bracketGeometry('right', rects, null);
+    assert.equal(expected.ok, true);
+    assert.equal(report.d, expected.path, 'the viewer copy of the brace shape equals the plugin geometry');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
+test('sharing viewer summaries: the drawing code writes text with textContent and builds only div, svg and path', () => {
+  const src = read('experiences/sharing/viewer/main.ts');
+  const start = src.indexOf('function drawSummaries');
+  const block = src.slice(start, src.indexOf('let edgeFrame'));
+  assert.ok(start > 0 && block.includes('label.textContent = summary.text'));
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment/.test(block));
+});
+
 test('sharing viewer collapse: the fold button is always visible and works by mouse and keyboard, then pan and zoom still work (headless Chrome)', async t => {
   const candidates = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium'].filter(Boolean);
   const chrome = candidates.find(file => fs.existsSync(file));

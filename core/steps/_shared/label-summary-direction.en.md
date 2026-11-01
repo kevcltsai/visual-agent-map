@@ -1,0 +1,1 @@
+Conclusion direction given by the user (written by the user, read-only; each entry lists the child topics a bracket frames, then the user's conclusion. Take it as the direction of your conclusion, never rewrite or contradict it; if the evidence does not support it, say so explicitly and state the gap)

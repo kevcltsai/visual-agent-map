@@ -755,6 +755,27 @@ var en = {
   "ui.canvas_boundary_name": "Frame label (optional)",
   "ui.canvas_boundary_edit": "Edit frame label\u2026",
   "ui.canvas_boundary_remove": "Remove frame",
+  "ui.summary_add": "Add summary bracket",
+  "ui.summary_add_command": "Add a summary bracket over the selected topics",
+  "ui.summaries_group": "Summary brackets",
+  "ui.summary_label": "Summary bracket: {0}",
+  "ui.summary_new_label": "New summary bracket",
+  "ui.summary_edit": "Edit summary\u2026",
+  "ui.summary_edit_label": "Summary text (Cmd/Ctrl+Enter saves, Esc cancels)",
+  "ui.summary_use_selection": "Use the selected topics as the range",
+  "ui.summary_remove": "Remove summary bracket",
+  "ui.summary_added": "Summary bracket added.",
+  "ui.summary_removed": "Summary bracket removed.",
+  "ui.summary_range_changed": "Summary bracket range changed.",
+  "ui.summary_unavailable": "Summary brackets are not available on this map.",
+  "ui.summary_select_first": "Select the topics to bracket first.",
+  "ui.summary_refused_unknown": "These topics cannot be bracketed.",
+  "ui.summary_refused_root": "The root topic cannot be bracketed; select its subtopics.",
+  "ui.summary_refused_cross_parent": "Select topics under the same parent topic.",
+  "ui.summary_refused_not_adjacent": "Select topics that sit next to each other, with none left out in between.",
+  "ui.summary_refused_too_many": "A bracket can hold at most 50 topics.",
+  "ui.summary_layout_unsupported": "This arrangement does not support summary brackets yet.",
+  "ui.summary_cross_side": "Select topics on one side only; a bracket cannot span both halves of a balanced map.",
   "ui.export_map": "Export map",
   "ui.export_png_vault": "Save PNG image in the Vault",
   "ui.export_png_download": "Download PNG image",
@@ -2932,6 +2953,27 @@ var zhCN = {
   "ui.canvas_boundary_name": "\u5916\u6846\u6807\u7B7E\uFF08\u53EF\u7559\u7A7A\uFF09",
   "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6807\u7B7E\u2026",
   "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
+  "ui.summary_add": "\u52A0\u6458\u8981\u62EC\u53F7",
+  "ui.summary_add_command": "\u4E3A\u9009\u53D6\u7684\u8BAE\u9898\u52A0\u6458\u8981\u62EC\u53F7",
+  "ui.summaries_group": "\u6458\u8981\u62EC\u53F7",
+  "ui.summary_label": "\u6458\u8981\u62EC\u53F7\uFF1A{0}",
+  "ui.summary_new_label": "\u65B0\u7684\u6458\u8981\u62EC\u53F7",
+  "ui.summary_edit": "\u7F16\u8F91\u603B\u7ED3\u2026",
+  "ui.summary_edit_label": "\u603B\u7ED3\u6587\u5B57\uFF08Cmd/Ctrl+Enter \u4FDD\u5B58\uFF0CEsc \u53D6\u6D88\uFF09",
+  "ui.summary_use_selection": "\u6539\u7528\u9009\u53D6\u7684\u8BAE\u9898\u5F53\u8303\u56F4",
+  "ui.summary_remove": "\u79FB\u9664\u6458\u8981\u62EC\u53F7",
+  "ui.summary_added": "\u5DF2\u52A0\u4E0A\u6458\u8981\u62EC\u53F7\u3002",
+  "ui.summary_removed": "\u5DF2\u79FB\u9664\u6458\u8981\u62EC\u53F7\u3002",
+  "ui.summary_range_changed": "\u5DF2\u66F4\u6539\u6458\u8981\u62EC\u53F7\u7684\u8303\u56F4\u3002",
+  "ui.summary_unavailable": "\u8FD9\u5F20\u5730\u56FE\u4E0D\u80FD\u52A0\u6458\u8981\u62EC\u53F7\u3002",
+  "ui.summary_select_first": "\u8BF7\u5148\u9009\u53D6\u8981\u62EC\u8D77\u6765\u7684\u8BAE\u9898\u3002",
+  "ui.summary_refused_unknown": "\u8FD9\u4E9B\u8BAE\u9898\u4E0D\u80FD\u52A0\u62EC\u53F7\u3002",
+  "ui.summary_refused_root": "\u6839\u8BAE\u9898\u4E0D\u80FD\u52A0\u62EC\u53F7\uFF0C\u8BF7\u9009\u5B83\u7684\u5B50\u8BAE\u9898\u3002",
+  "ui.summary_refused_cross_parent": "\u8BF7\u9009\u540C\u4E00\u4E2A\u7236\u8BAE\u9898\u4E0B\u7684\u8BAE\u9898\u3002",
+  "ui.summary_refused_not_adjacent": "\u8BF7\u9009\u76F8\u90BB\u7684\u8BAE\u9898\uFF0C\u4E2D\u95F4\u4E0D\u80FD\u6F0F\u6389\u3002",
+  "ui.summary_refused_too_many": "\u4E00\u4E2A\u62EC\u53F7\u6700\u591A\u6846 50 \u4E2A\u8BAE\u9898\u3002",
+  "ui.summary_layout_unsupported": "\u6B64\u6392\u5217\u65B9\u5411\u5C1A\u4E0D\u652F\u6301\u6458\u8981\u62EC\u53F7\u3002",
+  "ui.summary_cross_side": "\u8BF7\u53EA\u9009\u540C\u4E00\u4FA7\u7684\u8BAE\u9898\uFF0C\u62EC\u53F7\u4E0D\u80FD\u8DE8\u8FC7\u5E73\u8861\u56FE\u7684\u5DE6\u53F3\u4E24\u4FA7\u3002",
   "ui.export_map": "\u5BFC\u51FA\u5730\u56FE",
   "ui.export_png_vault": "\u5C06 PNG \u56FE\u7247\u5B58\u5165 Vault",
   "ui.export_png_download": "\u4E0B\u8F7D PNG \u56FE\u7247",
@@ -5109,6 +5151,27 @@ var zhTW = {
   "ui.canvas_boundary_name": "\u5916\u6846\u6A19\u7C64\uFF08\u53EF\u7559\u7A7A\uFF09",
   "ui.canvas_boundary_edit": "\u4FEE\u6539\u5916\u6846\u6A19\u7C64\u2026",
   "ui.canvas_boundary_remove": "\u79FB\u9664\u5916\u6846",
+  "ui.summary_add": "\u52A0\u6458\u8981\u62EC\u865F",
+  "ui.summary_add_command": "\u70BA\u9078\u53D6\u7684\u8B70\u984C\u52A0\u6458\u8981\u62EC\u865F",
+  "ui.summaries_group": "\u6458\u8981\u62EC\u865F",
+  "ui.summary_label": "\u6458\u8981\u62EC\u865F\uFF1A{0}",
+  "ui.summary_new_label": "\u65B0\u7684\u6458\u8981\u62EC\u865F",
+  "ui.summary_edit": "\u7DE8\u8F2F\u7E3D\u7D50\u2026",
+  "ui.summary_edit_label": "\u7E3D\u7D50\u6587\u5B57\uFF08Cmd/Ctrl+Enter \u5132\u5B58\uFF0CEsc \u53D6\u6D88\uFF09",
+  "ui.summary_use_selection": "\u6539\u7528\u9078\u53D6\u7684\u8B70\u984C\u7576\u7BC4\u570D",
+  "ui.summary_remove": "\u79FB\u9664\u6458\u8981\u62EC\u865F",
+  "ui.summary_added": "\u5DF2\u52A0\u4E0A\u6458\u8981\u62EC\u865F\u3002",
+  "ui.summary_removed": "\u5DF2\u79FB\u9664\u6458\u8981\u62EC\u865F\u3002",
+  "ui.summary_range_changed": "\u5DF2\u66F4\u6539\u6458\u8981\u62EC\u865F\u7684\u7BC4\u570D\u3002",
+  "ui.summary_unavailable": "\u9019\u5F35\u5FC3\u667A\u5716\u4E0D\u80FD\u52A0\u6458\u8981\u62EC\u865F\u3002",
+  "ui.summary_select_first": "\u8ACB\u5148\u9078\u53D6\u8981\u62EC\u8D77\u4F86\u7684\u8B70\u984C\u3002",
+  "ui.summary_refused_unknown": "\u9019\u4E9B\u8B70\u984C\u4E0D\u80FD\u52A0\u62EC\u865F\u3002",
+  "ui.summary_refused_root": "\u6839\u8B70\u984C\u4E0D\u80FD\u52A0\u62EC\u865F\uFF0C\u8ACB\u9078\u5B83\u7684\u5B50\u8B70\u984C\u3002",
+  "ui.summary_refused_cross_parent": "\u8ACB\u9078\u540C\u4E00\u500B\u6BCD\u8B70\u984C\u4E0B\u7684\u8B70\u984C\u3002",
+  "ui.summary_refused_not_adjacent": "\u8ACB\u9078\u76F8\u9130\u7684\u8B70\u984C\uFF0C\u4E2D\u9593\u4E0D\u80FD\u6F0F\u6389\u3002",
+  "ui.summary_refused_too_many": "\u4E00\u500B\u62EC\u865F\u6700\u591A\u6846 50 \u500B\u8B70\u984C\u3002",
+  "ui.summary_layout_unsupported": "\u6B64\u6392\u5217\u65B9\u5411\u5C1A\u4E0D\u652F\u63F4\u6458\u8981\u62EC\u865F\u3002",
+  "ui.summary_cross_side": "\u8ACB\u53EA\u9078\u540C\u4E00\u5074\u7684\u8B70\u984C\uFF0C\u62EC\u865F\u4E0D\u80FD\u8DE8\u904E\u5E73\u8861\u5716\u7684\u5DE6\u53F3\u5169\u5074\u3002",
   "ui.export_map": "\u532F\u51FA\u5FC3\u667A\u5716",
   "ui.export_png_vault": "\u5C07 PNG \u5716\u7247\u5B58\u9032 Vault",
   "ui.export_png_download": "\u4E0B\u8F09 PNG \u5716\u7247",
@@ -8494,6 +8557,12 @@ var label_ancestors_zh_default = "\u7956\u5148\u8B70\u984C\u80CC\u666F\n";
 // core/steps/_shared/label-ancestors.en.md
 var label_ancestors_en_default = "Ancestor topic context\n";
 
+// core/steps/_shared/label-summary-direction.zh.md
+var label_summary_direction_zh_default = "\u4F7F\u7528\u8005\u7D66\u7684\u7D50\u8AD6\u65B9\u5411\uFF08\u4F7F\u7528\u8005\u64B0\u5BEB\u3001\u552F\u8B80\uFF1B\u6BCF\u9805\u5148\u5217\u62EC\u865F\u6846\u4F4F\u7684\u5B50\u8B70\u984C\uFF0C\u518D\u5217\u4F7F\u7528\u8005\u7684\u7D50\u8AD6\u3002\u4EE5\u6B64\u70BA\u7D50\u8AD6\u7684\u65B9\u5411\uFF0C\u4E0D\u5F97\u6539\u5BEB\u6216\u5426\u5B9A\uFF1B\u82E5\u8B49\u64DA\u4E0D\u652F\u6301\uFF0C\u8ACB\u660E\u78BA\u5BEB\u51FA\u843D\u5DEE\uFF09";
+
+// core/steps/_shared/label-summary-direction.en.md
+var label_summary_direction_en_default = "Conclusion direction given by the user (written by the user, read-only; each entry lists the child topics a bracket frames, then the user's conclusion. Take it as the direction of your conclusion, never rewrite or contradict it; if the evidence does not support it, say so explicitly and state the gap)";
+
 // core/steps/_shared/label-user-text.zh.md
 var label_user_text_zh_default = "\u4F7F\u7528\u8005\u5728\u6B64\u8B70\u984C\u4E0B\u64B0\u5BEB\u7684\u6587\u5B57\uFF08\u552F\u8B80\uFF1B\u7576\u4F5C\u4F7F\u7528\u8005\u81EA\u5DF1\u7684\u8F38\u5165\uFF0C\u4E0D\u5F97\u6539\u5BEB\uFF0C\u4E5F\u4E0D\u662F\u53EF\u5F15\u7528\u7684\u4F86\u6E90\uFF09\n";
 
@@ -8646,6 +8715,7 @@ var LABEL_ANCESTORS = pair2(label_ancestors_zh_default, label_ancestors_en_defau
 var LABEL_RULES = pair2(label_rules_zh_default, label_rules_en_default);
 var LABEL_SOURCES = pair2(label_sources_zh_default, label_sources_en_default);
 var LABEL_SUMMARY = pair2(label_summary_zh_default, label_summary_en_default);
+var LABEL_SUMMARY_DIRECTION = pair2(label_summary_direction_zh_default, label_summary_direction_en_default);
 var LABEL_USER_TEXT = pair2(label_user_text_zh_default, label_user_text_en_default);
 var LABEL_TASK = pair2(label_task_zh_default, label_task_en_default);
 var LABEL_TOPIC = pair2(label_topic_zh_default, label_topic_en_default);
@@ -8711,16 +8781,16 @@ function assembleCoffeeContext(session) {
   const rounds = (_a2 = session.rounds) != null ? _a2 : [];
   const attachedInterventions = /* @__PURE__ */ new Set();
   if (rounds.length) {
-    for (const round of rounds) {
-      const source = round.markdown || round.draftMarkdown || "";
-      const attached = ((_b2 = session.interventions) != null ? _b2 : []).filter((item) => item.roundId === round.id).sort((a, b) => {
+    for (const round2 of rounds) {
+      const source = round2.markdown || round2.draftMarkdown || "";
+      const attached = ((_b2 = session.interventions) != null ? _b2 : []).filter((item) => item.roundId === round2.id).sort((a, b) => {
         var _a3, _b3;
         return ((_a3 = a.afterTurn) != null ? _a3 : 0) - ((_b3 = b.afterTurn) != null ? _b3 : 0) || Date.parse(a.createdAt) - Date.parse(b.createdAt);
       });
       for (const item of attached) attachedInterventions.add(item.id);
       if (!attached.length || !/^###\s+/m.test(source)) {
         add(
-          round.createdAt,
+          round2.createdAt,
           [source, ...attached.map((item) => `${CONTEXT_INTERVENTION}${item.text}`)].filter(Boolean).join("\n\n")
         );
         continue;
@@ -8744,7 +8814,7 @@ function assembleCoffeeContext(session) {
         }
       }
       inject(Number.MAX_SAFE_INTEGER);
-      add(round.createdAt, output.join("\n\n"));
+      add(round2.createdAt, output.join("\n\n"));
     }
   } else add(session.createdAt, session.transcriptMarkdown);
   for (const question of session.questions) {
@@ -8848,21 +8918,21 @@ ${file.content}`).join("\n")}`;
 function coffeeSegments(session) {
   var _a2, _b2;
   const rounds = (_a2 = session.rounds) != null ? _a2 : [];
-  const result = rounds.map((round, index) => {
+  const result = rounds.map((round2, index) => {
     var _a3, _b3;
     return {
-      id: `round:${round.id}`,
-      kind: (_a3 = round.kind) != null ? _a3 : index === 0 ? round.id === "round-1" ? "legacy" : "initial" : "continuation",
-      summary: round.summary,
-      status: round.status,
+      id: `round:${round2.id}`,
+      kind: (_a3 = round2.kind) != null ? _a3 : index === 0 ? round2.id === "round-1" ? "legacy" : "initial" : "continuation",
+      summary: round2.summary,
+      status: round2.status,
       text: [
-        round.markdown || round.draftMarkdown || "",
-        ...((_b3 = session.interventions) != null ? _b3 : []).filter((item) => item.roundId === round.id).map((item) => {
+        round2.markdown || round2.draftMarkdown || "",
+        ...((_b3 = session.interventions) != null ? _b3 : []).filter((item) => item.roundId === round2.id).map((item) => {
           var _a4, _b4;
           return `User intervention after turn ${(_a4 = item.afterTurn) != null ? _a4 : 0} (${(_b4 = item.status) != null ? _b4 : "sent"}): ${item.text}`;
         })
       ].filter(Boolean).join("\n\n"),
-      createdAt: round.createdAt
+      createdAt: round2.createdAt
     };
   });
   if (!rounds.length && session.transcriptMarkdown)
@@ -10832,7 +10902,7 @@ var CoffeeEngine = class {
     const snapshot = {
       ...this.session,
       questions: this.session.questions.map((question) => ({ ...question })),
-      rounds: ((_a2 = this.session.rounds) != null ? _a2 : []).map((round) => ({ ...round }))
+      rounds: ((_a2 = this.session.rounds) != null ? _a2 : []).map((round2) => ({ ...round2 }))
     };
     const summariesOnly = this.summarizing;
     this.persistQueue = this.persistQueue.catch(() => void 0).then(() => this.retired ? void 0 : this.saveSession(snapshot, summariesOnly));
@@ -10900,14 +10970,14 @@ var CoffeeEngine = class {
   }
   recoverCompleteDraft() {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
-    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b2 = [...(_a2 = this.session.rounds) != null ? _a2 : []].reverse().find((round2) => round2.draftMarkdown)) == null ? void 0 : _b2.draftMarkdown) != null ? _d : "";
+    const savedDraft = (_d = (_c = this.session.draftMarkdown) != null ? _c : (_b2 = [...(_a2 = this.session.rounds) != null ? _a2 : []].reverse().find((round3) => round3.draftMarkdown)) == null ? void 0 : _b2.draftMarkdown) != null ? _d : "";
     if (!COMPLETION_MARKER.test(savedDraft)) return null;
     const recoveredSummary = extractSegmentSummary(stripCompletionMarker(savedDraft));
     const draft = recoveredSummary.markdown;
     const { dialogue: recoverableDialogue, notes } = splitObserverNotes(draft);
     const parts = recoverableDialogue.split(/(?=^### )/gm), introduction = ((_e = parts[0]) == null ? void 0 : _e.startsWith("### ")) ? "" : ((_f = parts.shift()) != null ? _f : "").trim();
     const draftRoundIds = new Set(
-      ((_g = this.session.rounds) != null ? _g : []).filter((round2) => round2.draftMarkdown).map((round2) => round2.id)
+      ((_g = this.session.rounds) != null ? _g : []).filter((round3) => round3.draftMarkdown).map((round3) => round3.id)
     );
     const hasDraftInterventions = ((_h = this.session.interventions) != null ? _h : []).some(
       (item) => item.roundId && draftRoundIds.has(item.roundId)
@@ -10921,9 +10991,9 @@ var CoffeeEngine = class {
     const dialogue = [introduction, ...speeches].filter(Boolean).join("\n\n");
     if (!dialogue || !noteSections(notes).length) return null;
     const mergedNotes = mergeObserverNotes(this.session, notes);
-    const draftRounds = ((_i = this.session.rounds) != null ? _i : []).filter((round2) => round2.draftMarkdown);
+    const draftRounds = ((_i = this.session.rounds) != null ? _i : []).filter((round3) => round3.draftMarkdown);
     const roundId = (_k = (_j = draftRounds.at(-1)) == null ? void 0 : _j.id) != null ? _k : crypto.randomUUID();
-    const round = {
+    const round2 = {
       ...draftRounds.at(-1),
       id: roundId,
       summary: (_m = recoveredSummary.summary) != null ? _m : (_l = draftRounds.at(-1)) == null ? void 0 : _l.summary,
@@ -10939,7 +11009,7 @@ var CoffeeEngine = class {
     const interventions = ((_q = this.session.interventions) != null ? _q : []).map(
       (item) => item.roundId && draftRoundIdsForInterventions.has(item.roundId) ? { ...item, roundId } : item
     );
-    const rounds = [...completedRounds, round];
+    const rounds = [...completedRounds, round2];
     this.setSession({
       ...this.session,
       rounds,
@@ -11072,7 +11142,7 @@ var CoffeeEngine = class {
     }) : [];
     if (context.length + previousDraft.length > MAX_COFFEE_CONTEXT_CHARS)
       return Promise.reject(this.engineError("coffee.table_too_long_start_new"));
-    const round = {
+    const round2 = {
       id: roundId,
       kind: (_i = retryRound == null ? void 0 : retryRound.kind) != null ? _i : ((_h = (_g = this.session.rounds) == null ? void 0 : _g.length) != null ? _h : 0) === 0 ? "initial" : kind,
       markdown: "",
@@ -11090,7 +11160,7 @@ var CoffeeEngine = class {
       status: "generating",
       lastGenerationStartedAt: (/* @__PURE__ */ new Date()).toISOString(),
       error: void 0,
-      rounds: [...((_j = this.session.rounds) != null ? _j : []).filter((item) => item.id !== roundId), round]
+      rounds: [...((_j = this.session.rounds) != null ? _j : []).filter((item) => item.id !== roundId), round2]
     });
     const pending2 = (async () => {
       var _a3, _b3, _c2;
@@ -11291,7 +11361,7 @@ ${instruction}`);
     const existingNames = [
       ...[
         this.session.transcriptMarkdown,
-        ...((_c = this.session.rounds) != null ? _c : []).map((round) => round.markdown),
+        ...((_c = this.session.rounds) != null ? _c : []).map((round2) => round2.markdown),
         ...this.session.questions.map((item) => item.answer)
       ].join("\n").matchAll(/^###\s+([^｜|\n]+)[｜|]/gm)
     ].map((match) => match[1].trim());
@@ -11661,7 +11731,7 @@ function normalizeSession(value) {
     rounds,
     observerNotes: Array.isArray(value.observerNotes) ? value.observerNotes.filter((item) => typeof item === "string") : [],
     questions,
-    transcriptMarkdown: rounds.map((round) => round.markdown).filter(Boolean).join("\n\n"),
+    transcriptMarkdown: rounds.map((round2) => round2.markdown).filter(Boolean).join("\n\n"),
     dirtyNotes: value.dirtyNotes === true,
     convergenceDraft: rawDraft,
     convergenceRawDraft: savedRawDraft,
@@ -11927,7 +11997,7 @@ var CoffeeStorage = class {
       status: session.status,
       ...session.error ? { error: session.error } : {},
       guests: session.guests,
-      rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round }) => round),
+      rounds: storedRounds.map(({ markdown: _markdown, notes: _notes, ...round2 }) => round2),
       questions: questions.map(({ id, createdAt, status, error, draftAnswer, invitedGuests, summary }) => ({
         summary,
         id,
@@ -12063,7 +12133,7 @@ var CoffeeStorage = class {
         if (Array.isArray(data))
           for (const entry of data) {
             if (typeof entry.id !== "string") continue;
-            const item = entry.id.startsWith("round:") ? rounds.find((round) => `round:${round.id}` === entry.id) : questions.find((question) => `question:${question.id}` === entry.id);
+            const item = entry.id.startsWith("round:") ? rounds.find((round2) => `round:${round2.id}` === entry.id) : questions.find((question) => `question:${question.id}` === entry.id);
             if (item) {
               item.summary = typeof entry.summary === "string" && !/[\r\n]/.test(entry.summary) ? entry.summary.trim() || void 0 : void 0;
               if ("markdown" in item && ["initial", "continuation", "legacy"].includes(String(entry.kind)))
@@ -12073,7 +12143,7 @@ var CoffeeStorage = class {
       } catch (e) {
       }
     for (const meta of (_B = side.rounds) != null ? _B : [])
-      if (!rounds.some((round) => round.id === meta.id) && meta.status !== "completed")
+      if (!rounds.some((round2) => round2.id === meta.id) && meta.status !== "completed")
         rounds.push({ ...meta, markdown: "", notes: "" });
     rounds.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const observerNotes2 = (side.convergenceUndo ? [latest] : [latest, ...noteVersions]).filter(Boolean);
@@ -12093,7 +12163,7 @@ var CoffeeStorage = class {
       ...side.error ? { error: side.error } : {},
       guests: guestSettings,
       rounds,
-      transcriptMarkdown: rounds.map((round) => round.markdown).filter(Boolean).join("\n\n"),
+      transcriptMarkdown: rounds.map((round2) => round2.markdown).filter(Boolean).join("\n\n"),
       questions,
       observerNotes: observerNotes2,
       ...side.draftMarkdown ? { draftMarkdown: side.draftMarkdown } : {},
@@ -12169,19 +12239,19 @@ var CoffeeStorage = class {
     lines.push("", `## ${t2("\u5C0D\u8A71\u7D00\u9304", "Conversation")}`, "");
     const events = [];
     let roundNumber = 0;
-    for (const round of (_n = session.rounds) != null ? _n : []) {
-      const attached = ((_o = session.interventions) != null ? _o : []).filter((item) => item.roundId === round.id).sort((a, b) => {
+    for (const round2 of (_n = session.rounds) != null ? _n : []) {
+      const attached = ((_o = session.interventions) != null ? _o : []).filter((item) => item.roundId === round2.id).sort((a, b) => {
         var _a3, _b3;
         return ((_a3 = a.afterTurn) != null ? _a3 : 0) - ((_b3 = b.afterTurn) != null ? _b3 : 0);
-      }), body = interleaveInterventions(round.markdown, attached);
+      }), body = interleaveInterventions(round2.markdown, attached);
       if (!body) continue;
       roundNumber++;
       events.push({
-        at: round.createdAt,
+        at: round2.createdAt,
         lines: [
           `## ${t2(`\u5C0D\u8AC7\u7B2C ${roundNumber} \u6BB5`, `Conversation part ${roundNumber}`)}`,
           "",
-          `<!-- coffee-tables-round:${round.id} -->`,
+          `<!-- coffee-tables-round:${round2.id} -->`,
           "",
           body
         ]
@@ -12226,10 +12296,10 @@ var CoffeeStorage = class {
     if (insights.length)
       lines.push(`## ${t2("\u89C0\u5BDF\u8005\u6574\u7406", "Observer notes")}`, "", serializeInsightNotes(insights, session.language));
     const drafts = [
-      ...((_v = session.rounds) != null ? _v : []).filter((round) => round.draftMarkdown).map(
-        (round, index) => `### ${t2(`\u5C0D\u8AC7\u7B2C ${index + 1} \u6BB5\u8349\u7A3F`, `Conversation part ${index + 1} draft`)}
+      ...((_v = session.rounds) != null ? _v : []).filter((round2) => round2.draftMarkdown).map(
+        (round2, index) => `### ${t2(`\u5C0D\u8AC7\u7B2C ${index + 1} \u6BB5\u8349\u7A3F`, `Conversation part ${index + 1} draft`)}
 
-${round.draftMarkdown}`
+${round2.draftMarkdown}`
       ),
       ...session.questions.filter((question) => question.draftAnswer).map(
         (question, index) => `### ${t2(`\u8FFD\u554F\u8349\u7A3F ${index + 1}`, `Follow-up draft ${index + 1}`)}
@@ -12241,11 +12311,11 @@ ${question.draftAnswer}`
       drafts.push(`### ${t2("\u89C0\u5BDF\u8005\u6574\u7406\u8349\u7A3F", "Observer notes draft")}
 
 ${session.observerDraftMarkdown}`);
-    if (drafts.length || session.draftMarkdown && !((_w = session.rounds) != null ? _w : []).some((round) => round.draftMarkdown))
+    if (drafts.length || session.draftMarkdown && !((_w = session.rounds) != null ? _w : []).some((round2) => round2.draftMarkdown))
       lines.push(
         `## ${t2("\u672A\u5B8C\u6210\u8349\u7A3F", "Unfinished drafts")}`,
         "",
-        ...session.draftMarkdown && !((_x = session.rounds) != null ? _x : []).some((round) => round.draftMarkdown) ? [session.draftMarkdown] : [],
+        ...session.draftMarkdown && !((_x = session.rounds) != null ? _x : []).some((round2) => round2.draftMarkdown) ? [session.draftMarkdown] : [],
         ...drafts
       );
     return lines.join("\n");
@@ -12994,7 +13064,7 @@ function migrateGuests(value) {
 function conversationHash(rounds, questions, interventions) {
   return contentHash(
     JSON.stringify({
-      rounds: rounds.map((round) => demoteRootHeadings(round.markdown)).filter(Boolean),
+      rounds: rounds.map((round2) => demoteRootHeadings(round2.markdown)).filter(Boolean),
       questions: questions.map(({ question, answer, draftAnswer, invitedGuests }) => [
         question,
         answer,
@@ -13080,7 +13150,7 @@ function itemTime(item) {
 function effectiveTableStatus(session, busy = false) {
   var _a2, _b2;
   if (busy) return "generating";
-  if (session.status === "generating" || session.questions.some((question) => question.status !== "complete") || ((_a2 = session.rounds) != null ? _a2 : []).some((round) => round.status !== "completed") || ((_b2 = session.interventions) != null ? _b2 : []).some((item) => item.status === "pending" || item.status === "failed"))
+  if (session.status === "generating" || session.questions.some((question) => question.status !== "complete") || ((_a2 = session.rounds) != null ? _a2 : []).some((round2) => round2.status !== "completed") || ((_b2 = session.interventions) != null ? _b2 : []).some((item) => item.status === "pending" || item.status === "failed"))
     return "error";
   return session.status;
 }
@@ -13619,7 +13689,7 @@ function liveRosterFor(session, draftMarkdown = "") {
   var _a2, _b2;
   const history2 = [
     session.transcriptMarkdown,
-    ...((_a2 = session.rounds) != null ? _a2 : []).flatMap((round) => [round.markdown, round.draftMarkdown]),
+    ...((_a2 = session.rounds) != null ? _a2 : []).flatMap((round2) => [round2.markdown, round2.draftMarkdown]),
     ...((_b2 = session.questions) != null ? _b2 : []).flatMap((question) => [question.answer, question.draftAnswer])
   ];
   return rosterFor(session, [...history2, draftMarkdown].filter(Boolean).join("\n"));
@@ -14782,7 +14852,7 @@ ${old.customPrompt}` : (_M = selectedStyle == null ? void 0 : selectedStyle.prom
             cls: "ct-warning",
             text: this.t("coffee.these_notes_predate_later_conversation_changes")
           });
-        const notes = (_f2 = (_e2 = (_b3 = session.observerNotes) == null ? void 0 : _b3[0]) != null ? _e2 : (_d2 = (_c2 = session.rounds) == null ? void 0 : _c2.find((round) => round.notes)) == null ? void 0 : _d2.notes) != null ? _f2 : "";
+        const notes = (_f2 = (_e2 = (_b3 = session.observerNotes) == null ? void 0 : _b3[0]) != null ? _e2 : (_d2 = (_c2 = session.rounds) == null ? void 0 : _c2.find((round2) => round2.notes)) == null ? void 0 : _d2.notes) != null ? _f2 : "";
         if (notes)
           void import_obsidian8.MarkdownRenderer.render(
             this.app,
@@ -15167,8 +15237,8 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
       messages.addClass("ct-live-holding");
     }
     const events = [];
-    ((_b2 = engine.session.rounds) != null ? _b2 : []).forEach((round, index) => {
-      if (round.status !== "generating") events.push({ at: round.createdAt, type: "round", index });
+    ((_b2 = engine.session.rounds) != null ? _b2 : []).forEach((round2, index) => {
+      if (round2.status !== "generating") events.push({ at: round2.createdAt, type: "round", index });
     });
     engine.session.questions.forEach(
       (question, index) => {
@@ -15182,10 +15252,10 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     events.sort((a, b) => a.at.localeCompare(b.at));
     for (const event of events) {
       if (event.type === "round") {
-        const round = ((_d = engine.session.rounds) != null ? _d : [])[event.index];
+        const round2 = ((_d = engine.session.rounds) != null ? _d : [])[event.index];
         this.renderRound(
-          round.markdown || round.draftMarkdown || this.t("coffee.this_segment_has_no_dialogue_yet"),
-          round.id,
+          round2.markdown || round2.draftMarkdown || this.t("coffee.this_segment_has_no_dialogue_yet"),
+          round2.id,
           messages
         );
       } else if (event.type === "question") {
@@ -15911,9 +15981,9 @@ ${person.bio}`));
     if (draft) {
       hold(draft);
       draft.empty();
-      const round = [...(_b2 = engine.session.rounds) != null ? _b2 : []].reverse().find((item) => item.status === "generating");
+      const round2 = [...(_b2 = engine.session.rounds) != null ? _b2 : []].reverse().find((item) => item.status === "generating");
       if (engine.session.status !== "completed" && engine.session.draftMarkdown)
-        this.renderRound(engine.session.draftMarkdown, round == null ? void 0 : round.id, draft);
+        this.renderRound(engine.session.draftMarkdown, round2 == null ? void 0 : round2.id, draft);
     }
     for (const question of engine.session.questions) {
       const live = this.contentEl.querySelector(`[data-live-question-id="${question.id}"]`);
@@ -16130,6 +16200,7 @@ var MEMBER_LIMIT = 500;
 var TEXT_LIMIT = 2e3;
 var PARENT_ID_LIMIT = 200;
 var LINK_LIMIT = 20;
+var SUMMARY_MEMBER_LIMIT = 50;
 var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var finite = (v) => typeof v === "number" && Number.isFinite(v);
 function isSafeImagePath(path) {
@@ -16182,6 +16253,15 @@ function cleanTextItem(raw) {
   if (links.length) item.links = links;
   return item;
 }
+function cleanSummary(raw) {
+  const { id, parentId, members, text: text11 } = raw;
+  if (typeof id !== "string" || !ID.test(id) || typeof parentId !== "string" || !ID.test(parentId)) return null;
+  if (!Array.isArray(members) || members.length === 0 || members.length > SUMMARY_MEMBER_LIMIT) return null;
+  if (!members.every((m) => typeof m === "string" && ID.test(m))) return null;
+  const clean4 = cleanText(text11);
+  if (clean4 === null) return null;
+  return { id, kind: "summary", parentId, members: [...new Set(members)], text: clean4 };
+}
 function sanitizeCanvasItems(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
@@ -16192,9 +16272,10 @@ function sanitizeCanvasItems(raw) {
     if (entry.kind === "image") item = cleanImage(entry);
     else if (entry.kind === "boundary") item = cleanBoundary(entry);
     else if (entry.kind === "text") item = cleanTextItem(entry);
+    else if (entry.kind === "summary") item = cleanSummary(entry);
     else item = entry;
     if (!item) continue;
-    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text") {
+    if (item.kind === "image" || item.kind === "boundary" || item.kind === "text" || item.kind === "summary") {
       const id = item.id;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -16313,6 +16394,186 @@ function removeLinksTo(items, nodeIds) {
       item.links.filter((l) => !gone.has(l))
     );
   });
+}
+var isSummary = (item) => item.kind === "summary";
+var childIds = (nodes, parentId) => nodes.filter((n) => n.parentId === parentId).map((n) => n.id);
+function checkSummaryMembers(members, nodes) {
+  if (!Array.isArray(members) || !members.every((m) => typeof m === "string" && ID.test(m)))
+    return { ok: false, reason: "invalid" };
+  const unique3 = [...new Set(members)];
+  if (unique3.length === 0) return { ok: false, reason: "invalid" };
+  if (unique3.length > SUMMARY_MEMBER_LIMIT) return { ok: false, reason: "too-many" };
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  let parentId = null;
+  for (const id of unique3) {
+    const node = byId.get(id);
+    if (!node) return { ok: false, reason: "unknown" };
+    if (node.parentId === null || !byId.has(node.parentId)) return { ok: false, reason: "root" };
+    if (parentId === null) parentId = node.parentId;
+    else if (parentId !== node.parentId) return { ok: false, reason: "cross-parent" };
+  }
+  if (parentId === null) return { ok: false, reason: "invalid" };
+  const siblings = childIds(nodes, parentId);
+  const picked = new Set(unique3);
+  const positions2 = siblings.flatMap((id, index) => picked.has(id) ? [index] : []);
+  if (positions2[positions2.length - 1] - positions2[0] + 1 !== positions2.length)
+    return { ok: false, reason: "not-adjacent" };
+  return { ok: true, parentId, members: positions2.map((i) => siblings[i]) };
+}
+function effectiveSummaryRange(summary, nodes) {
+  const siblings = childIds(nodes, summary.parentId);
+  const picked = new Set(summary.members);
+  const positions2 = siblings.flatMap((id, index) => picked.has(id) ? [index] : []);
+  if (!positions2.length) return [];
+  return siblings.slice(positions2[0], positions2[positions2.length - 1] + 1);
+}
+function addSummary(items, summary, nodes) {
+  const unchanged = [...items];
+  if (typeof summary.id !== "string" || !ID.test(summary.id) || cleanText(summary.text) === null)
+    return { ok: false, reason: "invalid", items: unchanged };
+  if (items.some((i) => i.id === summary.id))
+    return { ok: false, reason: "duplicate", items: unchanged };
+  const checked = checkSummaryMembers(summary.members, nodes);
+  if (!checked.ok) return { ok: false, reason: checked.reason, items: unchanged };
+  const clean4 = cleanSummary({
+    id: summary.id,
+    kind: "summary",
+    parentId: checked.parentId,
+    members: checked.members,
+    text: summary.text
+  });
+  if (!clean4) return { ok: false, reason: "invalid", items: unchanged };
+  return { ok: true, items: [...items, clean4] };
+}
+function setSummaryText(items, id, text11) {
+  const clean4 = cleanText(text11);
+  if (clean4 === null) return [...items];
+  return items.map((item) => isSummary(item) && item.id === id ? { ...item, text: clean4 } : item);
+}
+function setSummaryMembers(items, id, members, nodes) {
+  const unchanged = [...items];
+  if (!items.some((i) => isSummary(i) && i.id === id)) return { ok: false, reason: "unknown", items: unchanged };
+  const checked = checkSummaryMembers(members, nodes);
+  if (!checked.ok) return { ok: false, reason: checked.reason, items: unchanged };
+  return {
+    ok: true,
+    items: items.map(
+      (item) => isSummary(item) && item.id === id ? { ...item, parentId: checked.parentId, members: checked.members } : item
+    )
+  };
+}
+function removeSummary(items, id) {
+  return items.filter((item) => !(isSummary(item) && item.id === id));
+}
+function pruneSummaries(items, nodes) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const out = [];
+  for (const item of items) {
+    if (!isSummary(item)) {
+      out.push(item);
+      continue;
+    }
+    if (!byId.has(item.parentId)) continue;
+    const members = item.members.filter((m) => {
+      var _a2;
+      return ((_a2 = byId.get(m)) == null ? void 0 : _a2.parentId) === item.parentId;
+    });
+    if (!members.length) continue;
+    out.push(members.length === item.members.length ? item : { ...item, members });
+  }
+  return out;
+}
+function removeSummaryMembers(items, nodeIds) {
+  const gone = new Set(nodeIds);
+  const out = [];
+  for (const item of items) {
+    if (!isSummary(item)) {
+      out.push(item);
+      continue;
+    }
+    if (gone.has(item.parentId)) continue;
+    const members = item.members.filter((m) => !gone.has(m));
+    if (!members.length) continue;
+    out.push(members.length === item.members.length ? item : { ...item, members });
+  }
+  return out;
+}
+function summaryDirectionContext(items, nodes, parentId, titleOf) {
+  return items.filter((item) => isSummary(item) && item.parentId === parentId).flatMap((summary) => {
+    const range = effectiveSummaryRange(summary, nodes);
+    if (!range.length) return [];
+    const titles = range.map((id) => titleOf(id).replace(/\s+/g, " ").trim()).join("; ");
+    return [`- ${titles}
+  ${summary.text.replace(/\n/g, "\n  ")}`];
+  }).join("\n");
+}
+
+// experiences/visual-map/summary-bracket-geometry.ts
+var BRACKET_GAP = 14;
+var BRACKET_DEPTH = 12;
+var BRACKET_LABEL_GAP = 8;
+function bracketSupported(direction) {
+  return ["right", "left", "down", "up", "balanced"].includes(direction);
+}
+var finite2 = (n) => typeof n === "number" && Number.isFinite(n);
+var round = (n) => Math.round(n * 100) / 100;
+function unionRects(rects) {
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const r of rects) {
+    if (!r || !finite2(r.x) || !finite2(r.y) || !finite2(r.w) || !finite2(r.h)) continue;
+    left = Math.min(left, r.x);
+    top = Math.min(top, r.y);
+    right = Math.max(right, r.x + r.w);
+    bottom = Math.max(bottom, r.y + r.h);
+  }
+  return left === Infinity ? null : { x: left, y: top, w: right - left, h: bottom - top };
+}
+function bracketGeometry(direction, memberRects, parentRect, rangeRects = memberRects) {
+  if (!bracketSupported(direction)) return { ok: false, reason: "unsupported" };
+  const extent = unionRects(memberRects);
+  if (!extent) return { ok: false, reason: "empty" };
+  let side;
+  if (direction === "balanced") {
+    const middle = parentRect && finite2(parentRect.x) && finite2(parentRect.w) ? parentRect.x + parentRect.w / 2 : null;
+    if (middle === null) return { ok: false, reason: "empty" };
+    const halves = new Set(rangeRects.map((r) => r.x + r.w / 2 < middle ? "left" : "right"));
+    if (halves.size !== 1) return { ok: false, reason: "cross-side" };
+    side = halves.has("left") ? "left" : "right";
+  } else side = direction;
+  return { ok: true, ...shape(side, extent) };
+}
+function shape(side, e) {
+  const d = BRACKET_DEPTH;
+  const horizontalRun = side === "down" || side === "up";
+  const u1 = horizontalRun ? e.x : e.y, u2 = horizontalRun ? e.x + e.w : e.y + e.h;
+  const base = side === "right" ? e.x + e.w + BRACKET_GAP : side === "left" ? e.x - BRACKET_GAP : side === "down" ? e.y + e.h + BRACKET_GAP : e.y - BRACKET_GAP;
+  const sign = side === "right" || side === "down" ? 1 : -1;
+  const mid = (u1 + u2) / 2;
+  const r = Math.min(d, Math.max(0, (u2 - u1) / 4));
+  const at = (u, v) => horizontalRun ? `${round(u)} ${round(v)}` : `${round(v)} ${round(u)}`;
+  const v0 = base, v1 = base + sign * d, v2 = base + sign * 2 * d;
+  const path = [
+    `M ${at(u1, v0)}`,
+    `Q ${at(u1, v1)} ${at(u1 + r, v1)}`,
+    `L ${at(mid - r, v1)}`,
+    `Q ${at(mid, v1)} ${at(mid, v2)}`,
+    `Q ${at(mid, v1)} ${at(mid + r, v1)}`,
+    `L ${at(u2 - r, v1)}`,
+    `Q ${at(u2, v1)} ${at(u2, v0)}`
+  ].join(" ");
+  const tip = v2 + sign * BRACKET_LABEL_GAP;
+  return {
+    side,
+    path,
+    label: horizontalRun ? { x: round(mid), y: round(tip) } : { x: round(tip), y: round(mid) },
+    extent: e
+  };
+}
+function summaryTextBox(side, label, w, h) {
+  if (side === "left") return { x: label.x - w, y: label.y - h / 2, w, h };
+  if (side === "down") return { x: label.x - w / 2, y: label.y, w, h };
+  if (side === "up") return { x: label.x - w / 2, y: label.y - h, w, h };
+  return { x: label.x, y: label.y - h / 2, w, h };
 }
 
 // experiences/visual-map/image-input.ts
@@ -16460,7 +16721,7 @@ function textLines(title) {
   return raw.slice(0, 20).map((line) => String(line).slice(0, TEXT_LIMIT2));
 }
 function buildMapSvg(scene) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
+  var _a2, _b2, _c, _d, _e, _f, _g, _h;
   const width = num(scene == null ? void 0 : scene.width);
   const height = num(scene == null ? void 0 : scene.height);
   if (width === null || height === null || width <= 0 || height <= 0) return "";
@@ -16515,6 +16776,26 @@ function buildMapSvg(scene) {
     textLines(card.title).slice(0, fits).forEach((line, i) => {
       out.push(
         `<text x="${box[0] + 14}" y="${top + i * 16}" font-family="${FONT}" font-size="13" fill="${fill2}">${escapeXml(line)}</text>`
+      );
+    });
+    out.push("</g>");
+  }
+  for (const summary of (_h = scene.summaries) != null ? _h : []) {
+    if (typeof (summary == null ? void 0 : summary.d) !== "string" || !PATH_DATA.test(summary.d) || summary.d.length > 4e3) continue;
+    const [x, y] = [num(summary.x), num(summary.y)];
+    if (x === null || y === null) continue;
+    const stroke = color(summary.stroke, strokeColor);
+    out.push(
+      `<g><path d="${summary.d.trim()}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>`
+    );
+    const lines = textLines(summary.text);
+    const anchor = summary.side === "left" ? "end" : summary.side === "right" ? "start" : "middle";
+    const lineHeight = 17;
+    const first = summary.side === "up" ? y - (lines.length - 1) * lineHeight - 4 : summary.side === "down" ? y + 13 : y - (lines.length - 1) * lineHeight / 2 + 4;
+    const fill2 = color(summary.textColor, textColor);
+    lines.forEach((line, i) => {
+      out.push(
+        `<text x="${x}" y="${Math.round((first + i * lineHeight) * 100) / 100}" text-anchor="${anchor}" font-family="${FONT}" font-size="13" fill="${fill2}">${escapeXml(line)}</text>`
       );
     });
     out.push("</g>");
@@ -17367,7 +17648,7 @@ function radialPositions(input) {
     let step = fine;
     let touched = clash();
     let low = base.slice();
-    for (let round = 0; touched.size && round < MAX_ROUNDS; round++) {
+    for (let round2 = 0; touched.size && round2 < MAX_ROUNDS; round2++) {
       low = base.slice();
       for (const depth of touched) base[depth] += step;
       step *= 2;
@@ -20584,7 +20865,7 @@ var clip = (value, limit) => {
   return characters.length > limit ? `${characters.slice(0, limit - 1).join("")}\u2026` : text11;
 };
 function buildMapChatContext(input) {
-  var _a2, _b2, _c, _d, _e;
+  var _a2, _b2, _c, _d, _e, _f;
   const hashes = {};
   const topicHashes = {};
   const byId = new Map(input.outline.map((node) => [node.id, node]));
@@ -20688,6 +20969,16 @@ function buildMapChatContext(input) {
         ...linkedTo(item.links)
       })),
       userTextsNote: "userTexts are notes the user wrote on the map. Read them as the user's own words; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
+    } : {},
+    ...((_f = input.summaries) == null ? void 0 : _f.length) ? {
+      summaries: input.summaries.map((item) => ({
+        id: item.id,
+        parentId: item.parentId,
+        readOnly: true,
+        members: item.members.map(brief).filter(Boolean),
+        text: item.text
+      })),
+      summariesNote: "summaries are conclusions the user wrote over neighbouring child topics (summary brackets). Read them as the user's own words and as the direction of the conclusion; they are not cards, have no card id you may act on, and must not be rewritten or deleted."
     } : {},
     activeFile: active,
     earlierTurns: history2.map((turn) => ({ role: turn.role, text: turn.text }))
@@ -22984,11 +23275,11 @@ var FOLDED = `${EDGE},${EDGE} ${FOLD_X},${EDGE} ${FAR},${FOLD_Y} ${FAR},${FAR} $
 var FOLD_LINE = `${FOLD_X},${EDGE} ${FOLD_X},${FOLD_Y} ${FAR},${FOLD_Y}`;
 var DIAMOND = `50,${EDGE} ${FAR},50 50,${FAR} ${EDGE},50`;
 function hasSvgShape(kind) {
-  const shape = TOPIC_KIND_SHAPES[kind].shape;
-  return shape !== "rounded" && shape !== "rect";
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
+  return shape2 !== "rounded" && shape2 !== "rect";
 }
 function renderShapeBackground(card, kind) {
-  const shape = TOPIC_KIND_SHAPES[kind].shape;
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
   if (!hasSvgShape(kind)) return void 0;
   const svg = createSvg("svg");
   svg.addClass("vam-kind-shape");
@@ -22996,17 +23287,17 @@ function renderShapeBackground(card, kind) {
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("focusable", "false");
-  const outline = createSvg(shape === "ellipse" ? "ellipse" : "polygon");
+  const outline = createSvg(shape2 === "ellipse" ? "ellipse" : "polygon");
   outline.addClass("vam-kind-outline");
-  if (shape === "ellipse") {
+  if (shape2 === "ellipse") {
     outline.setAttribute("cx", "50");
     outline.setAttribute("cy", "50");
     outline.setAttribute("rx", "50");
     outline.setAttribute("ry", "50");
-  } else outline.setAttribute("points", shape === "diamond" ? DIAMOND : shape === "hexagon" ? HEXAGON : FOLDED);
+  } else outline.setAttribute("points", shape2 === "diamond" ? DIAMOND : shape2 === "hexagon" ? HEXAGON : FOLDED);
   outline.setAttribute("vector-effect", "non-scaling-stroke");
   svg.appendChild(outline);
-  if (shape === "folded") {
+  if (shape2 === "folded") {
     const fold2 = createSvg("polyline");
     fold2.addClass("vam-kind-fold");
     fold2.setAttribute("points", FOLD_LINE);
@@ -23029,9 +23320,9 @@ var FIT = {
 var SAFETY = 4;
 var BASE_PADDING = { top: 12, right: 14, bottom: 14, left: 14 };
 function shapeInsets(kind, content) {
-  const shape = TOPIC_KIND_SHAPES[kind].shape;
-  if (shape === "rounded" || shape === "rect") return { ...BASE_PADDING };
-  const fit = FIT[shape];
+  const shape2 = TOPIC_KIND_SHAPES[kind].shape;
+  if (shape2 === "rounded" || shape2 === "rect") return { ...BASE_PADDING };
+  const fit = FIT[shape2];
   const side = content.width * (1 - fit.width) / 2;
   const vertical = content.height * (1 / fit.height - 1) / 2 + SAFETY;
   return { top: vertical, right: side, bottom: vertical, left: side };
@@ -28965,8 +29256,8 @@ var reduce_en_default = "Combine the supplied extracted evidence without droppin
 var text6 = (template) => renderTemplate(template, {});
 var EXTRACT = { zh: text6(extract_zh_default), en: text6(extract_en_default) };
 var REDUCE = { zh: text6(reduce_zh_default), en: text6(reduce_en_default) };
-function referenceTask(round, language2) {
-  return inLanguage(round === "extract" ? EXTRACT : REDUCE, language2);
+function referenceTask(round2, language2) {
+  return inLanguage(round2 === "extract" ? EXTRACT : REDUCE, language2);
 }
 
 // ai/aim-contracts.ts
@@ -29700,6 +29991,8 @@ ${context.workingFindings}` : "",
 ${context.sourceContext}` : "",
     ...context.userTexts ? [`${inLanguage(LABEL_USER_TEXT, language2)}:
 ${context.userTexts}`] : [],
+    ...context.summaryDirections ? [`${inLanguage(LABEL_SUMMARY_DIRECTION, language2)}:
+${context.summaryDirections}`] : [],
     `${inLanguage(LABEL_ANCESTORS, language2)}:
 ${context.ancestors || none}`,
     `${inLanguage(LABEL_TASK, language2)}:
@@ -29850,15 +30143,15 @@ var AiTaskService = class {
     if (!input.countRepair) (_c = input.onWorkingFindingsSent) == null ? void 0 : _c.call(input, (_b2 = context.workingFindings) != null ? _b2 : "");
     const pluginDirectory = this.options.pluginDirectory();
     const outputLanguage2 = (_d = context.outputLanguage) != null ? _d : this.options.language();
-    const shape = taskResponseShape(context);
-    const step = prepareStep(createTaskStep(taskStepId(context, role), shape.schema), {
+    const shape2 = taskResponseShape(context);
+    const step = prepareStep(createTaskStep(taskStepId(context, role), shape2.schema), {
       context,
       language: outputLanguage2,
       provider,
       providerLabel: provider === "claude" ? "Claude Code" : "Codex App Server",
-      strictGapAudit: shape.isAimGapAudit,
-      webResearch: shape.isIsolatedWebResearch,
-      contract: shape.contract
+      strictGapAudit: shape2.isAimGapAudit,
+      webResearch: shape2.isIsolatedWebResearch,
+      contract: shape2.contract
     });
     console.debug("Visual Agent Map AI metrics", prepared.metrics);
     const countsWeb = !context.aimIsolatedResearch && ((_e = context.mode) != null ? _e : "task") === "task" && context.researchMode === "research" && role === void 0 && !input.countRepair;
@@ -30326,10 +30619,10 @@ var AiTaskService = class {
   async extractReferenceFindings(context, model, reasoning, signal, onRequestAccepted) {
     var _a2, _b2, _c;
     let working = referenceBatches((_a2 = context.referenceGroups) != null ? _a2 : []);
-    let round = 0;
+    let round2 = 0;
     while (true) {
-      round++;
-      const batches = round === 1 ? working : packReferenceChunks(working);
+      round2++;
+      const batches = round2 === 1 ? working : packReferenceChunks(working);
       const findings = [];
       for (let index = 0; index < batches.length; index++) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -30340,7 +30633,7 @@ var AiTaskService = class {
             summary: "",
             rules: "",
             detail: "",
-            task: referenceTask(round === 1 ? "extract" : "reduce", this.options.language()),
+            task: referenceTask(round2 === 1 ? "extract" : "reduce", this.options.language()),
             ancestors: "",
             sourceContext: batches[index],
             mode: "task",
@@ -30356,7 +30649,7 @@ var AiTaskService = class {
           onRequestAccepted,
           void 0,
           void 0,
-          round === 1 ? "reference-extract" : "reference-reduce"
+          round2 === 1 ? "reference-extract" : "reference-reduce"
         );
         if (!result.detail.trim()) throw new Error(t("ui.reference_processing_empty_result"));
         findings.push(result.detail.trim());
@@ -37488,10 +37781,10 @@ var RelevanceGradeService = class {
   async repair(request, signal, hooks, first, stopped, repairStep, repairRequest, send) {
     var _a2, _b2;
     let failure = first;
-    for (let round = 1; ; round++) {
+    for (let round2 = 1; ; round2++) {
       const prepared = prepareStep(repairStep(failure), repairRequest(failure));
       if (signal.aborted) throw stopped();
-      (_a2 = hooks.onRepair) == null ? void 0 : _a2.call(hooks, round, failure.missing ? "missing-bounded" : "hierarchy");
+      (_a2 = hooks.onRepair) == null ? void 0 : _a2.call(hooks, round2, failure.missing ? "missing-bounded" : "hierarchy");
       let raw = "";
       let failed;
       try {
@@ -37507,7 +37800,7 @@ var RelevanceGradeService = class {
         return prepared.parse(raw);
       } catch (error) {
         if (!(error instanceof RelevanceGradeError) || !error.hierarchy) throw error;
-        if (round >= RELEVANCE_REPAIR_MAX_ROUNDS)
+        if (round2 >= RELEVANCE_REPAIR_MAX_ROUNDS)
           throw error.hierarchy.missing ? new RelevanceGradeError("invalid", error.message, void 0, (_b2 = error.detail) != null ? _b2 : error.message) : new RelevanceGradeError(
             "invalid",
             translate(uiLocale(request.language), "error.relevance_grade_hierarchy"),
@@ -44320,6 +44613,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     });
     /** Text node element per id (tree-attached and free), rebuilt on every render. */
     __publicField(this, "textEls", /* @__PURE__ */ new Map());
+    /** A summary bracket being created: nothing is written until it has text, so Esc or an empty text leaves no trace (Critical Path). */
+    __publicField(this, "pendingSummary", null);
+    __publicField(this, "editingSummaryId", null);
+    /** Detaches the open bracket editor without saving and returns its draft, so a repaint can reopen it. */
+    __publicField(this, "suspendSummaryEdit", null);
+    __publicField(this, "summaryEditDraft", null);
+    __publicField(this, "summaryEls", /* @__PURE__ */ new Map());
     /** A text node that opens its editor as soon as the next paint has it (a new node, or Enter on a focused one). */
     __publicField(this, "pendingTextEditId", null);
     __publicField(this, "editingTextId", null);
@@ -44415,7 +44715,17 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
   /** Drops the links of every free text block to the removed cards, in the same map edit (decision #2); no `canvasItems` appears out of nothing. */
   dropTextLinks(map, ids) {
     var _a2;
-    if ((_a2 = map.canvasItems) == null ? void 0 : _a2.length) map.canvasItems = removeLinksTo(map.canvasItems, new Set(ids));
+    if (!((_a2 = map.canvasItems) == null ? void 0 : _a2.length)) return;
+    const gone = new Set(ids);
+    map.canvasItems = removeSummaryMembers(removeLinksTo(map.canvasItems, gone), gone);
+    if (!map.canvasItems.length) delete map.canvasItems;
+  }
+  /** After any map edit: brackets whose members were moved to another parent or removed are cleaned in the same transaction (decision #2). */
+  pruneSummariesIn(map) {
+    var _a2;
+    if (!((_a2 = map.canvasItems) == null ? void 0 : _a2.some((item) => item.kind === "summary"))) return;
+    map.canvasItems = pruneSummaries(map.canvasItems, map.nodes);
+    if (!map.canvasItems.length) delete map.canvasItems;
   }
   /** Arranges the whole map; text nodes under shown topics go with it. Without text nodes it is `arrangeMap`. */
   arrangeAll(map, options = {}) {
@@ -44990,19 +45300,22 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     ).open();
   }
   async onClose() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j;
     this.closed = true;
-    this.cancelLinking(false);
     this.closeMapSearch(false);
     this.exitPresentation(false);
+    this.cancelLinking(false);
+    (_a2 = this.suspendSummaryEdit) == null ? void 0 : _a2.call(this);
+    this.pendingSummary = null;
+    this.summaryEditDraft = null;
     this.releaseCovers();
-    (_a2 = this.unbindClipboard) == null ? void 0 : _a2.call(this);
+    (_b2 = this.unbindClipboard) == null ? void 0 : _b2.call(this);
     this.unbindClipboard = null;
     this.renderAfterDrag = false;
-    (_b2 = this.announcer) == null ? void 0 : _b2.remove();
+    (_c = this.announcer) == null ? void 0 : _c.remove();
     this.announcer = null;
     this.announcedStages.clear();
-    (_c = this.unsubscribeResearch) == null ? void 0 : _c.call(this);
+    (_d = this.unsubscribeResearch) == null ? void 0 : _d.call(this);
     this.unsubscribeResearch = null;
     if (this.researchTick !== null) window.clearInterval(this.researchTick);
     if (this.researchRenderTimer !== null) window.clearTimeout(this.researchRenderTimer);
@@ -45013,10 +45326,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     this.hoverResearch = null;
     this.plugin.releaseOutline(this);
     this.abortMapChat();
-    (_d = this.chat) == null ? void 0 : _d.dispose();
-    (_e = this.relevancePanelCleanup) == null ? void 0 : _e.call(this);
+    (_e = this.chat) == null ? void 0 : _e.dispose();
+    (_f = this.relevancePanelCleanup) == null ? void 0 : _f.call(this);
     this.relevancePanelCleanup = null;
-    if (this.relevancePanelOpen) (_g = (_f = this.plugin).releaseWarmClaude) == null ? void 0 : _g.call(_f);
+    if (this.relevancePanelOpen) (_h = (_g = this.plugin).releaseWarmClaude) == null ? void 0 : _h.call(_g);
     this.abortRelevanceGrade();
     for (const task of this.synthesisTasks.values()) if (task.state === "running") task.controller.abort();
     this.synthesisTasks.clear();
@@ -45036,8 +45349,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
     this.stopAimProgress();
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
-    (_h = this.hoverCard) == null ? void 0 : _h.remove();
-    (_i = this.dragCleanup) == null ? void 0 : _i.call(this);
+    (_i = this.hoverCard) == null ? void 0 : _i.remove();
+    (_j = this.dragCleanup) == null ? void 0 : _j.call(this);
     if (this.viewportTimer !== null) {
       window.clearTimeout(this.viewportTimer);
       this.viewportTimer = null;
@@ -48207,6 +48520,7 @@ ${request.requirements}` : preset.text,
         map.viewport = clone(viewport);
         before = clone(map);
         change(map, attachmentPath);
+        this.pruneSummariesIn(map);
         after = clone(map);
       }).commit({ deferRebuild: true });
       this.history.push(entry);
@@ -48914,10 +49228,12 @@ ${request.requirements}` : preset.text,
    * they paint behind the cards. A file that cannot be found shows a named placeholder; the item stays in the map.
    */
   renderCanvasItems() {
-    var _a2, _b2, _c, _d;
-    const stage = this.stageEl, items = (_a2 = this.map) == null ? void 0 : _a2.canvasItems;
-    if (!stage || !(items == null ? void 0 : items.length)) {
+    var _a2, _b2, _c, _d, _e;
+    const stage = this.stageEl, items = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : [];
+    if (!stage || !(items == null ? void 0 : items.length) && !this.pendingSummary) {
       if (this.linkingTextId) this.cancelLinking(false);
+      if (this.suspendSummaryEdit) this.suspendSummaryEdit();
+      this.summaryEditDraft = null;
       return;
     }
     const editable = this.canEditCanvasItems();
@@ -48926,7 +49242,7 @@ ${request.requirements}` : preset.text,
     layer == null ? void 0 : layer.setAttr("aria-label", t("ui.canvas_images_group"));
     for (const item of items) {
       if (item.kind !== "image" || !layer) continue;
-      const image = item, name = (_b2 = image.path.split("/").pop()) != null ? _b2 : image.path, label = t("ui.canvas_image_label", name), el = layer.createDiv("vam-canvas-image");
+      const image = item, name = (_c = image.path.split("/").pop()) != null ? _c : image.path, label = t("ui.canvas_image_label", name), el = layer.createDiv("vam-canvas-image");
       el.dataset.itemId = image.id;
       el.setAttr("role", "img");
       el.setAttr("aria-label", label);
@@ -48936,7 +49252,7 @@ ${request.requirements}` : preset.text,
       el.style.width = `${image.w}px`;
       el.style.height = `${image.h}px`;
       const file = this.app.vault.getAbstractFileByPath(image.path);
-      const source = file instanceof import_obsidian32.TFile ? (_d = (_c = this.app.vault).getResourcePath) == null ? void 0 : _d.call(_c, file) : void 0;
+      const source = file instanceof import_obsidian32.TFile ? (_e = (_d = this.app.vault).getResourcePath) == null ? void 0 : _e.call(_d, file) : void 0;
       const placeholder2 = () => {
         el.empty();
         el.addClass("is-missing");
@@ -48967,6 +49283,7 @@ ${request.requirements}` : preset.text,
     }
     this.renderTextNodes(stage, items);
     this.renderBoundaries(stage, items, editable);
+    this.renderSummaries(stage, items);
     this.focusItemId = null;
   }
   /** Text nodes change only on a map the user may edit, and never while presenting. */
@@ -49429,6 +49746,31 @@ ${request.requirements}` : preset.text,
     );
     return attached.filter((text11) => text11.parentId === nodeId).map((text11) => `- ${text11.text.replace(/\n/g, "\n  ")}`).join("\n");
   }
+  /** The brackets under `nodeId` as the "direction from the user" block of an integration prompt; nothing at all when it has none (decision #6). */
+  summaryDirections(nodeId) {
+    var _a2;
+    const items = (_a2 = this.map) == null ? void 0 : _a2.canvasItems;
+    if (!(items == null ? void 0 : items.some((item) => item.kind === "summary")) || !this.map) return {};
+    const titles = new Map(this.map.nodes.map((node) => {
+      var _a3, _b2;
+      return [node.id, (_b2 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b2 : ""];
+    }));
+    const text11 = summaryDirectionContext(items, this.map.nodes, nodeId, (id) => {
+      var _a3;
+      return (_a3 = titles.get(id)) != null ? _a3 : "";
+    });
+    return text11 ? { summaryDirections: text11 } : {};
+  }
+  /** Every bracket of the map for the chat context: the effective range, so the AI reads what the canvas shows (decision #6). */
+  chatSummaries() {
+    var _a2;
+    const map = this.map;
+    if (!((_a2 = map == null ? void 0 : map.canvasItems) == null ? void 0 : _a2.some((item) => item.kind === "summary"))) return void 0;
+    return map.canvasItems.filter((item) => item.kind === "summary").flatMap((summary) => {
+      const members = effectiveSummaryRange(summary, map.nodes);
+      return members.length ? [{ id: summary.id, parentId: summary.parentId, members, text: summary.text }] : [];
+    });
+  }
   /** Every text node of the map for the chat context; a free one (its topic is gone) goes with `parentId: null` (decision #4). */
   chatUserTexts() {
     var _a2, _b2, _c, _d;
@@ -49551,6 +49893,333 @@ ${request.requirements}` : preset.text,
         el.focus({ preventScroll: true });
       }
     }
+  }
+  // ---- Summary brackets (summary-bracket plan, decisions #1, #2, #4) -------------------------------------------------
+  /** Brackets change on a map the user may edit (topic selection mode included, where they are created), never while presenting. */
+  canEditSummary() {
+    return !!this.map && !this.builtIn && !this.map.aim && !this.presentation;
+  }
+  /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
+  summaryGeometry(parentId, range) {
+    var _a2, _b2;
+    if (!this.map || !range.length) return null;
+    const nodes = this.map.nodes, children = /* @__PURE__ */ new Map();
+    for (const node of nodes)
+      if (node.parentId) children.set(node.parentId, [...(_a2 = children.get(node.parentId)) != null ? _a2 : [], node.id]);
+    const rectOf = (id) => {
+      const card = this.cardEls.get(id);
+      if (!card) return null;
+      const box = boxOf(card);
+      return { x: box.x, y: box.y, w: box.width, h: box.height };
+    };
+    const rangeRects = [], all = [];
+    for (const id of range) {
+      const own2 = rectOf(id);
+      if (!own2) continue;
+      rangeRects.push(own2);
+      const stack = [id], seen = /* @__PURE__ */ new Set();
+      while (stack.length) {
+        const current = stack.pop();
+        if (seen.has(current)) continue;
+        seen.add(current);
+        const rect2 = rectOf(current);
+        if (rect2) all.push(rect2);
+        stack.push(...(_b2 = children.get(current)) != null ? _b2 : []);
+      }
+    }
+    if (!rangeRects.length) return null;
+    const parentCard = rectOf(parentId), direction = layoutDirectionFor(nodes, range[0], layoutOf(this.map).direction);
+    return bracketGeometry(direction, all, parentCard, rangeRects);
+  }
+  /** Whether these topics can be bracketed now; a refusal carries the i18n key that says why (shown, announced, and the button's title). */
+  summaryEntryCheck(ids) {
+    if (!this.map || !this.canEditSummary()) return { ok: false, reason: "ui.summary_unavailable" };
+    if (!ids.length) return { ok: false, reason: "ui.summary_select_first" };
+    const check = checkSummaryMembers(ids, this.map.nodes);
+    if (!check.ok) return { ok: false, reason: this.summaryRefusalKey(check.reason) };
+    const geometry = this.summaryGeometry(check.parentId, check.members);
+    if (geometry && !geometry.ok) {
+      if (geometry.reason === "unsupported") return { ok: false, reason: "ui.summary_layout_unsupported" };
+      if (geometry.reason === "cross-side") return { ok: false, reason: "ui.summary_cross_side" };
+    }
+    return check;
+  }
+  summaryRefusalKey(reason) {
+    switch (reason) {
+      case "root":
+        return "ui.summary_refused_root";
+      case "cross-parent":
+        return "ui.summary_refused_cross_parent";
+      case "not-adjacent":
+        return "ui.summary_refused_not_adjacent";
+      case "too-many":
+        return "ui.summary_refused_too_many";
+      default:
+        return "ui.summary_refused_unknown";
+    }
+  }
+  /** The topics a summary entry acts on: the multi-selection, or the one selected topic. */
+  summaryTargets() {
+    return this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+  }
+  /** Entry for the toolbar, command and context menu: starts a bracket over the topics and opens its text editor (nothing is written yet). */
+  addSummaryOver(ids = this.summaryTargets()) {
+    var _a2;
+    const check = this.summaryEntryCheck(ids);
+    if (!check.ok) {
+      (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(check.reason));
+      new import_obsidian32.Notice(t(check.reason));
+      return;
+    }
+    if (this.suspendSummaryEdit) this.suspendSummaryEdit();
+    this.summaryEditDraft = null;
+    this.pendingSummary = { id: `sum-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, members: check.members };
+    this.render();
+  }
+  /**
+   * Draws the brackets: a brace beyond the outer edge of the framed subtrees and the text beyond the brace. Measured from the cards
+   * drawn now, so layout changes, moves and folding are followed without writing anything; a bracket whose cards are all hidden
+   * (or whose arrangement cannot draw it) is not drawn but kept. Text goes in through textContent only.
+   */
+  renderSummaries(stage, items) {
+    var _a2, _b2, _c;
+    if (this.suspendSummaryEdit) this.summaryEditDraft = this.suspendSummaryEdit();
+    const map = this.map;
+    const entries = items.filter((item) => item.kind === "summary").map((summary) => ({ summary, isNew: false }));
+    if (this.pendingSummary) {
+      const check = map ? checkSummaryMembers(this.pendingSummary.members, map.nodes) : null;
+      if ((check == null ? void 0 : check.ok) && this.canEditSummary())
+        entries.push({
+          summary: {
+            id: this.pendingSummary.id,
+            kind: "summary",
+            parentId: check.parentId,
+            members: check.members,
+            text: ""
+          },
+          isNew: true
+        });
+      else {
+        this.pendingSummary = null;
+        this.summaryEditDraft = null;
+      }
+    }
+    if (!map || !entries.length) {
+      this.summaryEditDraft = null;
+      return;
+    }
+    const editable = this.canEditSummary();
+    const layer = stage.createDiv("vam-summaries");
+    layer.setAttr("role", "group");
+    layer.setAttr("aria-label", t("ui.summaries_group"));
+    for (const { summary, isNew } of entries) {
+      const range = effectiveSummaryRange(summary, map.nodes), geometry = this.summaryGeometry(summary.parentId, range);
+      if (!(geometry == null ? void 0 : geometry.ok)) continue;
+      const el = layer.createDiv(`vam-summary is-side-${geometry.side}`);
+      el.dataset.itemId = summary.id;
+      el.setAttr("role", "group");
+      el.setAttr("aria-label", isNew ? t("ui.summary_new_label") : t("ui.summary_label", summary.text.slice(0, 60)));
+      el.tabIndex = 0;
+      const svg = createSvg("svg");
+      svg.addClass("vam-summary-brace");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      const path = createSvg("path");
+      path.setAttribute("d", geometry.path);
+      path.setAttribute("fill", "none");
+      svg.appendChild(path);
+      el.appendChild(svg);
+      const label = el.createDiv({ cls: "vam-summary-text", text: summary.text });
+      label.style.left = `${geometry.label.x}px`;
+      label.style.top = `${geometry.label.y}px`;
+      this.summaryEls.set(summary.id, el);
+      el.addEventListener("focus", () => el.addClass("is-selected"));
+      el.addEventListener("blur", () => el.removeClass("is-selected"));
+      label.addEventListener("pointerdown", (event) => {
+        if (event.button === 0 && !this.editingSummaryId) el.focus({ preventScroll: true });
+      });
+      if (!editable || isNew) continue;
+      label.addEventListener("dblclick", (event) => {
+        event.stopPropagation();
+        this.startSummaryEdit(summary.id);
+      });
+      label.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = new import_obsidian32.Menu();
+        menu.addItem(
+          (item) => item.setTitle(t("ui.summary_edit")).setIcon("pencil").onClick(() => this.startSummaryEdit(summary.id))
+        );
+        menu.addItem(
+          (item) => item.setTitle(t("ui.summary_use_selection")).setIcon("brackets").onClick(() => this.enqueue(() => this.changeSummaryRange(summary.id)))
+        );
+        menu.addItem(
+          (item) => item.setTitle(t("ui.summary_remove")).setIcon("trash").onClick(() => this.enqueue(() => this.removeSummaryItem(summary.id)))
+        );
+        menu.showAtMouseEvent(event);
+      });
+      el.addEventListener("keydown", (event) => {
+        if (event.target !== el || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (!event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.enqueue(() => this.removeSummaryItem(summary.id));
+        } else if (!event.shiftKey && (event.key === "Enter" || event.key === "F2")) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.startSummaryEdit(summary.id);
+        }
+      });
+    }
+    const draft = this.summaryEditDraft;
+    this.summaryEditDraft = null;
+    const pending2 = (_b2 = (_a2 = this.pendingSummary) == null ? void 0 : _a2.id) != null ? _b2 : null;
+    if (draft && this.summaryEls.has(draft.id)) {
+      this.focusItemId = null;
+      this.focusNodeId = null;
+      this.focusResizeNodeId = null;
+      this.startSummaryEdit(draft.id, draft.value);
+    } else if (pending2 && this.summaryEls.has(pending2)) {
+      this.focusItemId = null;
+      this.focusNodeId = null;
+      this.focusResizeNodeId = null;
+      this.startSummaryEdit(pending2);
+    } else if (this.focusItemId && this.summaryEls.has(this.focusItemId)) {
+      (_c = this.summaryEls.get(this.focusItemId)) == null ? void 0 : _c.focus({ preventScroll: true });
+      this.focusItemId = null;
+    }
+  }
+  /**
+   * Opens the text editor in place of a bracket's text: Cmd/Ctrl+Enter or leaving it saves, Esc cancels. For a bracket still being
+   * created, an empty text or Esc writes nothing; for a stored one an empty text removes it (one undo step each).
+   */
+  startSummaryEdit(id, draft) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const el = this.summaryEls.get(id);
+    const stored = ((_b2 = (_a2 = this.map) == null ? void 0 : _a2.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "summary" && item.id === id
+    );
+    const isNew = !stored && ((_c = this.pendingSummary) == null ? void 0 : _c.id) === id;
+    if (!el || !stored && !isNew || !this.canEditSummary() || this.editingSummaryId) return;
+    this.editingSummaryId = id;
+    const body = el.querySelector(".vam-summary-text");
+    body == null ? void 0 : body.addClass("vam-sr-only");
+    const input = el.createEl("textarea", {
+      cls: "vam-summary-input",
+      attr: { rows: "3", maxlength: String(TEXT_LIMIT), "aria-label": t("ui.summary_edit_label") }
+    });
+    input.style.left = (_d = body == null ? void 0 : body.style.left) != null ? _d : "0px";
+    input.style.top = (_e = body == null ? void 0 : body.style.top) != null ? _e : "0px";
+    input.value = (_f = draft != null ? draft : stored == null ? void 0 : stored.text) != null ? _f : "";
+    let done = false;
+    const close = () => {
+      done = true;
+      this.editingSummaryId = null;
+      this.suspendSummaryEdit = null;
+      input.remove();
+      body == null ? void 0 : body.removeClass("vam-sr-only");
+    };
+    this.suspendSummaryEdit = () => {
+      done = true;
+      this.editingSummaryId = null;
+      this.suspendSummaryEdit = null;
+      return { id, value: input.value };
+    };
+    const commit = () => {
+      var _a3, _b3;
+      if (done) return;
+      const value = input.value;
+      close();
+      const members = (_b3 = (_a3 = this.pendingSummary) == null ? void 0 : _a3.members) != null ? _b3 : [];
+      if (isNew) this.pendingSummary = null;
+      this.enqueue(() => this.saveSummaryItem(id, value, isNew ? members : null));
+    };
+    const cancel = () => {
+      var _a3, _b3;
+      close();
+      if (isNew) {
+        const first = (_b3 = (_a3 = this.pendingSummary) == null ? void 0 : _a3.members[0]) != null ? _b3 : null;
+        this.pendingSummary = null;
+        this.focusNodeId = first;
+        this.render();
+        this.focusNodeId = null;
+      } else el.focus({ preventScroll: true });
+    };
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cancel();
+      } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        commit();
+      }
+    });
+    input.addEventListener("blur", commit);
+    input.focus({ preventScroll: true });
+    (_g = input.select) == null ? void 0 : _g.call(input);
+  }
+  /** Writes a new bracket (`members` given) or new text for a stored one, as one undo step; empty text writes nothing / removes. */
+  async saveSummaryItem(id, value, members) {
+    var _a2, _b2, _c;
+    if (!this.map) return;
+    if (members) {
+      if (cleanText(value) === null) {
+        this.render();
+        return;
+      }
+      this.focusItemId = id;
+      try {
+        await this.mapChange((map) => {
+          var _a3;
+          const result = addSummary((_a3 = map.canvasItems) != null ? _a3 : [], { id, members, text: value }, map.nodes);
+          if (!result.ok) throw new Error(t(this.summaryRefusalKey(result.reason)));
+          map.canvasItems = result.items;
+        }, false);
+        (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.summary_added"));
+      } catch (error) {
+        this.focusItemId = null;
+        this.render();
+        new import_obsidian32.Notice(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
+    const current = ((_b2 = this.map.canvasItems) != null ? _b2 : []).find(
+      (item) => item.kind === "summary" && item.id === id
+    );
+    if (!current) return;
+    this.focusItemId = id;
+    if (cleanText(value) === null) {
+      this.focusItemId = null;
+      await this.changeCanvasItems(id, (items) => removeSummary(items, id));
+      (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.summary_removed"));
+    } else if (cleanText(value) !== current.text)
+      await this.changeCanvasItems(id, (items) => setSummaryText(items, id, value));
+  }
+  async removeSummaryItem(id) {
+    var _a2;
+    this.focusItemId = null;
+    await this.changeCanvasItems(id, (items) => removeSummary(items, id));
+    (_a2 = this.announcer) == null ? void 0 : _a2.setText(t("ui.summary_removed"));
+  }
+  /** Replaces a bracket's range with the selected topics (same rules as creating one); one undo step. */
+  async changeSummaryRange(id) {
+    var _a2, _b2;
+    if (!this.map) return;
+    const check = this.summaryEntryCheck(this.summaryTargets());
+    if (!check.ok) {
+      (_a2 = this.announcer) == null ? void 0 : _a2.setText(t(check.reason));
+      new import_obsidian32.Notice(t(check.reason));
+      return;
+    }
+    this.focusItemId = id;
+    await this.changeCanvasItems(id, (items) => {
+      var _a3, _b3;
+      const result = setSummaryMembers(items, id, check.members, (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b3 : []);
+      return result.ok ? result.items : [...items];
+    });
+    (_b2 = this.announcer) == null ? void 0 : _b2.setText(t("ui.summary_range_changed"));
   }
   /** Asks for a frame's label (blank is allowed) and writes it as one undo step. */
   editBoundaryLabel(id) {
@@ -49837,9 +50506,25 @@ ${request.requirements}` : preset.text,
     }
   }
   onCanvasContextMenu(event) {
+    var _a2, _b2, _c;
+    const hit = event.target;
+    const card = (_a2 = hit == null ? void 0 : hit.closest) == null ? void 0 : _a2.call(hit, ".vam-node");
+    if (card && !((_b2 = hit == null ? void 0 : hit.closest) == null ? void 0 : _b2.call(hit, INTERACTIVE_SELECTOR)) && this.canEditSummary()) {
+      const cardId = (_c = [...this.cardEls].find(([, el]) => el === card)) == null ? void 0 : _c[0];
+      if (cardId) {
+        event.preventDefault();
+        const ids = this.multiSelected.has(cardId) ? [...this.multiSelected] : [cardId];
+        const menu2 = new import_obsidian32.Menu();
+        menu2.addItem(
+          (item) => item.setTitle(t("ui.summary_add")).setIcon("brackets").onClick(() => this.addSummaryOver(ids))
+        );
+        menu2.showAtMouseEvent(event);
+      }
+      return;
+    }
     if (!this.canEditCanvasItems()) return;
     const target = event.target;
-    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-canvas-image") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))
+    if (!(target == null ? void 0 : target.closest) || target.closest(".vam-node") || target.closest(".vam-summary-text") || target.closest(".vam-canvas-image") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR))
       return;
     const point = this.stagePoint({ x: event.clientX, y: event.clientY });
     if (!point) return;
@@ -51057,7 +51742,7 @@ ${request.requirements}` : preset.text,
    * pictures alone are over the limit (read no further).
    */
   async collectExportScene(isCurrent) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const map = this.map;
     if (!map) return null;
     const win = window;
@@ -51176,9 +51861,34 @@ ${request.requirements}` : preset.text,
         stroke: colorOf(computed((_g = this.viewportEl) != null ? _g : this.contentEl).getPropertyValue("--text-muted"))
       });
     }
+    const summaryScenes = [];
+    for (const item of (_h = map.canvasItems) != null ? _h : []) {
+      if (item.kind !== "summary") continue;
+      const summary = item;
+      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes));
+      if (!(geometry == null ? void 0 : geometry.ok)) continue;
+      const lines = wrapText(summary.text, 200 - 12);
+      grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
+      const across = geometry.side === "right" || geometry.side === "left";
+      grow(
+        geometry.side === "left" ? geometry.label.x - 200 : geometry.side === "right" ? geometry.label.x : geometry.label.x - 100,
+        across ? geometry.label.y - lines.length * 9 : geometry.side === "up" ? geometry.label.y - lines.length * 17 : geometry.label.y,
+        200,
+        across ? lines.length * 18 : lines.length * 17
+      );
+      summaryScenes.push({
+        d: geometry.path,
+        x: geometry.label.x,
+        y: geometry.label.y,
+        side: geometry.side,
+        text: lines,
+        stroke: colorOf(computed((_i = this.viewportEl) != null ? _i : this.contentEl).getPropertyValue("--text-muted")),
+        textColor: colorOf(computed((_j = this.viewportEl) != null ? _j : this.contentEl).getPropertyValue("--text-normal"))
+      });
+    }
     const edges = [];
-    for (const el of Array.from((_i = (_h = this.edgesEl) == null ? void 0 : _h.children) != null ? _i : [])) {
-      if (((_j = el.tagName) == null ? void 0 : _j.toLowerCase()) !== "path") continue;
+    for (const el of Array.from((_l = (_k = this.edgesEl) == null ? void 0 : _k.children) != null ? _l : [])) {
+      if (((_m = el.tagName) == null ? void 0 : _m.toLowerCase()) !== "path") continue;
       const d = el.getAttribute("d");
       const style = computed(el);
       const stroke = colorOf(style.stroke);
@@ -51186,17 +51896,17 @@ ${request.requirements}` : preset.text,
       edges.push({
         d,
         stroke,
-        ...((_k = el.getAttribute("class")) != null ? _k : "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {}
+        ...((_n = el.getAttribute("class")) != null ? _n : "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {}
       });
       try {
-        const bbox = (_l = el.getBBox) == null ? void 0 : _l.call(el);
+        const bbox = (_o = el.getBBox) == null ? void 0 : _o.call(el);
         if (bbox) grow(bbox.x, bbox.y, bbox.width, bbox.height);
       } catch (e) {
       }
     }
     if (!cards.length && !images.length) return { refuse: "empty" };
     const margin = 24;
-    const root = computed((_m = this.viewportEl) != null ? _m : this.contentEl);
+    const root = computed((_p = this.viewportEl) != null ? _p : this.contentEl);
     const variable = (name) => colorOf(root.getPropertyValue(name));
     const scene = {
       x: bounds.minX - margin,
@@ -51212,6 +51922,7 @@ ${request.requirements}` : preset.text,
       },
       boundaries,
       edges,
+      summaries: summaryScenes,
       cards,
       images
     };
@@ -52022,6 +52733,7 @@ ${request.requirements}` : preset.text,
     this.releaseCovers();
     this.cardEls.clear();
     this.textEls.clear();
+    this.summaryEls.clear();
     this.cardChecks.clear();
     this.selectionBarEl = null;
     this.edgesEl = createSvg("svg");
@@ -52137,10 +52849,10 @@ ${request.requirements}` : preset.text,
       background.setAttribute("preserveAspectRatio", "none");
       background.setAttribute("aria-hidden", "true");
       background.setAttribute("focusable", "false");
-      const shape = createSvg("polygon");
-      shape.setAttribute("points", "25,0.5 75,0.5 99.5,50 75,99.5 25,99.5 0.5,50");
-      shape.setAttribute("vector-effect", "non-scaling-stroke");
-      background.appendChild(shape);
+      const shape2 = createSvg("polygon");
+      shape2.setAttribute("points", "25,0.5 75,0.5 99.5,50 75,99.5 25,99.5 0.5,50");
+      shape2.setAttribute("vector-effect", "non-scaling-stroke");
+      background.appendChild(shape2);
       card.appendChild(background);
     }
     const kind = this.topicKindOf(node.id);
@@ -55175,7 +55887,7 @@ ${request.requirements}` : preset.text,
     );
   }
   renderSelectionBar(workspace) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const selection = workspace.createDiv("vam-selection-bar");
     const names3 = [...this.multiSelected].map((id) => {
       var _a3;
@@ -55204,13 +55916,20 @@ ${request.requirements}` : preset.text,
     this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
     if (!((_a2 = this.map) == null ? void 0 : _a2.aim) && !this.builtIn)
       this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
+    if (!((_b2 = this.map) == null ? void 0 : _b2.aim) && !this.builtIn) {
+      const check = this.summaryEntryCheck(this.summaryTargets()), bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
+      if (!check.ok) {
+        bracket.setAttr("aria-disabled", "true");
+        bracket.setAttr("title", t(check.reason));
+      }
+    }
     this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
     this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
     const count = this.multiSelected.size;
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
-    if (!((_b2 = this.map) == null ? void 0 : _b2.aim) && !this.builtIn) {
+    if (!((_c = this.map) == null ? void 0 : _c.aim) && !this.builtIn) {
       const check = this.mergeCheck(), merge = this.button(selection, t("ui.merge"), () => this.openMerge());
       if (count > 1) merge.setAttr("aria-label", t("ui.merge_0_topics", count));
       if (!check.ok) {
@@ -55218,8 +55937,8 @@ ${request.requirements}` : preset.text,
         merge.setAttr("title", t(check.reason));
       }
     }
-    if (!((_c = this.map) == null ? void 0 : _c.aim)) {
-      const running = ((_d = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _d.status) === "running";
+    if (!((_d = this.map) == null ? void 0 : _d.aim)) {
+      const running = ((_e = this.plugin.expansionBatches.get(this.multiResearchKey())) == null ? void 0 : _e.status) === "running";
       const research = this.button(
         selection,
         t("ui.multi_research"),
@@ -55337,6 +56056,7 @@ ${request.requirements}` : preset.text,
             task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
             ancestors: await this.ancestorContext(node, promptLanguage),
             userTexts: this.userTextContext(node.id),
+            ...this.summaryDirections(node.id),
             workingFindings: note.newFindings,
             referenceGroups: [...selectedSources, childSources],
             // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
@@ -55403,7 +56123,7 @@ ${request.requirements}` : preset.text,
       { language: options == null ? void 0 : options.outputLanguage }
     );
     const sourceSnapshot = JSON.stringify(childSources.documents);
-    const childIds = children.map((child) => child.id).sort().join("|");
+    const childIds2 = children.map((child) => child.id).sort().join("|");
     const mapPath = this.path, mapId = this.map.id;
     const noteSnapshot = JSON.stringify([
       note.title,
@@ -55448,6 +56168,7 @@ ${request.requirements}` : preset.text,
           task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
           ancestors: await this.ancestorContext(node, (_f = options == null ? void 0 : options.outputLanguage) != null ? _f : language2),
           userTexts: this.userTextContext(node.id),
+          ...this.summaryDirections(node.id),
           workingFindings: note.newFindings,
           onWorkingFindingsSent: (sent) => {
             findingsSent = sent === note.newFindings;
@@ -55483,7 +56204,7 @@ ${request.requirements}` : preset.text,
       await this.plugin.repo.updateNote(node.path, { status: note.status });
       const save = async (summary, detail) => this.plugin.mutate(async () => {
         var _a3, _b3, _c2, _d2, _e2, _f2, _g2;
-        if (((_a3 = options == null ? void 0 : options.signal) == null ? void 0 : _a3.aborted) || this.closed || this.path !== mapPath || ((_b3 = this.map) == null ? void 0 : _b3.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds)
+        if (((_a3 = options == null ? void 0 : options.signal) == null ? void 0 : _a3.aborted) || this.closed || this.path !== mapPath || ((_b3 = this.map) == null ? void 0 : _b3.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds2)
           throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
         const currentSources = await this.topicReferenceGroup(
           children,
@@ -56481,6 +57202,14 @@ ${note.detail.trim()}` : "",
       if (!(el == null ? void 0 : el.hasClass("is-free"))) continue;
       boxes.push({ x: text11.x, y: text11.y, w: TEXT_NODE_WIDTH, h: el.offsetHeight || TEXT_NODE_HEIGHT });
     }
+    for (const el of this.summaryEls.values()) {
+      const text11 = el.querySelector(".vam-summary-text");
+      const side = ["right", "left", "down", "up"].find((each) => el.hasClass(`is-side-${each}`));
+      if (!text11 || !side) continue;
+      const label = { x: parseFloat(text11.style.left), y: parseFloat(text11.style.top) };
+      if (!Number.isFinite(label.x) || !Number.isFinite(label.y)) continue;
+      boxes.push(summaryTextBox(side, label, text11.offsetWidth, text11.offsetHeight));
+    }
     const minX = Math.min(...boxes.map((b) => b.x)), maxX = Math.max(...boxes.map((b) => b.x + b.w));
     const minY = Math.min(...boxes.map((b) => b.y)), maxY = Math.max(...boxes.map((b) => b.y + b.h));
     this.map.viewport = fitViewport(
@@ -56508,7 +57237,7 @@ ${note.detail.trim()}` : "",
     );
     viewport.addEventListener("pointerdown", (event) => {
       const target = event.target;
-      if (target.closest(".vam-node") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
+      if (target.closest(".vam-node") || target.closest(".vam-text-node") || target.closest(".vam-boundary-label") || target.closest(".vam-summary") || target.closest(".vam-summary-text") || target.closest(INTERACTIVE_SELECTOR) || !this.map)
         return;
       const intent = canvasPointerIntent({
         button: event.button,
@@ -57025,6 +57754,7 @@ ${note.detail.trim()}` : "",
       snippets,
       files,
       userTexts: this.chatUserTexts(),
+      summaries: this.chatSummaries(),
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns()
     });
@@ -60365,6 +61095,41 @@ function shareTextNodes(map) {
   }
   return out;
 }
+function shareSummaries(map) {
+  var _a2, _b2;
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const byId = new Map(map.nodes.map((node) => [node.id, node]));
+  for (const item of (_a2 = map.canvasItems) != null ? _a2 : []) {
+    const raw = item;
+    if (raw.kind !== "summary" || typeof raw.id !== "string" || !raw.id || seen.has(raw.id)) continue;
+    if (typeof raw.text !== "string" || typeof raw.parentId !== "string" || !Array.isArray(raw.members)) continue;
+    const text11 = raw.text.trim().slice(0, SHARE_TEXT_LIMIT);
+    const parent = byId.get(raw.parentId);
+    if (!text11 || !parent) continue;
+    const picked = new Set(raw.members.filter((id) => typeof id === "string"));
+    const siblings = map.nodes.filter((node) => node.parentId === parent.id);
+    const at = siblings.flatMap((node, index) => picked.has(node.id) ? [index] : []);
+    if (!at.length) continue;
+    const range = siblings.slice(at[0], at[at.length - 1] + 1);
+    const direction = layoutDirectionFor(map.nodes, range[0].id, layoutOf(map).direction);
+    let side;
+    if (direction === "balanced") {
+      const middle = parent.x + ((_b2 = parent.width) != null ? _b2 : CARD_WIDTH) / 2;
+      const halves = new Set(range.map((node) => {
+        var _a3;
+        return node.x + ((_a3 = node.width) != null ? _a3 : CARD_WIDTH) / 2 < middle ? "left" : "right";
+      }));
+      if (halves.size !== 1) continue;
+      side = halves.has("left") ? "left" : "right";
+    } else if (direction === "right" || direction === "left" || direction === "down" || direction === "up")
+      side = direction;
+    else continue;
+    seen.add(raw.id);
+    out.push({ id: raw.id, parentId: parent.id, members: range.map((node) => node.id), side, text: text11 });
+  }
+  return out;
+}
 function buildSharePayload(map, notesById, options) {
   if (map.aim || map.nodes.some((node) => node.aimKind !== void 0))
     throw new ShareError("aim-map", "AIM maps cannot be shared.");
@@ -60401,6 +61166,7 @@ function buildSharePayload(map, notesById, options) {
   });
   const goal = optionalText(options.goal);
   const textNodes = shareTextNodes(map);
+  const summaries = shareSummaries(map);
   return {
     format: SHARE_FORMAT,
     version: SHARE_VERSION,
@@ -60412,6 +61178,7 @@ function buildSharePayload(map, notesById, options) {
     viewport: { x: map.viewport.x, y: map.viewport.y, zoom: map.viewport.zoom },
     nodes,
     ...textNodes.length ? { textNodes } : {},
+    ...summaries.length ? { summaries } : {},
     assets: options.includeImages ? { ...options.assets } : {}
   };
 }
@@ -61939,8 +62706,8 @@ function shareViewerUiExtras(languages) {
 }
 
 // experiences/sharing/viewer-bundle.generated.ts
-var SHARE_VIEWER_JS = '(()=>{function qe(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}function Ze(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(l=>l!==t.parentId)]}function ye(t,o){let r=new Set,l=[o];for(;l.length;){let s=l.pop();for(let d of t)d.parentId===s&&d.id!==o&&!r.has(d.id)&&(r.add(d.id),l.push(d.id))}return r}function be(t,o){let r=new Map(t.map(d=>[d.id,d])),l=d=>{let u=0,c=new Set([d.id]);for(let f=d.parentId;f&&r.has(f)&&!c.has(f);f=r.get(f).parentId)c.add(f),u++;return u},s=new Set(t.map(d=>d.parentId).filter(d=>!!d&&r.has(d)));for(let d of t)s.has(d.id)&&(d.collapsed=o===null?!1:l(d)>=o)}function xe(t){if(t>150)return"right";if(t<-150)return"left"}function Qe(t,o,r,l={left:0,right:0}){let s={...l},d=new Map;for(let u of t){let c=s.left<s.right?"left":"right";d.set(u.id,c),s[c]+=o(u)+r}return d}function Je(t,o,r,l){let s=t.map(l),d={left:0,right:0};t.forEach((c,f)=>{let b=s[f];b&&(d[b]+=o(c)+r)});let u=Qe(t.filter((c,f)=>!s[f]),o,r,d);return new Map(t.map((c,f)=>{var b;return[c.id,(b=s[f])!=null?b:u.get(c.id)]}))}function qn(t){return t==="right"||t==="left"||t==="down"||t==="up"}function tn(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function Qt(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return qn(r)?r:void 0}function en(t){let{width:o,column:r,mapDirection:l,engine:s}=t,d=(u,c)=>{var S,$;let f=[],b=(M,h)=>{for(let w of[...t.kidsOf(M),...t.joinsOf(M)])Qt(w)?f.push({node:w,root:h}):b(w,h)};for(let M of u)b(M,M);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!f.length)return s(c,p);let y=c==="down"||c==="up",v=f.map(({node:M,root:h})=>{let w=d([M],Qt(M)),m=1/0,x=-1/0,E=1/0,P=-1/0,L=new Map,F=N=>{L.set(N.id,N);for(let O of[...t.kidsOf(N),...t.joinsOf(N)])F(O)};F(M);for(let[N,O]of w)m=Math.min(m,O.x),x=Math.max(x,O.x+o),E=Math.min(E,O.y),P=Math.max(P,O.y+t.heightFor(L.get(N)));let A=Math.max(1,Math.ceil((x-m+r-o)/r));return{node:M,root:h,placed:w,minX:m,maxX:x,minY:E,maxY:P,slots:A}}),I=new Map(v.map(M=>[M.node.id,M])),B=M=>{let h=I.get(M.id);return!h||!y?[]:Array.from({length:h.slots},(w,m)=>({id:`${M.id}\\0pad${m}`}))},D=new Set,k=s(c,{roots:u,kidsOf:M=>{if(!I.has(M.id))return t.kidsOf(M);let h=B(M);for(let w of h)D.add(w.id);return h},joinsOf:M=>I.has(M.id)?[]:t.joinsOf(M),heightFor:M=>{if(D.has(M.id))return 0;let h=I.get(M.id);return h&&!y?h.maxY-h.minY:t.heightFor(M)}}),H=new Map;for(let[M,h]of k)!D.has(M)&&!I.has(M)&&H.set(M,h);for(let M of v){let h=k.get(M.node.id),w,m;y?(w=h.x+r/2-(M.minX+M.maxX)/2,m=c==="down"?h.y-M.minY:h.y+t.heightFor(M.node)-M.maxY):(w=c==="right"||c==="balanced"&&h.x>=(($=(S=k.get(M.root.id))==null?void 0:S.x)!=null?$:h.x)?h.x-M.minX:h.x+o-M.maxX,m=h.y-M.minY);for(let[x,E]of M.placed)H.set(x,{x:E.x+w,y:E.y+m})}return H};return d(t.roots,l)}var nn=1/Math.tan(Math.PI/3);function rn(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:s,width:d,column:u,gap:c,left:f,top:b}=t,p=u-d,y=C=>[...r(C),...l(C)],v=o.map(C=>{let k=new Map,H=L=>L.reduce((F,A)=>F+k.get(A.id),0)+Math.max(0,L.length-1)*c,S=L=>{let F=y(L);for(let A of F)S(A);k.set(L.id,Math.max(s(L),H(F)))},$=(L,F,A,N)=>{let O=y(L),W=A+(k.get(L.id)-H(O))/2,j=O.map(J=>{let Z=$(J,F+1,W,N);return W+=k.get(J.id)+c,Z}),X=s(L),Q=j.length?(j[0]+j[j.length-1])/2:A+k.get(L.id)/2;return N.push({id:L.id,x:-F*u,centre:Q,height:X}),Q},M=y(C).map((L,F)=>{let A=F%2===0?1:-1,N=y(L);for(let tt of N)S(tt);let O=[],W=c;for(let tt of N){let ct=O.length,yt=$(tt,0,W,O)*nn-p;for(let ut=ct;ut<O.length;ut++)O[ut].x+=yt-d;W+=k.get(tt.id)+c}let j=Math.max(u,W),X=j*nn,Q=s(L),J=[-d/2,...O.map(tt=>tt.x)],Z=[d/2,X,...O.map(tt=>tt.x+d)];return{topic:L,side:A,length:j,height:Q,cards:O,minX:Math.min(...J),maxX:Math.max(...Z)}}),h=s(C),w=[{id:C.id,x:0,y:-h/2,height:h}],m={above:-p,below:-p};for(let L of M){let F=L.side===1?"above":"below",A=m[F]-L.maxX,N=-L.side*L.length;w.push({id:L.topic.id,x:A-d/2,y:N-L.side*(L.height/2)-L.height/2,height:L.height});for(let O of L.cards)w.push({id:O.id,x:A+O.x,y:N+L.side*O.centre-O.height/2,height:O.height});m[F]=A+L.minX-p}let x=Math.min(...w.map(L=>L.x)),E=Math.min(...w.map(L=>L.y)),P=Math.max(...w.map(L=>L.y+L.height));return{out:w,minX:x,minY:E,maxY:P}}),I=new Map,B=f+Math.max(0,...v.map(C=>-C.minX)),D=b;for(let C of v){for(let k of C.out)I.set(k.id,{x:B+k.x,y:D+k.y-C.minY});D+=C.maxY-C.minY+c}return I}var Zn=Math.PI*2,Qn=6,Jn=60;function tr(t,o,r,l){let s=[...t.values()].sort((u,c)=>u.y-c.y),d=new Set;for(let u=0;u<s.length;u++){let c=s[u];for(let f=u+1;f<s.length;f++){let b=s[f];if(b.y>=c.y+c.height+r)break;l&&l.checks++,Math.abs(c.x-b.x)<o&&c.y<b.y+b.height+r&&d.add(Math.max(c.depth,b.depth))}}return d}function on(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:s,width:d,column:u,gap:c,left:f,top:b}=t,p=new Map,y=b;for(let v of o){let I=[],B=new Map,D=A=>[...r(A),...l(A)],C=A=>{let N=D(A),O=N.length?N.reduce((W,j)=>W+C(j),0):1;return B.set(A.id,O),O};C(v);let k=(A,N,O,W)=>{I.push({id:A.id,depth:N,angle:(O+W)/2,height:s(A)});let j=O,X=(W-O)/B.get(A.id);for(let Q of D(A)){let J=X*B.get(Q.id);k(Q,N+1,j,j+J),j+=J}};k(v,0,0,Zn);let H=Math.max(...I.map(A=>A.depth)),S=Array.from({length:H+1},(A,N)=>N*u),$=()=>{let A=[];return S.forEach((N,O)=>A.push(O?Math.max(N,A[O-1]+u):0)),new Map(I.map(N=>{let O=A[N.depth];return[N.id,{x:Math.round(O*Math.sin(N.angle)-d/2),y:Math.round(-O*Math.cos(N.angle)-N.height/2),depth:N.depth,height:N.height}]}))},M=u/Qn,h=()=>(t.stats&&t.stats.rounds++,tr($(),d,c,t.stats)),w=M,m=h(),x=S.slice();for(let A=0;m.size&&A<Jn;A++){x=S.slice();for(let N of m)S[N]+=w;w*=2,m=h()}if(!m.size&&x.some((A,N)=>S[N]-A>M)){let A=S.slice();for(;A.some((N,O)=>N-x[O]>M);){let N=A.map((O,W)=>(O+x[W])/2);S.splice(0,S.length,...N),h().size?x=N:A=N}S.splice(0,S.length,...A)}let E=$(),P=Math.min(...[...E.values()].map(A=>A.x)),L=Math.min(...[...E.values()].map(A=>A.y)),F=Math.max(...[...E.values()].map(A=>A.y+A.height));for(let[A,N]of E)p.set(A,{x:Math.round(f)+N.x-P,y:y+N.y-L});y+=F-L+c}return p}function Jt(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:s,column:d,rowGap:u,flip:c,left:f,top:b}=t,p=new Map,y=new Map,v=x=>x.reduce((E,P)=>E+p.get(P.id),0),I=x=>{let E=r(x),P=l(x);for(let L of[...E,...P])I(L);p.set(x.id,Math.max(d,v(E),v(P))),y.set(x.id,1+Math.max(0,...E.map(L=>y.get(L.id))))},B=new Map,D=new Map,C=(x,E,P)=>{let L=r(x),F=l(x),A=p.get(x.id),N=(X,Q)=>{let J=P+(A-v(X))/2;return X.map(Z=>{C(Z,Q,J);let tt=B.get(Z.id);return J+=p.get(Z.id),tt})},O=N(L,E+1),W=N(F,E+y.get(x.id)),j=O.length?O:W;D.set(x.id,E),B.set(x.id,j.length?(j[0]+j[j.length-1])/2:P)},k=f,H=[],S=x=>{H.push(x);for(let E of[...r(x),...l(x)])S(E)};for(let x of o)I(x),C(x,0,k),k+=p.get(x.id),S(x);let $=Math.max(0,...D.values()),M=Array.from({length:$+1},()=>0);for(let x of H)M[D.get(x.id)]=Math.max(M[D.get(x.id)],s(x));let h=[],w=b;for(let x=0;x<=$;x++){let E=c?$-x:x;h[E]=w,w+=M[E]+u}let m=new Map;for(let x of H){let E=D.get(x.id),P=c?h[E]+M[E]-s(x):h[E];m.set(x.id,{x:B.get(x.id),y:P})}return m}function sn(t){let{roots:o,kidsOf:r,joinsOf:l,heightFor:s,width:d,column:u,gap:c,left:f,top:b}=t,p=new Map,y=b;for(let v of o){let I=new Map,B=S=>{I.set(S.id,s(S));for(let $ of[...r(S),...l(S)])B($)};B(v);let D=[{id:v.id,x:f,y:0}],C=f+u;[...r(v),...l(v)].forEach((S,$)=>{let M=Jt({roots:[S],kidsOf:r,joinsOf:l,heightFor:s,column:u,rowGap:u-d,flip:$%2===1,left:C,top:0}),h=M.get(S.id).y,w=C;for(let[m,x]of M)D.push({id:m,x:x.x,y:x.y-h}),w=Math.max(w,x.x);C=w+u});let k=Math.min(...D.map(S=>S.y)),H=Math.max(...D.map(S=>S.y+I.get(S.id)));for(let S of D)p.set(S.id,{x:S.x,y:y+S.y-k});y+=H-k+c}return p}var $t=300;function er(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}var nr=24,rr={compact:{column:330,gap:12},standard:{column:360,gap:nr},spacious:{column:420,gap:48}};function or(t){return t==="compact"||t==="spacious"}var ir=180;function sr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...rr[or(r)?r:"standard"]}}var ar=t=>t==="left"?-1:1;var lr=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:ir};function cr(t,o){var f,b;let r=new Map(t.map(p=>[p.id,p])),l=new Map,s=new Map,d=(p,y,v)=>{var I;return p.set(y,[...(I=p.get(y))!=null?I:[],v])};for(let p of t){if(!p.parentId)continue;let y=p.aimKind!=="question"&&((f=p.aimConvergesFromNodeIds)!=null&&f.length)?Ze(p).map(I=>r.get(I)):[],v=(b=y[0])==null?void 0:b.parentId;v&&r.has(v)&&y.every(I=>I&&I.parentId===v)?d(s,v,p):d(l,p.parentId,p)}return{kidsOf:p=>{var y;return o&&p.collapsed?[]:(y=l.get(p.id))!=null?y:[]},joinsOf:p=>{var y;return o&&p.collapsed?[]:((y=s.get(p.id))!=null?y:[]).filter(v=>{var I;return!(o&&((I=r.get(v.parentId))!=null&&I.collapsed))})}}}function Me(t){var M;let{roots:o,kidsOf:r,joinsOf:l,heightFor:s,column:d,gap:u,sign:c,left:f,top:b}=t,p=new Map,y=new Map,v=new Map,I=new Map,B=new Map,D=h=>h.reduce((w,m)=>w+y.get(m.id),0)+Math.max(0,h.length-1)*u,C=h=>{let w=r(h),m=l(h);B.set(h.id,h);for(let x of[...w,...m])C(x);y.set(h.id,Math.max(s(h),D(w),D(m))),v.set(h.id,1+Math.max(0,...w.map(x=>v.get(x.id))))},k=(h,w,m)=>{let x=r(h),E=l(h),P=y.get(h.id),L=(X,Q)=>{let J=m+(P-D(X))/2;return X.map(Z=>{let tt=k(Z,Q,J);return J+=y.get(Z.id)+u,tt})},F=L(x,w+1),A=L(E,w+v.get(h.id)),N=F.length?x:E,O=F.length?F:A,W=s(h),j=m+(P-W)/2;if(O.length){let X=O[0]+s(N[0])/2,Q=O[O.length-1]+s(N[N.length-1])/2;j=(X+Q)/2-W/2}return p.set(h.id,{x:0,y:b+j}),I.set(h.id,w),j},H=0;for(let h of o)C(h),k(h,0,H),H+=y.get(h.id)+u;let S=[];for(let[h,w]of I)S[w]=Math.max((M=S[w])!=null?M:0,er(B.get(h)));let $=h=>{var m,x;let w=0;if(c>0)for(let E=0;E<h;E++)w+=(m=S[E])!=null?m:0;else for(let E=1;E<=h;E++)w+=(x=S[E])!=null?x:0;return w};for(let[h,w]of p){let m=I.get(h);w.x=f+c*(m*d+$(m))}return{placed:p,sizes:y}}function dr(t,o,r){let{roots:l,kidsOf:s,joinsOf:d,heightFor:u,gap:c,left:f,top:b}=o,p=Me({...o,sign:1}).sizes,y=new Map(t.map(k=>[k.id,k])),v=l.map(k=>{var M;let H=(M=y.get(k.id))!=null?M:k,S=Je(s(k),h=>p.get(h.id),c,h=>{var w;return r?void 0:xe(((w=y.get(h.id))!=null?w:h).x-H.x)}),$=h=>Me({...o,roots:[k],kidsOf:w=>w.id===k.id?s(w).filter(m=>S.get(m.id)===h):s(w),joinsOf:w=>w.id===k.id&&h==="left"?[]:d(w),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:k,right:$("right"),left:$("left")}}),I=Math.max(0,...v.flatMap(({left:k})=>[...k.values()].map(H=>-H.x))),B=f+I,D=new Map,C=0;for(let{root:k,right:H,left:S}of v){let $=E=>E.get(k.id).y+u(k)/2,M=Math.max($(H),$(S)),h=[];for(let E of[{placed:H,isLeft:!1},{placed:S,isLeft:!0}]){let{placed:P,isLeft:L}=E,F=M-$(P);for(let[A,N]of P)L&&A===k.id||h.push([A,{x:B+N.x,y:N.y+F}])}let w=E=>u(y.get(E)),m=Math.min(...h.map(([,E])=>E.y)),x=Math.max(...h.map(([E,P])=>P.y+w(E)));for(let[E,P]of h)D.set(E,{x:P.x,y:b+C+P.y-m});C+=x-m+c}return D}function ur(t,o,r,l,s=!1,d,u="right",c=!1){let{direction:f,column:b,gap:p}=sr(u),{kidsOf:y,joinsOf:v}=cr(t,s),I=C=>lr(d,C.id),B=(C,k)=>{if(C==="down"||C==="up")return Jt({...k,column:b,rowGap:b-$t,flip:C==="up",left:r,top:l});let H={...k,column:b,gap:p,left:r,top:l};if(C==="radial")return on({...H,width:$t});if(C==="timeline")return sn({...H,width:$t});if(C==="fishbone")return rn({...H,width:$t});let S={...H,sign:ar(C)};return C==="balanced"?dr(t,S,c):Me(S).placed},D={roots:o,kidsOf:y,joinsOf:v,heightFor:I};return tn(f)&&t.some(C=>Qt(C))?en({...D,width:$t,column:b,mapDirection:f,engine:B}):B(f,D)}function an(t,o,r,l="right",s={}){let d=o!=null&&o.size?t.filter(f=>!o.has(f.id)):t,u=d.filter(f=>!f.parentId),c=ur(d,u,80,80,!0,r,l,s.reset===!0);return t.map(f=>({...f,...c.get(f.id)}))}function ln(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function cn(t,o,r,l){let s=t.zoom;return{zoom:s,x:r.width/2-o.x*s,y:l+(r.height-l)/2-o.y*s}}function dn(t,o,r,l=1.2){let s=Math.max(1,o.height-r),d=t.maxX-t.minX,u=t.maxY-t.minY,c=Math.max(.25,Math.min(l,(o.width-80)/d,(s-80)/u));return{zoom:c,x:(o.width-d*c)/2-t.minX*c,y:r+(s-u*c)/2-t.minY*c}}var te={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Te(t){let o=3735928559,r=1103547991;for(let l=0;l<t.length;l++){let s=t.charCodeAt(l);o=Math.imul(o^s,2654435761),r=Math.imul(r^s,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var wt="\\u27E6",At="\\u27E7",jt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,fn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),ve=new Set(["pre","script","style","textarea","template","noscript"]),pr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),fr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),mr=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,gr=/\\p{L}/u,Ut=t=>t.localName.toLowerCase(),mn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},ee=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function gn(t){for(let o of ee(t))if(fn.has(Ut(o))||ve.has(Ut(o))||gn(o))return!0;return!1}function hn(t){let o=Ut(t);return ve.has(o)?"skip":pr.has(o)||t.getAttribute("translate")==="no"||mn(t).some(r=>fr.has(r))?"atom":fn.has(o)||gn(t)?"block":"inline"}function hr(t,o){return t.replace(mr,r=>(o.push({literal:r,atom:!0}),`${wt}${o.length}/${At}`))}function yr(t,o){let r="",l=s=>{var u;if(s.nodeType===3){r+=hr((u=s.nodeValue)!=null?u:"",o);return}if(s.nodeType!==1){o.push({node:s,atom:!0}),r+=`${wt}${o.length}/${At}`;return}let d=s;if(hn(d)==="inline"){o.push({node:d,atom:!1});let c=o.length;r+=`${wt}${c}${At}`;for(let f of Array.from(d.childNodes))l(f);r+=`${wt}/${c}${At}`;return}o.push({node:d,atom:!0}),r+=`${wt}${o.length}/${At}`};for(let s of t)l(s);return r}function un(t){return gr.test(t.replace(jt,""))}function yn(t){let o=[],r=u=>{let c=u.getAttribute("alt");c&&un(c)&&o.push({index:o.length,kind:"attribute",text:c.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},l=u=>{for(let c of ee(u)){let f=Ut(c);ve.has(f)||f==="svg"||(f==="img"?r(c):l(c))}},s=u=>{if(!u.length)return;let c=[],f=yr(u,c),b=f.trim();if(!b||!un(b)||f.includes("\\u27E6\\u27E6"))return;let p=f.replace(jt,"");if(p.includes(wt)||p.includes(At))return;let y=f.slice(0,f.length-f.trimStart().length),v=f.slice(f.trimEnd().length);o.push({index:o.length,kind:"run",text:b,nodes:u,lead:y,trail:v,parts:c})},d=u=>{let c=[];for(let f of Array.from(u.childNodes)){if(f.nodeType===3){c.push(f);continue}if(f.nodeType!==1){s(c),c=[];continue}let b=f,p=hn(b);p==="atom"||p==="inline"?c.push(b):(s(c),c=[],p==="block"&&d(b))}s(c)};return l(t),d(t),{units:o}}var pn=t=>[...t.matchAll(jt)].map(o=>o[0]);function br(t,o){if(!o.trim())return!1;let r=pn(t),l=pn(o);if(r.length!==l.length||r.some((d,u)=>d!==l[u]))return!1;let s=o.replace(jt,"");return!s.includes(wt)&&!s.includes(At)}function xr(t,o,r){var f;let l=[],s=[],d=b=>{let p=s[s.length-1];p?p.appendChild(b):l.push(b)},u=b=>{b&&d(r.createTextNode(b))};u(t.lead);let c=0;for(let b of o.matchAll(jt)){u(o.slice(c,b.index)),c=((f=b.index)!=null?f:0)+b[0].length;let p=t.parts[Number(b[2])-1];if(b[1]==="/")s.pop();else if(b[3]==="/")p.literal!==void 0?u(p.literal):p.node&&d(p.node.cloneNode(!0));else if(p.node){let y=p.node.cloneNode(!1);d(y),s.push(y)}}return u(o.slice(c)),u(t.trail),l}function bn(t,o){var s,d,u;let r={applied:0,kept:0},l=[...t.units.filter(c=>c.kind==="attribute"),...t.units.filter(c=>c.kind==="run")];for(let c of l){let f=o(c);if(f===void 0||!br(c.text,f)){r.kept++;continue}if(c.kind==="attribute"){(d=c.element)==null||d.setAttribute((s=c.attribute)!=null?s:"alt",f.trim()),r.applied++;continue}let b=c.nodes[0],p=b==null?void 0:b.parentNode,y=b==null?void 0:b.ownerDocument;if(!b||!p||!y){r.kept++;continue}for(let v of xr(c,f,y))p.insertBefore(v,b);for(let v of c.nodes)(u=v.parentNode)==null||u.removeChild(v);r.applied++}return r}function xn(t){let o=[],r=l=>{for(let s of ee(l))Ut(s)==="svg"?o.push(s):r(s)};return r(t),o}function Mn(t,o){let r=[],l=s=>{for(let d of ee(s))mn(d).includes(o)&&r.push(d),l(d)};return l(t),r}var Tn="vam-mermaid-slot",ne=1,vn=3,wn=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},Mr=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Tr=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function vr(t){var o,r;return t.nodeType===vn?Mr((o=t.nodeValue)!=null?o:""):t.nodeType!==ne?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:An(t)}function An(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(l=>{var s;return` ${l}="${Tr((s=t.getAttribute(l))!=null?s:"")}"`}).join("");return`<${o}${r}>${wr(t)}</${o}>`}function wr(t){return Array.from(t.childNodes).map(vr).join("")}function Ar(t){let o=[],r=l=>{if(o.push(l),l.nodeType===ne)for(let s of Array.from(l.childNodes))r(s)};return r(t),o}function Er(t,o){var l;let r=xn(t);for(let s of r){let d=o();d.setAttribute("class",Tn),(l=s.parentNode)==null||l.replaceChild(d,s)}return{root:t,svgs:r,extraction:yn(t)}}function Nr(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Te(o)}`}var kr=t=>Te(An(t));function Lr(t,o){if(!Array.isArray(o))return!1;let r=Ar(t);for(let l of o){if(!Array.isArray(l)||l.length!==2)return!1;let[s,d]=l;if(typeof s!="number"||!Number.isInteger(s)||s<0||s>=r.length)return!1;let u=r[s];if(typeof d=="string"){if(u.nodeType!==vn)return!1;u.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(u.nodeType!==ne)return!1;for(let[c,f]of Object.entries(d))if(f===null)u.removeAttribute(c);else if(typeof f=="string")u.setAttribute(c,f);else return!1}else return!1}return!0}function Sr(t,o,r){if(!t||typeof t!="object")return null;let l=t;if(typeof l.svg=="string"){let s=r(l.svg),d=Array.from(s.childNodes).filter(u=>u.nodeType===ne);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof l.check=="string"&&l.check===kr(o)){let s=o.cloneNode(!0);return Lr(s,l.patch)?s:null}return null}function En(t,o,r){var f,b;let l={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:s,extraction:d}=Er(t,r.createSlot),u=o.detailSegments;if(u!==void 0||o.detailCheck!==void 0)if(Array.isArray(u)&&u.length===d.units.length&&o.detailCheck===Nr(d)){let p=bn(d,v=>{let I=u[v.index];return typeof I=="string"?I:void 0}),y=u.filter(v=>typeof v!="string").length;if(l.applied=p.applied,l.kept=Math.max(0,p.kept-y),r.afterText&&!r.afterText(t))return l.fallback=!0,l}else l.fallback=!0;let c=Mn(t,Tn);c.length!==s.length&&(l.fallback=!0);for(let[p,y]of c.entries()){let v=s[p];if(!v)break;let I=(f=o.detailDiagrams)==null?void 0:f[p],B=v;if(I){let D=null;try{D=Sr(I,v,r.parse)}catch{D=null}D?B=D:l.diagramsKept++}(b=y.parentNode)==null||b.replaceChild(B,y)}return l}function ht(t,o,r){let l=t.createElement(o);return r&&(l.className=r),l}function Ir(t,o){var u;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),l=(u=r==null?void 0:r[1])!=null?u:t,[s,d=""]=o.imageSource.split("{0}");return[s,l,d]}function Or(t,o,r){let[l,s,d]=Ir(o,r),u=ht(t,"span");u.className="vam-image-source";let c=ht(t,"a");return c.setAttribute("href",o),c.setAttribute("target","_blank"),c.setAttribute("rel","noopener noreferrer"),c.textContent=s,u.append(t.createTextNode(l),c,t.createTextNode(d)),u}function we(t,o,r,l,s){Nn(t,o,new DOMParser().parseFromString(r,"text/html").body,l,s)}function Nn(t,o,r,l,s){var u,c,f,b;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let y of p.getAttributeNames()){let v=(u=p.getAttribute(y))!=null?u:"",I=y.toLowerCase();(I.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(I)&&/^\\s*(javascript|vbscript):/i.test(v))&&p.removeAttribute(y)}let d=()=>{let p=ht(t,"span");return p.className="vam-image-omitted",p.textContent=s.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let y=(c=p.getAttribute("src"))!=null?c:"";if(y.startsWith("vam-asset:")){let v=l[y.slice(10)];typeof v=="string"&&v.startsWith("data:image/")?p.setAttribute("src",v):p.replaceWith(d())}else if(/^https?:\\/\\//i.test(y)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let v=p.closest("a");(v!=null?v:p).after(Or(t,y,s))}else/^data:image\\//i.test(y)||p.replaceWith(d())}for(let p of Array.from(r.querySelectorAll("a"))){let y=(f=p.getAttribute("href"))!=null?f:"";/^(https?:|mailto:)/i.test(y)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):y.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((b=p.parentElement)!=null&&b.classList.contains("vam-table-scroll"))continue;let y=ht(t,"div");y.className="vam-table-scroll",p.replaceWith(y),y.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function kn(t,o,r,l,s,d){let u=c=>new DOMParser().parseFromString(c,"text/html").body;try{let c=u(r);En(c,l,{parse:u,createSlot:()=>ht(t,"div")}),Nn(t,o,c,s,d)}catch{o.replaceChildren(),we(t,o,r,s,d)}}function re(t,o,r,l){let s=Math.max(60,Math.abs(r-t)/2);return`M ${t} ${o} C ${t+s} ${o}, ${r-s} ${l}, ${r} ${l}`}var Ae=["red","orange","yellow","green","blue","purple"];function Ln(t){let o=t["topic-color"];return Ae.find(r=>r===o)}var Cr=["done","warning","star","priority-1","priority-2","priority-3"];var Rr={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3"};function Sn(t){let o=t["topic-markers"];return Array.isArray(o)?Cr.filter(r=>o.includes(r)):[]}function In(t){return Rr[t]}var Dr=(t,o)=>t.toLowerCase()===o.toLowerCase(),oe=(t,o)=>t.find(r=>Dr(r,o));function _r(t,o){if(typeof t!="string"||!t.trim())return;let r=oe(o,t.trim());if(r)return r;let l=t.trim().toLowerCase().split(/[-_]/),s=l[0];if(s==="zh"){let u=l.slice(1).some(c=>c==="hant"||c==="tw"||c==="hk"||c==="mo")?"TW":"CN";return oe(o,`${s}-${u}`)}return o.find(d=>d.toLowerCase().split(/[-_]/)[0]===s)}function On(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let l=oe(o,t.stored);if(l)return l}if(typeof t.defaultLanguage=="string"){let l=oe(o,t.defaultLanguage);if(l)return l}for(let l of t.browser){let s=_r(l,o);if(s)return s}return r}function Cn(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Pr="https://github.com/kevcltsai/visual-agent-map?ref=share",Hr="und",It="http://www.w3.org/2000/svg",Rn="vam-share-panel-width",Dn="vam-share-outline-open",zr="(max-width: 600px)",Br=300,Ee=240,$r=.25,Fr=2,Ur=4,jr={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},Kr={core:"target",support:"library",side:"skip"},_n=t=>t==="core"||t==="support"||t==="side",Et=(t,o)=>t.replace("{0}",String(o));function Le(t,o){var l;let r=(l=t.getElementById(o))==null?void 0:l.textContent;if(r)try{return JSON.parse(r)}catch{return}}function Pn(t){let o={...te};if(t&&typeof t=="object")for(let s of Object.keys(o)){let d=t[s];typeof d=="string"&&(o[s]=d)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...te.markerNames};for(let s of Object.keys(o.markerNames)){let d=r[s];typeof d=="string"&&d.trim()&&(o.markerNames[s]=d)}}let l=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...te.colorNames},l&&typeof l=="object")for(let s of Ae){let d=l[s];typeof d=="string"&&d.trim()&&(o.colorNames[s]=d)}return o}function Vr(t){let o=Le(t,"vam-ui"),r=new Map,l={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[s,d]of Object.entries(o.uiByLanguage))r.set(s,Pn(d));if(o.languageNames&&typeof o.languageNames=="object")for(let[s,d]of Object.entries(o.languageNames))typeof d=="string"&&d&&(l[s]=d)}return{sets:r,names:l}}var dt=t=>typeof t=="string"&&t.trim()!=="";function Ne(t){try{return window.localStorage.getItem(t)}catch{return null}}function ke(t,o){try{window.localStorage.setItem(t,o)}catch{}}var ft=()=>window.matchMedia(zr).matches;function Hn(t){var Ve,We,Ye,Xe;let o=Pn(Le(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let l=t.getElementById("vam-app"),s=Le(t,"vam-map");if(!l)return;if(!s||s.format!=="vam-share"||s.version!==1||!Array.isArray(s.nodes)){l.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=s.assets&&typeof s.assets=="object"?s.assets:{},u=new Map,c=[];for(let e of s.nodes){if(!e||typeof e.id!="string"||u.has(e.id))continue;u.set(e.id,e);let n=qe(e.width);c.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{}})}let f=new Map(c.map(e=>[e.id,e]));for(let e of c)e.parentId&&(!f.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let b=[];if(Array.isArray(s.textNodes)){let e=new Set;for(let n of s.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let i=typeof n.parentId=="string"?f.get(n.parentId):void 0;b.push({id:n.id,parentId:i?i.id:null,text:n.text,dx:i?n.x-i.x:n.x,dy:i?n.y-i.y:n.y,links:!i&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(a=>typeof a=="string"&&f.has(a)))):[]})}}let p=new Map,y=new Map;for(let e of c)e.parentId&&y.set(e.parentId,[...(Ve=y.get(e.parentId))!=null?Ve:[],e]);let v=Vr(t),I=Array.isArray(s.languages)?Array.from(new Set(s.languages.filter(dt))):[],B=Cn((We=s.source)==null?void 0:We.mapId),D=I.length>=2,C=D?I[0]:"",k=C;if(D){let e=[];try{e=Array.from((Ye=window.navigator.languages)!=null?Ye:[window.navigator.language]).filter(dt)}catch{}k=On({languages:I,stored:B?Ne(B):null,defaultLanguage:dt(s.defaultLanguage)?s.defaultLanguage:void 0,browser:e})}let H=e=>{var n;return(n=v.sets.get(e))!=null?n:o},S=D&&C===Hr,$=()=>D&&k!==C;D&&(r=H(k),t.documentElement.lang=k);let M=e=>{var i;let n=$()?(i=e.translations)==null?void 0:i[k]:void 0;return!n||typeof n!="object"?e:{title:dt(n.title)?n.title:e.title,summary:dt(n.summary)?n.summary:e.summary,reason:dt(n.reason)?n.reason:e.reason,detailHtml:dt(n.detailHtml)?n.detailHtml:e.detailHtml,...wn(n)&&dt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},h=()=>{var a;let e=$()?(a=s.translations)==null?void 0:a[k]:void 0,n=dt(e==null?void 0:e.title)?e.title:s.title,i=dt(e==null?void 0:e.goal)?e.goal:s.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof i=="string"?i.trim():""}},w=(e,n)=>{var i;try{let a=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(a&&a!==e)return a}catch{}return(i=v.names[e])!=null?i:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let m=(e,n,i)=>{let a=ht(t,e);return n&&(a.className=n),i!==void 0&&(a.textContent=i),a},x=e=>{let n=t.createElementNS(It,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let i of jr[e]){let[a,...g]=i.split("|"),T=t.createElementNS(It,a);for(let R of g)T.setAttribute(R.slice(0,R.indexOf("=")),R.slice(R.indexOf("=")+1));n.append(T)}return n},E=(e,n,i,a)=>{let g=m("button",i,n);return g.type="button",g.addEventListener("click",T=>{T.stopPropagation(),a()}),e.append(g),g},P=(e,n,i,a)=>{let g=m("button");return g.type="button",g.setAttribute("aria-label",i),g.title=i,g.append(x(n)),g.addEventListener("click",T=>{T.stopPropagation(),a()}),e.append(g),g},L=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,F=e=>Sn({"topic-markers":e.markers}),A=()=>/^(zh|ja)/.test(r.lang),N=(e,n)=>{if(!n.length)return e;let i=n.map(a=>r.markerNames[a]).join(A()?"\\u3001":", ");return`${e}${A()?"\\uFF0C":", "}${Et(r.markerLabel,i)}`},O=e=>Ln({"topic-color":e.color}),W=e=>{let n=m("span","vam-markers");for(let i of e){let a=m("span","vam-marker",In(i));a.dataset.marker=i,a.setAttribute("aria-hidden","true"),n.append(a)}return n},j=(e,n)=>{let i=m("span","vam-relevance-tag");i.dataset.tier=e,n&&(i.title=n);let a=m("span","vam-relevance-icon");return a.append(x(Kr[e])),i.append(a,m("span",void 0,L(e))),i};l.className="vam-app";let X=m("div","vam-toolbar"),Q=m("h1","vam-map-switcher"),J=m("span","vam-shared");X.append(Q,J);let Z=P(X,"list","",()=>St(et.hidden,!0));X.prepend(Z),Z.setAttribute("aria-controls","vam-outline");let tt=m("div","vam-toolbar-actions"),ct=m("select","vam-language");if(D){for(let e of I){let n=m("option",void 0,(Xe=v.names[e])!=null?Xe:w(e));n.value=e,S&&e===C&&(n.dataset.original="1"),ct.append(n)}ct.value=k,tt.append(ct)}let ie=m("span","vam-made-with"),yt=m("a","vam-install");yt.href=Pr,yt.target="_blank",yt.rel="noopener noreferrer",tt.append(ie,yt),X.append(tt);let ut=m("div","vam-translate-note");ut.hidden=!0;let bt=m("div","vam-workspace"),V=m("div","vam-viewport"),xt=m("div","vam-stage");xt.setAttribute("role","tree");let Mt=t.createElementNS(It,"svg");Mt.setAttribute("class","vam-edges"),Mt.setAttribute("aria-hidden","true"),xt.append(Mt),V.append(xt);let Kt=m("div","vam-canvas-overlay"),Nt=m("div","vam-map-tools"),Ot=m("span","vam-goal"),Se=m("span","vam-goal-text");Ot.append(x("target"),Se);let Ie=m("span","vam-canvas-hint"),mt=m("div","vam-zoom-controls"),zn=P(mt,"minus","",()=>Dt(1/1.2)),Ct=m("button","vam-zoom","100%");Ct.type="button",Ct.addEventListener("click",e=>{e.stopPropagation(),Dt(1/U.zoom)}),mt.append(Ct);let Bn=P(mt,"plus","",()=>Dt(1.2)),$n=P(mt,"max","",()=>_t()),pt=m("button","vam-layout-button");pt.type="button",pt.setAttribute("aria-haspopup","menu"),pt.setAttribute("aria-expanded","false"),mt.append(pt);let ot=m("div","vam-layout-menu");ot.setAttribute("role","menu"),ot.hidden=!0,mt.append(ot),Kt.append(Nt,Ie,mt);let K=m("aside","vam-inspector");K.hidden=!0;let et=m("nav","vam-outline");et.id="vam-outline";let Rt=m("div","vam-outline-tree");Rt.setAttribute("role","tree"),et.append(Rt),bt.append(et,V,Kt,K),l.replaceChildren(...D?[X,ut,bt]:[X,bt]);let U={x:0,y:0,zoom:1},nt=null,se=!1,Vt=Number(Ne(Rn))||Br,Y=new Map,Fn=()=>{let e=new Set,n=(i,a)=>{var g;for(let T of(g=y.get(i.id))!=null?g:[])a&&e.add(T.id),n(T,a||T.collapsed)};for(let i of c)i.parentId||n(i,i.collapsed);return e},Oe=e=>{var i,a;let n=0;for(let g=e.parentId;g&&!(++n>c.length);g=(a=(i=f.get(g))==null?void 0:i.parentId)!=null?a:null);return n},Ce=()=>ln(V.getBoundingClientRect().top,Nt.hidden?void 0:Nt.getBoundingClientRect());function gt(){xt.style.transform=`translate(${U.x}px, ${U.y}px) scale(${U.zoom})`;let e=`${Math.round(U.zoom*100)}%`;Ct.textContent=e,Ct.setAttribute("aria-label",Et(r.zoomReset,e))}function Dt(e,n){let i=n!=null?n:{x:V.clientWidth/2,y:V.clientHeight/2},a=Math.min(Fr,Math.max($r,U.zoom*e)),g=a/U.zoom;U={x:i.x-(i.x-U.x)*g,y:i.y-(i.y-U.y)*g,zoom:a},gt()}let ae=!1;function _t(){if(!Y.size)return;if(!V.clientWidth||!V.clientHeight){ae=!0;return}let e=1/0,n=1/0,i=-1/0,a=-1/0;for(let g of Y.values())e=Math.min(e,g.offsetLeft),n=Math.min(n,g.offsetTop),i=Math.max(i,g.offsetLeft+(g.offsetWidth||280)),a=Math.max(a,g.offsetTop+g.offsetHeight);for(let g of b){let T=g.parentId?void 0:p.get(g.id);T&&(e=Math.min(e,T.offsetLeft),n=Math.min(n,T.offsetTop),i=Math.max(i,T.offsetLeft+(T.offsetWidth||300)),a=Math.max(a,T.offsetTop+(T.offsetHeight||60)))}U=dn({minX:e,minY:n,maxX:i,maxY:a},{width:V.clientWidth,height:V.clientHeight},Ce()),gt()}function Re(e){let n=Y.get(e);n&&(U=cn(U,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:V.clientWidth,height:V.clientHeight},Ce()),gt())}function kt(){var e;Mt.replaceChildren();for(let n of c){let i=n.parentId?Y.get(n.parentId):void 0,a=Y.get(n.id);if(!i||!a)continue;let g=t.createElementNS(It,"path");g.setAttribute("d",re(i.offsetLeft+i.offsetWidth,i.offsetTop+i.offsetHeight/2,a.offsetLeft,a.offsetTop+a.offsetHeight/2)),g.setAttribute("class",((e=u.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Mt.append(g)}for(let n of b){let i=n.parentId?Y.get(n.parentId):void 0,a=p.get(n.id);if(!i||!a)continue;let g=t.createElementNS(It,"path");g.setAttribute("d",re(i.offsetLeft+i.offsetWidth,i.offsetTop+i.offsetHeight/2,a.offsetLeft,a.offsetTop+a.offsetHeight/2)),g.setAttribute("class","vam-edge vam-text-edge"),Mt.append(g)}for(let n of b){let i=p.get(n.id);if(i)for(let a of n.links){let g=Y.get(a);if(!g)continue;let T=i.offsetLeft+i.offsetWidth/2<=g.offsetLeft+g.offsetWidth/2,R=t.createElementNS(It,"path");R.setAttribute("d",re(T?i.offsetLeft+i.offsetWidth:i.offsetLeft,i.offsetTop+i.offsetHeight/2,T?g.offsetLeft:g.offsetLeft+g.offsetWidth,g.offsetTop+g.offsetHeight/2)),R.setAttribute("class","vam-edge vam-text-link"),Mt.append(R)}}}let le=0,De=()=>{le||(le=window.requestAnimationFrame(()=>{le=0,kt()}))},ce=e=>{let n=Y.get(e),i=f.get(e);!n||!i||(n.style.left=`${i.x}px`,n.style.top=`${i.y}px`,i.width&&(n.style.width=`${i.width}px`),_e(e))},_e=e=>{let n=f.get(e);if(n)for(let i of b){let a=i.parentId===e?p.get(i.id):void 0;a&&(a.style.left=`${n.x+i.dx}px`,a.style.top=`${n.y+i.dy}px`)}};function Un(){for(let e of p.values())e.remove();p.clear();for(let e of b){let n=e.parentId?f.get(e.parentId):void 0;if(e.parentId&&(!n||!Y.has(e.parentId)||n.collapsed))continue;let i=m("div",`vam-text-node${n?"":" is-free"}`);i.setAttribute("role","note"),i.textContent=e.text,n||(i.style.left=`${e.dx}px`,i.style.top=`${e.dy}px`),xt.append(i),p.set(e.id,i),n&&_e(n.id)}}function de(){var n,i;for(let a of Y.values())a.remove();Y.clear();let e=Fn();for(let a of c){if(e.has(a.id))continue;let g=u.get(a.id),T=M(g),R=ye(c,a.id).size,z=_n(g.tier)?g.tier:void 0,_=m("div",`vam-node${a.id===nt?" is-selected":""}`);_.dataset.nodeId=a.id,_.dataset.status=g.status==="completed"?"completed":"idea",z&&(_.dataset.relevance=z),_.tabIndex=0,_.setAttribute("role","treeitem"),_.setAttribute("aria-level",String(Oe(a)+1)),_.setAttribute("aria-selected",String(a.id===nt));let at=F(g),lt=O(g);lt&&(_.dataset.topicColor=lt);let rt=N(String((n=T.title)!=null?n:""),at);_.setAttribute("aria-label",lt?`${rt}${A()?"\\uFF0C":", "}${Et(r.colorLabel,r.colorNames[lt])}`:rt),R&&_.setAttribute("aria-expanded",String(!a.collapsed));let q=m("div","vam-node-header");_.append(q),g.status!=="completed"&&q.append(m("span","vam-status vam-status-idea",r.toResearch)),z&&q.append(j(z,typeof T.reason=="string"?T.reason:void 0)),at.length&&q.append(W(at));let Ge=m("div","vam-node-tools");if(_.append(Ge),R){let st=a.collapsed?Et(r.expandCount,R):r.collapse,he=E(q,st,"vam-collapse-button",()=>{a.collapsed=!a.collapsed,Pt(a.id,!0)});he.setAttribute("aria-expanded",String(!a.collapsed)),he.setAttribute("aria-label",st),he.title=st}E(Ge,r.detailsButton,void 0,()=>Lt(a.id)),_.append(m("h3","vam-card-title",String((i=T.title)!=null?i:""))),typeof T.summary=="string"&&T.summary.trim()&&_.append(m("p","vam-card-summary",T.summary)),_.addEventListener("click",()=>{se||Lt(a.id)}),_.addEventListener("keydown",st=>{st.target===_&&(st.key==="Enter"||st.key===" "?(st.preventDefault(),Lt(a.id)):R&&st.key===(a.collapsed?"ArrowRight":"ArrowLeft")&&(st.preventDefault(),a.collapsed=!a.collapsed,Pt(a.id)))}),_.addEventListener("pointerdown",st=>jn(st,a,_)),xt.append(_),Y.set(a.id,_),ce(a.id)}Un()}function Wt(){an(c,void 0,n=>{var i;return(i=Y.get(n))==null?void 0:i.offsetHeight}).forEach((n,i)=>{c[i].x=n.x,c[i].y=n.y});for(let n of Y.keys())ce(n)}function Pt(e,n=!1){var g;let i=e?(g=Y.get(e))==null?void 0:g.getBoundingClientRect():void 0;de(),Wt(),kt();let a=e?Y.get(e):void 0;if(a){if(i){let R=a.getBoundingClientRect();U={...U,x:U.x+i.left-R.left,y:U.y+i.top-R.top},gt()}let T=n?a.querySelector(".vam-collapse-button"):null;(T!=null?T:a).focus({preventScroll:!0})}}function jn(e,n,i){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let a=e.clientX,g=e.clientY,T=n.x,R=n.y,z=!1,_=lt=>{let rt=lt.clientX-a,q=lt.clientY-g;if(!z){if(Math.hypot(rt,q)<=Ur)return;z=!0,i.classList.add("is-dragging"),i.setPointerCapture(lt.pointerId)}n.x=T+rt/U.zoom,n.y=R+q/U.zoom,ce(n.id),De()},at=()=>{i.removeEventListener("pointermove",_),i.removeEventListener("pointerup",at),i.removeEventListener("pointercancel",at),i.classList.remove("is-dragging"),z&&(se=!0,window.setTimeout(()=>se=!1,0))};i.addEventListener("pointermove",_),i.addEventListener("pointerup",at),i.addEventListener("pointercancel",at)}let ue=e=>Math.round(Math.min(Math.max(Ee,e),Math.max(Ee,bt.clientWidth*.7)));function Yt(){let e=ft();if(K.hidden||e){K.style.removeProperty("width"),Kt.style.removeProperty("right");return}let n=ue(Vt);K.style.width=`${n}px`,Kt.style.right=`${n}px`,G.setAttribute("aria-valuenow",String(n)),G.setAttribute("aria-valuemax",String(ue(1/0)))}let G=m("div","vam-inspector-resizer");G.setAttribute("role","separator"),G.setAttribute("aria-orientation","vertical"),G.setAttribute("aria-label",r.resizePanel),G.setAttribute("aria-valuemin",String(Ee)),G.tabIndex=0;let Xt=(e,n)=>{Vt=ue(e),Yt(),n&&ke(Rn,String(Vt))};G.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,i=K.offsetWidth;G.setPointerCapture(e.pointerId),G.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let a=T=>Xt(i+n-T.clientX,!1),g=()=>{G.removeEventListener("pointermove",a),G.removeEventListener("pointerup",g),G.removeEventListener("pointercancel",g),G.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),Xt(Vt,!0)};G.addEventListener("pointermove",a),G.addEventListener("pointerup",g),G.addEventListener("pointercancel",g)}),G.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")Xt(K.offsetWidth+n,!0);else if(e.key==="ArrowRight")Xt(K.offsetWidth-n,!0);else return;e.preventDefault()});let pe=ft();window.addEventListener("resize",()=>{Yt(),gt(),ft()!==pe&&(pe=ft(),St(pe?!1:Be(),!1))});function fe(){nt=null;for(let e of Y.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");K.hidden=!0,bt.classList.remove("has-inspector"),K.replaceChildren(),Yt(),vt()}function Lt(e){var _,at,lt;let n=f.get(e),i=u.get(e);if(!n||!i)return;let a={...i,...M(i)};nt=e;for(let[rt,q]of Y)q.classList.toggle("is-selected",rt===e),q.setAttribute("aria-selected",String(rt===e));K.replaceChildren(G);let g=m("div","vam-inspector-heading");g.append(m("strong",void 0,r.topicDetails)),E(g,r.close,void 0,fe),K.append(g,m("h3",void 0,String((_=a.title)!=null?_:"")));let T=_n(a.tier)?a.tier:void 0;if(T){let rt=m("div","vam-inspector-why");rt.append(j(T));let q=typeof a.reason=="string"&&a.reason.trim()?a.reason:a.manual?r.manualReason:"";q&&rt.append(m("span",void 0,q)),K.append(rt)}typeof a.summary=="string"&&a.summary.trim()&&K.append(m("p","vam-sample-summary",a.summary));let R=m("div","vam-sample-detail");typeof a.detailHtml=="string"&&a.detailHtml.trim()?a.compact?kn(t,R,a.detailHtml,a.compact,d,r):we(t,R,a.detailHtml,d,r):R.append(m("p","vam-inspector-empty",r.noContent)),K.append(R);let z=(at=y.get(e))!=null?at:[];if(z.length){let rt=m("div","vam-subtopics");rt.append(m("strong",void 0,r.subtopics));for(let q of z)E(rt,String((lt=M(u.get(q.id)).title)!=null?lt:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Pt(n.id)),Lt(q.id),Re(q.id)});K.append(rt)}K.hidden=!1,bt.classList.add("has-inspector"),Yt(),K.scrollTop=0,vt(),$e()}let me=e=>{be(c,e),Pt(),_t()},Ht=e=>{ot.hidden||(ot.hidden=!0,pt.setAttribute("aria-expanded","false"),e&&pt.focus())};function Kn(){ot.replaceChildren();let e=[{label:r.collapseAll,run:()=>me(0)},{label:r.expandAll,run:()=>me(null)},...[1,2,3].map(n=>({label:Et(r.expandToLevel,n),run:()=>me(n)})),null,{label:r.autoLayout,run:()=>{Wt(),kt()}}];for(let n of e){if(!n){ot.append(m("hr"));continue}let i=m("button",void 0,n.label);i.type="button",i.setAttribute("role","menuitem"),i.addEventListener("click",a=>{a.stopPropagation(),Ht(!0),n.run()}),ot.append(i)}}let Pe=()=>Array.from(ot.querySelectorAll("button"));pt.addEventListener("click",e=>{var n;if(e.stopPropagation(),!ot.hidden)return Ht(!0);ot.hidden=!1,pt.setAttribute("aria-expanded","true"),(n=Pe()[0])==null||n.focus()}),ot.addEventListener("keydown",e=>{let n=Pe(),i=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(i+1)%n.length].focus();else if(e.key==="ArrowUp")n[(i-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Ht(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!ot.hidden&&!mt.contains(e.target)&&Ht(!1);let n=e.target;ft()&&!et.hidden&&!et.contains(n)&&!Z.contains(n)&&St(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!ot.hidden)Ht(!0);else if(ft()&&!et.hidden)St(!1,!1),Z.focus();else if(!K.hidden){let n=nt?Y.get(nt):void 0;fe(),n==null||n.focus({preventScroll:!0})}}});function He(){let e=h();if(t.title=e.title,Q.textContent=e.title,xt.setAttribute("aria-label",e.title),J.textContent=r.readOnly,ie.textContent=r.madeWithVam,yt.textContent=r.install,ct.setAttribute("aria-label",r.language),ct.title=r.language,S)for(let i of Array.from(ct.options))i.dataset.original&&(i.textContent=r.originalText);e.goal?(Se.textContent=Et(r.goal,e.goal),Ot.title=e.goal,Ot.parentElement||Nt.append(Ot),Nt.hidden=!1):(Ot.remove(),Nt.hidden=!0),Ie.textContent=r.hint;let n=(i,a)=>{i.setAttribute("aria-label",a),i.title=a};if(n(zn,r.zoomOut),n(Bn,r.zoomIn),n($n,r.showAll),pt.textContent=r.layout,K.setAttribute("aria-label",r.topicDetails),et.setAttribute("aria-label",r.outline),Rt.setAttribute("aria-label",r.outline),n(Z,r.outline),G.setAttribute("aria-label",r.resizePanel),Kn(),$()){let i=S?r.aiTranslatedUnknown:Et(r.aiTranslated,w(C,k));ut.textContent=`${i} ${r.imageTextUntranslated}`,ut.hidden=!1}else ut.hidden=!0;gt()}function Vn(e){if(e===k||!I.includes(e))return;k=e,r=H(e),B&&ke(B,e),t.documentElement.lang=e;let n=K.scrollTop;He(),de(),kt(),Ue(),nt!==null&&f.has(nt)&&!K.hidden&&(Lt(nt),K.scrollTop=n),De()}ct.addEventListener("change",()=>Vn(ct.value));let Gt=[],ze=e=>{var n;Gt.push(e);for(let i of(n=y.get(e.id))!=null?n:[])ze(i)};for(let e of c)e.parentId||ze(e);let zt=new Set,Tt=new Map,qt=null;function Be(){return Ne(Dn)!=="0"}function St(e,n){et.hidden=!e,bt.classList.toggle("has-outline",e),Z.setAttribute("aria-expanded",String(e)),n&&!ft()&&ke(Dn,e?"1":"0")}let Wn=()=>Gt.filter(e=>{var n;return!((n=Tt.get(e.id))!=null&&n.hidden)});function vt(){var i,a,g;let e=[];for(let T of Gt){let R=Tt.get(T.id);if(!R)continue;let z=!1;for(let _=T.parentId;_&&!z;_=(a=(i=f.get(_))==null?void 0:i.parentId)!=null?a:null)z=zt.has(_);R.hidden=z,z||e.push(T),y.has(T.id)&&R.setAttribute("aria-expanded",String(!zt.has(T.id))),T.id===nt?R.setAttribute("aria-current","true"):R.removeAttribute("aria-current")}let n=(g=e.find(T=>T.id===qt))!=null?g:e[0];for(let[T,R]of Tt)R.tabIndex=T===(n==null?void 0:n.id)?0:-1}function $e(){let e=nt?Tt.get(nt):void 0;!e||e.hidden||!et.clientHeight||(e.offsetTop<et.scrollTop?et.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>et.scrollTop+et.clientHeight&&(et.scrollTop=e.offsetTop+e.offsetHeight-et.clientHeight))}function ge(e){zt.delete(e)||zt.add(e),vt()}function Yn(e){var n;qt=e,vt(),(n=Tt.get(e))==null||n.focus()}function Xn(){for(let[e,n]of Y)n.classList.toggle("is-selected",e===nt),n.setAttribute("aria-selected",String(e===nt))}function Fe(e){var g,T,R;let n=f.get(e);if(!n)return;let i=!1,a=0;for(let z=n.parentId;z&&a++<=c.length;z=(T=(g=f.get(z))==null?void 0:g.parentId)!=null?T:null){let _=f.get(z);_!=null&&_.collapsed&&(_.collapsed=!1,i=!0)}nt=e,i&&Pt(),Re(e),K.hidden?Xn():Lt(e),vt(),$e(),ft()&&St(!1,!1),(R=Y.get(e))==null||R.focus({preventScroll:!0})}function Gn(e,n){var z;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let i=Wn(),a=i.indexOf(n),g=(z=y.get(n.id))!=null?z:[],T=zt.has(n.id),R;switch(e.key){case"ArrowDown":R=i[a+1];break;case"ArrowUp":R=i[a-1];break;case"Home":R=i[0];break;case"End":R=i[i.length-1];break;case"ArrowRight":g.length&&T?ge(n.id):R=g[0];break;case"ArrowLeft":g.length&&!T?ge(n.id):R=n.parentId?f.get(n.parentId):void 0;break;case"Enter":case" ":Fe(n.id);break;default:return}e.preventDefault(),R&&Yn(R.id)}function Ue(){var e;Rt.replaceChildren(),Tt.clear();for(let n of Gt){let i=String((e=M(u.get(n.id)).title)!=null?e:""),a=m("div","vam-outline-item");a.dataset.outlineId=n.id,a.setAttribute("role","treeitem");let g=Oe(n)+1;a.setAttribute("aria-level",String(g)),a.style.setProperty("--depth",String(g-1));let T=m("span","vam-outline-twist");y.has(n.id)&&(T.append(x("chevron")),T.addEventListener("click",_=>{_.stopPropagation(),ge(n.id)}));let R=m("span","vam-outline-title",i);R.title=i,a.append(T,R);let z=F(u.get(n.id));z.length&&(a.append(W(z)),a.setAttribute("aria-label",N(i,z))),a.addEventListener("click",()=>Fe(n.id)),a.addEventListener("keydown",_=>Gn(_,n)),a.addEventListener("focus",()=>{qt!==n.id&&(qt=n.id,vt())}),Rt.append(a),Tt.set(n.id,a)}vt()}let it=new Map,Bt=0,Zt=!1;V.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(V.setPointerCapture(e.pointerId),it.set(e.pointerId,{x:e.clientX,y:e.clientY}),V.classList.add("is-panning"),it.size===1&&(Zt=!1),it.size===2)){let[n,i]=Array.from(it.values());Bt=Math.hypot(n.x-i.x,n.y-i.y)}}),V.addEventListener("pointermove",e=>{let n=it.get(e.pointerId);if(!n)return;if(it.set(e.pointerId,{x:e.clientX,y:e.clientY}),it.size===2&&Bt){let[g,T]=Array.from(it.values()),R=Math.hypot(g.x-T.x,g.y-T.y),z=V.getBoundingClientRect();Dt(R/Bt,{x:(g.x+T.x)/2-z.left,y:(g.y+T.y)/2-z.top}),Bt=R,Zt=!0;return}let i=e.clientX-n.x,a=e.clientY-n.y;Zt||(Zt=Math.abs(i)+Math.abs(a)>0),U={...U,x:U.x+i,y:U.y+a},gt()});let je=e=>{it.delete(e.pointerId)&&(it.size<2&&(Bt=0),it.size||(V.classList.remove("is-panning"),!Zt&&e.type==="pointerup"&&!K.hidden&&fe()))};V.addEventListener("pointerup",je),V.addEventListener("pointercancel",je),V.addEventListener("wheel",e=>{e.preventDefault();let n=V.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?Dt(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(U={...U,x:U.x-e.deltaX,y:U.y-e.deltaY},gt())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{ae&&(ae=!1,_t())}).observe(V),He(),Ue(),St(ft()?!1:Be(),!1),be(c,1),de(),Wt(),kt(),_t();let Ke=t.fonts;Ke&&Ke.ready.then(()=>{nt!==null||it.size||(Wt(),kt(),_t())})}Hn(document);})();';
-var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }\n.vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }\n.vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }\n.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n.vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }\n.vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n.vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }\n.vam-text-edge { opacity: 0.8; }\n.vam-text-link { stroke-dasharray: 5 4; opacity: 0.8; }\n';
+var SHARE_VIEWER_JS = '(()=>{function Je(t){if(!(typeof t!="number"||!Number.isFinite(t)))return Math.min(560,Math.max(200,Math.round(t)))}function tn(t){var r;let o=t.aimKind==="question"?[]:(r=t.aimConvergesFromNodeIds)!=null?r:[];return[...t.parentId?[t.parentId]:[],...o.filter(c=>c!==t.parentId)]}function ne(t,o){let r=new Set,c=[o];for(;c.length;){let s=c.pop();for(let d of t)d.parentId===s&&d.id!==o&&!r.has(d.id)&&(r.add(d.id),c.push(d.id))}return r}function Te(t,o){let r=new Map(t.map(d=>[d.id,d])),c=d=>{let u=0,l=new Set([d.id]);for(let g=d.parentId;g&&r.has(g)&&!l.has(g);g=r.get(g).parentId)l.add(g),u++;return u},s=new Set(t.map(d=>d.parentId).filter(d=>!!d&&r.has(d)));for(let d of t)s.has(d.id)&&(d.collapsed=o===null?!1:c(d)>=o)}function ve(t){if(t>150)return"right";if(t<-150)return"left"}function en(t,o,r,c={left:0,right:0}){let s={...c},d=new Map;for(let u of t){let l=s.left<s.right?"left":"right";d.set(u.id,l),s[l]+=o(u)+r}return d}function nn(t,o,r,c){let s=t.map(c),d={left:0,right:0};t.forEach((l,g)=>{let b=s[g];b&&(d[b]+=o(l)+r)});let u=en(t.filter((l,g)=>!s[g]),o,r,d);return new Map(t.map((l,g)=>{var b;return[l.id,(b=s[g])!=null?b:u.get(l.id)]}))}function tr(t){return t==="right"||t==="left"||t==="down"||t==="up"}function rn(t){return t==="right"||t==="left"||t==="down"||t==="up"||t==="balanced"}function re(t){if(!(t!=null&&t.parentId))return;let o=t.layout;if(!o||typeof o!="object"||Array.isArray(o))return;let r=o.direction;return tr(r)?r:void 0}function on(t){let{width:o,column:r,mapDirection:c,engine:s}=t,d=(u,l)=>{var A,B;let g=[],b=(v,h)=>{for(let x of[...t.kidsOf(v),...t.joinsOf(v)])re(x)?g.push({node:x,root:h}):b(x,h)};for(let v of u)b(v,v);let p={roots:u,kidsOf:t.kidsOf,joinsOf:t.joinsOf,heightFor:t.heightFor};if(!g.length)return s(l,p);let y=l==="down"||l==="up",T=g.map(({node:v,root:h})=>{let x=d([v],re(v)),R=1/0,w=-1/0,f=1/0,z=-1/0,I=new Map,F=k=>{I.set(k.id,k);for(let C of[...t.kidsOf(k),...t.joinsOf(k)])F(C)};F(v);for(let[k,C]of x)R=Math.min(R,C.x),w=Math.max(w,C.x+o),f=Math.min(f,C.y),z=Math.max(z,C.y+t.heightFor(I.get(k)));let L=Math.max(1,Math.ceil((w-R+r-o)/r));return{node:v,root:h,placed:x,minX:R,maxX:w,minY:f,maxY:z,slots:L}}),N=new Map(T.map(v=>[v.node.id,v])),$=v=>{let h=N.get(v.id);return!h||!y?[]:Array.from({length:h.slots},(x,R)=>({id:`${v.id}\\0pad${R}`}))},_=new Set,E=s(l,{roots:u,kidsOf:v=>{if(!N.has(v.id))return t.kidsOf(v);let h=$(v);for(let x of h)_.add(x.id);return h},joinsOf:v=>N.has(v.id)?[]:t.joinsOf(v),heightFor:v=>{if(_.has(v.id))return 0;let h=N.get(v.id);return h&&!y?h.maxY-h.minY:t.heightFor(v)}}),H=new Map;for(let[v,h]of E)!_.has(v)&&!N.has(v)&&H.set(v,h);for(let v of T){let h=E.get(v.node.id),x,R;y?(x=h.x+r/2-(v.minX+v.maxX)/2,R=l==="down"?h.y-v.minY:h.y+t.heightFor(v.node)-v.maxY):(x=l==="right"||l==="balanced"&&h.x>=((B=(A=E.get(v.root.id))==null?void 0:A.x)!=null?B:h.x)?h.x-v.minX:h.x+o-v.maxX,R=h.y-v.minY);for(let[w,f]of v.placed)H.set(w,{x:f.x+x,y:f.y+R})}return H};return d(t.roots,c)}var sn=1/Math.tan(Math.PI/3);function an(t){let{roots:o,kidsOf:r,joinsOf:c,heightFor:s,width:d,column:u,gap:l,left:g,top:b}=t,p=u-d,y=O=>[...r(O),...c(O)],T=o.map(O=>{let E=new Map,H=I=>I.reduce((F,L)=>F+E.get(L.id),0)+Math.max(0,I.length-1)*l,A=I=>{let F=y(I);for(let L of F)A(L);E.set(I.id,Math.max(s(I),H(F)))},B=(I,F,L,k)=>{let C=y(I),Y=L+(E.get(I.id)-H(C))/2,W=C.map(G=>{let st=B(G,F+1,Y,k);return Y+=E.get(G.id)+l,st}),J=s(I),tt=W.length?(W[0]+W[W.length-1])/2:L+E.get(I.id)/2;return k.push({id:I.id,x:-F*u,centre:tt,height:J}),tt},v=y(O).map((I,F)=>{let L=F%2===0?1:-1,k=y(I);for(let rt of k)A(rt);let C=[],Y=l;for(let rt of k){let pt=C.length,ct=B(rt,0,Y,C)*sn-p;for(let Lt=pt;Lt<C.length;Lt++)C[Lt].x+=ct-d;Y+=E.get(rt.id)+l}let W=Math.max(u,Y),J=W*sn,tt=s(I),G=[-d/2,...C.map(rt=>rt.x)],st=[d/2,J,...C.map(rt=>rt.x+d)];return{topic:I,side:L,length:W,height:tt,cards:C,minX:Math.min(...G),maxX:Math.max(...st)}}),h=s(O),x=[{id:O.id,x:0,y:-h/2,height:h}],R={above:-p,below:-p};for(let I of v){let F=I.side===1?"above":"below",L=R[F]-I.maxX,k=-I.side*I.length;x.push({id:I.topic.id,x:L-d/2,y:k-I.side*(I.height/2)-I.height/2,height:I.height});for(let C of I.cards)x.push({id:C.id,x:L+C.x,y:k+I.side*C.centre-C.height/2,height:C.height});R[F]=L+I.minX-p}let w=Math.min(...x.map(I=>I.x)),f=Math.min(...x.map(I=>I.y)),z=Math.max(...x.map(I=>I.y+I.height));return{out:x,minX:w,minY:f,maxY:z}}),N=new Map,$=g+Math.max(0,...T.map(O=>-O.minX)),_=b;for(let O of T){for(let E of O.out)N.set(E.id,{x:$+E.x,y:_+E.y-O.minY});_+=O.maxY-O.minY+l}return N}var er=Math.PI*2,nr=6,rr=60;function or(t,o,r,c){let s=[...t.values()].sort((u,l)=>u.y-l.y),d=new Set;for(let u=0;u<s.length;u++){let l=s[u];for(let g=u+1;g<s.length;g++){let b=s[g];if(b.y>=l.y+l.height+r)break;c&&c.checks++,Math.abs(l.x-b.x)<o&&l.y<b.y+b.height+r&&d.add(Math.max(l.depth,b.depth))}}return d}function ln(t){let{roots:o,kidsOf:r,joinsOf:c,heightFor:s,width:d,column:u,gap:l,left:g,top:b}=t,p=new Map,y=b;for(let T of o){let N=[],$=new Map,_=L=>[...r(L),...c(L)],O=L=>{let k=_(L),C=k.length?k.reduce((Y,W)=>Y+O(W),0):1;return $.set(L.id,C),C};O(T);let E=(L,k,C,Y)=>{N.push({id:L.id,depth:k,angle:(C+Y)/2,height:s(L)});let W=C,J=(Y-C)/$.get(L.id);for(let tt of _(L)){let G=J*$.get(tt.id);E(tt,k+1,W,W+G),W+=G}};E(T,0,0,er);let H=Math.max(...N.map(L=>L.depth)),A=Array.from({length:H+1},(L,k)=>k*u),B=()=>{let L=[];return A.forEach((k,C)=>L.push(C?Math.max(k,L[C-1]+u):0)),new Map(N.map(k=>{let C=L[k.depth];return[k.id,{x:Math.round(C*Math.sin(k.angle)-d/2),y:Math.round(-C*Math.cos(k.angle)-k.height/2),depth:k.depth,height:k.height}]}))},v=u/nr,h=()=>(t.stats&&t.stats.rounds++,or(B(),d,l,t.stats)),x=v,R=h(),w=A.slice();for(let L=0;R.size&&L<rr;L++){w=A.slice();for(let k of R)A[k]+=x;x*=2,R=h()}if(!R.size&&w.some((L,k)=>A[k]-L>v)){let L=A.slice();for(;L.some((k,C)=>k-w[C]>v);){let k=L.map((C,Y)=>(C+w[Y])/2);A.splice(0,A.length,...k),h().size?w=k:L=k}A.splice(0,A.length,...L)}let f=B(),z=Math.min(...[...f.values()].map(L=>L.x)),I=Math.min(...[...f.values()].map(L=>L.y)),F=Math.max(...[...f.values()].map(L=>L.y+L.height));for(let[L,k]of f)p.set(L,{x:Math.round(g)+k.x-z,y:y+k.y-I});y+=F-I+l}return p}function oe(t){let{roots:o,kidsOf:r,joinsOf:c,heightFor:s,column:d,rowGap:u,flip:l,left:g,top:b}=t,p=new Map,y=new Map,T=w=>w.reduce((f,z)=>f+p.get(z.id),0),N=w=>{let f=r(w),z=c(w);for(let I of[...f,...z])N(I);p.set(w.id,Math.max(d,T(f),T(z))),y.set(w.id,1+Math.max(0,...f.map(I=>y.get(I.id))))},$=new Map,_=new Map,O=(w,f,z)=>{let I=r(w),F=c(w),L=p.get(w.id),k=(J,tt)=>{let G=z+(L-T(J))/2;return J.map(st=>{O(st,tt,G);let rt=$.get(st.id);return G+=p.get(st.id),rt})},C=k(I,f+1),Y=k(F,f+y.get(w.id)),W=C.length?C:Y;_.set(w.id,f),$.set(w.id,W.length?(W[0]+W[W.length-1])/2:z)},E=g,H=[],A=w=>{H.push(w);for(let f of[...r(w),...c(w)])A(f)};for(let w of o)N(w),O(w,0,E),E+=p.get(w.id),A(w);let B=Math.max(0,..._.values()),v=Array.from({length:B+1},()=>0);for(let w of H)v[_.get(w.id)]=Math.max(v[_.get(w.id)],s(w));let h=[],x=b;for(let w=0;w<=B;w++){let f=l?B-w:w;h[f]=x,x+=v[f]+u}let R=new Map;for(let w of H){let f=_.get(w.id),z=l?h[f]+v[f]-s(w):h[f];R.set(w.id,{x:$.get(w.id),y:z})}return R}function cn(t){let{roots:o,kidsOf:r,joinsOf:c,heightFor:s,width:d,column:u,gap:l,left:g,top:b}=t,p=new Map,y=b;for(let T of o){let N=new Map,$=A=>{N.set(A.id,s(A));for(let B of[...r(A),...c(A)])$(B)};$(T);let _=[{id:T.id,x:g,y:0}],O=g+u;[...r(T),...c(T)].forEach((A,B)=>{let v=oe({roots:[A],kidsOf:r,joinsOf:c,heightFor:s,column:u,rowGap:u-d,flip:B%2===1,left:O,top:0}),h=v.get(A.id).y,x=O;for(let[R,w]of v)_.push({id:R,x:w.x,y:w.y-h}),x=Math.max(x,w.x);O=x+u});let E=Math.min(..._.map(A=>A.y)),H=Math.max(..._.map(A=>A.y+N.get(A.id)));for(let A of _)p.set(A.id,{x:A.x,y:y+A.y-E});y+=H-E+l}return p}var Wt=300;function ir(t){var o;return Math.max(0,((o=t.width)!=null?o:280)-280)}var sr=24,ar={compact:{column:330,gap:12},standard:{column:360,gap:sr},spacious:{column:420,gap:48}};function lr(t){return t==="compact"||t==="spacious"}var cr=180;function dr(t){let o=typeof t=="string"?t:t.direction,r=typeof t=="string"?void 0:t.spacing;return{direction:o,...ar[lr(r)?r:"standard"]}}var ur=t=>t==="left"?-1:1;var fr=(t,o)=>{let r=t==null?void 0:t(o);return r!==void 0&&Number.isFinite(r)&&r>0?r:cr};function pr(t,o){var g,b;let r=new Map(t.map(p=>[p.id,p])),c=new Map,s=new Map,d=(p,y,T)=>{var N;return p.set(y,[...(N=p.get(y))!=null?N:[],T])};for(let p of t){if(!p.parentId)continue;let y=p.aimKind!=="question"&&((g=p.aimConvergesFromNodeIds)!=null&&g.length)?tn(p).map(N=>r.get(N)):[],T=(b=y[0])==null?void 0:b.parentId;T&&r.has(T)&&y.every(N=>N&&N.parentId===T)?d(s,T,p):d(c,p.parentId,p)}return{kidsOf:p=>{var y;return o&&p.collapsed?[]:(y=c.get(p.id))!=null?y:[]},joinsOf:p=>{var y;return o&&p.collapsed?[]:((y=s.get(p.id))!=null?y:[]).filter(T=>{var N;return!(o&&((N=r.get(T.parentId))!=null&&N.collapsed))})}}}function we(t){var v;let{roots:o,kidsOf:r,joinsOf:c,heightFor:s,column:d,gap:u,sign:l,left:g,top:b}=t,p=new Map,y=new Map,T=new Map,N=new Map,$=new Map,_=h=>h.reduce((x,R)=>x+y.get(R.id),0)+Math.max(0,h.length-1)*u,O=h=>{let x=r(h),R=c(h);$.set(h.id,h);for(let w of[...x,...R])O(w);y.set(h.id,Math.max(s(h),_(x),_(R))),T.set(h.id,1+Math.max(0,...x.map(w=>T.get(w.id))))},E=(h,x,R)=>{let w=r(h),f=c(h),z=y.get(h.id),I=(J,tt)=>{let G=R+(z-_(J))/2;return J.map(st=>{let rt=E(st,tt,G);return G+=y.get(st.id)+u,rt})},F=I(w,x+1),L=I(f,x+T.get(h.id)),k=F.length?w:f,C=F.length?F:L,Y=s(h),W=R+(z-Y)/2;if(C.length){let J=C[0]+s(k[0])/2,tt=C[C.length-1]+s(k[k.length-1])/2;W=(J+tt)/2-Y/2}return p.set(h.id,{x:0,y:b+W}),N.set(h.id,x),W},H=0;for(let h of o)O(h),E(h,0,H),H+=y.get(h.id)+u;let A=[];for(let[h,x]of N)A[x]=Math.max((v=A[x])!=null?v:0,ir($.get(h)));let B=h=>{var R,w;let x=0;if(l>0)for(let f=0;f<h;f++)x+=(R=A[f])!=null?R:0;else for(let f=1;f<=h;f++)x+=(w=A[f])!=null?w:0;return x};for(let[h,x]of p){let R=N.get(h);x.x=g+l*(R*d+B(R))}return{placed:p,sizes:y}}function mr(t,o,r){let{roots:c,kidsOf:s,joinsOf:d,heightFor:u,gap:l,left:g,top:b}=o,p=we({...o,sign:1}).sizes,y=new Map(t.map(E=>[E.id,E])),T=c.map(E=>{var v;let H=(v=y.get(E.id))!=null?v:E,A=nn(s(E),h=>p.get(h.id),l,h=>{var x;return r?void 0:ve(((x=y.get(h.id))!=null?x:h).x-H.x)}),B=h=>we({...o,roots:[E],kidsOf:x=>x.id===E.id?s(x).filter(R=>A.get(R.id)===h):s(x),joinsOf:x=>x.id===E.id&&h==="left"?[]:d(x),sign:h==="left"?-1:1,left:0,top:0}).placed;return{root:E,right:B("right"),left:B("left")}}),N=Math.max(0,...T.flatMap(({left:E})=>[...E.values()].map(H=>-H.x))),$=g+N,_=new Map,O=0;for(let{root:E,right:H,left:A}of T){let B=f=>f.get(E.id).y+u(E)/2,v=Math.max(B(H),B(A)),h=[];for(let f of[{placed:H,isLeft:!1},{placed:A,isLeft:!0}]){let{placed:z,isLeft:I}=f,F=v-B(z);for(let[L,k]of z)I&&L===E.id||h.push([L,{x:$+k.x,y:k.y+F}])}let x=f=>u(y.get(f)),R=Math.min(...h.map(([,f])=>f.y)),w=Math.max(...h.map(([f,z])=>z.y+x(f)));for(let[f,z]of h)_.set(f,{x:z.x,y:b+O+z.y-R});O+=w-R+l}return _}function gr(t,o,r,c,s=!1,d,u="right",l=!1){let{direction:g,column:b,gap:p}=dr(u),{kidsOf:y,joinsOf:T}=pr(t,s),N=O=>fr(d,O.id),$=(O,E)=>{if(O==="down"||O==="up")return oe({...E,column:b,rowGap:b-Wt,flip:O==="up",left:r,top:c});let H={...E,column:b,gap:p,left:r,top:c};if(O==="radial")return ln({...H,width:Wt});if(O==="timeline")return cn({...H,width:Wt});if(O==="fishbone")return an({...H,width:Wt});let A={...H,sign:ur(O)};return O==="balanced"?mr(t,A,l):we(A).placed},_={roots:o,kidsOf:y,joinsOf:T,heightFor:N};return rn(g)&&t.some(O=>re(O))?on({..._,width:Wt,column:b,mapDirection:g,engine:$}):$(g,_)}function dn(t,o,r,c="right",s={}){let d=o!=null&&o.size?t.filter(g=>!o.has(g.id)):t,u=d.filter(g=>!g.parentId),l=gr(d,u,80,80,!0,r,c,s.reset===!0);return t.map(g=>({...g,...l.get(g.id)}))}function un(t,o){return!o||!(o.bottom>o.top)?0:Math.max(0,Math.ceil(o.bottom-t))+8}function fn(t,o,r,c){let s=t.zoom;return{zoom:s,x:r.width/2-o.x*s,y:c+(r.height-c)/2-o.y*s}}function pn(t,o,r,c=1.2){let s=Math.max(1,o.height-r),d=t.maxX-t.minX,u=t.maxY-t.minY,l=Math.max(.25,Math.min(c,(o.width-80)/d,(s-80)/u));return{zoom:l,x:(o.width-d*l)/2-t.minX*l,y:r+(s-u*l)/2-t.minY*l}}var ie={lang:"en",readOnly:"Shared map \\xB7 read-only",madeWithVam:"Made with VAM",install:"Install VAM",goal:"Goal: {0}",hint:"Drag empty space to pan \\xB7 Scroll to zoom \\xB7 Click a topic to read it",layout:"Layout",collapseAll:"Collapse all",expandAll:"Expand all",expandToLevel:"Expand to level {0}",autoLayout:"Auto layout",zoomIn:"Zoom in",zoomOut:"Zoom out",zoomReset:"Zoom {0}, reset to 100%",showAll:"Show all",toResearch:"To research",tierCore:"Must learn",tierSupport:"Learn when needed",tierSide:"Skippable",manualReason:"You set this",topicDetails:"Topic details",detailsButton:"Details",close:"Close",collapse:"Collapse",expandCount:"Expand {0}",subtopics:"Subtopics",noContent:"This topic has no notes in the shared file.",imageOmitted:"[image not included]",imageSource:"Source: {0}",resizePanel:"Resize the side panel",outline:"Outline",untitledMap:"Untitled map",language:"Language",aiTranslated:"Translated by AI from {0}.",aiTranslatedUnknown:"Translated by AI.",originalText:"Original",imageTextUntranslated:"Text inside images is not translated.",markerLabel:"Markers: {0}",markerNames:{done:"Done",warning:"Warning",star:"Star","priority-1":"Priority 1","priority-2":"Priority 2","priority-3":"Priority 3"},colorLabel:"Color: {0}",colorNames:{red:"Red",orange:"Orange",yellow:"Yellow",green:"Green",blue:"Blue",purple:"Purple"}};function Ae(t){let o=3735928559,r=1103547991;for(let c=0;c<t.length;c++){let s=t.charCodeAt(c);o=Math.imul(o^s,2654435761),r=Math.imul(r^s,1597334677)}return o=Math.imul(o^o>>>16,2246822507)^Math.imul(r^r>>>13,3266489909),r=Math.imul(r^r>>>16,2246822507)^Math.imul(o^o>>>13,3266489909),(4294967296*(2097151&r)+(o>>>0)).toString(36)}var wt="\\u27E6",At="\\u27E7",Vt=/\u27E6(\\/?)(\\d+)(\\/?)\u27E7/g,hn=new Set(["address","article","aside","blockquote","body","caption","colgroup","dd","details","dialog","div","dl","dt","fieldset","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hgroup","hr","legend","li","main","nav","ol","p","section","summary","table","tbody","td","tfoot","th","thead","tr","ul"]),Ee=new Set(["pre","script","style","textarea","template","noscript"]),hr=new Set(["code","kbd","samp","var","tt","svg","math","img","br","wbr","input","canvas","video","audio","iframe","object","embed","select","button"]),yr=new Set(["math","katex","katex-display","mjx-container","tag","notranslate","vam-image-omitted","vam-mermaid-note","vam-mermaid-slot"]),br=/(?:https?:\\/\\/|www\\.)[^\\s<>"\'\uFF0C\u3002\u3001\uFF1B\uFF1A\uFF09\u300D\u300F\u3011\u300B]+/gi,xr=/\\p{L}/u,Kt=t=>t.localName.toLowerCase(),yn=t=>{var o;return((o=t.getAttribute("class"))!=null?o:"").split(/\\s+/).filter(Boolean)},se=t=>Array.from(t.childNodes).filter(o=>o.nodeType===1);function bn(t){for(let o of se(t))if(hn.has(Kt(o))||Ee.has(Kt(o))||bn(o))return!0;return!1}function xn(t){let o=Kt(t);return Ee.has(o)?"skip":hr.has(o)||t.getAttribute("translate")==="no"||yn(t).some(r=>yr.has(r))?"atom":hn.has(o)||bn(t)?"block":"inline"}function Mr(t,o){return t.replace(br,r=>(o.push({literal:r,atom:!0}),`${wt}${o.length}/${At}`))}function Tr(t,o){let r="",c=s=>{var u;if(s.nodeType===3){r+=Mr((u=s.nodeValue)!=null?u:"",o);return}if(s.nodeType!==1){o.push({node:s,atom:!0}),r+=`${wt}${o.length}/${At}`;return}let d=s;if(xn(d)==="inline"){o.push({node:d,atom:!1});let l=o.length;r+=`${wt}${l}${At}`;for(let g of Array.from(d.childNodes))c(g);r+=`${wt}/${l}${At}`;return}o.push({node:d,atom:!0}),r+=`${wt}${o.length}/${At}`};for(let s of t)c(s);return r}function mn(t){return xr.test(t.replace(Vt,""))}function Mn(t){let o=[],r=u=>{let l=u.getAttribute("alt");l&&mn(l)&&o.push({index:o.length,kind:"attribute",text:l.trim(),nodes:[],lead:"",trail:"",parts:[],element:u,attribute:"alt"})},c=u=>{for(let l of se(u)){let g=Kt(l);Ee.has(g)||g==="svg"||(g==="img"?r(l):c(l))}},s=u=>{if(!u.length)return;let l=[],g=Tr(u,l),b=g.trim();if(!b||!mn(b)||g.includes("\\u27E6\\u27E6"))return;let p=g.replace(Vt,"");if(p.includes(wt)||p.includes(At))return;let y=g.slice(0,g.length-g.trimStart().length),T=g.slice(g.trimEnd().length);o.push({index:o.length,kind:"run",text:b,nodes:u,lead:y,trail:T,parts:l})},d=u=>{let l=[];for(let g of Array.from(u.childNodes)){if(g.nodeType===3){l.push(g);continue}if(g.nodeType!==1){s(l),l=[];continue}let b=g,p=xn(b);p==="atom"||p==="inline"?l.push(b):(s(l),l=[],p==="block"&&d(b))}s(l)};return c(t),d(t),{units:o}}var gn=t=>[...t.matchAll(Vt)].map(o=>o[0]);function vr(t,o){if(!o.trim())return!1;let r=gn(t),c=gn(o);if(r.length!==c.length||r.some((d,u)=>d!==c[u]))return!1;let s=o.replace(Vt,"");return!s.includes(wt)&&!s.includes(At)}function wr(t,o,r){var g;let c=[],s=[],d=b=>{let p=s[s.length-1];p?p.appendChild(b):c.push(b)},u=b=>{b&&d(r.createTextNode(b))};u(t.lead);let l=0;for(let b of o.matchAll(Vt)){u(o.slice(l,b.index)),l=((g=b.index)!=null?g:0)+b[0].length;let p=t.parts[Number(b[2])-1];if(b[1]==="/")s.pop();else if(b[3]==="/")p.literal!==void 0?u(p.literal):p.node&&d(p.node.cloneNode(!0));else if(p.node){let y=p.node.cloneNode(!1);d(y),s.push(y)}}return u(o.slice(l)),u(t.trail),c}function Tn(t,o){var s,d,u;let r={applied:0,kept:0},c=[...t.units.filter(l=>l.kind==="attribute"),...t.units.filter(l=>l.kind==="run")];for(let l of c){let g=o(l);if(g===void 0||!vr(l.text,g)){r.kept++;continue}if(l.kind==="attribute"){(d=l.element)==null||d.setAttribute((s=l.attribute)!=null?s:"alt",g.trim()),r.applied++;continue}let b=l.nodes[0],p=b==null?void 0:b.parentNode,y=b==null?void 0:b.ownerDocument;if(!b||!p||!y){r.kept++;continue}for(let T of wr(l,g,y))p.insertBefore(T,b);for(let T of l.nodes)(u=T.parentNode)==null||u.removeChild(T);r.applied++}return r}function vn(t){let o=[],r=c=>{for(let s of se(c))Kt(s)==="svg"?o.push(s):r(s)};return r(t),o}function wn(t,o){let r=[],c=s=>{for(let d of se(s))yn(d).includes(o)&&r.push(d),c(d)};return c(t),r}var An="vam-mermaid-slot",ae=1,En=3,Ln=t=>{let o=t;return!!o&&(Array.isArray(o.detailSegments)||Array.isArray(o.detailDiagrams))},Ar=t=>t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"),Er=t=>t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");function Lr(t){var o,r;return t.nodeType===En?Ar((o=t.nodeValue)!=null?o:""):t.nodeType!==ae?`\\0${t.nodeType}:${(r=t.nodeValue)!=null?r:""}\\0`:Nn(t)}function Nn(t){let o=t.localName.toLowerCase(),r=t.getAttributeNames().sort().map(c=>{var s;return` ${c}="${Er((s=t.getAttribute(c))!=null?s:"")}"`}).join("");return`<${o}${r}>${Nr(t)}</${o}>`}function Nr(t){return Array.from(t.childNodes).map(Lr).join("")}function kr(t){let o=[],r=c=>{if(o.push(c),c.nodeType===ae)for(let s of Array.from(c.childNodes))r(s)};return r(t),o}function Sr(t,o){var c;let r=vn(t);for(let s of r){let d=o();d.setAttribute("class",An),(c=s.parentNode)==null||c.replaceChild(d,s)}return{root:t,svgs:r,extraction:Mn(t)}}function Ir(t){let o=t.units.map(r=>`${r.kind}\\0${r.text}`).join("");return`${t.units.length}.${Ae(o)}`}var Or=t=>Ae(Nn(t));function Cr(t,o){if(!Array.isArray(o))return!1;let r=kr(t);for(let c of o){if(!Array.isArray(c)||c.length!==2)return!1;let[s,d]=c;if(typeof s!="number"||!Number.isInteger(s)||s<0||s>=r.length)return!1;let u=r[s];if(typeof d=="string"){if(u.nodeType!==En)return!1;u.nodeValue=d}else if(d&&typeof d=="object"&&!Array.isArray(d)){if(u.nodeType!==ae)return!1;for(let[l,g]of Object.entries(d))if(g===null)u.removeAttribute(l);else if(typeof g=="string")u.setAttribute(l,g);else return!1}else return!1}return!0}function Rr(t,o,r){if(!t||typeof t!="object")return null;let c=t;if(typeof c.svg=="string"){let s=r(c.svg),d=Array.from(s.childNodes).filter(u=>u.nodeType===ae);return d.length===1&&d[0].localName.toLowerCase()==="svg"?d[0]:null}if(typeof c.check=="string"&&c.check===Or(o)){let s=o.cloneNode(!0);return Cr(s,c.patch)?s:null}return null}function kn(t,o,r){var g,b;let c={applied:0,kept:0,fallback:!1,diagramsKept:0},{svgs:s,extraction:d}=Sr(t,r.createSlot),u=o.detailSegments;if(u!==void 0||o.detailCheck!==void 0)if(Array.isArray(u)&&u.length===d.units.length&&o.detailCheck===Ir(d)){let p=Tn(d,T=>{let N=u[T.index];return typeof N=="string"?N:void 0}),y=u.filter(T=>typeof T!="string").length;if(c.applied=p.applied,c.kept=Math.max(0,p.kept-y),r.afterText&&!r.afterText(t))return c.fallback=!0,c}else c.fallback=!0;let l=wn(t,An);l.length!==s.length&&(c.fallback=!0);for(let[p,y]of l.entries()){let T=s[p];if(!T)break;let N=(g=o.detailDiagrams)==null?void 0:g[p],$=T;if(N){let _=null;try{_=Rr(N,T,r.parse)}catch{_=null}_?$=_:c.diagramsKept++}(b=y.parentNode)==null||b.replaceChild($,y)}return c}function yt(t,o,r){let c=t.createElement(o);return r&&(c.className=r),c}function Dr(t,o){var u;let r=/^https?:\\/\\/(?:[^/?#@]*@)?([^/?#:]+)/i.exec(t),c=(u=r==null?void 0:r[1])!=null?u:t,[s,d=""]=o.imageSource.split("{0}");return[s,c,d]}function _r(t,o,r){let[c,s,d]=Dr(o,r),u=yt(t,"span");u.className="vam-image-source";let l=yt(t,"a");return l.setAttribute("href",o),l.setAttribute("target","_blank"),l.setAttribute("rel","noopener noreferrer"),l.textContent=s,u.append(t.createTextNode(c),l,t.createTextNode(d)),u}function Le(t,o,r,c,s){Sn(t,o,new DOMParser().parseFromString(r,"text/html").body,c,s)}function Sn(t,o,r,c,s){var u,l,g,b;for(let p of Array.from(r.querySelectorAll("script, iframe, frame, object, embed, applet, link, meta, base")))p.remove();for(let p of Array.from(r.querySelectorAll("*")))for(let y of p.getAttributeNames()){let T=(u=p.getAttribute(y))!=null?u:"",N=y.toLowerCase();(N.startsWith("on")||/^(href|src|xlink:href|action|formaction)$/.test(N)&&/^\\s*(javascript|vbscript):/i.test(T))&&p.removeAttribute(y)}let d=()=>{let p=yt(t,"span");return p.className="vam-image-omitted",p.textContent=s.imageOmitted,p};for(let p of Array.from(r.querySelectorAll("img"))){let y=(l=p.getAttribute("src"))!=null?l:"";if(y.startsWith("vam-asset:")){let T=c[y.slice(10)];typeof T=="string"&&T.startsWith("data:image/")?p.setAttribute("src",T):p.replaceWith(d())}else if(/^https?:\\/\\//i.test(y)){p.setAttribute("referrerpolicy","no-referrer"),p.setAttribute("loading","lazy");let T=p.closest("a");(T!=null?T:p).after(_r(t,y,s))}else/^data:image\\//i.test(y)||p.replaceWith(d())}for(let p of Array.from(r.querySelectorAll("a"))){let y=(g=p.getAttribute("href"))!=null?g:"";/^(https?:|mailto:)/i.test(y)?(p.setAttribute("target","_blank"),p.setAttribute("rel","noopener noreferrer")):y.startsWith("#")||p.removeAttribute("href")}for(let p of Array.from(r.querySelectorAll("table"))){if((b=p.parentElement)!=null&&b.classList.contains("vam-table-scroll"))continue;let y=yt(t,"div");y.className="vam-table-scroll",p.replaceWith(y),y.append(p)}o.append(...Array.from(r.childNodes).map(p=>t.importNode(p,!0)))}function In(t,o,r,c,s,d){let u=l=>new DOMParser().parseFromString(l,"text/html").body;try{let l=u(r);kn(l,c,{parse:u,createSlot:()=>yt(t,"div")}),Sn(t,o,l,s,d)}catch{o.replaceChildren(),Le(t,o,r,s,d)}}function le(t,o,r,c){let s=Math.max(60,Math.abs(r-t)/2);return`M ${t} ${o} C ${t+s} ${o}, ${r-s} ${c}, ${r} ${c}`}var Ne=["red","orange","yellow","green","blue","purple"];function On(t){let o=t["topic-color"];return Ne.find(r=>r===o)}var Pr=["done","warning","star","priority-1","priority-2","priority-3"];var Hr={done:"\\u2713",warning:"\\u26A0",star:"\\u2605","priority-1":"P1","priority-2":"P2","priority-3":"P3"};function Cn(t){let o=t["topic-markers"];return Array.isArray(o)?Pr.filter(r=>o.includes(r)):[]}function Rn(t){return Hr[t]}var $r=(t,o)=>t.toLowerCase()===o.toLowerCase(),ce=(t,o)=>t.find(r=>$r(r,o));function zr(t,o){if(typeof t!="string"||!t.trim())return;let r=ce(o,t.trim());if(r)return r;let c=t.trim().toLowerCase().split(/[-_]/),s=c[0];if(s==="zh"){let u=c.slice(1).some(l=>l==="hant"||l==="tw"||l==="hk"||l==="mo")?"TW":"CN";return ce(o,`${s}-${u}`)}return o.find(d=>d.toLowerCase().split(/[-_]/)[0]===s)}function Dn(t){let{languages:o}=t,r=o[0];if(typeof t.stored=="string"){let c=ce(o,t.stored);if(c)return c}if(typeof t.defaultLanguage=="string"){let c=ce(o,t.defaultLanguage);if(c)return c}for(let c of t.browser){let s=zr(c,o);if(s)return s}return r}function _n(t){return typeof t=="string"&&t.trim()!==""?`vam-share-language:${t}`:void 0}var Br="https://github.com/kevcltsai/visual-agent-map?ref=share",Fr="und",bt="http://www.w3.org/2000/svg",Pn="vam-share-panel-width",Hn="vam-share-outline-open",jr="(max-width: 600px)",Ur=300,ke=240,Wr=.25,Kr=2,Vr=4,Yr={target:["circle|cx=12|cy=12|r=10","circle|cx=12|cy=12|r=6","circle|cx=12|cy=12|r=2"],library:["path|d=m16 6 4 14","path|d=M12 6v14","path|d=M8 8v12","path|d=M4 4v16"],skip:["polygon|points=5 4 15 12 5 20 5 4","line|x1=19|x2=19|y1=5|y2=19"],minus:["path|d=M5 12h14"],list:["path|d=M8 6h13","path|d=M8 12h13","path|d=M8 18h13","path|d=M3 6h.01","path|d=M3 12h.01","path|d=M3 18h.01"],chevron:["path|d=m9 18 6-6-6-6"],plus:["path|d=M5 12h14","path|d=M12 5v14"],max:["path|d=M8 3H5a2 2 0 0 0-2 2v3","path|d=M21 8V5a2 2 0 0 0-2-2h-3","path|d=M3 16v3a2 2 0 0 0 2 2h3","path|d=M16 21h3a2 2 0 0 0 2-2v-3"]},Xr={core:"target",support:"library",side:"skip"},$n=t=>t==="core"||t==="support"||t==="side",Et=(t,o)=>t.replace("{0}",String(o));function Oe(t,o){var c;let r=(c=t.getElementById(o))==null?void 0:c.textContent;if(r)try{return JSON.parse(r)}catch{return}}function zn(t){let o={...ie};if(t&&typeof t=="object")for(let s of Object.keys(o)){let d=t[s];typeof d=="string"&&(o[s]=d)}let r=t&&typeof t=="object"?t.markerNames:void 0;if(r&&typeof r=="object"){o.markerNames={...ie.markerNames};for(let s of Object.keys(o.markerNames)){let d=r[s];typeof d=="string"&&d.trim()&&(o.markerNames[s]=d)}}let c=t&&typeof t=="object"?t.colorNames:void 0;if(o.colorNames={...ie.colorNames},c&&typeof c=="object")for(let s of Ne){let d=c[s];typeof d=="string"&&d.trim()&&(o.colorNames[s]=d)}return o}function Gr(t){let o=Oe(t,"vam-ui"),r=new Map,c={};if(o&&typeof o=="object"){if(o.uiByLanguage&&typeof o.uiByLanguage=="object")for(let[s,d]of Object.entries(o.uiByLanguage))r.set(s,zn(d));if(o.languageNames&&typeof o.languageNames=="object")for(let[s,d]of Object.entries(o.languageNames))typeof d=="string"&&d&&(c[s]=d)}return{sets:r,names:c}}var dt=t=>typeof t=="string"&&t.trim()!=="";function Se(t){try{return window.localStorage.getItem(t)}catch{return null}}function Ie(t,o){try{window.localStorage.setItem(t,o)}catch{}}function qr(t,o){let r=Math.min(...o.map(x=>x.x)),c=Math.min(...o.map(x=>x.y)),s=Math.max(...o.map(x=>x.x+x.w)),d=Math.max(...o.map(x=>x.y+x.h)),u=14,l=12,g=8,b=t==="down"||t==="up",p=b?r:c,y=b?s:d,T=t==="right"?s+u:t==="left"?r-u:t==="down"?d+u:c-u,N=t==="right"||t==="down"?1:-1,$=(p+y)/2,_=Math.min(l,Math.max(0,(y-p)/4)),O=x=>Math.round(x*100)/100,E=(x,R)=>b?`${O(x)} ${O(R)}`:`${O(R)} ${O(x)}`,H=T,A=T+N*l,B=T+N*2*l,v=[`M ${E(p,H)}`,`Q ${E(p,A)} ${E(p+_,A)}`,`L ${E($-_,A)}`,`Q ${E($,A)} ${E($,B)}`,`Q ${E($,A)} ${E($+_,A)}`,`L ${E(y-_,A)}`,`Q ${E(y,A)} ${E(y,H)}`].join(" "),h=B+N*g;return b?{path:v,x:O($),y:O(h)}:{path:v,x:O(h),y:O($)}}var ft=()=>window.matchMedia(jr).matches;function Bn(t){var Xe,Ge,qe,Qe;let o=zn(Oe(t,"vam-ui")),r=o;t.documentElement.lang=r.lang;let c=t.getElementById("vam-app"),s=Oe(t,"vam-map");if(!c)return;if(!s||s.format!=="vam-share"||s.version!==1||!Array.isArray(s.nodes)){c.replaceChildren(t.createTextNode("This is not a Visual Agent Map share file."));return}let d=s.assets&&typeof s.assets=="object"?s.assets:{},u=new Map,l=[];for(let e of s.nodes){if(!e||typeof e.id!="string"||u.has(e.id))continue;u.set(e.id,e);let n=Je(e.width);l.push({id:e.id,path:e.id,parentId:typeof e.parentId=="string"?e.parentId:null,x:Number.isFinite(e.x)?e.x:0,y:Number.isFinite(e.y)?e.y:0,collapsed:!!e.collapsed,...n!==void 0&&n!==280?{width:n}:{}})}let g=new Map(l.map(e=>[e.id,e]));for(let e of l)e.parentId&&(!g.has(e.parentId)||e.parentId===e.id)&&(e.parentId=null);let b=[];if(Array.isArray(s.textNodes)){let e=new Set;for(let n of s.textNodes){if(!n||typeof n.id!="string"||e.has(n.id)||typeof n.text!="string"||!n.text.trim()||!Number.isFinite(n.x)||!Number.isFinite(n.y))continue;e.add(n.id);let i=typeof n.parentId=="string"?g.get(n.parentId):void 0;b.push({id:n.id,parentId:i?i.id:null,text:n.text,dx:i?n.x-i.x:n.x,dy:i?n.y-i.y:n.y,links:!i&&Array.isArray(n.links)?Array.from(new Set(n.links.filter(a=>typeof a=="string"&&g.has(a)))):[]})}}let p=e=>e==="right"||e==="left"||e==="down"||e==="up"?e:null,y=[];if(Array.isArray(s.summaries)){let e=new Set;for(let n of s.summaries){let i=p(n==null?void 0:n.side);if(!n||typeof n.id!="string"||e.has(n.id)||!i||typeof n.text!="string"||!n.text.trim()||!Array.isArray(n.members))continue;let a=Array.from(new Set(n.members.filter(m=>typeof m=="string"&&g.has(m))));a.length&&(e.add(n.id),y.push({id:n.id,members:a,side:i,text:n.text}))}}let T=new Map,N=new Map;for(let e of l)e.parentId&&N.set(e.parentId,[...(Xe=N.get(e.parentId))!=null?Xe:[],e]);let $=Gr(t),_=Array.isArray(s.languages)?Array.from(new Set(s.languages.filter(dt))):[],O=_n((Ge=s.source)==null?void 0:Ge.mapId),E=_.length>=2,H=E?_[0]:"",A=H;if(E){let e=[];try{e=Array.from((qe=window.navigator.languages)!=null?qe:[window.navigator.language]).filter(dt)}catch{}A=Dn({languages:_,stored:O?Se(O):null,defaultLanguage:dt(s.defaultLanguage)?s.defaultLanguage:void 0,browser:e})}let B=e=>{var n;return(n=$.sets.get(e))!=null?n:o},v=E&&H===Fr,h=()=>E&&A!==H;E&&(r=B(A),t.documentElement.lang=A);let x=e=>{var i;let n=h()?(i=e.translations)==null?void 0:i[A]:void 0;return!n||typeof n!="object"?e:{title:dt(n.title)?n.title:e.title,summary:dt(n.summary)?n.summary:e.summary,reason:dt(n.reason)?n.reason:e.reason,detailHtml:dt(n.detailHtml)?n.detailHtml:e.detailHtml,...Ln(n)&&dt(e.detailHtml)?{compact:n,detailHtml:e.detailHtml}:{}}},R=()=>{var a;let e=h()?(a=s.translations)==null?void 0:a[A]:void 0,n=dt(e==null?void 0:e.title)?e.title:s.title,i=dt(e==null?void 0:e.goal)?e.goal:s.goal;return{title:typeof n=="string"&&n.trim()||r.untitledMap,goal:typeof i=="string"?i.trim():""}},w=(e,n)=>{var i;try{let a=new Intl.DisplayNames([n!=null?n:e],{type:"language"}).of(e);if(a&&a!==e)return a}catch{}return(i=$.names[e])!=null?i:e};try{let e=window.matchMedia("(prefers-color-scheme: dark)"),n=()=>{t.documentElement.classList.toggle("theme-dark",e.matches)};n(),e.addEventListener("change",n)}catch{}let f=(e,n,i)=>{let a=yt(t,e);return n&&(a.className=n),i!==void 0&&(a.textContent=i),a},z=e=>{let n=t.createElementNS(bt,"svg");n.setAttribute("class","svg-icon"),n.setAttribute("viewBox","0 0 24 24"),n.setAttribute("aria-hidden","true");for(let i of Yr[e]){let[a,...m]=i.split("|"),M=t.createElementNS(bt,a);for(let S of m)M.setAttribute(S.slice(0,S.indexOf("=")),S.slice(S.indexOf("=")+1));n.append(M)}return n},I=(e,n,i,a)=>{let m=f("button",i,n);return m.type="button",m.addEventListener("click",M=>{M.stopPropagation(),a()}),e.append(m),m},F=(e,n,i,a)=>{let m=f("button");return m.type="button",m.setAttribute("aria-label",i),m.title=i,m.append(z(n)),m.addEventListener("click",M=>{M.stopPropagation(),a()}),e.append(m),m},L=e=>e==="core"?r.tierCore:e==="support"?r.tierSupport:r.tierSide,k=e=>Cn({"topic-markers":e.markers}),C=()=>/^(zh|ja)/.test(r.lang),Y=(e,n)=>{if(!n.length)return e;let i=n.map(a=>r.markerNames[a]).join(C()?"\\u3001":", ");return`${e}${C()?"\\uFF0C":", "}${Et(r.markerLabel,i)}`},W=e=>On({"topic-color":e.color}),J=e=>{let n=f("span","vam-markers");for(let i of e){let a=f("span","vam-marker",Rn(i));a.dataset.marker=i,a.setAttribute("aria-hidden","true"),n.append(a)}return n},tt=(e,n)=>{let i=f("span","vam-relevance-tag");i.dataset.tier=e,n&&(i.title=n);let a=f("span","vam-relevance-icon");return a.append(z(Xr[e])),i.append(a,f("span",void 0,L(e))),i};c.className="vam-app";let G=f("div","vam-toolbar"),st=f("h1","vam-map-switcher"),rt=f("span","vam-shared");G.append(st,rt);let pt=F(G,"list","",()=>It(et.hidden,!0));G.prepend(pt),pt.setAttribute("aria-controls","vam-outline");let Yt=f("div","vam-toolbar-actions"),ct=f("select","vam-language");if(E){for(let e of _){let n=f("option",void 0,(Qe=$.names[e])!=null?Qe:w(e));n.value=e,v&&e===H&&(n.dataset.original="1"),ct.append(n)}ct.value=A,Yt.append(ct)}let Lt=f("span","vam-made-with"),Ct=f("a","vam-install");Ct.href=Br,Ct.target="_blank",Ct.rel="noopener noreferrer",Yt.append(Lt,Ct),G.append(Yt);let Rt=f("div","vam-translate-note");Rt.hidden=!0;let xt=f("div","vam-workspace"),K=f("div","vam-viewport"),mt=f("div","vam-stage");mt.setAttribute("role","tree");let Mt=t.createElementNS(bt,"svg");Mt.setAttribute("class","vam-edges"),Mt.setAttribute("aria-hidden","true"),mt.append(Mt);let Dt=f("div","vam-summaries");Dt.setAttribute("role","group"),y.length&&mt.append(Dt),K.append(mt);let Xt=f("div","vam-canvas-overlay"),Nt=f("div","vam-map-tools"),_t=f("span","vam-goal"),Ce=f("span","vam-goal-text");_t.append(z("target"),Ce);let Re=f("span","vam-canvas-hint"),gt=f("div","vam-zoom-controls"),Fn=F(gt,"minus","",()=>$t(1/1.2)),Pt=f("button","vam-zoom","100%");Pt.type="button",Pt.addEventListener("click",e=>{e.stopPropagation(),$t(1/j.zoom)}),gt.append(Pt);let jn=F(gt,"plus","",()=>$t(1.2)),Un=F(gt,"max","",()=>zt()),ut=f("button","vam-layout-button");ut.type="button",ut.setAttribute("aria-haspopup","menu"),ut.setAttribute("aria-expanded","false"),gt.append(ut);let ot=f("div","vam-layout-menu");ot.setAttribute("role","menu"),ot.hidden=!0,gt.append(ot),Xt.append(Nt,Re,gt);let U=f("aside","vam-inspector");U.hidden=!0;let et=f("nav","vam-outline");et.id="vam-outline";let Ht=f("div","vam-outline-tree");Ht.setAttribute("role","tree"),et.append(Ht),xt.append(et,K,Xt,U),c.replaceChildren(...E?[G,Rt,xt]:[G,xt]);let j={x:0,y:0,zoom:1},nt=null,de=!1,Gt=Number(Se(Pn))||Ur,V=new Map,Wn=()=>{let e=new Set,n=(i,a)=>{var m;for(let M of(m=N.get(i.id))!=null?m:[])a&&e.add(M.id),n(M,a||M.collapsed)};for(let i of l)i.parentId||n(i,i.collapsed);return e},De=e=>{var i,a;let n=0;for(let m=e.parentId;m&&!(++n>l.length);m=(a=(i=g.get(m))==null?void 0:i.parentId)!=null?a:null);return n},_e=()=>un(K.getBoundingClientRect().top,Nt.hidden?void 0:Nt.getBoundingClientRect());function ht(){mt.style.transform=`translate(${j.x}px, ${j.y}px) scale(${j.zoom})`;let e=`${Math.round(j.zoom*100)}%`;Pt.textContent=e,Pt.setAttribute("aria-label",Et(r.zoomReset,e))}function $t(e,n){let i=n!=null?n:{x:K.clientWidth/2,y:K.clientHeight/2},a=Math.min(Kr,Math.max(Wr,j.zoom*e)),m=a/j.zoom;j={x:i.x-(i.x-j.x)*m,y:i.y-(i.y-j.y)*m,zoom:a},ht()}let ue=!1;function zt(){if(!V.size)return;if(!K.clientWidth||!K.clientHeight){ue=!0;return}let e=1/0,n=1/0,i=-1/0,a=-1/0;for(let m of V.values())e=Math.min(e,m.offsetLeft),n=Math.min(n,m.offsetTop),i=Math.max(i,m.offsetLeft+(m.offsetWidth||280)),a=Math.max(a,m.offsetTop+m.offsetHeight);for(let m of b){let M=m.parentId?void 0:T.get(m.id);M&&(e=Math.min(e,M.offsetLeft),n=Math.min(n,M.offsetTop),i=Math.max(i,M.offsetLeft+(M.offsetWidth||300)),a=Math.max(a,M.offsetTop+(M.offsetHeight||60)))}for(let m of Array.from(Dt.querySelectorAll(".vam-summary"))){let M=m.querySelector(".vam-summary-text");if(!M)continue;let S=parseFloat(M.style.left),P=parseFloat(M.style.top),D=M.offsetWidth,X=M.offsetHeight;if(!Number.isFinite(S)||!Number.isFinite(P))continue;let it=m.classList.contains("is-side-left")?S-D:m.classList.contains("is-side-down")||m.classList.contains("is-side-up")?S-D/2:S,Q=m.classList.contains("is-side-up")?P-X:m.classList.contains("is-side-down")?P:P-X/2;e=Math.min(e,it),n=Math.min(n,Q),i=Math.max(i,it+D),a=Math.max(a,Q+X)}j=pn({minX:e,minY:n,maxX:i,maxY:a},{width:K.clientWidth,height:K.clientHeight},_e()),ht()}function Pe(e){let n=V.get(e);n&&(j=fn(j,{x:n.offsetLeft+n.offsetWidth/2,y:n.offsetTop+n.offsetHeight/2},{width:K.clientWidth,height:K.clientHeight},_e()),ht())}function kt(){var e;Mt.replaceChildren();for(let n of l){let i=n.parentId?V.get(n.parentId):void 0,a=V.get(n.id);if(!i||!a)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",le(i.offsetLeft+i.offsetWidth,i.offsetTop+i.offsetHeight/2,a.offsetLeft,a.offsetTop+a.offsetHeight/2)),m.setAttribute("class",((e=u.get(n.id))==null?void 0:e.tier)==="side"?"vam-edge vam-edge-side":"vam-edge"),Mt.append(m)}for(let n of b){let i=n.parentId?V.get(n.parentId):void 0,a=T.get(n.id);if(!i||!a)continue;let m=t.createElementNS(bt,"path");m.setAttribute("d",le(i.offsetLeft+i.offsetWidth,i.offsetTop+i.offsetHeight/2,a.offsetLeft,a.offsetTop+a.offsetHeight/2)),m.setAttribute("class","vam-edge vam-text-edge"),Mt.append(m)}for(let n of b){let i=T.get(n.id);if(i)for(let a of n.links){let m=V.get(a);if(!m)continue;let M=i.offsetLeft+i.offsetWidth/2<=m.offsetLeft+m.offsetWidth/2,S=t.createElementNS(bt,"path");S.setAttribute("d",le(M?i.offsetLeft+i.offsetWidth:i.offsetLeft,i.offsetTop+i.offsetHeight/2,M?m.offsetLeft:m.offsetLeft+m.offsetWidth,m.offsetTop+m.offsetHeight/2)),S.setAttribute("class","vam-edge vam-text-link"),Mt.append(S)}}Kn()}function Kn(){Dt.replaceChildren();for(let e of y){let n=[];for(let P of e.members)for(let D of[P,...ne(l,P)]){let X=V.get(D);X&&n.push({x:X.offsetLeft,y:X.offsetTop,w:X.offsetWidth||280,h:X.offsetHeight})}if(!n.length)continue;let i=qr(e.side,n),a=f("div",`vam-summary is-side-${e.side}`);a.setAttribute("role","note");let m=t.createElementNS(bt,"svg");m.setAttribute("class","vam-summary-brace"),m.setAttribute("aria-hidden","true");let M=t.createElementNS(bt,"path");M.setAttribute("d",i.path),M.setAttribute("fill","none"),m.append(M),a.append(m);let S=f("div","vam-summary-text");S.textContent=e.text,S.style.left=`${i.x}px`,S.style.top=`${i.y}px`,a.append(S),Dt.append(a)}}let fe=0,He=()=>{fe||(fe=window.requestAnimationFrame(()=>{fe=0,kt()}))},pe=e=>{let n=V.get(e),i=g.get(e);!n||!i||(n.style.left=`${i.x}px`,n.style.top=`${i.y}px`,i.width&&(n.style.width=`${i.width}px`),$e(e))},$e=e=>{let n=g.get(e);if(n)for(let i of b){let a=i.parentId===e?T.get(i.id):void 0;a&&(a.style.left=`${n.x+i.dx}px`,a.style.top=`${n.y+i.dy}px`)}};function Vn(){for(let e of T.values())e.remove();T.clear();for(let e of b){let n=e.parentId?g.get(e.parentId):void 0;if(e.parentId&&(!n||!V.has(e.parentId)||n.collapsed))continue;let i=f("div",`vam-text-node${n?"":" is-free"}`);i.setAttribute("role","note"),i.textContent=e.text,n||(i.style.left=`${e.dx}px`,i.style.top=`${e.dy}px`),mt.append(i),T.set(e.id,i),n&&$e(n.id)}}function me(){var n,i;for(let a of V.values())a.remove();V.clear();let e=Wn();for(let a of l){if(e.has(a.id))continue;let m=u.get(a.id),M=x(m),S=ne(l,a.id).size,P=$n(m.tier)?m.tier:void 0,D=f("div",`vam-node${a.id===nt?" is-selected":""}`);D.dataset.nodeId=a.id,D.dataset.status=m.status==="completed"?"completed":"idea",P&&(D.dataset.relevance=P),D.tabIndex=0,D.setAttribute("role","treeitem"),D.setAttribute("aria-level",String(De(a)+1)),D.setAttribute("aria-selected",String(a.id===nt));let X=k(m),it=W(m);it&&(D.dataset.topicColor=it);let Q=Y(String((n=M.title)!=null?n:""),X);D.setAttribute("aria-label",it?`${Q}${C()?"\\uFF0C":", "}${Et(r.colorLabel,r.colorNames[it])}`:Q),S&&D.setAttribute("aria-expanded",String(!a.collapsed));let Z=f("div","vam-node-header");D.append(Z),m.status!=="completed"&&Z.append(f("span","vam-status vam-status-idea",r.toResearch)),P&&Z.append(tt(P,typeof M.reason=="string"?M.reason:void 0)),X.length&&Z.append(J(X));let Ze=f("div","vam-node-tools");if(D.append(Ze),S){let lt=a.collapsed?Et(r.expandCount,S):r.collapse,Me=I(Z,lt,"vam-collapse-button",()=>{a.collapsed=!a.collapsed,Bt(a.id,!0)});Me.setAttribute("aria-expanded",String(!a.collapsed)),Me.setAttribute("aria-label",lt),Me.title=lt}I(Ze,r.detailsButton,void 0,()=>St(a.id)),D.append(f("h3","vam-card-title",String((i=M.title)!=null?i:""))),typeof M.summary=="string"&&M.summary.trim()&&D.append(f("p","vam-card-summary",M.summary)),D.addEventListener("click",()=>{de||St(a.id)}),D.addEventListener("keydown",lt=>{lt.target===D&&(lt.key==="Enter"||lt.key===" "?(lt.preventDefault(),St(a.id)):S&&lt.key===(a.collapsed?"ArrowRight":"ArrowLeft")&&(lt.preventDefault(),a.collapsed=!a.collapsed,Bt(a.id)))}),D.addEventListener("pointerdown",lt=>Yn(lt,a,D)),mt.append(D),V.set(a.id,D),pe(a.id)}Vn()}function qt(){dn(l,void 0,n=>{var i;return(i=V.get(n))==null?void 0:i.offsetHeight}).forEach((n,i)=>{l[i].x=n.x,l[i].y=n.y});for(let n of V.keys())pe(n)}function Bt(e,n=!1){var m;let i=e?(m=V.get(e))==null?void 0:m.getBoundingClientRect():void 0;me(),qt(),kt();let a=e?V.get(e):void 0;if(a){if(i){let S=a.getBoundingClientRect();j={...j,x:j.x+i.left-S.left,y:j.y+i.top-S.top},ht()}let M=n?a.querySelector(".vam-collapse-button"):null;(M!=null?M:a).focus({preventScroll:!0})}}function Yn(e,n,i){if(e.button!==0||!e.isPrimary||e.target.closest("button"))return;let a=e.clientX,m=e.clientY,M=n.x,S=n.y,P=!1,D=it=>{let Q=it.clientX-a,Z=it.clientY-m;if(!P){if(Math.hypot(Q,Z)<=Vr)return;P=!0,i.classList.add("is-dragging"),i.setPointerCapture(it.pointerId)}n.x=M+Q/j.zoom,n.y=S+Z/j.zoom,pe(n.id),He()},X=()=>{i.removeEventListener("pointermove",D),i.removeEventListener("pointerup",X),i.removeEventListener("pointercancel",X),i.classList.remove("is-dragging"),P&&(de=!0,window.setTimeout(()=>de=!1,0))};i.addEventListener("pointermove",D),i.addEventListener("pointerup",X),i.addEventListener("pointercancel",X)}let ge=e=>Math.round(Math.min(Math.max(ke,e),Math.max(ke,xt.clientWidth*.7)));function Qt(){let e=ft();if(U.hidden||e){U.style.removeProperty("width"),Xt.style.removeProperty("right");return}let n=ge(Gt);U.style.width=`${n}px`,Xt.style.right=`${n}px`,q.setAttribute("aria-valuenow",String(n)),q.setAttribute("aria-valuemax",String(ge(1/0)))}let q=f("div","vam-inspector-resizer");q.setAttribute("role","separator"),q.setAttribute("aria-orientation","vertical"),q.setAttribute("aria-label",r.resizePanel),q.setAttribute("aria-valuemin",String(ke)),q.tabIndex=0;let Zt=(e,n)=>{Gt=ge(e),Qt(),n&&Ie(Pn,String(Gt))};q.addEventListener("pointerdown",e=>{e.preventDefault();let n=e.clientX,i=U.offsetWidth;q.setPointerCapture(e.pointerId),q.classList.add("is-resizing"),t.body.classList.add("vam-resizing");let a=M=>Zt(i+n-M.clientX,!1),m=()=>{q.removeEventListener("pointermove",a),q.removeEventListener("pointerup",m),q.removeEventListener("pointercancel",m),q.classList.remove("is-resizing"),t.body.classList.remove("vam-resizing"),Zt(Gt,!0)};q.addEventListener("pointermove",a),q.addEventListener("pointerup",m),q.addEventListener("pointercancel",m)}),q.addEventListener("keydown",e=>{let n=e.shiftKey?48:16;if(e.key==="ArrowLeft")Zt(U.offsetWidth+n,!0);else if(e.key==="ArrowRight")Zt(U.offsetWidth-n,!0);else return;e.preventDefault()});let he=ft();window.addEventListener("resize",()=>{Qt(),ht(),ft()!==he&&(he=ft(),It(he?!1:je(),!1))});function ye(){nt=null;for(let e of V.values())e.classList.remove("is-selected"),e.setAttribute("aria-selected","false");U.hidden=!0,xt.classList.remove("has-inspector"),U.replaceChildren(),Qt(),vt()}function St(e){var D,X,it;let n=g.get(e),i=u.get(e);if(!n||!i)return;let a={...i,...x(i)};nt=e;for(let[Q,Z]of V)Z.classList.toggle("is-selected",Q===e),Z.setAttribute("aria-selected",String(Q===e));U.replaceChildren(q);let m=f("div","vam-inspector-heading");m.append(f("strong",void 0,r.topicDetails)),I(m,r.close,void 0,ye),U.append(m,f("h3",void 0,String((D=a.title)!=null?D:"")));let M=$n(a.tier)?a.tier:void 0;if(M){let Q=f("div","vam-inspector-why");Q.append(tt(M));let Z=typeof a.reason=="string"&&a.reason.trim()?a.reason:a.manual?r.manualReason:"";Z&&Q.append(f("span",void 0,Z)),U.append(Q)}typeof a.summary=="string"&&a.summary.trim()&&U.append(f("p","vam-sample-summary",a.summary));let S=f("div","vam-sample-detail");typeof a.detailHtml=="string"&&a.detailHtml.trim()?a.compact?In(t,S,a.detailHtml,a.compact,d,r):Le(t,S,a.detailHtml,d,r):S.append(f("p","vam-inspector-empty",r.noContent)),U.append(S);let P=(X=N.get(e))!=null?X:[];if(P.length){let Q=f("div","vam-subtopics");Q.append(f("strong",void 0,r.subtopics));for(let Z of P)I(Q,String((it=x(u.get(Z.id)).title)!=null?it:""),void 0,()=>{n.collapsed&&(n.collapsed=!1,Bt(n.id)),St(Z.id),Pe(Z.id)});U.append(Q)}U.hidden=!1,xt.classList.add("has-inspector"),Qt(),U.scrollTop=0,vt(),Ue()}let be=e=>{Te(l,e),Bt(),zt()},Ft=e=>{ot.hidden||(ot.hidden=!0,ut.setAttribute("aria-expanded","false"),e&&ut.focus())};function Xn(){ot.replaceChildren();let e=[{label:r.collapseAll,run:()=>be(0)},{label:r.expandAll,run:()=>be(null)},...[1,2,3].map(n=>({label:Et(r.expandToLevel,n),run:()=>be(n)})),null,{label:r.autoLayout,run:()=>{qt(),kt()}}];for(let n of e){if(!n){ot.append(f("hr"));continue}let i=f("button",void 0,n.label);i.type="button",i.setAttribute("role","menuitem"),i.addEventListener("click",a=>{a.stopPropagation(),Ft(!0),n.run()}),ot.append(i)}}let ze=()=>Array.from(ot.querySelectorAll("button"));ut.addEventListener("click",e=>{var n;if(e.stopPropagation(),!ot.hidden)return Ft(!0);ot.hidden=!1,ut.setAttribute("aria-expanded","true"),(n=ze()[0])==null||n.focus()}),ot.addEventListener("keydown",e=>{let n=ze(),i=n.indexOf(t.activeElement);if(e.key==="ArrowDown")n[(i+1)%n.length].focus();else if(e.key==="ArrowUp")n[(i-1+n.length)%n.length].focus();else if(e.key==="Home")n[0].focus();else if(e.key==="End")n[n.length-1].focus();else return e.key==="Tab"?Ft(!1):void 0;e.preventDefault()}),t.addEventListener("pointerdown",e=>{!ot.hidden&&!gt.contains(e.target)&&Ft(!1);let n=e.target;ft()&&!et.hidden&&!et.contains(n)&&!pt.contains(n)&&It(!1,!1)}),t.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!ot.hidden)Ft(!0);else if(ft()&&!et.hidden)It(!1,!1),pt.focus();else if(!U.hidden){let n=nt?V.get(nt):void 0;ye(),n==null||n.focus({preventScroll:!0})}}});function Be(){let e=R();if(t.title=e.title,st.textContent=e.title,mt.setAttribute("aria-label",e.title),rt.textContent=r.readOnly,Lt.textContent=r.madeWithVam,Ct.textContent=r.install,ct.setAttribute("aria-label",r.language),ct.title=r.language,v)for(let i of Array.from(ct.options))i.dataset.original&&(i.textContent=r.originalText);e.goal?(Ce.textContent=Et(r.goal,e.goal),_t.title=e.goal,_t.parentElement||Nt.append(_t),Nt.hidden=!1):(_t.remove(),Nt.hidden=!0),Re.textContent=r.hint;let n=(i,a)=>{i.setAttribute("aria-label",a),i.title=a};if(n(Fn,r.zoomOut),n(jn,r.zoomIn),n(Un,r.showAll),ut.textContent=r.layout,U.setAttribute("aria-label",r.topicDetails),et.setAttribute("aria-label",r.outline),Ht.setAttribute("aria-label",r.outline),n(pt,r.outline),q.setAttribute("aria-label",r.resizePanel),Xn(),h()){let i=v?r.aiTranslatedUnknown:Et(r.aiTranslated,w(H,A));Rt.textContent=`${i} ${r.imageTextUntranslated}`,Rt.hidden=!1}else Rt.hidden=!0;ht()}function Gn(e){if(e===A||!_.includes(e))return;A=e,r=B(e),O&&Ie(O,e),t.documentElement.lang=e;let n=U.scrollTop;Be(),me(),kt(),Ke(),nt!==null&&g.has(nt)&&!U.hidden&&(St(nt),U.scrollTop=n),He()}ct.addEventListener("change",()=>Gn(ct.value));let Jt=[],Fe=e=>{var n;Jt.push(e);for(let i of(n=N.get(e.id))!=null?n:[])Fe(i)};for(let e of l)e.parentId||Fe(e);let jt=new Set,Tt=new Map,te=null;function je(){return Se(Hn)!=="0"}function It(e,n){et.hidden=!e,xt.classList.toggle("has-outline",e),pt.setAttribute("aria-expanded",String(e)),n&&!ft()&&Ie(Hn,e?"1":"0")}let qn=()=>Jt.filter(e=>{var n;return!((n=Tt.get(e.id))!=null&&n.hidden)});function vt(){var i,a,m;let e=[];for(let M of Jt){let S=Tt.get(M.id);if(!S)continue;let P=!1;for(let D=M.parentId;D&&!P;D=(a=(i=g.get(D))==null?void 0:i.parentId)!=null?a:null)P=jt.has(D);S.hidden=P,P||e.push(M),N.has(M.id)&&S.setAttribute("aria-expanded",String(!jt.has(M.id))),M.id===nt?S.setAttribute("aria-current","true"):S.removeAttribute("aria-current")}let n=(m=e.find(M=>M.id===te))!=null?m:e[0];for(let[M,S]of Tt)S.tabIndex=M===(n==null?void 0:n.id)?0:-1}function Ue(){let e=nt?Tt.get(nt):void 0;!e||e.hidden||!et.clientHeight||(e.offsetTop<et.scrollTop?et.scrollTop=e.offsetTop:e.offsetTop+e.offsetHeight>et.scrollTop+et.clientHeight&&(et.scrollTop=e.offsetTop+e.offsetHeight-et.clientHeight))}function xe(e){jt.delete(e)||jt.add(e),vt()}function Qn(e){var n;te=e,vt(),(n=Tt.get(e))==null||n.focus()}function Zn(){for(let[e,n]of V)n.classList.toggle("is-selected",e===nt),n.setAttribute("aria-selected",String(e===nt))}function We(e){var m,M,S;let n=g.get(e);if(!n)return;let i=!1,a=0;for(let P=n.parentId;P&&a++<=l.length;P=(M=(m=g.get(P))==null?void 0:m.parentId)!=null?M:null){let D=g.get(P);D!=null&&D.collapsed&&(D.collapsed=!1,i=!0)}nt=e,i&&Bt(),Pe(e),U.hidden?Zn():St(e),vt(),Ue(),ft()&&It(!1,!1),(S=V.get(e))==null||S.focus({preventScroll:!0})}function Jn(e,n){var P;if(e.target!==e.currentTarget||e.altKey||e.ctrlKey||e.metaKey)return;let i=qn(),a=i.indexOf(n),m=(P=N.get(n.id))!=null?P:[],M=jt.has(n.id),S;switch(e.key){case"ArrowDown":S=i[a+1];break;case"ArrowUp":S=i[a-1];break;case"Home":S=i[0];break;case"End":S=i[i.length-1];break;case"ArrowRight":m.length&&M?xe(n.id):S=m[0];break;case"ArrowLeft":m.length&&!M?xe(n.id):S=n.parentId?g.get(n.parentId):void 0;break;case"Enter":case" ":We(n.id);break;default:return}e.preventDefault(),S&&Qn(S.id)}function Ke(){var e;Ht.replaceChildren(),Tt.clear();for(let n of Jt){let i=String((e=x(u.get(n.id)).title)!=null?e:""),a=f("div","vam-outline-item");a.dataset.outlineId=n.id,a.setAttribute("role","treeitem");let m=De(n)+1;a.setAttribute("aria-level",String(m)),a.style.setProperty("--depth",String(m-1));let M=f("span","vam-outline-twist");N.has(n.id)&&(M.append(z("chevron")),M.addEventListener("click",D=>{D.stopPropagation(),xe(n.id)}));let S=f("span","vam-outline-title",i);S.title=i,a.append(M,S);let P=k(u.get(n.id));P.length&&(a.append(J(P)),a.setAttribute("aria-label",Y(i,P))),a.addEventListener("click",()=>We(n.id)),a.addEventListener("keydown",D=>Jn(D,n)),a.addEventListener("focus",()=>{te!==n.id&&(te=n.id,vt())}),Ht.append(a),Tt.set(n.id,a)}vt()}let at=new Map,Ut=0,ee=!1;K.addEventListener("pointerdown",e=>{if(!(e.target.closest(".vam-node")||e.pointerType==="mouse"&&e.button!==0)&&(K.setPointerCapture(e.pointerId),at.set(e.pointerId,{x:e.clientX,y:e.clientY}),K.classList.add("is-panning"),at.size===1&&(ee=!1),at.size===2)){let[n,i]=Array.from(at.values());Ut=Math.hypot(n.x-i.x,n.y-i.y)}}),K.addEventListener("pointermove",e=>{let n=at.get(e.pointerId);if(!n)return;if(at.set(e.pointerId,{x:e.clientX,y:e.clientY}),at.size===2&&Ut){let[m,M]=Array.from(at.values()),S=Math.hypot(m.x-M.x,m.y-M.y),P=K.getBoundingClientRect();$t(S/Ut,{x:(m.x+M.x)/2-P.left,y:(m.y+M.y)/2-P.top}),Ut=S,ee=!0;return}let i=e.clientX-n.x,a=e.clientY-n.y;ee||(ee=Math.abs(i)+Math.abs(a)>0),j={...j,x:j.x+i,y:j.y+a},ht()});let Ve=e=>{at.delete(e.pointerId)&&(at.size<2&&(Ut=0),at.size||(K.classList.remove("is-panning"),!ee&&e.type==="pointerup"&&!U.hidden&&ye()))};K.addEventListener("pointerup",Ve),K.addEventListener("pointercancel",Ve),K.addEventListener("wheel",e=>{e.preventDefault();let n=K.getBoundingClientRect();e.ctrlKey||e.metaKey||e.deltaMode===1||!e.deltaX&&Math.abs(e.deltaY)>=50?$t(Math.exp(-e.deltaY*(e.deltaMode===0?.0015:.04)),{x:e.clientX-n.left,y:e.clientY-n.top}):(j={...j,x:j.x-e.deltaX,y:j.y-e.deltaY},ht())},{passive:!1}),typeof ResizeObserver!="undefined"&&new ResizeObserver(()=>{ue&&(ue=!1,zt())}).observe(K),Be(),Ke(),It(ft()?!1:je(),!1),Te(l,1),me(),qt(),kt(),zt();let Ye=t.fonts;Ye&&Ye.ready.then(()=>{nt!==null||at.size||(qt(),kt(),zt())})}Bn(document);})();';
+var SHARE_VIEWER_CSS = '/* Share viewer styles. Order: tokens and base (this part), the card, canvas and inspector rules extracted from styles.css, then the viewer-only parts below the marker. */\n:root {\n  color-scheme: light;\n  --background-primary: #ffffff;\n  --background-secondary: #f6f6f6;\n  --background-modifier-border: #e0e0e0;\n  --background-modifier-border-hover: #cfcfcf;\n  --background-modifier-border-focus: #8a5cf5;\n  --background-modifier-hover: rgba(0, 0, 0, 0.05);\n  --background-modifier-active-hover: rgba(138, 92, 245, 0.15);\n  --text-normal: #222222;\n  --text-muted: #5c5c5c;\n  --text-faint: #8a8a8a;\n  --text-on-accent: #ffffff;\n  --text-error: #d1243c;\n  --interactive-accent: #8a5cf5;\n  --text-accent: #6f42e0;\n  --color-red: #e93147;\n  --color-red-rgb: 233, 49, 71;\n  --color-orange: #ec7500;\n  --color-yellow: #e0ac00;\n  --color-green: #08b94e;\n  --color-blue: #086ddd;\n  --color-purple: #7852ee;\n  --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);\n  --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.16);\n  --radius-s: 4px;\n  --radius-m: 8px;\n  --font-ui-smaller: 12px;\n  --font-ui-small: 13px;\n  --font-ui-medium: 15px;\n  --input-height: 30px;\n  --size-4-3: 12px;\n  --font-interface: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "PingFang SC", "Noto Sans TC", "Noto Sans SC", "Microsoft JhengHei", Roboto, sans-serif;\n  --font-monospace: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    color-scheme: dark;\n    --background-primary: #1e1e1e;\n    --background-secondary: #262626;\n    --background-modifier-border: #363636;\n    --background-modifier-border-hover: #4a4a4a;\n    --background-modifier-border-focus: #a88bfa;\n    --background-modifier-hover: rgba(255, 255, 255, 0.06);\n    --background-modifier-active-hover: rgba(168, 139, 250, 0.2);\n    --text-normal: #dadada;\n    --text-muted: #b3b3b3;\n    --text-faint: #8c8c8c;\n    --text-error: #fb464c;\n    --text-accent: #a88bfa;\n    --color-red: #fb464c;\n    --color-red-rgb: 251, 70, 76;\n    --color-orange: #e9973f;\n    --color-yellow: #e0de71;\n    --color-green: #44cf6e;\n    --color-blue: #027aff;\n    --color-purple: #a882ff;\n    --shadow-s: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);\n    --shadow-l: 0 8px 28px rgba(0, 0, 0, 0.5);\n  }\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { height: 100%; margin: 0; }\nbody { background: var(--background-primary); color: var(--text-normal); font-family: var(--font-interface); font-size: var(--font-ui-small); overflow: hidden; -webkit-text-size-adjust: 100%; }\nbutton { font: inherit; font-size: var(--font-ui-small); color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); padding: 4px 10px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }\nbutton:hover { background: var(--background-modifier-hover); }\nbutton:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.svg-icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }\n.vam-app { display: flex; flex-direction: column; height: 100%; }\n/* From styles.css, unchanged. */\n.vam-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 48px; padding: 6px 10px 6px 6px; border-bottom: 1px solid var(--background-modifier-border); background: var(--background-primary); flex-shrink: 0; }\n.vam-toolbar button, .vam-map-tools button, .vam-actions button { font-size: var(--font-ui-small); }\n.vam-toolbar .vam-map-switcher { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-medium); min-width: 0; max-width: min(460px, 45%); height: auto; padding: 6px 8px; border: 0; border-radius: var(--radius-m); background: transparent; box-shadow: none; color: var(--text-normal); cursor: pointer; }\n.vam-toolbar .vam-map-switcher:hover { background: var(--background-modifier-hover); }\n.vam-map-switcher:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-switcher-icon { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }\n.vam-map-switcher-icon svg { width: 14px; height: 14px; }\n.vam-toolbar-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }\n.vam-canvas-overlay { position: absolute; z-index: 4; inset: 0; pointer-events: none; }\n.vam-canvas-overlay > * { pointer-events: auto; }\n.vam-map-tools, .vam-zoom-controls { position: absolute; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }\n.vam-map-tools { top: 12px; left: 12px; flex-wrap: wrap; max-width: calc(100% - 24px); }\n.vam-map-tools button:not(.mod-cta), .vam-zoom-controls button { background: transparent; box-shadow: none; }\n.vam-map-tools button:focus-visible, .vam-zoom-controls button:focus-visible, .vam-node-tools button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }\n.vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-zoom-controls { right: 12px; bottom: 12px; }\n.vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }\n.vam-layout-button::after { content: "\u25BE" / ""; margin-left: 4px; color: var(--text-muted); }\n.vam-zoom { min-width: 52px; padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-muted); }\n.vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }\n.vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }\n.vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }\n.vam-viewport.is-panning { cursor: grabbing; }\n.vam-node.is-cut { outline: 2px dashed var(--text-muted); outline-offset: 3px; opacity: 0.7; }\n.vam-stage { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }\n.vam-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }\n.vam-edge { fill: none; stroke: var(--interactive-accent); stroke-width: 2; opacity: 1; }\n.vam-canvas-items { position: absolute; left: 0; top: 0; width: 1px; height: 1px; z-index: -1; pointer-events: none; }\n.vam-canvas-image { position: absolute; box-sizing: border-box; pointer-events: auto; cursor: grab; user-select: none; touch-action: none; border: 1px solid var(--background-modifier-border); border-radius: 4px; background: var(--background-primary); overflow: visible; }\n.vam-canvas-image:focus-visible, .vam-canvas-image.is-selected { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }\n.vam-canvas-image img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; -webkit-user-drag: none; }\n.vam-canvas-image.is-missing { display: flex; align-items: center; justify-content: center; padding: 4px; border-style: dashed; color: var(--text-muted); font-size: var(--font-ui-smaller); text-align: center; overflow: hidden; word-break: break-all; }\n.vam-canvas-image-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border: 1px solid var(--interactive-accent); border-radius: 2px; background: var(--background-primary); cursor: nwse-resize; display: none; }\n.vam-canvas-image.is-selected .vam-canvas-image-handle { display: block; }\n.vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }\n.vam-node:hover { border-color: var(--background-modifier-border-hover); }\n.vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }\n.vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }\n.vam-card-resize:hover, .vam-card-resize:focus-visible { opacity: 1; background: var(--interactive-accent); outline: none; }\n.vam-node > .vam-card-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; border: 0; }\n.vam-edge-convergence { stroke: var(--interactive-accent); stroke-dasharray: 5 5; opacity: 1; }\n.vam-node:active { cursor: grabbing; }\n.vam-node.is-selected { border-color: var(--interactive-accent); outline: 2px solid var(--interactive-accent); outline-offset: 2px; }\n.vam-node:focus-visible { outline: 2px dashed var(--interactive-accent); outline-offset: 5px; }\n.vam-node-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }\n.vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }\n.vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }\n.vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }\n.vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }\n.vam-node-tools > .vam-collapse-button { order: -1; }\n.vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }\n.vam-status::before { content: ""; display: inline-block; margin-right: 6px; vertical-align: 1px; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; background: var(--text-muted); }\n.vam-status-idea::before { border: 1.5px solid var(--text-muted); background: transparent; }\n.vam-status-running { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-running::before { background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }\n.vam-status-completed::before { background: var(--interactive-accent); }\n.vam-status-queued { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-status-queued::before { border: 1.5px solid var(--interactive-accent); background: transparent; }\n.vam-status-error { color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); }\n.vam-status-error::before { background: var(--color-red); }\n.vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }\n.vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }\n.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }\n.vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }\n.vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }\n.vam-node:not([data-aim-kind])[data-status="idea"] { border-style: dashed; border-color: var(--background-modifier-border-hover); box-shadow: none; }\n.vam-card-summary.is-preview { font-style: italic; color: var(--text-muted); }\n.vam-card-preview-label { font-style: normal; font-weight: 600; margin-right: 6px; }\n.vam-node:not([data-aim-kind])[data-status="idea"] .vam-card-summary { color: var(--text-muted); }\n.vam-node:not([data-aim-kind])[data-status="running"] { border-color: var(--interactive-accent); }\n.vam-node:not([data-aim-kind])[data-status="queued"] { --vam-card-bg: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary)); border-style: dashed; border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent); }\n.vam-node:not([data-aim-kind])[data-status="running"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--interactive-accent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: vam-scan 1.6s ease-in-out infinite; }\n.vam-node:not([data-aim-kind])[data-status="error"] { border-color: rgba(var(--color-red-rgb), 0.55); }\n.vam-relevance-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: var(--font-ui-smaller); line-height: 1.4; white-space: nowrap; }\n.vam-relevance-tag-name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; white-space: nowrap; }\n.vam-relevance-tag > .vam-relevance-icon { display: inline-flex; flex: none; }\n.vam-relevance-tag .svg-icon { width: 14px; height: 14px; }\n.vam-relevance-tag[data-tier="core"] { color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }\n.vam-relevance-tag[data-tier="support"] { color: var(--text-muted); }\n.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n.vam-node[data-relevance="side"] { border-style: dashed; }\n.vam-node[data-relevance="side"] .vam-card-title, .vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-edge.vam-edge-side { stroke: var(--text-muted); opacity: 1; }\n.theme-dark .vam-viewport { background-color: var(--background-primary); }\n.theme-dark .vam-node { --vam-card-bg: var(--background-secondary); }\n.vam-inspector { width: 300px; flex-shrink: 0; padding: 16px; overflow-y: auto; border-left: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-inspector-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }\n.vam-inspector-heading strong { font-size: var(--font-ui-medium); }\n.vam-node.is-readonly, .vam-node.is-readonly:active { cursor: pointer; }\n.vam-sample-summary { color: var(--text-muted); line-height: 1.6; }\n.vam-sample-detail { line-height: 1.6; }\n@media (max-width: 900px) {\n  .vam-inspector { width: 260px; }\n}\n@media (max-width: 600px) {\n  .vam-inspector { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 85%); z-index: 5; box-shadow: var(--shadow-l); }\n  .vam-workspace.has-inspector .vam-zoom-controls { right: auto; left: 12px; }\n}\n.vam-node[data-topic-color="red"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-red); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="orange"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-orange); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="yellow"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-yellow); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="green"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-green); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="blue"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-blue); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color="purple"]:not([data-aim-kind]) { --vam-topic-hue: var(--color-purple); --vam-card-bg: color-mix(in srgb, var(--vam-topic-hue) 14%, var(--background-primary)); }\n.vam-node[data-topic-color]:not([data-aim-kind])::before { content: ""; position: absolute; z-index: 1; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 2px; background: color-mix(in srgb, var(--vam-topic-hue) 60%, var(--text-normal)); pointer-events: none; }\n.vam-node.is-drop-target { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }\n.vam-viewport.is-image-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -4px; }\n@keyframes vam-pulse { 50% { opacity: 0.35; } }\n@keyframes vam-scan { from { background-position: -100% 0; } to { background-position: 200% 0; } }\n/* Viewer-only parts: the pieces Obsidian would otherwise provide. */\n.vam-toolbar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }\n.vam-toolbar .vam-map-switcher { cursor: default; margin: 0; font-weight: 600; font-family: inherit; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }\n.vam-toolbar .vam-map-switcher:hover { background: transparent; }\n.vam-shared { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-toolbar-actions { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }\n.vam-made-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }\n.vam-install { display: inline-flex; align-items: center; height: 30px; padding: 4px 12px; border-radius: var(--radius-s); background: var(--interactive-accent); color: var(--text-on-accent); font-size: var(--font-ui-small); text-decoration: none; white-space: nowrap; }\n.vam-install:hover { filter: brightness(1.08); }\n.vam-language { font: inherit; font-size: var(--font-ui-small); height: 30px; max-width: 11em; padding: 0 8px; color: var(--text-normal); background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); cursor: pointer; }\n.vam-language:hover { background: var(--background-modifier-hover); }\n.vam-translate-note { flex-shrink: 0; padding: 5px max(10px, env(safe-area-inset-left, 0px)); font-size: var(--font-ui-smaller); line-height: 1.4; color: var(--text-muted); background: var(--background-secondary); border-bottom: 1px solid var(--background-modifier-border); }\n.vam-translate-note[hidden] { display: none; }\n.vam-goal { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 22em; padding: 0 6px; line-height: var(--input-height); font-size: var(--font-ui-small); color: var(--text-normal); }\n.vam-goal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.vam-goal .svg-icon { color: var(--text-accent); }\n.vam-map-tools[hidden] { display: none; }\n.vam-zoom-controls { right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }\n.vam-zoom-controls button { background: transparent; }\n.vam-node { touch-action: none; }\n.vam-node.is-dragging { cursor: grabbing; z-index: 2; }\n.vam-node .vam-node-tools button, .vam-node-header button { background: transparent; border: 0; }\n.vam-node-header > .vam-collapse-button { border: 1px solid var(--background-modifier-border); background: var(--background-primary); }\n.vam-layout-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; display: flex; flex-direction: column; min-width: 190px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-l); }\n.vam-layout-menu[hidden] { display: none; }\n.vam-layout-menu button { justify-content: flex-start; width: 100%; border: 0; background: transparent; height: 30px; }\n.vam-layout-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--background-modifier-border); }\n.vam-zoom-controls { overflow: visible; }\n.vam-inspector { font-size: 14px; line-height: 1.6; color: var(--text-normal); }\n@media (min-width: 601px) { .vam-inspector { position: relative; } }\n.vam-inspector[hidden] { display: none; }\n.vam-inspector-heading button { height: 26px; }\n.vam-inspector h3 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; overflow-wrap: anywhere; }\n.vam-inspector-why { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--font-ui-small); }\n.vam-inspector-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 2; }\n.vam-inspector-resizer:hover, .vam-inspector-resizer.is-resizing { background: var(--background-modifier-active-hover); }\n.vam-inspector-empty { color: var(--text-muted); }\n.vam-subtopics { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }\n.vam-subtopics strong { font-size: var(--font-ui-small); color: var(--text-muted); font-weight: 500; }\n.vam-subtopics button { justify-content: flex-start; height: auto; min-height: 30px; white-space: normal; text-align: left; }\n/* Outline: the topic tree on the left of the map; a drawer over the map at phone width. */\n.vam-outline { position: relative; flex: none; width: 260px; padding: 6px 0; overflow-y: auto; overscroll-behavior: contain; background: var(--background-secondary); border-right: 1px solid var(--background-modifier-border); }\n.vam-outline[hidden] { display: none; }\n.vam-outline-item { --depth: 0; display: flex; align-items: center; gap: 2px; min-height: 28px; padding: 2px 8px 2px calc(8px + var(--depth, 0) * 16px); color: var(--text-normal); cursor: pointer; background-image: repeating-linear-gradient(to right, var(--background-modifier-border) 0 1px, transparent 1px 16px); background-repeat: no-repeat; background-position: 16px 0; background-size: calc(var(--depth, 0) * 16px) 100%; }\n.vam-outline-item[hidden] { display: none; }\n.vam-outline-item:hover { background-color: var(--background-modifier-hover); }\n.vam-outline-item[aria-current="true"] { background-color: var(--background-modifier-active-hover); color: var(--text-normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--interactive-accent); }\n.vam-outline-item:focus-visible { outline-offset: -2px; }\n.vam-outline-twist { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 16px; height: 16px; color: var(--text-muted); }\n.vam-outline-twist .svg-icon { width: 12px; height: 12px; transition: transform 0.1s; }\n.vam-outline-item[aria-expanded="true"] > .vam-outline-twist .svg-icon { transform: rotate(90deg); }\n.vam-outline-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n@media (min-width: 601px) { .vam-workspace.has-outline > .vam-canvas-overlay { left: 260px; } }\n@media (max-width: 600px) { .vam-outline { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(85vw, 320px); box-shadow: var(--shadow-l); } }\n/* Contrast: the viewer does not fade side topics (the extracted rule uses opacity .5, which pulled text under 4.5:1); the dashed frame and the tag mark them instead. Repeated classes outrank the extracted rules without !important. */\n.vam-node.vam-node[data-relevance="side"] { opacity: 1; }\n.vam-node.vam-node[data-relevance="side"] .vam-card-title, .vam-node.vam-node[data-relevance="side"] .vam-card-summary { color: var(--text-muted); }\n.vam-node .vam-relevance-tag.vam-relevance-tag[data-tier="side"] { color: var(--text-muted); }\n/* Topic markers (ticket 33): plain-text symbols, the same row on cards and in the outline. */\n.vam-markers { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: var(--font-ui-smaller); font-weight: 600; line-height: 1.4; color: var(--text-normal); white-space: nowrap; }\n.vam-outline-item .vam-markers { margin-left: 6px; }\n.vam-status-idea.vam-status-idea { color: var(--text-muted); }\n.vam-status-idea.vam-status-idea::before { border-color: var(--text-muted); }\n/* Reading styles for the note HTML that Obsidian rendered at export time. */\n.vam-sample-detail { overflow-wrap: anywhere; }\n.vam-sample-detail h1, .vam-sample-detail h2, .vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { margin: 18px 0 6px; line-height: 1.35; }\n.vam-sample-detail h1 { font-size: 18px; }\n.vam-sample-detail h2 { font-size: 16px; }\n.vam-sample-detail h3, .vam-sample-detail h4, .vam-sample-detail h5, .vam-sample-detail h6 { font-size: 15px; }\n.vam-sample-detail p { margin: 8px 0; }\n.vam-sample-detail ul, .vam-sample-detail ol { padding-left: 22px; margin: 8px 0; }\n.vam-sample-detail a { color: var(--text-accent); }\n.vam-sample-detail blockquote { margin: 10px 0; padding: 2px 12px; border-left: 3px solid var(--background-modifier-border-hover); color: var(--text-muted); }\n.vam-sample-detail hr { border: 0; border-top: 1px solid var(--background-modifier-border); margin: 14px 0; }\n.vam-sample-detail code { font-family: var(--font-monospace); font-size: 12px; background: var(--background-secondary); padding: 1px 4px; border-radius: 3px; }\n.vam-sample-detail pre { overflow-x: auto; background: var(--background-secondary); padding: 8px; border-radius: 6px; }\n.vam-sample-detail pre code { background: transparent; padding: 0; }\n.vam-sample-detail img { max-width: 100%; height: auto; }\n.vam-sample-detail svg { max-width: 100%; height: auto; }\n.vam-sample-detail .mermaid, .vam-sample-detail .vam-table-scroll { overflow-x: auto; margin: 10px 0; }\n.vam-sample-detail table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }\n.vam-sample-detail th, .vam-sample-detail td { border: 1px solid var(--background-modifier-border); padding: 4px 6px; text-align: left; vertical-align: top; min-width: 5em; overflow-wrap: normal; word-break: normal; }\n.vam-sample-detail .callout { margin: 10px 0; padding: 8px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--interactive-accent) 9%, transparent); border-left: 3px solid var(--interactive-accent); }\n.vam-sample-detail .callout-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-accent); }\n.vam-sample-detail .callout-icon { display: inline-flex; flex: none; }\n.vam-sample-detail .callout-icon svg { width: 16px; height: 16px; }\n.vam-sample-detail .callout-content p:first-child { margin-top: 4px; }\n.vam-sample-detail .vam-image-source { display: block; margin: 2px 0 8px; color: var(--text-faint); font-size: var(--font-ui-smaller); overflow-wrap: anywhere; }\n.vam-sample-detail .vam-image-omitted { color: var(--text-faint); font-size: var(--font-ui-smaller); }\n.vam-sample-detail .internal-link { color: inherit; text-decoration: none; }\n/* Repeating the class raises specificity above the extracted per-card cursor rules (up to 0,3,0), so no !important is needed. */\n.vam-resizing.vam-resizing.vam-resizing.vam-resizing, .vam-resizing.vam-resizing.vam-resizing.vam-resizing * { cursor: col-resize; user-select: none; }\n@media (max-width: 700px) { .vam-canvas-overlay > .vam-canvas-hint { display: none; } }\n@media (max-width: 600px) { .vam-workspace.has-inspector > .vam-canvas-overlay { right: 0; } .vam-inspector { width: 100%; box-shadow: none; } }\n@media (max-width: 600px) { .vam-inspector-heading { position: sticky; top: 0; z-index: 3; background: var(--background-primary); padding: 8px 0; margin-bottom: 6px; } }\n@media (max-width: 600px) { .vam-inspector-resizer { display: none; } .vam-toolbar .vam-map-switcher { max-width: 100%; } .vam-made-with { display: none; } }\n/* Four :root pseudo-classes (0,4,0) outrank every extracted transition rule without !important. */\n@media (prefers-reduced-motion: reduce) { :root:root:root:root * { transition: none; } }\n.vam-text-node { position: absolute; box-sizing: border-box; width: 300px; padding: 8px 10px; border: 1px dashed var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); color: var(--text-normal); font-size: 0.9em; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }\n.vam-text-edge { opacity: 0.8; }\n.vam-text-link { stroke-dasharray: 5 4; opacity: 0.8; }\n.vam-summaries, .vam-summary { position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; }\n.vam-summary-brace { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }\n.vam-summary-brace path { stroke: var(--text-muted); stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; fill: none; }\n.vam-summary-text { position: absolute; box-sizing: border-box; width: 200px; padding: 2px 6px; color: var(--text-normal); font-size: 0.85em; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }\n.vam-summary.is-side-right .vam-summary-text { transform: translate(0, -50%); }\n.vam-summary.is-side-left .vam-summary-text { transform: translate(-100%, -50%); text-align: right; }\n.vam-summary.is-side-down .vam-summary-text { transform: translate(-50%, 0); text-align: center; }\n.vam-summary.is-side-up .vam-summary-text { transform: translate(-50%, -100%); text-align: center; }\n@media (max-width: 700px) { .vam-summary-text { width: 150px; } }\n';
 
 // experiences/sharing/share-html.ts
 var CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
@@ -66200,6 +66967,19 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         }
       }),
       key: "ui.text_node_add_command"
+    });
+    this.localizedCommands.push({
+      command: this.addCommand({
+        id: "add-summary-bracket",
+        name: t("ui.summary_add_command"),
+        checkCallback: (checking) => {
+          const view = this.app.workspace.getActiveViewOfType(VisualAgentMapView);
+          if (!view) return false;
+          if (!checking) view.addSummaryOver();
+          return true;
+        }
+      }),
+      key: "ui.summary_add_command"
     });
     this.addLocalizedCommand("share-map", "share.command", () => this.openShare());
     this.addLocalizedCommand("open-topic-outline", "ui.open_topic_outline", () => {

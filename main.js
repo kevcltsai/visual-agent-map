@@ -604,6 +604,7 @@ var en = {
   "ui.topic_color": "Color",
   "ui.topic_color_none": "None",
   "ui.topic_color_apply_branch": "Apply to whole branch",
+  "ui.topic_color_apply_branch_aria": "Apply colour to whole branch",
   "ui.topic_style": "Style",
   "ui.topic_style_bold": "Bold",
   "ui.topic_style_size": "Text size",
@@ -613,6 +614,7 @@ var en = {
   "ui.topic_style_border_thick": "Thick border",
   "ui.topic_style_line_thick": "Thick line",
   "ui.topic_style_apply_branch": "Apply to whole branch",
+  "ui.topic_style_apply_branch_aria": "Apply style to whole branch",
   "ui.topic_style_aria_0": "Style: {0}",
   "ui.add_subtopic_menu": "Add subtopic\u2026",
   "ui.add_kind_0": "Add {0}",
@@ -2851,6 +2853,7 @@ var zhCN = {
   "ui.topic_color": "\u989C\u8272",
   "ui.topic_color_none": "\u65E0",
   "ui.topic_color_apply_branch": "\u5E94\u7528\u5230\u6574\u4E2A\u5206\u652F",
+  "ui.topic_color_apply_branch_aria": "\u628A\u989C\u8272\u5E94\u7528\u5230\u6574\u4E2A\u5206\u652F",
   "ui.topic_style": "\u6837\u5F0F",
   "ui.topic_style_bold": "\u7C97\u4F53",
   "ui.topic_style_size": "\u5B57\u53F7",
@@ -2860,6 +2863,7 @@ var zhCN = {
   "ui.topic_style_border_thick": "\u7C97\u5916\u6846",
   "ui.topic_style_line_thick": "\u7C97\u8FDE\u7EBF",
   "ui.topic_style_apply_branch": "\u5E94\u7528\u5230\u6574\u4E2A\u5206\u652F",
+  "ui.topic_style_apply_branch_aria": "\u628A\u6837\u5F0F\u5E94\u7528\u5230\u6574\u4E2A\u5206\u652F",
   "ui.topic_style_aria_0": "\u6837\u5F0F\uFF1A{0}",
   "ui.add_subtopic_menu": "\u6DFB\u52A0\u5B50\u8BAE\u9898\u2026",
   "ui.add_kind_0": "\u6DFB\u52A0{0}",
@@ -5098,6 +5102,7 @@ var zhTW = {
   "ui.topic_color": "\u984F\u8272",
   "ui.topic_color_none": "\u7121",
   "ui.topic_color_apply_branch": "\u5957\u7528\u5230\u6574\u500B\u5206\u652F",
+  "ui.topic_color_apply_branch_aria": "\u628A\u984F\u8272\u5957\u7528\u5230\u6574\u500B\u5206\u652F",
   "ui.topic_style": "\u6A23\u5F0F",
   "ui.topic_style_bold": "\u7C97\u9AD4",
   "ui.topic_style_size": "\u5B57\u7D1A",
@@ -5107,6 +5112,7 @@ var zhTW = {
   "ui.topic_style_border_thick": "\u7C97\u5916\u6846",
   "ui.topic_style_line_thick": "\u7C97\u9023\u7DDA",
   "ui.topic_style_apply_branch": "\u5957\u7528\u5230\u6574\u500B\u5206\u652F",
+  "ui.topic_style_apply_branch_aria": "\u628A\u6A23\u5F0F\u5957\u7528\u5230\u6574\u500B\u5206\u652F",
   "ui.topic_style_aria_0": "\u6A23\u5F0F\uFF1A{0}",
   "ui.add_subtopic_menu": "\u65B0\u589E\u5B50\u8B70\u984C\u2026",
   "ui.add_kind_0": "\u65B0\u589E{0}",
@@ -55643,7 +55649,7 @@ ${request.requirements}` : preset.text,
       t("ui.topic_color_apply_branch"),
       () => this.enqueue(() => this.changeTopicColor(node, current(), true)),
       branchNoteIds(this.map.nodes, node.id).length < 2
-    );
+    ).setAttr("aria-label", t("ui.topic_color_apply_branch_aria"));
   }
   /**
    * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
@@ -55713,8 +55719,6 @@ ${request.requirements}` : preset.text,
         if (on) choice2.addClass("is-pressed");
         if ((focus == null ? void 0 : focus.toggle) === id) choice2.focus();
       }
-      const sizeLabel = section3.querySelector(".vam-topic-style-size-label");
-      sizeLabel == null ? void 0 : sizeLabel.remove();
       group.empty();
       const active = sizeOf();
       sizes.forEach((id, index) => {
@@ -55753,7 +55757,7 @@ ${request.requirements}` : preset.text,
       t("ui.topic_style_apply_branch"),
       () => this.enqueue(() => this.changeTopicStyle(node, this.styleOf(node.id), true)),
       branchNoteIds(this.map.nodes, node.id).length < 2
-    );
+    ).setAttr("aria-label", t("ui.topic_style_apply_branch_aria"));
   }
   /**
    * Sets the whitelisted styles of one topic, or of the topic and all its descendants (folded ones too), in one undoable

@@ -12471,7 +12471,7 @@ export class VisualAgentMapView extends ItemView {
       t("ui.topic_color_apply_branch"),
       () => this.enqueue(() => this.changeTopicColor(node, current(), true)),
       branchNoteIds(this.map!.nodes, node.id).length < 2
-    );
+    ).setAttr("aria-label", t("ui.topic_color_apply_branch_aria"));
   }
   /**
    * Sets (or, with null, clears) the topic colour of one topic, or of the topic and all its descendants (folded ones too),
@@ -12534,8 +12534,6 @@ export class VisualAgentMapView extends ItemView {
         if (on) choice.addClass("is-pressed");
         if (focus?.toggle === id) choice.focus();
       }
-      const sizeLabel = section.querySelector(".vam-topic-style-size-label");
-      sizeLabel?.remove();
       group.empty();
       const active = sizeOf();
       sizes.forEach((id, index) => {
@@ -12579,7 +12577,7 @@ export class VisualAgentMapView extends ItemView {
       t("ui.topic_style_apply_branch"),
       () => this.enqueue(() => this.changeTopicStyle(node, this.styleOf(node.id), true)),
       branchNoteIds(this.map!.nodes, node.id).length < 2
-    );
+    ).setAttr("aria-label", t("ui.topic_style_apply_branch_aria"));
   }
   /**
    * Sets the whitelisted styles of one topic, or of the topic and all its descendants (folded ones too), in one undoable

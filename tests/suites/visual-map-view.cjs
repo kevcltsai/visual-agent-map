@@ -3746,6 +3746,13 @@ integrationTest('topic-style: bold, thick border and thick line are aria-pressed
   pressed()[1].click(); await dom.tick(); radios()[1].click(); await dom.tick();
   assert.deepEqual(calls.at(-1), ['fact', ['border-thick', 'text-small'], false], 'a size keeps the other switches');
   const leaf = dom.element('leaf'); view.renderStyleSection(leaf, view.map.nodes[1]); assert.equal(dom.button(leaf, 'Apply to whole branch').disabled, true);
+  const sizeLabels = () => dom.findAll(panel, c => c.cls && c.cls.split(' ').includes('vam-topic-style-size-label'));
+  assert.deepEqual(sizeLabels().map(l => l.text), ['Text size'], 'the size label survives every repaint');
+  const styleApply = dom.button(panel, 'Apply to whole branch'); assert.equal(styleApply.attrs['aria-label'], 'Apply style to whole branch');
+  view.renderColorSection = Object.getPrototypeOf(view).renderColorSection;
+  const both = dom.element('both'); view.renderColorSection(both, view.map.nodes[0]); view.renderStyleSection(both, view.map.nodes[0]);
+  const applies = dom.findAll(both, c => c.tag === 'button' && c.text === 'Apply to whole branch').map(b => b.attrs['aria-label']);
+  assert.deepEqual(applies, ['Apply colour to whole branch', 'Apply style to whole branch'], 'the two apply buttons have distinct names');
   dom.button(panel, 'Apply to whole branch').click(); await dom.tick();
   assert.deepEqual(calls.at(-1), ['fact', ['text-small', 'border-thick'], true]);
 });

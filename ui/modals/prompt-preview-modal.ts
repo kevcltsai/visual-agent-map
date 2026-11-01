@@ -58,6 +58,12 @@ export class PromptPreviewModal extends Modal {
     this.bodyEl = contentEl.createDiv({ cls: "vam-prompt-preview-body" });
     this.renderBody();
     select.focus();
+    // The block files may have been edited since the store last read them (the settings page stays open while they are
+    // edited in a tab): read them again and show what is there now. An unchanged problem leaves the live region alone.
+    void this.store
+      .refresh()
+      .catch(() => undefined)
+      .then(() => this.renderBody());
   }
 
   onClose(): void {

@@ -49,11 +49,12 @@ const TONES = () => ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'
 // One Template or Tone row against a fake plugin and store; `calls` records what the buttons asked of the plugin.
 function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), list = [], old = [], hold = {} } = {}) {
   const calls = [];
-  const view = { options: [], value: undefined, disabled: false, attrs: {}, focused: 0, buttons: [], desc: '', descAttrs: {}, name: '' };
+  const view = { options: [], value: undefined, disabled: false, attrs: {}, focused: 0, buttons: [], desc: '', descAttrs: {}, name: '', classes: [], descWrites: 0 };
   const settingsObject = { language: 'en', ...settings };
   const setting = {
     descEl: { setAttr: (k, v) => { view.descAttrs[k] = v; } },
-    setName(name) { view.name = name; return this; }, setDesc(desc) { view.desc = desc; return this; },
+    settingEl: { addClass: name => { view.classes.push(name); } },
+    setName(name) { view.name = name; return this; }, setDesc(desc) { view.desc = desc; view.descWrites++; return this; },
     addDropdown(build) {
       build({
         selectEl: { replaceChildren() { view.options = []; }, setAttr: (k, v) => { view.attrs[k] = v; }, focus() { view.focused++; view.focusedEl = 'select'; } },
@@ -243,4 +244,17 @@ test('every style-file problem has a translated message in en, zh-TW and zh-CN, 
 test('the old template library is gone from the code and the dictionaries', () => {
   assert.ok(!fs.existsSync(path.join(root, 'ui/modals/detail-templates-modal.ts')));
   for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(!fs.readFileSync(path.join(root, `i18n/${language}.ts`), 'utf8').includes('"ui.note_style_custom"'));
+});
+
+test('FB1 L2/B2: the row description is written only when its text changes, and the row carries the wrapping class', async () => {
+  const row = blockRow('template');
+  await flush();
+  assert.deepEqual(row.view.classes, ['vam-block-row']);
+  const writes = row.view.descWrites;
+  assert.ok(writes >= 1);
+  await row.view.buttons[0].click();
+  await flush();
+  assert.equal(row.view.descWrites, writes, 'an action that leaves the text alone does not write it twice (aria-live)');
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.match(css, /^\.vam-block-row > \.setting-item-control \{[^}]*flex-wrap: wrap/m);
 });

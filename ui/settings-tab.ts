@@ -125,6 +125,9 @@ export function renderNoteBlockSetting(
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
   setting.setName(label);
   setting.descEl.setAttr("aria-live", "polite");
+  setting.settingEl.addClass("vam-block-row");
+  // The description is a live region: it is written only when its text changes, so a screen reader does not repeat it.
+  let shownDesc: string | undefined;
   let busy = false;
   let picker: DropdownComponent | undefined;
   let openButton: ButtonComponent | undefined;
@@ -164,7 +167,10 @@ export function renderNoteBlockSetting(
       else if (item.modified) parts.push(t("ui.block_status_modified"));
       else parts.push(t(item.fileName === undefined ? "ui.block_status_builtin_none" : "ui.block_status_builtin_file"));
     }
-    setting.setDesc(parts.join(" "));
+    const desc = parts.join(" ");
+    if (desc === shownDesc) return;
+    shownDesc = desc;
+    setting.setDesc(desc);
   };
   /** Writes the two shown values into the settings (not when an old default still decides), then runs `action`. */
   const act = async (action: (ref: string) => Promise<void>, target: () => HTMLElement | undefined): Promise<void> => {

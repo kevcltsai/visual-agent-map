@@ -1368,6 +1368,83 @@ integrationTest('runAgent: a template block with two format headings still runs 
   assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 5/);
   assert.match(String(h.notices[0]), /built-in template is used/);
 });
+// Ticket 04 FB1: the Notice for an unreadable template block belongs to the entry of a run, once per execution.
+const BAD_BLOCK = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+async function installBadBlock(plugin, file = 'Bad') {
+  const files = { [`WS/S/Blocks/Templates/${file}.md`]: BAD_BLOCK };
+  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  plugin.noteStyles = new NoteStyleStore({ settings: () => plugin.settings, port, save: async () => {} });
+  await plugin.noteStyles.refresh();
+}
+const badBlockSettings = { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'file:Bad' };
+const blockNotices = notices => notices.filter(message => /Bad\.md/.test(String(message)));
+integrationTest('FB1 F1: opening the research or the synthesis dialog raises no Notice for an unreadable template block', async () => {
+  const opened = [], notices = [];
+  const h = await templateHarness({ language: 'en', settings: badBlockSettings });
+  await installBadBlock(h.plugin);
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class { constructor(message) { notices.push(message); } } } });
+  const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
+  view.openNextStep(h.topic);
+  await until(() => opened.length === 1);
+  view.multiSelected = new Set([h.topic.id, other.id]);
+  view.openSelectionSynthesis(null);
+  assert.equal(opened.length, 2, 'both dialogs opened');
+  assert.deepEqual(notices, [], 'a label or a dialog is not a run');
+  assert.deepEqual(h.notices, []);
+});
+integrationTest('FB1 F1: one runAgent, one synthesis and one integration each raise exactly one Notice naming file and line', async () => {
+  const h = await templateHarness({ language: 'en', settings: badBlockSettings, reply: (_context, call) => (call === 1 ? { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] } : { summary: 'Synth', detail: '### Core conclusions\n\nTwo', visualReferences: [], suggestions: [] }) });
+  await installBadBlock(h.plugin);
+  const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.run();
+  assert.equal(blockNotices(h.notices).length, 1, 'runAgent');
+  assert.match(String(h.notices[0]), /line 5/);
+  h.notices.length = 0;
+  await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
+  assert.equal(blockNotices(h.notices).length, 1, 'one integration (start and write-back together)');
+  h.notices.length = 0;
+  const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace'); child.parentId = h.topic.id; h.doc.nodes.push(child); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.repo.updateNote(h.topic.path, { status: 'completed' });
+  await h.view.startSynthesis(h.topic, { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] }, 'Compare them', message => assert.fail(message), () => {});
+  await until(() => !h.plugin.running.size);
+  assert.equal(blockNotices(h.notices).length, 1, 'one synthesis');
+});
+integrationTest('FB1 F1: a multi-topic research batch raises the Notice once, not once per topic', async () => {
+  const h = await templateHarness({ language: 'en', settings: badBlockSettings });
+  await installBadBlock(h.plugin);
+  const second = await h.repo.createNote('Second', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(second); await h.repo.saveMap(h.mapPath, h.doc);
+  const third = await h.repo.createNote('Third', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(third); await h.repo.saveMap(h.mapPath, h.doc);
+  await h.repo.updateNote(second.path, { prompt: 'Research second' }); await h.repo.updateNote(third.path, { prompt: 'Research third' });
+  h.plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
+  h.view.multiSelected = new Set([h.topic.id, second.id, third.id]);
+  await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'fast', requirements: '' });
+  await until(() => h.contexts.length === 3 && !h.plugin.running.size);
+  assert.equal(blockNotices(h.notices).length, 1);
+});
+integrationTest('FB1 F2: an unreadable block with the output language different from the interface language falls back to the built-in template in the output language, and keeps file and line', async () => {
+  const h = await templateHarness({ language: 'zh-TW', settings: badBlockSettings, reply: () => ({ summary: 'English summary', detail: '### Core conclusions\n\nC', visualReferences: [], suggestions: [] }) });
+  await installBadBlock(h.plugin);
+  const handle = await h.view.runAgent(h.topic, undefined, message => assert.fail(message), { outputLanguage: 'en' });
+  await handle?.finished; await until(() => !h.plugin.running.size);
+  const context = h.contexts[0];
+  assert.equal(context.detailTemplate.id, 'standard');
+  assert.equal(context.detailTemplate.sections[0].name, 'Core conclusions', 'the stand-in is in the output language');
+  assert.equal(context.styleSelection.template.fileName, 'Bad.md', 'the block still travels with the run');
+  const { AiTaskService } = load('core/ai-task-service.ts');
+  const prompts = [];
+  const runtime = { runTask: async prompt => { prompts.push(prompt); return JSON.stringify({ summary: 'S', detail: 'D', suggestions: [], visualReferences: [] }); } };
+  const service = new AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'zh-TW', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => false, mermaidParses: async () => true, codexRuntime: () => runtime, claudeRuntime: () => runtime });
+  const { detailTemplate: _skip, ...rest } = context;
+  await service.askModel({ ...rest, detailTemplate: context.detailTemplate, outputLanguage: 'en' }, 'gpt-6-luna', 'low');
+  assert.match(prompts[0], /Core conclusions/, 'the prompt carries the English built-in headings');
+  assert.doesNotMatch(prompts[0], /核心結論/, 'no interface-language headings');
+  const note = await h.repo.readNote(h.topic.path);
+  assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')).slice(0, 2), ['### Core conclusions', '### Key knowledge']);
+  assert.equal(blockNotices(h.notices).length, 1);
+  assert.match(String(blockNotices(h.notices)[0]), /line 5/);
+});
 integrationTest('runAgent: a changed built-in block keeps its text in the run context (the template is not swapped for a fresh built-in) and raises no Notice (04)', async () => {
   const changed = '## Alpha\nDescribe alpha.\n\n## Beta\nDescribe beta.\n\n# Format rules\n\nFORMAT-LINE-MINE\n';
   const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'builtin:standard' } });

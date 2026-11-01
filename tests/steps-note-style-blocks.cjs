@@ -582,3 +582,15 @@ test('counter 14: changing the step does not touch the live region while the pro
   assert.notEqual(region().children[0], first);
   modal.close();
 });
+
+test('FB1 B1: opening the preview reads the block files again, so a block edited after the settings page opened shows its new line', async () => {
+  const { store, v } = makeStore({ noteTemplateBlock: 'file:Mine' }, { [`${TPL}/Mine.md`]: MINE });
+  await store.refresh();
+  v.files[`${TPL}/Mine.md`] = MINE.replace('FORMAT-LINE-MINE', 'FORMAT-LINE-EDITED-LATER');
+  const { modal, dom } = openPreviewModal(store);
+  const texts = () => dom.findAll(modal.contentEl, item => item.tag === 'pre').map(item => item.text).join('\n');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.match(texts(), /FORMAT-LINE-EDITED-LATER/);
+  assert.doesNotMatch(texts(), /FORMAT-LINE-MINE\b/);
+  modal.close();
+});

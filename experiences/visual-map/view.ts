@@ -225,7 +225,12 @@ import {
   type CountIssue,
   type DetailTemplate
 } from "../../ai/detail-templates";
-import { emptyNoteStyleStore, type NoteStyleStore, type StyleLevel } from "../../ai/note-style-store";
+import {
+  emptyNoteStyleStore,
+  type NoteStyleStore,
+  type StyleLevel,
+  type StyleResolution
+} from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
 import {
@@ -499,6 +504,8 @@ const originBaseline = (origin?: string): string =>
     .update(origin ?? "")
     .digest("hex");
 
+/** What resolving a note style gives a view: the template, the ids that could not be used and, for a block, why. */
+type StyleBlockResult = Pick<StyleResolution, "template" | "missing" | "blockIssues">;
 type AimQuestionStatus = "running" | "completed" | "partial" | "failed" | "cancelled" | "not_started";
 function aimQuestionStatus(
   map: MapDocument,
@@ -3739,7 +3746,9 @@ export class VisualAgentMapView extends ItemView {
     const currentModel = this.plugin.currentModelChoice().model;
     const model = (request.shallowResearch && request.model) || currentModel;
     await this.noteStyles.refresh();
-    const { template } = this.styleOrThrow([{ template: request.detailTemplateId }]);
+    const importStyle = this.styleOrThrow([{ template: request.detailTemplateId }]);
+    this.noticeBlockIssues(importStyle);
+    const { template } = importStyle;
     let result: Awaited<ReturnType<typeof createOutlineMap>>;
     try {
       result = await createOutlineMap(
@@ -3840,7 +3849,7 @@ export class VisualAgentMapView extends ItemView {
         model = (request.shallowResearch && request.model) || baseModel;
         // A template chosen here is recorded on each new topic: an import never changes this map's default.
         await this.noteStyles.refresh();
-        const template = this.mapDetailTemplate(settings.language, request.detailTemplateId);
+        const template = this.mapDetailTemplate(settings.language, request.detailTemplateId, true);
         const result = await addOutlineToMap(
           repo,
           map,
@@ -5404,7 +5413,7 @@ export class VisualAgentMapView extends ItemView {
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        detailTemplate: this.mapDetailTemplate(language)
+        detailTemplate: this.mapDetailTemplate(language, undefined, true)
       };
       const ask = (context: TaskContext): Promise<AiResult> =>
         // Each request is its own attempt of one entry: the repair request clears the first request's preview.
@@ -12986,13 +12995,22 @@ export class VisualAgentMapView extends ItemView {
       if (node) placed.set(node.id, { x: node.x, y: node.y });
     }
     let respaced = false;
+    const gate = { shown: false };
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
       children,
       // Quick research that reads local context only (the S7 default) is a first look: no diagram call per child.
       (child, batchSignal, accepted) =>
-        this.researchChild(child, batchSignal, accepted, pendingOptions, pendingOptions.researchMode !== "local"),
+        this.researchChild(
+          child,
+          batchSignal,
+          accepted,
+          pendingOptions,
+          pendingOptions.researchMode !== "local",
+          undefined,
+          gate
+        ),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
         if (state?.status === "running") this.plugin.quickExpandPending.add(parent.path);
@@ -13017,9 +13035,10 @@ export class VisualAgentMapView extends ItemView {
     accepted: () => void,
     choices: TaskOptions,
     charts = true,
-    onResult?: (result: AiResult) => void
+    onResult?: (result: AiResult) => void,
+    gate?: { shown: boolean }
   ): Promise<void> {
-    const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId);
+    const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId, gate);
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
       choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
@@ -13168,6 +13187,7 @@ export class VisualAgentMapView extends ItemView {
         // Web activity of the topics that finished: Research mode only (a local run searches nothing, so it has nothing to report).
         const web: ResearchWebTally = { searches: 0, counted: 0, withoutSearch: 0 };
         try {
+          const gate = { shown: false };
           await this.plugin.expansionCoordinator.start(
             key,
             nodes,
@@ -13178,12 +13198,20 @@ export class VisualAgentMapView extends ItemView {
                 return "skipped";
               }
               const choices = choicesFor(await this.plugin.repo.readNote(child.path, this.map ?? undefined));
-              await this.researchChild(child, batchSignal, accepted, choices, choices.mapAiMode !== "quick", result => {
-                if (choices.researchMode !== "research" || result.retrievals === undefined) return;
-                web.counted++;
-                web.searches += result.retrievals;
-                if (!result.retrievals) web.withoutSearch++;
-              });
+              await this.researchChild(
+                child,
+                batchSignal,
+                accepted,
+                choices,
+                choices.mapAiMode !== "quick",
+                result => {
+                  if (choices.researchMode !== "research" || result.retrievals === undefined) return;
+                  web.counted++;
+                  web.searches += result.retrievals;
+                  if (!result.retrievals) web.withoutSearch++;
+                },
+                gate
+              );
               return undefined;
             },
             () => {
@@ -14356,7 +14384,7 @@ export class VisualAgentMapView extends ItemView {
     const model = chosen.model;
     const language = this.plugin.settings.language;
     await this.noteStyles.refresh();
-    const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId);
+    const detailTemplate = this.mapDetailTemplate(options?.outputLanguage ?? language, options?.detailTemplateId, true);
     try {
       const integrationStyle = this.styleFields(undefined, options, detailTemplate);
       const integrationContext: TaskContext = {
@@ -17866,14 +17894,21 @@ export class VisualAgentMapView extends ItemView {
    * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.
    * Only an explicit choice is written to the topic; a topic template that no longer exists is reported once and cleared.
    */
-  private async detailTemplateFor(node: MapNode, chosenId?: string, chosenToneId?: string): Promise<DetailTemplate> {
+  private async detailTemplateFor(
+    node: MapNode,
+    chosenId?: string,
+    chosenToneId?: string,
+    gate?: { shown: boolean }
+  ): Promise<DetailTemplate> {
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     // Choosing a style file writes it as the topic's template and deletes the topic's own tone; the file decides the tone.
     else if (chosenId?.startsWith("style:")) await this.plugin.repo.updateNote(node.path, { toneId: "" });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     await this.noteStyles.refresh();
-    const { template, missing } = this.resolveTopicTemplate(note, chosenId);
+    const resolved = this.resolveTopicTemplate(note, chosenId);
+    const { template, missing } = resolved;
+    this.noticeBlockIssues(resolved, gate);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
       if (note.detailTemplateId.startsWith("style:")) {
         // The file may come back (moved back, restored): the note is not rewritten. The Notice offers another style.
@@ -17889,7 +17924,7 @@ export class VisualAgentMapView extends ItemView {
     return template;
   }
   /** Resolves the topic's content template without notifying or writing anything (see detailTemplateFor). */
-  private resolveTopicTemplate(note: Note, chosenId?: string): { template: DetailTemplate; missing: string[] } {
+  private resolveTopicTemplate(note: Note, chosenId?: string): StyleBlockResult {
     return this.styleOrThrow([
       { template: chosenId },
       { template: note.detailTemplateId, tone: note.toneId },
@@ -17900,7 +17935,7 @@ export class VisualAgentMapView extends ItemView {
    * The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and
    * line. A template block that does not parse only shows a Notice (file, line, reason) and the run uses the built-in one.
    */
-  private styleOrThrow(levels: StyleLevel[]): { template: DetailTemplate; missing: string[] } {
+  private styleOrThrow(levels: StyleLevel[]): StyleBlockResult {
     const resolved = this.noteStyles.resolve(levels);
     if (resolved.invalid) {
       const first = resolved.invalid.issues[0];
@@ -17913,17 +17948,28 @@ export class VisualAgentMapView extends ItemView {
         () => void openStyleFile(this.app, this.noteStyles, ref)
       );
     }
-    // A template block that cannot be read does not stop the run: the built-in template stands in, and the user is told once.
-    const issue = resolved.blockIssues?.[0];
-    if (issue) new Notice(t("ui.preview_issue_0_1_2", issue.fileName ?? issue.id, issue.line, styleIssueText(issue)));
     return resolved;
+  }
+  /**
+   * A template block that cannot be read does not stop the run: the built-in template stands in, and the user is told.
+   * Only the entry of a run calls this (resolving for a label, a dialog or a write-back never does). `gate` makes a
+   * group of runs (a batch) tell the user once.
+   */
+  private noticeBlockIssues(resolved: Pick<StyleResolution, "blockIssues">, gate?: { shown: boolean }): void {
+    const issue = resolved.blockIssues?.[0];
+    if (!issue || gate?.shown) return;
+    if (gate) gate.shown = true;
+    new Notice(t("ui.preview_issue_0_1_2", issue.fileName ?? issue.id, issue.line, styleIssueText(issue)));
   }
   /**
    * The template a run uses, in the run's language. A template the store resolved from a block (a changed built-in or the
    * user's own) is kept as it is: swapping in a fresh built-in object would drop its block text from the run.
    */
   private templateForRun(template: DetailTemplate, language: ContentLanguage): DetailTemplate {
-    return this.noteStyles.resolutionOf(template)?.block ? template : templateInLanguage(template, language);
+    const resolution = this.noteStyles.resolutionOf(template);
+    if (!resolution?.block) return templateInLanguage(template, language);
+    // A block that cannot be read: the built-in stand-in follows the run's language, and the answer moves with it.
+    return resolution.blockIssues ? this.noteStyles.rebind(template, templateInLanguage(template, language)) : template;
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   private get noteStyles(): NoteStyleStore {
@@ -17956,12 +18002,13 @@ export class VisualAgentMapView extends ItemView {
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
-  private mapDetailTemplate(language: ContentLanguage, chosenId?: string): DetailTemplate {
-    return this.templateForRun(
-      this.styleOrThrow([{ template: chosenId }, { template: this.map?.detailTemplateId, tone: this.map?.toneId }])
-        .template,
-      language
-    );
+  private mapDetailTemplate(language: ContentLanguage, chosenId?: string, notify = false): DetailTemplate {
+    const resolved = this.styleOrThrow([
+      { template: chosenId },
+      { template: this.map?.detailTemplateId, tone: this.map?.toneId }
+    ]);
+    if (notify) this.noticeBlockIssues(resolved);
+    return this.templateForRun(resolved.template, language);
   }
   /**
    * The model and reasoning a run really uses: a run-once choice first (never written to the topic), otherwise the

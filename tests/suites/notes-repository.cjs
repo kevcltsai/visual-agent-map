@@ -955,6 +955,18 @@ integrationTest('AI merge: usage notice first, a locked "merging" task while the
   notice.actions.find(a => a.text === 'Undo').click(); await h.plugin.mutate(async () => {});
   assert.deepEqual((await h.shape()).nodes, original.nodes); assert.equal(h.view.history.canUndo, false);
 });
+integrationTest('FB1 F1: one AI merge raises the unreadable-template-block Notice once (not for the check or the write)', async () => {
+  const h = await aiMergeHarness();
+  Object.assign(h.plugin.settings, { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'file:Bad', language: 'en' });
+  const files = { 'WS/S/Blocks/Templates/Bad.md': '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n' };
+  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
+  await h.plugin.noteStyles.refresh();
+  const { task } = await h.begin(); await h.untilSettled(task);
+  assert.ok(await h.mergedNode('AI merged'), 'the merge ran');
+  assert.equal(h.notices.filter(m => /Bad\.md/.test(m)).length, 1);
+});
 integrationTest('AI merge: the Notice has no working Undo once another step came after the merge', async () => {
   const h = await aiMergeHarness(); const { task } = await h.begin(); await h.untilSettled(task);
   const merged = await h.mergedNode('AI merged'); const done = await h.shape();

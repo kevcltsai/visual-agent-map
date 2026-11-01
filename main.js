@@ -26286,6 +26286,18 @@ var NoteStyleStore = class {
     return template2 ? this.resolutions.get(template2) : void 0;
   }
   /**
+   * `to` takes the place of `from` in the answer `resolve` gave for it (the built-in template that stands in for an
+   * unreadable block, put into the run's language), so block, issues and context fields still follow it. `to` is copied:
+   * the answer is remembered under the object's identity and a shared object must not carry one run's block into another.
+   */
+  rebind(from, to) {
+    const resolution = this.resolutions.get(from);
+    if (!resolution) return to;
+    const copy = { ...to };
+    this.resolutions.set(copy, { ...resolution, template: copy });
+    return copy;
+  }
+  /**
    * Fields to spread into a TaskContext: the style snapshot, `styleDiagrams: false` only when the file turns charts off,
    * and, when the template is the workspace's changed or own block, `styleSelection` (its text, and the tone choice of
    * `toneText`). A call that names no tone and no language gets what it got before.
@@ -48998,7 +49010,9 @@ ${request.requirements}` : preset.text,
     const currentModel = this.plugin.currentModelChoice().model;
     const model = request.shallowResearch && request.model || currentModel;
     await this.noteStyles.refresh();
-    const { template: template2 } = this.styleOrThrow([{ template: request.detailTemplateId }]);
+    const importStyle = this.styleOrThrow([{ template: request.detailTemplateId }]);
+    this.noticeBlockIssues(importStyle);
+    const { template: template2 } = importStyle;
     let result;
     try {
       result = await createOutlineMap(
@@ -49084,7 +49098,7 @@ ${request.requirements}` : preset.text,
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
-        const template2 = this.mapDetailTemplate(settings.language, request.detailTemplateId);
+        const template2 = this.mapDetailTemplate(settings.language, request.detailTemplateId, true);
         const result = await addOutlineToMap(
           repo,
           map,
@@ -50542,7 +50556,7 @@ ${request.requirements}` : preset.text,
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        detailTemplate: this.mapDetailTemplate(language2)
+        detailTemplate: this.mapDetailTemplate(language2, void 0, true)
       };
       const ask = (context) => (
         // Each request is its own attempt of one entry: the repair request clears the first request's preview.
@@ -57580,12 +57594,21 @@ ${request.requirements}` : preset.text,
       if (node) placed.set(node.id, { x: node.x, y: node.y });
     }
     let respaced = false;
+    const gate = { shown: false };
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
       children,
       // Quick research that reads local context only (the S7 default) is a first look: no diagram call per child.
-      (child, batchSignal, accepted) => this.researchChild(child, batchSignal, accepted, pendingOptions, pendingOptions.researchMode !== "local"),
+      (child, batchSignal, accepted) => this.researchChild(
+        child,
+        batchSignal,
+        accepted,
+        pendingOptions,
+        pendingOptions.researchMode !== "local",
+        void 0,
+        gate
+      ),
       () => {
         const state = this.plugin.expansionBatches.get(parent.path);
         if ((state == null ? void 0 : state.status) === "running") this.plugin.quickExpandPending.add(parent.path);
@@ -57602,9 +57625,9 @@ ${request.requirements}` : preset.text,
       signal
     );
   }
-  async researchChild(child, batchSignal, accepted, choices, charts = true, onResult) {
+  async researchChild(child, batchSignal, accepted, choices, charts = true, onResult, gate) {
     var _a2, _b2, _c;
-    const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId);
+    const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId, gate);
     const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
     const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
     let started = false;
@@ -57731,6 +57754,7 @@ ${request.requirements}` : preset.text,
         let skipped2 = 0;
         const web = { searches: 0, counted: 0, withoutSearch: 0 };
         try {
+          const gate = { shown: false };
           await this.plugin.expansionCoordinator.start(
             key2,
             nodes,
@@ -57742,12 +57766,20 @@ ${request.requirements}` : preset.text,
                 return "skipped";
               }
               const choices = choicesFor(await this.plugin.repo.readNote(child.path, (_a3 = this.map) != null ? _a3 : void 0));
-              await this.researchChild(child, batchSignal, accepted, choices, choices.mapAiMode !== "quick", (result) => {
-                if (choices.researchMode !== "research" || result.retrievals === void 0) return;
-                web.counted++;
-                web.searches += result.retrievals;
-                if (!result.retrievals) web.withoutSearch++;
-              });
+              await this.researchChild(
+                child,
+                batchSignal,
+                accepted,
+                choices,
+                choices.mapAiMode !== "quick",
+                (result) => {
+                  if (choices.researchMode !== "research" || result.retrievals === void 0) return;
+                  web.counted++;
+                  web.searches += result.retrievals;
+                  if (!result.retrievals) web.withoutSearch++;
+                },
+                gate
+              );
               return void 0;
             },
             () => {
@@ -58823,7 +58855,7 @@ ${note.detail.trim()}` : "",
     const model = chosen.model;
     const language2 = this.plugin.settings.language;
     await this.noteStyles.refresh();
-    const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId);
+    const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId, true);
     try {
       const integrationStyle = this.styleFields(void 0, options, detailTemplate);
       const integrationContext = {
@@ -62036,14 +62068,16 @@ ${addition}` : addition });
    * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.
    * Only an explicit choice is written to the topic; a topic template that no longer exists is reported once and cleared.
    */
-  async detailTemplateFor(node, chosenId, chosenToneId) {
+  async detailTemplateFor(node, chosenId, chosenToneId, gate) {
     var _a2;
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     else if (chosenId == null ? void 0 : chosenId.startsWith("style:")) await this.plugin.repo.updateNote(node.path, { toneId: "" });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     await this.noteStyles.refresh();
-    const { template: template2, missing } = this.resolveTopicTemplate(note, chosenId);
+    const resolved = this.resolveTopicTemplate(note, chosenId);
+    const { template: template2, missing } = resolved;
+    this.noticeBlockIssues(resolved, gate);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
       if (note.detailTemplateId.startsWith("style:")) {
         const missingId = note.detailTemplateId;
@@ -62073,15 +62107,14 @@ ${addition}` : addition });
    * line. A template block that does not parse only shows a Notice (file, line, reason) and the run uses the built-in one.
    */
   styleOrThrow(levels) {
-    var _a2, _b2;
     const resolved = this.noteStyles.resolve(levels);
     if (resolved.invalid) {
       const first = resolved.invalid.issues[0];
       const { fileName } = resolved.invalid;
       const base = fileName.replace(/\.md$/i, "");
       const builtin = NOTE_STYLE_PRESETS.find((item) => {
-        var _a3;
-        return ((_a3 = this.noteStyles.builtinIdOfFile(base)) == null ? void 0 : _a3.id) === item.id;
+        var _a2;
+        return ((_a2 = this.noteStyles.builtinIdOfFile(base)) == null ? void 0 : _a2.id) === item.id;
       });
       const ref = builtin ? { kind: "builtin", id: builtin.id } : { kind: "file", id: `style:${base}` };
       throw new NoteStyleFileError(
@@ -62089,17 +62122,28 @@ ${addition}` : addition });
         () => void openStyleFile(this.app, this.noteStyles, ref)
       );
     }
-    const issue2 = (_a2 = resolved.blockIssues) == null ? void 0 : _a2[0];
-    if (issue2) new import_obsidian32.Notice(t("ui.preview_issue_0_1_2", (_b2 = issue2.fileName) != null ? _b2 : issue2.id, issue2.line, styleIssueText(issue2)));
     return resolved;
+  }
+  /**
+   * A template block that cannot be read does not stop the run: the built-in template stands in, and the user is told.
+   * Only the entry of a run calls this (resolving for a label, a dialog or a write-back never does). `gate` makes a
+   * group of runs (a batch) tell the user once.
+   */
+  noticeBlockIssues(resolved, gate) {
+    var _a2, _b2;
+    const issue2 = (_a2 = resolved.blockIssues) == null ? void 0 : _a2[0];
+    if (!issue2 || (gate == null ? void 0 : gate.shown)) return;
+    if (gate) gate.shown = true;
+    new import_obsidian32.Notice(t("ui.preview_issue_0_1_2", (_b2 = issue2.fileName) != null ? _b2 : issue2.id, issue2.line, styleIssueText(issue2)));
   }
   /**
    * The template a run uses, in the run's language. A template the store resolved from a block (a changed built-in or the
    * user's own) is kept as it is: swapping in a fresh built-in object would drop its block text from the run.
    */
   templateForRun(template2, language2) {
-    var _a2;
-    return ((_a2 = this.noteStyles.resolutionOf(template2)) == null ? void 0 : _a2.block) ? template2 : templateInLanguage(template2, language2);
+    const resolution = this.noteStyles.resolutionOf(template2);
+    if (!(resolution == null ? void 0 : resolution.block)) return templateInLanguage(template2, language2);
+    return resolution.blockIssues ? this.noteStyles.rebind(template2, templateInLanguage(template2, language2)) : template2;
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {
@@ -62126,12 +62170,14 @@ ${addition}` : addition });
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
-  mapDetailTemplate(language2, chosenId) {
+  mapDetailTemplate(language2, chosenId, notify2 = false) {
     var _a2, _b2;
-    return this.templateForRun(
-      this.styleOrThrow([{ template: chosenId }, { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }]).template,
-      language2
-    );
+    const resolved = this.styleOrThrow([
+      { template: chosenId },
+      { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }
+    ]);
+    if (notify2) this.noticeBlockIssues(resolved);
+    return this.templateForRun(resolved.template, language2);
   }
   /**
    * The model and reasoning a run really uses: a run-once choice first (never written to the topic), otherwise the
@@ -62538,6 +62584,7 @@ var PromptPreviewModal = class extends import_obsidian33.Modal {
     this.bodyEl = contentEl.createDiv({ cls: "vam-prompt-preview-body" });
     this.renderBody();
     select.focus();
+    void this.store.refresh().catch(() => void 0).then(() => this.renderBody());
   }
   onClose() {
     this.contentEl.empty();
@@ -62662,6 +62709,8 @@ function renderNoteBlockSetting(setting, plugin, category, refresh) {
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
   setting.setName(label);
   setting.descEl.setAttr("aria-live", "polite");
+  setting.settingEl.addClass("vam-block-row");
+  let shownDesc;
   let busy = false;
   let picker;
   let openButton;
@@ -62702,7 +62751,10 @@ function renderNoteBlockSetting(setting, plugin, category, refresh) {
       else if (item.modified) parts.push(t("ui.block_status_modified"));
       else parts.push(t(item.fileName === void 0 ? "ui.block_status_builtin_none" : "ui.block_status_builtin_file"));
     }
-    setting.setDesc(parts.join(" "));
+    const desc = parts.join(" ");
+    if (desc === shownDesc) return;
+    shownDesc = desc;
+    setting.setDesc(desc);
   };
   const act = async (action, target) => {
     var _a2;

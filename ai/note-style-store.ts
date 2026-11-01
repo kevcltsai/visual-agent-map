@@ -417,6 +417,19 @@ export class NoteStyleStore {
   }
 
   /**
+   * `to` takes the place of `from` in the answer `resolve` gave for it (the built-in template that stands in for an
+   * unreadable block, put into the run's language), so block, issues and context fields still follow it. `to` is copied:
+   * the answer is remembered under the object's identity and a shared object must not carry one run's block into another.
+   */
+  rebind(from: DetailTemplate, to: DetailTemplate): DetailTemplate {
+    const resolution = this.resolutions.get(from);
+    if (!resolution) return to;
+    const copy = { ...to };
+    this.resolutions.set(copy, { ...resolution, template: copy });
+    return copy;
+  }
+
+  /**
    * Fields to spread into a TaskContext: the style snapshot, `styleDiagrams: false` only when the file turns charts off,
    * and, when the template is the workspace's changed or own block, `styleSelection` (its text, and the tone choice of
    * `toneText`). A call that names no tone and no language gets what it got before.

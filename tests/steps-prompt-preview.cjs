@@ -1,0 +1,174 @@
+// Ticket 05 P1: the full-prompt preview is the prompt a run sends (same code path), cut into labelled groups; the workspace
+// style fields come from one source shared with the map view; a template block that cannot be read never stops a note.
+// Unit level, plus one service-level check with a fake provider. The modal and the settings button are UI-checked separately.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { loadSource } = require('./support-replay.cjs');
+
+const M = loadSource(`
+export { PREVIEW_STEPS, previewPrompt, previewSections, sampleTaskContext } from "./core/blocks/prompt-preview";
+export { createTaskStep } from "./core/steps/task/step";
+export { assembledTaskPrompt } from "./core/steps/task/render";
+export { lookupBuiltinBlock, builtinTemplateText } from "./core/blocks/builtin";
+export { textbookTemplate } from "./ai/detail-templates";
+export { NoteStyleStore, runToneText } from "./ai/note-style-store";
+export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
+export { translate, noteLanguageOf } from "./i18n";
+export { AiTaskService } from "./core/ai-task-service";
+`);
+const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
+const PROVIDERS = ['codex', 'claude'];
+const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+const plain = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+
+const styleCases = language => ({
+  default: {},
+  textbook: { detailTemplate: M.textbookTemplate(M.noteLanguageOf(language)) },
+  'tone summary': { toneText: M.lookupBuiltinBlock('tone', 'summary', language) },
+  'custom-legacy tone': { toneText: 'my own voice' },
+  'broken body': { styleSelection: { template: { id: 'standard', body: BROKEN }, tone: { id: 'academic' } } }
+});
+const renderOf = (context, language, provider) =>
+  M.createTaskStep('task.run', {}).render({ context, language, provider, providerLabel: 'x', strictGapAudit: false, webResearch: false });
+
+test('counter 6: the preview text is the text the task step renders, and its sections join to it (150 combinations)', () => {
+  let combinations = 0;
+  for (const step of M.PREVIEW_STEPS) for (const language of LANGUAGES) for (const provider of PROVIDERS) {
+    for (const [name, fields] of Object.entries(styleCases(language))) {
+      const preview = M.previewPrompt(step.id, language, provider, fields);
+      const sent = renderOf(M.sampleTaskContext(step.id, language, fields), language, provider);
+      const label = `${step.id} ${language} ${provider} ${name}`;
+      assert.equal(preview.text, sent, label);
+      assert.equal(preview.sections.map(section => section.text).join(''), preview.text, label);
+      assert.ok(preview.sections.length > 0 && preview.sections.every(section => section.text.length > 0), label);
+      combinations++;
+    }
+  }
+  assert.equal(combinations, 150);
+});
+
+test('counter 6 (sample inputs): the five steps map to their own prompt step, and the sample text is translated', () => {
+  const stepOf = { research: 'research', quick: 'quick', decompose: 'decompose', synthesize: 'synthesize', merge: 'merge' };
+  assert.equal(M.PREVIEW_STEPS.map(step => step.id).join(), Object.keys(stepOf).join());
+  for (const language of LANGUAGES) {
+    const titles = new Set();
+    for (const step of M.PREVIEW_STEPS) {
+      assert.ok(M.translate(language, step.nameKey).length > 0);
+      const context = M.sampleTaskContext(step.id, language, {});
+      titles.add(context.title);
+      assert.equal(context.title, M.translate(language, 'ui.preview_sample_title'));
+      assert.equal(M.assembledTaskPrompt(context, language).text.includes(context.task), true, `${step.id} ${language}`);
+    }
+    assert.equal(titles.size, 1);
+  }
+  assert.equal(M.sampleTaskContext('quick', 'en', {}).mapAiMode, 'quick');
+  assert.equal(M.sampleTaskContext('quick', 'en', {}).researchMode, 'local');
+  assert.equal(M.sampleTaskContext('quick', 'en', {}).mode, 'task');
+  for (const mode of ['decompose', 'synthesize', 'merge']) assert.equal(M.sampleTaskContext(mode, 'en', {}).mode, mode);
+});
+
+test('counter 7 and decision 7: the sections only regroup the text; group names and the sample section are not added to it', () => {
+  for (const language of LANGUAGES) for (const step of M.PREVIEW_STEPS) {
+    const { text, sections } = M.previewPrompt(step.id, language, 'codex', { toneText: M.lookupBuiltinBlock('tone', 'plain', language) });
+    assert.equal(sections.map(section => section.text).join(''), text);
+    const groups = sections.map(section => section.group);
+    assert.ok(groups.includes('role') && groups.includes('fixed') && groups.includes('input') && groups.includes('tone'), `${step.id} ${language}`);
+    assert.equal(groups.includes('template'), step.id !== 'decompose', `${step.id} ${language}`);
+    // neighbours of one group are joined
+    groups.forEach((group, index) => { if (index) assert.notEqual(group, groups[index - 1]); });
+    // the first part is the output-language rule, the last is the task input
+    assert.equal(groups[groups.length - 1], 'input');
+    for (const word of ['role', 'template', 'tone', 'fixed', 'input']) assert.equal(sections.some(section => section.text.trim() === word), false);
+  }
+});
+
+test('counter 1 (preview): a broken body shows the built-in text and the reported line', () => {
+  for (const language of LANGUAGES) {
+    const bad = M.previewPrompt('research', language, 'codex', { styleSelection: { template: { id: 'standard', body: BROKEN, fileName: 'Mine.md' }, tone: { id: 'academic' } } });
+    const good = M.previewPrompt('research', language, 'codex', {});
+    assert.equal(bad.text, good.text);
+    assert.equal(bad.issues.length, 1);
+    assert.equal(bad.issues[0].line, 5);
+    assert.equal(bad.issues[0].fileName, 'Mine.md');
+    assert.equal(good.issues.length, 0);
+  }
+});
+
+// ---- the workspace style fields ----
+const PRESETS = [{ id: 'custom-tone-1', kind: 'tone', name: 'Pirate', text: 'Talk like a pirate.' }];
+const OWN = '---\n語氣: 簡明\n---\n## 重點\n說明\n';
+function makeStore(settingsPatch = {}, files = {}) {
+  const state = { ...files };
+  const port = {
+    list: async folder => Object.keys(state).filter(path => path.startsWith(`${folder}/`)).map(path => path.slice(folder.length + 1)),
+    read: async path => state[path],
+    folderExists: () => true, createFolder: async () => undefined, create: async () => undefined, trash: async () => undefined
+  };
+  const settings = { detailTemplates: [], promptPresets: PRESETS, workspaceFolder: 'WS', noteStylesFolder: 'WS/S', language: 'en', ...settingsPatch };
+  return new M.NoteStyleStore({ settings: () => settings, port, save: async () => undefined });
+}
+
+test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText and contextFields (5 presets, a style file, unset)', async () => {
+  const cases = [...M.NOTE_STYLE_BUILTIN_IDS.map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }];
+  assert.equal(cases.length, 8);
+  for (const patch of cases) for (const language of LANGUAGES) {
+    const store = makeStore({ ...patch, language }, { 'WS/S/Own.md': OWN });
+    await store.refresh();
+    const got = store.workspaceStyleFields(language);
+    const resolved = store.resolve([{}, {}]);
+    const label = JSON.stringify(patch) + language;
+    assert.equal(got.invalid, undefined, label);
+    assert.deepEqual(plain(got.detailTemplate), plain(resolved.template), label);
+    const tone = M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
+    assert.equal(got.toneText, tone, label);
+    assert.deepEqual(plain(got.noteStyle), plain(store.contextFields(resolved.template).noteStyle), label);
+    assert.equal(got.styleDiagrams, store.contextFields(resolved.template).styleDiagrams, label);
+    if (resolved.noteStyle) assert.equal(got.toneText, resolved.toneText, label);
+    // the preview of these fields is the prompt a run with the same fields renders
+    const preview = M.previewPrompt('research', language, 'codex', got);
+    assert.equal(preview.text, renderOf(M.sampleTaskContext('research', language, got), language, 'codex'), label);
+    assert.equal(preview.issues.length, 0);
+  }
+  const store = makeStore({ defaultNoteStyleId: 'style:Own' }, { 'WS/S/Own.md': OWN });
+  await store.refresh();
+  assert.equal(store.workspaceStyleFields('en').noteStyle.tone, '簡明');
+});
+
+test('counter 9: a default style file that does not parse is returned as invalid, not thrown', async () => {
+  const store = makeStore({ defaultNoteStyleId: 'style:Bad' }, { 'WS/S/Bad.md': '---\n語氣: x\n' });
+  await store.refresh();
+  let got;
+  assert.doesNotThrow(() => { got = store.workspaceStyleFields('en'); });
+  assert.equal(got.invalid.fileName, 'Bad.md');
+  assert.ok(got.invalid.issues[0].line >= 1);
+  assert.equal(got.detailTemplate, undefined);
+});
+
+test('runToneText: a style file decides its own tone, else the first tone preset id; academic is nothing', () => {
+  const file = { noteStyle: {}, toneText: 'from file' };
+  assert.equal(M.runToneText(file, PRESETS, ['custom-tone-1'], 'en'), 'from file');
+  assert.equal(M.runToneText({ noteStyle: {} }, PRESETS, ['custom-tone-1'], 'en'), undefined);
+  assert.equal(M.runToneText(undefined, PRESETS, [undefined, 'custom-tone-1'], 'en'), 'Talk like a pirate.');
+  assert.equal(M.runToneText(undefined, PRESETS, ['academic', 'custom-tone-1'], 'en'), undefined);
+  assert.equal(M.runToneText(undefined, PRESETS, [], 'en'), undefined);
+});
+
+// ---- the service: a broken block never stops a note ----
+test('counter 10: with a broken body in styleSelection the fake provider still writes the note and gets the built-in template text', async () => {
+  const prompts = [];
+  const NOTE = 'A written note.';
+  const runtime = { runTask: async prompt => { prompts.push(prompt); return JSON.stringify({ summary: 'S', detail: NOTE, suggestions: [], visualReferences: [] }); } };
+  const service = new M.AiTaskService({
+    pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false,
+    diagramsEnabled: () => false, mermaidParses: async () => true, codexRuntime: () => runtime, claudeRuntime: () => runtime
+  });
+  const base = { title: 'Topic', summary: 'Sum', rules: '', detail: '', task: 'Do it', ancestors: '', sourceContext: '', mode: 'task', researchMode: 'local', researchDepth: 'fast', visualMode: 'auto', outputLanguage: 'en' };
+  const result = await service.askModel({ ...base, styleSelection: { template: { id: 'standard', body: BROKEN }, tone: { id: 'academic' } } }, 'gpt-6-luna', 'low');
+  assert.equal(result.detail, NOTE);
+  const plainRun = await service.askModel({ ...base }, 'gpt-6-luna', 'low');
+  assert.equal(plainRun.detail, NOTE);
+  assert.equal(prompts.length, 2);
+  assert.equal(prompts[0], prompts[1], 'the prompt is the built-in one');
+  assert.equal(prompts[0].includes('### A\n'), false, 'the unreadable block text is not in it');
+  assert.ok(prompts[0].includes('### Key knowledge') || prompts[0].includes('###'), 'the built-in section headings are in it');
+});

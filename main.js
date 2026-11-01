@@ -1497,6 +1497,19 @@ var en = {
   "ui.note_style_textbook": "Textbook (intro, then sections)",
   "ui.note_style_textbook_short": "Textbook",
   "ui.block_template_format_heading": "Format rules",
+  "ui.preview_step_research": "Research a topic",
+  "ui.preview_step_quick": "Quick research",
+  "ui.preview_step_decompose": "Break into subtopics",
+  "ui.preview_step_synthesize": "Synthesize subtopics",
+  "ui.preview_step_merge": "Merge topics",
+  "ui.preview_sample_title": "Sample topic",
+  "ui.preview_sample_summary": "A short summary of what is known so far (sample).",
+  "ui.preview_sample_rules": "Rules of the map (sample).",
+  "ui.preview_sample_detail": "The topic's current note text (sample).",
+  "ui.preview_sample_task": "Research this topic: the task you typed goes here (sample).",
+  "ui.preview_sample_ancestors": "Parent topic > this topic (sample).",
+  "ui.preview_sample_findings": "An earlier finding about this topic (sample).",
+  "ui.preview_sample_sources": "[S1] A source passage the research found (sample).",
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",
@@ -3699,6 +3712,19 @@ var zhCN = {
   "ui.note_style_textbook": "\u6559\u79D1\u4E66\uFF08\u5148\u5BFC\u8BFB\uFF0C\u518D\u5206\u7C7B\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
   "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
+  "ui.preview_step_research": "\u7814\u7A76\u4E3B\u9898",
+  "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
+  "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u9898",
+  "ui.preview_step_synthesize": "\u6574\u5408\u5B50\u4E3B\u9898",
+  "ui.preview_step_merge": "\u5408\u5E76\u4E3B\u9898",
+  "ui.preview_sample_title": "\u793A\u4F8B\u4E3B\u9898",
+  "ui.preview_sample_summary": "\u76EE\u524D\u5DF2\u77E5\u5185\u5BB9\u7684\u7B80\u77ED\u6458\u8981\uFF08\u793A\u4F8B\uFF09\u3002",
+  "ui.preview_sample_rules": "\u8FD9\u5F20\u5730\u56FE\u7684\u89C4\u5219\uFF08\u793A\u4F8B\uFF09\u3002",
+  "ui.preview_sample_detail": "\u8FD9\u4E2A\u4E3B\u9898\u76EE\u524D\u7684\u7B14\u8BB0\u5185\u5BB9\uFF08\u793A\u4F8B\uFF09\u3002",
+  "ui.preview_sample_task": "\u7814\u7A76\u8FD9\u4E2A\u4E3B\u9898\uFF1A\u4F60\u8F93\u5165\u7684\u4EFB\u52A1\u4F1A\u5728\u8FD9\u91CC\uFF08\u793A\u4F8B\uFF09\u3002",
+  "ui.preview_sample_ancestors": "\u4E0A\u5C42\u4E3B\u9898 > \u8FD9\u4E2A\u4E3B\u9898\uFF08\u793A\u4F8B\uFF09\u3002",
+  "ui.preview_sample_findings": "\u5148\u524D\u5173\u4E8E\u8FD9\u4E2A\u4E3B\u9898\u7684\u4E00\u9879\u53D1\u73B0\uFF08\u793A\u4F8B\uFF09\u3002",
+  "ui.preview_sample_sources": "[S1] \u7814\u7A76\u627E\u5230\u7684\u4E00\u6BB5\u6765\u6E90\u5185\u5BB9\uFF08\u793A\u4F8B\uFF09\u3002",
   "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
   "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
   "ui.note_style_guide": "\u5B9E\u7528\u6307\u5357",
@@ -5901,6 +5927,19 @@ var zhTW = {
   "ui.note_style_textbook": "\u6559\u79D1\u66F8\uFF08\u5148\u5C0E\u8B80\uFF0C\u518D\u5206\u985E\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
   "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
+  "ui.preview_step_research": "\u7814\u7A76\u4E3B\u984C",
+  "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
+  "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u984C",
+  "ui.preview_step_synthesize": "\u6574\u5408\u5B50\u4E3B\u984C",
+  "ui.preview_step_merge": "\u5408\u4F75\u4E3B\u984C",
+  "ui.preview_sample_title": "\u7BC4\u4F8B\u4E3B\u984C",
+  "ui.preview_sample_summary": "\u76EE\u524D\u5DF2\u77E5\u5167\u5BB9\u7684\u7C21\u77ED\u6458\u8981\uFF08\u7BC4\u4F8B\uFF09\u3002",
+  "ui.preview_sample_rules": "\u9019\u5F35\u5730\u5716\u7684\u898F\u5247\uFF08\u7BC4\u4F8B\uFF09\u3002",
+  "ui.preview_sample_detail": "\u9019\u500B\u4E3B\u984C\u76EE\u524D\u7684\u7B46\u8A18\u5167\u5BB9\uFF08\u7BC4\u4F8B\uFF09\u3002",
+  "ui.preview_sample_task": "\u7814\u7A76\u9019\u500B\u4E3B\u984C\uFF1A\u4F60\u8F38\u5165\u7684\u4EFB\u52D9\u6703\u5728\u9019\u88E1\uFF08\u7BC4\u4F8B\uFF09\u3002",
+  "ui.preview_sample_ancestors": "\u4E0A\u5C64\u4E3B\u984C > \u9019\u500B\u4E3B\u984C\uFF08\u7BC4\u4F8B\uFF09\u3002",
+  "ui.preview_sample_findings": "\u5148\u524D\u95DC\u65BC\u9019\u500B\u4E3B\u984C\u7684\u4E00\u9805\u767C\u73FE\uFF08\u7BC4\u4F8B\uFF09\u3002",
+  "ui.preview_sample_sources": "[S1] \u7814\u7A76\u627E\u5230\u7684\u4E00\u6BB5\u4F86\u6E90\u5167\u5BB9\uFF08\u7BC4\u4F8B\uFF09\u3002",
   "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
   "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
   "ui.note_style_guide": "\u5BE6\u7528\u6307\u5357",
@@ -25189,6 +25228,10 @@ function builtinPairOf(templateId, toneId) {
   const tone2 = toneId || DEFAULT_TONE_ID;
   return NOTE_STYLE_BUILTIN_IDS.find((id) => BUILTIN_PAIRS[id].template === template2 && BUILTIN_PAIRS[id].tone === tone2);
 }
+function runToneText(resolution, presets, ids, language2) {
+  if (resolution == null ? void 0 : resolution.noteStyle) return resolution.toneText;
+  return resolveToneText(presets, ids, language2);
+}
 function defaultStylesFolderName(language2) {
   return translate(language2, "ui.note_styles_folder_name");
 }
@@ -25313,6 +25356,20 @@ var NoteStyleStore = class {
     const style = (_a2 = this.resolutionOf(template2)) == null ? void 0 : _a2.noteStyle;
     if (!style) return {};
     return { noteStyle: style, ...style.diagrams ? {} : { styleDiagrams: false } };
+  }
+  /**
+   * The style fields a run with no choice of its own gets: the same resolution, tone and context fields the map view
+   * spreads into a TaskContext. A default style file that does not parse is returned as `invalid` (the run would not start).
+   */
+  workspaceStyleFields(language2) {
+    const resolved = this.resolve([{}, {}]);
+    if (resolved.invalid) return { invalid: resolved.invalid };
+    const toneText = runToneText(resolved, this.settings.promptPresets, [void 0, void 0, void 0], language2);
+    return {
+      detailTemplate: resolved.template,
+      ...toneText ? { toneText } : {},
+      ...this.contextFields(resolved.template)
+    };
   }
   remember(resolution) {
     if (resolution.noteStyle) this.resolutions.set(resolution.template, resolution);
@@ -31415,7 +31472,7 @@ ${rules.join("\n")}` : ""
   };
 }
 function templateParts(selection, context, language2, topicAnchor, options) {
-  var _a2, _b2, _c, _d, _e, _f;
+  var _a2, _b2, _c, _d, _e, _f, _g;
   const { id } = selection.template;
   const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
   const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
@@ -31434,22 +31491,49 @@ function templateParts(selection, context, language2, topicAnchor, options) {
         })
       });
     }
-    return { sections: structure2(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language2) };
+    return { sections: structure2(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language2), issues: [] };
   }
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
-    const issue2 = parsed.issues[0];
-    throw new Error(`Template block ${id}: line ${issue2.line}: ${issue2.message}`);
+    const issues = parsed.issues.map((issue2) => ({
+      ...issue2,
+      category: "template",
+      id,
+      ...selection.template.fileName ? { fileName: selection.template.fileName } : {}
+    }));
+    const fallbackId = BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id) ? id : STANDARD_TEMPLATE_ID;
+    const { body: _body, fileName: _fileName, ...choice2 } = selection.template;
+    const detailTemplate = ((_g = context.detailTemplate) == null ? void 0 : _g.id) === id && fallbackId !== id ? void 0 : context.detailTemplate;
+    const fallback = templateParts(
+      { ...selection, template: { ...choice2, id: fallbackId } },
+      { ...context, detailTemplate },
+      language2,
+      topicAnchor,
+      {}
+    );
+    return { ...fallback, issues };
   }
   if (parsed.lead)
-    return { ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor), format: parsed.format };
+    return {
+      ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor),
+      format: parsed.format,
+      issues: []
+    };
   const template2 = parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
-  return { sections: structure2(template2), owned: describedSections(template2, language2), format: parsed.format };
+  return {
+    sections: structure2(template2),
+    owned: describedSections(template2, language2),
+    format: parsed.format,
+    issues: []
+  };
 }
 var formatText = (parts, selection, language2) => parts.format ? applyFormatPreferences(parts.format, language2, selection.template.legacyPreferences) : "";
 var CHART_BLOCK = "```mermaid";
 function chartsWanted(selection, context, language2, options = {}) {
   const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
+  return partsAskForCharts(parts, selection, language2);
+}
+function partsAskForCharts(parts, selection, language2) {
   const sections = selection.template.adaptive ? "" : parts.sections;
   return sections.includes(CHART_BLOCK) || formatText(parts, selection, language2).includes(CHART_BLOCK);
 }
@@ -31466,6 +31550,7 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   const quick = step === "quick";
   const none = inLanguage(NONE, language2);
   const topicAnchor = { kind: "topic", text: context.title };
+  const parts = templateParts(selection, context, language2, topicAnchor, options);
   const elements = [];
   const add = (...pieces) => elements.push(pieces);
   add(fixed(outputLanguage(language2, topicAnchor), "output-language"));
@@ -31490,7 +31575,6 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   add(fixed(inLanguage(modeFragment, language2), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
-    const parts = templateParts(selection, context, language2, topicAnchor, options);
     const pieces = [];
     if (selection.template.adaptive)
       pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
@@ -31540,7 +31624,9 @@ ${context.task}`, "task"));
   return {
     text: segments.map((segment) => segment.text).join(""),
     segments,
-    charts: chartsWanted(selection, context, language2, options)
+    charts: partsAskForCharts(parts, selection, language2),
+    // The decompose step carries no template, so a template that could not be read changes nothing there.
+    issues: step === "decompose" ? [] : parts.issues
   };
 }
 function sectionPieces(parts, id) {
@@ -31581,10 +31667,13 @@ function quickGuidance(context, language2) {
   );
   return `${depth} ${quickKnowledge(language2)}`;
 }
-function generalTaskPrompt(context, language2, provider = "codex") {
+function assembledTaskPrompt(context, language2, provider = "codex") {
   var _a2;
   const selection = (_a2 = context.styleSelection) != null ? _a2 : selectionFromContext(context, language2);
-  return assembleTaskPrompt(selection, promptStepOf(context), context, language2, provider).text;
+  return assembleTaskPrompt(selection, promptStepOf(context), context, language2, provider);
+}
+function generalTaskPrompt(context, language2, provider = "codex") {
+  return assembledTaskPrompt(context, language2, provider).text;
 }
 function taskPrompt(context, language2, provider = "codex") {
   return context.promptProfile === "aim" ? buildAimPrompt(context, language2, provider) : generalTaskPrompt(context, language2, provider);
@@ -46924,9 +47013,12 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian32.Ite
    */
   toneTextFor(note, chosenId, language2 = this.plugin.settings.language, template2) {
     var _a2;
-    const resolved = this.noteStyles.resolutionOf(template2);
-    if (resolved == null ? void 0 : resolved.noteStyle) return resolved.toneText;
-    return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId], language2);
+    return runToneText(
+      this.noteStyles.resolutionOf(template2),
+      this.plugin.settings.promptPresets,
+      [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId],
+      language2
+    );
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   fieldLinks() {

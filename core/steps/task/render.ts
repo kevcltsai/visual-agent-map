@@ -1,4 +1,4 @@
-import { assembleTaskPrompt, promptStepOf, selectionFromContext } from "./assemble";
+import { assembleTaskPrompt, promptStepOf, selectionFromContext, type AssembledPrompt } from "./assemble";
 import { aimPhase, buildAimPrompt, readerFacingAimPhase } from "../aim/shell";
 import type { TaskContext } from "../../../ai/types";
 import { translate, type ContentLanguage } from "../../../i18n";
@@ -40,14 +40,23 @@ export function quickGuidance(context: TaskContext, language: ContentLanguage): 
   return `${depth} ${quickKnowledge(language)}`;
 }
 
-/** The regular (non-AIM) task prompt: the style selection today's request fields stand for, assembled step by step. */
+/** The regular (non-AIM) task prompt with its segments and issues: the style selection today's request fields stand for, assembled step by step. */
+export function assembledTaskPrompt(
+  context: TaskContext,
+  language: ContentLanguage,
+  provider: AiProviderId = "codex"
+): AssembledPrompt {
+  const selection = context.styleSelection ?? selectionFromContext(context, language);
+  return assembleTaskPrompt(selection, promptStepOf(context), context, language, provider);
+}
+
+/** The regular (non-AIM) task prompt text. */
 export function generalTaskPrompt(
   context: TaskContext,
   language: ContentLanguage,
   provider: AiProviderId = "codex"
 ): string {
-  const selection = context.styleSelection ?? selectionFromContext(context, language);
-  return assembleTaskPrompt(selection, promptStepOf(context), context, language, provider).text;
+  return assembledTaskPrompt(context, language, provider).text;
 }
 
 /** AIM requests use the AIM prompt shell in core/steps/aim; its templates are Markdown files there. */

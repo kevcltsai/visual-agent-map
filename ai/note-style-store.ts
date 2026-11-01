@@ -1,4 +1,5 @@
-import { LANGUAGES, noteLanguageOf, translate, type UiLanguage } from "../i18n";
+import { LANGUAGES, noteLanguageOf, translate, type ContentLanguage, type UiLanguage } from "../i18n";
+import type { TaskContext } from "./types";
 import {
   resolveTemplate,
   sectionKeys,
@@ -97,6 +98,25 @@ export function builtinPairOf(
   const tone = toneId || DEFAULT_TONE_ID;
   return NOTE_STYLE_BUILTIN_IDS.find(id => BUILTIN_PAIRS[id].template === template && BUILTIN_PAIRS[id].tone === tone);
 }
+
+/**
+ * The writing tone of a run: a note style file decides its own (the answer made with the template, `resolution`), else the
+ * first of `ids` that names a tone preset. Academic (and nothing chosen) is undefined so prompts stay unchanged.
+ */
+export function runToneText(
+  resolution: StyleResolution | undefined,
+  presets: readonly PromptPreset[] | undefined,
+  ids: readonly (string | undefined)[],
+  language: ContentLanguage
+): string | undefined {
+  if (resolution?.noteStyle) return resolution.toneText;
+  return resolveToneText(presets, ids, language);
+}
+
+/** The style fields of a request that names no style of its own (the workspace default), or the style file that stops it. */
+export type WorkspaceStyleFields =
+  | { invalid: NonNullable<StyleResolution["invalid"]> }
+  | ({ invalid?: undefined } & Pick<TaskContext, "detailTemplate" | "toneText" | "noteStyle" | "styleDiagrams">);
 
 export function defaultStylesFolderName(language: UiLanguage): string {
   return translate(language, "ui.note_styles_folder_name");
@@ -240,6 +260,21 @@ export class NoteStyleStore {
     const style = this.resolutionOf(template)?.noteStyle;
     if (!style) return {};
     return { noteStyle: style, ...(style.diagrams ? {} : { styleDiagrams: false as const }) };
+  }
+
+  /**
+   * The style fields a run with no choice of its own gets: the same resolution, tone and context fields the map view
+   * spreads into a TaskContext. A default style file that does not parse is returned as `invalid` (the run would not start).
+   */
+  workspaceStyleFields(language: ContentLanguage): WorkspaceStyleFields {
+    const resolved = this.resolve([{}, {}]);
+    if (resolved.invalid) return { invalid: resolved.invalid };
+    const toneText = runToneText(resolved, this.settings.promptPresets, [undefined, undefined, undefined], language);
+    return {
+      detailTemplate: resolved.template,
+      ...(toneText ? { toneText } : {}),
+      ...this.contextFields(resolved.template)
+    };
   }
 
   private remember(resolution: StyleResolution): StyleResolution {

@@ -128,7 +128,7 @@ test('the selection bar joins names with the localized list separator and reads 
 });
 
 
-test('card title, map title, inspector title, outline rows and parent-picker rows carry dir="auto"; rows align to the start edge', () => {
+test('card title, map title, outline rows and parent-picker rows carry dir="auto"; rows align to the start edge', () => {
   const view = read('experiences/visual-map/view.ts');
   assert.match(view, /title\.setAttr\("dir", "auto"\)/);
   assert.match(view, /cls: "vam-map-title", attr: \{ dir: "auto" \}/);

@@ -2978,7 +2978,7 @@ test('B1 ui: the stylesheet takes colours and sizes from Obsidian variables only
   assert.match(css, /\.vam-map-chat\.is-overlay \+ \.vam-canvas \{ margin-left: 44px; \}/);
 });
 
-test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay) and the inspector, and the selection bar lives in the canvas', () => {
+test('B1 ui: render() builds the workspace as the chat window, the canvas (viewport + overlay), and the selection bar lives in the canvas', () => {
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); const render = source.slice(source.indexOf('  private render(): void {'), source.indexOf('  /** `shownNode` may be a display copy'));
   assert.match(render, /const canvas = workspace\.createDiv\("vam-canvas"\)/); assert.match(render, /this\.viewportEl = canvas\.createDiv\("vam-viewport"\)/); assert.match(render, /const overlay = canvas\.createDiv\("vam-canvas-overlay"\)/);
   assert.match(render, /this\.renderSelectionBar\(canvas\)/);

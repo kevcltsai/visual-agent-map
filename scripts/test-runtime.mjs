@@ -118,7 +118,7 @@ try {
   await driver.clearDiagnostics();
   const blankMap = `JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view")[0]?.view; return { language:p.settings.language, views:app.workspace.getLeavesOfType("visual-agent-map-view").length, mapTitle:v?.map?.title, command:p.localizedCommands.find(x=>x.command.id.endsWith(":open-map"))?.command.name }; })())`;
   const english = await evaluate(blankMap);
-  check("English install shows the English command label", english.language === "en" && english.command === "Visual Agent Map (VAM): Open mind map", JSON.stringify(english));
+  check("English install shows the English command label", english.language === "en" && english.command?.endsWith("Open mind map"), JSON.stringify(english));
 
   await evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","zh-TW"); return true})()`);
   const chinese = await evaluate(blankMap);

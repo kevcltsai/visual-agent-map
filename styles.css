@@ -1519,6 +1519,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-field-head > .vam-field-link:disabled { color: var(--text-faint); cursor: default; text-decoration: none; }
 .vam-field-head > .vam-field-link:focus-visible, .vam-note-style-problem > .vam-field-link:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; border-radius: var(--radius-s); }
 .vam-field > select { max-width: 100%; }
+/* Full-prompt preview (read-only dialog). */
+.vam-prompt-preview { max-width: 100%; }
+.vam-prompt-preview-label { display: block; margin: 8px 0 4px; font-weight: 600; }
+.vam-prompt-preview-body { margin-top: 8px; }
+.vam-prompt-preview-text { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; margin: 0 0 12px; padding: 8px; background: var(--background-secondary); border-radius: var(--radius-s); user-select: text; }
+.vam-prompt-preview-problem { color: var(--text-error); }
+
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-map-search-input { width: 180px; min-width: 0; flex: 1 1 auto; }

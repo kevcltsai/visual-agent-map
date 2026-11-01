@@ -1,5 +1,6 @@
 import type { CountIssue, DetailTemplate } from "./detail-templates";
 import type { NoteStyle } from "./note-style-file";
+import type { StyleSelection } from "../core/steps/task/assemble";
 import type { AimContract } from "./aim-contracts";
 import type { ContentLanguage } from "../i18n";
 import type { ReferenceGroup } from "./reference-materials";
@@ -63,6 +64,11 @@ export interface TaskContext {
    * the Obsidian syntax text; its template and tone arrive as `detailTemplate` and `toneText`. Absent for built-in and old styles.
    */
   noteStyle?: NoteStyle;
+  /**
+   * The template and tone the prompt assembler uses (trusted, never serialized). Absent today: the assembler derives the
+   * selection from `detailTemplate`, `toneText` and `noteStyle`.
+   */
+  styleSelection?: StyleSelection;
   /** Trusted: false when the note style file turns diagrams off; the background chart step is then skipped (AND with the global setting). */
   styleDiagrams?: boolean;
   /** Resolved writing-tone text (trusted). Absent for the default academic tone, so prompts stay unchanged. */

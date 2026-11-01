@@ -235,14 +235,8 @@ import {
   type CountIssue,
   type DetailTemplate
 } from "../../ai/detail-templates";
-import { emptyNoteStyleStore, type NoteStyleStore, type StyleLevel } from "../../ai/note-style-store";
-import {
-  DEFAULT_OUTLINE_PRESET_ID,
-  DEFAULT_TONE_ID,
-  listPresets,
-  resolvePreset,
-  resolveToneText
-} from "../../ai/prompt-presets";
+import { emptyNoteStyleStore, runToneText, type NoteStyleStore, type StyleLevel } from "../../ai/note-style-store";
+import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
 import {
   errorNotice,
@@ -2164,9 +2158,12 @@ export class VisualAgentMapView extends ItemView {
     template?: DetailTemplate
   ): string | undefined {
     // A note style file decides its own tone (the answer was made with the template, see NoteStyleStore.resolve).
-    const resolved = this.noteStyles.resolutionOf(template);
-    if (resolved?.noteStyle) return resolved.toneText;
-    return resolveToneText(this.plugin.settings.promptPresets, [chosenId, note?.toneId, this.map?.toneId], language);
+    return runToneText(
+      this.noteStyles.resolutionOf(template),
+      this.plugin.settings.promptPresets,
+      [chosenId, note?.toneId, this.map?.toneId],
+      language
+    );
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   private fieldLinks(): FieldLinks {
@@ -4630,7 +4627,10 @@ export class VisualAgentMapView extends ItemView {
         ))
     );
   }
-  /** After "Organize workspace folders" moved maps: follow the open map to its new path (the next synchronize reloads it). */
+  /**
+   * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the
+   * next synchronize reloads it).
+   */
   relocate(moved: Map<string, string>): void {
     const next = moved.get(this.path);
     if (!next) return;

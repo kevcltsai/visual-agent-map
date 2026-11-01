@@ -101,7 +101,8 @@ const ISSUE_KEYS = new Set([
   "key_duplicate",
   "no_sections",
   "count_invalid",
-  "comment_unclosed"
+  "comment_unclosed",
+  "format_heading_repeated"
 ]);
 
 /** The translated reason of one parse problem: a file-format code or a template error key. */

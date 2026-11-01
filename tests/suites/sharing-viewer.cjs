@@ -1098,6 +1098,38 @@ test('sharing viewer topic-color: a card carries data-topic-color and a named la
   }
 });
 
+test('sharing viewer topic-style: whitelisted tokens set data attributes, tampered tokens set none, and the shell has no url( (headless Chrome)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-topic-style-'));
+  try {
+    const data = payload();
+    data.nodes[0].style = ['bold', 'text-large', 'border-thick', 'line-thick'];
+    data.nodes[1].style = ['BOLD', 'text-huge', '"><script>document.title=1</script>', 3];
+    data.nodes[2].style = 'bold';
+    const out = path.join(directory, 'style.html');
+    const shell = html.renderShareHtml(data, text.shareViewerUiFor('en'));
+    assert.ok(!shell.includes('url('), 'the shell never contains url(');
+    fs.writeFileSync(out, shell);
+    const ids = data.nodes.slice(0, 3).map(n => n.id);
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`(() => {
+        const card = id => document.querySelector('[data-node-id="' + id + '"]');
+        return { cards: ${JSON.stringify(ids)}.map(id => ({ bold: card(id)?.dataset.topicStyleBold ?? null, size: card(id)?.dataset.topicStyleSize ?? null, border: card(id)?.dataset.topicStyleBorder ?? null })),
+          thick: document.querySelectorAll('.vam-edge[data-line-thick]').length, title: document.title };
+      })()`);
+    });
+    assert.deepEqual(report.cards[0], { bold: 'true', size: 'large', border: 'thick' });
+    assert.deepEqual(report.cards[1], { bold: null, size: null, border: null });
+    assert.deepEqual(report.cards[2], { bold: 'true', size: null, border: null }, 'a lone string counts as one token');
+    assert.ok(report.thick <= 1);
+    assert.notEqual(report.title, '1');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});
+
 test('sharing viewer topic-color contrast: card text on every colour meets WCAG AA in light and dark (headless Chrome; the colour rules come from styles.css)', async t => {
   const chrome = findChrome();
   if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');

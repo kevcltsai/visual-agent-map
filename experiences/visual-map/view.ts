@@ -8718,6 +8718,17 @@ export class VisualAgentMapView extends ItemView {
         textColor: colorOf(titleEl ? computed(titleEl).color : undefined),
         accent: card.dataset.topicColor ? colorOf(computed(card, "::before").backgroundColor) : undefined
       };
+      // card-style: only a styled card carries these, so an unstyled map's scene is unchanged.
+      if (card.dataset.topicStyleSize) {
+        const size = parseFloat(titleEl ? computed(titleEl).fontSize : "");
+        // The screen's small / large title relative to the 13 px export default (medium is 15 px on screen).
+        if (Number.isFinite(size) && size > 0) item.titleSize = Math.round((size * 13) / 15);
+      }
+      if (card.dataset.topicStyleBold) item.titleWeight = 800;
+      if (card.dataset.topicStyleBorder) {
+        const width = parseFloat(style.borderTopWidth);
+        if (Number.isFinite(width) && width > 0) item.strokeWidth = width;
+      }
       const frame = card.querySelector<HTMLElement>(".vam-card-cover");
       const coverPath = frame ? this.exportCoverPath(node.path) : null;
       if (frame && coverPath) {
@@ -8835,7 +8846,10 @@ export class VisualAgentMapView extends ItemView {
       edges.push({
         d,
         stroke,
-        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {})
+        ...((el.getAttribute("class") ?? "").split(/\s+/).includes("vam-text-link") ? { dashed: true } : {}),
+        ...((el.getAttribute("data-line-thick") ?? null) !== null
+          ? { width: parseFloat(style.strokeWidth) > 0 ? parseFloat(style.strokeWidth) : 4 }
+          : {})
       });
       try {
         const bbox = (el as unknown as SVGGraphicsElement).getBBox?.();

@@ -7,7 +7,7 @@ import { isCompactEntry } from "../share-translate-compact";
 import { fillDetail, fillTranslatedDetail, linkRow } from "./detail";
 import { edgePathData } from "./edge-path";
 import { createViewerElement } from "./dom";
-import { readTopicColor, TOPIC_COLORS, type TopicColor } from "../../../topic-colors";
+import { readTopicColor, readTopicStyle, TOPIC_COLORS, type TopicColor } from "../../../topic-colors";
 import { markerSymbol, readTopicMarkers, type TopicMarker } from "../../../topic-markers";
 import { pickShareLanguage, shareLanguageKey } from "./language";
 
@@ -393,6 +393,8 @@ export function startViewer(doc: Document): void {
   /** The colour of a topic: the whitelist is applied again here, so a hand-edited file cannot inject anything. */
   const colorOf = (item: ShareNodePayload): TopicColor | undefined => readTopicColor({ "topic-color": item.color });
 
+  const styleOf = (item: ShareNodePayload): string[] => readTopicStyle({ "topic-style": item.style });
+
   const markerRow = (markers: TopicMarker[]): HTMLElement => {
     const row = make("span", "vam-markers");
     for (const id of markers) {
@@ -617,6 +619,8 @@ export function startViewer(doc: Document): void {
         )
       );
       path.setAttribute("class", info.get(node.id)?.tier === "side" ? "vam-edge vam-edge-side" : "vam-edge");
+      const childInfo = info.get(node.id);
+      if (childInfo && styleOf(childInfo).includes("line-thick")) path.setAttribute("data-line-thick", "");
       edges.append(path);
     }
     for (const text of texts) {
@@ -764,6 +768,11 @@ export function startViewer(doc: Document): void {
       const markers = markersOf(item);
       const color = colorOf(item);
       if (color) card.dataset.topicColor = color;
+      const styles = styleOf(item);
+      if (styles.includes("bold")) card.dataset.topicStyleBold = "true";
+      if (styles.includes("border-thick")) card.dataset.topicStyleBorder = "thick";
+      if (styles.includes("text-small")) card.dataset.topicStyleSize = "small";
+      else if (styles.includes("text-large")) card.dataset.topicStyleSize = "large";
       const markedName = nameWithMarkers(String(shown.title ?? ""), markers);
       card.setAttribute(
         "aria-label",

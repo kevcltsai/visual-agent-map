@@ -661,6 +661,7 @@ export class ShareExporter {
         ...(note.relevance ? { relevance: note.relevance } : {}),
         ...(note.markers?.length ? { markers: note.markers } : {}),
         ...(note.color ? { color: note.color } : {}),
+        ...(note.style?.length ? { style: note.style } : {}),
         ...(note.links?.length ? { links: note.links } : {})
       };
       const rendered = this.rendered.get(node.id);

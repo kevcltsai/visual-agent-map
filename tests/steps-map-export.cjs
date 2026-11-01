@@ -102,3 +102,15 @@ test('summary-bracket: a bracket is a path and escaped text lines; hostile path 
   assert.match(left, /text-anchor="middle"/);
   assert.equal(ex.buildMapSvg(base), ex.buildMapSvg({ ...base, summaries: [] }), 'no summaries leaves the bytes unchanged');
 });
+
+test('card-style export: a styled card and edge carry size, weight and widths; an unstyled scene is unchanged', () => {
+  const card = { x: 0, y: 0, w: 200, h: 80, title: 'Hello' };
+  const plainSvg = ex.buildMapSvg({ ...base, cards: [card], edges: [{ d: 'M 0 0 L 5 5' }] });
+  assert.ok(!/font-weight|stroke-width="(3|4)"/.test(plainSvg));
+  assert.ok(plainSvg.includes('font-size="13"') && plainSvg.includes('stroke-width="1.5"'));
+  const svg = ex.buildMapSvg({ ...base, cards: [{ ...card, titleSize: 17, titleWeight: 800, strokeWidth: 3 }], edges: [{ d: 'M 0 0 L 5 5', width: 4 }] });
+  assert.ok(svg.includes('font-size="17"') && svg.includes('font-weight="800"'));
+  assert.ok(svg.includes('stroke-width="3"') && svg.includes('stroke-width="4"'));
+  const hostile = ex.buildMapSvg({ ...base, cards: [{ ...card, titleSize: '9" onload="x', titleWeight: NaN, strokeWidth: Infinity }], edges: [{ d: 'M 0 0 L 5 5', width: 'x' }] });
+  assert.ok(!hostile.includes('onload') && hostile.includes('font-size="13"') && hostile.includes('stroke-width="1.5"'));
+});

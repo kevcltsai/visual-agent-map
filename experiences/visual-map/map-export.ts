@@ -16,6 +16,12 @@ export interface SceneCard {
   textColor?: string;
   /** The topic-colour bar at the card's left edge (the `::before` of a card that has a topic colour). */
   accent?: string;
+  /** card-style: the title's font size in px, only when the topic has a text-size style (default 13). */
+  titleSize?: number;
+  /** card-style: the title's font weight (400 to 900), only when the topic is bold. */
+  titleWeight?: number;
+  /** card-style: the border width in px, only when the topic has a thick border (default 1). */
+  strokeWidth?: number;
   cover?: SceneImage | null;
 }
 export interface SceneImage {
@@ -32,6 +38,8 @@ export interface SceneEdge {
   stroke?: string;
   /** canvas-text-node: a free text block's link to a topic is drawn dashed. */
   dashed?: boolean;
+  /** card-style: the line width in px, only for a thick line (default 1.5). */
+  width?: number;
 }
 export interface SceneBoundary {
   x: number;
@@ -133,6 +141,12 @@ function imageElement(image: SceneImage | null | undefined): string {
     ? `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>`
     : "";
 }
+/** A finite number inside [min, max], or undefined (so an absent or odd value draws the default). */
+function numberIn(value: unknown, min: number, max: number): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.round(Math.min(max, Math.max(min, value)) * 100) / 100
+    : undefined;
+}
 function textLines(title: string | string[]): string[] {
   const raw = Array.isArray(title) ? title : String(title ?? "").split(/\r?\n/);
   return raw.slice(0, 20).map(line => String(line).slice(0, TEXT_LIMIT));
@@ -173,15 +187,19 @@ export function buildMapSvg(scene: MapScene): string {
   for (const edge of scene.edges ?? []) {
     if (typeof edge?.d !== "string" || !PATH_DATA.test(edge.d) || edge.d.length > 4000) continue;
     out.push(
-      `<path d="${edge.d.trim()}" fill="none" stroke="${color(edge.stroke, strokeColor)}" stroke-width="1.5"${edge.dashed === true ? ' stroke-dasharray="5 4"' : ""}/>`
+      `<path d="${edge.d.trim()}" fill="none" stroke="${color(edge.stroke, strokeColor)}" stroke-width="${numberIn(edge.width, 0.5, 8) ?? 1.5}"${edge.dashed === true ? ' stroke-dasharray="5 4"' : ""}/>`
     );
   }
   for (const image of scene.images ?? []) out.push(imageElement(image));
   for (const card of scene.cards ?? []) {
     const box = rect(card?.x, card?.y, card?.w, card?.h);
     if (!box) continue;
+    const cardStrokeWidth = numberIn(card.strokeWidth, 0.5, 8);
+    const titleSize = numberIn(card.titleSize, 8, 40);
+    const titleWeight = numberIn(card.titleWeight, 100, 900);
+    const lineStep = titleSize === undefined ? 16 : Math.max(16, Math.round(titleSize * 1.3));
     out.push(
-      `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"/>`
+      `<g><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" rx="8" fill="${color(card.fill, cardColor)}" stroke="${color(card.stroke, strokeColor)}"${cardStrokeWidth === undefined ? "" : ` stroke-width="${cardStrokeWidth}"`}/>`
     );
     if (card.accent !== undefined)
       out.push(
@@ -191,12 +209,12 @@ export function buildMapSvg(scene: MapScene): string {
     const fill = color(card.textColor, textColor);
     const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
     const top = (coverBox ? coverBox[1] + coverBox[3] : box[1]) + 22;
-    const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / 16) + 1);
+    const fits = Math.max(1, Math.floor((box[1] + box[3] - 8 - top) / lineStep) + 1);
     textLines(card.title)
       .slice(0, fits)
       .forEach((line, i) => {
         out.push(
-          `<text x="${box[0] + 14}" y="${top + i * 16}" font-family="${FONT}" font-size="13" fill="${fill}">${escapeXml(line)}</text>`
+          `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
         );
       });
     out.push("</g>");

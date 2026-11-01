@@ -404,6 +404,20 @@ test('sharing links: the payload carries only valid deduplicated http(s) hrefs, 
   assert.equal(JSON.stringify(plainPayload).includes('"links":["'), false, 'a map without topic links is unchanged');
 });
 
+test('sharing topic-style: the payload carries only whitelisted style tokens, and no key when there is none', () => {
+  const { notesById } = cleanedNotes();
+  const styled = { ...notesById, rich: { ...notesById.rich, style: ['bold', 'text-large', 'text-small', 'BOLD', 'x', 3] } };
+  const payload = format.buildSharePayload(fixtureMap(), styled, options());
+  assert.equal(payload.version, 1, 'no version bump');
+  assert.deepEqual(JSON.parse(JSON.stringify(payload.nodes.find(n => n.id === 'rich').style)), ['bold', 'text-large']);
+  for (const bad of ['BOLD', 3, null, {}, '"><script>', ['nope'], []]) {
+    const p = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, style: bad } }, options());
+    assert.equal('style' in p.nodes.find(n => n.id === 'rich'), false, `${JSON.stringify(bad)} is dropped`);
+  }
+  const plainPayload = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.ok(!format.serializeShareJson(plainPayload).includes('"style"'), 'a map without styles is unchanged');
+});
+
 // Ticket 37 P3: topic colour in the share payload. Optional field, same version, whitelist only.
 test('sharing topic-color: the payload carries only a whitelisted colour id, and no key when there is none', () => {
   const { notesById } = cleanedNotes();

@@ -1,7 +1,7 @@
 import type { MapDocument } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
-import { readTopicColor, type TopicColor } from "../../topic-colors";
+import { readTopicColor, readTopicStyle, type TopicColor, type TopicStyle } from "../../topic-colors";
 import { CARD_WIDTH, clampCardWidth } from "../../map-graph";
 import { layoutDirectionFor } from "../../layouts/compose";
 import { layoutOf } from "../../map-layout";
@@ -98,6 +98,8 @@ export interface ShareNodePayload {
   markers?: TopicMarker[];
   /** Optional (ticket 37): a whitelisted topic colour id. Absent means none; `version` stays 1. */
   color?: TopicColor;
+  /** Optional (card-style): whitelisted topic style tokens. Absent means none; `version` stays 1. The viewer checks them again. */
+  style?: TopicStyle[];
   /** Optional (topic-links): normalized http(s) hrefs of the topic. Absent means none; `version` stays 1. The viewer checks each again. */
   links?: string[];
   /** Detail rendered to sanitized HTML at export time; images reference `assets` by name. */
@@ -170,6 +172,8 @@ export interface ShareNoteInput {
   markers?: readonly unknown[];
   /** Topic colour id from the note; anything not on the whitelist is dropped when the payload is built. */
   color?: unknown;
+  /** Topic style tokens from the note; anything not on the whitelist is dropped when the payload is built. */
+  style?: readonly unknown[];
   /** Topic link list from the note; only valid http(s) addresses survive when the payload is built. */
   links?: readonly unknown[];
   /** Rendered, sanitized HTML (supplied by the Obsidian-side exporter). */
@@ -297,6 +301,8 @@ export function buildSharePayload(
     if (markers.length) out.markers = markers;
     const color = readTopicColor({ "topic-color": note?.color });
     if (color) out.color = color;
+    const style = readTopicStyle({ "topic-style": note?.style });
+    if (style.length) out.style = style;
     const links = readTopicLinks({ "topic-links": note?.links });
     if (links.length) out.links = links;
     if (options.includeDetail) {

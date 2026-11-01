@@ -291,6 +291,7 @@ test('decision 22: the parsed built-in text gives the same prompt as today, in e
             if (step === 'decompose') assert.equal(parsedPath.text, plain.text);
             else {
               assert.ok(hasSections, `${language} ${provider} ${name} ${id} the fixed structure text is added`);
+              assert.ok(parsedPath.text.includes(added[1]), `${language} ${provider} ${name} ${id} the fixed update log rule is added`);
               const stripped = added.reduce((text, piece) => text.replace(piece, ''), parsedPath.text);
               assert.equal(stripped, plain.text, `${language} ${provider} ${name} ${id} (parsed path, fixed segment excluded)`);
               const blocks = result => JSON.stringify(result.segments.filter(segment => segment.source.kind === 'block'));

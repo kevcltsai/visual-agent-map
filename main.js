@@ -49011,7 +49011,8 @@ ${request.requirements}` : preset.text,
     const model = request.shallowResearch && request.model || currentModel;
     await this.noteStyles.refresh();
     const importStyle = this.styleOrThrow([{ template: request.detailTemplateId }]);
-    this.noticeBlockIssues(importStyle);
+    const noticeGate = { shown: false };
+    this.noticeBlockIssues(importStyle, noticeGate);
     const { template: template2 } = importStyle;
     let result;
     try {
@@ -49056,10 +49057,15 @@ ${request.requirements}` : preset.text,
       model,
       () => {
         var _a3;
-        return this.startShallowResearch(root, children, {
-          ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
-          referenceGroups: []
-        });
+        return this.startShallowResearch(
+          root,
+          children,
+          {
+            ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
+            referenceGroups: []
+          },
+          noticeGate
+        );
       }
     ).catch((error) => errorNotice(error));
   }
@@ -49068,6 +49074,7 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c;
     const settings = this.plugin.settings;
     const repo = this.plugin.repo;
+    const noticeGate = { shown: false };
     const target = () => {
       const where = this.outlineImportTarget();
       if (!this.map || where.map !== "editable")
@@ -49098,7 +49105,7 @@ ${request.requirements}` : preset.text,
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
-        const template2 = this.mapDetailTemplate(settings.language, request.detailTemplateId, true);
+        const template2 = this.mapDetailTemplate(settings.language, request.detailTemplateId, true, noticeGate);
         const result = await addOutlineToMap(
           repo,
           map,
@@ -49212,13 +49219,18 @@ ${request.requirements}` : preset.text,
       model,
       () => {
         var _a3;
-        return this.startShallowResearch(top, children, {
-          ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
-          referenceGroups: [],
-          ...request.researchOptions,
-          ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
-          ...request.toneId ? { toneId: request.toneId } : {}
-        });
+        return this.startShallowResearch(
+          top,
+          children,
+          {
+            ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
+            referenceGroups: [],
+            ...request.researchOptions,
+            ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
+            ...request.toneId ? { toneId: request.toneId } : {}
+          },
+          noticeGate
+        );
       }
     ).catch((error) => errorNotice(error));
   }
@@ -57584,7 +57596,8 @@ ${request.requirements}` : preset.text,
       { sync: false }
     );
   }
-  startShallowResearch(parent, children, options) {
+  /** `noticeGate` is the caller's gate when it already told the user about an unreadable template block. */
+  startShallowResearch(parent, children, options, noticeGate) {
     var _a2;
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
@@ -57594,7 +57607,7 @@ ${request.requirements}` : preset.text,
       if (node) placed.set(node.id, { x: node.x, y: node.y });
     }
     let respaced = false;
-    const gate = { shown: false };
+    const gate = noticeGate != null ? noticeGate : { shown: false };
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
@@ -62170,13 +62183,13 @@ ${addition}` : addition });
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
-  mapDetailTemplate(language2, chosenId, notify2 = false) {
+  mapDetailTemplate(language2, chosenId, notify2 = false, gate) {
     var _a2, _b2;
     const resolved = this.styleOrThrow([
       { template: chosenId },
       { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }
     ]);
-    if (notify2) this.noticeBlockIssues(resolved);
+    if (notify2) this.noticeBlockIssues(resolved, gate);
     return this.templateForRun(resolved.template, language2);
   }
   /**

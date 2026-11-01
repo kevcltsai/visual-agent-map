@@ -3747,7 +3747,9 @@ export class VisualAgentMapView extends ItemView {
     const model = (request.shallowResearch && request.model) || currentModel;
     await this.noteStyles.refresh();
     const importStyle = this.styleOrThrow([{ template: request.detailTemplateId }]);
-    this.noticeBlockIssues(importStyle);
+    // One operation, one Notice: the shallow research that follows shares this gate.
+    const noticeGate = { shown: false };
+    this.noticeBlockIssues(importStyle, noticeGate);
     const { template } = importStyle;
     let result: Awaited<ReturnType<typeof createOutlineMap>>;
     try {
@@ -3796,10 +3798,15 @@ export class VisualAgentMapView extends ItemView {
     // and an error becomes a Notice instead of keeping the window waiting.
     void this.plugin
       .confirmAiUsage(model, () =>
-        this.startShallowResearch(root, children, {
-          ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
-          referenceGroups: []
-        })
+        this.startShallowResearch(
+          root,
+          children,
+          {
+            ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
+            referenceGroups: []
+          },
+          noticeGate
+        )
       )
       .catch(error => errorNotice(error));
   }
@@ -3810,6 +3817,8 @@ export class VisualAgentMapView extends ItemView {
   ): Promise<void> {
     const settings = this.plugin.settings;
     const repo = this.plugin.repo;
+    // One operation, one Notice: the shallow research that follows shares this gate.
+    const noticeGate = { shown: false };
     // Checked against the map as it is when the work runs; a rejection keeps the import window open.
     const target = (): { map: MapDocument; path: string; parent: MapNode | null } => {
       const where = this.outlineImportTarget();
@@ -3849,7 +3858,7 @@ export class VisualAgentMapView extends ItemView {
         model = (request.shallowResearch && request.model) || baseModel;
         // A template chosen here is recorded on each new topic: an import never changes this map's default.
         await this.noteStyles.refresh();
-        const template = this.mapDetailTemplate(settings.language, request.detailTemplateId, true);
+        const template = this.mapDetailTemplate(settings.language, request.detailTemplateId, true, noticeGate);
         const result = await addOutlineToMap(
           repo,
           map,
@@ -3978,13 +3987,18 @@ export class VisualAgentMapView extends ItemView {
     // The import window closes once the topics exist; the research runs in the background (Stop is on the batch badge).
     void this.plugin
       .confirmAiUsage(model, () =>
-        this.startShallowResearch(top, children, {
-          ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
-          referenceGroups: [],
-          ...request.researchOptions,
-          ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
-          ...(request.toneId ? { toneId: request.toneId } : {})
-        })
+        this.startShallowResearch(
+          top,
+          children,
+          {
+            ...aiModeOptions(request.aiMode ?? "quick", "subtopic"),
+            referenceGroups: [],
+            ...request.researchOptions,
+            ...(request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {}),
+            ...(request.toneId ? { toneId: request.toneId } : {})
+          },
+          noticeGate
+        )
       )
       .catch(error => errorNotice(error));
   }
@@ -12986,7 +13000,13 @@ export class VisualAgentMapView extends ItemView {
       { sync: false }
     );
   }
-  private startShallowResearch(parent: MapNode, children: MapNode[], options: TaskOptions): Promise<void> {
+  /** `noticeGate` is the caller's gate when it already told the user about an unreadable template block. */
+  private startShallowResearch(
+    parent: MapNode,
+    children: MapNode[],
+    options: TaskOptions,
+    noticeGate?: { shown: boolean }
+  ): Promise<void> {
     const signal = options.signal;
     const pendingOptions = this.researchChoices(options);
     const placed = new Map<string, { x: number; y: number }>();
@@ -12995,7 +13015,7 @@ export class VisualAgentMapView extends ItemView {
       if (node) placed.set(node.id, { x: node.x, y: node.y });
     }
     let respaced = false;
-    const gate = { shown: false };
+    const gate = noticeGate ?? { shown: false };
     this.plugin.quickExpandPending.add(parent.path);
     return this.plugin.expansionCoordinator.start(
       parent.path,
@@ -18002,12 +18022,17 @@ export class VisualAgentMapView extends ItemView {
    * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first.
    */
-  private mapDetailTemplate(language: ContentLanguage, chosenId?: string, notify = false): DetailTemplate {
+  private mapDetailTemplate(
+    language: ContentLanguage,
+    chosenId?: string,
+    notify = false,
+    gate?: { shown: boolean }
+  ): DetailTemplate {
     const resolved = this.styleOrThrow([
       { template: chosenId },
       { template: this.map?.detailTemplateId, tone: this.map?.toneId }
     ]);
-    if (notify) this.noticeBlockIssues(resolved);
+    if (notify) this.noticeBlockIssues(resolved, gate);
     return this.templateForRun(resolved.template, language);
   }
   /**

@@ -1423,6 +1423,16 @@ integrationTest('FB1 F1: a multi-topic research batch raises the Notice once, no
   await until(() => h.contexts.length === 3 && !h.plugin.running.size);
   assert.equal(blockNotices(h.notices).length, 1);
 });
+integrationTest('M1: an outline import with shallow research and an unreadable template block raises exactly one Notice', async () => {
+  const h = await templateHarness({ language: 'en', settings: badBlockSettings });
+  await installBadBlock(h.plugin);
+  h.plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
+  const nodes = [{ title: 'Root', level: 1, parent: null, line: 1 }, { title: 'One', level: 2, parent: 0, line: 2 }, { title: 'Two', level: 2, parent: 0, line: 3 }];
+  await h.view.importOutline({ nodes, source: null, shallowResearch: true, placement: { kind: 'tree' } });
+  await until(() => h.contexts.length === 2 && !h.plugin.running.size);
+  assert.equal(h.contexts.length, 2, 'the shallow research really ran for both children');
+  assert.equal(blockNotices(h.notices).length, 1, 'one operation, one Notice');
+});
 integrationTest('FB1 F2: an unreadable block with the output language different from the interface language falls back to the built-in template in the output language, and keeps file and line', async () => {
   const h = await templateHarness({ language: 'zh-TW', settings: badBlockSettings, reply: () => ({ summary: 'English summary', detail: '### Core conclusions\n\nC', visualReferences: [], suggestions: [] }) });
   await installBadBlock(h.plugin);

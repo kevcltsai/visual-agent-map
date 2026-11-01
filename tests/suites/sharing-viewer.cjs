@@ -1104,9 +1104,9 @@ test('sharing viewer topic-style: whitelisted tokens set data attributes, tamper
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-topic-style-'));
   try {
     const data = payload();
-    data.nodes[0].style = ['bold', 'text-large', 'border-thick', 'line-thick'];
-    data.nodes[1].style = ['BOLD', 'text-huge', '"><script>document.title=1</script>', 3];
-    data.nodes[2].style = 'bold';
+    data.nodes[0].style = ['bold', 'text-large', 'border-thick'];
+    data.nodes[1].style = ['BOLD', 'text-huge', '"><script>document.title=1</script>', 3, 'line-thick'];
+    data.nodes[2].style = ['bold', 'LINE-THICK', 'line-thick"><x'];
     const out = path.join(directory, 'style.html');
     const shell = html.renderShareHtml(data, text.shareViewerUiFor('en'));
     assert.ok(!shell.includes('url('), 'the shell never contains url(');
@@ -1123,7 +1123,7 @@ test('sharing viewer topic-style: whitelisted tokens set data attributes, tamper
     assert.deepEqual(report.cards[0], { bold: 'true', size: 'large', border: 'thick' });
     assert.deepEqual(report.cards[1], { bold: null, size: null, border: null });
     assert.deepEqual(report.cards[2], { bold: 'true', size: null, border: null }, 'a lone string counts as one token');
-    assert.ok(report.thick <= 1);
+    assert.equal(report.thick, 1, 'only the child with the exact line-thick token gets a thick line; tampered tokens get none');
     assert.notEqual(report.title, '1');
   } finally {
     try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }

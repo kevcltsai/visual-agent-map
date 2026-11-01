@@ -31741,7 +31741,7 @@ var AiTaskService = class {
    * is on, and it is a plain research task or synthesis (never a count repair, interim detail, AIM or decompose/merge).
    */
   chartEligible(input) {
-    return !!input.addCharts && input.styleDiagrams !== false && this.diagramsOn() && !input.countRepair && !input.intermediateDetail && input.promptProfile !== "aim" && (input.mode === "task" || input.mode === "synthesize");
+    return !!input.addCharts && this.diagramsOn() && input.styleDiagrams !== false && !input.countRepair && !input.intermediateDetail && input.promptProfile !== "aim" && (input.mode === "task" || input.mode === "synthesize");
   }
   /**
    * The chart step for a note that was already written: one local, tool-free model call, run after the write. Returns the

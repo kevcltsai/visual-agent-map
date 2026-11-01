@@ -1500,6 +1500,13 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-node[data-topic-style-border="thick"]:not([data-aim-kind]) { border-width: 3px; --vam-kind-width: 3px; }
 .vam-view .vam-node[data-topic-style-border="thick"].is-selected:not([data-aim-kind]), .vam-view .vam-node[data-topic-style-border="thick"].is-relation-end:not([data-aim-kind]) { outline-width: 3px; --vam-kind-width: 4px; }
 .vam-view .vam-edge[data-line-thick] { stroke-width: 4px; }
+.vam-note-style-problems { display: flex; flex-direction: column; gap: 4px; }
+.vam-note-style-problems:empty { display: none; }
+.vam-note-style-problem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: var(--font-ui-smaller); color: var(--text-error); overflow-wrap: anywhere; }
+.vam-note-style-problem > .vam-field-link { padding: 0; height: auto; border: 0; background: none; box-shadow: none; color: var(--text-accent); cursor: pointer; }
+.vam-note-style-problem > .vam-field-link:hover { text-decoration: underline; }
+.vam-field-head > .vam-field-link:disabled { color: var(--text-faint); cursor: default; text-decoration: none; }
+.vam-field > select { max-width: 100%; }
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-map-search-input { width: 180px; min-width: 0; flex: 1 1 auto; }
@@ -1560,10 +1567,3 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-view .vam-topic-link-menu { position: absolute; z-index: 50; display: flex; flex-direction: column; min-width: 160px; max-width: 320px; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-topic-link-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; border: 0; box-shadow: none; background: transparent; color: var(--text-normal); font-weight: 400; }
 .vam-view .vam-topic-link-item:hover { background: var(--background-modifier-hover); }
-.vam-note-style-problems { display: flex; flex-direction: column; gap: 4px; }
-.vam-note-style-problems:empty { display: none; }
-.vam-note-style-problem { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: var(--font-ui-smaller); color: var(--text-error); overflow-wrap: anywhere; }
-.vam-note-style-problem > .vam-field-link { padding: 0; height: auto; border: 0; background: none; box-shadow: none; color: var(--text-accent); cursor: pointer; }
-.vam-note-style-problem > .vam-field-link:hover { text-decoration: underline; }
-.vam-field-head > .vam-field-link:disabled { color: var(--text-faint); cursor: default; text-decoration: none; }
-.vam-field > select { max-width: 100%; }

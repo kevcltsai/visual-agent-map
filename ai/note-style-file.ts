@@ -71,14 +71,19 @@ export const NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain
 export type NoteStyleBuiltinId = (typeof NOTE_STYLE_BUILTIN_IDS)[number];
 export const CANONICAL_LANGUAGES: readonly NoteStyleLanguage[] = ["zh-TW", "zh-CN", "en"];
 
+/** A per-language record built from entries, so no source line branches on a language id (language gate). */
+function byLanguage<T>(zhTW: T, zhCN: T, en: T): Record<NoteStyleLanguage, T> {
+  return Object.fromEntries([["zh-TW", zhTW], ["zh-CN", zhCN], ["en", en]]) as Record<NoteStyleLanguage, T>;
+}
+
 /** Frozen canonical contents. A new version adds a v2 entry here; v1 files never change (the test pins their hashes). */
 export const CANONICAL_VERSIONS: readonly Record<NoteStyleBuiltinId, Record<NoteStyleLanguage, string>>[] = [
   {
-    standard: { "zh-TW": StandardzhTW, "zh-CN": StandardzhCN, en: Standarden },
-    textbook: { "zh-TW": TextbookzhTW, "zh-CN": TextbookzhCN, en: Textbooken },
-    summary: { "zh-TW": SummaryzhTW, "zh-CN": SummaryzhCN, en: Summaryen },
-    plain: { "zh-TW": PlainzhTW, "zh-CN": PlainzhCN, en: Plainen },
-    guide: { "zh-TW": GuidezhTW, "zh-CN": GuidezhCN, en: Guideen }
+    standard: byLanguage(StandardzhTW, StandardzhCN, Standarden),
+    textbook: byLanguage(TextbookzhTW, TextbookzhCN, Textbooken),
+    summary: byLanguage(SummaryzhTW, SummaryzhCN, Summaryen),
+    plain: byLanguage(PlainzhTW, PlainzhCN, Plainen),
+    guide: byLanguage(GuidezhTW, GuidezhCN, Guideen)
   }
 ];
 
@@ -126,29 +131,29 @@ export function matchCanonical(
 }
 
 // ---- frozen legacy export (v1): never edit; a different layout needs a serializeLegacyV2 and both stay recognised ----
-const LEGACY_V1 = {
-  "zh-TW": {
+const LEGACY_V1 = byLanguage(
+  {
     callouts: "方框: 自動",
     count: "數量: ",
     atLeast: "至少 ",
     comment: (name: string) =>
       `%% 這個檔決定 AI 怎麼寫「${name}」風格的筆記。改完存檔，下次 AI 更新就照新內容寫，已寫好的筆記不會變。 %%`
   },
-  "zh-CN": {
+  {
     callouts: "方框: 自动",
     count: "数量: ",
     atLeast: "至少 ",
     comment: (name: string) =>
       `%% 这个文件决定 AI 怎么写「${name}」风格的笔记。改完保存，下次 AI 更新就按新内容写，已写好的笔记不会变。 %%`
   },
-  en: {
+  {
     callouts: "callouts: auto",
     count: "Count: ",
     atLeast: "at least ",
     comment: (name: string) =>
       `%% This file decides how the AI writes notes in the "${name}" style. Save your edits and the next AI update follows them; notes already written do not change. %%`
   }
-} as const;
+);
 
 /**
  * The file an old custom template is exported as (frozen). Roles and aliases are not written: the parser gives the

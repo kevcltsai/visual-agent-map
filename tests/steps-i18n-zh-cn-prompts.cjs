@@ -31,12 +31,22 @@ const NOTE = entry('zh-CN').note, NOTE_ZH = entry(NOTE).prompt.zh.plain, CN_ZH =
 const HEADING_RULE_CN = `六個標準 Detail 標題固定使用筆記語言（${NOTE_ZH}），逐字照 detail 結構寫出；內文仍使用${CN_ZH}。`;
 const HEADING_RULE_TW = '六個標準 Detail 標題固定跟隨介面語言。';
 const CLAUSE_CN = `固定標題必須逐字照上列寫出（${NOTE_ZH}，不要轉成${CN_ZH}），不可增加另一套標題；只有標題底下的內容使用${CN_ZH}撰寫。`;
+// The note style file prompts (custom headings) carry the shorter clause from headings-verbatim-custom.zh.md.
+const CLAUSE_CUSTOM_CN = `固定標題必須逐字照上列寫出，不可增加另一套標題；只有標題底下的內容使用${CN_ZH}撰寫。`;
 // Returns the text without the additions, and how many of each it carried.
 const stripVerbatim = text => {
   const rules = text.split(HEADING_RULE_CN).length - 1;
-  const lines = text.split('\n'), kept = lines.filter(line => line !== CLAUSE_CN);
+  const lines = text.split('\n'), kept = lines.filter(line => line !== CLAUSE_CN && line !== CLAUSE_CUSTOM_CN);
   return { text: kept.join('\n').split(HEADING_RULE_CN).join(HEADING_RULE_TW), rules, clauses: lines.length - kept.length };
 };
+// The count issues that repair prompts quote (ui.detail_count_issue_*) are filled in the output language too; their
+// literal pieces between the {n} placeholders are paired like the research.* texts.
+const ISSUE_PAIRS = Object.keys(zhTW).filter(key => key.startsWith('ui.detail_count_issue_')).flatMap(key => {
+  const cn = zhCN[key].split(/\{\d+\}/), tw = zhTW[key].split(/\{\d+\}/);
+  return cn.map((piece, index) => [piece, tw[index]]).filter(([a, b]) => a && a !== b);
+});
+dictionaryPairs.push(...ISSUE_PAIRS);
+dictionaryPairs.sort((a, b) => b[0].length - a[0].length);
 const toTraditional = text => {
   let result = text;
   CN.forEach(name => { result = result.split(name).join(`\u0000${CN.indexOf(name)}\u0000`); });
@@ -84,14 +94,14 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 23 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 27 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
-  assert.equal(lines.length, 23); // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction
+  assert.equal(lines.length, 27); // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction + the four note style file prompts
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 23 output-language sentences and 23 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 27 output-language sentences and 27 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -99,5 +109,5 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 23 outp
   }
   for (const file of fs.readdirSync(directory).filter(name => /\.zh(\.\d+)?\.txt$/.test(name)))
     assert.equal(fs.readFileSync(path.join(directory, file), 'utf8').includes('固定標題必須逐字'), false, `${file}: zh-TW has no clause`);
-  assert.deepEqual(total, { rules: 23, clauses: 23 });
+  assert.deepEqual(total, { rules: 27, clauses: 27 });
 });

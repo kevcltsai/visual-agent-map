@@ -20600,9 +20600,10 @@ function introDetailStructure(language2, values) {
   return renderTemplate(inLanguage(INTRO_DETAIL_STRUCTURE_TEMPLATE, language2), values);
 }
 var CUSTOM_DETAIL_CALLOUT_TEMPLATE = { zh: custom_detail_rule_callout_zh_default, en: custom_detail_rule_callout_en_default };
+var CUSTOM_DETAIL_STOP = { zh: "\u3002", en: "." };
 function customDetailCallout(language2, values) {
   const text11 = renderTemplate(inLanguage(CUSTOM_DETAIL_CALLOUT_TEMPLATE, language2), values);
-  return values.body ? text11 : text11.replace(/[：:]\s*$/, language2 === "en" ? "." : "\u3002");
+  return values.body ? text11 : text11.replace(/[：:]\s*$/, inLanguage(CUSTOM_DETAIL_STOP, language2));
 }
 
 // ai/detail-templates.ts
@@ -24802,13 +24803,16 @@ var guide_en_default2 = '---\ntone: Practical guide\ncallouts: auto\n---\n%% Thi
 var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
 var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
 var CANONICAL_LANGUAGES = ["zh-TW", "zh-CN", "en"];
+function byLanguage(zhTW2, zhCN2, en2) {
+  return Object.fromEntries([["zh-TW", zhTW2], ["zh-CN", zhCN2], ["en", en2]]);
+}
 var CANONICAL_VERSIONS = [
   {
-    standard: { "zh-TW": standard_zh_TW_default, "zh-CN": standard_zh_CN_default, en: standard_en_default },
-    textbook: { "zh-TW": textbook_zh_TW_default, "zh-CN": textbook_zh_CN_default, en: textbook_en_default },
-    summary: { "zh-TW": summary_zh_TW_default, "zh-CN": summary_zh_CN_default, en: summary_en_default2 },
-    plain: { "zh-TW": plain_zh_TW_default, "zh-CN": plain_zh_CN_default, en: plain_en_default2 },
-    guide: { "zh-TW": guide_zh_TW_default, "zh-CN": guide_zh_CN_default, en: guide_en_default2 }
+    standard: byLanguage(standard_zh_TW_default, standard_zh_CN_default, standard_en_default),
+    textbook: byLanguage(textbook_zh_TW_default, textbook_zh_CN_default, textbook_en_default),
+    summary: byLanguage(summary_zh_TW_default, summary_zh_CN_default, summary_en_default2),
+    plain: byLanguage(plain_zh_TW_default, plain_zh_CN_default, plain_en_default2),
+    guide: byLanguage(guide_zh_TW_default, guide_zh_CN_default, guide_en_default2)
   }
 ];
 function builtinStyleFileName(id, language2) {
@@ -24836,26 +24840,26 @@ function matchCanonical(text11) {
           return { id, language: language2, version: version + 1 };
   return void 0;
 }
-var LEGACY_V1 = {
-  "zh-TW": {
+var LEGACY_V1 = byLanguage(
+  {
     callouts: "\u65B9\u6846: \u81EA\u52D5",
     count: "\u6578\u91CF: ",
     atLeast: "\u81F3\u5C11 ",
     comment: (name) => `%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C${name}\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002 %%`
   },
-  "zh-CN": {
+  {
     callouts: "\u65B9\u6846: \u81EA\u52A8",
     count: "\u6570\u91CF: ",
     atLeast: "\u81F3\u5C11 ",
     comment: (name) => `%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C${name}\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002 %%`
   },
-  en: {
+  {
     callouts: "callouts: auto",
     count: "Count: ",
     atLeast: "at least ",
     comment: (name) => `%% This file decides how the AI writes notes in the "${name}" style. Save your edits and the next AI update follows them; notes already written do not change. %%`
   }
-};
+);
 function serializeLegacyV1(template, language2) {
   const words2 = LEGACY_V1[language2];
   const sections = template.sections.map((section3) => {
@@ -63863,12 +63867,12 @@ function attachTranslations(payload, options) {
   const translations = {};
   for (const item of pieces) translations[item.language] = item.piece.top;
   const nodes = payload.nodes.map((node) => {
-    const byLanguage = {};
+    const byLanguage2 = {};
     for (const item of pieces) {
       const translation = item.piece.nodes[node.id];
-      if (translation) byLanguage[item.language] = translation;
+      if (translation) byLanguage2[item.language] = translation;
     }
-    return Object.keys(byLanguage).length ? { ...node, translations: byLanguage } : node;
+    return Object.keys(byLanguage2).length ? { ...node, translations: byLanguage2 } : node;
   });
   return {
     ...payload,

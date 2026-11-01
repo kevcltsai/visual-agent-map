@@ -164,11 +164,12 @@ export function introDetailStructure(
   return renderTemplate(inLanguage(INTRO_DETAIL_STRUCTURE_TEMPLATE, language), values);
 }
 const CUSTOM_DETAIL_CALLOUT_TEMPLATE: FragmentPair = { zh: CustomRuleCalloutZH, en: CustomRuleCalloutEN };
+const CUSTOM_DETAIL_STOP: FragmentPair = { zh: "。", en: "." };
 /** One section's callout instruction from a note style file. An empty body leaves just the placement sentence. */
 export function customDetailCallout(
   language: ContentLanguage,
   values: { heading: string; type: string; fold: string; body: string }
 ): string {
   const text = renderTemplate(inLanguage(CUSTOM_DETAIL_CALLOUT_TEMPLATE, language), values);
-  return values.body ? text : text.replace(/[：:]\s*$/, language === "en" ? "." : "。");
+  return values.body ? text : text.replace(/[：:]\s*$/, inLanguage(CUSTOM_DETAIL_STOP, language));
 }

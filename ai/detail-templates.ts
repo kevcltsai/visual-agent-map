@@ -8,12 +8,25 @@ import {
 } from "../i18n";
 import { fencedLines } from "./markdown-blocks";
 import { headingsVerbatim } from "../core/steps/_shared/fragments";
-import { customDetailRule, customDetailStructure, textbookDetailStructure } from "../core/steps/task/fragments";
+import {
+  customDetailCallout,
+  customDetailRule,
+  customDetailStructure,
+  introDetailStructure,
+  textbookDetailStructure
+} from "../core/steps/task/fragments";
 
 export type DetailSectionRole = "none" | "sources" | "log";
 export interface DetailCount {
   mode: "exact" | "min";
   n: number;
+}
+/** A callout a note style file places in a section: the section uses this callout and `body` is its instruction (memory only). */
+export interface DetailCallout {
+  type: string;
+  fold: "" | "-" | "+";
+  title: string;
+  body: string;
 }
 export interface DetailSection {
   id: string;
@@ -23,11 +36,17 @@ export interface DetailSection {
   count?: DetailCount;
   /** Earlier names (and the other language's Standard name) so old notes still map to this section. */
   aliases: string[];
+  /** Memory only (a parsed note style file; never saved): callouts the section uses. */
+  callouts?: DetailCallout[];
 }
 export interface DetailTemplate {
   id: string;
   name: string;
   sections: DetailSection[];
+  /** Memory only (a parsed note style file; never saved): "intro" writes a lead-in then the non-empty sections. */
+  layout?: "intro" | "sections";
+  /** Memory only: the lead-in instruction of the "intro" layout. */
+  intro?: string;
 }
 export interface TemplateIssue {
   key: TranslationKey;
@@ -348,7 +367,24 @@ function structureText(
     if (section.description.trim()) rules.push(description(section));
     if (section.count)
       rules.push(customDetailRule(section.count.mode, language, { heading, n: String(section.count.n) }));
+    for (const callout of section.callouts ?? [])
+      rules.push(
+        customDetailCallout(language, {
+          heading,
+          type: callout.type,
+          fold: callout.fold,
+          // A multi-line callout body is joined into one sentence: line breaks become spaces.
+          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+        })
+      );
   }
+  if (template.layout === "intro")
+    return introDetailStructure(language, {
+      intro: (template.intro ?? "").replace(/\s*\n\s*/g, " ").trim(),
+      count: String(template.sections.length),
+      headings,
+      rules: rules.length ? `\n${rules.join("\n")}` : ""
+    });
   return customDetailStructure(language, {
     count: String(template.sections.length),
     headings,

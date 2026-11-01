@@ -164,7 +164,9 @@ export function canonicalDetail(
     }
     (current === null ? leading : sections.get(current)!).push(line);
   }
-  if (template.id === TEXTBOOK_TEMPLATE_ID) return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
+  // A note style file with a lead-in is written like Textbook: lead-in kept, empty sections omitted.
+  if (template.id === TEXTBOOK_TEMPLATE_ID || template.layout === "intro")
+    return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
   if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
   else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(sections.get(0) ?? [])]);
   if (footnotes.length && sourcesIndex >= 0) {

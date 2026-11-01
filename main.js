@@ -8830,6 +8830,18 @@ var headings_verbatim_custom_zh_default = "\u56FA\u5B9A\u6A19\u984C\u5FC5\u9808\
 // core/steps/_shared/headings-verbatim-custom.en.md
 var headings_verbatim_custom_en_default = "Write the headings exactly as listed above and add no second set of headings; only the content under the headings is written in {{language}}.\n";
 
+// core/steps/_shared/format-preferences.zh.md
+var format_preferences_zh_default = "\u9019\u500B\u98A8\u683C\u4E0D\u4F7F\u7528\uFF1A{{list}}\uFF1B\u4E0B\u5217\u898F\u5247\u8981\u6C42\u9019\u4E9B\u8A9E\u6CD5\u6642\u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF1B\u5176\u4ED6\u9650\u5236\u7167\u5E38\u9069\u7528\u3002\n";
+
+// core/steps/_shared/format-preferences.en.md
+var format_preferences_en_default = "This style does not use: {{list}}; where the rules below ask for this syntax, use a plain list or a #### subheading instead; the other limits still apply.\n";
+
+// core/steps/_shared/format-preferences-placed.zh.md
+var format_preferences_placed_zh_default = "callout \u53EA\u7528\u5728\u98A8\u683C\u6307\u5B9A\u7684\u4F4D\u7F6E\uFF1B\u898F\u5247 5 \u7684\u53EF\u647A\u758A callout \u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\u3002\n";
+
+// core/steps/_shared/format-preferences-placed.en.md
+var format_preferences_placed_en_default = "Use callouts only where the style places them; the foldable callout in rule 5 becomes a plain list or a #### subheading.\n";
+
 // core/steps/_shared/tone.zh.md
 var tone_zh_default = "\u8A9E\u6C23\u898F\u5247\uFF1A\u8A9E\u6C23\u53EA\u6539\u8B8A\u63AA\u8FAD\u8207\u5448\u73FE\u65B9\u5F0F\uFF0C\u7D55\u4E0D\u964D\u4F4E\u4F86\u6E90\u3001\u5F15\u7528\u8207\u6E96\u78BA\u6027\u7684\u8981\u6C42\uFF1B\u5176\u4ED6\u6240\u6709\u898F\u5247\uFF08\u4F86\u6E90\u6A19\u793A\u3001\u5F15\u7528\u3001\u4E8B\u5BE6\u67E5\u6838\u3001JSON \u5951\u7D04\uFF09\u7167\u5E38\u9069\u7528\u3002\n{{tone}}\n";
 
@@ -8905,6 +8917,53 @@ function headingsVerbatim(output, instruction, custom = false, anchor) {
     note: languagePromptName(note, spelled, "plain"),
     language: language2
   });
+}
+var FORMAT_PREFERENCES = { zh: format_preferences_zh_default, en: format_preferences_en_default };
+var FORMAT_PREFERENCES_PLACED = {
+  zh: text2(format_preferences_placed_zh_default),
+  en: text2(format_preferences_placed_en_default)
+};
+var FORMAT_ITEM_NAMES = {
+  zh: ["callout", "\u5716\u8868\uFF08mermaid\uFF09", "\u8868\u683C", "\u5F85\u8FA6\u6E05\u55AE\uFF08- [ ]\uFF09", "\u87A2\u5149\u6A19\u8A18\uFF08==highlight==\uFF09"],
+  en: ["callouts", "diagrams (mermaid)", "tables", "task lists (- [ ])", "highlights (==highlight==)"]
+};
+function obsidianFormat(language2, preferences) {
+  const original = inLanguage(OBSIDIAN_FORMAT, language2);
+  if (!preferences) return original;
+  const { callouts, diagrams, tables, tasks, highlight } = preferences;
+  const placed = callouts === "placed";
+  if (!placed && diagrams && tables && tasks && highlight) return original;
+  const zh = instructionLanguageOf(language2) === "zh";
+  const off = [placed, !diagrams, !tables, !tasks, !highlight];
+  const lines = [];
+  let lastBullet = 0;
+  for (let line of original.split("\n")) {
+    if (line.startsWith("- ")) {
+      if (placed && line.includes("> [!")) continue;
+      if (!diagrams && line.includes("```mermaid```")) continue;
+      if (!tasks && line.includes("`- [ ]`")) continue;
+      if (!highlight && line.includes("==highlight==")) continue;
+      if (line.includes(zh ? "Markdown \u8868\u683C" : "a Markdown table")) {
+        if (!tables) continue;
+        if (!diagrams) line = line.slice(0, line.indexOf(zh ? "\u8868\u683C\u88E1\u6709" : " When the table holds")).trimEnd();
+      }
+      lines.push(line);
+      lastBullet = lines.length - 1;
+    } else lines.push(line);
+  }
+  const names3 = FORMAT_ITEM_NAMES[zh ? "zh" : "en"];
+  const list = names3.filter((_, index) => off[index]).join(zh ? "\u3001" : ", ");
+  const sentence = [
+    renderTemplate(inLanguage(FORMAT_PREFERENCES, language2), { list }),
+    placed ? inLanguage(FORMAT_PREFERENCES_PLACED, language2) : ""
+  ].filter(Boolean).join(zh ? "" : " ");
+  if (lastBullet) lines.splice(lastBullet + 1, 0, "", sentence);
+  else {
+    const rest = lines.slice(1).filter((line, index, all) => line || all[index - 1] !== "");
+    lines.splice(1, lines.length - 1, ...rest);
+    lines.splice(2, 0, sentence, "");
+  }
+  return lines.join("\n");
 }
 
 // experiences/coffee-tables/prompt-parts.ts
@@ -20382,6 +20441,19 @@ var custom_detail_rule_min_zh_default = "{{heading}} \u5FC5\u9808\u81F3\u5C11\u6
 // core/steps/task/custom-detail-rule-min.en.md
 var custom_detail_rule_min_en_default = "{{heading}} must have at least {{n}} items (top-level list items, or #### sub-headings).\n";
 
+// core/steps/task/intro-detail-structure.zh.md
+var intro_detail_structure_zh_default = "detail \u5FC5\u9808\u5148\u5BEB 2\u20134 \u500B\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\u7684\u5C0E\u8B80\u6BB5\u843D\uFF0C\u5C0E\u8B80\u6307\u793A\uFF1A\u300C{{intro}}\u300D\u3002\u5C0E\u8B80\u4E4B\u5F8C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B {{count}} \u500B\u4E09\u7D1A\u6A19\u984C\uFF1A{{headings}}\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u6BB5\u843D\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u4F7F\u7528\u8005\u8981\u6C42\u67D0\u6BB5\u7684\u6578\u91CF\u6642\uFF0C\u9808\u9075\u5B88\u8A72\u6578\u91CF\u3002{{rules}}\n";
+
+// core/steps/task/intro-detail-structure.en.md
+var intro_detail_structure_en_default = `The detail must first write 2\u20134 lead-in paragraphs with no heading at all, following this lead-in instruction: "{{intro}}". After the lead-in, use exactly these {{count}} level-three headings in order: {{headings}}. Leave out a whole section that has no reliable material (no heading, and never write 'No new content this time'; this rule overrides the later formatting rule that says to write 'No new content this time' in sections with nothing to say). Follow any count the user requests for a section.{{rules}}
+`;
+
+// core/steps/task/custom-detail-rule-callout.zh.md
+var custom_detail_rule_callout_zh_default = "{{heading}} \u4F7F\u7528\u4E00\u500B `> [!{{type}}]{{fold}}` callout\uFF1A{{body}}\n";
+
+// core/steps/task/custom-detail-rule-callout.en.md
+var custom_detail_rule_callout_en_default = "In {{heading}}, use one `> [!{{type}}]{{fold}}` callout: {{body}}\n";
+
 // core/steps/task/textbook-detail-structure.zh.md
 var textbook_detail_structure_zh_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A{{headings}}\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002{{log}} \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C{{log}}\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n";
 
@@ -20573,6 +20645,15 @@ var TEXTBOOK_DETAIL_STRUCTURE_TEMPLATE = {
 };
 function textbookDetailStructure(language2, values) {
   return renderTemplate(inLanguage(TEXTBOOK_DETAIL_STRUCTURE_TEMPLATE, language2), values);
+}
+var INTRO_DETAIL_STRUCTURE_TEMPLATE = { zh: intro_detail_structure_zh_default, en: intro_detail_structure_en_default };
+function introDetailStructure(language2, values) {
+  return renderTemplate(inLanguage(INTRO_DETAIL_STRUCTURE_TEMPLATE, language2), values);
+}
+var CUSTOM_DETAIL_CALLOUT_TEMPLATE = { zh: custom_detail_rule_callout_zh_default, en: custom_detail_rule_callout_en_default };
+function customDetailCallout(language2, values) {
+  const text11 = renderTemplate(inLanguage(CUSTOM_DETAIL_CALLOUT_TEMPLATE, language2), values);
+  return values.body ? text11 : text11.replace(/[：:]\s*$/, language2 === "en" ? "." : "\u3002");
 }
 
 // ai/detail-templates.ts
@@ -20792,7 +20873,7 @@ function detailStructurePrompt(template, language2, standardText, anchor) {
   ].filter(Boolean).join("\n");
 }
 function structureText(template, language2, standardText) {
-  var _a2;
+  var _a2, _b2, _c;
   const headings = template.sections.map((section3) => `### ${section3.name}`).join(", ");
   const description = (section3) => customDetailRule("description", language2, {
     heading: `### ${section3.name}`,
@@ -20818,7 +20899,25 @@ function structureText(template, language2, standardText) {
     if (section3.description.trim()) rules.push(description(section3));
     if (section3.count)
       rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
+    for (const callout of (_b2 = section3.callouts) != null ? _b2 : [])
+      rules.push(
+        customDetailCallout(language2, {
+          heading,
+          type: callout.type,
+          fold: callout.fold,
+          // A multi-line callout body is joined into one sentence: line breaks become spaces.
+          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+        })
+      );
   }
+  if (template.layout === "intro")
+    return introDetailStructure(language2, {
+      intro: ((_c = template.intro) != null ? _c : "").replace(/\s*\n\s*/g, " ").trim(),
+      count: String(template.sections.length),
+      headings,
+      rules: rules.length ? `
+${rules.join("\n")}` : ""
+    });
   return customDetailStructure(language2, {
     count: String(template.sections.length),
     headings,
@@ -23797,7 +23896,8 @@ function canonicalDetail(value, language2 = "zh-TW", template = standardTemplate
     }
     (current === null ? leading : sections.get(current)).push(line);
   }
-  if (template.id === TEXTBOOK_TEMPLATE_ID) return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
+  if (template.id === TEXTBOOK_TEMPLATE_ID || template.layout === "intro")
+    return textbookDetail(template, leading, sections, footnotes, sourcesIndex);
   if (sections.size === 0) sections.set(0, [leading.join("\n").trim()]);
   else if (leading.join("\n").trim()) sections.set(0, [leading.join("\n").trim(), ...(_a2 = sections.get(0)) != null ? _a2 : []]);
   if (footnotes.length && sourcesIndex >= 0) {
@@ -30339,7 +30439,7 @@ function generalTaskPrompt(context, language2, provider = "codex") {
         topicAnchor
       ),
       // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
-      readerFacingDetail(context) && context.mode !== "merge" ? inLanguage(OBSIDIAN_FORMAT, language2) : ""
+      readerFacingDetail(context) && context.mode !== "merge" ? obsidianFormat(language2, context.noteStyle) : ""
     ].filter(Boolean).join("\n\n") : "",
     quick ? quickGuidance(context, language2) : researchGuidance(context, language2),
     ...visualGuidance(context, language2),
@@ -30831,7 +30931,7 @@ var AiTaskService = class {
    * is on, and it is a plain research task or synthesis (never a count repair, interim detail, AIM or decompose/merge).
    */
   chartEligible(input) {
-    return !!input.addCharts && this.diagramsOn() && !input.countRepair && !input.intermediateDetail && input.promptProfile !== "aim" && (input.mode === "task" || input.mode === "synthesize");
+    return !!input.addCharts && input.styleDiagrams !== false && this.diagramsOn() && !input.countRepair && !input.intermediateDetail && input.promptProfile !== "aim" && (input.mode === "task" || input.mode === "synthesize");
   }
   /**
    * The chart step for a note that was already written: one local, tool-free model call, run after the write. Returns the

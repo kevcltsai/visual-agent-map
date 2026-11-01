@@ -15,6 +15,10 @@ import CustomRuleExactZH from "./custom-detail-rule-exact.zh.md";
 import CustomRuleExactEN from "./custom-detail-rule-exact.en.md";
 import CustomRuleMinZH from "./custom-detail-rule-min.zh.md";
 import CustomRuleMinEN from "./custom-detail-rule-min.en.md";
+import IntroDetailStructureZH from "./intro-detail-structure.zh.md";
+import IntroDetailStructureEN from "./intro-detail-structure.en.md";
+import CustomRuleCalloutZH from "./custom-detail-rule-callout.zh.md";
+import CustomRuleCalloutEN from "./custom-detail-rule-callout.en.md";
 import TextbookDetailStructureZH from "./textbook-detail-structure.zh.md";
 import TextbookDetailStructureEN from "./textbook-detail-structure.en.md";
 import RepairCountsZH from "./repair-counts.zh.md";
@@ -149,4 +153,22 @@ const TEXTBOOK_DETAIL_STRUCTURE_TEMPLATE: FragmentPair = {
 /** The Textbook template's structure text: lead-in, `{{headings}}` in order, omit-empty override, self-check before `{{log}}`. */
 export function textbookDetailStructure(language: ContentLanguage, values: { headings: string; log: string }): string {
   return renderTemplate(inLanguage(TEXTBOOK_DETAIL_STRUCTURE_TEMPLATE, language), values);
+}
+
+const INTRO_DETAIL_STRUCTURE_TEMPLATE: FragmentPair = { zh: IntroDetailStructureZH, en: IntroDetailStructureEN };
+/** A note style file with a lead-in: a lead-in per `{{intro}}`, then the `{{count}}` headings in order; empty sections are omitted. */
+export function introDetailStructure(
+  language: ContentLanguage,
+  values: { intro: string; count: string; headings: string; rules: string }
+): string {
+  return renderTemplate(inLanguage(INTRO_DETAIL_STRUCTURE_TEMPLATE, language), values);
+}
+const CUSTOM_DETAIL_CALLOUT_TEMPLATE: FragmentPair = { zh: CustomRuleCalloutZH, en: CustomRuleCalloutEN };
+/** One section's callout instruction from a note style file. An empty body leaves just the placement sentence. */
+export function customDetailCallout(
+  language: ContentLanguage,
+  values: { heading: string; type: string; fold: string; body: string }
+): string {
+  const text = renderTemplate(inLanguage(CUSTOM_DETAIL_CALLOUT_TEMPLATE, language), values);
+  return values.body ? text : text.replace(/[：:]\s*$/, language === "en" ? "." : "。");
 }

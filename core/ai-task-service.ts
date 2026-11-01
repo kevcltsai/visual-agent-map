@@ -513,6 +513,7 @@ export class AiTaskService {
   chartEligible(input: TaskContext): boolean {
     return (
       !!input.addCharts &&
+      input.styleDiagrams !== false &&
       this.diagramsOn() &&
       !input.countRepair &&
       !input.intermediateDetail &&

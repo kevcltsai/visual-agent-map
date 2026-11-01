@@ -17,7 +17,7 @@ import {
   LABEL_USER_TEXT,
   LOCAL_FIRST,
   NONE,
-  OBSIDIAN_FORMAT,
+  obsidianFormat,
   REFERENCE_CITATIONS,
   quickKnowledge,
   ROLE,
@@ -115,7 +115,7 @@ export function generalTaskPrompt(
                 topicAnchor
               ),
           // A merge keeps the sources' own formatting; the syntax suggestions would invite callouts the sources lack.
-          readerFacingDetail(context) && context.mode !== "merge" ? inLanguage(OBSIDIAN_FORMAT, language) : ""
+          readerFacingDetail(context) && context.mode !== "merge" ? obsidianFormat(language, context.noteStyle) : ""
         ]
           .filter(Boolean)
           .join("\n\n")

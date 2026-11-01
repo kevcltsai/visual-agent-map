@@ -52,6 +52,10 @@ import HeadingsVerbatimFollowZH from "./headings-verbatim-follow.zh.md";
 import HeadingsVerbatimFollowEN from "./headings-verbatim-follow.en.md";
 import HeadingsVerbatimCustomZH from "./headings-verbatim-custom.zh.md";
 import HeadingsVerbatimCustomEN from "./headings-verbatim-custom.en.md";
+import FormatPreferencesZH from "./format-preferences.zh.md";
+import FormatPreferencesEN from "./format-preferences.en.md";
+import FormatPreferencesPlacedZH from "./format-preferences-placed.zh.md";
+import FormatPreferencesPlacedEN from "./format-preferences-placed.en.md";
 import ToneZH from "./tone.zh.md";
 import ToneEN from "./tone.en.md";
 
@@ -184,4 +188,70 @@ export function headingsVerbatim(
     note: languagePromptName(note, spelled, "plain"),
     language
   });
+}
+
+/** Which Obsidian syntaxes a note style file allows (all on, callouts "auto" = today's text). */
+export interface FormatPreferences {
+  callouts: "auto" | "placed";
+  diagrams: boolean;
+  tables: boolean;
+  tasks: boolean;
+  highlight: boolean;
+}
+const FORMAT_PREFERENCES: FragmentPair = { zh: FormatPreferencesZH, en: FormatPreferencesEN };
+const FORMAT_PREFERENCES_PLACED: FragmentPair = {
+  zh: text(FormatPreferencesPlacedZH),
+  en: text(FormatPreferencesPlacedEN)
+};
+const FORMAT_ITEM_NAMES = {
+  zh: ["callout", "圖表（mermaid）", "表格", "待辦清單（- [ ]）", "螢光標記（==highlight==）"],
+  en: ["callouts", "diagrams (mermaid)", "tables", "task lists (- [ ])", "highlights (==highlight==)"]
+} as const;
+
+/**
+ * The Obsidian syntax text with the lines of syntaxes a note style does not use removed, followed by the fixed
+ * "this style does not use" sentence. With every preference at its default (or none given) it is OBSIDIAN_FORMAT as is.
+ * Rules 1-10 are never touched.
+ */
+export function obsidianFormat(language: ContentLanguage, preferences?: FormatPreferences): string {
+  const original = inLanguage(OBSIDIAN_FORMAT, language);
+  if (!preferences) return original;
+  const { callouts, diagrams, tables, tasks, highlight } = preferences;
+  const placed = callouts === "placed";
+  if (!placed && diagrams && tables && tasks && highlight) return original;
+  const zh = instructionLanguageOf(language) === "zh";
+  const off = [placed, !diagrams, !tables, !tasks, !highlight];
+  const lines: string[] = [];
+  let lastBullet = 0;
+  for (let line of original.split("\n")) {
+    if (line.startsWith("- ")) {
+      if (placed && line.includes("> [!")) continue;
+      if (!diagrams && line.includes("```mermaid```")) continue;
+      if (!tasks && line.includes("`- [ ]`")) continue;
+      if (!highlight && line.includes("==highlight==")) continue;
+      if (line.includes(zh ? "Markdown 表格" : "a Markdown table")) {
+        if (!tables) continue;
+        // The chart that goes right under a table is a diagram: without diagrams the line keeps only the table.
+        if (!diagrams) line = line.slice(0, line.indexOf(zh ? "表格裡有" : " When the table holds")).trimEnd();
+      }
+      lines.push(line);
+      lastBullet = lines.length - 1;
+    } else lines.push(line);
+  }
+  const names = FORMAT_ITEM_NAMES[zh ? "zh" : "en"];
+  const list = names.filter((_, index) => off[index]).join(zh ? "、" : ", ");
+  const sentence = [
+    renderTemplate(inLanguage(FORMAT_PREFERENCES, language), { list }),
+    placed ? inLanguage(FORMAT_PREFERENCES_PLACED, language) : ""
+  ]
+    .filter(Boolean)
+    .join(zh ? "" : " ");
+  if (lastBullet) lines.splice(lastBullet + 1, 0, "", sentence);
+  else {
+    // Every bullet was removed: keep one blank line between the lead-in, the sentence and the rules.
+    const rest = lines.slice(1).filter((line, index, all) => line || all[index - 1] !== "");
+    lines.splice(1, lines.length - 1, ...rest);
+    lines.splice(2, 0, sentence, "");
+  }
+  return lines.join("\n");
 }

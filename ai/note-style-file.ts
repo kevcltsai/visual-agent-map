@@ -447,7 +447,7 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
       layout: intro ? "intro" : "sections",
       intro,
       sections,
-      template: { id: options.id, name: options.name, sections }
+      template: { id: options.id, name: options.name, sections, layout: intro ? "intro" : "sections", intro }
     }
   };
 }

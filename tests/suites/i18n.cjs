@@ -95,20 +95,6 @@ test('concurrent language changes are ignored until the first save and refresh c
   assert.equal(plugin.settings.language, 'zh-TW');
   assert.equal(plugin.languageSwitchPending, false);
 });
-test('built-in Sample language refresh preserves selected topic and view state', async () => {
-  const { VisualAgentMapView } = load('main.ts', { obsidian });
-  const { builtInSample } = load('builtin-sample.ts');
-  const plugin = { settings: { language: 'zh-TW' }, syncOutline() {}, releaseOutline() {} };
-  const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.builtIn = true; view.map = builtInSample('en').map; view.notes = builtInSample('en').notes;
-  view.map.viewport = { x: -128, y: 74, zoom: 0.83 };
-  view.selected = view.map.nodes[0].id; view.render = () => {};
-  const selected = view.selected, viewport = plain(view.map.viewport);
-  await view.refreshFromPlugin();
-  assert.match(view.map.title, /範例/);
-  assert.equal(view.selected, selected);
-  assert.deepEqual(plain(view.map.viewport), viewport);
-});
 test('AI entry prompts for Codex only when unavailable and leaves manual work available', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });
   const plugin = new Plugin(); let guides = 0;
@@ -191,16 +177,6 @@ test('all user-facing translations use stable semantic keys', () => {
   for (const [id, source] of dictionaryFiles) {
     const values = dictionaryValues(source);
     for (const [key, value] of englishValues) assert.deepEqual(placeholders(values.get(key)), placeholders(value), `${id} ${key} placeholders must match between locales`);
-  }
-});
-test('the sample tour names the controls exactly as the map labels them, in both languages', () => {
-  const { translate } = load('i18n.ts');
-  for (const lang of ['en', 'zh-TW', 'zh-CN']) {
-    const tr = key => translate(lang, key);
-    for (const key of ['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'])
-      assert.ok(tr('ui.tour_2_body').includes(tr(key)), `${lang}: tour step 2 names ${tr(key)}`);
-    assert.ok(tr('ui.tour_4_body').includes(tr('ui.select_topics')), `${lang}: tour step 4 names the select button`);
-    assert.ok(tr('ui.tour_5_body').includes(tr('ui.topic')), `${lang}: tour step 5 names the add-topic button`);
   }
 });
 test('language registry helpers resolve the four language axes', () => {

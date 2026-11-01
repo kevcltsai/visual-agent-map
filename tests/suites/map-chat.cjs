@@ -866,15 +866,15 @@ integrationTest('map chat: declining the usage notice sends nothing and keeps th
   eq(h.control.calls, ['confirm']); assert.equal(chat.draft, 'hello'); assert.equal(chat.transcript().length, 0);
 });
 
-integrationTest('map chat: an empty draft, a second send while busy and a send on the sample map do nothing', async () => {
+integrationTest('map chat: an empty draft, a second send while busy do nothing, and a send on a map outside the managed folder is sent as noEditableMap', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   h.type('   '); await h.view.sendMapChat(); eq(h.control.calls, []);
   const gate = deferred(); h.control.reply = async () => { await gate.promise; return { reply: 'r', actions: [], rejected: [] }; };
   h.type('one'); const first = h.view.sendMapChat(); await requestOut(chat);
   h.type('two'); await h.view.sendMapChat(); assert.equal(h.control.requests.length, 1, 'only one request at a time');
   gate.resolve(); await first;
-  h.view.builtIn = true; h.type('three'); await h.view.sendMapChat();
-  // B1-ui: the read-only sample is the opening screen now; a message from it is sent, and tells the model there is no map to edit.
+  h.view.path = 'Elsewhere/Map.md'; h.type('three'); await h.view.sendMapChat();
+  // A map outside the managed folders cannot be edited; a message from it is still sent, and tells the model there is no map to edit.
   assert.equal(h.control.requests.length, 2); assert.equal(h.control.requests[1].context.noEditableMap, true);
 });
 
@@ -999,14 +999,12 @@ integrationTest('map chat: repaints caused by the chat\'s own writes keep the co
   assert.equal(chat.transcript().at(-1).text, 'done'); assert.ok(find(h.rootEl, i => i === chat.el));
 });
 
-integrationTest('map chat: a different map starts a new conversation, and the sample map has the panel too (B1-ui)', async () => {
+integrationTest('map chat: a different map starts a new conversation', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
   chat.begin('old'); chat.finish('old answer', []); chat.addTopicReference(h.ids.a);
   h.view.map.id = 'another-map'; h.repaint();
   assert.equal(chat.transcript().length, 0); assert.equal(chat.attachments().length, 0);
   chat.begin('x'); chat.finish('y', []);
-  h.view.builtIn = true; h.repaint(); assert.ok(find(h.rootEl, i => i === chat.el) && chat.isHero === false, 'B1-ui: the read-only sample keeps the conversation it had (side window); a fresh one shows the opening screen');
-  h.view.builtIn = false; h.repaint(); assert.ok(find(h.rootEl, i => i === chat.el)); assert.equal(chat.transcript().length, 2, 'and it comes back as it was');
 });
 
 integrationTest('map chat: the selection (one card, or the selected set) shows as references', async () => {
@@ -2754,17 +2752,6 @@ integrationTest('B1 ui: a map with cards does not get the opening screen either'
   const h = await harness(); await h.view.hydrate(); h.repaint(); assert.equal(h.view.chat.isHero, false);
 });
 
-integrationTest('B1 ui: the read-only sample shows the opening screen in its start card, and a message from it is sent as noEditableMap', async () => {
-  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
-  // render() makes the start card before it mounts the chat; the stand-in does the same.
-  const repaint = () => { const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore(); return ws; };
-  repaint(); const chat = h.view.chat;
-  assert.equal(chat.isHero, true); const card = find(h.rootEl, i => hasClass(i, 'vam-sample-start-chat')); assert.ok(find(card, i => i === chat.el), 'in the sample\'s start card');
-  h.type('Coffee map'); await h.view.sendMapChat();
-  assert.equal(h.control.requests.length, 1); assert.equal(h.control.requests[0].context.noEditableMap, true); assert.equal(JSON.parse(h.control.requests[0].context.json).noEditableMap ?? true, true);
-  assert.equal(chat.hasMessages, true); assert.equal(chat.isHero, false, 'after the message it is the side window');
-});
-
 // ---- opening screen: create an empty map without AI ----------------------------------------------------------------
 
 integrationTest('45 ui: the opening screen has a secondary "create an empty mind map" button after the examples; reachable by Tab, named by its text, not the call to action', async () => {
@@ -2794,12 +2781,6 @@ integrationTest('45 ui: after the first message the button is hidden, and a map 
   h.type('Coffee'); await h.view.sendMapChat();
   assert.equal(chat.isHero, false); assert.equal(chat.emptyMapEl.hidden, true, 'side window: hidden');
   const g = await harness(); await g.view.hydrate(); g.repaint(); g.open(); assert.equal(g.view.chat.isHero, false); assert.equal(g.view.chat.emptyMapEl.hidden, true, 'a map with cards');
-});
-
-integrationTest('45 ui: the read-only sample\'s opening screen does not get a second button (its start card has one)', async () => {
-  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
-  const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore();
-  assert.equal(h.view.chat.isHero, true); assert.equal(h.view.chat.emptyMapEl.hidden, true);
 });
 
 // ---- suggestions -------------------------------------------------------------------------------------------------
@@ -3125,16 +3106,14 @@ integrationTest('B1 fix 11: a map that was made but could not be opened says so,
   void original;
 });
 
-integrationTest('B1 fix 12: the read-only sample, from the opening screen to a map of the user\'s own: message, plan card, Apply, the new map with its cards, the conversation kept', async () => {
-  const h = await harness(); await h.view.hydrate(); h.view.builtIn = true;
-  const repaint = () => { const restore = h.view.detachMapChat(); h.page.doc.activeElement = null; h.rootEl.empty(); const start = h.rootEl.createDiv('vam-sample-start'); start.createDiv('vam-sample-start-chat'); h.page.attach(start); const ws = h.rootEl.createDiv('vam-workspace'); const overlay = h.page.attach(ws.createDiv('vam-canvas-overlay')); h.view.mountMapChat(ws, overlay); restore(); };
-  repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
+integrationTest('B1 fix 12: a blank map outside the managed folders, from the opening screen to a map of the user\'s own: message, plan card, Apply, the new map with its cards, the conversation kept', async () => {
+  const h = await harness({ empty: true }); await h.view.hydrate(); h.view.path = 'Elsewhere/Map.md'; h.repaint(); const chat = h.view.chat; assert.equal(chat.isHero, true);
   const actions = [{ kind: 'create_map', title: 'Coffee study' }, addRoot('r', 'Coffee'), ...Array.from({ length: 4 }, (_, i) => addRoot(`c${i}`, `Part ${i}`, 'new:r'))];
   h.control.reply = async () => ({ reply: 'I will make a map.', actions, rejected: [] });
   const topicsBefore = (await h.repo.topics()).length; h.type('Coffee map'); await h.view.sendMapChat();
   assert.equal(h.control.requests[0].context.noEditableMap, true); assert.equal(planCard(h).length, 1, 'a new map waits for the yes'); assert.equal((await h.repo.topics()).length, topicsBefore);
   planButton(h, 'apply').click(); await until(() => !h.view.chatApplying && chat.pendingPlan() === null && chat.transcript().at(-1).lines.length > 0);
-  assert.equal(h.view.builtIn, false, 'a map of the user\'s own'); assert.equal(h.view.map.title, 'Coffee study'); assert.equal(h.view.map.nodes.length, 5); assert.equal((await h.repo.topics()).length, topicsBefore + 1);
+  assert.equal(h.view.map.title, 'Coffee study'); assert.equal(h.view.map.nodes.length, 5); assert.equal((await h.repo.topics()).length, topicsBefore + 1);
   assert.equal(chat.transcript().length, 2, 'the conversation went along'); eq(lineTexts(chat).slice(0, 6).every(t => /^Done/.test(t)), true);
 });
 
@@ -3723,7 +3702,6 @@ integrationTest('B3 insert: stale fences - another map, a card that is gone, a m
     ['merging', h => { h.view.mergeTasks.set(h.view.path, { mapPath: h.view.path, sources: [{ id: h.ids.a, path: h.node('a').path }], controller: new AbortController(), state: 'running' }); }, /being merged/],
     ['AI running (activeTasks)', h => { h.plugin.activeTasks.set(h.node('a').path, new AbortController()); }, /AI is working on the card/],
     ['AI running (running)', h => { h.plugin.running.add(h.node('a').path); }, /AI is working on the card/],
-    ['built-in sample', h => { h.view.builtIn = true; }, /cannot be edited/],
     ['AIM map', h => { h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; }, /cannot be edited/]
   ];
   for (const [label, spoil, reason] of cases) {
@@ -3904,13 +3882,6 @@ integrationTest('B3 save: a button between the model list and Close; hidden on t
   assert.equal(chat.completedTurns().length, 1, 'a failed turn is not saved');
   const hero = await harness({ empty: true }); await hero.view.hydrate(); hero.repaint();
   assert.equal(hero.view.chat.isHero, true); assert.equal(saveButton(hero).hidden, true);
-});
-integrationTest('B3 save: the built-in sample has no folder, so the button says so and nothing is written', async () => {
-  const { h, chat } = await imageHarness(); chat.finish('Answer.', []);
-  h.view.builtIn = true; chat.refreshSelection(); // the host answers canSave() when the button repaints
-  chat.begin('again'); chat.finish('Again.', []);
-  const button = saveButton(h); assert.equal(button.attrs['aria-disabled'], 'true'); assert.equal(button.attrs.title, 'This map has no folder to save into.');
-  button.click(); await tick(); eq(savedPaths(h), []);
 });
 integrationTest('B3 save: writes a new Chats note named by the local date and the first sentence, creates the folder, and tells the reader once', async () => {
   const { h, chat } = await imageHarness();

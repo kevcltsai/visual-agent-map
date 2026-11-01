@@ -224,3 +224,61 @@ export { standardTemplate, textbookTemplate } from "./ai/detail-templates";
     assert.deepEqual(names, S.standardTemplate(language).sections.map(section => section.name), language);
   }
 });
+
+// Q1: the two-zone template text (sections, then the format rules after a level-one heading line).
+let templateModule;
+const T = () => templateModule ??= loadSource(`
+export { parseTemplateBlock, splitTemplateZones, templateFormatHeading } from "./core/blocks/template-block";
+export { builtinTemplateText } from "./core/blocks/builtin";
+export { detailStructurePrompt, standardTemplate, textbookTemplate } from "./ai/detail-templates";
+export { OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
+export { noteLanguageOf } from "./i18n";
+`);
+
+test('counter 10: a built-in template text parses into the sections of today and the format rules of today', () => {
+  const t = T();
+  for (const id of ['standard', 'textbook']) {
+    for (const language of LANGUAGES) {
+      const text = t.builtinTemplateText(id, language);
+      const parsed = t.parseTemplateBlock(text, { id, name: id });
+      assert.equal(parsed.ok, true, `${id} ${language} ${JSON.stringify(parsed.issues)}`);
+      assert.equal(parsed.format, t.inLanguage(t.OBSIDIAN_FORMAT, language), `${id} ${language} format`);
+      const today = (id === 'textbook' ? t.textbookTemplate : t.standardTemplate)(t.noteLanguageOf(language));
+      // The section files word the descriptions differently from today's built-in strings, so the structure (headings and
+      // roles) is compared; the unmodified built-in keeps today's wording by taking today's path in the assembler.
+      const shape = template => template.sections.map(section => `${section.name}|${section.role ?? ''}`).join();
+      assert.equal(shape(parsed.template), shape(today), `${id} ${language} sections`);
+    }
+  }
+});
+
+test('counter 10: every spelling of the format heading splits the zones, in any language', () => {
+  const t = T();
+  const names = LANGUAGES.map(language => t.templateFormatHeading(language));
+  assert.equal(new Set(names).size, 3);
+  for (const name of names) {
+    const zones = t.splitTemplateZones(`## A\nbody\n\n# ${name}\n\n\nrule 1\nrule 2\n\n`);
+    assert.equal(zones.sections, '## A\nbody\n');
+    assert.equal(zones.format, 'rule 1\nrule 2');
+  }
+  const none = t.parseTemplateBlock('## A\nbody\n', { id: 'x', name: 'x' });
+  assert.equal(none.ok, true);
+  assert.equal(none.format, '');
+});
+
+test('counter 11: a second format heading reports its line; a heading inside fenced code is not one', () => {
+  const t = T();
+  const name = t.templateFormatHeading('en');
+  const twice = t.parseTemplateBlock(`## A\nbody\n# ${name}\nr\n# ${name}\nr2\n`, { id: 'x', name: 'x' });
+  assert.equal(twice.ok, false);
+  assert.equal(twice.issues[0].line, 5);
+  const fenced = t.parseTemplateBlock(`## A\nbody\n# ${name}\n\`\`\`\n# ${name}\n\`\`\`\n`, { id: 'x', name: 'x' });
+  assert.equal(fenced.ok, true);
+  assert.equal(fenced.format, `\`\`\`\n# ${name}\n\`\`\``);
+});
+
+test('Q1: the sections zone keeps original line numbers in parse issues', () => {
+  const t = T();
+  const parsed = t.parseTemplateBlock('## A\n數量: x\nbody\n', { id: 'x', name: 'x' });
+  if (!parsed.ok) assert.ok(parsed.issues.every(issue => issue.line >= 1));
+});

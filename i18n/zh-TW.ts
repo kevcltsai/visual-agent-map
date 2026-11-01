@@ -1461,6 +1461,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.note_style_textbook_short": "教科書",
   "ui.block_format_standard": "標準 Obsidian 格式",
   "ui.block_format_plain": "純文字",
+  "ui.block_template_format_heading": "格式規則",
   "ui.note_style_summary": "精簡重點",
   "ui.note_style_plain": "白話說明",
   "ui.note_style_guide": "實用指南",

@@ -1498,6 +1498,7 @@ var en = {
   "ui.note_style_textbook_short": "Textbook",
   "ui.block_format_standard": "Standard Obsidian format",
   "ui.block_format_plain": "Plain text",
+  "ui.block_template_format_heading": "Format rules",
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",
@@ -3701,6 +3702,7 @@ var zhCN = {
   "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
   "ui.block_format_standard": "\u6807\u51C6 Obsidian \u683C\u5F0F",
   "ui.block_format_plain": "\u7EAF\u6587\u672C",
+  "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
   "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
   "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
   "ui.note_style_guide": "\u5B9E\u7528\u6307\u5357",
@@ -5904,6 +5906,7 @@ var zhTW = {
   "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
   "ui.block_format_standard": "\u6A19\u6E96 Obsidian \u683C\u5F0F",
   "ui.block_format_plain": "\u7D14\u6587\u5B57",
+  "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
   "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
   "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
   "ui.note_style_guide": "\u5BE6\u7528\u6307\u5357",
@@ -31246,25 +31249,26 @@ var tone = (id, nameKey) => ({
     return id === "academic" ? "" : (_b2 = (_a2 = builtinPresets(language2, "tone").find((preset) => preset.id === id)) == null ? void 0 : _a2.text) != null ? _b2 : "";
   }
 });
-var template = (id, nameKey, files) => ({
-  category: "template",
-  id,
-  nameKey,
-  body: (language2) => strip2(
-    files[language2 === "zh-TW" || language2 === "zh-CN" ? language2 : instructionLanguageOf(language2) === "zh" ? "zh-TW" : "en"]
-  )
-});
+function fileFor(files, language2) {
+  const own2 = files[language2];
+  if (own2 !== void 0) return own2;
+  const match = CANONICAL_LANGUAGES.find((item) => instructionLanguageOf(item) === instructionLanguageOf(language2));
+  return files[match != null ? match : CANONICAL_LANGUAGES[0]];
+}
+var template = (id, nameKey, files) => {
+  const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language2, index) => [language2, files[index]]));
+  return {
+    category: "template",
+    id,
+    nameKey,
+    body: (language2) => strip2(fileFor(table, language2)),
+    sections: (language2) => strip2(fileFor(table, language2)),
+    format: (language2) => inLanguage(OBSIDIAN_FORMAT, language2)
+  };
+};
 var BUILTIN_BLOCKS = [
-  template("standard", "ui.note_style_standard_short", {
-    "zh-TW": standard_zh_TW_default3,
-    "zh-CN": standard_zh_CN_default3,
-    en: standard_en_default3
-  }),
-  template("textbook", "ui.note_style_textbook_short", {
-    "zh-TW": textbook_zh_TW_default3,
-    "zh-CN": textbook_zh_CN_default3,
-    en: textbook_en_default3
-  }),
+  template("standard", "ui.note_style_standard_short", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
+  template("textbook", "ui.note_style_textbook_short", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
   {
     category: "format",
     id: "standard-obsidian",

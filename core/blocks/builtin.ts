@@ -1,4 +1,6 @@
 import { instructionLanguageOf, type ContentLanguage, type TranslationKey } from "../../i18n";
+import { CANONICAL_LANGUAGES, type NoteStyleLanguage } from "../../ai/note-style-file";
+import { templateFormatHeading } from "./template-block";
 import { builtinPresets } from "../../ai/prompt-presets";
 import { OBSIDIAN_FORMAT, inLanguage } from "../steps/_shared/fragments";
 import PlainTextZH from "./format/plain-text.zh.md";
@@ -22,6 +24,10 @@ export interface BuiltinBlock {
   readonly nameKey: TranslationKey;
   /** The block's prompt text in the language's instruction language. */
   body(language: ContentLanguage): string;
+  /** Template blocks only: the sections zone (same text as `body`). */
+  sections?(language: ContentLanguage): string;
+  /** Template blocks only: the format rules zone. */
+  format?(language: ContentLanguage): string;
 }
 
 const strip = (text: string): string => (text.endsWith("\n") ? text.slice(0, -1) : text);
@@ -35,38 +41,48 @@ const tone = (id: string, nameKey: TranslationKey): BuiltinBlock => ({
     id === "academic" ? "" : (builtinPresets(language, "tone").find(preset => preset.id === id)?.text ?? "")
 });
 
-/** A template block's body is its section file text (canonical v2 without the tone and format switches). */
-const template = (
-  id: string,
-  nameKey: TranslationKey,
-  files: Record<"zh-TW" | "zh-CN" | "en", string>
-): BuiltinBlock => ({
-  category: "template",
-  id,
-  nameKey,
-  body: language =>
-    strip(
-      files[
-        language === "zh-TW" || language === "zh-CN"
-          ? language
-          : instructionLanguageOf(language) === "zh"
-            ? "zh-TW"
-            : "en"
-      ]
-    )
-});
+/**
+ * The section file of `language`: the canonical language's own file, otherwise the file of the first canonical
+ * language that shares its instruction language.
+ */
+function fileFor(files: Readonly<Record<NoteStyleLanguage, string>>, language: ContentLanguage): string {
+  const own = (files as Readonly<Record<string, string | undefined>>)[language];
+  if (own !== undefined) return own;
+  const match = CANONICAL_LANGUAGES.find(item => instructionLanguageOf(item) === instructionLanguageOf(language));
+  return files[match ?? CANONICAL_LANGUAGES[0]];
+}
+
+/**
+ * A template block's body is its section file text (canonical v2 without the tone and format switches); `format` is the
+ * Obsidian format rules the prompt carries today. `files` follow the order of CANONICAL_LANGUAGES.
+ */
+const template = (id: string, nameKey: TranslationKey, files: readonly string[]): BuiltinBlock => {
+  const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language, index) => [language, files[index]])) as Record<
+    NoteStyleLanguage,
+    string
+  >;
+  return {
+    category: "template",
+    id,
+    nameKey,
+    body: language => strip(fileFor(table, language)),
+    sections: language => strip(fileFor(table, language)),
+    format: language => inLanguage(OBSIDIAN_FORMAT, language)
+  };
+};
+
+/**
+ * The whole text of a built-in template: the sections, the format rules heading, then today's Obsidian format rules.
+ * The text a template editor opens and "restore default" writes.
+ */
+export function builtinTemplateText(id: string, language: NoteStyleLanguage): string {
+  const block = findBuiltinBlock("template", id);
+  return `${block.sections?.(language)}\n\n# ${templateFormatHeading(language)}\n\n${block.format?.(language)}`;
+}
 
 export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
-  template("standard", "ui.note_style_standard_short", {
-    "zh-TW": StandardZhTW,
-    "zh-CN": StandardZhCN,
-    en: StandardEn
-  }),
-  template("textbook", "ui.note_style_textbook_short", {
-    "zh-TW": TextbookZhTW,
-    "zh-CN": TextbookZhCN,
-    en: TextbookEn
-  }),
+  template("standard", "ui.note_style_standard_short", [StandardZhTW, StandardZhCN, StandardEn]),
+  template("textbook", "ui.note_style_textbook_short", [TextbookZhTW, TextbookZhCN, TextbookEn]),
   {
     category: "format",
     id: "standard-obsidian",

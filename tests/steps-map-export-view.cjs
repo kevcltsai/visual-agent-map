@@ -392,3 +392,21 @@ test('canvas-text-node: a free text link path is exported as a dashed edge, othe
   assert.match(svg, /<path d="M 10 10 L 90 90"[^>]*stroke-dasharray="5 4"/);
   assert.doesNotMatch(svg.match(/<path d="M 380 120[^>]*>/)[0], /dasharray/);
 });
+
+test('card-height: the scene marks clipped:true only for a fixed-height card the view shows as clipped', async () => {
+  const h = await harness();
+  const titleOf = c => (c.title.join ? c.title.join('') : String(c.title));
+  const sceneCards = async () => { const { scene } = await h.view.collectExportScene(() => true); return { root: scene.cards.find(c => titleOf(c).includes('Root')), child: scene.cards.find(c => titleOf(c).includes('Child')) }; };
+  let cards = await sceneCards();
+  assert.ok(!('clipped' in cards.root) && !('clipped' in cards.child), 'no heights: no clipped key');
+  h.view.map.nodes.find(n => n.id === h.root.id).height = 100;
+  cards = await sceneCards();
+  assert.ok(!('clipped' in cards.root), 'a fixed height whose content fits is not clipped');
+  h.view.cardEls.get(h.child.id).addClass('is-clipped');
+  cards = await sceneCards();
+  assert.ok(!('clipped' in cards.child), 'the class without a stored height is ignored');
+  h.view.cardEls.get(h.root.id).addClass('is-clipped');
+  cards = await sceneCards();
+  assert.equal(cards.root.clipped, true, 'fixed height and clipped');
+  assert.ok(!('clipped' in cards.child));
+});

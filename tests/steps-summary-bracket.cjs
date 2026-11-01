@@ -49,7 +49,13 @@ test('A1: a map without summaries is unchanged byte for byte', () => {
 });
 
 test('A2: the 0.28.0 sanitize keeps a summary as is; the new one drops dangling members on write', () => {
-  const source = execFileSync('git', ['show', '0.28.0:experiences/visual-map/canvas-items.ts'], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+  // CI checks out without tags, so fall back to the committed copy of the same 0.28.0 file.
+  let source;
+  try {
+    source = execFileSync('git', ['show', '0.28.0:experiences/visual-map/canvas-items.ts'], { cwd: path.join(__dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    source = fs.readFileSync(path.join(__dirname, 'fixtures', 'legacy-canvas-items-47c406a.ts.txt'), 'utf8');
+  }
   const old = loadSource(source);
   const items = [sum(), { id: 'i1', kind: 'image', path: 'a.png', x: 1, y: 2, w: 3, h: 4 }];
   const oldOut = plain(old.sanitizeCanvasItems(items));

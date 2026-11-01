@@ -161,7 +161,7 @@ integrationTest('Next Step: the model field offers Fix connection and the templa
 function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', children = 1, pending = 0, research, expand, synthesize, language = 'en', plugin: pluginOverrides = {} } = {}) {
   const notices = [];
   const Modal = dom.makeModal();
-  const { NextStepModal } = load('main.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } } } });
+  const { NextStepModal, NoteStyleFileError } = load('tests/support-main-entry.ts', { obsidian: { ...obsidian, Modal, setIcon: () => {}, Notice: class { constructor(message) { notices.push(message); } hide() {} } } }, { createFragment: dom.createFragment });
   const modelState = provider => ({ provider, status: 'ready', models: provider === 'codex' ? ['gpt-test'] : [] });
   const sources = { currentTopicId: 'current', currentLabel: 'Current topic included', synthesisLabel: 'Current topic and child topics included', synthesisTopics: ['Child A', 'Child B'], topics: async () => [], readTopic: async () => [] };
   const saved = [];
@@ -177,7 +177,7 @@ function nextStepHarness({ settings = {}, modelSettings = {}, topic = 'Parent', 
     settingsArg);
   modal.open();
   const actions = () => find(modal.modalEl, i => hasCls(i, 'vam-next-actions'));
-  return { modal, plugin, notices, saved, calls, actions, settings: settingsArg, sources };
+  return { modal, plugin, notices, saved, calls, actions, settings: settingsArg, sources, NoteStyleFileError };
 }
 integrationTest('Next Step: the model select starts with Follow default; saves only modelSource and never pins a model', async () => {
   const pick = (h, value) => { const select = byLabel(h.modal.contentEl, 'Model'); select.value = value; select.fire('change'); };
@@ -1327,4 +1327,17 @@ integrationTest('B2 synthesize (chat): the options equal what the integration di
   await chatApply(selChat, [synth(selChat.kids.map(k => k.id))], 'x'); await until(() => selChatSeen.length === 1);
   assert.deepEqual(selChatSeen[0].options, selDialogSeen[0].options, 'selection: same TaskOptions, including the new topic\'s default name');
   console.log('B2 integration default options (selection):', JSON.stringify(selChatSeen[0].options));
+});
+
+integrationTest('Next Step: a bad style file found after the dialog hid shows Open this file and never reaches the provider', async () => {
+  const spy = hookSpy(); let opened = 0, askModel = 0;
+  const h = nextStepHarness({ modelSettings: { topicStatus: 'idea', background: spy.hooks }, plugin: { askModel: () => { askModel++; } },
+    research: async function () { throw new h.NoteStyleFileError('The note style file "A.md" cannot be used (line 2): x', () => { opened++; }); } });
+  button(h.actions(), 'Confirm research task').click(); await until(() => h.notices.length);
+  assert.equal(h.modal.closeCount, 1, 'the dialog had hidden');
+  const shown = h.notices[h.notices.length - 1];
+  assert.equal(typeof shown, 'object', 'a fragment with an action, not plain text');
+  const open = findAll(shown, i => i.tag === 'button')[0];
+  assert.equal(open.text, 'Open this file'); open.click(); assert.equal(opened, 1);
+  assert.equal(askModel, 0, 'no provider call');
 });

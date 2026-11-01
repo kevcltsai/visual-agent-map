@@ -36245,8 +36245,7 @@ var NextStepModal = class extends import_obsidian24.Modal {
         if (this.dead(controller)) return;
         await work();
       } catch (error) {
-        if (this.closed && !controller.signal.aborted)
-          new import_obsidian24.Notice(error instanceof Error ? error.message : String(error));
+        if (this.closed && !controller.signal.aborted) errorNotice(error);
         this.failed(
           panel,
           button,

@@ -23,7 +23,7 @@ const png = (w = 400, h = 200) => {
 };
 const file = (data, { type = 'image/png', name = 'pic.png' } = {}) => ({ name, type, size: data.byteLength, arrayBuffer: async () => data });
 
-async function harness({ aim = false, builtIn = false } = {}) {
+async function harness({ aim = false } = {}) {
   const { repo, app, contents, files } = fixture('en', { linkIndex: true });
   const settings = { ...DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' };
   repo.settings = settings;
@@ -66,7 +66,7 @@ async function harness({ aim = false, builtIn = false } = {}) {
   view.viewportEl.getBoundingClientRect = () => ({ left: 10, top: 5, right: 810, bottom: 605, width: 800, height: 600 });
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
   if (aim) view.map.aim = { version: 1 };
-  view.builtIn = builtIn; view.integrationMode = false;
+  view.integrationMode = false;
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
@@ -213,11 +213,6 @@ test('paste leaves everything else alone: text only, a selection that cannot tak
   const aim = await harness({ aim: true });
   aim.view.selected = aim.node.id;
   assert.equal(aim.view.pasteCanvasImages(clipboardEvent([file(png())])), false);
-  const sample = await harness({ builtIn: true });
-  sample.view.selected = sample.node.id;
-  assert.equal(sample.view.pasteCanvasImages(clipboardEvent([file(png())])), false);
-  await sample.settle();
-  assert.equal(sample.counts.createBinary, 0);
 });
 
 test('dragover highlights the card with is-drop-target until it leaves or drops; the canvas hint is replaced meanwhile', async () => {

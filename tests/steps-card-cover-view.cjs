@@ -229,7 +229,7 @@ test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover
     const h = await coverHarness(text);
     const calls = [];
     Object.assign(h.view, {
-      builtIn: !editable, integrationMode: false, enqueue: fn => fn(),
+      integrationMode: !editable, enqueue: fn => fn(),
       changeTopicCover: async node => { calls.push(node.id); return {}; }
     });
     h.view.map = { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
@@ -255,7 +255,7 @@ test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover
 
 test('P4b: changeTopicCover refuses a topic that is not editable', async () => {
   const h = await coverHarness(TEXT);
-  Object.assign(h.view, { builtIn: true });
+  Object.assign(h.view, { integrationMode: true });
   assert.equal(await h.view.changeTopicCover({ id: 'm', path: NOTE }), null);
   assert.equal(h.contents.get(NOTE), TEXT);
 });

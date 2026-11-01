@@ -171,8 +171,8 @@ test('counter-example 3: Delete removes the reference only; undo brings it back 
   assert.deepEqual(h.trashed, [], 'trashFile was called 0 times');
 });
 
-test('images cannot be changed on an AIM map, the built-in sample or in selection mode', async () => {
-  for (const mode of ['builtIn', 'integrationMode']) {
+test('images cannot be changed on selection mode', async () => {
+  for (const mode of ['integrationMode']) {
     const h = await harness([image()]);
     h.view[mode] = true;
     h.view.render();

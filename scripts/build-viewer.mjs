@@ -1,6 +1,6 @@
 // Builds the share viewer (browser JavaScript and CSS) into experiences/sharing/viewer-bundle.generated.ts, which the
 // plugin embeds in every shared HTML file. Run by `npm run build` before tsc; the generated file is committed and
-// `npm run verify` checks it is current (the same way as main.js and compiled.json).
+// `npm run verify` checks it is current (the same way as main.js).
 import { build } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";

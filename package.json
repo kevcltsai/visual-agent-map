@@ -5,8 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "compile:sample": "node scripts/compile-sample.mjs",
-    "build": "node scripts/build-viewer.mjs && npm run compile:sample && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "build": "node scripts/build-viewer.mjs && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "check:artifacts": "node scripts/check-artifacts.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "test:vault": "npm run test:ui:prepare",
@@ -16,7 +15,7 @@
     "verify:vault:reinstall": "node scripts/verify-reinstall-test-vault.mjs",
     "lint": "eslint . --max-warnings=0 && node scripts/check-css.mjs && node scripts/check-test-timing.mjs && node scripts/check-test-wiring.mjs",
     "test": "node scripts/test-harness.mjs",
-    "test:unit": "npm run compile:sample && node scripts/test-unit.mjs",
+    "test:unit": "node scripts/test-unit.mjs",
     "test:aim": "VAM_SUITES=aim node --test tests/run.cjs tests/aim-*.cjs tests/steps-aim-*.cjs tests/codex-parallel-runtime.cjs && VAM_SUITES=other node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs",
     "test:aim:node": "node tests/tools/aim-node.cjs",
     "test:integration": "node scripts/test-integration.mjs",
@@ -26,8 +25,8 @@
     "test:ui:update": "node scripts/test-harness.mjs --update-current",
     "format": "prettier --write \"**/*.ts\"",
     "format:check": "prettier --check \"**/*.ts\"",
-    "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
-    "verify:fast": "npm run lint && npm run format:check && npm run check:i18n && npm run test:unit && git diff --exit-code -- main.js samples/taiwan-travel/compiled.json experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"
+    "verify": "npm run lint && npm run format:check && npm run check:i18n && npm test && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts",
+    "verify:fast": "npm run lint && npm run format:check && npm run check:i18n && npm run test:unit && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts"
   },
   "devDependencies": {
     "@codemirror/state": "6.5.0",

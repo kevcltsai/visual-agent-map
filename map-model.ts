@@ -11,6 +11,7 @@ import { isContentLanguage, isNoteLanguage, t, translate, type ContentLanguage, 
 import {
   applyCollapseLevel,
   CARD_WIDTH,
+  clampCardHeight,
   clampCardWidth,
   descendants,
   parentIdsForNode,
@@ -633,6 +634,11 @@ export function parseMap(content: string, log?: RelationLogger): MapDocument {
       const width = clampCardWidth(n.width);
       if (width === undefined || width === CARD_WIDTH) delete n.width;
       else n.width = width;
+    }
+    if (n.height !== undefined) {
+      const height = clampCardHeight(n.height);
+      if (height === undefined) delete n.height;
+      else n.height = height;
     }
     if (
       n.aimKind !== undefined &&

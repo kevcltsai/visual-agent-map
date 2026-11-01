@@ -1204,3 +1204,44 @@ test('sharing viewer links: link text exists in every language and the viewer im
   assert.equal(text.shareViewerUiFor('zh-TW').linksLabel, '網址：{0}');
   assert.equal(/from\s+["'][^"']*topic-links["']/.test(read('experiences/sharing/viewer/detail.ts') + read('experiences/sharing/viewer/main.ts')), false, 'the viewer sources do not import topic-links');
 });
+
+test('sharing viewer card-height: a short card keeps its title and loses the summary first, with a cover in between (headless Chrome, flex shrink order)', async t => {
+  const chrome = findChrome();
+  if (!chrome) return t.skip('no Chrome found (set CHROME_BIN)');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-share-card-height-'));
+  try {
+    const data = payload();
+    data.nodes[0].height = 80;
+    data.nodes[0].title = 'Short title';
+    data.nodes[0].summary = 'A long summary that needs several lines of the card to be shown completely, one two three four five six seven eight nine ten eleven twelve.';
+    const out = path.join(directory, 'height.html');
+    fs.writeFileSync(out, html.renderShareHtml(data, text.shareViewerUiFor('en')));
+    const report = await dumpDomLight(chrome, directory, pathToFileURL(out).href, 60000, async send => {
+      const evaluate = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.value;
+      return evaluate(`(() => {
+        const card = document.querySelector('[data-node-id="${data.nodes[0].id}"]');
+        const size = el => ({ h: el.offsetHeight, scroll: el.scrollHeight });
+        const before = { title: size(card.querySelector('h3')), summary: size(card.querySelector('p')) };
+        // The plugin draws a cover frame between title and summary; the viewer has none, so stand one in to check the order.
+        const cover = document.createElement('div');
+        cover.className = 'vam-card-cover';
+        cover.style.height = '96px';
+        card.querySelector('h3').after(cover);
+        return { clipped: card.classList.contains('is-clipped'), cardHeight: card.offsetHeight, before, title: size(card.querySelector('h3')), summary: size(card.querySelector('p')), cover: size(cover), fade: getComputedStyle(card.querySelector('.vam-card-fade')).display, more: getComputedStyle(card.querySelector('.vam-card-more')).display };
+      })()`);
+    });
+    assert.equal(report.clipped, true);
+    assert.equal(report.cardHeight, 80);
+    assert.equal(report.before.summary.h, 0, 'the summary is the first to shrink, down to nothing');
+    console.log(JSON.stringify(report)); // At the 80px minimum the header and padding leave about one line, so the title may be partly cut, but it is the last thing to go.
+    assert.ok(report.before.title.h > 0, 'the title is still visible');
+    // A real cover frame is 96px: at 80px the header and the title leave no room for it, so the cover goes to nothing before the title gives up anything.
+    assert.equal(report.cover.h, 0, 'the cover shrinks before the title');
+    assert.ok(report.title.h > 0, 'the title is still visible with a cover present');
+    assert.equal(report.summary.h, 0);
+    assert.notEqual(report.fade, 'none');
+    assert.notEqual(report.more, 'none');
+  } finally {
+    try { fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { console.warn(`could not remove temp directory: ${error.message}`); }
+  }
+});

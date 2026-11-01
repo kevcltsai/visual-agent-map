@@ -457,6 +457,23 @@ test('sharing card-width: the payload carries width only for a custom width and 
   assert.match(viewerSource, /card\.style\.width = `\$\{node\.width\}px`/);
 });
 
+// card-height: the payload carries a custom card height only when one is set, same version.
+test('sharing card-height: the payload carries a cleaned height only when one is set', () => {
+  const { notesById } = cleanedNotes();
+  const map = fixtureMap();
+  map.nodes[0].height = 320;
+  map.nodes[1].height = 9999;
+  map.nodes[2].height = 'tall';
+  map.nodes[3].height = 50.4;
+  const payload = format.buildSharePayload(map, notesById, options());
+  assert.equal(payload.version, 1, 'no version bump');
+  const heights = payload.nodes.map(n => ('height' in n ? n.height : null));
+  assert.deepEqual(plain(heights.slice(0, 4)), [320, 720, null, 80]);
+  for (const node of payload.nodes.slice(4)) assert.equal('height' in node, false, `${node.id} has no height key`);
+  const plainPayload = format.buildSharePayload(fixtureMap(), notesById, options());
+  assert.equal(JSON.stringify(plainPayload).includes('"height"'), false, 'a map without heights serializes without the key');
+});
+
 // tree-text-node (P4): text nodes travel as plain text in an optional `textNodes` list; the viewer only uses textContent.
 test('sharing text-nodes: no text nodes means no key and unchanged bytes; text nodes carry parent, orphans get null', () => {
   const { notesById } = cleanedNotes();

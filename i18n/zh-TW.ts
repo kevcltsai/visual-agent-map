@@ -307,6 +307,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.aim_research_not_generated": "這個回答尚未產生研究子議題。",
   "ui.aim_retry_subtopics": "重新產生子議題",
   "ui.card_resize_label": "卡片寬度",
+  "ui.card_height_label": "卡片高度",
   "ui.codex_allowance_notice": "Codex 額度提醒",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
     "VAM 會透過你目前登入的 Codex 帳號執行 AI 任務，並使用該帳號的 Codex 使用額度。可用額度與限制依你的 ChatGPT 方案而定。",

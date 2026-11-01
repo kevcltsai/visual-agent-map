@@ -1081,12 +1081,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     await this.saveSettings();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
-  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
   openPromptPreview(trigger?: HTMLElement): void {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
     new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger).open();
   }
+  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice(): ModelChoice {
     const { model, reasoning } = resolveTaskModel({
       current: { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }

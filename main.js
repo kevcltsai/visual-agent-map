@@ -1521,8 +1521,8 @@ var en = {
   "ui.preview_group_tone": "Tone",
   "ui.preview_group_fixed": "Fixed by the plugin",
   "ui.preview_group_input": "Task input (sample)",
-  "ui.preview_issue_0_1_2": 'The template block "{0}" cannot be read (line {1}): {2}. The built-in template is used instead.',
-  "ui.preview_style_invalid_0_1_2": 'The default note style file "{0}" cannot be used (line {1}): {2}. Research will not start until it is fixed.',
+  "ui.preview_issue_0_1_2": 'The template block "{0}" cannot be read (line {1}): {2} The built-in template is used instead.',
+  "ui.preview_style_invalid_0_1_2": 'The default note style file "{0}" cannot be used (line {1}): {2} Research will not start until it is fixed.',
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",
@@ -3750,8 +3750,8 @@ var zhCN = {
   "ui.preview_group_tone": "\u8BED\u6C14",
   "ui.preview_group_fixed": "\u63D2\u4EF6\u56FA\u5B9A",
   "ui.preview_group_input": "\u4EFB\u52A1\u8F93\u5165\uFF08\u793A\u4F8B\uFF09",
-  "ui.preview_issue_0_1_2": "\u6A21\u677F\u79EF\u6728\u201C{0}\u201D\u8BFB\u4E0D\u61C2\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u3002\u8FD9\u6B21\u6539\u7528\u5185\u7F6E\u6A21\u677F\u3002",
-  "ui.preview_style_invalid_0_1_2": "\u9ED8\u8BA4\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u65E0\u6CD5\u4F7F\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u3002\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u4F1A\u5F00\u59CB\u3002",
+  "ui.preview_issue_0_1_2": "\u6A21\u677F\u79EF\u6728\u201C{0}\u201D\u8BFB\u4E0D\u61C2\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u8FD9\u6B21\u6539\u7528\u5185\u7F6E\u6A21\u677F\u3002",
+  "ui.preview_style_invalid_0_1_2": "\u9ED8\u8BA4\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u65E0\u6CD5\u4F7F\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u4F1A\u5F00\u59CB\u3002",
   "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
   "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
   "ui.note_style_guide": "\u5B9E\u7528\u6307\u5357",
@@ -5979,8 +5979,8 @@ var zhTW = {
   "ui.preview_group_tone": "\u8A9E\u6C23",
   "ui.preview_group_fixed": "\u5916\u639B\u56FA\u5B9A",
   "ui.preview_group_input": "\u4EFB\u52D9\u8F38\u5165\uFF08\u7BC4\u4F8B\uFF09",
-  "ui.preview_issue_0_1_2": "\u6A21\u677F\u7A4D\u6728\u300C{0}\u300D\u8B80\u4E0D\u61C2\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u3002\u9019\u6B21\u6539\u7528\u5167\u5EFA\u6A21\u677F\u3002",
-  "ui.preview_style_invalid_0_1_2": "\u9810\u8A2D\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u7121\u6CD5\u4F7F\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u3002\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u6703\u958B\u59CB\u3002",
+  "ui.preview_issue_0_1_2": "\u6A21\u677F\u7A4D\u6728\u300C{0}\u300D\u8B80\u4E0D\u61C2\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u9019\u6B21\u6539\u7528\u5167\u5EFA\u6A21\u677F\u3002",
+  "ui.preview_style_invalid_0_1_2": "\u9810\u8A2D\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u7121\u6CD5\u4F7F\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u6703\u958B\u59CB\u3002",
   "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
   "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
   "ui.note_style_guide": "\u5BE6\u7528\u6307\u5357",
@@ -69556,12 +69556,12 @@ ${t("ui.organize_link_wait_hint")}`;
     await this.saveSettings();
     for (const listener of [...this.currentModelListeners]) listener(this.settings.cliModel);
   }
-  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   /** Opens the read-only full-prompt preview; `trigger` gets the focus back when it closes. */
   openPromptPreview(trigger) {
     const provider = this.runtimeIdFor(this.currentModelChoice().model);
     new PromptPreviewModal(this.app, this.noteStyles, this.settings.language, provider, trigger).open();
   }
+  /** The current model and reasoning level, resolved the one way every entry point shares (ADR-021). */
   currentModelChoice() {
     const { model, reasoning } = resolveTaskModel({
       current: { model: this.settings.cliModel, reasoning: normalizeReasoningLevel(this.settings.cliReasoning) }

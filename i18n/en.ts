@@ -1564,9 +1564,9 @@ export const en = {
   "ui.preview_group_fixed": "Fixed by the plugin",
   "ui.preview_group_input": "Task input (sample)",
   "ui.preview_issue_0_1_2":
-    'The template block "{0}" cannot be read (line {1}): {2}. The built-in template is used instead.',
+    'The template block "{0}" cannot be read (line {1}): {2} The built-in template is used instead.',
   "ui.preview_style_invalid_0_1_2":
-    'The default note style file "{0}" cannot be used (line {1}): {2}. Research will not start until it is fixed.',
+    'The default note style file "{0}" cannot be used (line {1}): {2} Research will not start until it is fixed.',
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",

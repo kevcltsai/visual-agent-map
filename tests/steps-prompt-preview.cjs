@@ -170,7 +170,7 @@ test('counter 10: with a broken body in styleSelection the fake provider still w
   assert.equal(prompts.length, 2);
   assert.equal(prompts[0], prompts[1], 'the prompt is the built-in one');
   assert.equal(prompts[0].includes('### A\n'), false, 'the unreadable block text is not in it');
-  assert.ok(prompts[0].includes('### Key knowledge') || prompts[0].includes('###'), 'the built-in section headings are in it');
+  assert.ok(prompts[0].includes('### Key knowledge: The concepts, data, mechanisms and background needed to understand the conclusions.\n'), 'the built-in standard template section is in it');
 });
 
 // P2: group headings are UI only (never inside the prompt text), exist in every language, and the modal shows text as plain text.
@@ -189,4 +189,27 @@ test('counter 7 (P2): the group headings are translated and never appear in the 
 test('counter 8 (P2): the modal never renders markup or Markdown', () => {
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'ui/modals/prompt-preview-modal.ts'), 'utf8');
   assert.equal(/MarkdownRenderer|innerHTML|insertAdjacentHTML/.test(source), false);
+});
+
+// F1: the reason text from styleIssueText already ends with its own full stop, so the two notice templates must not add another.
+test('F1: the unreadable-block and invalid-style notices never end a reason with doubled sentence punctuation', () => {
+  const S = require('./support.cjs');
+  const i18n = S.load('i18n.ts');
+  const obsidian = { ...S.obsidian, PluginSettingTab: class {}, Setting: class {}, Modal: class {} };
+  const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
+  const codes = ['file_long', 'tone_long', 'frontmatter_unclosed', 'frontmatter_line', 'value_invalid', 'key_duplicate', 'no_sections', 'count_invalid', 'comment_unclosed', 'format_heading_repeated'];
+  const doubled = /[。．.！!？?]\s*[。．.！!？?]/;
+  try {
+    for (const language of LANGUAGES) {
+      i18n.setUiLanguage(language);
+      for (const code of codes) {
+        const reason = styleIssueText({ code, line: 3, values: ['a', 'b'], message: 'x' });
+        for (const key of ['ui.preview_style_invalid_0_1_2', 'ui.preview_issue_0_1_2']) {
+          const shown = i18n.t(key, 'Style.md', 3, reason);
+          assert.ok(shown.includes(reason), `${language} ${key} ${code}: the reason is shown`);
+          assert.equal(doubled.test(shown), false, `${language} ${key} ${code}: ${shown}`);
+        }
+      }
+    }
+  } finally { i18n.setUiLanguage('en'); }
 });

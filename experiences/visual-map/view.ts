@@ -16989,7 +16989,7 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(() => this.resizeCard(node.id, { width }));
     };
     handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       // The card's own pointerdown starts a move; the handle only resizes.
       event.stopPropagation();
       event.preventDefault();
@@ -17038,11 +17038,13 @@ export class VisualAgentMapView extends ItemView {
     });
     handle.addEventListener("click", event => event.stopPropagation());
     handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       if (widthOf() !== CARD_WIDTH) commit(undefined);
     });
     handle.addEventListener("keydown", event => {
+      if (this.presentation) return;
       const current = widthOf();
       let next: number | undefined | null = null;
       if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
@@ -17111,7 +17113,7 @@ export class VisualAgentMapView extends ItemView {
       this.enqueue(() => this.resizeCard(node.id, { height }));
     };
     handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       this.clearHoverTimer();
@@ -17170,11 +17172,13 @@ export class VisualAgentMapView extends ItemView {
     });
     handle.addEventListener("click", event => event.stopPropagation());
     handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       if (setHeight() !== undefined) commit(undefined);
     });
     handle.addEventListener("keydown", event => {
+      if (this.presentation) return;
       const current = heightOf();
       let next: number | undefined | null = null;
       if (event.key === "ArrowDown") next = current + CARD_HEIGHT_STEP;
@@ -17203,7 +17207,7 @@ export class VisualAgentMapView extends ItemView {
     const handle = card.createSpan({ cls: "vam-card-resize-corner", attr: { "aria-hidden": "true" } });
     const nodeNow = (): MapNode | undefined => this.map?.nodes.find(item => item.id === node.id);
     handle.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       this.clearHoverTimer();
@@ -17270,6 +17274,7 @@ export class VisualAgentMapView extends ItemView {
     });
     handle.addEventListener("click", event => event.stopPropagation());
     handle.addEventListener("dblclick", event => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       const current = nodeNow();

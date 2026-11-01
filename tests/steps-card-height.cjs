@@ -295,3 +295,53 @@ test('A8 the view marks a scene card clipped only for a fixed-height card the vi
   const exportSource = fs.readFileSync(path.join(root, 'experiences', 'visual-map', 'map-export.ts'), 'utf8');
   assert.match(exportSource, /card\.clipped === true/);
 });
+
+// ---- P4: presentation mode and export clipping --------------------------------------------------------------------------
+const widthHandle = h => {
+  const handlers = new Map(), attrs = {};
+  const handle = { attrs, handlers, tabIndex: 0, setAttr(n, v) { attrs[n] = v; }, addEventListener(n, fn) { handlers.set(n, fn); }, removeEventListener(n) { handlers.delete(n); }, setPointerCapture() {} };
+  h.view.attachResizeHandle({ style: {}, createSpan: () => handle }, h.nodes[0]);
+  return handle;
+};
+
+test('P4 once a presentation starts the existing handles do nothing: no drag, double click or key writes or changes the card', () => {
+  const h = harness({ width: 400, height: 320 });
+  const w = widthHandle(h);
+  h.view.presentation = { currentId: 'a' };
+  const ev = extra => ({ button: 0, pointerId: 1, clientX: 0, clientY: 0, key: '', preventDefault() {}, stopPropagation() {}, ...extra });
+  for (const [handle, keys] of [[h.y, ['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter']], [w, ['ArrowRight', 'ArrowLeft', 'Home', 'End', 'Enter']], [h.corner, []]]) {
+    handle.handlers.get('pointerdown')?.(ev({ clientX: 0, clientY: 0 }));
+    handle.handlers.get('pointermove')?.(ev({ clientX: 120, clientY: 90 }));
+    handle.handlers.get('pointerup')?.(ev({ clientX: 120, clientY: 90 }));
+    handle.handlers.get('dblclick')?.(ev());
+    for (const key of keys) handle.handlers.get('keydown')?.(ev({ key }));
+  }
+  assert.equal(h.changes.length, 0, 'nothing is written');
+  assert.deepEqual([h.card.style.width, h.card.style.height], ['400px', '320px'], 'the card keeps its size');
+  assert.deepEqual([h.nodes[0].width, h.nodes[0].height], [400, 320]);
+  h.view.presentation = null;
+  h.y.handlers.get('keydown')(ev({ key: 'ArrowDown' }));
+  assert.equal(h.changes.length, 1, 'after the presentation the handles work again');
+});
+
+test('P4 the stylesheet hides all three handles while the stage is presenting', () => {
+  assert.match(styles(), /\.vam-view \.vam-stage\[data-presenting\] \.vam-card-resize, \.vam-view \.vam-stage\[data-presenting\] \.vam-card-resize-y, \.vam-view \.vam-stage\[data-presenting\] \.vam-card-resize-corner \{ display: none; \}/);
+});
+
+test('P4 export: a clipped card keeps its image and text inside its frame; a scene without clipped is byte-identical', () => {
+  const ex = load('experiences/visual-map/map-export.ts');
+  const base = { width: 400, height: 300, title: 'Map', theme: { background: '#fff', text: '#111' } };
+  const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+  const card = { x: 10, y: 20, w: 100, h: 60, title: ['one', 'two', 'three'], cover: { x: 10, y: 20, w: 100, h: 96, href: PNG, fit: 'cover' } };
+  const plain = ex.buildMapSvg({ ...base, cards: [card] });
+  assert.ok(!plain.includes('viewBox="10 20'), 'no clip without clipped');
+  assert.equal(ex.buildMapSvg({ ...base, cards: [{ ...card, clipped: false }] }), plain);
+  const svg = ex.buildMapSvg({ ...base, cards: [{ ...card, clipped: true }] });
+  const open = svg.indexOf('<svg x="10" y="20" width="100" height="60" viewBox="10 20 100 60">');
+  assert.ok(open > 0, 'a nested svg the size of the card');
+  const close = svg.indexOf('</svg>', open);
+  const inside = svg.slice(open, close);
+  assert.ok(inside.includes('<image ') && inside.includes('>one…<'), 'image and text are inside the clip');
+  assert.ok(svg.indexOf('<rect x="10" y="20" width="100" height="60"') < open, 'the frame is drawn outside the clip');
+  assert.ok(!/url\(|clipPath/.test(svg), 'no url() reference: the whitelist is unchanged');
+});

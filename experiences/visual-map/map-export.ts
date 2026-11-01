@@ -207,6 +207,9 @@ export function buildMapSvg(scene: MapScene): string {
       out.push(
         `<rect x="${box[0]}" y="${box[1] + 14}" width="4" height="${Math.max(1, box[3] - 28)}" rx="2" fill="${color(card.accent, strokeColor)}"/>`
       );
+    // card-height: a clipped card's image and text sit in a nested svg the size of the card, which cuts them at the frame (the whitelist allows svg but no clipPath or url()). The viewBox keeps the page coordinates.
+    if (card.clipped === true)
+      out.push(`<svg x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" viewBox="${box.join(" ")}">`);
     out.push(imageElement(card.cover));
     const fill = color(card.textColor, textColor);
     const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
@@ -219,6 +222,7 @@ export function buildMapSvg(scene: MapScene): string {
         `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize ?? 13}"${titleWeight === undefined ? "" : ` font-weight="${titleWeight}"`} fill="${fill}">${escapeXml(line)}</text>`
       );
     });
+    if (card.clipped === true) out.push("</svg>");
     out.push("</g>");
   }
   for (const summary of scene.summaries ?? []) {

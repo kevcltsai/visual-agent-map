@@ -16854,6 +16854,8 @@ function buildMapSvg(scene) {
       out.push(
         `<rect x="${box[0]}" y="${box[1] + 14}" width="4" height="${Math.max(1, box[3] - 28)}" rx="2" fill="${color(card.accent, strokeColor)}"/>`
       );
+    if (card.clipped === true)
+      out.push(`<svg x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" viewBox="${box.join(" ")}">`);
     out.push(imageElement(card.cover));
     const fill2 = color(card.textColor, textColor);
     const coverBox = card.cover ? rect(card.cover.x, card.cover.y, card.cover.w, card.cover.h) : null;
@@ -16866,6 +16868,7 @@ function buildMapSvg(scene) {
         `<text x="${box[0] + 14}" y="${top + i * lineStep}" font-family="${FONT}" font-size="${titleSize != null ? titleSize : 13}"${titleWeight === void 0 ? "" : ` font-weight="${titleWeight}"`} fill="${fill2}">${escapeXml(line)}</text>`
       );
     });
+    if (card.clipped === true) out.push("</svg>");
     out.push("</g>");
   }
   for (const summary of (_i = scene.summaries) != null ? _i : []) {
@@ -60339,7 +60342,7 @@ ${addition}` : addition });
     };
     handle.addEventListener("pointerdown", (event) => {
       var _a2, _b2;
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       this.clearHoverTimer();
@@ -60385,12 +60388,14 @@ ${addition}` : addition });
     });
     handle.addEventListener("click", (event) => event.stopPropagation());
     handle.addEventListener("dblclick", (event) => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       if (widthOf() !== CARD_WIDTH) commit(void 0);
     });
     handle.addEventListener("keydown", (event) => {
       var _a2;
+      if (this.presentation) return;
       const current = widthOf();
       let next = null;
       if (event.key === "ArrowRight") next = current + CARD_WIDTH_STEP;
@@ -60465,7 +60470,7 @@ ${addition}` : addition });
     };
     handle.addEventListener("pointerdown", (event) => {
       var _a3, _b2;
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       this.clearHoverTimer();
@@ -60521,12 +60526,14 @@ ${addition}` : addition });
     });
     handle.addEventListener("click", (event) => event.stopPropagation());
     handle.addEventListener("dblclick", (event) => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       if (setHeight() !== void 0) commit(void 0);
     });
     handle.addEventListener("keydown", (event) => {
       var _a3;
+      if (this.presentation) return;
       const current = heightOf();
       let next = null;
       if (event.key === "ArrowDown") next = current + CARD_HEIGHT_STEP;
@@ -60559,7 +60566,7 @@ ${addition}` : addition });
     };
     handle.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c, _d, _e;
-      if (event.button !== 0 || !this.map) return;
+      if (event.button !== 0 || !this.map || this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       this.clearHoverTimer();
@@ -60619,6 +60626,7 @@ ${addition}` : addition });
     });
     handle.addEventListener("click", (event) => event.stopPropagation());
     handle.addEventListener("dblclick", (event) => {
+      if (this.presentation) return;
       event.stopPropagation();
       event.preventDefault();
       const current = nodeNow();

@@ -51,6 +51,21 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
   }
 });
 
+test('collect snapshots: note style files (parsed file sections, intro layout, every format preference off)', async () => {
+  const { parseNoteStyleFile } = loadModule('ai/note-style-file.ts');
+  const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return result.style; };
+  const sectionsStyle = parsed('---\n語氣: 親切白話\n---\n## 核心結論\n數量: 3\n用 1–3 句講最重要的結論。\n> [!summary]\n> 先講結論。\n\n## 證據與來源\n列出來源。\n\n## 更新紀錄\n一行摘要。\n');
+  const introStyle = parsed('---\n語氣: 親切白話\n圖表: 關\n---\n先用 2–4 段導讀帶讀者進入主題。\n\n## 核心結論\n> [!summary]\n> 用 1–3 句講最重要的結論。\n\n## 常見誤解\n> [!warning]\n> 用「初學者常以為…，其實…」的句型。\n');
+  const offStyle = parsed('---\n方框: 指定\n圖表: 關\n表格: 關\n待辦清單: 關\n螢光標記: 關\n---\n## 核心結論\n講結論。\n');
+  for (const [language, tag] of LANGUAGES) {
+    const ctx = { ...base, outputLanguage: language };
+    const withStyle = style => ({ ...ctx, detailTemplate: style.template, noteStyle: style, toneText: undefined });
+    await recordContext(`service.task-style-file-sections.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file (sections layout, count, callout instruction, sources and log roles)', language, withStyle(sectionsStyle));
+    await recordContext(`service.task-style-file-intro.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file in the intro layout (lead-in, empty sections omitted, diagrams off)', language, withStyle(introStyle));
+    await recordContext(`service.task-style-file-format-off.${tag}`, 'AiTaskService instructions: mode task with a note style file that turns callouts (placed only), diagrams, tables, task lists and highlights off', language, withStyle(offStyle));
+  }
+});
+
 test('collect snapshots: topics whose language is read from the text (D-2026-10-94)', async () => {
   // The existing snapshots name an explicit language id; these two start from the topic text. An English topic with function
   // words is detected as en (the en path); a French topic keeps the follow-input row, whose clause quotes the topic.

@@ -219,14 +219,13 @@ export class OutlineImportModal extends Modal {
     };
     this.syncModelLabel();
     const style = noteStyleField(researchOptions, {
+      styles: this.links.styles,
       templates: this.templates,
       tones: this.tones,
       keepLabel: t("ui.note_style_use_default_0", this.defaultStyleLabel),
-      templateDefault: t("ui.detail_template_use_workspace"),
-      toneDefault: t("ui.tone_use_default"),
-      manageTemplates: this.links.manageTemplates,
-      manageTones: this.links.manageTones
+      currentRef: this.links.currentStyleRef
     });
+    void style.reload();
     this.template = style.templateId;
     this.tone = style.toneId;
     this.setStyle = style.set;

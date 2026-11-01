@@ -1,11 +1,8 @@
 // Modals and task helpers used by the Visual Map view; moved from view.ts unchanged.
 import type VisualAgentMapPlugin from "../../main";
-import { listPresets } from "../../ai/prompt-presets";
-import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { defaultOutputLanguage } from "../aim/content-language";
 import {
   FOLLOW_INPUT_ID,
-  noteLanguageOf,
   OUTPUT_LANGUAGE_CHOICES,
   supportedLanguageLabel,
   SUPPORTED_LANGUAGES,
@@ -41,9 +38,8 @@ import {
 } from "./outline-import";
 import { FOLLOW_DEFAULT_MODEL, syncModelSelect } from "../../core/model-discovery";
 import { aiModeField, fieldLink, linkedField, noteStyleField } from "./research-fields";
+import { stylePickerFor, type StyleRef } from "./note-style-picker";
 import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
-import { DetailTemplatesModal } from "../../ui/modals/detail-templates-modal";
-import { builtinTemplates } from "../../ai/detail-templates";
 import { titleProblemText } from "../../ui/modals/title-check";
 
 export type SynthesisContent = "full" | "summary";
@@ -164,6 +160,8 @@ export interface NextStepSettings extends OutputLanguageMemory, AiModeMemory {
   currentTone?: string;
   /** Name of the note style (template + tone) the topic resolves to today, shown in "Keep current (…)". */
   currentStyle?: string;
+  /** The style behind `currentStyle`, so "Edit this style" works on the first option. */
+  currentStyleRef?: StyleRef;
   /** The topic's summary today, shown beside a draft that would replace it. */
   currentSummary?: string;
   /** The topic's research state and how many of its direct children are researched, for the suggested mode. */
@@ -241,6 +239,7 @@ export interface SelectionSynthesis {
     | "tones"
     | "currentTone"
     | "currentStyle"
+    | "currentStyleRef"
     | "outputLanguage"
     | "rememberOutputLanguage"
   >;
@@ -367,6 +366,7 @@ export class NextStepModal extends Modal {
         | "tones"
         | "currentTone"
         | "currentStyle"
+        | "currentStyleRef"
         | "outputLanguage"
         | "rememberOutputLanguage"
       >
@@ -1595,30 +1595,17 @@ export class NextStepModal extends Modal {
       this.manualOutputLanguage = languageSelect.value as ContentLanguage;
     });
     const style = noteStyleField(compactSettings, {
+      styles: stylePickerFor(this.app, this.plugin),
       templates: this.info?.templates ?? [],
       tones: this.info?.tones ?? [],
       keepLabel: t("ui.note_style_keep_0", this.info?.currentStyle ?? ""),
-      templateDefault: t("ui.detail_template_keep_0", this.info?.currentTemplate ?? ""),
-      toneDefault: t("ui.tone_keep_0", this.info?.currentTone ?? ""),
       currentTemplate: this.info?.currentTemplate,
       currentTone: this.info?.currentTone,
       currentStyle: this.info?.currentStyle,
-      manageTemplates: (selected, refreshed) => {
-        const settings = this.plugin.settings;
-        const choices = (): { id: string; name: string }[] =>
-          builtinTemplates(noteLanguageOf(settings.language), settings.language)
-            .concat(settings.detailTemplates)
-            .map(({ id, name }) => ({ id, name }));
-        new DetailTemplatesModal(this.app, this.plugin, () => refreshed(choices()), selected).open();
-      },
-      manageTones: (selected, refreshed) => {
-        const settings = this.plugin.settings;
-        const choices = (): { id: string; name: string }[] =>
-          listPresets(settings.promptPresets, "tone", settings.language).map(({ id, name }) => ({ id, name }));
-        new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(choices()), selected).open();
-      },
+      currentRef: this.info?.currentStyleRef,
       changed: () => refreshSummary()
     });
+    void style.reload();
     const templateId = style.templateId;
     const toneId = style.toneId;
     const describeOutput = (): void => {

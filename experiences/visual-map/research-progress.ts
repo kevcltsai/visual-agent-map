@@ -16,6 +16,8 @@ export interface ResearchProgress {
   preview?: ResearchPreview;
   /** The model that runs this task; shown after the stage name. */
   model?: string;
+  /** The note style file this run follows (with ".md"); shown after the model. Absent for built-in and old styles. */
+  style?: string;
 }
 export interface ResearchProgressClock {
   now(): number;
@@ -37,7 +39,7 @@ export class ResearchProgressStore {
   private pending = new Map<string, unknown>();
   constructor(private clock: ResearchProgressClock = realClock) {}
 
-  begin(path: string, attemptId: string, now: number, model?: string): void {
+  begin(path: string, attemptId: string, now: number, model?: string, style?: string): void {
     this.cancelPending(path);
     this.entries.set(path, {
       attemptId,
@@ -45,7 +47,8 @@ export class ResearchProgressStore {
       stage: "waiting",
       stageAt: now,
       slow: false,
-      ...(model ? { model } : {})
+      ...(model ? { model } : {}),
+      ...(style ? { style } : {})
     });
     this.notify(path);
   }

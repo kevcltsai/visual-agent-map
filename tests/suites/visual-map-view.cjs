@@ -651,17 +651,18 @@ test('multi research modal: no mode, network, image or depth fields; each row sh
   assert.deepEqual(plain(model().children.map(c => c.value)), ['']);
   models = [{ id: 'm1', label: 'Model One' }, { id: 'm2', label: 'Model Two' }]; changed();
   assert.deepEqual(plain(model().children.map(c => [c.value, c.text])), [['', 'Current model (overridden topics keep their own)'], ['m1', 'Model One'], ['m2', 'Model Two']]);
-  const templateSelect = find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Content template');
-  assert.deepEqual(plain(templateSelect.children.map(c => [c.value, c.text])), [['', "Each topic's current template"], ['standard', 'Standard'], ['A', 'Alpha template']]);
+  // The Note style select lists the built-ins, then the old custom templates the dialog was given (no style folder in this double).
+  const templateSelect = find(modal.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style');
+  assert.deepEqual(plain(templateSelect.children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
+  assert.deepEqual(plain(find(templateSelect, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['legacy:A', 'Alpha template']]);
   const start = find(modal.modalEl, i => i.tag === 'button' && i.text === 'Start research (2)');
   start.listeners.click(); start.listeners.click();
   assert.equal(modal.closed, 1); assert.equal(requests.length, 1); modal.onClose(); assert.equal(unwatched, 1);
   assert.deepEqual(plain(requests[0]), { requirements: '' }, 'the request carries no mode: each topic runs in its own note\'s mode');
   const second = []; const m2 = new mod.MultiResearchModal({}, ['A'], { list: () => [{ id: 'm1', label: 'Model One' }], watch: () => () => {} }, templates, r => second.push(r)); m2.open();
   find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Model').value = 'm1';
-  // The template select lives under "Custom…" of the Note style select.
-  const style2 = find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style'); style2.value = 'custom'; style2.listeners.change();
-  find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Content template').value = 'A';
+  // An old custom template is picked in the Note style select itself.
+  const style2 = find(m2.contentEl, i => i.tag === 'select' && i['aria-label'] === 'Note style'); style2.value = 'legacy:A'; style2.listeners.change();
   find(m2.contentEl, i => i.tag === 'textarea').value = '  only 2025  ';
   find(m2.modalEl, i => i.tag === 'button' && i.text === 'Start research (1)').listeners.click();
   assert.deepEqual(plain(second[0]), { requirements: 'only 2025', model: 'm1', detailTemplateId: 'A' });
@@ -709,17 +710,17 @@ integrationTest('Next Step modal: the content template choice goes into research
     modal.onOpen();
     return modal;
   };
-  const templateSelect = modal => find(modal.contentEl, item => item.tag === 'select' && item['aria-label'] === 'Content template');
-  // The template select sits under "Custom…" of the Note style select.
-  const customStyle = modal => { const style = find(modal.contentEl, item => item.tag === 'select' && item['aria-label'] === 'Note style'); style.value = 'custom'; style.fire('change'); };
+  const templateSelect = modal => find(modal.contentEl, item => item.tag === 'select' && item['aria-label'] === 'Note style');
+  // An old custom template is picked in the Note style select itself (no style folder in this double).
   const cardsOf = modal => find(modal.contentEl, item => item.cls === 'vam-next-cards');
   // Owner decision 2026-10-19: a research press hides the dialog, so each choice runs on its own fresh dialog.
   const modal = open('keep', settings);
-  assert.deepEqual(plain(templateSelect(modal).children.map(c => [c.value, c.text])), [['', 'Keep current (Standard)'], ['standard', 'Standard'], ['A', 'Alpha template']]);
+  assert.deepEqual(plain(templateSelect(modal).children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
+  assert.deepEqual(plain(find(templateSelect(modal), c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['legacy:A', 'Alpha template']]);
   button(modal.modalEl, 'Confirm research task').click(); await tick();
   assert.equal('detailTemplateId' in seen.research, false, 'keep-current sends no choice');
   const picked = open('picked', settings);
-  customStyle(picked); templateSelect(picked).value = 'A';
+  templateSelect(picked).value = 'legacy:A';
   button(picked.modalEl, 'Confirm research task').click(); await tick();
   assert.equal(seen.research.detailTemplateId, 'A');
   // C2: quick explore is an AI outline reviewed in the dialog; the template choice reaches its create step.
@@ -727,7 +728,7 @@ integrationTest('Next Step modal: the content template choice goes into research
   let ready;
   const quickOutline = { presets: [{ id: 'knowledge-tree', name: 'Knowledge tree generator' }], generate: async () => plain(load('experiences/visual-map/outline-import.ts', { obsidian }).parseOutline('# Parent\n## A').nodes), create: async (_nodes, options) => { seen.expand = options; } };
   const quickModal = open('quick', { ...settings, quickOutline, background: { begin() {}, end() {}, outlineReady: outline => { ready = outline; } } });
-  customStyle(quickModal); templateSelect(quickModal).value = 'A';
+  templateSelect(quickModal).value = 'legacy:A';
   cardsOf(quickModal).children[1].click();
  
   button(quickModal.modalEl, 'Expand').click(); await tick(); await tick();
@@ -735,30 +736,13 @@ integrationTest('Next Step modal: the content template choice goes into research
   button(reviewModal.contentEl, 'Create subtopics (1)').click(); await tick(); await tick();
   assert.equal(seen.expand.detailTemplateId, 'A');
   const synthModal = open('synth', settings);
-  customStyle(synthModal); templateSelect(synthModal).value = 'A';
+  templateSelect(synthModal).value = 'legacy:A';
   cardsOf(synthModal).children[2].click();
   const synthPanel = all(synthModal.contentEl, item => item.cls.includes('vam-next-research'))[2];
   button(synthModal.modalEl, 'Get synthesis suggestions first').click(); await tick();
   assert.equal(seen.synth.detailTemplateId, 'A');
   const bare = open('bare', undefined);
-  assert.deepEqual(plain(templateSelect(bare).children.map(c => c.value)), ['']);
-});
-test('templateField: keep option first, returns the chosen template id or undefined for keep', () => {
-  const element = (tag, options = {}) => ({ tag, text: options.text, value: options.value ?? '', children: [],
-    createEl(name, value = {}) { const child = element(name, value); this.children.push(child); return child; },
-    createDiv(value = {}) { return this.createEl('div', typeof value === 'string' ? { cls: value } : value); },
-    createSpan(value = {}) { const child = element('span', value); this.children.push(child); return child; },
-    replaceChildren() { this.children = []; },
-    setAttr(name, value) { this[name] = value; } });
-  const { templateField } = load('experiences/visual-map/research-fields.ts', { obsidian });
-  const parent = element('div');
-  const read = templateField(parent, [{ id: 'standard', name: 'Standard' }, { id: 'A', name: 'Alpha' }], 'Keep it');
-  const select = parent.children[0].children.find(child => child.tag === 'select');
-  assert.equal(select['aria-label'], 'Content template');
-  assert.deepEqual(plain(select.children.map(c => [c.value, c.text])), [['', 'Keep it'], ['standard', 'Standard'], ['A', 'Alpha']]);
-  assert.equal(read(), undefined);
-  select.value = 'A'; assert.equal(read(), 'A');
-  select.value = ''; assert.equal(read(), undefined);
+  assert.deepEqual(plain(templateSelect(bare).children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
 });
 integrationTest('draft review renders the draft, edits on demand and keeps the dialog open when saving fails', async () => {
   const element = (tag, options = {}) => ({

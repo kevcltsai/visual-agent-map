@@ -514,6 +514,7 @@ export class AiTaskService {
     return (
       !!input.addCharts &&
       this.diagramsOn() &&
+      input.styleDiagrams !== false &&
       !input.countRepair &&
       !input.intermediateDetail &&
       input.promptProfile !== "aim" &&

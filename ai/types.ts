@@ -1,4 +1,5 @@
 import type { CountIssue, DetailTemplate } from "./detail-templates";
+import type { NoteStyle } from "./note-style-file";
 import type { AimContract } from "./aim-contracts";
 import type { ContentLanguage } from "../i18n";
 import type { ReferenceGroup } from "./reference-materials";
@@ -57,6 +58,13 @@ export interface TaskContext {
   intermediateDetail?: boolean;
   /** Content template for fixed-section details (trusted; Standard when absent). */
   detailTemplate?: DetailTemplate;
+  /**
+   * The parsed note style file this run uses (one read per run; trusted, never serialized). Its format preferences shape
+   * the Obsidian syntax text; its template and tone arrive as `detailTemplate` and `toneText`. Absent for built-in and old styles.
+   */
+  noteStyle?: NoteStyle;
+  /** Trusted: false when the note style file turns diagrams off; the background chart step is then skipped (AND with the global setting). */
+  styleDiagrams?: boolean;
   /** Resolved writing-tone text (trusted). Absent for the default academic tone, so prompts stay unchanged. */
   toneText?: string;
   /** Trusted flag: after the note is written, run the chart step once. Never serialized into a prompt. */

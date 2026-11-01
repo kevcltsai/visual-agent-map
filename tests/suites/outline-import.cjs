@@ -255,13 +255,12 @@ test('outline modal: the content template select sits in the research options an
     const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, templates);
     modal.open();
     const options = h.find(modal.contentEl, item => /vam-outline-research-options/.test(item.cls));
-    const select = h.find(options, item => item.tag === 'select' && item['aria-label'] === 'Content template');
+    const select = h.find(options, item => item.tag === 'select' && item['aria-label'] === 'Note style');
     assert.ok(select, 'inside the research options');
-    assert.deepEqual(plain(select.children.map(c => [c.value, c.text])), [['', 'Use the workspace default'], ['standard', 'Standard'], ['t1', 'Template one']]);
+    assert.deepEqual(plain(select.children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
+    assert.deepEqual(plain(h.find(select, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['legacy:t1', 'Template one']]);
     const textarea = h.find(modal.contentEl, item => item.tag === 'textarea'); textarea.value = '# R\n## A'; textarea.listeners.input();
-    const style = h.find(options, item => item.tag === 'select' && item['aria-label'] === 'Note style');
-    if (picked) { style.value = 'custom'; style.listeners.change(); }
-    select.value = picked;
+    select.value = picked ? `legacy:${picked}` : '';
     const shallow = h.find(modal.contentEl, item => item.tag === 'input' && item.type === 'checkbox'); shallow.checked = shallowOn; shallow.listeners.change();
     h.find(modal.modalEl, item => item.tag === 'button' && item.text === 'Add to mind map').listeners.click();
     await new Promise(resolve => setTimeout(resolve, 0));

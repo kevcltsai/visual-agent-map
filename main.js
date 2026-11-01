@@ -24804,7 +24804,11 @@ var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
 var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
 var CANONICAL_LANGUAGES = ["zh-TW", "zh-CN", "en"];
 function byLanguage(zhTW2, zhCN2, en2) {
-  return Object.fromEntries([["zh-TW", zhTW2], ["zh-CN", zhCN2], ["en", en2]]);
+  return Object.fromEntries([
+    ["zh-TW", zhTW2],
+    ["zh-CN", zhCN2],
+    ["en", en2]
+  ]);
 }
 var CANONICAL_VERSIONS = [
   {

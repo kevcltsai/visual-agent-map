@@ -73,7 +73,11 @@ export const CANONICAL_LANGUAGES: readonly NoteStyleLanguage[] = ["zh-TW", "zh-C
 
 /** A per-language record built from entries, so no source line branches on a language id (language gate). */
 function byLanguage<T>(zhTW: T, zhCN: T, en: T): Record<NoteStyleLanguage, T> {
-  return Object.fromEntries([["zh-TW", zhTW], ["zh-CN", zhCN], ["en", en]]) as Record<NoteStyleLanguage, T>;
+  return Object.fromEntries([
+    ["zh-TW", zhTW],
+    ["zh-CN", zhCN],
+    ["en", en]
+  ]) as Record<NoteStyleLanguage, T>;
 }
 
 /** Frozen canonical contents. A new version adds a v2 entry here; v1 files never change (the test pins their hashes). */

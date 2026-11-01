@@ -172,3 +172,21 @@ test('counter 10: with a broken body in styleSelection the fake provider still w
   assert.equal(prompts[0].includes('### A\n'), false, 'the unreadable block text is not in it');
   assert.ok(prompts[0].includes('### Key knowledge') || prompts[0].includes('###'), 'the built-in section headings are in it');
 });
+
+// P2: group headings are UI only (never inside the prompt text), exist in every language, and the modal shows text as plain text.
+test('counter 7 (P2): the group headings are translated and never appear in the prompt text', () => {
+  const groups = ['role', 'template', 'tone', 'fixed', 'input'];
+  for (const language of LANGUAGES) {
+    const titles = groups.map(group => M.translate(language, `ui.preview_group_${group}`));
+    assert.equal(new Set(titles).size, groups.length, `${language}: five different headings`);
+    for (const step of M.PREVIEW_STEPS) for (const provider of PROVIDERS) {
+      const preview = M.previewPrompt(step.id, language, provider, {});
+      for (const title of titles) assert.equal(preview.text.includes(title), false, `${language} ${step.id}: "${title}" is not prompt text`);
+    }
+  }
+});
+
+test('counter 8 (P2): the modal never renders markup or Markdown', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'ui/modals/prompt-preview-modal.ts'), 'utf8');
+  assert.equal(/MarkdownRenderer|innerHTML|insertAdjacentHTML/.test(source), false);
+});

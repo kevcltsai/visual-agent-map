@@ -1551,6 +1551,22 @@ export const en = {
   "ui.preview_sample_ancestors": "Parent topic > this topic (sample).",
   "ui.preview_sample_findings": "An earlier finding about this topic (sample).",
   "ui.preview_sample_sources": "[S1] A source passage the research found (sample).",
+  "ui.preview_prompt_title": "Full prompt preview",
+  "ui.preview_prompt_open": "Preview full prompt",
+  "ui.preview_prompt_command": "Preview the full prompt",
+  "ui.preview_prompt_hint":
+    "Read-only. This is the exact text the AI receives for the step you pick, with sample task input. Nothing is saved or sent.",
+  "ui.preview_prompt_step_label": "Step",
+  "ui.preview_prompt_text_0": "Prompt text: {0}",
+  "ui.preview_group_role": "Role (fixed by the plugin)",
+  "ui.preview_group_template": "Template",
+  "ui.preview_group_tone": "Tone",
+  "ui.preview_group_fixed": "Fixed by the plugin",
+  "ui.preview_group_input": "Task input (sample)",
+  "ui.preview_issue_0_1_2":
+    'The template block "{0}" cannot be read (line {1}): {2}. The built-in template is used instead.',
+  "ui.preview_style_invalid_0_1_2":
+    'The default note style file "{0}" cannot be used (line {1}): {2}. Research will not start until it is fixed.',
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",
@@ -1630,6 +1646,7 @@ export const en = {
   "ui.note_style_issue_no_sections": "The file has no ## section.",
   "ui.note_style_issue_count_invalid": "The count is not a number.",
   "ui.note_style_issue_comment_unclosed": "A %% comment is never closed.",
+  "ui.note_style_issue_format_heading_repeated": "The format rules heading appears a second time.",
   "ui.note_style_folder_missing": "Style folder not found",
   "ui.note_style_folder_missing_desc_0":
     '"{0}" does not exist. Choose the folder again or open the style folder to create it.',

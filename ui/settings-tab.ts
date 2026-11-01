@@ -70,6 +70,9 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
       refresh();
     })
   );
+  setting.addButton(button =>
+    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl))
+  );
 }
 
 export const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";

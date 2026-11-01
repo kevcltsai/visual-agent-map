@@ -31507,7 +31507,9 @@ function quickGuidance(context, language2) {
   return `${depth} ${quickKnowledge(language2)}`;
 }
 function generalTaskPrompt(context, language2, provider = "codex") {
-  return assembleTaskPrompt(selectionFromContext(context, language2), promptStepOf(context), context, language2, provider).text;
+  var _a2;
+  const selection = (_a2 = context.styleSelection) != null ? _a2 : selectionFromContext(context, language2);
+  return assembleTaskPrompt(selection, promptStepOf(context), context, language2, provider).text;
 }
 function taskPrompt(context, language2, provider = "codex") {
   return context.promptProfile === "aim" ? buildAimPrompt(context, language2, provider) : generalTaskPrompt(context, language2, provider);
@@ -31975,7 +31977,10 @@ var AiTaskService = class {
    * is on, and it is a plain research task or synthesis (never a count repair, interim detail, AIM or decompose/merge).
    */
   chartEligible(input2) {
-    return !!input2.addCharts && this.diagramsOn() && input2.styleDiagrams !== false && !input2.countRepair && !input2.intermediateDetail && input2.promptProfile !== "aim" && (input2.mode === "task" || input2.mode === "synthesize");
+    var _a2, _b2;
+    const language2 = (_a2 = input2.outputLanguage) != null ? _a2 : this.options.language();
+    return !!input2.addCharts && this.diagramsOn() && input2.styleDiagrams !== false && !input2.countRepair && !input2.intermediateDetail && input2.promptProfile !== "aim" && (input2.mode === "task" || input2.mode === "synthesize") && // The template decides: no mermaid block in its sections or format rules, no chart step.
+    chartsWanted((_b2 = input2.styleSelection) != null ? _b2 : selectionFromContext(input2, language2), input2, language2);
   }
   /**
    * The chart step for a note that was already written: one local, tool-free model call, run after the write. Returns the

@@ -30,6 +30,7 @@ import { createTaskStep, taskStepId, type TaskStepRole } from "./steps/task/step
 import { chartStep, ChartRejected } from "./steps/chart/step";
 import { applyCharts, existingDiagrams, type ChartCode } from "./steps/chart/insert";
 import { readerFacingDetail } from "./steps/task/render";
+import { chartsWanted, selectionFromContext } from "./steps/task/assemble";
 
 export { extractJsonObject } from "./steps/task/parse";
 
@@ -511,6 +512,7 @@ export class AiTaskService {
    * is on, and it is a plain research task or synthesis (never a count repair, interim detail, AIM or decompose/merge).
    */
   chartEligible(input: TaskContext): boolean {
+    const language = input.outputLanguage ?? this.options.language();
     return (
       !!input.addCharts &&
       this.diagramsOn() &&
@@ -518,7 +520,9 @@ export class AiTaskService {
       !input.countRepair &&
       !input.intermediateDetail &&
       input.promptProfile !== "aim" &&
-      (input.mode === "task" || input.mode === "synthesize")
+      (input.mode === "task" || input.mode === "synthesize") &&
+      // The template decides: no mermaid block in its sections or format rules, no chart step.
+      chartsWanted(input.styleSelection ?? selectionFromContext(input, language), input, language)
     );
   }
 

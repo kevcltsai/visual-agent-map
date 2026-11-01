@@ -46,8 +46,8 @@ export function generalTaskPrompt(
   language: ContentLanguage,
   provider: AiProviderId = "codex"
 ): string {
-  return assembleTaskPrompt(selectionFromContext(context, language), promptStepOf(context), context, language, provider)
-    .text;
+  const selection = context.styleSelection ?? selectionFromContext(context, language);
+  return assembleTaskPrompt(selection, promptStepOf(context), context, language, provider).text;
 }
 
 /** AIM requests use the AIM prompt shell in core/steps/aim; its templates are Markdown files there. */

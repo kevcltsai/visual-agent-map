@@ -19991,13 +19991,15 @@ function readTopicMarkers(fm) {
 }
 function toggleTopicMarker(raw, id) {
   const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const group = TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id));
+  const groupIds = group.ids;
   let next;
-  if (current.includes(id)) next = current.filter((v) => v !== id);
-  else {
-    const groupIds = TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).ids;
-    next = isSingleChoiceMarker(id) ? current.filter((v) => typeof v !== "string" || !groupIds.includes(v)) : current.slice();
-    next.push(id);
-  }
+  if (group.single) {
+    const shown = groupIds.find((g) => current.includes(g));
+    const rest = current.filter((v) => typeof v !== "string" || !groupIds.includes(v));
+    next = shown === id ? rest : [...rest, id];
+  } else if (current.includes(id)) next = current.filter((v) => v !== id);
+  else next = [...current, id];
   return next.length ? next : null;
 }
 function markerSymbol(id) {
@@ -62682,7 +62684,7 @@ var SHARE_VIEWER_UI_EXTRA = {
       "flag-green": "\u7DD1\u306E\u65D7",
       "flag-blue": "\u9752\u3044\u65D7",
       smile: "\u7B11\u9854",
-      neutral: "\u666E\u901A",
+      neutral: "\u7121\u8868\u60C5",
       sad: "\u60B2\u3057\u3044",
       question: "\u8CEA\u554F"
     },

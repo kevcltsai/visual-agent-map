@@ -107,3 +107,11 @@ test('markers compat: the 0.28 module reads a note with new ids without throwing
   // The current module reads the 0.28 multi-value result as the first priority only.
   assert.deepEqual(own(m.readTopicMarkers({ 'topic-markers': ['priority-1', 'priority-3'] })), ['priority-1']);
 });
+
+test('markers toggle: legacy multi-value single-choice group follows the shown value', () => {
+  assert.deepEqual(own(m.toggleTopicMarker(['priority-1', 'priority-3'], 'priority-3')), ['priority-3']);
+  assert.equal(m.toggleTopicMarker(['priority-1', 'priority-3'], 'priority-1'), null);
+  assert.deepEqual(own(m.toggleTopicMarker(['future-x', 'priority-1', 'priority-3'], 'priority-1')), ['future-x']);
+  assert.deepEqual(own(m.toggleTopicMarker(['progress-25', 'progress-75'], 'progress-75')), ['progress-75']);
+  assert.equal(m.toggleTopicMarker(['progress-25', 'progress-75'], 'progress-25'), null);
+});

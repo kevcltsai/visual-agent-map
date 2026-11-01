@@ -66,7 +66,7 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
       "flag-green": "緑の旗",
       "flag-blue": "青い旗",
       smile: "笑顔",
-      neutral: "普通",
+      neutral: "無表情",
       sad: "悲しい",
       question: "質問"
     },

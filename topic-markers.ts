@@ -125,15 +125,16 @@ export function readTopicMarkers(fm: Record<string, unknown>): TopicMarker[] {
 export function toggleTopicMarker(raw: unknown, id: TopicMarker): string[] | null {
   // A hand-written string is a one-item list; non-string items stay as they are (the writer quotes strings only).
   const current: unknown[] = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const group = TOPIC_MARKER_GROUPS.find(g => g.ids.includes(id))!;
+  const groupIds: readonly string[] = group.ids;
   let next: unknown[];
-  if (current.includes(id)) next = current.filter(v => v !== id);
-  else {
-    const groupIds: readonly string[] = TOPIC_MARKER_GROUPS.find(g => g.ids.includes(id))!.ids;
-    next = isSingleChoiceMarker(id)
-      ? current.filter(v => typeof v !== "string" || !groupIds.includes(v))
-      : current.slice();
-    next.push(id);
-  }
+  if (group.single) {
+    // Compare with the value the surfaces show (the first whitelisted one), not with any stored value.
+    const shown = groupIds.find(g => current.includes(g));
+    const rest = current.filter(v => typeof v !== "string" || !groupIds.includes(v));
+    next = shown === id ? rest : [...rest, id];
+  } else if (current.includes(id)) next = current.filter(v => v !== id);
+  else next = [...current, id];
   return next.length ? (next as string[]) : null;
 }
 

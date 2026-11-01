@@ -767,16 +767,14 @@ integrationTest('importOutline under a topic that is no longer on the map reject
   assert.deepEqual(h.notesInFolder(), files);
 });
 
-integrationTest('the import window gets its target from the open view: editable map, selection title, AIM, built-in sample', async () => {
+integrationTest('the import window gets its target from the open view: editable map, selection title, AIM', async () => {
   const h = await placementHarness();
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'editable' });
   h.view.selected = h.oldChild.id; h.view.notes.set(h.oldChild.id, await h.repo.readNote(h.oldChild.path));
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'editable', selected: { id: h.oldChild.id, title: 'Old child' } });
   h.view.map = { ...h.view.map, aim: { version: 1 } };
   assert.equal(h.view.outlineImportTarget().map, 'aim');
-  h.view.builtIn = true;
-  assert.equal(h.view.outlineImportTarget().map, 'none');
-  h.view.builtIn = false; h.view.map = null;
+  h.view.map = null;
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'none' });
 });
 

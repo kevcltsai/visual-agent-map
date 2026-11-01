@@ -206,9 +206,8 @@ test('P5 cut: pasting into its own branch or a descendant is refused and the map
   }
 });
 
-test('P5 cut: a read-only map (built-in sample, AIM, topic selection mode) cannot be cut', async () => {
+test('P5 cut: a read-only map (AIM, topic selection mode) cannot be cut', async () => {
   const cases = {
-    builtIn: h => { h.view.builtIn = true; },
     aim: h => { h.view.map.aim = { version: 1 }; },
     integration: h => { h.view.integrationMode = true; }
   };

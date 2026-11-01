@@ -105,9 +105,9 @@ test('P4 copy: a selected branch joins its selected descendant; several roots ke
   assert.equal(event.clipboardData.store.get('text/plain'), '- Leaf\n- Branch\n\t- Kid');
 });
 
-test('P4 copy: a read-only map (built-in sample) can still be copied (D4)', async () => {
+test('P4 copy: a read-only map (AIM) can still be copied (D4)', async () => {
   const h = await harness();
-  h.view.builtIn = true;
+  h.view.map.aim = { version: 1 };
   const event = copyOf(h, ['leaf']);
   assert.equal(event.defaultPrevented, true);
   assert.equal(parse(event.clipboardData.store.get(MIME)).ok, true);
@@ -238,10 +238,9 @@ test('P4 paste: an external payload makes new notes with kind, strength and body
   assert.equal(h.history(), 1);
 });
 
-test('P4 paste: read-only situations (built-in sample, AIM map, topic selection mode) write nothing and say so', async () => {
+test('P4 paste: read-only situations (AIM map, topic selection mode) write nothing and say so', async () => {
   const valid = payloadText([{ id: 'a', parent: null, title: 'Claim', kind: 'topic', body: '' }]);
   const cases = {
-    builtIn: h => { h.view.builtIn = true; },
     aim: h => { h.view.map.aim = { version: 1 }; },
     integration: h => { h.view.integrationMode = true; }
   };

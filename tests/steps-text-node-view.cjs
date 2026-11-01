@@ -136,11 +136,10 @@ test('Enter on a focused text node opens the editor', async () => {
   assert.ok(find(h.textEl('t1'), i => i.tag === 'textarea'));
 });
 
-test('counter-example: AIM, built-in sample and presentation cannot edit text', async () => {
-  for (const mode of ['aim', 'builtIn', 'presentation']) {
+test('counter-example: AIM and presentation cannot edit text', async () => {
+  for (const mode of ['aim', 'presentation']) {
     const h = await harness(({ root }) => [txt({ parentId: root.id })]);
     if (mode === 'aim') h.view.map.aim = { branches: [] };
-    if (mode === 'builtIn') h.view.builtIn = true;
     if (mode === 'presentation') h.view.presentation = { order: [], currentId: 'x' };
     h.view.render();
     h.textEl('t1').fire('dblclick', {});
@@ -486,11 +485,10 @@ test('canvas-text-node: chatUserTexts carries links for the map chat context', a
   assert.equal('links' in out.find(t => t.id === 't1'), false);
 });
 
-test('canvas-text-node: AIM, built-in and presentation cannot start link mode or move a block', async () => {
-  for (const mode of ['aim', 'builtIn', 'presentation']) {
+test('canvas-text-node: AIM and presentation cannot start link mode or move a block', async () => {
+  for (const mode of ['aim', 'presentation']) {
     const h = await harness(() => [free()]);
     if (mode === 'aim') h.view.map.aim = { branches: [] };
-    if (mode === 'builtIn') h.view.builtIn = true;
     if (mode === 'presentation') h.view.presentation = { order: [], currentId: 'x' };
     h.view.render();
     h.view.startLinking('f1');

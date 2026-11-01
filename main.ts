@@ -16,7 +16,6 @@ import {
   translate,
   initialUiLanguage,
   languagePromptName,
-  noteLanguageOf,
   uiLocale,
   type TranslationKey,
   type ContentLanguage
@@ -46,7 +45,7 @@ import {
   CLAUDE_INSTALL_URL
 } from "./ui/settings-tab";
 import { join } from "node:path";
-import { type MapDocument, type MapNode } from "./map-model";
+import { type MapDocument } from "./map-model";
 import {
   DEFAULT_SETTINGS,
   isManagedMapPath,
@@ -71,7 +70,6 @@ import responseSchema from "./response-schema.json";
 import type { AiResult, AiTaskKind, Suggestion, TaskContext } from "./ai/types";
 import { clampPreviewScale, legacyPreviewScale } from "./ui/preview-utils";
 import { fitImageForInput } from "./ui/fit-image-input";
-import { BUILTIN_SAMPLE_ID, builtInSample } from "./builtin-sample";
 import { debugLog, LogManager } from "./log-manager";
 import { AiExchangeLog } from "./ai-exchange-log";
 import { PendingSuggestions } from "./pending-suggestions";
@@ -197,7 +195,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     markdownSelectionAiAutoOpen: saved?.markdownSelectionAiAutoOpen !== false,
     addDiagramsAfterResearch: saved?.addDiagramsAfterResearch !== false,
     workspaceInitialized: saved ? saved.workspaceInitialized !== false : false,
-    sampleTourVersionSeen: saved?.sampleTourVersionSeen ?? 0,
     canvasHintSeen: saved?.canvasHintSeen === true
   };
 }
@@ -304,7 +301,6 @@ export default class VisualAgentMapPlugin extends Plugin {
   private outlineSourceView: VisualAgentMapView | null = null;
   private outlineMap: MapDocument | null = null;
   private outlineTitles = new Map<string, string>();
-  private outlineSample = false;
   private outlineMarkers = new Map<string, TopicMarker[]>();
   private outlineLinks = new Map<string, string[]>();
   private settingTab!: VisualAgentMapSettingTab;
@@ -317,8 +313,9 @@ export default class VisualAgentMapPlugin extends Plugin {
   private writing = 0;
   private externalReconcileTimer: number | null = null;
   private readonly externalReconcilePaths = new Set<string>();
-  private firstInstallSamplePending = false;
   private workspaceRecoveryCandidates: string[] = [];
+  /** The blank map made on first install; finishStartup opens it. Null on every other start. */
+  private firstInstallMapPath: string | null = null;
   languageSwitchPending = false;
   recordFailure(context: string, error: unknown): string {
     const message = error instanceof Error ? error.message : String(error);
@@ -360,7 +357,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       .filter((view): view is VisualAgentMapView => view instanceof VisualAgentMapView);
   }
   /** A map view passes itself as `source`; only the outline's source view may update it, so background tabs never win. */
-  syncOutline(map: MapDocument | null, notes: Map<string, Note>, sample = false, source?: VisualAgentMapView): void {
+  syncOutline(map: MapDocument | null, notes: Map<string, Note>, source?: VisualAgentMapView): void {
     if (source) {
       if (this.outlineSourceView && this.outlineSourceView !== source) return;
       this.outlineSourceView = source;
@@ -368,7 +365,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     const titles = new Map([...notes].map(([id, note]) => [id, note.title]));
     this.outlineMap = map;
     this.outlineTitles = titles;
-    this.outlineSample = sample;
     const markers = new Map<string, TopicMarker[]>();
     for (const [id, note] of notes) if (note.markers?.length) markers.set(id, note.markers);
     this.outlineMarkers = markers;
@@ -377,7 +373,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.outlineLinks = links;
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
       if (leaf.view instanceof OutlineView) {
-        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample, markers, links);
+        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, markers, links);
       }
   }
   /** Marks the active outline row without rebuilding the outline. */
@@ -399,13 +395,7 @@ export default class VisualAgentMapPlugin extends Plugin {
           }
         );
         if (!this.coffeeOutlineActive)
-          leaf.view.setMap(
-            this.outlineMap,
-            this.outlineTitles,
-            this.outlineSample,
-            this.outlineMarkers,
-            this.outlineLinks
-          );
+          leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineMarkers, this.outlineLinks);
       }
   }
   /** Called when a map view closes: the outline falls back to another open map, or empties. */
@@ -442,7 +432,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     const view = source ?? this.app.workspace.getActiveViewOfType(VisualAgentMapView) ?? this.views()[0];
     const snapshot = view?.shareSnapshot();
     if (!snapshot || snapshot === "none") return void new Notice(t("share.unavailable_no_map"));
-    if (snapshot === "sample") return void new Notice(t("share.unavailable_sample"));
     if (snapshot === "aim") return void new Notice(t("share.unavailable_aim"));
     if (snapshot === "empty") return void new Notice(t("share.unavailable_empty"));
     new ShareModal(this.app, {
@@ -563,20 +552,7 @@ export default class VisualAgentMapPlugin extends Plugin {
             this.settings.migrated = true;
           })
     ).then(async () => {
-      if (!saved) {
-        if (this.repo.workspaceExists()) {
-          this.settings.workspaceInitialized = true;
-          await this.saveSettings();
-        } else {
-          this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
-          if (!this.workspaceRecoveryCandidates.length) {
-            await this.repo.ensureWorkspace();
-            this.settings.workspaceInitialized = true;
-            this.firstInstallSamplePending = true;
-            await this.saveSettings();
-          }
-        }
-      }
+      await this.initializeFirstInstall(!!saved);
       if (this.settings.structureVersion < 2) {
         const count = await this.repo.normalizeGeneratedNoteFilenames();
         this.settings.structureVersion = 2;
@@ -721,9 +697,6 @@ export default class VisualAgentMapPlugin extends Plugin {
         error => new Notice(error instanceof Error ? error.message : String(error))
       );
     });
-    this.addLocalizedCommand("open-built-in-sample", "ui.open_the_taiwan_travel_sample", () => {
-      void this.activateBuiltInSample(true);
-    });
     this.addLocalizedCommand("repair-workspace", "ui.repair_agent_workspace", () => {
       this.runMutation(() => this.repairWorkspace());
     });
@@ -774,6 +747,29 @@ export default class VisualAgentMapPlugin extends Plugin {
     });
     this.registerVaultEvents();
   }
+  /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
+  private async initializeFirstInstall(hasSaved: boolean): Promise<void> {
+    if (hasSaved) return;
+    if (this.repo.workspaceExists()) {
+      this.settings.workspaceInitialized = true;
+      await this.saveSettings();
+      return;
+    }
+    this.workspaceRecoveryCandidates = await this.repo.workspaceCandidates();
+    if (this.workspaceRecoveryCandidates.length) return;
+    await this.repo.ensureWorkspace();
+    this.settings.workspaceInitialized = true;
+    try {
+      this.firstInstallMapPath = await this.repo.createMap(t("ui.new_mind_map_from_sample"));
+    } catch (error) {
+      this.firstInstallMapPath = null;
+      this.logs.appendLog(
+        "warn",
+        `First-install map was not created: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    await this.saveSettings();
+  }
   /** Vault modify/delete/rename handlers; kept separate so tests can drive the real handlers on a fake vault. */
   /**
    * Work after Obsidian's layout is ready. The topic outline is deliberately not opened here: it opens only through
@@ -784,7 +780,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     try {
       await this.ready;
       if (this.workspaceRecoveryCandidates.length) await this.offerWorkspaceReconnect(this.workspaceRecoveryCandidates);
-      else if (this.firstInstallSamplePending) await this.activateBuiltInSample();
+      else if (this.firstInstallMapPath) await this.activateView(this.firstInstallMapPath);
     } catch (error) {
       this.logs.appendLog(
         "warn",
@@ -852,11 +848,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       this.logs.appendLog("warn", message);
       new Notice(message);
     }
-  }
-  consumeFirstInstallSample(): boolean {
-    const pending = this.firstInstallSamplePending;
-    this.firstInstallSamplePending = false;
-    return pending;
   }
   /**
    * One persistent Notice that follows a multi-topic move: Obsidian may take a while per topic to update links (and asks
@@ -1184,72 +1175,6 @@ export default class VisualAgentMapPlugin extends Plugin {
         )
       );
     else new Notice(t("ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett", diagnostic.executable));
-  }
-  async duplicateBuiltInSample(): Promise<string> {
-    await this.repo.ensureWorkspace();
-    this.settings.workspaceInitialized = true;
-    const sample = builtInSample(noteLanguageOf(this.settings.language), false);
-    let createdRoot: TFolder | undefined;
-    try {
-      const path = await this.repo.createMap(sample.map.title, [], folder => {
-        createdRoot = folder;
-      });
-      const root = this.repo.topicRoot(path);
-      const map = await this.repo.readMap(path);
-      await this.repo.folder(`${root}/Attachments`);
-      for (const [name, data] of sample.assets) await this.app.vault.createBinary(`${root}/Attachments/${name}`, data);
-      const byOldPath = new Map<string, MapNode>();
-      for (const source of sample.map.nodes) {
-        const note = sample.notes.get(source.id)!;
-        const created = await this.repo.createNote(
-          note.title,
-          this.currentModelChoice().model,
-          map,
-          path,
-          source.parentId ? "inherited" : "workspace"
-        );
-        created.x = source.x;
-        created.y = source.y;
-        created.collapsed = source.collapsed;
-        byOldPath.set(source.path, created);
-        map.nodes.push(created);
-      }
-      for (const source of sample.map.nodes) {
-        const created = byOldPath.get(source.path)!,
-          note = sample.notes.get(source.id)!;
-        created.parentId = source.parentId
-          ? byOldPath.get(sample.map.nodes.find(item => item.id === source.parentId)!.path)!.id
-          : null;
-        await this.repo.updateNote(created.path, {
-          summary: note.summary,
-          prompt: note.prompt,
-          rules: note.rules,
-          preview: note.preview,
-          detail: note.detail,
-          status: note.status,
-          sourcePaths: note.sourcePaths.map(sourcePath => byOldPath.get(sourcePath)!.path)
-        });
-      }
-      map.viewport = { ...sample.map.viewport };
-      await this.repo.saveMap(path, map);
-      await this.repo.rebuildDerivedData(root);
-      await this.saveSettings();
-      new Notice(t("ui.created_an_editable_copy_of_the_sample"));
-      return path;
-    } catch (error) {
-      if (createdRoot) {
-        const root = createdRoot.path;
-        try {
-          const current = this.app.vault.getAbstractFileByPath(root);
-          if (current && current !== createdRoot) throw new Error(t("ui.sample_cleanup_folder_changed"));
-          if (current) await this.app.fileManager.trashFile(createdRoot);
-        } catch (cleanupError) {
-          const message = (value: unknown): string => (value instanceof Error ? value.message : String(value));
-          throw new Error(t("ui.sample_cleanup_failed", message(error), root, message(cleanupError)), { cause: error });
-        }
-      }
-      throw error;
-    }
   }
   private isMap(file: TFile): boolean {
     const marker: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.["visual-agent-map"];
@@ -1797,15 +1722,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       active: true,
       state: path ? { file: path } : leaf.view instanceof VisualAgentMapView ? leaf.view.getState() : {}
     });
-    await this.app.workspace.revealLeaf(leaf);
-  }
-  private async activateBuiltInSample(forceTour = false): Promise<void> {
-    await this.ready;
-    this.firstInstallSamplePending = false;
-    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
-    if (!leaf) leaf = this.app.workspace.getLeaf("tab");
-    await leaf.setViewState({ type: VIEW_TYPE, active: true, state: { sample: BUILTIN_SAMPLE_ID } });
-    if (forceTour && leaf.view instanceof VisualAgentMapView) await leaf.view.openBuiltInSample(true);
     await this.app.workspace.revealLeaf(leaf);
   }
   private async loadCodexModels(): Promise<{ models: string[]; reasoningEfforts: Record<string, string[]> }> {

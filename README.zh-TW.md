@@ -23,7 +23,7 @@
 ## 開始使用
 
 1. 到 **Obsidian 桌面版 → 設定 → 第三方外掛 → 瀏覽** 搜尋 **Visual Agent Map**，安裝並啟用。需要桌面版 Obsidian **1.13.7+**。
-2. 開啟內建範例，或建立自己的地圖。使用 AI 功能前，安裝並登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。
+2. 首次使用時 VAM 會開啟一張空白心智圖：用一句話開始，或直接加議題。使用 AI 功能前，安裝並登入 [Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)，再到 VAM 設定檢查 CLI。
 3. 選擇「**＋ 新增地圖 → 新增 AIM**」體驗 AIM。
 
 介面提供英文、繁體中文與簡體中文。AI 回答會跟著你書寫的語言，包括日文、韓文、西班牙文等其他語言。

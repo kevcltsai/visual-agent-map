@@ -180,7 +180,7 @@ export interface MapChatHost {
   send(): void;
   /** The panel asks to stop the running request. */
   stop(): void;
-  /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button (the built-in sample already has one). */
+  /** The opening screen's secondary button: a new empty map through the name box, no AI. Absent: no button. */
   createEmptyMap?(): void;
   /** The clock the stage seconds are counted on (tests); the real time when absent. */
   now?(): number;

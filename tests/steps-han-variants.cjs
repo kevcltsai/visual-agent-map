@@ -60,7 +60,7 @@ const outlineRows = (markers, titles = new Map([['a', 'Alpha'], ['b', 'Beta']]))
   const view = new OutlineView({ app: {} }, async () => {});
   const map = { title: 'M', nodes: [{ id: 'a', parentId: null, path: 'a.md' }, { id: 'b', parentId: 'a', path: 'b.md' }] };
   if (markers === undefined) view.setMap(map, titles);
-  else view.setMap(map, titles, false, markers);
+  else view.setMap(map, titles, markers);
   return { dom, view, rows: dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-note')) };
 };
 

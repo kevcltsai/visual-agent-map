@@ -1,5 +1,5 @@
 // 0.28 ticket 34 P2: in-map search (Mod+F). Real view + repository; the DOM is the stand-in from tests/support-dom.cjs.
-// Covers the key interception rules, title matching, jumping with folds, screen-reader text, render survival, Esc focus and the sample map.
+// Covers the key interception rules, title matching, jumping with folds, screen-reader text, render survival, Esc focus.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -211,19 +211,6 @@ test('34: a match inside two folded levels opens both in one history step, and u
   const undone = h.view.map;
   assert.equal(undone.nodes.find(n => n.id === h.ids.branch).collapsed, true);
   assert.equal(undone.nodes.find(n => n.id === h.ids.inner).collapsed, true);
-});
-
-test('34: the sample map opens folds in memory only (no file, no history)', async () => {
-  const h = await harness();
-  h.view.builtIn = true;
-  const before = h.view.history.past.length;
-  const diskBefore = JSON.stringify(await h.saved());
-  h.press(h.card('alpha')); h.type('needle');
-  h.keydown('Enter'); await h.settle();
-  assert.equal(h.view.map.nodes.find(n => n.id === h.ids.inner).collapsed, false, 'opened in memory');
-  assert.ok(h.card('deep'));
-  assert.equal(h.view.history.past.length, before, 'no history');
-  assert.equal(JSON.stringify(await h.saved()), diskBefore, 'nothing written');
 });
 
 test('34: a render during the search keeps the query, the current match, the field focus and the caret', async () => {

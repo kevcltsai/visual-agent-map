@@ -200,9 +200,8 @@ test('P5 text paste: a bad line refuses the whole text with its line number', as
   assert.equal(h.map().nodes.length, 5); assert.equal(h.history(), 0);
 });
 
-test('P5 text paste: a read-only map (built-in sample, AIM, topic selection mode) writes nothing and says so', async () => {
+test('P5 text paste: a read-only map (AIM, topic selection mode) writes nothing and says so', async () => {
   const cases = {
-    builtIn: h => { h.view.builtIn = true; },
     aim: h => { h.view.map.aim = { version: 1 }; },
     integration: h => { h.view.integrationMode = true; }
   };

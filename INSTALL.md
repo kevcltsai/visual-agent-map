@@ -27,9 +27,9 @@ Do not install files from the repository's `main` branch into a production vault
 
 ## 2. Start your first map
 
-1. Explore the built-in read-only sample and its five-step tour. A fresh install starts in English regardless of Obsidian's language. You can choose Traditional Chinese or Simplified Chinese in VAM settings; that choice is saved across restarts. The Simplified Chinese interface uses the Traditional Chinese sample.
-2. Select **Duplicate to my workspace** to start from the sample, or **Create empty mind map**. You can edit either map without an AI service.
-3. Changing VAM's interface language also changes the built-in sample. Existing maps and notes keep their original titles and writing.
+1. A fresh install opens a blank mind map: start with one sentence, or add topics yourself. VAM starts in English regardless of Obsidian's language. You can choose Traditional Chinese or Simplified Chinese in VAM settings; that choice is saved across restarts.
+2. Select **Create empty mind map** any time to start another map. You can edit maps without an AI service.
+3. Changing VAM's interface language does not change existing maps and notes; they keep their original titles and writing.
 
 ## 3. Prepare an AI service
 
@@ -85,7 +85,7 @@ New mind maps are created in `Mind Maps/` and new AIM maps in `AIM/` inside your
 
 Map AI chat: tested live with Claude only; Codex was not tested live in the chat. A picture you inserted and one that could not load look alike, and the result line for a picture search says it started even if the search later finds nothing. Changes the chat applies from a reply cannot be undone. English and Simplified Chinese chat screens, pop-out windows and Windows or Linux were not checked.
 
-Share files: AIM research maps and the built-in sample cannot be shared yet, and web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
+Share files: AIM research maps cannot be shared yet, and web images are not embedded: they keep their original address and are shown only when the reader is online. Translations are made by AI and their quality is not checked by a native speaker. iOS cannot open a local HTML file, so view a shared file on a phone through a web address such as GitHub Pages. Opening a share file from a local file on desktop Safari was not tested.
 
 Coffee Tables stores what it needs to continue a conversation in the hidden `Coffee Tables/.sessions` folder. Obsidian Sync skips hidden folders, so on other devices you can read synced conversations but not continue them; continue them on the device where they started.
 
@@ -120,9 +120,9 @@ VAM 不需要專屬 API key。獨立 CLI 不需要 npm；只有從原始碼建�
 
 ## 2. 開始第一張心智圖
 
-1. 先探索內建唯讀範例與五步導覽。全新安裝預設英文，與 Obsidian 語言無關；可在 VAM 設定選擇繁體中文或簡體中文，選擇會跨重啟保留。簡體中文介面使用繁體中文版範例。
-2. 選擇 **複製到我的工作區**，或選擇 **建立空白心智圖**。沒有 AI 服務也能編輯。
-3. 切換 VAM 介面語言也會更換內建唯讀範例。既有地圖與筆記的名稱及內容不會改變。
+1. 全新安裝會開啟一張空白心智圖：用一句話開始，或直接加議題。VAM 預設英文，與 Obsidian 語言無關；可在 VAM 設定選擇繁體中文或簡體中文，選擇會跨重啟保留。
+2. 隨時可選擇 **建立空白心智圖** 開始另一張地圖。沒有 AI 服務也能編輯。
+3. 切換 VAM 介面語言不會改變既有地圖與筆記；它們的名稱及內容維持原樣。
 
 ## 3. 為 AI 任務準備服務
 
@@ -178,6 +178,6 @@ AI 從網路找到的圖片不一定能自由使用，請查看各自的來源�
 
 地圖 AI 對話：只用 Claude 做過實機測試，Codex 未在對話中實機測試。已插入的圖與無法載入的圖看起來一樣，找圖的結果列即使之後找不到圖也會寫「已開始」。對話依回覆套用的變更無法復原。對話在英文與簡體中文畫面、彈出視窗、Windows 與 Linux 未檢查。
 
-分享檔：AIM 研究地圖與內建範例目前不能分享，網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
+分享檔：AIM 研究地圖目前不能分享，網路圖片不會內嵌，保留原網址，讀者連線時才顯示；翻譯由 AI 產生，品質未經母語者檢查。iOS 無法開啟本機 HTML 檔，手機請透過網址（例如 GitHub Pages）檢視；桌面 Safari 開啟本機分享檔尚未測試。
 
 Coffee Tables 把接續對談所需的資料存在隱藏資料夾 `Coffee Tables/.sessions`。Obsidian Sync 不同步隱藏資料夾，因此在其他裝置上可以閱讀同步過去的對談，但無法接著聊；請回到開始對談的裝置繼續。

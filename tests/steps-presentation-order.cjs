@@ -100,8 +100,8 @@ test('stepOrder on an empty list is null', () => {
   assert.equal(stepOrder([], 'a', -1), null);
 });
 
-test('sample map taiwan-travel (12 nodes, 2 roots) lists every node once', () => {
-  const file = path.join(__dirname, '..', 'samples', 'taiwan-travel', 'zh-TW', 'Map.md');
+test('regression fixture map (12 nodes, 2 roots) lists every node once', () => {
+  const file = path.join(__dirname, 'fixtures', 'taiwan-travel-regression', 'Map.md');
   const { core } = require('./support.cjs');
   const doc = core.parseMap(fs.readFileSync(file, 'utf8'));
   assert.equal(doc.nodes.length, 12);

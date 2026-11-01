@@ -4,8 +4,7 @@ import { isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-// Seeded vaults have already seen the current tour; read the version so a tour bump cannot leave them behind.
-const sampleTourVersion = Number(/SAMPLE_TOUR_VERSION = (\d+)/.exec(readFileSync(join(root, "builtin-sample.ts"), "utf8"))[1]);
+const fixtureRoot = join(root, "tests/fixtures/taiwan-travel-regression");
 // Shared fixture builder; environment/reset/launch policy belongs to test-harness.mjs.
 export function ensureSourceSelectionFixture(vault, workspaceRoot = "Agent Workspace", { preserveExisting = false } = {}) {
   const topic = join(vault, workspaceRoot, "Topics", "Local Source Fixture");
@@ -67,17 +66,17 @@ if (requested !== "onboarding") {
   mkdirSync(join(topicRoot, "Unassigned"), { recursive: true });
   mkdirSync(join(topicRoot, "Archive"), { recursive: true });
   mkdirSync(join(workspace, "Inbox"), { recursive: true });
-  cpSync(join(root, "samples/taiwan-travel/zh-TW/Notes"), join(topicRoot, "Notes"), { recursive: true });
-  cpSync(join(root, "samples/taiwan-travel/Attachments"), join(topicRoot, "Attachments"), { recursive: true, filter: source => statSync(source).isDirectory() || source.endsWith(".webp") });
+  cpSync(join(fixtureRoot, "Notes"), join(topicRoot, "Notes"), { recursive: true });
+  cpSync(join(fixtureRoot, "Attachments"), join(topicRoot, "Attachments"), { recursive: true, filter: source => statSync(source).isDirectory() || source.endsWith(".webp") });
   const notePrefix = `${workspaceRoot}/Topics/Taiwan Travel Regression (zh-TW test fixture)/Notes/`;
-  const map = readFileSync(join(root, "samples/taiwan-travel/zh-TW/Map.md"), "utf8").replaceAll('"Notes/', `"${notePrefix}`);
+  const map = readFileSync(join(fixtureRoot, "Map.md"), "utf8").replaceAll('"Notes/', `"${notePrefix}`);
   writeFileSync(join(topicRoot, "Map.md"), map);
   for (const path of filesBelow(join(topicRoot, "Notes"))) writeFileSync(path, readFileSync(path, "utf8").replaceAll("Notes/", notePrefix));
   ensureSourceSelectionFixture(vault, workspaceRoot);
   writeFileSync(join(plugin, "data.json"), JSON.stringify({
     language: "zh-TW", workspaceFolder: workspaceRoot, topicsFolder: `${workspaceRoot}/Topics`, inboxFolder: `${workspaceRoot}/Inbox`,
     notesFolder: `${workspaceRoot}/Nodes`, mapsFolder: `${workspaceRoot}/Maps`, migrated: true, structureVersion: 2,
-    workspaceInitialized: true, firstUseNoticeSeen: true, sampleTourVersionSeen: sampleTourVersion
+    workspaceInitialized: true, firstUseNoticeSeen: true
   }, null, 2));
   if (requested === "reinstall") writeFileSync(join(config, "vam-reinstall-baseline.json"), JSON.stringify({ profile: requested, workspaceRoot, hashes: workspaceHashes(workspace) }, null, 2));
 }

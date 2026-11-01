@@ -15,7 +15,7 @@ test('workspace defaults to the configured low-cost model and low reasoning', ()
   assert.equal(DEFAULT_SETTINGS.codexUsageNoticeSeen, false);
   assert.equal(DEFAULT_SETTINGS.claudeUsageNoticeSeen, false);
   assert.equal(DEFAULT_SETTINGS.workspaceInitialized, false);
-  assert.equal(DEFAULT_SETTINGS.sampleTourVersionSeen, 0);
+  assert.ok(!('sampleTourVersionSeen' in DEFAULT_SETTINGS));
   assert.equal(DEFAULT_SETTINGS.canvasHintSeen, false);
   assert.doesNotMatch(DEFAULT_SETTINGS.models, /claude:/);
   assert.equal(normalizeReasoningLevel('medium'), 'medium');
@@ -402,4 +402,12 @@ test('MS-02: settings description and the discovery summary are two separate ele
     for (const key of ['ui.map_chat_model_follow_0', 'ui.map_chat_model_follow_short_0', 'ui.workspace_default_model', 'ui.models_are_loaded_from_each_installed_ai_service_changes_apply_only_to_new_root_topics']) assert.equal(source.includes(`"${key}"`), false, `${lang} no longer has ${key}`);
     assert.ok(source.includes('"ui.current_model"') && source.includes('"ui.current_model_description"'));
   }
+});
+test('N1: a data.json that still carries sampleTourVersionSeen loads without error and the key is dropped', () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian });
+  const result = settingsFromSaved({ sampleTourVersionSeen: 3, workspaceInitialized: true, language: 'en' });
+  assert.ok(!('sampleTourVersionSeen' in result));
+  assert.ok(!JSON.stringify(result).includes('sampleTourVersionSeen'));
+  assert.equal(result.workspaceInitialized, true);
+  assert.equal(result.language, 'en');
 });

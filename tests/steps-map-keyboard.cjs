@@ -187,10 +187,9 @@ test('A4: F2 on the view scope renames the focused card and passes through when 
   assert.equal(h.modals.length, 1, 'the card handler does not open a second dialog when the scope already handled F2');
 });
 
-test('A4: the sample, an AIM map and selection mode ignore the new keys and the title double-click', async () => {
-  for (const mode of ['sample', 'aim', 'select']) {
+test('A4: an AIM map and selection mode ignore the new keys and the title double-click', async () => {
+  for (const mode of ['aim', 'select']) {
     const h = await harness();
-    if (mode === 'sample') h.view.builtIn = true;
     if (mode === 'aim') h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
     if (mode === 'select') h.view.integrationMode = true;
     h.build();
@@ -262,7 +261,7 @@ test('0.25 retest: Mod+Enter and Shift+Enter live on the view scope (Obsidian ea
   assert.deepEqual(h.added, []);
   doc.activeElement = h.card('leaf');
   assert.equal(fire(['Mod'], { isComposing: true }), true, 'IME composition'); assert.equal(fire(['Mod'], { defaultPrevented: true }), true, 'already handled');
-  for (const mode of ['builtIn', 'integrationMode']) { h.view[mode] = true; assert.equal(fire(['Mod']), true, mode); h.view[mode] = false; }
+  for (const mode of ['integrationMode']) { h.view[mode] = true; assert.equal(fire(['Mod']), true, mode); h.view[mode] = false; }
   h.view.map.aim = {}; assert.equal(fire(['Mod']), true, 'AIM map'); delete h.view.map.aim;
   h.view.closed = true; assert.equal(fire(['Mod']), true, 'closed view'); h.view.closed = false;
   await tick(); assert.deepEqual(h.added, [], 'no pass-through branch added anything');

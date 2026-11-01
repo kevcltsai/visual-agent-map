@@ -63,7 +63,7 @@ async function waitFor(name, predicate, timeoutMs = 30_000) {
   let last;
   while (Date.now() < deadline) {
     try {
-      last = await evaluate(`JSON.stringify((()=>{const p=app.plugins.plugins["visual-agent-map"];return {vault:app.vault.getName(),enabled:app.plugins.enabledPlugins.has("visual-agent-map"),ready:!!p?.repo,language:p?.settings?.language,workspaceInitialized:p?.settings?.workspaceInitialized,sample:app.workspace.getLeavesOfType("visual-agent-map-view").some(l=>l.view.builtIn)}})())`);
+      last = await evaluate(`JSON.stringify((()=>{const p=app.plugins.plugins["visual-agent-map"];return {vault:app.vault.getName(),enabled:app.plugins.enabledPlugins.has("visual-agent-map"),ready:!!p?.repo,language:p?.settings?.language,workspaceInitialized:p?.settings?.workspaceInitialized,views:app.workspace.getLeavesOfType("visual-agent-map-view").length,blank:app.workspace.getLeavesOfType("visual-agent-map-view").some(l=>l.view.map?.nodes?.length===0&&l.view.chat?.isHero)}})())`);
       if (predicate(last)) return last;
     } catch { /* The app may still be starting; the bounded deadline captures the last state. */ }
     await delay(500);
@@ -103,32 +103,30 @@ try {
   const activeVaultPath = (await driver.vaultPath()).replace(/\/$/, "");
   check(`${driver.kind.toUpperCase()} targets the test vault`, activeVaultPath === vault.replace(/\/$/, ""), activeVaultPath);
 
-  await waitFor("VAM cold-start initialization", state => state.vault === basename(vault) && state.enabled && state.ready && state.workspaceInitialized && state.sample);
-  const initial = await evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const leaves=app.workspace.getLeavesOfType("visual-agent-map-view"); return { enabled:app.plugins.enabledPlugins.has("visual-agent-map"), pluginLoaded:!!p, language:p?.settings?.language, workspaceInitialized:p?.settings?.workspaceInitialized, ready:!!p?.repo, sample:leaves.some(l=>l.view.builtIn), mapTitles:leaves.map(l=>l.view.getDisplayText()), commands:p?.localizedCommands?.map(x=>x.command.name), logEntries:p?.logs?.entries||[] }; })())`);
+  await waitFor("VAM cold-start initialization", state => state.vault === basename(vault) && state.enabled && state.ready && state.workspaceInitialized && state.views === 1 && state.blank);
+  const initial = await evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const leaves=app.workspace.getLeavesOfType("visual-agent-map-view"); return { enabled:app.plugins.enabledPlugins.has("visual-agent-map"), pluginLoaded:!!p, language:p?.settings?.language, workspaceInitialized:p?.settings?.workspaceInitialized, ready:!!p?.repo, views:leaves.length, blank:leaves.some(l=>l.view.map?.nodes?.length===0&&l.view.chat?.isHero), mapTitles:leaves.map(l=>l.view.map?.title), commands:p?.localizedCommands?.map(x=>x.command.name), logEntries:p?.logs?.entries||[] }; })())`);
   check("VAM is enabled and initialized", initial.enabled && initial.pluginLoaded && initial.ready && initial.workspaceInitialized, JSON.stringify({ enabled: initial.enabled, loaded: initial.pluginLoaded, ready: initial.ready, workspaceInitialized: initial.workspaceInitialized }));
   const loadedPluginVersion = await evaluate(`JSON.stringify(app.plugins.plugins["visual-agent-map"]?.manifest?.version ?? null)`);
   check("Loaded plugin is the prepared build", loadedPluginVersion === environment.version, `loaded=${loadedPluginVersion}, prepared=${environment.version}`);
   check("Fresh English install selects English", initial.language === "en", `language=${initial.language}`);
-  check("First launch opens the official Sample", initial.sample && initial.mapTitles.some(title => title.startsWith("Sample:")), JSON.stringify(initial.mapTitles));
-  check("VAM command entry points registered", initial.commands?.some(name => name.endsWith("Open mind map")) && initial.commands?.some(name => name.endsWith("Open the Taiwan travel sample")), JSON.stringify(initial.commands));
+  check("First launch opens one blank map", initial.views === 1 && initial.blank, JSON.stringify({ views: initial.views, titles: initial.mapTitles }));
+  check("VAM command entry points registered", initial.commands?.some(name => name.endsWith("Open mind map")) && !initial.commands?.some(name => /Taiwan|sample/i.test(name)), JSON.stringify(initial.commands));
 
   const startupErrors = await driver.errors();
   report.diagnostics.startupErrors = startupErrors;
   check("No captured startup errors", /^No errors captured\.?$/.test(startupErrors), startupErrors);
   await driver.clearDiagnostics();
-  await driver.command("visual-agent-map:open-built-in-sample");
-  const sample = await evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view").find(l=>l.view.builtIn)?.view; return { language:p.settings.language, builtIn:!!v, title:v?.getDisplayText(), badge:document.querySelector(".vam-readonly-badge")?.innerText||"", start:document.querySelector(".vam-sample-start")?.innerText||"", command:p.localizedCommands.find(x=>x.command.id==="open-map")?.command.name }; })())`);
-  check("Sample command opens the built-in read-only map", sample.builtIn && sample.badge.includes("Official sample") && sample.title.includes("Taiwan Journey"), JSON.stringify({ title: sample.title, badge: sample.badge }));
-  check("English first-use actions are visible without Codex", sample.start.includes("Duplicate to my workspace") && sample.start.includes("Create an empty mind map") && sample.start.includes("only needed for AI tasks"), sample.start.replace(/\s+/g, " "));
+  const blankMap = `JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view")[0]?.view; return { language:p.settings.language, views:app.workspace.getLeavesOfType("visual-agent-map-view").length, mapTitle:v?.map?.title, command:p.localizedCommands.find(x=>x.command.id.endsWith(":open-map"))?.command.name }; })())`;
+  const english = await evaluate(blankMap);
+  check("English install shows the English command label", english.language === "en" && english.command?.endsWith("Open mind map"), JSON.stringify(english));
 
   await evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","zh-TW"); return true})()`);
-  const chinese = await evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view").find(l=>l.view.builtIn)?.view; return { language:p.settings.language, title:v?.getDisplayText(), mapTitle:v?.map?.title, command:p.localizedCommands.find(x=>x.command.id.endsWith(":open-map"))?.command.name, hint:document.querySelector(".vam-sample-start")?.innerText||"" }; })())`);
-  check("Language change updates Sample and entry points", chinese.language === "zh-TW" && chinese.command === "Visual Agent Map (VAM): 開啟心智圖" && chinese.mapTitle?.includes("台灣"), JSON.stringify({ language: chinese.language, mapTitle: chinese.mapTitle, command: chinese.command }));
-  check("Chinese first-use actions remain available", chinese.hint.includes("複製到我的工作區") && chinese.hint.includes("建立空白心智圖"), chinese.hint.replace(/\s+/g, " "));
+  const chinese = await evaluate(blankMap);
+  check("Language change updates the command label but not the map title", chinese.language === "zh-TW" && chinese.command === "Visual Agent Map (VAM): 開啟心智圖" && chinese.mapTitle === english.mapTitle && chinese.views === 1, JSON.stringify({ english, chinese }));
 
   await evaluate(`(async()=>{await app.plugins.plugins["visual-agent-map"].settingTab.setControlValue("language","en"); return true})()`);
-  const afterSwitch = await evaluate(`JSON.stringify((() => { const p=app.plugins.plugins["visual-agent-map"]; const v=app.workspace.getLeavesOfType("visual-agent-map-view").find(l=>l.view.builtIn)?.view; return { language:p.settings.language, title:v?.map?.title, command:p.localizedCommands.find(x=>x.command.id.endsWith(":open-map"))?.command.name }; })())`);
-  check("Switching back restores English Sample", afterSwitch.language === "en" && afterSwitch.command === "Visual Agent Map (VAM): Open mind map" && afterSwitch.title?.includes("Taiwan Journey"), JSON.stringify(afterSwitch));
+  const afterSwitch = await evaluate(blankMap);
+  check("Switching back restores the English label and keeps the map title", afterSwitch.language === "en" && afterSwitch.command === "Visual Agent Map (VAM): Open mind map" && afterSwitch.mapTitle === english.mapTitle, JSON.stringify(afterSwitch));
 
   const errors = await driver.errors();
   const pluginLogs = await evaluate(`JSON.stringify(app.plugins.plugins["visual-agent-map"].logs.entries.filter(e=>e.level==="error"||e.message.includes("初始化未完成")))`);

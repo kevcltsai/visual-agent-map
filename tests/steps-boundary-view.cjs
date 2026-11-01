@@ -209,16 +209,7 @@ test('renameBoundary changes only the label, one undo step; blank removes the la
   assert.equal('label' in (await h.onDisk())[0], false);
 });
 
-test('frames cannot be changed on an AIM map or the built-in sample; in selection mode they are drawn but only added, not edited', async () => {
-  for (const mode of ['builtIn']) {
-    const h = await harness(ids => [frame([ids.root])], { mode });
-    h.view.render();
-    const before = await h.onDisk();
-    await h.view.addBoundary([h.ids.root], 'x');
-    await h.view.removeCanvasItem('b1');
-    await h.view.renameBoundary('b1', 'x');
-    assert.deepEqual(await h.onDisk(), before, mode);
-  }
+test('frames cannot be changed on an AIM map; in selection mode they are drawn but only added, not edited', async () => {
   const aim = await harness(ids => [frame([ids.root])]);
   aim.view.map.aim = { version: 1 };
   const before = await aim.onDisk();
@@ -243,10 +234,6 @@ test('the selection bar offers "Add frame" for the selected topics', async () =>
   h.view.multiSelected = new Set();
   const empty = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.text === 'Add frame');
   assert.equal(empty.disabled, true);
-  const built = await harness();
-  built.view.builtIn = true;
-  built.view.multiSelected = new Set([built.ids.root]);
-  assert.equal(find(built.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.text === 'Add frame'), undefined);
 });
 
 test('the label dialog may be left blank only when asked to; the default still refuses an empty name', () => {

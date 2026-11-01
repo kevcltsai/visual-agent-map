@@ -297,7 +297,7 @@ integrationTest('Visual Map close fences late Planner rendering and reopen start
   let resolvePlanner, call = 0, renders = 0;
   const plugin = { repo, settings: { language: 'zh-TW', cliModel: 'gpt-6-luna' }, ready: Promise.resolve(), mutate: async work => work(),
     askModel: async () => { call++; if (call === 1) return new Promise(resolve => { resolvePlanner = () => resolve({ summary: '晚到問題？', detail: '不應寫回關閉的 View。', suggestions: [{ title: 'A', task: '', contribution: '', parentTitle: '' }, { title: 'B', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }); }); return { summary: '重新開啟後的問題？', detail: '新生命週期。', suggestions: [{ title: 'A', task: '', contribution: '', parentTitle: '' }, { title: 'B', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }; },
-    syncOutline() {}, releaseOutline() {}, consumeFirstInstallSample: () => false };
+    syncOutline() {}, releaseOutline() {} };
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app: {} }, plugin);
   view.contentEl = { addClass() {}, tabIndex: 0 }; view.registerDomEvent = () => {};
   view.path = created.mapPath; view.map = created.map; view.notes.set(created.root.id, await repo.readNote(created.root.path)); view.selected = created.root.id; view.render = () => { renders++; };
@@ -789,7 +789,7 @@ integrationTest('AIM partial continuation runs on the question note model, not t
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const calls = [];
   const view = new VisualAgentMapView({ app: {} }, { settings: { ...DEFAULT_SETTINGS }, mutate: async work => work(), repo: { readMap: async () => { throw new Error('stop'); } } });
-  view.path = 'Map.md'; view.closed = false; view.builtIn = false; view.aimViewEpoch = 1; view.render = () => {}; view.aimViewIsCurrent = () => false;
+  view.path = 'Map.md'; view.closed = false; view.aimViewEpoch = 1; view.render = () => {}; view.aimViewIsCurrent = () => false;
   view.map = { aim: { runs: [{ id: 'run-1', branchId: 'b1' }], branches: [{ id: 'b1', questionNodeId: 'q1' }] } };
   view.notes = new Map([['q1', { model: 'claude:sonnet', reasoning: 'high' }]]);
   view.aimManual = { continuePartial: async (...args) => { calls.push(args.slice(0, 4)); return { status: 'partial' }; } };

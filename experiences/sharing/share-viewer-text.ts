@@ -52,7 +52,22 @@ export function shareViewerUiFor(language: ShareLanguage): ShareViewerUi {
       star: text("share.viewer_marker_star"),
       "priority-1": text("share.viewer_marker_priority_1"),
       "priority-2": text("share.viewer_marker_priority_2"),
-      "priority-3": text("share.viewer_marker_priority_3")
+      "priority-3": text("share.viewer_marker_priority_3"),
+      "priority-4": text("share.viewer_marker_priority_4"),
+      "priority-5": text("share.viewer_marker_priority_5"),
+      "progress-0": text("share.viewer_marker_progress_0"),
+      "progress-25": text("share.viewer_marker_progress_25"),
+      "progress-50": text("share.viewer_marker_progress_50"),
+      "progress-75": text("share.viewer_marker_progress_75"),
+      "progress-100": text("share.viewer_marker_progress_100"),
+      "flag-red": text("share.viewer_marker_flag_red"),
+      "flag-yellow": text("share.viewer_marker_flag_yellow"),
+      "flag-green": text("share.viewer_marker_flag_green"),
+      "flag-blue": text("share.viewer_marker_flag_blue"),
+      smile: text("share.viewer_marker_smile"),
+      neutral: text("share.viewer_marker_neutral"),
+      sad: text("share.viewer_marker_sad"),
+      question: text("share.viewer_marker_question")
     },
     colorLabel: text("share.viewer_color_0"),
     colorNames: {

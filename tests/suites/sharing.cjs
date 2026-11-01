@@ -376,6 +376,8 @@ test('sharing markers: the payload carries only whitelisted marker ids in fixed 
   const withMarkers = { ...notesById, rich: { ...notesById.rich, markers: hostile }, [Object.keys(notesById)[0]]: { ...notesById[Object.keys(notesById)[0]], markers: [] } };
   const payload = format.buildSharePayload(fixtureMap(), withMarkers, options());
   assert.equal(payload.version, 1, 'no version bump');
+  const added = format.buildSharePayload(fixtureMap(), { ...notesById, rich: { ...notesById.rich, markers: ['question', 'flag-red', 'progress-50', 'priority-5', '<img src=x onerror=alert(1)>', 'flag-purple'] } }, options());
+  assert.deepEqual(plain(added.nodes.find(n => n.id === 'rich').markers), ['priority-5', 'progress-50', 'flag-red', 'question']);
   const rich = payload.nodes.find(n => n.id === 'rich');
   assert.deepEqual(plain(rich.markers), ['done', 'star', 'priority-3']);
   assert.ok(!JSON.stringify(payload).includes('onerror'), 'unknown values never reach the file');

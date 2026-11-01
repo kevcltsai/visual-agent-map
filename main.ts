@@ -34,7 +34,8 @@ import {
   WorkspaceLeaf,
   type Command
 } from "obsidian";
-import { NoteStyleStore, type StyleFilePort } from "./ai/note-style-store";
+import { NoteStyleStore, type NoteStyleUpgradeEvent, type StyleFilePort } from "./ai/note-style-store";
+import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
@@ -162,6 +163,12 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
           )
         }
       : {}),
+    ...(normalizeNoteStyleAliases(saved?.noteStyleAliases)
+      ? { noteStyleAliases: normalizeNoteStyleAliases(saved?.noteStyleAliases) }
+      : {}),
+    ...(normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade)
+      ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade) }
+      : {}),
     coffeeStyles: Array.isArray(saved?.coffeeStyles)
       ? saved.coffeeStyles.filter(
           (item: unknown): item is { id: string; name: string; prompt: string } =>
@@ -217,7 +224,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
     port: this.noteStylePort(),
-    save: () => this.saveSettings()
+    save: () => this.saveSettings(),
+    report: event => this.reportNoteStyleUpgrade(event)
   });
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
@@ -750,6 +758,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     this.app.workspace.onLayoutReady(() => {
+      // The one-time upgrade of the old note style data starts here, after the settings are loaded and the workspace is ready.
+      void this.noteStyles.startUpgrade(this.ready);
       void this.finishStartup();
     });
     this.registerVaultEvents();
@@ -1233,6 +1243,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;
     this.aiRuntime.dispose();
+  }
+  /** Says once what the note style upgrade could not do (it never stops the plugin). */
+  private reportNoteStyleUpgrade(event: NoteStyleUpgradeEvent): void {
+    if (event.kind === "failed") new Notice(t("ui.note_style_upgrade_failed"));
+    else if (event.kind === "skipped") new Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
+    else new Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   private noteStylePort(): StyleFilePort {

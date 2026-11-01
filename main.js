@@ -1607,6 +1607,10 @@ var en = {
   "ui.note_style_restored_0": 'Restored "{0}". The earlier content is in the trash.',
   "ui.note_style_restore_not_builtin": "Open one of the built-in note style files first.",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
+  "ui.note_style_upgrade_tone_name_0": "{0} tone",
+  "ui.note_style_upgrade_failed": "Your note styles could not be upgraded to blocks this time. They keep working as before, and VAM tries again the next time it loads.",
+  "ui.note_style_upgrade_skipped_0": "These style files could not be read, so they were not upgraded and stay where they are: {0}",
+  "ui.note_style_upgrade_trash_failed_0": "Your note styles were upgraded to blocks, but these old files could not be moved to the trash and are no longer used: {0}",
   "ui.progress_note_style_0": "Style: {0}",
   "ui.note_style_edit": "Edit this style",
   "ui.note_style_edit_button": "Open file",
@@ -3866,6 +3870,10 @@ var zhCN = {
   "ui.note_style_restored_0": "\u5DF2\u6062\u590D\u201C{0}\u201D\uFF0C\u4E4B\u524D\u7684\u5185\u5BB9\u5728\u5E9F\u7EB8\u7BD3\u3002",
   "ui.note_style_restore_not_builtin": "\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A\u5185\u7F6E\u7684\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u3002",
   "ui.note_style_folder_opened_0": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A{0}",
+  "ui.note_style_upgrade_tone_name_0": "{0} \u8BED\u6C14",
+  "ui.note_style_upgrade_failed": "\u8FD9\u6B21\u6CA1\u80FD\u628A\u4F60\u7684\u7B14\u8BB0\u98CE\u683C\u5347\u7EA7\u6210\u79EF\u6728\u3002\u5B83\u4EEC\u7167\u65E7\u53EF\u7528\uFF0CVAM \u4E0B\u6B21\u52A0\u8F7D\u65F6\u4F1A\u518D\u8BD5\u4E00\u6B21\u3002",
+  "ui.note_style_upgrade_skipped_0": "\u8FD9\u4E9B\u98CE\u683C\u6587\u4EF6\u8BFB\u4E0D\u51FA\u6765\uFF0C\u6240\u4EE5\u6CA1\u6709\u5347\u7EA7\uFF0C\u7559\u5728\u539F\u5904\uFF1A{0}",
+  "ui.note_style_upgrade_trash_failed_0": "\u4F60\u7684\u7B14\u8BB0\u98CE\u683C\u5DF2\u5347\u7EA7\u6210\u79EF\u6728\uFF0C\u4F46\u8FD9\u4E9B\u65E7\u6587\u4EF6\u6CA1\u80FD\u79FB\u5230\u5E9F\u7EB8\u7BD3\uFF0C\u4E4B\u540E\u4E0D\u4F1A\u518D\u4F7F\u7528\uFF1A{0}",
   "ui.progress_note_style_0": "\u98CE\u683C\uFF1A{0}",
   "ui.note_style_edit": "\u7F16\u8F91\u8FD9\u4E2A\u98CE\u683C",
   "ui.note_style_edit_button": "\u6253\u5F00\u6587\u4EF6",
@@ -6125,6 +6133,10 @@ var zhTW = {
   "ui.note_style_restored_0": "\u5DF2\u6062\u5FA9\u300C{0}\u300D\uFF0C\u5148\u524D\u7684\u5167\u5BB9\u5728\u5783\u573E\u6876\u3002",
   "ui.note_style_restore_not_builtin": "\u8ACB\u5148\u958B\u555F\u4E00\u500B\u5167\u5EFA\u7684\u7B46\u8A18\u98A8\u683C\u6A94\u3002",
   "ui.note_style_folder_opened_0": "\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A{0}",
+  "ui.note_style_upgrade_tone_name_0": "{0} \u8A9E\u6C23",
+  "ui.note_style_upgrade_failed": "\u9019\u6B21\u6C92\u80FD\u628A\u4F60\u7684\u7B46\u8A18\u98A8\u683C\u5347\u7D1A\u6210\u7A4D\u6728\u3002\u5B83\u5011\u7167\u820A\u53EF\u7528\uFF0CVAM \u4E0B\u6B21\u8F09\u5165\u6642\u6703\u518D\u8A66\u4E00\u6B21\u3002",
+  "ui.note_style_upgrade_skipped_0": "\u9019\u4E9B\u98A8\u683C\u6A94\u8B80\u4E0D\u51FA\u4F86\uFF0C\u6240\u4EE5\u6C92\u6709\u5347\u7D1A\uFF0C\u7559\u5728\u539F\u8655\uFF1A{0}",
+  "ui.note_style_upgrade_trash_failed_0": "\u4F60\u7684\u7B46\u8A18\u98A8\u683C\u5DF2\u5347\u7D1A\u6210\u7A4D\u6728\uFF0C\u4F46\u9019\u4E9B\u820A\u6A94\u6C92\u80FD\u79FB\u5230\u5783\u573E\u6876\uFF0C\u4E4B\u5F8C\u4E0D\u6703\u518D\u4F7F\u7528\uFF1A{0}",
   "ui.progress_note_style_0": "\u98A8\u683C\uFF1A{0}",
   "ui.note_style_edit": "\u7DE8\u8F2F\u9019\u500B\u98A8\u683C",
   "ui.note_style_edit_button": "\u958B\u555F\u6A94\u6848",
@@ -7231,11 +7243,11 @@ function cleanStyle(value) {
 function cleanAttributes(node) {
   var _a2;
   for (const { name, value } of Array.from(node.attributes)) {
-    const lower3 = name.toLowerCase();
-    if (lower3.startsWith("on")) node.removeAttribute(name);
-    else if ((lower3 === "href" || lower3 === "xlink:href" || lower3 === "src") && unsafeUrl(value))
+    const lower4 = name.toLowerCase();
+    if (lower4.startsWith("on")) node.removeAttribute(name);
+    else if ((lower4 === "href" || lower4 === "xlink:href" || lower4 === "src") && unsafeUrl(value))
       node.removeAttribute(name);
-    else if (lower3 === "style") {
+    else if (lower4 === "style") {
       if (HARD_TO_VET.test(value)) node.removeAttribute(name);
       else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
     } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
@@ -21269,8 +21281,8 @@ function guardMapChatWrite(check) {
   const path = normalizeVaultPath(check.path);
   if (path === null) return { ok: false, code: "outside_vault" };
   const configDir = normalizeVaultPath(check.configDir);
-  const lower3 = path.toLowerCase();
-  const inside2 = (dir) => !!dir && (lower3 === dir.toLowerCase() || lower3.startsWith(`${dir.toLowerCase()}/`));
+  const lower4 = path.toLowerCase();
+  const inside2 = (dir) => !!dir && (lower4 === dir.toLowerCase() || lower4.startsWith(`${dir.toLowerCase()}/`));
   if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
@@ -25241,16 +25253,16 @@ function parseNoteStyleFile(text11, options) {
         const where = index + 1;
         const calloutField = CALLOUT_KEYS[keyName];
         if (calloutField) {
-          const lower3 = value.toLocaleLowerCase();
+          const lower4 = value.toLocaleLowerCase();
           if (calloutSeen.has(calloutField))
             issues.push(
               issue(where, "key_duplicate", `Line ${where}: "${pair6[1].trim()}" is written twice.`, pair6[1].trim())
             );
           else {
             calloutSeen.add(calloutField);
-            if (OFF.has(lower3)) calloutMap[calloutField] = "off";
-            else if (OBSIDIAN_CALLOUT_TYPES.has(lower3)) {
-              if (lower3 !== calloutField) calloutMap[calloutField] = lower3;
+            if (OFF.has(lower4)) calloutMap[calloutField] = "off";
+            else if (OBSIDIAN_CALLOUT_TYPES.has(lower4)) {
+              if (lower4 !== calloutField) calloutMap[calloutField] = lower4;
             } else
               issues.push(
                 issue(
@@ -26071,10 +26083,10 @@ function backupName(name, now, taken) {
   return `${uniqueBlockName(`${name} ${stamp}`, takenBases)}.md`;
 }
 
-// ai/note-style-store.ts
-var stripMd3 = (name) => name.replace(/\.md$/i, "");
-var lower2 = (value) => value.toLocaleLowerCase();
-var SAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
+// ai/note-style-upgrade.ts
+var NOTE_STYLE_UPGRADE_VERSION = 1;
+var styleAliasKey = (base) => `style:${base}`;
+var pairAliasKey = (id) => `pair:${id}`;
 var BUILTIN_PAIRS = {
   standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
   textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
@@ -26087,6 +26099,229 @@ function builtinPairOf(templateId, toneId) {
   const tone2 = toneId || DEFAULT_TONE_ID;
   return NOTE_STYLE_BUILTIN_IDS.find((id) => BUILTIN_PAIRS[id].template === template2 && BUILTIN_PAIRS[id].tone === tone2);
 }
+var lower2 = (value) => value.toLocaleLowerCase();
+var has = (object2, key2) => Boolean(Object.prototype.hasOwnProperty.call(object2, key2));
+var escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function normalizeNoteStyleAliases(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const result = {};
+  for (const [key2, entry] of Object.entries(value)) {
+    if (!entry || typeof entry !== "object") continue;
+    const { template: template2, tone: tone2 } = entry;
+    const alias = {
+      ...typeof template2 === "string" && template2 ? { template: template2 } : {},
+      ...typeof tone2 === "string" && tone2 ? { tone: tone2 } : {}
+    };
+    if (alias.template || alias.tone) result[key2] = alias;
+  }
+  return result;
+}
+function normalizeNoteStyleUpgradeMarker(value) {
+  const version = value && typeof value === "object" ? value.version : void 0;
+  return typeof version === "number" && Number.isFinite(version) ? { version } : void 0;
+}
+function isBuiltinStyleFileText(id, text11) {
+  var _a2, _b2;
+  if (((_a2 = matchCanonical(text11)) == null ? void 0 : _a2.id) === id) return true;
+  for (const version of CANONICAL_VERSIONS)
+    for (const language2 of CANONICAL_LANGUAGES) {
+      const canonical = version[id][language2];
+      const comment = (_b2 = /%%[^\n]*/.exec(canonical)) == null ? void 0 : _b2[0];
+      const name = builtinStyleFileName(id, language2);
+      const at = comment ? comment.indexOf(name) : -1;
+      if (comment && at >= 0 && text11.includes(comment.slice(0, at + name.length + 1))) return true;
+    }
+  return false;
+}
+function builtinStyleFileBase(files, id, preferred) {
+  const languages = [preferred, ...CANONICAL_LANGUAGES.filter((language2) => language2 !== preferred)];
+  const names3 = [...new Set(languages.map((language2) => builtinStyleFileName(id, language2)))];
+  for (const name of names3) {
+    const matches = [...files.keys()].filter(
+      (base) => lower2(base) === lower2(name) || new RegExp(`^${escapeRegExp(lower2(name))} \\(\\d+\\)$`).test(lower2(base))
+    ).sort();
+    const found = matches.find((base) => isBuiltinStyleFileText(id, files.get(base)));
+    if (found) return found;
+  }
+  return void 0;
+}
+var reservedNames = (category) => new Set(
+  BUILTIN_BLOCKS.filter((block) => block.category === category).flatMap(
+    (block) => builtinBlockNames(category, block.id).map(lower2)
+  )
+);
+var Namer = class {
+  constructor(category, existing, reserved) {
+    this.category = category;
+    this.reserved = reserved;
+    __publicField(this, "held", /* @__PURE__ */ new Map());
+    __publicField(this, "planned", []);
+    for (const [base, text11] of existing) this.held.set(lower2(base), { base, text: text11 });
+  }
+  place(wanted, fallback, text11) {
+    const safe = cleanBlockName(wanted) || cleanBlockName(fallback) || "Block";
+    for (let n = 1; ; n++) {
+      const name = n === 1 ? safe : `${safe} (${n})`;
+      const key2 = lower2(name);
+      if (this.reserved.has(key2)) continue;
+      const held = this.held.get(key2);
+      if (!held) {
+        this.held.set(key2, { base: name, text: text11 });
+        this.planned.push({ category: this.category, base: name, text: text11 });
+        return name;
+      }
+      if (normalizeStyleContent(held.text) === normalizeStyleContent(text11)) return held.base;
+    }
+  }
+};
+var trimBlankLines2 = (text11) => {
+  const lines = text11.split("\n");
+  let start = 0;
+  let end = lines.length;
+  while (start < end && !lines[start].trim()) start++;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return lines.slice(start, end).join("\n");
+};
+function styleFileBody(text11) {
+  const lines = text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+  if (lines[0].trimEnd() !== "---") return trimBlankLines2(lines.join("\n"));
+  const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
+  return trimBlankLines2(lines.slice(end < 0 ? lines.length : end + 1).join("\n"));
+}
+function formatZone(language2, style) {
+  return trimBlankLines2(applyFormatPreferences(inLanguage(OBSIDIAN_FORMAT, language2), language2, style));
+}
+var templateText = (body, format, language2) => `${body}
+
+# ${templateFormatHeading(noteLanguageOf(language2))}
+
+${format}
+`;
+function templateSectionsText(template2, language2) {
+  const head = serializeLegacyV1({ ...template2, sections: [] }, language2);
+  const full = serializeLegacyV1(template2, language2);
+  return trimBlankLines2(full.startsWith(head) ? full.slice(head.length) : full);
+}
+var sectionShape = (section3) => {
+  var _a2, _b2;
+  return JSON.stringify([
+    section3.name,
+    section3.description.replace(/\r\n?/g, "\n").trim(),
+    (_a2 = section3.count) != null ? _a2 : null,
+    (_b2 = section3.callouts) != null ? _b2 : []
+  ]);
+};
+function planNoteStyleUpgrade(input2) {
+  var _a2, _b2, _c, _d;
+  const { language: language2 } = input2;
+  const templates = new Namer("template", input2.blocks.template, reservedNames("template"));
+  const tones = new Namer("tone", input2.blocks.tone, reservedNames("tone"));
+  const aliases = {};
+  const oldFiles = /* @__PURE__ */ new Map();
+  const skipped2 = [];
+  const toneNameKey = "ui.note_style_upgrade_tone_name_0";
+  const presetRefs = /* @__PURE__ */ new Map();
+  for (const preset of ((_a2 = input2.promptPresets) != null ? _a2 : []).filter((item) => item.kind === "tone")) {
+    const base = tones.place(preset.name, preset.id, preset.text);
+    presetRefs.set(preset.id, fileRef(base));
+    aliases[preset.id] = { tone: fileRef(base) };
+  }
+  const toneRefOf = (raw, fileBase) => {
+    if (!raw) return void 0;
+    const key2 = lower2(raw.trim());
+    const pools = [language2, ...LANGUAGES.map((item) => item.id)].map(
+      (item) => listPresets(input2.promptPresets, "tone", item)
+    );
+    for (const pool of pools) {
+      const found = pool.find((item) => lower2(item.id) === key2 || lower2(item.name) === key2);
+      if (!found) continue;
+      if (found.id === DEFAULT_TONE_ID) return builtinRef(DEFAULT_TONE_ID);
+      if (!isBuiltinPreset(found.id)) return presetRefs.get(found.id);
+      const own2 = pools[0].find((item) => item.id === found.id);
+      if (own2 && own2.text.trim() === found.text.trim()) return builtinRef(found.id);
+      return fileRef(tones.place(translate(language2, toneNameKey, fileBase), fileBase, found.text.trim()));
+    }
+    return fileRef(tones.place(translate(language2, toneNameKey, fileBase), fileBase, raw.trim()));
+  };
+  const pairBase = new Map(
+    NOTE_STYLE_BUILTIN_IDS.map((id) => [id, builtinStyleFileBase(input2.files, id, language2)])
+  );
+  const blockOfFile = /* @__PURE__ */ new Map();
+  for (const base of [...input2.files.keys()].sort()) {
+    const text11 = input2.files.get(base);
+    const pair6 = NOTE_STYLE_BUILTIN_IDS.find((id) => pairBase.get(id) === base);
+    if (pair6 && ((_b2 = matchCanonical(text11)) == null ? void 0 : _b2.id) === pair6) {
+      oldFiles.set(base, text11);
+      continue;
+    }
+    const parsed = parseNoteStyleFile(text11, { id: styleAliasKey(base), name: base });
+    if (!parsed.ok) {
+      skipped2.push(base);
+      continue;
+    }
+    const style = parsed.style;
+    const format = formatZone(language2, style);
+    const full = templateText(styleFileBody(text11), format, language2);
+    const check = parseTemplateBlock(full, { id: fileRef(base), name: base });
+    if (!check.ok || check.lead !== style.intro || check.format !== format || check.template.sections.length !== style.sections.length || check.template.sections.some((section3, index) => sectionShape(section3) !== sectionShape(style.sections[index]))) {
+      skipped2.push(base);
+      continue;
+    }
+    const templateRef = fileRef(templates.place(base, base, full));
+    const toneRef = toneRefOf(style.tone, base);
+    oldFiles.set(base, text11);
+    blockOfFile.set(base, { template: templateRef, ...toneRef ? { tone: toneRef } : {} });
+    aliases[styleAliasKey(base)] = { template: templateRef, tone: toneRef != null ? toneRef : builtinRef(DEFAULT_TONE_ID) };
+    if (pair6) aliases[pairAliasKey(pair6)] = { ...aliases[styleAliasKey(base)] };
+  }
+  for (const [id, name] of Object.entries((_c = input2.noteStyleFiles) != null ? _c : {})) {
+    const converted = blockOfFile.get(stripMd2(name));
+    if (converted) aliases[id] = { ...converted };
+  }
+  for (const template2 of input2.detailTemplates) {
+    if (has(aliases, template2.id)) continue;
+    const format = formatZone(language2);
+    const full = templateText(templateSectionsText(template2, language2), format, language2);
+    const check = parseTemplateBlock(full, { id: fileRef(template2.name), name: template2.name });
+    if (!check.ok || check.lead || check.format !== format || check.template.sections.length !== template2.sections.length || check.template.sections.some((section3, index) => sectionShape(section3) !== sectionShape(template2.sections[index])))
+      continue;
+    aliases[template2.id] = { template: fileRef(templates.place(template2.name, "Style", full)) };
+  }
+  const keys = {};
+  const chosen = input2.defaultNoteStyleId || input2.defaultDetailTemplateId;
+  if (chosen) {
+    const preset = input2.defaultNoteStyleId ? NOTE_STYLE_BUILTIN_IDS.find((id) => id === input2.defaultNoteStyleId) : void 0;
+    const level = preset ? { template: BUILTIN_PAIRS[preset].template, tone: BUILTIN_PAIRS[preset].tone } : { template: chosen, tone: void 0 };
+    let template2;
+    let tone2;
+    if (level.template === STANDARD_TEMPLATE_ID || level.template === TEXTBOOK_TEMPLATE_ID) {
+      const pair6 = builtinPairOf(level.template, level.tone);
+      const alias = pair6 ? aliases[pairAliasKey(pair6)] : void 0;
+      template2 = (_d = alias == null ? void 0 : alias.template) != null ? _d : builtinRef(level.template);
+      tone2 = alias ? alias.tone : level.tone ? builtinRef(level.tone) : void 0;
+    } else if (has(aliases, level.template)) {
+      template2 = aliases[level.template].template;
+      tone2 = aliases[level.template].tone;
+    }
+    if (!input2.noteTemplateBlock && template2) keys.noteTemplateBlock = template2;
+    const toneToSet = input2.noteTemplateBlock ? level.tone ? builtinRef(level.tone) : void 0 : tone2;
+    if (!input2.noteToneBlock && toneToSet) keys.noteToneBlock = toneToSet;
+  }
+  const blocks = [...templates.planned, ...tones.planned];
+  return {
+    blocks,
+    oldFiles: [...oldFiles].map(([base, text11]) => ({ base, text: text11 })),
+    skipped: skipped2,
+    aliases,
+    keys,
+    nothing: !blocks.length && !oldFiles.size && !Object.keys(aliases).length && !keys.noteTemplateBlock && !keys.noteToneBlock
+  };
+}
+
+// ai/note-style-store.ts
+var stripMd3 = (name) => name.replace(/\.md$/i, "");
+var lower3 = (value) => value.toLocaleLowerCase();
+var SAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
 function runToneText(resolution, presets, ids, language2) {
   if (resolution == null ? void 0 : resolution.noteStyle) return resolution.toneText;
   return resolveToneText(presets, ids, language2);
@@ -26104,6 +26339,10 @@ var NoteStyleStore = class {
     __publicField(this, "resolutions", /* @__PURE__ */ new WeakMap());
     /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
     __publicField(this, "writeQueue", Promise.resolve());
+    /** The one upgrade run of this session (started once; later calls get the same answer). */
+    __publicField(this, "upgradeRun");
+    /** An upgrade that could not be written out: its blocks, aliases and keys answer in memory until the next load retries it. */
+    __publicField(this, "pending");
   }
   get settings() {
     return this.deps.settings();
@@ -26115,6 +26354,10 @@ var NoteStyleStore = class {
   }
   /** Reads every style file of the folder once. Call at the start of a run; later calls in the run see this snapshot. */
   async refresh() {
+    if (this.upgradeRun) await this.upgradeRun;
+    await this.load();
+  }
+  async load() {
     const folder = this.folder();
     const next = /* @__PURE__ */ new Map();
     let names3 = [];
@@ -26153,6 +26396,7 @@ var NoteStyleStore = class {
     };
   }
   async loadBlocks() {
+    var _a2, _b2;
     const dirs = this.blockDirectories();
     const next = { template: /* @__PURE__ */ new Map(), tone: /* @__PURE__ */ new Map() };
     for (const category of ["template", "tone"]) {
@@ -26170,6 +26414,9 @@ var NoteStyleStore = class {
         }
       }
     }
+    for (const block of (_b2 = (_a2 = this.pending) == null ? void 0 : _a2.blocks) != null ? _b2 : [])
+      if (![...next[block.category].keys()].some((base) => lower3(base) === lower3(block.base)))
+        next[block.category].set(block.base, block.text);
     this.blocks = next;
   }
   /** The base name of the file that overrides a built-in block, if the block folder holds one (the interface language's name first). */
@@ -26177,7 +26424,7 @@ var NoteStyleStore = class {
     const block = findBuiltinBlock(category, id);
     const names3 = [translate(this.settings.language, block.nameKey), ...builtinBlockNames(category, id)];
     for (const name of names3) {
-      const base = [...this.blocks[category].keys()].find((key2) => lower2(key2) === lower2(name));
+      const base = [...this.blocks[category].keys()].find((key2) => lower3(key2) === lower3(name));
       if (base !== void 0) return base;
     }
     return void 0;
@@ -26223,35 +26470,13 @@ var NoteStyleStore = class {
     return items;
   }
   // ---- identification of files ----
-  builtinNames(id) {
-    const preferred = this.settings.language;
-    const languages = [preferred, ...CANONICAL_LANGUAGES.filter((language2) => language2 !== preferred)];
-    return [...new Set(languages.map((language2) => builtinStyleFileName(id, language2)))];
-  }
   /** True when `text` is a built-in's file (canonical, or edited but still carrying its usage comment). */
   isBuiltinFile(id, text11) {
-    var _a2, _b2;
-    if (((_a2 = matchCanonical(text11)) == null ? void 0 : _a2.id) === id) return true;
-    for (const version of CANONICAL_VERSIONS)
-      for (const language2 of CANONICAL_LANGUAGES) {
-        const canonical = version[id][language2];
-        const comment = (_b2 = /%%[^\n]*/.exec(canonical)) == null ? void 0 : _b2[0];
-        const name = builtinStyleFileName(id, language2);
-        const at = comment ? comment.indexOf(name) : -1;
-        if (comment && at >= 0 && text11.includes(comment.slice(0, at + name.length + 1))) return true;
-      }
-    return false;
+    return isBuiltinStyleFileText(id, text11);
   }
   /** The base name of the file that holds a built-in style now, if one is in the folder. */
   builtinFile(id) {
-    for (const name of this.builtinNames(id)) {
-      const matches = [...this.files.keys()].filter(
-        (base) => lower2(base) === lower2(name) || new RegExp(`^${escapeRegExp(lower2(name))} \\(\\d+\\)$`).test(lower2(base))
-      ).sort();
-      const found = matches.find((base) => this.isBuiltinFile(id, this.files.get(base)));
-      if (found) return found;
-    }
-    return void 0;
+    return builtinStyleFileBase(this.files, id, this.settings.language);
   }
   /**
    * The built-in a file base name stands for ("restore default" applies to it). The name alone is not enough: a user's own
@@ -26260,12 +26485,12 @@ var NoteStyleStore = class {
    */
   builtinIdOfFile(baseName3) {
     const base = stripMd3(baseName3);
-    const key2 = lower2(base);
+    const key2 = lower3(base);
     for (const id of NOTE_STYLE_BUILTIN_IDS)
       for (const language2 of CANONICAL_LANGUAGES) {
-        const name = lower2(builtinStyleFileName(id, language2));
-        if (key2 !== name && !new RegExp(`^${escapeRegExp(name)} \\(\\d+\\)$`).test(key2)) continue;
-        const held = [...this.files.keys()].find((item) => lower2(item) === key2);
+        const name = lower3(builtinStyleFileName(id, language2));
+        if (key2 !== name && !new RegExp(`^${escapeRegExp2(name)} \\(\\d+\\)$`).test(key2)) continue;
+        const held = [...this.files.keys()].find((item) => lower3(item) === key2);
         if (held !== void 0 && !this.isBuiltinFile(id, this.files.get(held))) continue;
         return { id, language: language2 };
       }
@@ -26293,7 +26518,7 @@ var NoteStyleStore = class {
     for (let index = 0; index < all.length; index++) {
       const id = all[index].template;
       if (!id) continue;
-      const isBlock = index === all.length - 1 && !!settings.noteTemplateBlock && id === settings.noteTemplateBlock;
+      const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
       const found = isBlock ? this.tryBlock(id, toneChain, noteLanguage) : this.tryId(id, index, all, toneChain, noteLanguage);
       if (found) return this.remember({ ...found, missing });
       missing.push(id);
@@ -26340,13 +26565,42 @@ var NoteStyleStore = class {
    */
   toneTextFor(template2, ids, language2) {
     const resolution = this.resolutionOf(template2);
-    const presets = this.settings.promptPresets;
-    if (resolution == null ? void 0 : resolution.noteStyle) return runToneText(resolution, presets, ids, language2);
+    if (resolution == null ? void 0 : resolution.noteStyle) return runToneText(resolution, this.settings.promptPresets, ids, language2);
+    if (resolution == null ? void 0 : resolution.toneDecided) return resolution.toneText;
+    return this.plainTone(ids, language2).text;
+  }
+  /**
+   * The tone of the first of `ids` that names a tone (a custom tone preset's id goes through its alias to the tone block;
+   * academic is no text), else the workspace tone: a built-in tone by id, or a text that fills the gap only when no tone
+   * is named by the run, topic or map.
+   */
+  plainTone(ids, language2) {
+    const own2 = this.namedTone(ids, language2);
+    if (own2.named) return own2;
     const workspace = this.workspaceTone();
-    if (!workspace) return resolveToneText(presets, ids, language2);
-    if ("id" in workspace) return resolveToneText(presets, [...ids, workspace.id], language2);
-    if (ids.some((id) => findPreset(presets, "tone", id, language2))) return resolveToneText(presets, ids, language2);
-    return workspace.text.trim() || void 0;
+    if (!workspace) return own2;
+    if ("id" in workspace) return this.namedTone([workspace.id], language2);
+    return { named: true, text: workspace.text.trim() || void 0 };
+  }
+  /** The first of `ids` that names a tone decides: `named`, and its text (undefined for academic or an empty text). */
+  namedTone(ids, language2) {
+    const presets = this.settings.promptPresets;
+    for (const id of ids) {
+      if (!id) continue;
+      const alias = this.aliasOf(id);
+      if ((alias == null ? void 0 : alias.tone) && !alias.template) {
+        const target = this.toneByRef(alias.tone);
+        if (target) return { named: true, text: this.toneTargetText(target, language2) };
+        continue;
+      }
+      const found = findPreset(presets, "tone", id, language2);
+      if (found)
+        return { named: true, text: found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0 };
+    }
+    return { named: false };
+  }
+  toneTargetText(target, language2) {
+    return "id" in target ? resolveToneText(this.settings.promptPresets, [target.id], language2) : target.text.trim() || void 0;
   }
   /**
    * The style fields a run with no choice of its own gets: the same resolution, tone and context fields the map view
@@ -26368,23 +26622,46 @@ var NoteStyleStore = class {
    */
   workspaceTone() {
     const settings = this.settings;
-    if (settings.noteToneBlock) {
-      const ref = parseBlockRef(settings.noteToneBlock);
-      if ((ref == null ? void 0 : ref.kind) === "builtin") {
-        if (!this.isBuiltinBlockId("tone", ref.id)) return void 0;
-        const base = this.overrideBase("tone", ref.id);
-        const text11 = base === void 0 ? void 0 : this.blocks.tone.get(base);
-        if (text11 !== void 0 && !isUnmodifiedBlock("tone", ref.id, text11)) return { text: text11 };
-        return { id: ref.id };
-      }
-      if ((ref == null ? void 0 : ref.kind) === "file") {
-        const text11 = this.blocks.tone.get(ref.base);
-        return text11 === void 0 ? void 0 : { text: text11 };
-      }
-      return void 0;
-    }
+    const key2 = this.toneKey();
+    if (key2) return this.toneByRef(key2);
     const preset = NOTE_STYLE_BUILTIN_IDS.find((id) => id === settings.defaultNoteStyleId);
     return preset ? { id: BUILTIN_PAIRS[preset].tone } : void 0;
+  }
+  /** A tone block ref as a tone: a built-in by id (so the run's chain can apply it), or the text of a changed built-in or own file. */
+  toneByRef(ref) {
+    const parsed = parseBlockRef(ref);
+    if ((parsed == null ? void 0 : parsed.kind) === "builtin") {
+      if (!this.isBuiltinBlockId("tone", parsed.id)) return void 0;
+      const base = this.overrideBase("tone", parsed.id);
+      const text11 = base === void 0 ? void 0 : this.blocks.tone.get(base);
+      if (text11 !== void 0 && !isUnmodifiedBlock("tone", parsed.id, text11)) return { text: text11 };
+      return { id: parsed.id };
+    }
+    if ((parsed == null ? void 0 : parsed.kind) === "file") {
+      const text11 = this.blocks.tone.get(parsed.base);
+      return text11 === void 0 ? void 0 : { text: text11 };
+    }
+    return void 0;
+  }
+  // ---- upgrade state the resolution reads: what is saved, else what an unfinished upgrade holds in memory ----
+  templateKey() {
+    var _a2;
+    return this.settings.noteTemplateBlock || ((_a2 = this.pending) == null ? void 0 : _a2.keys.noteTemplateBlock);
+  }
+  toneKey() {
+    var _a2;
+    return this.settings.noteToneBlock || ((_a2 = this.pending) == null ? void 0 : _a2.keys.noteToneBlock);
+  }
+  aliasOf(key2) {
+    var _a2;
+    const saved = this.settings.noteStyleAliases;
+    if (saved && Object.prototype.hasOwnProperty.call(saved, key2)) return saved[key2];
+    const held = (_a2 = this.pending) == null ? void 0 : _a2.aliases;
+    return held && Object.prototype.hasOwnProperty.call(held, key2) ? held[key2] : void 0;
+  }
+  /** Until the upgrade has finished, the old sources (style files, exported files) are still read. */
+  legacyReads() {
+    return !this.settings.noteStyleUpgrade;
   }
   remember(resolution) {
     if (resolution.noteStyle || resolution.block) this.resolutions.set(resolution.template, resolution);
@@ -26392,7 +26669,8 @@ var NoteStyleStore = class {
   }
   workspaceLevel() {
     const settings = this.settings;
-    if (settings.noteTemplateBlock) return { template: settings.noteTemplateBlock };
+    const block = this.templateKey();
+    if (block) return { template: block };
     const chosen = settings.defaultNoteStyleId;
     if (chosen) {
       const preset = NOTE_STYLE_BUILTIN_IDS.find((id) => id === chosen);
@@ -26453,12 +26731,17 @@ var NoteStyleStore = class {
     var _a2, _b2, _c;
     const settings = this.settings;
     if (id.startsWith("style:")) {
+      const aliased = this.tryAlias(id, "user", level, toneChain, noteLanguage);
+      if (aliased) return aliased;
+      if (!this.legacyReads()) return void 0;
       const base = id.slice("style:".length);
       const text11 = this.files.get(base);
       if (text11 === void 0) return void 0;
       return this.fromFile(parseNoteStyleFile(text11, { id, name: base }), `${base}.md`, level, toneChain, "user");
     }
-    const exported = (_a2 = settings.noteStyleFiles) == null ? void 0 : _a2[id];
+    const aliasedOld = this.tryAlias(id, "legacy", level, toneChain, noteLanguage);
+    if (aliasedOld) return aliasedOld;
+    const exported = this.legacyReads() ? (_a2 = settings.noteStyleFiles) == null ? void 0 : _a2[id] : void 0;
     if (exported) {
       const base = stripMd3(exported);
       const text11 = this.files.get(base);
@@ -26470,9 +26753,11 @@ var NoteStyleStore = class {
       }
     }
     if (id === STANDARD_TEMPLATE_ID || id === TEXTBOOK_TEMPLATE_ID) {
-      const tone2 = toneChain.find((toneId) => findPreset(settings.promptPresets, "tone", toneId, settings.language));
+      const tone2 = toneChain.find((toneId) => this.namedTone([toneId], settings.language).named);
       const builtin = builtinPairOf(id, tone2);
-      const base = builtin ? this.builtinFile(builtin) : void 0;
+      const aliasedPair = builtin ? this.tryAlias(pairAliasKey(builtin), "pair", level, toneChain, noteLanguage) : void 0;
+      if (aliasedPair) return aliasedPair;
+      const base = builtin && this.legacyReads() ? this.builtinFile(builtin) : void 0;
       if (builtin && base !== void 0) {
         const text11 = this.files.get(base);
         if (((_c = matchCanonical(text11)) == null ? void 0 : _c.id) !== builtin)
@@ -26486,6 +26771,32 @@ var NoteStyleStore = class {
       }
     }
     return this.legacyResult(id, toneChain, noteLanguage);
+  }
+  /**
+   * An old id that the upgrade moved to a template block (`alias.template`), answered as the old file was: the block, and
+   * the tone the file decided. A style file's tone is its own unless the same or a more specific level names one; an old
+   * template's whole chain (and the workspace tone) is asked first; a built-in style's file always decides its own.
+   * Absent when the id has no alias or its block file is gone (the caller goes on as for a file that is missing).
+   */
+  tryAlias(key2, kind, level, toneChain, noteLanguage) {
+    const alias = this.aliasOf(key2);
+    if (!(alias == null ? void 0 : alias.template)) return void 0;
+    const found = this.tryBlock(alias.template, toneChain, noteLanguage);
+    if (!found) return void 0;
+    const language2 = this.settings.language;
+    const target = alias.tone ? this.toneByRef(alias.tone) : void 0;
+    const own2 = target ? this.toneTargetText(target, language2) : void 0;
+    let toneText;
+    if (kind === "pair") toneText = own2;
+    else if (kind === "user") {
+      const named = this.namedTone(toneChain.slice(0, level + 1), language2);
+      toneText = named.named ? named.text : own2;
+    } else {
+      if (!alias.tone) return found;
+      const named = this.plainTone(toneChain, language2);
+      toneText = named.named ? named.text : own2;
+    }
+    return { ...found, ...toneText ? { toneText } : {}, toneDecided: true };
   }
   fromFile(parsed, fileName, level, toneChain, kind) {
     const settings = this.settings;
@@ -26508,12 +26819,12 @@ var NoteStyleStore = class {
   /** `語氣` is the name or id of an existing tone (its full text is used), else free text. */
   toneFromFile(raw) {
     const settings = this.settings;
-    const key2 = lower2(raw.trim());
+    const key2 = lower3(raw.trim());
     const pools = [settings.language, ...LANGUAGES.map((language2) => language2.id)].map(
       (language2) => listPresets(settings.promptPresets, "tone", language2)
     );
     for (const pool of pools) {
-      const found = pool.find((item) => lower2(item.id) === key2 || lower2(item.name) === key2);
+      const found = pool.find((item) => lower3(item.id) === key2 || lower3(item.name) === key2);
       if (found) return found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0;
     }
     return raw.trim() || void 0;
@@ -26524,12 +26835,12 @@ var NoteStyleStore = class {
     var _a2;
     const settings = this.settings;
     const exportedBy = new Map(
-      Object.entries((_a2 = settings.noteStyleFiles) != null ? _a2 : {}).map(([uuid, name]) => [lower2(stripMd3(name)), uuid])
+      Object.entries((_a2 = settings.noteStyleFiles) != null ? _a2 : {}).map(([uuid, name]) => [lower3(stripMd3(name)), uuid])
     );
     const items = [];
     for (const [base, text11] of [...this.files].sort(([a], [b]) => a.localeCompare(b))) {
       const builtin = NOTE_STYLE_BUILTIN_IDS.find((id2) => this.builtinFile(id2) === base);
-      const uuid = exportedBy.get(lower2(base));
+      const uuid = exportedBy.get(lower3(base));
       const id = builtin ? builtin : uuid != null ? uuid : `style:${base}`;
       const parsed = parseNoteStyleFile(text11, { id: typeof id === "string" ? id : base, name: base });
       const issues = parsed.ok ? [] : parsed.issues;
@@ -26548,7 +26859,7 @@ var NoteStyleStore = class {
   // ---- writing files (only on a user action) ----
   uniqueName(base, taken) {
     let name = base;
-    for (let n = 2; taken.has(lower2(name)); n++) name = `${base} (${n})`;
+    for (let n = 2; taken.has(lower3(name)); n++) name = `${base} (${n})`;
     return name;
   }
   /**
@@ -26567,11 +26878,11 @@ var NoteStyleStore = class {
     }
     await port.createFolder(folder);
     await this.refresh();
-    const taken = new Set([...this.files.keys()].map(lower2));
+    const taken = new Set([...this.files.keys()].map(lower3));
     const write = async (base, content) => {
       await port.create(`${folder}/${base}.md`, content);
       this.files.set(base, content);
-      taken.add(lower2(base));
+      taken.add(lower3(base));
     };
     for (const id of NOTE_STYLE_BUILTIN_IDS) {
       if (this.builtinFile(id) !== void 0) continue;
@@ -26581,21 +26892,21 @@ var NoteStyleStore = class {
       );
     }
     const map = { ...(_a2 = settings.noteStyleFiles) != null ? _a2 : {} };
-    const claimed = new Set(Object.values(map).map((name) => lower2(stripMd3(name))));
+    const claimed = new Set(Object.values(map).map((name) => lower3(stripMd3(name))));
     for (const template2 of settings.detailTemplates) {
       if (map[template2.id]) continue;
       const wanted = template2.name.replace(SAFE_NAME, " ").replace(/\s+/g, " ").trim() || "Style";
-      const existing = [...this.files.keys()].find((base2) => lower2(base2) === lower2(wanted));
-      if (existing !== void 0 && !claimed.has(lower2(existing)) && this.legacyUnchanged(template2, this.files.get(existing))) {
+      const existing = [...this.files.keys()].find((base2) => lower3(base2) === lower3(wanted));
+      if (existing !== void 0 && !claimed.has(lower3(existing)) && this.legacyUnchanged(template2, this.files.get(existing))) {
         map[template2.id] = `${existing}.md`;
-        claimed.add(lower2(existing));
+        claimed.add(lower3(existing));
         dirty = true;
         continue;
       }
       const base = this.uniqueName(wanted, taken);
       await write(base, serializeLegacyV1(template2, settings.language));
       map[template2.id] = `${base}.md`;
-      claimed.add(lower2(base));
+      claimed.add(lower3(base));
       dirty = true;
     }
     if (Object.keys(map).length && JSON.stringify(map) !== JSON.stringify((_b2 = settings.noteStyleFiles) != null ? _b2 : {})) {
@@ -26630,7 +26941,7 @@ var NoteStyleStore = class {
     return run;
   }
   takenNames(category) {
-    return new Set([...this.blocks[category].keys()].map(lower2));
+    return new Set([...this.blocks[category].keys()].map(lower3));
   }
   /**
    * The path of the file behind a block, so it can be opened. A built-in with no file gets one, written with its text in
@@ -26727,7 +27038,7 @@ var NoteStyleStore = class {
           present = [];
         }
         await port.createFolder(dirs.backup);
-        backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower2)))}`;
+        backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower3)))}`;
         await port.create(backup, live);
       } catch (e) {
         return { ok: false, reason: "backup-failed" };
@@ -26741,6 +27052,132 @@ var NoteStyleStore = class {
       return { ok: true, backup };
     });
   }
+  // ---- the one-time upgrade of the old note style data (the only write that is not a user action) ----
+  /**
+   * Starts the upgrade once (`after` is awaited first, for example the plugin's start-up); later calls get the same
+   * promise. It never rejects: a failure is reported once, the unfinished upgrade answers from memory this session, and
+   * the next load tries again. `refresh()` waits for it.
+   */
+  startUpgrade(after) {
+    var _a2;
+    (_a2 = this.upgradeRun) != null ? _a2 : this.upgradeRun = (async () => {
+      var _a3, _b2;
+      try {
+        if (after) await after.catch(() => void 0);
+        return await this.runUpgrade();
+      } catch (e) {
+        (_b2 = (_a3 = this.deps).report) == null ? void 0 : _b2.call(_a3, { kind: "failed" });
+        return { status: "failed", skipped: [], trashFailed: [] };
+      }
+    })();
+    return this.upgradeRun;
+  }
+  upgradeLegacy() {
+    return this.startUpgrade();
+  }
+  /**
+   * Order: the plan is applied in memory, then backups of the old files, the block files, data.json (new keys, aliases,
+   * marker), and only then the old files go to the trash. A failure before the marker leaves the marker, the keys and the
+   * old files alone. Nothing is ever overwritten: a name taken by other text was given a new name by the plan.
+   */
+  async runUpgrade() {
+    var _a2, _b2, _c, _d, _e, _f;
+    const settings = this.settings;
+    if (settings.noteStyleUpgrade) return { status: "already", skipped: [], trashFailed: [] };
+    await this.load();
+    const plan = planNoteStyleUpgrade({
+      language: settings.language,
+      files: this.files,
+      detailTemplates: settings.detailTemplates,
+      promptPresets: settings.promptPresets,
+      noteStyleFiles: settings.noteStyleFiles,
+      defaultNoteStyleId: settings.defaultNoteStyleId,
+      defaultDetailTemplateId: settings.defaultDetailTemplateId,
+      noteTemplateBlock: settings.noteTemplateBlock,
+      noteToneBlock: settings.noteToneBlock,
+      blocks: this.blocks
+    });
+    if (!plan.nothing) {
+      this.pending = { blocks: plan.blocks, aliases: plan.aliases, keys: plan.keys };
+      for (const block of plan.blocks) this.blocks[block.category].set(block.base, block.text);
+    }
+    try {
+      await this.serial(() => this.writeUpgrade(plan));
+    } catch (e) {
+      (_b2 = (_a2 = this.deps).report) == null ? void 0 : _b2.call(_a2, { kind: "failed" });
+      return { status: "failed", skipped: plan.skipped, trashFailed: [] };
+    }
+    this.pending = void 0;
+    const trashFailed = await this.trashUpgraded(plan);
+    if (plan.skipped.length) (_d = (_c = this.deps).report) == null ? void 0 : _d.call(_c, { kind: "skipped", names: plan.skipped });
+    if (trashFailed.length) (_f = (_e = this.deps).report) == null ? void 0 : _f.call(_e, { kind: "trash-failed", names: trashFailed });
+    return { status: "done", skipped: plan.skipped, trashFailed };
+  }
+  async writeUpgrade(plan) {
+    var _a2, _b2, _c;
+    const { port } = this.deps;
+    const settings = this.settings;
+    const dirs = this.blockDirectories();
+    if (plan.oldFiles.length) {
+      let present = [];
+      try {
+        present = await port.list(dirs.backup);
+      } catch (e) {
+        present = [];
+      }
+      await port.createFolder(dirs.backup);
+      const taken = new Set(present.map(lower3));
+      const now = (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date();
+      for (const old of plan.oldFiles) {
+        const name = backupName(old.base, now, taken);
+        taken.add(lower3(name));
+        await port.create(`${dirs.backup}/${name}`, old.text);
+      }
+    }
+    for (const category of ["tone", "template"]) {
+      const items = plan.blocks.filter((block) => block.category === category);
+      if (!items.length) continue;
+      await port.createFolder(dirs[category]);
+      for (const item of items) await port.create(`${dirs[category]}/${item.base}.md`, item.text);
+    }
+    const before = {
+      noteTemplateBlock: settings.noteTemplateBlock,
+      noteToneBlock: settings.noteToneBlock,
+      noteStyleAliases: settings.noteStyleAliases,
+      noteStyleUpgrade: settings.noteStyleUpgrade
+    };
+    if (plan.keys.noteTemplateBlock && !settings.noteTemplateBlock)
+      settings.noteTemplateBlock = plan.keys.noteTemplateBlock;
+    if (plan.keys.noteToneBlock && !settings.noteToneBlock) settings.noteToneBlock = plan.keys.noteToneBlock;
+    if (Object.keys(plan.aliases).length) settings.noteStyleAliases = { ...plan.aliases, ...settings.noteStyleAliases };
+    settings.noteStyleUpgrade = { version: NOTE_STYLE_UPGRADE_VERSION };
+    try {
+      await this.deps.save();
+    } catch (error) {
+      for (const [key2, value] of Object.entries(before)) {
+        if (value === void 0) delete settings[key2];
+        else settings[key2] = value;
+      }
+      throw error;
+    }
+  }
+  /** The old files that became blocks go to the trash, each only while it still holds the text that was backed up. */
+  async trashUpgraded(plan) {
+    const { port } = this.deps;
+    const folder = this.folder();
+    const failed = [];
+    for (const old of plan.oldFiles) {
+      const path = `${folder}/${old.base}.md`;
+      try {
+        if (await port.read(path) !== old.text) throw new Error("changed");
+        await port.trash(path);
+        this.files.delete(old.base);
+      } catch (e) {
+        failed.push(old.base);
+      }
+    }
+    return failed;
+  }
   /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */
   async followFolderRename(oldPath, newPath) {
     if (oldPath !== this.folder()) return false;
@@ -26753,19 +27190,19 @@ var NoteStyleStore = class {
     return this.deps.port.folderExists(this.folder());
   }
 };
-function escapeRegExp(value) {
+function escapeRegExp2(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function inheritRoles(parsed, original) {
   for (const section3 of parsed.sections) {
-    const key2 = lower2(section3.name.trim());
+    const key2 = lower3(section3.name.trim());
     const match = original.sections.find((item) => sectionKeys(item).includes(key2));
     if (!match) continue;
     if (section3.role === "none" && match.role !== "none" && !parsed.sections.some((other) => other.role === match.role))
       section3.role = match.role;
-    const names3 = new Set(parsed.sections.map((item) => lower2(item.name.trim())));
+    const names3 = new Set(parsed.sections.map((item) => lower3(item.name.trim())));
     for (const alias of [match.name, ...match.aliases]) {
-      if (!alias.trim() || names3.has(lower2(alias.trim())) || section3.aliases.some((a) => lower2(a) === lower2(alias)))
+      if (!alias.trim() || names3.has(lower3(alias.trim())) || section3.aliases.some((a) => lower3(a) === lower3(alias)))
         continue;
       section3.aliases.push(alias);
     }
@@ -63002,7 +63439,7 @@ function shownBlocks(plugin) {
   const chosen = (_b2 = (_a2 = settings.defaultNoteStyleId) != null ? _a2 : settings.defaultDetailTemplateId) != null ? _b2 : "standard";
   const preset = NOTE_STYLE_PRESETS.find((item) => item.id === chosen);
   const standard = NOTE_STYLE_PRESETS[0];
-  const has = (category, ref) => ref !== void 0 && store.listBlocks(category).some((item) => item.ref === ref);
+  const has2 = (category, ref) => ref !== void 0 && store.listBlocks(category).some((item) => item.ref === ref);
   const keyed = settings.noteTemplateBlock;
   let legacyName;
   if (!keyed && !preset) {
@@ -63010,9 +63447,9 @@ function shownBlocks(plugin) {
     const unexported = store.unexportedTemplates().find((item) => item.id === chosen);
     legacyName = (_d = (_c = old && "name" in old ? old.name : void 0) != null ? _c : unexported == null ? void 0 : unexported.name) != null ? _d : chosen.replace(/^style:/, "");
   }
-  const template2 = keyed ? has("template", keyed) ? keyed : builtinRef(standard.templateId) : preset ? builtinRef(preset.templateId) : builtinRef(standard.templateId);
+  const template2 = keyed ? has2("template", keyed) ? keyed : builtinRef(standard.templateId) : preset ? builtinRef(preset.templateId) : builtinRef(standard.templateId);
   const toneKey = settings.noteToneBlock;
-  const tone2 = toneKey ? has("tone", toneKey) ? toneKey : builtinRef(standard.toneId) : builtinRef((preset != null ? preset : standard).toneId);
+  const tone2 = toneKey ? has2("tone", toneKey) ? toneKey : builtinRef(standard.toneId) : builtinRef((preset != null ? preset : standard).toneId);
   return {
     template: legacyName === void 0 ? template2 : LEGACY_PICK,
     tone: tone2,
@@ -64352,23 +64789,23 @@ function allowedUrl(tag, name, value) {
   return false;
 }
 function cssIsInert(css) {
-  const lower3 = css.toLowerCase();
-  if (lower3.includes("@import") || lower3.includes("expression(") || lower3.includes("javascript:")) return false;
-  if (lower3.includes("behavior:") || lower3.includes("-moz-binding")) return false;
-  for (const match of lower3.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
+  const lower4 = css.toLowerCase();
+  if (lower4.includes("@import") || lower4.includes("expression(") || lower4.includes("javascript:")) return false;
+  if (lower4.includes("behavior:") || lower4.includes("-moz-binding")) return false;
+  for (const match of lower4.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
     if (!match[2].trim().startsWith("#")) return false;
-  return !FORBIDDEN_SCHEMES.test(lower3);
+  return !FORBIDDEN_SCHEMES.test(lower4);
 }
 function scrubAttributes(element, tag, report) {
   var _a2;
   for (const name of element.getAttributeNames()) {
-    const lower3 = name.toLowerCase();
+    const lower4 = name.toLowerCase();
     const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
     let drop = false;
-    if (lower3.startsWith("on") || lower3 === "srcdoc") drop = true;
-    else if (lower3.startsWith("data-") && !lower3.startsWith("data-callout")) drop = true;
-    else if (URL_ATTRIBUTES.has(lower3)) drop = !allowedUrl(tag, lower3, value);
-    else if (lower3 === "style") drop = !cssIsInert(value);
+    if (lower4.startsWith("on") || lower4 === "srcdoc") drop = true;
+    else if (lower4.startsWith("data-") && !lower4.startsWith("data-callout")) drop = true;
+    else if (URL_ATTRIBUTES.has(lower4)) drop = !allowedUrl(tag, lower4, value);
+    else if (lower4 === "style") drop = !cssIsInert(value);
     else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
     if (drop) {
       element.removeAttribute(name);
@@ -69670,6 +70107,8 @@ function settingsFromSaved(saved) {
         Object.entries(saved.noteStyleFiles).filter(([, name]) => typeof name === "string" && name)
       )
     } : {},
+    ...normalizeNoteStyleAliases(saved == null ? void 0 : saved.noteStyleAliases) ? { noteStyleAliases: normalizeNoteStyleAliases(saved == null ? void 0 : saved.noteStyleAliases) } : {},
+    ...normalizeNoteStyleUpgradeMarker(saved == null ? void 0 : saved.noteStyleUpgrade) ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved == null ? void 0 : saved.noteStyleUpgrade) } : {},
     coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter(
       (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
     ) : [],
@@ -69714,7 +70153,8 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
     __publicField(this, "noteStyles", new NoteStyleStore({
       settings: () => this.settings,
       port: this.noteStylePort(),
-      save: () => this.saveSettings()
+      save: () => this.saveSettings(),
+      report: (event) => this.reportNoteStyleUpgrade(event)
     }));
     __publicField(this, "ready", Promise.resolve());
     __publicField(this, "running", /* @__PURE__ */ new Set());
@@ -70241,6 +70681,7 @@ var VisualAgentMapPlugin = class extends import_obsidian41.Plugin {
       })
     );
     this.app.workspace.onLayoutReady(() => {
+      void this.noteStyles.startUpgrade(this.ready);
       void this.finishStartup();
     });
     this.registerVaultEvents();
@@ -70683,6 +71124,12 @@ ${t("ui.organize_link_wait_hint")}`;
     this.resetCodexRuntime();
     this.unloaded = true;
     this.aiRuntime.dispose();
+  }
+  /** Says once what the note style upgrade could not do (it never stops the plugin). */
+  reportNoteStyleUpgrade(event) {
+    if (event.kind === "failed") new import_obsidian41.Notice(t("ui.note_style_upgrade_failed"));
+    else if (event.kind === "skipped") new import_obsidian41.Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
+    else new import_obsidian41.Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {

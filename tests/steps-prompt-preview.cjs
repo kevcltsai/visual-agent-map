@@ -119,7 +119,9 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
     const label = JSON.stringify(patch) + language;
     assert.equal(got.invalid, undefined, label);
     assert.deepEqual(plain(got.detailTemplate), plain(resolved.template), label);
-    const tone = M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
+    // D7 (ticket 04): the workspace tone is the end of the chain, so summary, plain and guide now reach the run
+    const workspaceTone = { summary: 'summary', plain: 'plain', guide: 'guide' }[patch.defaultNoteStyleId];
+    const tone = workspaceTone ? M.lookupBuiltinBlock('tone', workspaceTone, language) : M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
     assert.equal(got.toneText, tone, label);
     assert.deepEqual(plain(got.noteStyle), plain(store.contextFields(resolved.template).noteStyle), label);
     assert.equal(got.styleDiagrams, store.contextFields(resolved.template).styleDiagrams, label);

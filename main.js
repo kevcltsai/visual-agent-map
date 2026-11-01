@@ -1497,6 +1497,11 @@ var en = {
   "ui.note_style_textbook": "Textbook (intro, then sections)",
   "ui.note_style_textbook_short": "Textbook",
   "ui.block_template_format_heading": "Format rules",
+  "ui.block_folder_name": "Blocks",
+  "ui.block_folder_template": "Templates",
+  "ui.block_folder_tone": "Tones",
+  "ui.block_folder_backup": "Backups",
+  "ui.block_copy_name_0": "{0} copy",
   "ui.preview_step_research": "Research a topic",
   "ui.preview_step_quick": "Quick research",
   "ui.preview_step_decompose": "Break into subtopics",
@@ -3726,6 +3731,11 @@ var zhCN = {
   "ui.note_style_textbook": "\u6559\u79D1\u4E66\uFF08\u5148\u5BFC\u8BFB\uFF0C\u518D\u5206\u7C7B\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
   "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
+  "ui.block_folder_name": "\u79EF\u6728",
+  "ui.block_folder_template": "\u6A21\u677F",
+  "ui.block_folder_tone": "\u8BED\u6C14",
+  "ui.block_folder_backup": "\u5907\u4EFD",
+  "ui.block_copy_name_0": "{0} \u526F\u672C",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u9898",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u9898",
@@ -5955,6 +5965,11 @@ var zhTW = {
   "ui.note_style_textbook": "\u6559\u79D1\u66F8\uFF08\u5148\u5C0E\u8B80\uFF0C\u518D\u5206\u985E\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
   "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
+  "ui.block_folder_name": "\u7A4D\u6728",
+  "ui.block_folder_template": "\u6A21\u677F",
+  "ui.block_folder_tone": "\u8A9E\u6C23",
+  "ui.block_folder_backup": "\u5099\u4EFD",
+  "ui.block_copy_name_0": "{0} \u526F\u672C",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u984C",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u984C",
@@ -7141,11 +7156,11 @@ function cleanStyle(value) {
 function cleanAttributes(node) {
   var _a2;
   for (const { name, value } of Array.from(node.attributes)) {
-    const lower2 = name.toLowerCase();
-    if (lower2.startsWith("on")) node.removeAttribute(name);
-    else if ((lower2 === "href" || lower2 === "xlink:href" || lower2 === "src") && unsafeUrl(value))
+    const lower3 = name.toLowerCase();
+    if (lower3.startsWith("on")) node.removeAttribute(name);
+    else if ((lower3 === "href" || lower3 === "xlink:href" || lower3 === "src") && unsafeUrl(value))
       node.removeAttribute(name);
-    else if (lower2 === "style") {
+    else if (lower3 === "style") {
       if (HARD_TO_VET.test(value)) node.removeAttribute(name);
       else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
     } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
@@ -21162,8 +21177,8 @@ function guardMapChatWrite(check) {
   const path = normalizeVaultPath(check.path);
   if (path === null) return { ok: false, code: "outside_vault" };
   const configDir = normalizeVaultPath(check.configDir);
-  const lower2 = path.toLowerCase();
-  const inside2 = (dir) => !!dir && (lower2 === dir.toLowerCase() || lower2.startsWith(`${dir.toLowerCase()}/`));
+  const lower3 = path.toLowerCase();
+  const inside2 = (dir) => !!dir && (lower3 === dir.toLowerCase() || lower3.startsWith(`${dir.toLowerCase()}/`));
   if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
@@ -24753,6 +24768,21 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
   ].join("\n");
 }
 
+// ai/visual-guidance.ts
+function visualGuidance(context, language2) {
+  const synthesis = context.mode === "synthesize";
+  const maySearch = context.researchMode !== "local" && context.mode !== "decompose" && context.visualMode !== "off";
+  const mayReuse = synthesis || context.mode === "merge";
+  const instructions = [];
+  if (!maySearch) {
+    instructions.push(inLanguage(VISUAL_NONE, language2));
+    if (mayReuse) instructions.push(inLanguage(VISUAL_PRESERVE, language2));
+  } else if (context.visualMode === "on") instructions.push(inLanguage(VISUAL_ON, language2));
+  else instructions.push(inLanguage(VISUAL_AUTO, language2));
+  if (maySearch || mayReuse) instructions.push(inLanguage(VISUAL_EMBED, language2));
+  return instructions;
+}
+
 // core/note-styles/canonical/v1/standard.zh-TW.md
 var standard_zh_TW_default = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6A19\u6E96\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
@@ -25119,16 +25149,16 @@ function parseNoteStyleFile(text11, options) {
         const where = index + 1;
         const calloutField = CALLOUT_KEYS[keyName];
         if (calloutField) {
-          const lower2 = value.toLocaleLowerCase();
+          const lower3 = value.toLocaleLowerCase();
           if (calloutSeen.has(calloutField))
             issues.push(
               issue(where, "key_duplicate", `Line ${where}: "${pair6[1].trim()}" is written twice.`, pair6[1].trim())
             );
           else {
             calloutSeen.add(calloutField);
-            if (OFF.has(lower2)) calloutMap[calloutField] = "off";
-            else if (OBSIDIAN_CALLOUT_TYPES.has(lower2)) {
-              if (lower2 !== calloutField) calloutMap[calloutField] = lower2;
+            if (OFF.has(lower3)) calloutMap[calloutField] = "off";
+            else if (OBSIDIAN_CALLOUT_TYPES.has(lower3)) {
+              if (lower3 !== calloutField) calloutMap[calloutField] = lower3;
             } else
               issues.push(
                 issue(
@@ -25254,9 +25284,704 @@ function parseNoteStyleFile(text11, options) {
   };
 }
 
-// ai/note-style-store.ts
-var stripMd2 = (name) => name.replace(/\.md$/i, "");
+// core/blocks/template-block.ts
+var FORMAT_HEADING_KEY = "ui.block_template_format_heading";
+function templateFormatHeading(language2) {
+  return translate(language2, FORMAT_HEADING_KEY);
+}
+var unify = (text11) => text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+var trimBlankLines = (lines) => {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && !lines[start].trim()) start++;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return lines.slice(start, end).join("\n");
+};
+function splitTemplateZones(text11) {
+  const lines = unify(text11).split("\n");
+  const code = fencedLines(lines);
+  const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
+  const separatorLines = [];
+  lines.forEach((line, index) => {
+    if (code[index]) return;
+    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line);
+    if (heading && names3.has(heading[1])) separatorLines.push(index + 1);
+  });
+  if (!separatorLines.length) return { sections: lines.join("\n"), format: void 0, separatorLines };
+  const first = separatorLines[0] - 1;
+  return {
+    sections: lines.slice(0, first).join("\n"),
+    format: trimBlankLines(lines.slice(first + 1)),
+    separatorLines
+  };
+}
+function parseTemplateBlock(text11, options) {
+  var _a2;
+  const zones = splitTemplateZones(text11);
+  if (zones.separatorLines.length > 1) {
+    const line = zones.separatorLines[1];
+    return {
+      ok: false,
+      issues: [
+        {
+          line,
+          code: "format_heading_repeated",
+          values: [line],
+          message: `Line ${line}: the format rules heading appears a second time.`
+        }
+      ]
+    };
+  }
+  const parsed = parseNoteStyleFile(zones.sections, options);
+  if (!parsed.ok) return parsed;
+  const { template: template2, intro } = parsed.style;
+  return {
+    ok: true,
+    template: { ...template2, layout: "sections", intro: "" },
+    lead: intro,
+    format: (_a2 = zones.format) != null ? _a2 : ""
+  };
+}
+
+// core/blocks/template/standard.zh-TW.md
+var standard_zh_TW_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/standard.zh-CN.md
+var standard_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/standard.en.md
+var standard_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+
+// core/blocks/template/textbook.zh-TW.md
+var textbook_zh_TW_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/textbook.zh-CN.md
+var textbook_zh_CN_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/textbook.en.md
+var textbook_en_default3 = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// core/blocks/builtin.ts
+var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
+var tone = (id, nameKey) => ({
+  category: "tone",
+  id,
+  nameKey,
+  body: (language2) => {
+    var _a2, _b2;
+    return id === "academic" ? "" : (_b2 = (_a2 = builtinPresets(language2, "tone").find((preset) => preset.id === id)) == null ? void 0 : _a2.text) != null ? _b2 : "";
+  }
+});
+function fileFor(files, language2) {
+  const own2 = files[language2];
+  if (own2 !== void 0) return own2;
+  const match = CANONICAL_LANGUAGES.find((item) => instructionLanguageOf(item) === instructionLanguageOf(language2));
+  return files[match != null ? match : CANONICAL_LANGUAGES[0]];
+}
+var template = (id, nameKey, files) => {
+  const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language2, index) => [language2, files[index]]));
+  return {
+    category: "template",
+    id,
+    nameKey,
+    body: (language2) => strip2(fileFor(table, language2)),
+    sections: (language2) => strip2(fileFor(table, language2)),
+    format: (language2) => inLanguage(OBSIDIAN_FORMAT, language2)
+  };
+};
+function builtinTemplateText(id, language2) {
+  var _a2, _b2;
+  const block = findBuiltinBlock("template", id);
+  return `${(_a2 = block.sections) == null ? void 0 : _a2.call(block, language2)}
+
+# ${templateFormatHeading(noteLanguageOf(language2))}
+
+${(_b2 = block.format) == null ? void 0 : _b2.call(block, language2)}`;
+}
+var BUILTIN_BLOCKS = [
+  template("standard", "ui.note_style_standard_short", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
+  template("textbook", "ui.note_style_textbook_short", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
+  tone("academic", "ui.preset_name_academic"),
+  tone("plain", "ui.preset_name_plain"),
+  tone("magazine", "ui.preset_name_magazine"),
+  tone("summary", "ui.preset_name_summary"),
+  tone("guide", "ui.preset_name_guide"),
+  tone("auto", "ui.preset_name_auto")
+];
+function findBuiltinBlock(category, id) {
+  const block = BUILTIN_BLOCKS.find((item) => item.category === category && item.id === id);
+  if (!block) throw new Error(`Unknown built-in block: ${category}/${id}`);
+  return block;
+}
+function lookupBuiltinBlock(category, id, language2) {
+  return findBuiltinBlock(category, id).body(language2);
+}
+
+// core/steps/aim/language.zh.md
+var language_zh_default = "\u8F38\u51FA\u8A9E\u8A00\uFF1A{{language}}\u3002\u6240\u6709\u7D66\u8B80\u8005\u770B\u7684\u6B04\u4F4D\u3001\u6A19\u984C\u3001\u554F\u984C\u8207\u9078\u9805\u90FD\u7528{{languagePlain}}\u64B0\u5BEB\uFF0C\u4E0D\u8AD6\u5176\u4ED6\u6307\u793A\u3001\u8A18\u61B6\u6216\u4F86\u6E90\u8CC7\u6599\u4F7F\u7528\u4F55\u7A2E\u8A9E\u8A00\u3002\u4FDD\u7559\u4F86\u6E90\u539F\u6587\u5F15\u8FF0\u8207\u5C08\u6709\u540D\u7A31\u3002\n";
+
+// core/steps/aim/language.en.md
+var language_en_default = "Output language: {{language}}. Write every reader-facing field, heading, question and option in {{languagePlain}}, whatever language other instructions, memories or source material use. Preserve quoted source text and proper names.\n";
+
+// core/steps/aim/json-contract.zh.md
+var json_contract_zh_default = "\u53EA\u56DE\u50B3\u7B26\u5408\u63D0\u4F9B\u4E4B response schema \u7684 JSON\uFF0C\u4E26\u5305\u542B\u6240\u6709\u5FC5\u8981\u6B04\u4F4D\u3002AIM \u672A\u555F\u7528\u8996\u89BA\u641C\u5C0B\uFF0C\u56E0\u6B64 visualReferences \u5FC5\u9808\u662F\u7A7A\u9663\u5217\u3002\n";
+
+// core/steps/aim/json-contract.en.md
+var json_contract_en_default = "Return JSON only, matching the supplied response schema and including every required field. AIM has visual search disabled, so visualReferences must be an empty array.\n";
+
+// core/steps/aim/web-search-off.zh.md
+var web_search_off_zh_default = "\u6B64\u968E\u6BB5\u50C5\u4F7F\u7528\u672C\u6B21\u63D0\u4F9B\u7684\u5167\u5BB9\uFF0C\u4E0D\u8981\u9032\u884C\u7DB2\u8DEF\u641C\u5C0B\u3002\n";
+
+// core/steps/aim/web-search-off.en.md
+var web_search_off_en_default = "Do not use web search in this local-only phase.\n";
+
+// core/steps/aim/web-search-on.zh.md
+var web_search_on_zh_default = "\u968E\u6BB5\u4EFB\u52D9\u9700\u8981\u5916\u90E8\u8B49\u64DA\u6642\u4F7F\u7528\u53EF\u7528\u7684\u7DB2\u8DEF\u641C\u5C0B\u5DE5\u5177\uFF0C\u4E26\u5982\u5BE6\u56DE\u5831\u641C\u5C0B\u72C0\u614B\u3002\n";
+
+// core/steps/aim/web-search-on.en.md
+var web_search_on_en_default = "Use available web search tools when the phase task requires external evidence. Report search status truthfully.\n";
+
+// core/steps/aim/label-detail.zh.md
+var label_detail_zh_default2 = "\u76EE\u524D\u5167\u5BB9\u8207\u63D0\u4F9B\u7684\u5831\u544A\n";
+
+// core/steps/aim/label-detail.en.md
+var label_detail_en_default2 = "Current detail and supplied reports\n";
+
+// core/steps/aim/label-findings.zh.md
+var label_findings_zh_default2 = "\u5148\u524D\u767C\u73FE\n";
+
+// core/steps/aim/label-findings.en.md
+var label_findings_en_default2 = "Previous findings\n";
+
+// core/steps/aim/guidance-structured.zh.md
+var guidance_structured_zh_default = "\u4F9D\u7167\u672C\u968E\u6BB5\u4EFB\u52D9\u8655\u7406\u3002\u6A5F\u5668\u53EF\u8B80\u7684\u6C7A\u7B56\u3001\u554F\u984C\u3001\u9078\u9805\u8207\u898F\u5283\u53EA\u653E\u5728 response schema \u5B9A\u7FA9\u7684 aim \u6B04\u4F4D\uFF1Bsummary \u8207 detail \u662F\u7D66\u8B80\u8005\u770B\u7684\u5167\u5BB9\uFF0C\u4E0D\u8981\u5BEB HTML \u8A3B\u89E3\u6A19\u8A18\u3002\u8207\u6240\u9078\u6C7A\u7B56\u7121\u95DC\u7684 aim \u6B04\u4F4D\u7559\u7A7A\u3002\u4E0D\u8981\u5957\u7528\u56FA\u5B9A\u6A19\u984C\u6A21\u677F\uFF0C\u4E5F\u4E0D\u8981\u628A\u898F\u5283\u3001\u5BE9\u67E5\u3001\u4FEE\u5FA9\u6216\u7814\u7A76\u968E\u6BB5\u6539\u5BEB\u6210\u5B8C\u6574\u77E5\u8B58\u9801\u3002\n";
+
+// core/steps/aim/guidance-structured.en.md
+var guidance_structured_en_default = "Follow the phase task. Put machine-readable decisions, questions, choices and plans only in the aim field defined by the response schema; summary and detail are reader-facing text. Do not write HTML comment markers. Leave aim fields that do not apply to the chosen decision empty. Do not impose a fixed heading template or turn planning, review, repair, or research into a complete knowledge page.\n";
+
+// core/steps/aim/guidance-gap-audit.zh.md
+var guidance_gap_audit_zh_default = "\u56B4\u683C\u9075\u5FAA\u672C\u968E\u6BB5\u4EFB\u52D9\u8207\u5C08\u7528\u56DE\u61C9 schema\u3002\u4E0D\u8981\u589E\u52A0\u6A19\u8A18\u3001\u5EFA\u8B70\u6216\u8996\u89BA\u53C3\u8003\uFF1B\u4E0D\u8981\u5957\u7528\u56FA\u5B9A\u6A19\u984C\u6A21\u677F\uFF0C\u4E5F\u4E0D\u8981\u628A\u7A3D\u6838\u6539\u5BEB\u6210\u5B8C\u6574\u77E5\u8B58\u9801\u3002\n";
+
+// core/steps/aim/guidance-gap-audit.en.md
+var guidance_gap_audit_en_default = "Follow the phase task and the dedicated response schema exactly. Do not add a marker, suggestions, or visual references. Do not impose a fixed heading template or turn this audit into a complete knowledge page.\n";
+
+// core/steps/aim/guidance-plain.zh.md
+var guidance_plain_zh_default = "\u4F9D\u7167\u672C\u968E\u6BB5\u4EFB\u52D9\u8655\u7406\u3002\u4E0D\u8981\u5957\u7528\u56FA\u5B9A\u6A19\u984C\u6A21\u677F\uFF0C\u4E5F\u4E0D\u8981\u628A\u898F\u5283\u3001\u5BE9\u67E5\u3001\u4FEE\u5FA9\u6216\u7814\u7A76\u968E\u6BB5\u6539\u5BEB\u6210\u5B8C\u6574\u77E5\u8B58\u9801\u3002\n";
+
+// core/steps/aim/guidance-plain.en.md
+var guidance_plain_en_default = "Follow the phase task exactly. Do not impose a fixed heading template or turn planning, review, repair, or research into a complete knowledge page.\n";
+
+// core/steps/aim/phase/research-gap-audit.zh.md
+var research_gap_audit_zh_default = "\u5728 detail \u5BEB\u7C21\u77ED\u7406\u7531\uFF0C\u4E26\u5C07 summary \u8A2D\u70BA\u5B8C\u5168\u76F8\u540C\u7684 user_condition \u6216 external_evidence\u3002suggestions \u8207 visualReferences \u5FC5\u9808\u662F\u7A7A\u9663\u5217\u3002\n";
+
+// core/steps/aim/phase/research-gap-audit.en.md
+var research_gap_audit_en_default = "Put a concise rationale in detail and set summary to exactly user_condition or external_evidence. Return empty suggestions and visualReferences arrays.\n";
+
+// core/steps/aim/phase/initial-clarification.zh.md
+var initial_clarification_zh_default = "\u53EA\u5728 aim.questions \u8A62\u554F\u5FC5\u8981\u4E14\u672A\u77E5\u7684\u4F7F\u7528\u8005\u689D\u4EF6\uFF1B\u53EF\u4EE5\u662F\u7A7A\u6E05\u55AE\u3002\n";
+
+// core/steps/aim/phase/initial-clarification.en.md
+var initial_clarification_en_default = "Ask only necessary unknown user conditions in aim.questions; an empty list is valid.\n";
+
+// core/steps/aim/phase/initial-question.zh.md
+var initial_question_zh_default = "\u9700\u8981\u63D0\u554F\u6642\uFF0C\u5728 aim.question \u5BEB\u4E00\u500B\u76F4\u63A5\u7684\u554F\u53E5\uFF0C\u4E26\u5728 aim.answerOptions \u63D0\u4F9B 2\u20135 \u500B\u4E0D\u540C\u9078\u9805\u3002\u4E0D\u8981\u4EE3\u66FF\u4F7F\u7528\u8005\u56DE\u7B54\u3002\n";
+
+// core/steps/aim/phase/initial-question.en.md
+var initial_question_en_default = "When asking, put one direct question in aim.question and 2\u20135 distinct answer choices in aim.answerOptions. Do not answer for the user.\n";
+
+// core/steps/aim/phase/research-plan.zh.md
+var research_plan_zh_default = "\u5728 aim.subtopics \u56DE\u50B3 0\u20135 \u500B\u4E0D\u540C\u8B49\u64DA\u4EFB\u52D9\uFF0C\u6A19\u660E\u6CBF\u7528\u3001\u66F4\u65B0\u6216\u65B0\u67E5\u8B49\u53CA\u4F9D\u8CF4\uFF1B\u96F6\u4EFB\u52D9\u9808\u6709\u53EF\u7528\u7684\u65E2\u6709\u8B49\u64DA\uFF0C\u4E0D\u8981\u6C42\u6700\u4F4E\u641C\u5C0B\u6578\uFF1B\u6B64 Planner \u968E\u6BB5\u4E0D\u8981\u56DE\u7B54\u6574\u9AD4\u76EE\u6A19\u6216\u9032\u884C\u7814\u7A76\u3002\n";
+
+// core/steps/aim/phase/research-plan.en.md
+var research_plan_en_default = "Return 0\u20135 distinct evidence tasks in aim.subtopics, using reuse/update/research and dependsOn. Empty requires usable prior evidence; no minimum new searches. Do not answer the goal or research in this Planner turn.\n";
+
+// core/steps/aim/phase/research-plan-repair.zh.md
+var research_plan_repair_zh_default = "\u53EA\u4F9D\u63D0\u4F9B\u7684\u8108\u7D61\u4FEE\u5FA9\u56DE\u5831\u7684\u898F\u5283\u7F3A\u9677\uFF0C\u5728 aim.subtopics \u56DE\u50B3 0\u20135 \u500B\u4E0D\u540C\u8B49\u64DA\u4EFB\u52D9\uFF1B\u96F6\u4EFB\u52D9\u9808\u6709\u53EF\u7528\u7684\u65E2\u6709\u8B49\u64DA\uFF1B\u4E0D\u8981\u9032\u884C\u7814\u7A76\u3002\n";
+
+// core/steps/aim/phase/research-plan-repair.en.md
+var research_plan_repair_en_default = "Repair only the reported plan defect using the supplied context. Return 0\u20135 distinct evidence tasks in aim.subtopics; empty requires usable prior evidence; do not research.\n";
+
+// core/steps/aim/phase/subtopic-research.zh.md
+var subtopic_research_zh_default = "\u53EA\u7814\u7A76\u6307\u5B9A\u76EE\u6A19\u3002\u6E96\u78BA\u56DE\u5831\u641C\u5C0B\u72C0\u614B\uFF0C\u5340\u5206\u8B49\u64DA\u8207\u4E0D\u78BA\u5B9A\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
+
+// core/steps/aim/phase/subtopic-research.en.md
+var subtopic_research_en_default = "Research only the assigned target. Report search status accurately, distinguish evidence from uncertainty, and preserve source attribution. Do not ask the user.\n";
+
+// core/steps/aim/phase/targeted-followup-research.zh.md
+var targeted_followup_research_zh_default = "\u53EA\u7814\u7A76\u6307\u5B9A\u7684\u4E00\u9805\u8B49\u64DA\u7F3A\u53E3\u3002\u6E96\u78BA\u56DE\u5831\u641C\u5C0B\u72C0\u614B\uFF0C\u5340\u5206\u8B49\u64DA\u8207\u4E0D\u78BA\u5B9A\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
+
+// core/steps/aim/phase/targeted-followup-research.en.md
+var targeted_followup_research_en_default = "Research the single assigned evidence gap. Report search status accurately, distinguish evidence from uncertainty, and preserve source attribution. Do not ask the user.\n";
+
+// core/steps/aim/phase/report-review.zh.md
+var report_review_zh_default = "research_more \u5FC5\u9808\u63D0\u4F9B\u6070\u597D\u4E00\u500B aim.researchTarget\uFF1Bask_user \u5FC5\u9808\u63D0\u4F9B\u4E00\u500B\u76F4\u63A5\u7684 aim.question \u8207 2\u20135 \u500B\u4E0D\u540C\u7684 aim.answerOptions\uFF1Bconclude \u5FC5\u9808\u63D0\u4F9B aim.stopReason\u3002\n";
+
+// core/steps/aim/phase/report-review.en.md
+var report_review_en_default = "For research_more, give exactly one aim.researchTarget. For ask_user, give one direct aim.question and 2\u20135 distinct aim.answerOptions. For conclude, give aim.stopReason.\n";
+
+// core/steps/aim/phase/decision-quality-review.zh.md
+var decision_quality_review_zh_default = "\u53EA\u5BE9\u67E5\u63D0\u4F9B\u7684\u5019\u9078\u6C7A\u7B56\u8207\u8B49\u64DA\u3002research_more \u5FC5\u9808\u63D0\u4F9B\u6070\u597D\u4E00\u500B aim.researchTarget\uFF1Bask_user \u5FC5\u9808\u63D0\u4F9B\u4E00\u500B\u76F4\u63A5\u7684 aim.question \u8207 2\u20135 \u500B\u4E0D\u540C\u7684 aim.answerOptions\uFF1Bconclude \u5FC5\u9808\u63D0\u4F9B aim.stopReason\u3002\n";
+
+// core/steps/aim/phase/decision-quality-review.en.md
+var decision_quality_review_en_default = "Review only the supplied candidate and evidence. For research_more, give exactly one aim.researchTarget. For ask_user, give one direct aim.question and 2\u20135 distinct aim.answerOptions. For conclude, give aim.stopReason.\n";
+
+// core/steps/aim/phase/format-repair.zh.md
+var format_repair_zh_default = "\u53EA\u4FEE\u5FA9\u7F3A\u6F0F\u6216\u683C\u5F0F\u932F\u8AA4\u7684\u5FC5\u8981\u6B04\u4F4D\u3002\u539F\u6A23\u4FDD\u7559\u65E2\u6709\u6C7A\u7B56\u8207\u4F7F\u7528\u8005\u554F\u984C\uFF1B\u4E0D\u8981\u91CD\u65B0\u89E3\u8B80\u8B49\u64DA\u3001\u6539\u8B8A\u6C7A\u7B56\u6216\u65B0\u589E\u4E8B\u5BE6\u3002\n";
+
+// core/steps/aim/phase/format-repair.en.md
+var format_repair_en_default = "Repair only missing or malformed required fields. Preserve the existing decision and user question exactly; do not reinterpret evidence, change the decision, or add facts.\n";
+
+// core/steps/aim/phase/delivery-outline.zh.md
+var delivery_outline_zh_default = "\u5728 aim.sections \u8A2D\u8A08\u8981\u6C42\u7684\u6587\u4EF6\u5927\u7DB1\uFF1B\u4E0D\u8981\u64B0\u5BEB\u6587\u4EF6\u6216\u9032\u884C\u7814\u7A76\u3002\n";
+
+// core/steps/aim/phase/delivery-outline.en.md
+var delivery_outline_en_default = "Design the requested document outline in aim.sections. Do not write the document or perform research.\n";
+
+// core/steps/aim/phase/delivery-research.zh.md
+var delivery_research_zh_default = "\u53EA\u7814\u7A76\u5DF2\u78BA\u8A8D\u7684\u6700\u7D42\u6587\u4EF6\u5927\u7DB1\u3002\u6E96\u78BA\u56DE\u5831\u53EF\u53D6\u5F97\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u64B0\u5BEB\u6587\u4EF6\u6216\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
+
+// core/steps/aim/phase/delivery-research.en.md
+var delivery_research_en_default = "Research only the agreed final-document outline. Report availability accurately and preserve source attribution. Do not write the document or ask the user.\n";
+
+// core/steps/aim/phase/delivery-writing.zh.md
+var delivery_writing_zh_default = "\u4F9D\u63D0\u4F9B\u7684\u8108\u7D61\u8207\u8B49\u64DA\u64B0\u5BEB\u8981\u6C42\u7684\u8B80\u8005\u6587\u4EF6\uFF0C\u9075\u5FAA\u4EFB\u52D9\u6307\u5B9A\u7D50\u69CB\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\u8207\u4E0D\u78BA\u5B9A\u6027\u3002\n";
+
+// core/steps/aim/phase/delivery-writing.en.md
+var delivery_writing_en_default = "Write the requested reader-facing deliverable from supplied context and evidence. Follow the task's requested structure and preserve attribution and uncertainty.\n";
+
+// core/steps/aim/phase/delivery-acceptance.zh.md
+var delivery_acceptance_zh_default = "\u4F9D\u539F\u59CB\u76EE\u6A19\u8207\u4EFB\u52D9\u5951\u7D04\u5BE9\u67E5\u5B8C\u6574\u4EA4\u4ED8\u5167\u5BB9\u3002\u5728 aim \u6B04\u4F4D\u56DE\u50B3\u6C7A\u7B56\uFF0C\u4E26\u9644\u7C21\u77ED\u901A\u904E\u8AAA\u660E\u6216\u554F\u984C\u6E05\u55AE\uFF1B\u4E0D\u8981\u91CD\u8907\u6216\u6539\u5BEB\u8349\u7A3F\u3002\u9700\u8981 research_more \u6642\u6307\u51FA\u4E00\u500B\u5177\u9AD4\u8B49\u64DA\u76EE\u6A19\u3002\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
+
+// core/steps/aim/phase/delivery-acceptance.en.md
+var delivery_acceptance_en_default = "Review the complete deliverable against the original goal and task contract. Return the decision in the aim fields and a brief acceptance note or list of issues; do not reproduce or rewrite the draft. If research_more is required, identify one concrete evidence target. Do not ask the user.\n";
+
+// core/steps/aim/shell.ts
+var text6 = (template2) => renderTemplate(template2, {});
+var pair5 = (zh, en2) => ({ zh: text6(zh), en: text6(en2) });
+var LANGUAGE = { zh: language_zh_default, en: language_en_default };
+var JSON_CONTRACT2 = pair5(json_contract_zh_default, json_contract_en_default);
+var WEB_SEARCH_OFF = pair5(web_search_off_zh_default, web_search_off_en_default);
+var WEB_SEARCH_ON = pair5(web_search_on_zh_default, web_search_on_en_default);
+var LABEL_DETAIL2 = pair5(label_detail_zh_default2, label_detail_en_default2);
+var LABEL_FINDINGS2 = pair5(label_findings_zh_default2, label_findings_en_default2);
+var GUIDANCE_STRUCTURED = pair5(guidance_structured_zh_default, guidance_structured_en_default);
+var GUIDANCE_GAP_AUDIT = pair5(guidance_gap_audit_zh_default, guidance_gap_audit_en_default);
+var GUIDANCE_PLAIN = pair5(guidance_plain_zh_default, guidance_plain_en_default);
+var PHASE_RULES = {
+  "research-gap-audit": pair5(research_gap_audit_zh_default, research_gap_audit_en_default),
+  "initial-clarification": pair5(initial_clarification_zh_default, initial_clarification_en_default),
+  "initial-question": pair5(initial_question_zh_default, initial_question_en_default),
+  "research-plan": pair5(research_plan_zh_default, research_plan_en_default),
+  "research-plan-repair": pair5(research_plan_repair_zh_default, research_plan_repair_en_default),
+  "subtopic-research": pair5(subtopic_research_zh_default, subtopic_research_en_default),
+  "targeted-followup-research": pair5(targeted_followup_research_zh_default, targeted_followup_research_en_default),
+  "report-review": pair5(report_review_zh_default, report_review_en_default),
+  "decision-quality-review": pair5(decision_quality_review_zh_default, decision_quality_review_en_default),
+  "format-repair": pair5(format_repair_zh_default, format_repair_en_default),
+  "delivery-outline": pair5(delivery_outline_zh_default, delivery_outline_en_default),
+  "delivery-research": pair5(delivery_research_zh_default, delivery_research_en_default),
+  "delivery-writing": pair5(delivery_writing_zh_default, delivery_writing_en_default),
+  "delivery-acceptance": pair5(delivery_acceptance_zh_default, delivery_acceptance_en_default)
+};
+var READER_FACING_PHASES = /* @__PURE__ */ new Set([
+  "subtopic-research",
+  "targeted-followup-research",
+  "delivery-writing"
+]);
+function readerFacingAimPhase(phase) {
+  return !!phase && READER_FACING_PHASES.has(phase);
+}
+function aimPhase(task) {
+  var _a2;
+  return (_a2 = task.match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _a2[1];
+}
+function phaseGuidance(phase, language2, responseContract, structured = false) {
+  const gapAuditContract = phase === "research-gap-audit" && responseContract === "aim-gap-audit";
+  const common = structured ? GUIDANCE_STRUCTURED : gapAuditContract ? GUIDANCE_GAP_AUDIT : GUIDANCE_PLAIN;
+  const rule = phase && Object.prototype.hasOwnProperty.call(PHASE_RULES, phase) ? inLanguage(PHASE_RULES[phase], language2) : "";
+  return [inLanguage(common, language2), rule].filter(Boolean).join("\n\n");
+}
+function buildAimPrompt(context, language2, provider = "codex") {
+  const phase = aimPhase(context.task);
+  const field = (label, value) => (value == null ? void 0 : value.trim()) ? `${label}:
+${value}` : "";
+  const blocks = [
+    inLanguageNaming(LANGUAGE, language2, { language: "region", languagePlain: "plain" }, void 0, {
+      kind: "topic",
+      text: context.title
+    }),
+    inLanguage(ROLE, language2),
+    inLanguage(SOURCE_SAFETY, language2),
+    context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "",
+    context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language2) : "",
+    withProviderOutput(inLanguage(JSON_CONTRACT2, language2), provider, language2),
+    context.toneText ? toneBlock(context.toneText, language2) : "",
+    phaseGuidance(phase, language2, context.responseContract, !!context.aimContract),
+    readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
+    context.researchMode === "local" ? inLanguage(WEB_SEARCH_OFF, language2) : context.researchMode === "research" ? inLanguage(WEB_SEARCH_ON, language2) : "",
+    field(inLanguage(LABEL_TOPIC, language2), context.title),
+    field(inLanguage(LABEL_SUMMARY, language2), context.summary),
+    context.detail ? `${inLanguage(LABEL_DETAIL2, language2)}:
+${context.detail}` : "",
+    field(inLanguage(LABEL_RULES, language2), context.rules),
+    context.workingFindings ? `${inLanguage(LABEL_FINDINGS2, language2)}:
+${context.workingFindings}` : "",
+    context.sourceContext ? `${inLanguage(LABEL_SOURCES, language2)}:
+${context.sourceContext}` : "",
+    field(inLanguage(LABEL_ANCESTORS, language2), context.ancestors),
+    field(inLanguage(LABEL_TASK, language2), context.task)
+  ];
+  return blocks.filter(Boolean).join("\n\n");
+}
+
+// core/steps/task/render.ts
+function readerFacingDetail(context) {
+  return context.promptProfile === "aim" ? readerFacingAimPhase(aimPhase(context.task)) : context.mode !== "decompose" && !context.intermediateDetail;
+}
+function isQuickTask(context) {
+  var _a2;
+  return context.mapAiMode === "quick" && context.researchMode === "local" && ((_a2 = context.mode) != null ? _a2 : "task") === "task" && context.promptProfile !== "aim" && !context.countRepair && !context.intermediateDetail;
+}
+function quickGuidance(context, language2) {
+  const depth = translate(
+    language2,
+    context.researchDepth === "fast" ? "research.fast" : context.researchDepth === "deep" ? "research.deep" : "research.normal"
+  );
+  return `${depth} ${quickKnowledge(language2)}`;
+}
+function assembledTaskPrompt(context, language2, provider = "codex") {
+  var _a2;
+  const selection = (_a2 = context.styleSelection) != null ? _a2 : selectionFromContext(context, language2);
+  return assembleTaskPrompt(selection, promptStepOf(context), context, language2, provider);
+}
+function generalTaskPrompt(context, language2, provider = "codex") {
+  return assembledTaskPrompt(context, language2, provider).text;
+}
+function taskPrompt(context, language2, provider = "codex") {
+  return context.promptProfile === "aim" ? buildAimPrompt(context, language2, provider) : generalTaskPrompt(context, language2, provider);
+}
+
+// core/steps/task/assemble.ts
+var CUSTOM_LEGACY_TONE = "custom-legacy";
+var DEFAULT_TONE = "academic";
+var TONE_MARKER = "\0tone\0";
+function promptStepOf(context) {
+  if (isQuickTask(context)) return "quick";
+  switch (context.mode) {
+    case "task":
+      return "research";
+    case "decompose":
+    case "synthesize":
+    case "merge":
+      return context.mode;
+    default:
+      return "default";
+  }
+}
+function toneChoiceFromText(toneText, language2) {
+  const builtinTone = toneText ? ["plain", "magazine", "summary", "guide", "auto"].find(
+    (id) => lookupBuiltinBlock("tone", id, language2) === toneText
+  ) : void 0;
+  return !toneText ? { id: DEFAULT_TONE } : builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText };
+}
+function selectionFromContext(context, language2) {
+  var _a2, _b2;
+  const templateId = (_b2 = (_a2 = context.detailTemplate) == null ? void 0 : _a2.id) != null ? _b2 : standardTemplate(noteLanguageOf(language2)).id;
+  return {
+    template: {
+      id: templateId,
+      ...context.detailFormat === "adaptive" ? { adaptive: true } : {},
+      ...context.noteStyle ? { legacyPreferences: context.noteStyle } : {}
+    },
+    tone: toneChoiceFromText(context.toneText, language2)
+  };
+}
+var headingOf = (name) => `### ${name}`;
+var descriptionRule = (section3, language2) => ({
+  text: section3.description.trim(),
+  rule: customDetailRule("description", language2, {
+    heading: headingOf(section3.name),
+    description: section3.description.trim()
+  })
+});
+var describedSections = (template2, language2) => template2.sections.filter((section3) => section3.description.trim()).map((section3) => descriptionRule(section3, language2));
+function leadStructure(template2, lead, language2, anchor) {
+  var _a2;
+  const rules = [];
+  for (const section3 of template2.sections) {
+    const heading = headingOf(section3.name);
+    if (section3.role === "log") rules.push(customDetailRule("log", language2, { heading }));
+    if (section3.description.trim()) rules.push(descriptionRule(section3, language2).rule);
+    if (section3.count)
+      rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
+    for (const callout of (_a2 = section3.callouts) != null ? _a2 : [])
+      rules.push(
+        customDetailCallout(language2, {
+          heading,
+          type: callout.type,
+          fold: callout.fold,
+          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
+        })
+      );
+  }
+  const structure2 = customDetailStructure(language2, {
+    count: String(template2.sections.length),
+    headings: template2.sections.map((section3) => headingOf(section3.name)).join(", "),
+    rules: rules.length ? `
+${rules.join("\n")}` : ""
+  });
+  const verbatim = headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template2.id), anchor);
+  return {
+    sections: [lead, structure2, verbatim].filter(Boolean).join("\n"),
+    owned: [{ text: lead }, ...describedSections(template2, language2)]
+  };
+}
+function templateParts(selection, context, language2, topicAnchor, options) {
+  var _a2, _b2, _c, _d, _e, _f, _g;
+  const { id } = selection.template;
+  const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
+  const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
+  const builtin = legacy || body !== void 0 ? BUILTIN_BLOCKS.find((block) => block.category === "template" && block.id === id) : findBuiltinBlock("template", id);
+  const unmodified = body === void 0 || builtin !== void 0 && normalizeStyleContent(body) === normalizeStyleContent(builtinTemplateText(id, language2));
+  const structure2 = (template3) => detailStructurePrompt(template3, language2, (headings) => detailStructure(language2, headings), topicAnchor);
+  if (unmodified) {
+    const today = (_e = context.detailTemplate) != null ? _e : (id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language2));
+    const owned = describedSections(today, language2);
+    if (today.id === TEXTBOOK_TEMPLATE_ID && today.layout !== "intro") {
+      const log = (_f = today.sections.find((section3) => section3.role === "log")) != null ? _f : today.sections[today.sections.length - 1];
+      owned.unshift({
+        text: textbookDetailStructure(language2, {
+          headings: today.sections.map((section3) => headingOf(section3.name)).join(", "),
+          log: headingOf(log.name)
+        })
+      });
+    }
+    return { sections: structure2(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language2), issues: [] };
+  }
+  const parsed = parseTemplateBlock(body, { id, name: id });
+  if (!parsed.ok) {
+    const issues = parsed.issues.map((issue2) => ({
+      ...issue2,
+      category: "template",
+      id,
+      ...selection.template.fileName ? { fileName: selection.template.fileName } : {}
+    }));
+    const fallbackId = BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id) ? id : STANDARD_TEMPLATE_ID;
+    const { body: _body, fileName: _fileName, ...choice2 } = selection.template;
+    const detailTemplate = ((_g = context.detailTemplate) == null ? void 0 : _g.id) === id && fallbackId !== id ? void 0 : context.detailTemplate;
+    const fallback = templateParts(
+      { ...selection, template: { ...choice2, id: fallbackId } },
+      { ...context, detailTemplate },
+      language2,
+      topicAnchor,
+      {}
+    );
+    return { ...fallback, issues };
+  }
+  if (parsed.lead)
+    return {
+      ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor),
+      format: parsed.format,
+      issues: []
+    };
+  const template2 = parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
+  return {
+    sections: structure2(template2),
+    owned: describedSections(template2, language2),
+    format: parsed.format,
+    issues: []
+  };
+}
+var formatText = (parts, selection, language2) => parts.format ? applyFormatPreferences(parts.format, language2, selection.template.legacyPreferences) : "";
+var CHART_BLOCK = "```mermaid";
+function chartsWanted(selection, context, language2, options = {}) {
+  const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
+  return partsAskForCharts(parts, selection, language2);
+}
+function partsAskForCharts(parts, selection, language2) {
+  const sections = selection.template.adaptive ? "" : parts.sections;
+  return sections.includes(CHART_BLOCK) || formatText(parts, selection, language2).includes(CHART_BLOCK);
+}
+var fixed = (text11, id) => [text11, { kind: "fixed", id }];
+var input = (text11, id) => [text11, { kind: "input", id }];
+function assembleTaskPrompt(selection, step, context, language2, provider = "codex", options = {}) {
+  var _a2;
+  const bodyOf = (category, id) => {
+    var _a3, _b2, _c;
+    findBuiltinBlock(category, id);
+    return (_c = (_b2 = (_a3 = options.blocks) == null ? void 0 : _a3[`${category}/${id}`]) == null ? void 0 : _b2.call(_a3, language2)) != null ? _c : lookupBuiltinBlock(category, id, language2);
+  };
+  const modeFragment = step === "research" || step === "quick" && context.mode === "task" ? GENERAL_TASK : step === "decompose" ? DECOMPOSE : step === "synthesize" ? SYNTHESIZE : step === "merge" ? MERGE : DEFAULT_TASK;
+  const quick = step === "quick";
+  const none = inLanguage(NONE, language2);
+  const topicAnchor = { kind: "topic", text: context.title };
+  const parts = templateParts(selection, context, language2, topicAnchor, options);
+  const elements = [];
+  const add = (...pieces) => elements.push(pieces);
+  add(fixed(outputLanguage(language2, topicAnchor), "output-language"));
+  add(fixed(inLanguage(quick ? ROLE_QUICK : ROLE, language2), "role"));
+  add(fixed(inLanguage(quick ? SOURCE_SAFETY_QUICK : SOURCE_SAFETY, language2), "source-safety"));
+  add(fixed(context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "", "reference-citations"));
+  add(
+    fixed(
+      context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language2) : "",
+      "local-first"
+    )
+  );
+  add(fixed(withProviderOutput(inLanguage(JSON_CONTRACT, language2), provider, language2), "json-contract"));
+  {
+    const body = (_a2 = selection.tone.body) != null ? _a2 : bodyOf("tone", selection.tone.id);
+    if (body) {
+      const block = { kind: "block", category: "tone", id: selection.tone.id };
+      const [before, after] = toneBlock(TONE_MARKER, language2).split(TONE_MARKER);
+      add(fixed(before != null ? before : "", "tone-rule"), [body, block], fixed(after != null ? after : "", "tone-rule"));
+    }
+  }
+  add(fixed(inLanguage(modeFragment, language2), "step"));
+  if (step === "decompose") add(fixed("", "template"));
+  else {
+    const pieces = [];
+    if (selection.template.adaptive)
+      pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
+    else pieces.push(sectionPieces(parts, selection.template.id));
+    if (readerFacingDetail(context) && step !== "merge") {
+      const text11 = formatText(parts, selection, language2);
+      if (text11)
+        pieces.push([[text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
+    }
+    add(...withSeparators(pieces));
+  }
+  add(fixed(quick ? quickGuidance(context, language2) : researchGuidance(context, language2), "research-guidance"));
+  for (const guidance of visualGuidance(context, language2)) add(fixed(guidance, "visual-guidance"));
+  add(input(`${inLanguage(LABEL_TOPIC, language2)}:
+${context.title}`, "topic"));
+  add(input(`${inLanguage(LABEL_SUMMARY, language2)}:
+${context.summary}`, "summary"));
+  add(input(step !== "decompose" ? `${inLanguage(LABEL_DETAIL, language2)}:
+${context.detail || none}` : "", "detail"));
+  add(input(`${inLanguage(LABEL_RULES, language2)}:
+${context.rules || none}`, "rules"));
+  add(
+    input(
+      context.workingFindings ? `${inLanguage(LABEL_FINDINGS, language2)}:
+${context.workingFindings}` : "",
+      "findings"
+    )
+  );
+  add(
+    input(context.sourceContext ? `${inLanguage(LABEL_SOURCES, language2)}:
+${context.sourceContext}` : "", "sources")
+  );
+  if (context.userTexts) add(input(`${inLanguage(LABEL_USER_TEXT, language2)}:
+${context.userTexts}`, "user-texts"));
+  if (context.summaryDirections)
+    add(input(`${inLanguage(LABEL_SUMMARY_DIRECTION, language2)}:
+${context.summaryDirections}`, "summary-directions"));
+  add(input(`${inLanguage(LABEL_ANCESTORS, language2)}:
+${context.ancestors || none}`, "ancestors"));
+  add(input(`${inLanguage(LABEL_TASK, language2)}:
+${context.task}`, "task"));
+  const segments = [];
+  elements.forEach((pieces, index) => {
+    if (index > 0) segments.push({ text: "\n\n", source: { kind: "separator" } });
+    for (const [text11, source] of pieces) if (text11) segments.push({ text: text11, source });
+  });
+  return {
+    text: segments.map((segment) => segment.text).join(""),
+    segments,
+    charts: partsAskForCharts(parts, selection, language2),
+    // The decompose step carries no template, so a template that could not be read changes nothing there.
+    issues: step === "decompose" ? [] : parts.issues
+  };
+}
+function sectionPieces(parts, id) {
+  var _a2;
+  const text11 = parts.sections;
+  const block = (part) => [part, { kind: "block", category: "template", id, part: "sections" }];
+  const pieces = [];
+  let cursor = 0;
+  for (const item of parts.owned) {
+    if (!item.text) continue;
+    const at = text11.indexOf((_a2 = item.rule) != null ? _a2 : item.text, cursor);
+    if (at < 0) continue;
+    const start = item.rule ? at + item.rule.lastIndexOf(item.text) : at;
+    if (start > cursor) pieces.push(fixed(text11.slice(cursor, start), "detail-structure"));
+    pieces.push(block(item.text));
+    cursor = start + item.text.length;
+  }
+  if (!pieces.length) return [block(text11)];
+  if (cursor < text11.length) pieces.push(fixed(text11.slice(cursor), "detail-structure"));
+  return pieces;
+}
+function withSeparators(groups) {
+  return groups.flatMap((group, index) => index > 0 ? [["\n\n", { kind: "separator" }], ...group] : group);
+}
+
+// core/blocks/block-files.ts
+var FOLDER_KEYS = {
+  root: "ui.block_folder_name",
+  template: "ui.block_folder_template",
+  tone: "ui.block_folder_tone",
+  backup: "ui.block_folder_backup"
+};
+function parseBlockRef(ref) {
+  if (!ref) return void 0;
+  if (ref.startsWith("builtin:") && ref.length > "builtin:".length) return { kind: "builtin", id: ref.slice(8) };
+  if (ref.startsWith("file:") && ref.length > "file:".length) return { kind: "file", base: ref.slice(5) };
+  return void 0;
+}
+var builtinRef = (id) => `builtin:${id}`;
+var fileRef = (base) => `file:${base}`;
 var lower = (value) => value.toLocaleLowerCase();
+var stripMd2 = (name) => name.replace(/\.md$/i, "");
+var UNSAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
+function cleanBlockName(name) {
+  const cleaned = name.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
+  return /^\.+$/.test(cleaned) ? "" : cleaned;
+}
+function blockFolderNames(role) {
+  return [...new Set(CANONICAL_LANGUAGES.map((language2) => translate(language2, FOLDER_KEYS[role])))];
+}
+function resolveBlockFolder(parent, role, exists, language2) {
+  const found = blockFolderNames(role).find((name) => exists(`${parent}/${name}`));
+  return `${parent}/${found != null ? found : translate(language2, FOLDER_KEYS[role])}`;
+}
+function builtinBlockNames(category, id) {
+  const block = findBuiltinBlock(category, id);
+  return [...new Set(CANONICAL_LANGUAGES.map((language2) => translate(language2, block.nameKey)))];
+}
+function builtinBlockText(category, id, language2) {
+  return category === "template" ? builtinTemplateText(id, language2) : findBuiltinBlock(category, id).body(language2);
+}
+function isUnmodifiedBlock(category, id, text11) {
+  const normalized = normalizeStyleContent(text11);
+  return CANONICAL_LANGUAGES.some(
+    (language2) => normalizeStyleContent(builtinBlockText(category, id, language2)) === normalized
+  );
+}
+function uniqueBlockName(base, taken) {
+  let name = base;
+  for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
+  return name;
+}
+function copyBlockName(category, sourceName, language2, taken) {
+  const reserved = new Set(taken);
+  for (const block of BUILTIN_BLOCKS)
+    if (block.category === category)
+      for (const name of builtinBlockNames(category, block.id)) reserved.add(lower(name));
+  const base = cleanBlockName(translate(language2, "ui.block_copy_name_0", cleanBlockName(sourceName))) || "copy";
+  return uniqueBlockName(base, reserved);
+}
+var two = (value) => String(value).padStart(2, "0");
+function backupName(name, now, taken) {
+  const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
+  const takenBases = new Set([...taken].map((item) => stripMd2(item)));
+  return `${uniqueBlockName(`${name} ${stamp}`, takenBases)}.md`;
+}
+
+// ai/note-style-store.ts
+var stripMd3 = (name) => name.replace(/\.md$/i, "");
+var lower2 = (value) => value.toLocaleLowerCase();
 var SAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
 var BUILTIN_PAIRS = {
   standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
@@ -25282,7 +26007,11 @@ var NoteStyleStore = class {
     this.deps = deps;
     /** File text by base name (no ".md"), as of the last `refresh()`. */
     __publicField(this, "files", /* @__PURE__ */ new Map());
+    /** Block file text by base name (no ".md") for each category, as of the last `refresh()` or block write. */
+    __publicField(this, "blocks", { template: /* @__PURE__ */ new Map(), tone: /* @__PURE__ */ new Map() });
     __publicField(this, "resolutions", /* @__PURE__ */ new WeakMap());
+    /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
+    __publicField(this, "writeQueue", Promise.resolve());
   }
   get settings() {
     return this.deps.settings();
@@ -25304,11 +26033,102 @@ var NoteStyleStore = class {
     }
     for (const name of names3) {
       try {
-        next.set(stripMd2(name), await this.deps.port.read(`${folder}/${name}`));
+        next.set(stripMd3(name), await this.deps.port.read(`${folder}/${name}`));
       } catch (e) {
       }
     }
     this.files = next;
+    await this.loadBlocks();
+  }
+  // ---- block files ----
+  /** The block folders: each is the first spelling that exists, else the interface language's (where it would be created). */
+  blockDirectories() {
+    const { port } = this.deps;
+    const exists = (path) => {
+      try {
+        return port.folderExists(path);
+      } catch (e) {
+        return false;
+      }
+    };
+    const language2 = this.settings.language;
+    const root = resolveBlockFolder(this.folder(), "root", exists, language2);
+    return {
+      root,
+      template: resolveBlockFolder(root, "template", exists, language2),
+      tone: resolveBlockFolder(root, "tone", exists, language2),
+      backup: resolveBlockFolder(root, "backup", exists, language2)
+    };
+  }
+  async loadBlocks() {
+    const dirs = this.blockDirectories();
+    const next = { template: /* @__PURE__ */ new Map(), tone: /* @__PURE__ */ new Map() };
+    for (const category of ["template", "tone"]) {
+      let names3 = [];
+      try {
+        names3 = await this.deps.port.list(dirs[category]);
+      } catch (e) {
+        names3 = [];
+      }
+      for (const name of names3) {
+        if (!/\.md$/i.test(name) || name.includes("/")) continue;
+        try {
+          next[category].set(stripMd3(name), await this.deps.port.read(`${dirs[category]}/${name}`));
+        } catch (e) {
+        }
+      }
+    }
+    this.blocks = next;
+  }
+  /** The base name of the file that overrides a built-in block, if the block folder holds one (the interface language's name first). */
+  overrideBase(category, id) {
+    const block = findBuiltinBlock(category, id);
+    const names3 = [translate(this.settings.language, block.nameKey), ...builtinBlockNames(category, id)];
+    for (const name of names3) {
+      const base = [...this.blocks[category].keys()].find((key2) => lower2(key2) === lower2(name));
+      if (base !== void 0) return base;
+    }
+    return void 0;
+  }
+  isBuiltinBlockId(category, id) {
+    return BUILTIN_BLOCKS.some((block) => block.category === category && block.id === id);
+  }
+  /** Every block of `category` for the picker: the built-ins first (marked when their file was changed), then the user's own files. */
+  listBlocks(category) {
+    const language2 = this.settings.language;
+    const map = this.blocks[category];
+    const issuesOf = (text11, id, name) => {
+      if (category !== "template") return [];
+      const parsed = parseTemplateBlock(text11, { id, name });
+      return parsed.ok ? [] : parsed.issues;
+    };
+    const items = [];
+    const used = /* @__PURE__ */ new Set();
+    for (const block of BUILTIN_BLOCKS.filter((item) => item.category === category)) {
+      const base = this.overrideBase(category, block.id);
+      const text11 = base === void 0 ? void 0 : map.get(base);
+      const modified = text11 !== void 0 && !isUnmodifiedBlock(category, block.id, text11);
+      if (base !== void 0) used.add(base);
+      items.push({
+        ref: builtinRef(block.id),
+        kind: "builtin",
+        name: translate(language2, block.nameKey),
+        ...base !== void 0 ? { fileName: `${base}.md` } : {},
+        modified,
+        issues: modified && text11 !== void 0 && base !== void 0 ? issuesOf(text11, block.id, base) : []
+      });
+    }
+    for (const [base, text11] of [...map].sort(([a], [b]) => a.localeCompare(b)))
+      if (!used.has(base))
+        items.push({
+          ref: fileRef(base),
+          kind: "file",
+          name: base,
+          fileName: `${base}.md`,
+          modified: false,
+          issues: issuesOf(text11, fileRef(base), base)
+        });
+    return items;
   }
   // ---- identification of files ----
   builtinNames(id) {
@@ -25334,7 +26154,7 @@ var NoteStyleStore = class {
   builtinFile(id) {
     for (const name of this.builtinNames(id)) {
       const matches = [...this.files.keys()].filter(
-        (base) => lower(base) === lower(name) || new RegExp(`^${escapeRegExp(lower(name))} \\(\\d+\\)$`).test(lower(base))
+        (base) => lower2(base) === lower2(name) || new RegExp(`^${escapeRegExp(lower2(name))} \\(\\d+\\)$`).test(lower2(base))
       ).sort();
       const found = matches.find((base) => this.isBuiltinFile(id, this.files.get(base)));
       if (found) return found;
@@ -25347,13 +26167,13 @@ var NoteStyleStore = class {
    * built-in's file; `restoreDefault` checks the live content again.
    */
   builtinIdOfFile(baseName3) {
-    const base = stripMd2(baseName3);
-    const key2 = lower(base);
+    const base = stripMd3(baseName3);
+    const key2 = lower2(base);
     for (const id of NOTE_STYLE_BUILTIN_IDS)
       for (const language2 of CANONICAL_LANGUAGES) {
-        const name = lower(builtinStyleFileName(id, language2));
+        const name = lower2(builtinStyleFileName(id, language2));
         if (key2 !== name && !new RegExp(`^${escapeRegExp(name)} \\(\\d+\\)$`).test(key2)) continue;
-        const held = [...this.files.keys()].find((item) => lower(item) === key2);
+        const held = [...this.files.keys()].find((item) => lower2(item) === key2);
         if (held !== void 0 && !this.isBuiltinFile(id, this.files.get(held))) continue;
         return { id, language: language2 };
       }
@@ -25381,7 +26201,8 @@ var NoteStyleStore = class {
     for (let index = 0; index < all.length; index++) {
       const id = all[index].template;
       if (!id) continue;
-      const found = this.tryId(id, index, all, toneChain, noteLanguage);
+      const isBlock = index === all.length - 1 && !!settings.noteTemplateBlock && id === settings.noteTemplateBlock;
+      const found = isBlock ? this.tryBlock(id, toneChain, noteLanguage) : this.tryId(id, index, all, toneChain, noteLanguage);
       if (found) return this.remember({ ...found, missing });
       missing.push(id);
     }
@@ -25392,12 +26213,36 @@ var NoteStyleStore = class {
   resolutionOf(template2) {
     return template2 ? this.resolutions.get(template2) : void 0;
   }
-  /** Fields to spread into a TaskContext: the style snapshot, and `styleDiagrams: false` only when the file turns charts off. */
-  contextFields(template2) {
-    var _a2;
-    const style = (_a2 = this.resolutionOf(template2)) == null ? void 0 : _a2.noteStyle;
-    if (!style) return {};
-    return { noteStyle: style, ...style.diagrams ? {} : { styleDiagrams: false } };
+  /**
+   * Fields to spread into a TaskContext: the style snapshot, `styleDiagrams: false` only when the file turns charts off,
+   * and, when the template is the workspace's changed or own block, `styleSelection` (its text, and the tone choice of
+   * `toneText`). A call that names no tone and no language gets what it got before.
+   */
+  contextFields(template2, toneText, language2) {
+    const resolution = this.resolutionOf(template2);
+    const style = resolution == null ? void 0 : resolution.noteStyle;
+    const fields = style ? { noteStyle: style, ...style.diagrams ? {} : { styleDiagrams: false } } : {};
+    if (resolution == null ? void 0 : resolution.block)
+      fields.styleSelection = {
+        template: resolution.block,
+        tone: toneChoiceFromText(toneText, language2 != null ? language2 : this.settings.language)
+      };
+    return fields;
+  }
+  /**
+   * The writing tone of a run on `template`: a note style file decides its own; else the first of `ids` that names a tone
+   * preset (academic is nothing); else the workspace tone, which sits at the end of the chain. Academic (and nothing
+   * chosen) is undefined so prompts stay unchanged.
+   */
+  toneTextFor(template2, ids, language2) {
+    const resolution = this.resolutionOf(template2);
+    const presets = this.settings.promptPresets;
+    if (resolution == null ? void 0 : resolution.noteStyle) return runToneText(resolution, presets, ids, language2);
+    const workspace = this.workspaceTone();
+    if (!workspace) return resolveToneText(presets, ids, language2);
+    if ("id" in workspace) return resolveToneText(presets, [...ids, workspace.id], language2);
+    if (ids.some((id) => findPreset(presets, "tone", id, language2))) return resolveToneText(presets, ids, language2);
+    return workspace.text.trim() || void 0;
   }
   /**
    * The style fields a run with no choice of its own gets: the same resolution, tone and context fields the map view
@@ -25406,19 +26251,44 @@ var NoteStyleStore = class {
   workspaceStyleFields(language2) {
     const resolved = this.resolve([{}, {}]);
     if (resolved.invalid) return { invalid: resolved.invalid };
-    const toneText = runToneText(resolved, this.settings.promptPresets, [void 0, void 0, void 0], language2);
+    const toneText = this.toneTextFor(resolved.template, [], language2);
     return {
       detailTemplate: resolved.template,
       ...toneText ? { toneText } : {},
-      ...this.contextFields(resolved.template)
+      ...this.contextFields(resolved.template, toneText, language2)
     };
   }
+  /**
+   * The workspace tone: a built-in tone by id (so the run's chain can apply it), or a text (a changed built-in's file or
+   * the user's own file). With no `noteToneBlock` it comes from the tone of a built-in `defaultNoteStyleId`.
+   */
+  workspaceTone() {
+    const settings = this.settings;
+    if (settings.noteToneBlock) {
+      const ref = parseBlockRef(settings.noteToneBlock);
+      if ((ref == null ? void 0 : ref.kind) === "builtin") {
+        if (!this.isBuiltinBlockId("tone", ref.id)) return void 0;
+        const base = this.overrideBase("tone", ref.id);
+        const text11 = base === void 0 ? void 0 : this.blocks.tone.get(base);
+        if (text11 !== void 0 && !isUnmodifiedBlock("tone", ref.id, text11)) return { text: text11 };
+        return { id: ref.id };
+      }
+      if ((ref == null ? void 0 : ref.kind) === "file") {
+        const text11 = this.blocks.tone.get(ref.base);
+        return text11 === void 0 ? void 0 : { text: text11 };
+      }
+      return void 0;
+    }
+    const preset = NOTE_STYLE_BUILTIN_IDS.find((id) => id === settings.defaultNoteStyleId);
+    return preset ? { id: BUILTIN_PAIRS[preset].tone } : void 0;
+  }
   remember(resolution) {
-    if (resolution.noteStyle) this.resolutions.set(resolution.template, resolution);
+    if (resolution.noteStyle || resolution.block) this.resolutions.set(resolution.template, resolution);
     return resolution;
   }
   workspaceLevel() {
     const settings = this.settings;
+    if (settings.noteTemplateBlock) return { template: settings.noteTemplateBlock };
     const chosen = settings.defaultNoteStyleId;
     if (chosen) {
       const preset = NOTE_STYLE_BUILTIN_IDS.find((id) => id === chosen);
@@ -25437,6 +26307,44 @@ var NoteStyleStore = class {
       toneText: resolveToneText(settings.promptPresets, toneChain, settings.language)
     };
   }
+  /**
+   * The workspace template block `ref`. An unmodified built-in (no file, or a file equal to a built-in text) is today's
+   * template. A changed or own block that parses gives the parsed template and the block to send; one that does not parse
+   * gives the built-in template (the same id when it is a built-in, else Standard) with the block and its issues. A file
+   * that is gone is not found (the caller falls back to Standard).
+   */
+  tryBlock(ref, toneChain, noteLanguage) {
+    const parsedRef = parseBlockRef(ref);
+    if (!parsedRef) return void 0;
+    const map = this.blocks.template;
+    let id;
+    let base;
+    if (parsedRef.kind === "builtin") {
+      if (!this.isBuiltinBlockId("template", parsedRef.id)) return void 0;
+      id = parsedRef.id;
+      const override = this.overrideBase("template", id);
+      if (override === void 0 || isUnmodifiedBlock("template", id, map.get(override)))
+        return this.legacyResult(id, toneChain, noteLanguage);
+      base = override;
+    } else {
+      if (!map.has(parsedRef.base)) return void 0;
+      id = ref;
+      base = parsedRef.base;
+    }
+    const text11 = map.get(base);
+    const fileName = `${base}.md`;
+    const block = { id, body: text11, fileName };
+    const parsed = parseTemplateBlock(text11, { id, name: base });
+    if (parsed.ok) return { template: { ...parsed.template }, missing: [], block };
+    const fallbackId = this.isBuiltinBlockId("template", id) ? id : STANDARD_TEMPLATE_ID;
+    const fallback = resolveTemplate(this.settings.detailTemplates, [fallbackId], noteLanguage).template;
+    return {
+      template: { ...fallback },
+      missing: [],
+      block,
+      blockIssues: parsed.issues.map((issue2) => ({ ...issue2, category: "template", id, fileName }))
+    };
+  }
   tryId(id, level, all, toneChain, noteLanguage) {
     var _a2, _b2, _c;
     const settings = this.settings;
@@ -25448,7 +26356,7 @@ var NoteStyleStore = class {
     }
     const exported = (_a2 = settings.noteStyleFiles) == null ? void 0 : _a2[id];
     if (exported) {
-      const base = stripMd2(exported);
+      const base = stripMd3(exported);
       const text11 = this.files.get(base);
       const original = settings.detailTemplates.find((template2) => template2.id === id);
       if (text11 !== void 0 && !this.legacyUnchanged(original, text11)) {
@@ -25496,12 +26404,12 @@ var NoteStyleStore = class {
   /** `語氣` is the name or id of an existing tone (its full text is used), else free text. */
   toneFromFile(raw) {
     const settings = this.settings;
-    const key2 = lower(raw.trim());
+    const key2 = lower2(raw.trim());
     const pools = [settings.language, ...LANGUAGES.map((language2) => language2.id)].map(
       (language2) => listPresets(settings.promptPresets, "tone", language2)
     );
     for (const pool of pools) {
-      const found = pool.find((item) => lower(item.id) === key2 || lower(item.name) === key2);
+      const found = pool.find((item) => lower2(item.id) === key2 || lower2(item.name) === key2);
       if (found) return found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0;
     }
     return raw.trim() || void 0;
@@ -25512,12 +26420,12 @@ var NoteStyleStore = class {
     var _a2;
     const settings = this.settings;
     const exportedBy = new Map(
-      Object.entries((_a2 = settings.noteStyleFiles) != null ? _a2 : {}).map(([uuid, name]) => [lower(stripMd2(name)), uuid])
+      Object.entries((_a2 = settings.noteStyleFiles) != null ? _a2 : {}).map(([uuid, name]) => [lower2(stripMd3(name)), uuid])
     );
     const items = [];
     for (const [base, text11] of [...this.files].sort(([a], [b]) => a.localeCompare(b))) {
       const builtin = NOTE_STYLE_BUILTIN_IDS.find((id2) => this.builtinFile(id2) === base);
-      const uuid = exportedBy.get(lower(base));
+      const uuid = exportedBy.get(lower2(base));
       const id = builtin ? builtin : uuid != null ? uuid : `style:${base}`;
       const parsed = parseNoteStyleFile(text11, { id: typeof id === "string" ? id : base, name: base });
       const issues = parsed.ok ? [] : parsed.issues;
@@ -25536,7 +26444,7 @@ var NoteStyleStore = class {
   // ---- writing files (only on a user action) ----
   uniqueName(base, taken) {
     let name = base;
-    for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
+    for (let n = 2; taken.has(lower2(name)); n++) name = `${base} (${n})`;
     return name;
   }
   /**
@@ -25555,11 +26463,11 @@ var NoteStyleStore = class {
     }
     await port.createFolder(folder);
     await this.refresh();
-    const taken = new Set([...this.files.keys()].map(lower));
+    const taken = new Set([...this.files.keys()].map(lower2));
     const write = async (base, content) => {
       await port.create(`${folder}/${base}.md`, content);
       this.files.set(base, content);
-      taken.add(lower(base));
+      taken.add(lower2(base));
     };
     for (const id of NOTE_STYLE_BUILTIN_IDS) {
       if (this.builtinFile(id) !== void 0) continue;
@@ -25569,21 +26477,21 @@ var NoteStyleStore = class {
       );
     }
     const map = { ...(_a2 = settings.noteStyleFiles) != null ? _a2 : {} };
-    const claimed = new Set(Object.values(map).map((name) => lower(stripMd2(name))));
+    const claimed = new Set(Object.values(map).map((name) => lower2(stripMd3(name))));
     for (const template2 of settings.detailTemplates) {
       if (map[template2.id]) continue;
       const wanted = template2.name.replace(SAFE_NAME, " ").replace(/\s+/g, " ").trim() || "Style";
-      const existing = [...this.files.keys()].find((base2) => lower(base2) === lower(wanted));
-      if (existing !== void 0 && !claimed.has(lower(existing)) && this.legacyUnchanged(template2, this.files.get(existing))) {
+      const existing = [...this.files.keys()].find((base2) => lower2(base2) === lower2(wanted));
+      if (existing !== void 0 && !claimed.has(lower2(existing)) && this.legacyUnchanged(template2, this.files.get(existing))) {
         map[template2.id] = `${existing}.md`;
-        claimed.add(lower(existing));
+        claimed.add(lower2(existing));
         dirty = true;
         continue;
       }
       const base = this.uniqueName(wanted, taken);
       await write(base, serializeLegacyV1(template2, settings.language));
       map[template2.id] = `${base}.md`;
-      claimed.add(lower(base));
+      claimed.add(lower2(base));
       dirty = true;
     }
     if (Object.keys(map).length && JSON.stringify(map) !== JSON.stringify((_b2 = settings.noteStyleFiles) != null ? _b2 : {})) {
@@ -25608,8 +26516,126 @@ var NoteStyleStore = class {
     if (!this.isBuiltinFile(builtin.id, live)) return false;
     await this.deps.port.trash(path);
     await this.deps.port.create(path, canonicalContent(builtin.id, builtin.language));
-    this.files.set(stripMd2(name), canonicalContent(builtin.id, builtin.language));
+    this.files.set(stripMd3(name), canonicalContent(builtin.id, builtin.language));
     return true;
+  }
+  // ---- writing block files (only on a user action; a file is never overwritten) ----
+  serial(task) {
+    const run = this.writeQueue.then(task, task);
+    this.writeQueue = run.catch(() => void 0);
+    return run;
+  }
+  takenNames(category) {
+    return new Set([...this.blocks[category].keys()].map(lower2));
+  }
+  /**
+   * The path of the file behind a block, so it can be opened. A built-in with no file gets one, written with its text in
+   * the interface language; a file that is there is left as it is. Throws for a file block that no longer exists.
+   */
+  ensureBlockFile(category, ref) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const parsed = parseBlockRef(ref);
+      const dir = this.blockDirectories()[category];
+      if ((parsed == null ? void 0 : parsed.kind) === "file") {
+        if (!this.blocks[category].has(parsed.base)) throw new Error(`Block file not found: ${parsed.base}`);
+        return { path: `${dir}/${parsed.base}.md`, base: parsed.base };
+      }
+      if ((parsed == null ? void 0 : parsed.kind) !== "builtin" || !this.isBuiltinBlockId(category, parsed.id))
+        throw new Error(`Unknown block: ${ref}`);
+      const override = this.overrideBase(category, parsed.id);
+      if (override !== void 0) return { path: `${dir}/${override}.md`, base: override };
+      const language2 = this.settings.language;
+      const block = findBuiltinBlock(category, parsed.id);
+      const base = uniqueBlockName(
+        cleanBlockName(translate(language2, block.nameKey)) || parsed.id,
+        this.takenNames(category)
+      );
+      const text11 = builtinBlockText(category, parsed.id, language2);
+      await this.deps.port.createFolder(dir);
+      await this.deps.port.create(`${dir}/${base}.md`, text11);
+      this.blocks[category].set(base, text11);
+      return { path: `${dir}/${base}.md`, base };
+    });
+  }
+  /**
+   * Copies a block into a new file of the category, named "<name> copy" (unique, never a built-in's name), and makes it
+   * the workspace's choice. Returns the new ref. The text copied is the block's file when it has one, else its built-in text.
+   */
+  copyBlock(category, ref) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const parsed = parseBlockRef(ref);
+      const language2 = this.settings.language;
+      let name;
+      let text11;
+      if ((parsed == null ? void 0 : parsed.kind) === "file") {
+        const held = this.blocks[category].get(parsed.base);
+        if (held === void 0) throw new Error(`Block file not found: ${parsed.base}`);
+        name = parsed.base;
+        text11 = held;
+      } else if ((parsed == null ? void 0 : parsed.kind) === "builtin" && this.isBuiltinBlockId(category, parsed.id)) {
+        const override = this.overrideBase(category, parsed.id);
+        name = translate(language2, findBuiltinBlock(category, parsed.id).nameKey);
+        text11 = override === void 0 ? builtinBlockText(category, parsed.id, language2) : this.blocks[category].get(override);
+      } else throw new Error(`Unknown block: ${ref}`);
+      const dir = this.blockDirectories()[category];
+      const base = copyBlockName(category, name, language2, this.takenNames(category));
+      await this.deps.port.createFolder(dir);
+      await this.deps.port.create(`${dir}/${base}.md`, text11);
+      this.blocks[category].set(base, text11);
+      const created = fileRef(base);
+      if (category === "template") this.settings.noteTemplateBlock = created;
+      else this.settings.noteToneBlock = created;
+      await this.deps.save();
+      return created;
+    });
+  }
+  /**
+   * Restores a built-in block: its file is saved to the backup folder first, then moved to the trash, so the built-in
+   * text applies again. Refused for an own block and for a built-in with no file. If the backup cannot be written the
+   * file stays as it is.
+   */
+  restoreBlock(category, ref) {
+    return this.serial(async () => {
+      var _a2, _b2, _c;
+      await this.loadBlocks();
+      const parsed = parseBlockRef(ref);
+      if ((parsed == null ? void 0 : parsed.kind) !== "builtin" || !this.isBuiltinBlockId(category, parsed.id))
+        return { ok: false, reason: "not-builtin" };
+      const base = this.overrideBase(category, parsed.id);
+      if (base === void 0) return { ok: false, reason: "no-override" };
+      const { port } = this.deps;
+      const dirs = this.blockDirectories();
+      const path = `${dirs[category]}/${base}.md`;
+      let live;
+      try {
+        live = await port.read(path);
+      } catch (e) {
+        return { ok: false, reason: "read-failed" };
+      }
+      let backup;
+      try {
+        let present = [];
+        try {
+          present = await port.list(dirs.backup);
+        } catch (e) {
+          present = [];
+        }
+        await port.createFolder(dirs.backup);
+        backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower2)))}`;
+        await port.create(backup, live);
+      } catch (e) {
+        return { ok: false, reason: "backup-failed" };
+      }
+      try {
+        await port.trash(path);
+      } catch (e) {
+        return { ok: false, reason: "trash-failed" };
+      }
+      this.blocks[category].delete(base);
+      return { ok: true, backup };
+    });
   }
   /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */
   async followFolderRename(oldPath, newPath) {
@@ -25628,14 +26654,14 @@ function escapeRegExp(value) {
 }
 function inheritRoles(parsed, original) {
   for (const section3 of parsed.sections) {
-    const key2 = lower(section3.name.trim());
+    const key2 = lower2(section3.name.trim());
     const match = original.sections.find((item) => sectionKeys(item).includes(key2));
     if (!match) continue;
     if (section3.role === "none" && match.role !== "none" && !parsed.sections.some((other) => other.role === match.role))
       section3.role = match.role;
-    const names3 = new Set(parsed.sections.map((item) => lower(item.name.trim())));
+    const names3 = new Set(parsed.sections.map((item) => lower2(item.name.trim())));
     for (const alias of [match.name, ...match.aliases]) {
-      if (!alias.trim() || names3.has(lower(alias.trim())) || section3.aliases.some((a) => lower(a) === lower(alias)))
+      if (!alias.trim() || names3.has(lower2(alias.trim())) || section3.aliases.some((a) => lower2(a) === lower2(alias)))
         continue;
       section3.aliases.push(alias);
     }
@@ -30626,9 +31652,9 @@ var reduce_zh_default = "\u6574\u5408\u6240\u63D0\u4F9B\u7684\u8B49\u64DA\u6458\
 var reduce_en_default = "Combine the supplied extracted evidence without dropping materially different facts, disagreements, caveats, source identifiers, or source mappings. Keep every original [S#] citation attached to its supported claims and preserve every exact [S#]-to-path mapping; never replace an identifier or alter a path.\n";
 
 // core/steps/reference/step.ts
-var text6 = (template2) => renderTemplate(template2, {});
-var EXTRACT = { zh: text6(extract_zh_default), en: text6(extract_en_default) };
-var REDUCE = { zh: text6(reduce_zh_default), en: text6(reduce_en_default) };
+var text7 = (template2) => renderTemplate(template2, {});
+var EXTRACT = { zh: text7(extract_zh_default), en: text7(extract_en_default) };
+var REDUCE = { zh: text7(reduce_zh_default), en: text7(reduce_en_default) };
 function referenceTask(round2, language2) {
   return inLanguage(round2 === "extract" ? EXTRACT : REDUCE, language2);
 }
@@ -30636,8 +31662,8 @@ function referenceTask(round2, language2) {
 // ai/aim-contracts.ts
 var AIM_NO_QUESTION = "__AIM_NO_QUESTION__";
 var QUESTION_SCOPE = "Ask about the user's goal, preferences, constraints or situation, never about this tool's workflow, counts, nodes or branches.";
-var text7 = { type: "string" };
-var texts = { type: "array", items: text7 };
+var text8 = { type: "string" };
+var texts = { type: "array", items: text8 };
 var nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
 var object = (properties) => ({
   type: "object",
@@ -30658,7 +31684,7 @@ function payloadSchema(contract) {
       return object({
         decision: { type: "string", enum: contract.requireQuestion ? ["ask_user"] : ["ask_user", "no_question"] },
         question: {
-          ...text7,
+          ...text8,
           description: `The one direct question for the user, written as a question. ${QUESTION_SCOPE} Empty only for no_question.`
         },
         answerOptions: {
@@ -30672,27 +31698,27 @@ function payloadSchema(contract) {
           type: "array",
           description: "0\u20133 distinct evidence tasks.",
           items: object({
-            id: text7,
-            title: text7,
-            task: text7,
-            expectedValue: text7,
+            id: text8,
+            title: text8,
+            task: text8,
+            expectedValue: text8,
             action: { type: "string", enum: ["research", "update", "reuse"] },
             dependsOn: { ...texts, description: "Ids of prerequisite targets in this plan; empty when independent." },
-            rationale: text7,
+            rationale: text8,
             source: {
               ...nullable(
                 object({
-                  branchId: text7,
-                  resultId: text7,
-                  notePath: text7,
+                  branchId: text8,
+                  resultId: text8,
+                  notePath: text8,
                   version: { type: "integer" },
-                  contentHash: text7
+                  contentHash: text8
                 })
               ),
               description: "For reuse/update: the exact source copied from the supplied ancestor report. Null for research."
             },
             validity: {
-              ...nullable(object({ conditionKeys: texts, reason: text7 })),
+              ...nullable(object({ conditionKeys: texts, reason: text8 })),
               description: "For reuse/update: which supplied condition keys the source depends on and why it still applies. Null for research."
             }
           })
@@ -30701,9 +31727,9 @@ function payloadSchema(contract) {
     case "reuse":
       return object({
         usable: { type: "boolean" },
-        rationale: text7,
+        rationale: text8,
         conditionKeys: texts,
-        validity: { ...text7, description: "Freshness and applicability assessment." }
+        validity: { ...text8, description: "Freshness and applicability assessment." }
       });
     case "review":
       return object({
@@ -30712,19 +31738,19 @@ function payloadSchema(contract) {
           description: "true when the supplied reports already answer the original goal under the known conditions; false when a material evidence gap in the goal itself remains."
         },
         decision: { type: "string", enum: [...contract.decisions] },
-        rationale: { ...text7, description: "Evidence-based reason for the decision." },
-        stopReason: { ...text7, description: "For conclude: why research can stop. Otherwise empty." },
+        rationale: { ...text8, description: "Evidence-based reason for the decision." },
+        stopReason: { ...text8, description: "For conclude: why research can stop. Otherwise empty." },
         question: {
-          ...text7,
+          ...text8,
           description: `For ask_user: the one direct question for the user, written as a question. ${QUESTION_SCOPE} Otherwise empty.`
         },
         answerOptions: { ...texts, description: "For ask_user: 2\u20135 distinct answer choices. Otherwise empty." },
         researchTarget: {
           ...nullable(
             object({
-              title: text7,
-              task: { ...text7, description: "Search instruction." },
-              expectedValue: { ...text7, description: "Uncertainty the search should reduce." }
+              title: text8,
+              task: { ...text8, description: "Search instruction." },
+              expectedValue: { ...text8, description: "Uncertainty the search should reduce." }
             })
           ),
           description: "For research_more: the one targeted evidence gap. Otherwise null."
@@ -30743,10 +31769,10 @@ function payloadSchema(contract) {
         sections: {
           type: "array",
           items: object({
-            heading: text7,
-            purpose: text7,
+            heading: text8,
+            purpose: text8,
             searchTask: {
-              ...text7,
+              ...text8,
               description: "Specific web search needed for this section, or empty if already supported."
             },
             evidenceIds: {
@@ -31000,223 +32026,6 @@ function taskResponseShape(context) {
   return { schema, isAimGapAudit, isIsolatedWebResearch, ...contract ? { contract } : {} };
 }
 
-// core/steps/aim/language.zh.md
-var language_zh_default = "\u8F38\u51FA\u8A9E\u8A00\uFF1A{{language}}\u3002\u6240\u6709\u7D66\u8B80\u8005\u770B\u7684\u6B04\u4F4D\u3001\u6A19\u984C\u3001\u554F\u984C\u8207\u9078\u9805\u90FD\u7528{{languagePlain}}\u64B0\u5BEB\uFF0C\u4E0D\u8AD6\u5176\u4ED6\u6307\u793A\u3001\u8A18\u61B6\u6216\u4F86\u6E90\u8CC7\u6599\u4F7F\u7528\u4F55\u7A2E\u8A9E\u8A00\u3002\u4FDD\u7559\u4F86\u6E90\u539F\u6587\u5F15\u8FF0\u8207\u5C08\u6709\u540D\u7A31\u3002\n";
-
-// core/steps/aim/language.en.md
-var language_en_default = "Output language: {{language}}. Write every reader-facing field, heading, question and option in {{languagePlain}}, whatever language other instructions, memories or source material use. Preserve quoted source text and proper names.\n";
-
-// core/steps/aim/json-contract.zh.md
-var json_contract_zh_default = "\u53EA\u56DE\u50B3\u7B26\u5408\u63D0\u4F9B\u4E4B response schema \u7684 JSON\uFF0C\u4E26\u5305\u542B\u6240\u6709\u5FC5\u8981\u6B04\u4F4D\u3002AIM \u672A\u555F\u7528\u8996\u89BA\u641C\u5C0B\uFF0C\u56E0\u6B64 visualReferences \u5FC5\u9808\u662F\u7A7A\u9663\u5217\u3002\n";
-
-// core/steps/aim/json-contract.en.md
-var json_contract_en_default = "Return JSON only, matching the supplied response schema and including every required field. AIM has visual search disabled, so visualReferences must be an empty array.\n";
-
-// core/steps/aim/web-search-off.zh.md
-var web_search_off_zh_default = "\u6B64\u968E\u6BB5\u50C5\u4F7F\u7528\u672C\u6B21\u63D0\u4F9B\u7684\u5167\u5BB9\uFF0C\u4E0D\u8981\u9032\u884C\u7DB2\u8DEF\u641C\u5C0B\u3002\n";
-
-// core/steps/aim/web-search-off.en.md
-var web_search_off_en_default = "Do not use web search in this local-only phase.\n";
-
-// core/steps/aim/web-search-on.zh.md
-var web_search_on_zh_default = "\u968E\u6BB5\u4EFB\u52D9\u9700\u8981\u5916\u90E8\u8B49\u64DA\u6642\u4F7F\u7528\u53EF\u7528\u7684\u7DB2\u8DEF\u641C\u5C0B\u5DE5\u5177\uFF0C\u4E26\u5982\u5BE6\u56DE\u5831\u641C\u5C0B\u72C0\u614B\u3002\n";
-
-// core/steps/aim/web-search-on.en.md
-var web_search_on_en_default = "Use available web search tools when the phase task requires external evidence. Report search status truthfully.\n";
-
-// core/steps/aim/label-detail.zh.md
-var label_detail_zh_default2 = "\u76EE\u524D\u5167\u5BB9\u8207\u63D0\u4F9B\u7684\u5831\u544A\n";
-
-// core/steps/aim/label-detail.en.md
-var label_detail_en_default2 = "Current detail and supplied reports\n";
-
-// core/steps/aim/label-findings.zh.md
-var label_findings_zh_default2 = "\u5148\u524D\u767C\u73FE\n";
-
-// core/steps/aim/label-findings.en.md
-var label_findings_en_default2 = "Previous findings\n";
-
-// core/steps/aim/guidance-structured.zh.md
-var guidance_structured_zh_default = "\u4F9D\u7167\u672C\u968E\u6BB5\u4EFB\u52D9\u8655\u7406\u3002\u6A5F\u5668\u53EF\u8B80\u7684\u6C7A\u7B56\u3001\u554F\u984C\u3001\u9078\u9805\u8207\u898F\u5283\u53EA\u653E\u5728 response schema \u5B9A\u7FA9\u7684 aim \u6B04\u4F4D\uFF1Bsummary \u8207 detail \u662F\u7D66\u8B80\u8005\u770B\u7684\u5167\u5BB9\uFF0C\u4E0D\u8981\u5BEB HTML \u8A3B\u89E3\u6A19\u8A18\u3002\u8207\u6240\u9078\u6C7A\u7B56\u7121\u95DC\u7684 aim \u6B04\u4F4D\u7559\u7A7A\u3002\u4E0D\u8981\u5957\u7528\u56FA\u5B9A\u6A19\u984C\u6A21\u677F\uFF0C\u4E5F\u4E0D\u8981\u628A\u898F\u5283\u3001\u5BE9\u67E5\u3001\u4FEE\u5FA9\u6216\u7814\u7A76\u968E\u6BB5\u6539\u5BEB\u6210\u5B8C\u6574\u77E5\u8B58\u9801\u3002\n";
-
-// core/steps/aim/guidance-structured.en.md
-var guidance_structured_en_default = "Follow the phase task. Put machine-readable decisions, questions, choices and plans only in the aim field defined by the response schema; summary and detail are reader-facing text. Do not write HTML comment markers. Leave aim fields that do not apply to the chosen decision empty. Do not impose a fixed heading template or turn planning, review, repair, or research into a complete knowledge page.\n";
-
-// core/steps/aim/guidance-gap-audit.zh.md
-var guidance_gap_audit_zh_default = "\u56B4\u683C\u9075\u5FAA\u672C\u968E\u6BB5\u4EFB\u52D9\u8207\u5C08\u7528\u56DE\u61C9 schema\u3002\u4E0D\u8981\u589E\u52A0\u6A19\u8A18\u3001\u5EFA\u8B70\u6216\u8996\u89BA\u53C3\u8003\uFF1B\u4E0D\u8981\u5957\u7528\u56FA\u5B9A\u6A19\u984C\u6A21\u677F\uFF0C\u4E5F\u4E0D\u8981\u628A\u7A3D\u6838\u6539\u5BEB\u6210\u5B8C\u6574\u77E5\u8B58\u9801\u3002\n";
-
-// core/steps/aim/guidance-gap-audit.en.md
-var guidance_gap_audit_en_default = "Follow the phase task and the dedicated response schema exactly. Do not add a marker, suggestions, or visual references. Do not impose a fixed heading template or turn this audit into a complete knowledge page.\n";
-
-// core/steps/aim/guidance-plain.zh.md
-var guidance_plain_zh_default = "\u4F9D\u7167\u672C\u968E\u6BB5\u4EFB\u52D9\u8655\u7406\u3002\u4E0D\u8981\u5957\u7528\u56FA\u5B9A\u6A19\u984C\u6A21\u677F\uFF0C\u4E5F\u4E0D\u8981\u628A\u898F\u5283\u3001\u5BE9\u67E5\u3001\u4FEE\u5FA9\u6216\u7814\u7A76\u968E\u6BB5\u6539\u5BEB\u6210\u5B8C\u6574\u77E5\u8B58\u9801\u3002\n";
-
-// core/steps/aim/guidance-plain.en.md
-var guidance_plain_en_default = "Follow the phase task exactly. Do not impose a fixed heading template or turn planning, review, repair, or research into a complete knowledge page.\n";
-
-// core/steps/aim/phase/research-gap-audit.zh.md
-var research_gap_audit_zh_default = "\u5728 detail \u5BEB\u7C21\u77ED\u7406\u7531\uFF0C\u4E26\u5C07 summary \u8A2D\u70BA\u5B8C\u5168\u76F8\u540C\u7684 user_condition \u6216 external_evidence\u3002suggestions \u8207 visualReferences \u5FC5\u9808\u662F\u7A7A\u9663\u5217\u3002\n";
-
-// core/steps/aim/phase/research-gap-audit.en.md
-var research_gap_audit_en_default = "Put a concise rationale in detail and set summary to exactly user_condition or external_evidence. Return empty suggestions and visualReferences arrays.\n";
-
-// core/steps/aim/phase/initial-clarification.zh.md
-var initial_clarification_zh_default = "\u53EA\u5728 aim.questions \u8A62\u554F\u5FC5\u8981\u4E14\u672A\u77E5\u7684\u4F7F\u7528\u8005\u689D\u4EF6\uFF1B\u53EF\u4EE5\u662F\u7A7A\u6E05\u55AE\u3002\n";
-
-// core/steps/aim/phase/initial-clarification.en.md
-var initial_clarification_en_default = "Ask only necessary unknown user conditions in aim.questions; an empty list is valid.\n";
-
-// core/steps/aim/phase/initial-question.zh.md
-var initial_question_zh_default = "\u9700\u8981\u63D0\u554F\u6642\uFF0C\u5728 aim.question \u5BEB\u4E00\u500B\u76F4\u63A5\u7684\u554F\u53E5\uFF0C\u4E26\u5728 aim.answerOptions \u63D0\u4F9B 2\u20135 \u500B\u4E0D\u540C\u9078\u9805\u3002\u4E0D\u8981\u4EE3\u66FF\u4F7F\u7528\u8005\u56DE\u7B54\u3002\n";
-
-// core/steps/aim/phase/initial-question.en.md
-var initial_question_en_default = "When asking, put one direct question in aim.question and 2\u20135 distinct answer choices in aim.answerOptions. Do not answer for the user.\n";
-
-// core/steps/aim/phase/research-plan.zh.md
-var research_plan_zh_default = "\u5728 aim.subtopics \u56DE\u50B3 0\u20135 \u500B\u4E0D\u540C\u8B49\u64DA\u4EFB\u52D9\uFF0C\u6A19\u660E\u6CBF\u7528\u3001\u66F4\u65B0\u6216\u65B0\u67E5\u8B49\u53CA\u4F9D\u8CF4\uFF1B\u96F6\u4EFB\u52D9\u9808\u6709\u53EF\u7528\u7684\u65E2\u6709\u8B49\u64DA\uFF0C\u4E0D\u8981\u6C42\u6700\u4F4E\u641C\u5C0B\u6578\uFF1B\u6B64 Planner \u968E\u6BB5\u4E0D\u8981\u56DE\u7B54\u6574\u9AD4\u76EE\u6A19\u6216\u9032\u884C\u7814\u7A76\u3002\n";
-
-// core/steps/aim/phase/research-plan.en.md
-var research_plan_en_default = "Return 0\u20135 distinct evidence tasks in aim.subtopics, using reuse/update/research and dependsOn. Empty requires usable prior evidence; no minimum new searches. Do not answer the goal or research in this Planner turn.\n";
-
-// core/steps/aim/phase/research-plan-repair.zh.md
-var research_plan_repair_zh_default = "\u53EA\u4F9D\u63D0\u4F9B\u7684\u8108\u7D61\u4FEE\u5FA9\u56DE\u5831\u7684\u898F\u5283\u7F3A\u9677\uFF0C\u5728 aim.subtopics \u56DE\u50B3 0\u20135 \u500B\u4E0D\u540C\u8B49\u64DA\u4EFB\u52D9\uFF1B\u96F6\u4EFB\u52D9\u9808\u6709\u53EF\u7528\u7684\u65E2\u6709\u8B49\u64DA\uFF1B\u4E0D\u8981\u9032\u884C\u7814\u7A76\u3002\n";
-
-// core/steps/aim/phase/research-plan-repair.en.md
-var research_plan_repair_en_default = "Repair only the reported plan defect using the supplied context. Return 0\u20135 distinct evidence tasks in aim.subtopics; empty requires usable prior evidence; do not research.\n";
-
-// core/steps/aim/phase/subtopic-research.zh.md
-var subtopic_research_zh_default = "\u53EA\u7814\u7A76\u6307\u5B9A\u76EE\u6A19\u3002\u6E96\u78BA\u56DE\u5831\u641C\u5C0B\u72C0\u614B\uFF0C\u5340\u5206\u8B49\u64DA\u8207\u4E0D\u78BA\u5B9A\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
-
-// core/steps/aim/phase/subtopic-research.en.md
-var subtopic_research_en_default = "Research only the assigned target. Report search status accurately, distinguish evidence from uncertainty, and preserve source attribution. Do not ask the user.\n";
-
-// core/steps/aim/phase/targeted-followup-research.zh.md
-var targeted_followup_research_zh_default = "\u53EA\u7814\u7A76\u6307\u5B9A\u7684\u4E00\u9805\u8B49\u64DA\u7F3A\u53E3\u3002\u6E96\u78BA\u56DE\u5831\u641C\u5C0B\u72C0\u614B\uFF0C\u5340\u5206\u8B49\u64DA\u8207\u4E0D\u78BA\u5B9A\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
-
-// core/steps/aim/phase/targeted-followup-research.en.md
-var targeted_followup_research_en_default = "Research the single assigned evidence gap. Report search status accurately, distinguish evidence from uncertainty, and preserve source attribution. Do not ask the user.\n";
-
-// core/steps/aim/phase/report-review.zh.md
-var report_review_zh_default = "research_more \u5FC5\u9808\u63D0\u4F9B\u6070\u597D\u4E00\u500B aim.researchTarget\uFF1Bask_user \u5FC5\u9808\u63D0\u4F9B\u4E00\u500B\u76F4\u63A5\u7684 aim.question \u8207 2\u20135 \u500B\u4E0D\u540C\u7684 aim.answerOptions\uFF1Bconclude \u5FC5\u9808\u63D0\u4F9B aim.stopReason\u3002\n";
-
-// core/steps/aim/phase/report-review.en.md
-var report_review_en_default = "For research_more, give exactly one aim.researchTarget. For ask_user, give one direct aim.question and 2\u20135 distinct aim.answerOptions. For conclude, give aim.stopReason.\n";
-
-// core/steps/aim/phase/decision-quality-review.zh.md
-var decision_quality_review_zh_default = "\u53EA\u5BE9\u67E5\u63D0\u4F9B\u7684\u5019\u9078\u6C7A\u7B56\u8207\u8B49\u64DA\u3002research_more \u5FC5\u9808\u63D0\u4F9B\u6070\u597D\u4E00\u500B aim.researchTarget\uFF1Bask_user \u5FC5\u9808\u63D0\u4F9B\u4E00\u500B\u76F4\u63A5\u7684 aim.question \u8207 2\u20135 \u500B\u4E0D\u540C\u7684 aim.answerOptions\uFF1Bconclude \u5FC5\u9808\u63D0\u4F9B aim.stopReason\u3002\n";
-
-// core/steps/aim/phase/decision-quality-review.en.md
-var decision_quality_review_en_default = "Review only the supplied candidate and evidence. For research_more, give exactly one aim.researchTarget. For ask_user, give one direct aim.question and 2\u20135 distinct aim.answerOptions. For conclude, give aim.stopReason.\n";
-
-// core/steps/aim/phase/format-repair.zh.md
-var format_repair_zh_default = "\u53EA\u4FEE\u5FA9\u7F3A\u6F0F\u6216\u683C\u5F0F\u932F\u8AA4\u7684\u5FC5\u8981\u6B04\u4F4D\u3002\u539F\u6A23\u4FDD\u7559\u65E2\u6709\u6C7A\u7B56\u8207\u4F7F\u7528\u8005\u554F\u984C\uFF1B\u4E0D\u8981\u91CD\u65B0\u89E3\u8B80\u8B49\u64DA\u3001\u6539\u8B8A\u6C7A\u7B56\u6216\u65B0\u589E\u4E8B\u5BE6\u3002\n";
-
-// core/steps/aim/phase/format-repair.en.md
-var format_repair_en_default = "Repair only missing or malformed required fields. Preserve the existing decision and user question exactly; do not reinterpret evidence, change the decision, or add facts.\n";
-
-// core/steps/aim/phase/delivery-outline.zh.md
-var delivery_outline_zh_default = "\u5728 aim.sections \u8A2D\u8A08\u8981\u6C42\u7684\u6587\u4EF6\u5927\u7DB1\uFF1B\u4E0D\u8981\u64B0\u5BEB\u6587\u4EF6\u6216\u9032\u884C\u7814\u7A76\u3002\n";
-
-// core/steps/aim/phase/delivery-outline.en.md
-var delivery_outline_en_default = "Design the requested document outline in aim.sections. Do not write the document or perform research.\n";
-
-// core/steps/aim/phase/delivery-research.zh.md
-var delivery_research_zh_default = "\u53EA\u7814\u7A76\u5DF2\u78BA\u8A8D\u7684\u6700\u7D42\u6587\u4EF6\u5927\u7DB1\u3002\u6E96\u78BA\u56DE\u5831\u53EF\u53D6\u5F97\u6027\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\uFF1B\u4E0D\u8981\u64B0\u5BEB\u6587\u4EF6\u6216\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
-
-// core/steps/aim/phase/delivery-research.en.md
-var delivery_research_en_default = "Research only the agreed final-document outline. Report availability accurately and preserve source attribution. Do not write the document or ask the user.\n";
-
-// core/steps/aim/phase/delivery-writing.zh.md
-var delivery_writing_zh_default = "\u4F9D\u63D0\u4F9B\u7684\u8108\u7D61\u8207\u8B49\u64DA\u64B0\u5BEB\u8981\u6C42\u7684\u8B80\u8005\u6587\u4EF6\uFF0C\u9075\u5FAA\u4EFB\u52D9\u6307\u5B9A\u7D50\u69CB\u4E26\u4FDD\u7559\u4F86\u6E90\u6B78\u5C6C\u8207\u4E0D\u78BA\u5B9A\u6027\u3002\n";
-
-// core/steps/aim/phase/delivery-writing.en.md
-var delivery_writing_en_default = "Write the requested reader-facing deliverable from supplied context and evidence. Follow the task's requested structure and preserve attribution and uncertainty.\n";
-
-// core/steps/aim/phase/delivery-acceptance.zh.md
-var delivery_acceptance_zh_default = "\u4F9D\u539F\u59CB\u76EE\u6A19\u8207\u4EFB\u52D9\u5951\u7D04\u5BE9\u67E5\u5B8C\u6574\u4EA4\u4ED8\u5167\u5BB9\u3002\u5728 aim \u6B04\u4F4D\u56DE\u50B3\u6C7A\u7B56\uFF0C\u4E26\u9644\u7C21\u77ED\u901A\u904E\u8AAA\u660E\u6216\u554F\u984C\u6E05\u55AE\uFF1B\u4E0D\u8981\u91CD\u8907\u6216\u6539\u5BEB\u8349\u7A3F\u3002\u9700\u8981 research_more \u6642\u6307\u51FA\u4E00\u500B\u5177\u9AD4\u8B49\u64DA\u76EE\u6A19\u3002\u4E0D\u8981\u8A62\u554F\u4F7F\u7528\u8005\u3002\n";
-
-// core/steps/aim/phase/delivery-acceptance.en.md
-var delivery_acceptance_en_default = "Review the complete deliverable against the original goal and task contract. Return the decision in the aim fields and a brief acceptance note or list of issues; do not reproduce or rewrite the draft. If research_more is required, identify one concrete evidence target. Do not ask the user.\n";
-
-// core/steps/aim/shell.ts
-var text8 = (template2) => renderTemplate(template2, {});
-var pair5 = (zh, en2) => ({ zh: text8(zh), en: text8(en2) });
-var LANGUAGE = { zh: language_zh_default, en: language_en_default };
-var JSON_CONTRACT2 = pair5(json_contract_zh_default, json_contract_en_default);
-var WEB_SEARCH_OFF = pair5(web_search_off_zh_default, web_search_off_en_default);
-var WEB_SEARCH_ON = pair5(web_search_on_zh_default, web_search_on_en_default);
-var LABEL_DETAIL2 = pair5(label_detail_zh_default2, label_detail_en_default2);
-var LABEL_FINDINGS2 = pair5(label_findings_zh_default2, label_findings_en_default2);
-var GUIDANCE_STRUCTURED = pair5(guidance_structured_zh_default, guidance_structured_en_default);
-var GUIDANCE_GAP_AUDIT = pair5(guidance_gap_audit_zh_default, guidance_gap_audit_en_default);
-var GUIDANCE_PLAIN = pair5(guidance_plain_zh_default, guidance_plain_en_default);
-var PHASE_RULES = {
-  "research-gap-audit": pair5(research_gap_audit_zh_default, research_gap_audit_en_default),
-  "initial-clarification": pair5(initial_clarification_zh_default, initial_clarification_en_default),
-  "initial-question": pair5(initial_question_zh_default, initial_question_en_default),
-  "research-plan": pair5(research_plan_zh_default, research_plan_en_default),
-  "research-plan-repair": pair5(research_plan_repair_zh_default, research_plan_repair_en_default),
-  "subtopic-research": pair5(subtopic_research_zh_default, subtopic_research_en_default),
-  "targeted-followup-research": pair5(targeted_followup_research_zh_default, targeted_followup_research_en_default),
-  "report-review": pair5(report_review_zh_default, report_review_en_default),
-  "decision-quality-review": pair5(decision_quality_review_zh_default, decision_quality_review_en_default),
-  "format-repair": pair5(format_repair_zh_default, format_repair_en_default),
-  "delivery-outline": pair5(delivery_outline_zh_default, delivery_outline_en_default),
-  "delivery-research": pair5(delivery_research_zh_default, delivery_research_en_default),
-  "delivery-writing": pair5(delivery_writing_zh_default, delivery_writing_en_default),
-  "delivery-acceptance": pair5(delivery_acceptance_zh_default, delivery_acceptance_en_default)
-};
-var READER_FACING_PHASES = /* @__PURE__ */ new Set([
-  "subtopic-research",
-  "targeted-followup-research",
-  "delivery-writing"
-]);
-function readerFacingAimPhase(phase) {
-  return !!phase && READER_FACING_PHASES.has(phase);
-}
-function aimPhase(task) {
-  var _a2;
-  return (_a2 = task.match(/<!--\s*aim-phase:\s*([a-z-]+)\s*-->/)) == null ? void 0 : _a2[1];
-}
-function phaseGuidance(phase, language2, responseContract, structured = false) {
-  const gapAuditContract = phase === "research-gap-audit" && responseContract === "aim-gap-audit";
-  const common = structured ? GUIDANCE_STRUCTURED : gapAuditContract ? GUIDANCE_GAP_AUDIT : GUIDANCE_PLAIN;
-  const rule = phase && Object.prototype.hasOwnProperty.call(PHASE_RULES, phase) ? inLanguage(PHASE_RULES[phase], language2) : "";
-  return [inLanguage(common, language2), rule].filter(Boolean).join("\n\n");
-}
-function buildAimPrompt(context, language2, provider = "codex") {
-  const phase = aimPhase(context.task);
-  const field = (label, value) => (value == null ? void 0 : value.trim()) ? `${label}:
-${value}` : "";
-  const blocks = [
-    inLanguageNaming(LANGUAGE, language2, { language: "region", languagePlain: "plain" }, void 0, {
-      kind: "topic",
-      text: context.title
-    }),
-    inLanguage(ROLE, language2),
-    inLanguage(SOURCE_SAFETY, language2),
-    context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "",
-    context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language2) : "",
-    withProviderOutput(inLanguage(JSON_CONTRACT2, language2), provider, language2),
-    context.toneText ? toneBlock(context.toneText, language2) : "",
-    phaseGuidance(phase, language2, context.responseContract, !!context.aimContract),
-    readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
-    context.researchMode === "local" ? inLanguage(WEB_SEARCH_OFF, language2) : context.researchMode === "research" ? inLanguage(WEB_SEARCH_ON, language2) : "",
-    field(inLanguage(LABEL_TOPIC, language2), context.title),
-    field(inLanguage(LABEL_SUMMARY, language2), context.summary),
-    context.detail ? `${inLanguage(LABEL_DETAIL2, language2)}:
-${context.detail}` : "",
-    field(inLanguage(LABEL_RULES, language2), context.rules),
-    context.workingFindings ? `${inLanguage(LABEL_FINDINGS2, language2)}:
-${context.workingFindings}` : "",
-    context.sourceContext ? `${inLanguage(LABEL_SOURCES, language2)}:
-${context.sourceContext}` : "",
-    field(inLanguage(LABEL_ANCESTORS, language2), context.ancestors),
-    field(inLanguage(LABEL_TASK, language2), context.task)
-  ];
-  return blocks.filter(Boolean).join("\n\n");
-}
-
 // core/steps/task/parse.ts
 function extractJsonObject(raw) {
   const candidates = [];
@@ -31291,435 +32100,6 @@ function parseAiResult(raw, label, language2, strictGapAudit = false, webResearc
     ...searchStatus ? { searchStatus } : {}
   };
   return contract ? foldAimContract(contract, parsed.aim, result) : result;
-}
-
-// ai/visual-guidance.ts
-function visualGuidance(context, language2) {
-  const synthesis = context.mode === "synthesize";
-  const maySearch = context.researchMode !== "local" && context.mode !== "decompose" && context.visualMode !== "off";
-  const mayReuse = synthesis || context.mode === "merge";
-  const instructions = [];
-  if (!maySearch) {
-    instructions.push(inLanguage(VISUAL_NONE, language2));
-    if (mayReuse) instructions.push(inLanguage(VISUAL_PRESERVE, language2));
-  } else if (context.visualMode === "on") instructions.push(inLanguage(VISUAL_ON, language2));
-  else instructions.push(inLanguage(VISUAL_AUTO, language2));
-  if (maySearch || mayReuse) instructions.push(inLanguage(VISUAL_EMBED, language2));
-  return instructions;
-}
-
-// core/blocks/template-block.ts
-var FORMAT_HEADING_KEY = "ui.block_template_format_heading";
-function templateFormatHeading(language2) {
-  return translate(language2, FORMAT_HEADING_KEY);
-}
-var unify = (text11) => text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-var trimBlankLines = (lines) => {
-  let start = 0;
-  let end = lines.length;
-  while (start < end && !lines[start].trim()) start++;
-  while (end > start && !lines[end - 1].trim()) end--;
-  return lines.slice(start, end).join("\n");
-};
-function splitTemplateZones(text11) {
-  const lines = unify(text11).split("\n");
-  const code = fencedLines(lines);
-  const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
-  const separatorLines = [];
-  lines.forEach((line, index) => {
-    if (code[index]) return;
-    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line);
-    if (heading && names3.has(heading[1])) separatorLines.push(index + 1);
-  });
-  if (!separatorLines.length) return { sections: lines.join("\n"), format: void 0, separatorLines };
-  const first = separatorLines[0] - 1;
-  return {
-    sections: lines.slice(0, first).join("\n"),
-    format: trimBlankLines(lines.slice(first + 1)),
-    separatorLines
-  };
-}
-function parseTemplateBlock(text11, options) {
-  var _a2;
-  const zones = splitTemplateZones(text11);
-  if (zones.separatorLines.length > 1) {
-    const line = zones.separatorLines[1];
-    return {
-      ok: false,
-      issues: [
-        {
-          line,
-          code: "format_heading_repeated",
-          values: [line],
-          message: `Line ${line}: the format rules heading appears a second time.`
-        }
-      ]
-    };
-  }
-  const parsed = parseNoteStyleFile(zones.sections, options);
-  if (!parsed.ok) return parsed;
-  const { template: template2, intro } = parsed.style;
-  return {
-    ok: true,
-    template: { ...template2, layout: "sections", intro: "" },
-    lead: intro,
-    format: (_a2 = zones.format) != null ? _a2 : ""
-  };
-}
-
-// core/blocks/template/standard.zh-TW.md
-var standard_zh_TW_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/blocks/template/standard.zh-CN.md
-var standard_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/blocks/template/standard.en.md
-var standard_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
-
-// core/blocks/template/textbook.zh-TW.md
-var textbook_zh_TW_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/blocks/template/textbook.zh-CN.md
-var textbook_zh_CN_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/blocks/template/textbook.en.md
-var textbook_en_default3 = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/blocks/builtin.ts
-var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
-var tone = (id, nameKey) => ({
-  category: "tone",
-  id,
-  nameKey,
-  body: (language2) => {
-    var _a2, _b2;
-    return id === "academic" ? "" : (_b2 = (_a2 = builtinPresets(language2, "tone").find((preset) => preset.id === id)) == null ? void 0 : _a2.text) != null ? _b2 : "";
-  }
-});
-function fileFor(files, language2) {
-  const own2 = files[language2];
-  if (own2 !== void 0) return own2;
-  const match = CANONICAL_LANGUAGES.find((item) => instructionLanguageOf(item) === instructionLanguageOf(language2));
-  return files[match != null ? match : CANONICAL_LANGUAGES[0]];
-}
-var template = (id, nameKey, files) => {
-  const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language2, index) => [language2, files[index]]));
-  return {
-    category: "template",
-    id,
-    nameKey,
-    body: (language2) => strip2(fileFor(table, language2)),
-    sections: (language2) => strip2(fileFor(table, language2)),
-    format: (language2) => inLanguage(OBSIDIAN_FORMAT, language2)
-  };
-};
-function builtinTemplateText(id, language2) {
-  var _a2, _b2;
-  const block = findBuiltinBlock("template", id);
-  return `${(_a2 = block.sections) == null ? void 0 : _a2.call(block, language2)}
-
-# ${templateFormatHeading(language2)}
-
-${(_b2 = block.format) == null ? void 0 : _b2.call(block, language2)}`;
-}
-var BUILTIN_BLOCKS = [
-  template("standard", "ui.note_style_standard_short", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
-  template("textbook", "ui.note_style_textbook_short", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
-  tone("academic", "ui.preset_name_academic"),
-  tone("plain", "ui.preset_name_plain"),
-  tone("magazine", "ui.preset_name_magazine"),
-  tone("summary", "ui.preset_name_summary"),
-  tone("guide", "ui.preset_name_guide"),
-  tone("auto", "ui.preset_name_auto")
-];
-function findBuiltinBlock(category, id) {
-  const block = BUILTIN_BLOCKS.find((item) => item.category === category && item.id === id);
-  if (!block) throw new Error(`Unknown built-in block: ${category}/${id}`);
-  return block;
-}
-function lookupBuiltinBlock(category, id, language2) {
-  return findBuiltinBlock(category, id).body(language2);
-}
-
-// core/steps/task/assemble.ts
-var CUSTOM_LEGACY_TONE = "custom-legacy";
-var DEFAULT_TONE = "academic";
-var TONE_MARKER = "\0tone\0";
-function promptStepOf(context) {
-  if (isQuickTask(context)) return "quick";
-  switch (context.mode) {
-    case "task":
-      return "research";
-    case "decompose":
-    case "synthesize":
-    case "merge":
-      return context.mode;
-    default:
-      return "default";
-  }
-}
-function selectionFromContext(context, language2) {
-  var _a2, _b2;
-  const templateId = (_b2 = (_a2 = context.detailTemplate) == null ? void 0 : _a2.id) != null ? _b2 : standardTemplate(noteLanguageOf(language2)).id;
-  const toneText = context.toneText;
-  const builtinTone = toneText ? ["plain", "magazine", "summary", "guide", "auto"].find(
-    (id) => lookupBuiltinBlock("tone", id, language2) === toneText
-  ) : void 0;
-  return {
-    template: {
-      id: templateId,
-      ...context.detailFormat === "adaptive" ? { adaptive: true } : {},
-      ...context.noteStyle ? { legacyPreferences: context.noteStyle } : {}
-    },
-    tone: !toneText ? { id: DEFAULT_TONE } : builtinTone ? { id: builtinTone } : { id: CUSTOM_LEGACY_TONE, body: toneText }
-  };
-}
-var headingOf = (name) => `### ${name}`;
-var descriptionRule = (section3, language2) => ({
-  text: section3.description.trim(),
-  rule: customDetailRule("description", language2, {
-    heading: headingOf(section3.name),
-    description: section3.description.trim()
-  })
-});
-var describedSections = (template2, language2) => template2.sections.filter((section3) => section3.description.trim()).map((section3) => descriptionRule(section3, language2));
-function leadStructure(template2, lead, language2, anchor) {
-  var _a2;
-  const rules = [];
-  for (const section3 of template2.sections) {
-    const heading = headingOf(section3.name);
-    if (section3.role === "log") rules.push(customDetailRule("log", language2, { heading }));
-    if (section3.description.trim()) rules.push(descriptionRule(section3, language2).rule);
-    if (section3.count)
-      rules.push(customDetailRule(section3.count.mode, language2, { heading, n: String(section3.count.n) }));
-    for (const callout of (_a2 = section3.callouts) != null ? _a2 : [])
-      rules.push(
-        customDetailCallout(language2, {
-          heading,
-          type: callout.type,
-          fold: callout.fold,
-          body: callout.body.replace(/\s*\n\s*/g, " ").trim()
-        })
-      );
-  }
-  const structure2 = customDetailStructure(language2, {
-    count: String(template2.sections.length),
-    headings: template2.sections.map((section3) => headingOf(section3.name)).join(", "),
-    rules: rules.length ? `
-${rules.join("\n")}` : ""
-  });
-  const verbatim = headingsVerbatim(language2, void 0, !isBuiltinTemplateId(template2.id), anchor);
-  return {
-    sections: [lead, structure2, verbatim].filter(Boolean).join("\n"),
-    owned: [{ text: lead }, ...describedSections(template2, language2)]
-  };
-}
-function templateParts(selection, context, language2, topicAnchor, options) {
-  var _a2, _b2, _c, _d, _e, _f, _g;
-  const { id } = selection.template;
-  const legacy = ((_a2 = context.detailTemplate) == null ? void 0 : _a2.id) === id;
-  const body = (_d = selection.template.body) != null ? _d : (_c = (_b2 = options.blocks) == null ? void 0 : _b2[`template/${id}`]) == null ? void 0 : _c.call(_b2, language2);
-  const builtin = legacy || body !== void 0 ? BUILTIN_BLOCKS.find((block) => block.category === "template" && block.id === id) : findBuiltinBlock("template", id);
-  const unmodified = body === void 0 || builtin !== void 0 && normalizeStyleContent(body) === normalizeStyleContent(builtinTemplateText(id, language2));
-  const structure2 = (template3) => detailStructurePrompt(template3, language2, (headings) => detailStructure(language2, headings), topicAnchor);
-  if (unmodified) {
-    const today = (_e = context.detailTemplate) != null ? _e : (id === "textbook" ? textbookTemplate : standardTemplate)(noteLanguageOf(language2));
-    const owned = describedSections(today, language2);
-    if (today.id === TEXTBOOK_TEMPLATE_ID && today.layout !== "intro") {
-      const log = (_f = today.sections.find((section3) => section3.role === "log")) != null ? _f : today.sections[today.sections.length - 1];
-      owned.unshift({
-        text: textbookDetailStructure(language2, {
-          headings: today.sections.map((section3) => headingOf(section3.name)).join(", "),
-          log: headingOf(log.name)
-        })
-      });
-    }
-    return { sections: structure2(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language2), issues: [] };
-  }
-  const parsed = parseTemplateBlock(body, { id, name: id });
-  if (!parsed.ok) {
-    const issues = parsed.issues.map((issue2) => ({
-      ...issue2,
-      category: "template",
-      id,
-      ...selection.template.fileName ? { fileName: selection.template.fileName } : {}
-    }));
-    const fallbackId = BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id) ? id : STANDARD_TEMPLATE_ID;
-    const { body: _body, fileName: _fileName, ...choice2 } = selection.template;
-    const detailTemplate = ((_g = context.detailTemplate) == null ? void 0 : _g.id) === id && fallbackId !== id ? void 0 : context.detailTemplate;
-    const fallback = templateParts(
-      { ...selection, template: { ...choice2, id: fallbackId } },
-      { ...context, detailTemplate },
-      language2,
-      topicAnchor,
-      {}
-    );
-    return { ...fallback, issues };
-  }
-  if (parsed.lead)
-    return {
-      ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor),
-      format: parsed.format,
-      issues: []
-    };
-  const template2 = parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
-  return {
-    sections: structure2(template2),
-    owned: describedSections(template2, language2),
-    format: parsed.format,
-    issues: []
-  };
-}
-var formatText = (parts, selection, language2) => parts.format ? applyFormatPreferences(parts.format, language2, selection.template.legacyPreferences) : "";
-var CHART_BLOCK = "```mermaid";
-function chartsWanted(selection, context, language2, options = {}) {
-  const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection, language2);
-}
-function partsAskForCharts(parts, selection, language2) {
-  const sections = selection.template.adaptive ? "" : parts.sections;
-  return sections.includes(CHART_BLOCK) || formatText(parts, selection, language2).includes(CHART_BLOCK);
-}
-var fixed = (text11, id) => [text11, { kind: "fixed", id }];
-var input = (text11, id) => [text11, { kind: "input", id }];
-function assembleTaskPrompt(selection, step, context, language2, provider = "codex", options = {}) {
-  var _a2;
-  const bodyOf = (category, id) => {
-    var _a3, _b2, _c;
-    findBuiltinBlock(category, id);
-    return (_c = (_b2 = (_a3 = options.blocks) == null ? void 0 : _a3[`${category}/${id}`]) == null ? void 0 : _b2.call(_a3, language2)) != null ? _c : lookupBuiltinBlock(category, id, language2);
-  };
-  const modeFragment = step === "research" || step === "quick" && context.mode === "task" ? GENERAL_TASK : step === "decompose" ? DECOMPOSE : step === "synthesize" ? SYNTHESIZE : step === "merge" ? MERGE : DEFAULT_TASK;
-  const quick = step === "quick";
-  const none = inLanguage(NONE, language2);
-  const topicAnchor = { kind: "topic", text: context.title };
-  const parts = templateParts(selection, context, language2, topicAnchor, options);
-  const elements = [];
-  const add = (...pieces) => elements.push(pieces);
-  add(fixed(outputLanguage(language2, topicAnchor), "output-language"));
-  add(fixed(inLanguage(quick ? ROLE_QUICK : ROLE, language2), "role"));
-  add(fixed(inLanguage(quick ? SOURCE_SAFETY_QUICK : SOURCE_SAFETY, language2), "source-safety"));
-  add(fixed(context.sourceContext ? inLanguage(REFERENCE_CITATIONS, language2) : "", "reference-citations"));
-  add(
-    fixed(
-      context.sourceContext && context.researchMode !== "local" ? inLanguage(LOCAL_FIRST, language2) : "",
-      "local-first"
-    )
-  );
-  add(fixed(withProviderOutput(inLanguage(JSON_CONTRACT, language2), provider, language2), "json-contract"));
-  {
-    const body = (_a2 = selection.tone.body) != null ? _a2 : bodyOf("tone", selection.tone.id);
-    if (body) {
-      const block = { kind: "block", category: "tone", id: selection.tone.id };
-      const [before, after] = toneBlock(TONE_MARKER, language2).split(TONE_MARKER);
-      add(fixed(before != null ? before : "", "tone-rule"), [body, block], fixed(after != null ? after : "", "tone-rule"));
-    }
-  }
-  add(fixed(inLanguage(modeFragment, language2), "step"));
-  if (step === "decompose") add(fixed("", "template"));
-  else {
-    const pieces = [];
-    if (selection.template.adaptive)
-      pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
-    else pieces.push(sectionPieces(parts, selection.template.id));
-    if (readerFacingDetail(context) && step !== "merge") {
-      const text11 = formatText(parts, selection, language2);
-      if (text11)
-        pieces.push([[text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
-    }
-    add(...withSeparators(pieces));
-  }
-  add(fixed(quick ? quickGuidance(context, language2) : researchGuidance(context, language2), "research-guidance"));
-  for (const guidance of visualGuidance(context, language2)) add(fixed(guidance, "visual-guidance"));
-  add(input(`${inLanguage(LABEL_TOPIC, language2)}:
-${context.title}`, "topic"));
-  add(input(`${inLanguage(LABEL_SUMMARY, language2)}:
-${context.summary}`, "summary"));
-  add(input(step !== "decompose" ? `${inLanguage(LABEL_DETAIL, language2)}:
-${context.detail || none}` : "", "detail"));
-  add(input(`${inLanguage(LABEL_RULES, language2)}:
-${context.rules || none}`, "rules"));
-  add(
-    input(
-      context.workingFindings ? `${inLanguage(LABEL_FINDINGS, language2)}:
-${context.workingFindings}` : "",
-      "findings"
-    )
-  );
-  add(
-    input(context.sourceContext ? `${inLanguage(LABEL_SOURCES, language2)}:
-${context.sourceContext}` : "", "sources")
-  );
-  if (context.userTexts) add(input(`${inLanguage(LABEL_USER_TEXT, language2)}:
-${context.userTexts}`, "user-texts"));
-  if (context.summaryDirections)
-    add(input(`${inLanguage(LABEL_SUMMARY_DIRECTION, language2)}:
-${context.summaryDirections}`, "summary-directions"));
-  add(input(`${inLanguage(LABEL_ANCESTORS, language2)}:
-${context.ancestors || none}`, "ancestors"));
-  add(input(`${inLanguage(LABEL_TASK, language2)}:
-${context.task}`, "task"));
-  const segments = [];
-  elements.forEach((pieces, index) => {
-    if (index > 0) segments.push({ text: "\n\n", source: { kind: "separator" } });
-    for (const [text11, source] of pieces) if (text11) segments.push({ text: text11, source });
-  });
-  return {
-    text: segments.map((segment) => segment.text).join(""),
-    segments,
-    charts: partsAskForCharts(parts, selection, language2),
-    // The decompose step carries no template, so a template that could not be read changes nothing there.
-    issues: step === "decompose" ? [] : parts.issues
-  };
-}
-function sectionPieces(parts, id) {
-  var _a2;
-  const text11 = parts.sections;
-  const block = (part) => [part, { kind: "block", category: "template", id, part: "sections" }];
-  const pieces = [];
-  let cursor = 0;
-  for (const item of parts.owned) {
-    if (!item.text) continue;
-    const at = text11.indexOf((_a2 = item.rule) != null ? _a2 : item.text, cursor);
-    if (at < 0) continue;
-    const start = item.rule ? at + item.rule.lastIndexOf(item.text) : at;
-    if (start > cursor) pieces.push(fixed(text11.slice(cursor, start), "detail-structure"));
-    pieces.push(block(item.text));
-    cursor = start + item.text.length;
-  }
-  if (!pieces.length) return [block(text11)];
-  if (cursor < text11.length) pieces.push(fixed(text11.slice(cursor), "detail-structure"));
-  return pieces;
-}
-function withSeparators(groups) {
-  return groups.flatMap((group, index) => index > 0 ? [["\n\n", { kind: "separator" }], ...group] : group);
-}
-
-// core/steps/task/render.ts
-function readerFacingDetail(context) {
-  return context.promptProfile === "aim" ? readerFacingAimPhase(aimPhase(context.task)) : context.mode !== "decompose" && !context.intermediateDetail;
-}
-function isQuickTask(context) {
-  var _a2;
-  return context.mapAiMode === "quick" && context.researchMode === "local" && ((_a2 = context.mode) != null ? _a2 : "task") === "task" && context.promptProfile !== "aim" && !context.countRepair && !context.intermediateDetail;
-}
-function quickGuidance(context, language2) {
-  const depth = translate(
-    language2,
-    context.researchDepth === "fast" ? "research.fast" : context.researchDepth === "deep" ? "research.deep" : "research.normal"
-  );
-  return `${depth} ${quickKnowledge(language2)}`;
-}
-function assembledTaskPrompt(context, language2, provider = "codex") {
-  var _a2;
-  const selection = (_a2 = context.styleSelection) != null ? _a2 : selectionFromContext(context, language2);
-  return assembleTaskPrompt(selection, promptStepOf(context), context, language2, provider);
-}
-function generalTaskPrompt(context, language2, provider = "codex") {
-  return assembledTaskPrompt(context, language2, provider).text;
-}
-function taskPrompt(context, language2, provider = "codex") {
-  return context.promptProfile === "aim" ? buildAimPrompt(context, language2, provider) : generalTaskPrompt(context, language2, provider);
 }
 
 // core/steps/task/step.ts
@@ -63368,23 +63748,23 @@ function allowedUrl(tag, name, value) {
   return false;
 }
 function cssIsInert(css) {
-  const lower2 = css.toLowerCase();
-  if (lower2.includes("@import") || lower2.includes("expression(") || lower2.includes("javascript:")) return false;
-  if (lower2.includes("behavior:") || lower2.includes("-moz-binding")) return false;
-  for (const match of lower2.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
+  const lower3 = css.toLowerCase();
+  if (lower3.includes("@import") || lower3.includes("expression(") || lower3.includes("javascript:")) return false;
+  if (lower3.includes("behavior:") || lower3.includes("-moz-binding")) return false;
+  for (const match of lower3.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
     if (!match[2].trim().startsWith("#")) return false;
-  return !FORBIDDEN_SCHEMES.test(lower2);
+  return !FORBIDDEN_SCHEMES.test(lower3);
 }
 function scrubAttributes(element, tag, report) {
   var _a2;
   for (const name of element.getAttributeNames()) {
-    const lower2 = name.toLowerCase();
+    const lower3 = name.toLowerCase();
     const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
     let drop = false;
-    if (lower2.startsWith("on") || lower2 === "srcdoc") drop = true;
-    else if (lower2.startsWith("data-") && !lower2.startsWith("data-callout")) drop = true;
-    else if (URL_ATTRIBUTES.has(lower2)) drop = !allowedUrl(tag, lower2, value);
-    else if (lower2 === "style") drop = !cssIsInert(value);
+    if (lower3.startsWith("on") || lower3 === "srcdoc") drop = true;
+    else if (lower3.startsWith("data-") && !lower3.startsWith("data-callout")) drop = true;
+    else if (URL_ATTRIBUTES.has(lower3)) drop = !allowedUrl(tag, lower3, value);
+    else if (lower3 === "style") drop = !cssIsInert(value);
     else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
     if (drop) {
       element.removeAttribute(name);
@@ -68664,6 +69044,8 @@ function settingsFromSaved(saved) {
     promptPresets: normalizePresets(saved == null ? void 0 : saved.promptPresets),
     defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
     ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
+    ...typeof (saved == null ? void 0 : saved.noteTemplateBlock) === "string" && saved.noteTemplateBlock ? { noteTemplateBlock: saved.noteTemplateBlock } : {},
+    ...typeof (saved == null ? void 0 : saved.noteToneBlock) === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
     ...(saved == null ? void 0 : saved.noteStyleFiles) && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles) ? {
       noteStyleFiles: Object.fromEntries(

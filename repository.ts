@@ -129,6 +129,10 @@ export interface Settings {
   defaultDetailTemplateId?: string;
   /** Workspace default note style: `style:<file name>`, an old template id, or a built-in style id. Absent = defaultDetailTemplateId. */
   defaultNoteStyleId?: string;
+  /** Workspace default template block: `builtin:<id>` or `file:<name>` (a file in the Templates block folder). Absent = the old default above. */
+  noteTemplateBlock?: string;
+  /** Workspace default tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the tone of the old default. */
+  noteToneBlock?: string;
   /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */

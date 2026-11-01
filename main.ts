@@ -147,6 +147,10 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     ...(typeof saved?.defaultNoteStyleId === "string" && saved.defaultNoteStyleId
       ? { defaultNoteStyleId: saved.defaultNoteStyleId }
       : {}),
+    ...(typeof saved?.noteTemplateBlock === "string" && saved.noteTemplateBlock
+      ? { noteTemplateBlock: saved.noteTemplateBlock }
+      : {}),
+    ...(typeof saved?.noteToneBlock === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
       : {}),

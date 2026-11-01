@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 function load(entry, overrides = {}, globals = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout, ...globals });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, URL, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout, ...globals });
   return module.exports;
 }
 
@@ -22,7 +22,7 @@ function load(entry, overrides = {}, globals = {}) {
 function loadSource(contents, overrides = {}) {
   const code = buildSync({ stdin: { contents, resolveDir: root, loader: 'ts', sourcefile: 'support-replay-entry.ts' }, external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout });
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console: Object.assign(Object.create(console), { debug() {} }), TextDecoder, URL, crypto: crypto.webcrypto, process, AbortController, DOMException, setTimeout, clearTimeout });
   return module.exports;
 }
 

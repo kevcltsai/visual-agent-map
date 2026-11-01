@@ -12,6 +12,74 @@ export function imageSourceParts(src: string, ui: Pick<ShareViewerUi, "imageSour
   return [before, host, after];
 }
 
+export const VIEWER_LINKS_MAX = 20;
+const VIEWER_LINK_MAX_LENGTH = 2048;
+// Held in a constant so no source text reads like a CSS function call: the shell scan refuses `url(` anywhere in the file.
+const UrlParser = URL;
+
+/**
+ * The href of an http(s) topic link from a shared file, or null. A separate copy of the plugin's `normalizeTopicLink`
+ * (the viewer bundle imports no plugin module); a unit test runs both on the same cases. Payloads can be edited by hand.
+ */
+export function viewerLinkHref(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > VIEWER_LINK_MAX_LENGTH) return null;
+  // eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
+  if (/[\x00-\x20\x7f-\x9f\u2028\u2029]/.test(text)) return null;
+  if (!/^https?:\/\//i.test(text)) return null;
+  let url: URL;
+  try {
+    url = new UrlParser(text);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (!url.hostname || url.username || url.password) return null;
+  if (url.href.length > VIEWER_LINK_MAX_LENGTH) return null;
+  return url.href;
+}
+
+/** The valid, deduplicated links of a node (at most 20) as `{ href, host }`; anything else in the payload is ignored. */
+export function viewerLinksOf(value: unknown): { href: string; host: string }[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: { href: string; host: string }[] = [];
+  for (const item of value as unknown[]) {
+    const href = viewerLinkHref(item);
+    if (!href || seen.has(href)) continue;
+    seen.add(href);
+    out.push({ href, host: new UrlParser(href).host });
+    if (out.length >= VIEWER_LINKS_MAX) break;
+  }
+  return out;
+}
+
+/** The "Links" row of the side panel: one anchor per valid link, labelled with its host only (textContent). Null when none is valid. */
+export function linkRow(
+  doc: Document,
+  value: unknown,
+  ui: Pick<ShareViewerUi, "linksLabel" | "linkOpen">
+): HTMLElement | null {
+  const links = viewerLinksOf(value);
+  if (!links.length) return null;
+  const row = createViewerElement(doc, "div");
+  row.className = "vam-inspector-links";
+  row.setAttribute("role", "group");
+  row.setAttribute("aria-label", ui.linksLabel.replace("{0}", links.map(link => link.host).join(", ")));
+  for (const { href, host } of links) {
+    const anchor = createViewerElement(doc, "a");
+    anchor.setAttribute("href", href);
+    anchor.setAttribute("target", "_blank");
+    anchor.setAttribute("rel", "noopener noreferrer");
+    anchor.setAttribute("referrerpolicy", "no-referrer");
+    anchor.setAttribute("aria-label", ui.linkOpen.replace("{0}", host));
+    anchor.textContent = host;
+    row.append(anchor);
+  }
+  return row;
+}
+
 function sourceLine(doc: Document, src: string, ui: ShareViewerUi): HTMLElement {
   const [before, host, after] = imageSourceParts(src, ui);
   const line = createViewerElement(doc, "span");

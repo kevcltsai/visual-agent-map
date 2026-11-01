@@ -1,0 +1,46 @@
+import { parseYaml } from "obsidian";
+
+export function frontmatter(content: string): Record<string, unknown> {
+  const yaml = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+  return yaml ? ((parseYaml(yaml) ?? {}) as Record<string, unknown>) : {};
+}
+
+/** A frontmatter value the relevance writers set: a string, a list of strings, true, or null to remove the key. */
+type FrontmatterValue = string | string[] | boolean | null;
+/**
+ * Sets or removes top-level frontmatter keys and leaves every other line, and the body, exactly as it was. A key that
+ * is already there keeps its place; new keys go at the end. Strings are written as JSON strings, which are valid YAML
+ * double-quoted scalars.
+ */
+export function setFrontmatterKeys(content: string, values: Record<string, FrontmatterValue>): string {
+  const eol = content.includes("\r\n") ? "\r\n" : "\n";
+  const render = (key: string, value: string | string[] | boolean): string[] =>
+    typeof value === "boolean"
+      ? [`${key}: ${value}`]
+      : Array.isArray(value)
+        ? [`${key}:`, ...value.map(item => `  - ${JSON.stringify(item)}`)]
+        : [`${key}: ${JSON.stringify(value)}`];
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?=\r?\n|$)/.exec(content);
+  if (!match) {
+    const lines = Object.entries(values).flatMap(([key, value]) => (value === null ? [] : render(key, value)));
+    return lines.length ? `---${eol}${lines.join(eol)}${eol}---${eol}${content}` : content;
+  }
+  const kept: string[] = [];
+  const written = new Set<string>();
+  let skipping = false;
+  for (const line of match[1].split(/\r?\n/)) {
+    const key = /^([A-Za-z][\w-]*):/.exec(line)?.[1];
+    if (key) {
+      skipping = Object.keys(values).includes(key);
+      if (skipping && !written.has(key)) {
+        written.add(key);
+        const value = values[key];
+        if (value !== null) kept.push(...render(key, value));
+      }
+    } else if (skipping && !/^\s+|^-(\s|$)/.test(line) && line !== "") skipping = false;
+    if (!skipping) kept.push(line);
+  }
+  for (const [key, value] of Object.entries(values))
+    if (!written.has(key) && value !== null) kept.push(...render(key, value));
+  return `---${eol}${kept.join(eol)}${eol}---${content.slice(match[0].length)}`;
+}

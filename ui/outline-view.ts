@@ -2,6 +2,7 @@ import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { toSimplifiedFold } from "../i18n/han-fold";
 import type { MapDocument, MapNode } from "../map-model";
+import { readTopicLinks } from "../topic-links";
 import { markerLabelKey, markerSymbol, readTopicMarkers, type TopicMarker } from "../topic-markers";
 import type { CoffeeNavigationSnapshot } from "../experiences/coffee-tables/segments";
 
@@ -13,6 +14,7 @@ export class OutlineView extends ItemView {
   private map: MapDocument | null = null;
   private titles = new Map<string, string>();
   private markers = new Map<string, TopicMarker[]>();
+  private links = new Map<string, string[]>();
   private collapsed = new Set<string>();
   private query = "";
   private activePath = "";
@@ -43,7 +45,8 @@ export class OutlineView extends ItemView {
     map: MapDocument | null,
     titles: Map<string, string>,
     sample = false,
-    markers: Map<string, TopicMarker[]> = new Map()
+    markers: Map<string, TopicMarker[]> = new Map(),
+    links: Map<string, string[]> = new Map()
   ): void {
     const search = this.contentEl.querySelector<HTMLInputElement>(".vam-outline-search");
     const restoreFocus = !!search && search === document.activeElement;
@@ -52,6 +55,7 @@ export class OutlineView extends ItemView {
     this.sample = sample;
     this.titles = titles;
     this.markers = markers;
+    this.links = links;
     if (map) this.collapsed = new Set([...this.collapsed].filter(id => map.nodes.some(node => node.id === id)));
     this.render();
     if (restoreFocus) {
@@ -215,6 +219,17 @@ export class OutlineView extends ItemView {
           const mark = row.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           mark.dataset.marker = id;
         }
+      }
+      // A row with links shows a quiet arrow (decoration); the count joins the accessible name. The outline never opens a link.
+      const linkCount = readTopicLinks({ "topic-links": this.links.get(node.id) }).length;
+      if (linkCount) {
+        const listSeparator = t("ui.list_separator");
+        const base = button.getAttr("aria-label") ?? title;
+        button.setAttr(
+          "aria-label",
+          `${base}${listSeparator === "、" ? "，" : ", "}${t("ui.outline_links_0", String(linkCount))}`
+        );
+        button.createSpan({ cls: "vam-outline-links", text: "↗", attr: { "aria-hidden": "true" } });
       }
       if (node.path === this.activePath) {
         button.addClass("is-active");

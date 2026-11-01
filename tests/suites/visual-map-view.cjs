@@ -966,7 +966,7 @@ integrationTest('structure panel: choosing a parent moves the topic at once and 
   const nodes = [{ id: 'a', path: 'A.md', parentId: null, x: 80, y: 80 }, { id: 'b', path: 'B.md', parentId: null, x: 80, y: 400 }, { id: 'c', path: 'C.md', parentId: 'a', x: 400, y: 80 }];
   const changes = []; let closed = 0, removed = 0, merging = false;
   const view = {
-    renderHypothesisSection() {}, renderMarkerSection() {}, renderColorSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
+    renderHypothesisSection() {}, renderMarkerSection() {}, renderLinkSection() {}, renderColorSection() {}, renderCoverSection() {}, renderBranchLayoutSection() {}, renderAddSubtopic() {},
     cardHeightOf: () => 100, arrangeBranch: VisualAgentMapView.prototype.arrangeBranch,
     builtIn: false, map: { nodes }, notes: new Map([['a', { title: 'Heat' }], ['b', { title: 'Water' }], ['c', { title: 'Pan', sourcePaths: [] }]]),
     app: { vault: { getAbstractFileByPath: () => null } }, referenceSourcePaths: () => [],
@@ -2041,15 +2041,15 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
 const heNotes = (list) => new Map(list.map(([id, extra]) => [id, { title: id.toUpperCase(), summary: '', status: 'completed', ...extra }]));
 const heHyp = (strength) => ({ topicKind: 'hypothesis', ...(strength ? { hypothesisStrength: strength } : {}) });
 // The shared DOM stand-in has a read-only textContent; labelCard writes it.
-const hePatch = el => { Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); }; el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
+const hePatch = el => { el.matches ??= () => false; Object.defineProperty(el, 'textContent', { configurable: true, get() { return this.text; }, set(v) { this.text = String(v); } }); el.appendChild = function (child) { return this.insertBefore(child, null); }; el.replaceWith = function (node) { const at = (node.remove(), this.parent.children.indexOf(this)); node.parent = this.parent; this.parent.children.splice(at, 1, node); }; el.after = function (node) { node.remove(); const at = this.parent.children.indexOf(this); this.parent.insertBefore(node, this.parent.children[at + 1] ?? null); }; const child = el.child; el.child = function (...args) { return hePatch(child.apply(this, args)); }; return el; };
 function heFixture(options = {}) {
-  const modals = [], notices = [], menus = [], logs = [], undone = [];
+  const modals = [], notices = [], menus = [], logs = [], undone = [], opened = [];
   const Modal = class { constructor(app, ...args) { this.app = app; this.args = args; } open() { modals.push(this); } close() {} };
   const Notice = class { constructor(message) { notices.push(message); } };
   const Menu = class { constructor() { menus.push(this); this.titles = []; } addItem(cb) { const entry = { setTitle: t => { this.titles.push(t); return entry; }, setIcon: () => entry, onClick: fn => { (this.clicks ??= []).push(fn); return entry; } }; cb(entry); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } };
   const svgCreated = [];
   const createSvg = tag => { const el = { tag, attrs: {}, classes: [], children: [], get textContent() { return this.text; }, set textContent(v) { this.text = String(v); this.children = []; }, setAttribute(n, v) { this.attrs[n] = v; }, addClass(n) { this.classes.push(n); }, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); }, listeners: {}, addEventListener(type, fn) { (this.listeners[type] ??= []).push(fn); }, fire(type, event = {}) { for (const fn of this.listeners[type] ?? []) fn(event); }, appendChild(c) { this.children.push(c); } }; svgCreated.push(el); return el; };
-  const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  const { VisualAgentMapView } = options.shared ?? load('main.ts', { obsidian: { ...obsidian, Modal, Notice, Menu } }, { createSvg, CSS: { escape: v => String(v) }, requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {}, open: (...args) => { opened.push(args); } });
   const topics = options.topics ?? [node('fact'), node('hyp'), node('other')];
   const doc = { ...map(topics), ...(options.aim ? { aim: { mode: 'x' } } : {}), ...(options.relations ? { topicRelations: options.relations } : {}) };
   const plugin = { pendingSuggestions: new Map(), expansionBatches: new Map(), logs: { appendLog: (level, message) => logs.push([level, message]) }, repo: { writeHypothesisStrength: async (path, strength) => undone.push([path, strength]) }, detailsShown: () => false, setOutlineActive() {}, settings: { ...DEFAULT_SETTINGS } };
@@ -2057,7 +2057,7 @@ function heFixture(options = {}) {
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.app = { vault: { getAbstractFileByPath: () => null }, metadataCache: { getFileCache: () => null } }; view.path = 'Map.md'; view.map = doc; view.builtIn = !!options.builtIn;
   view.notes = options.notes ?? heNotes([['fact', {}], ['hyp', heHyp('weak')], ['other', {}]]);
-  return { VisualAgentMapView, view, doc, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
+  return { VisualAgentMapView, view, doc, opened, modals, notices, menus, logs, svgCreated, writes: undone, Notice };
 }
 const heDrawn = (view, boxes) => {
   view.cardEls = new Map(Object.entries(boxes).map(([id, [x, y]]) => [id, { offsetLeft: x, offsetTop: y, offsetWidth: 280, offsetHeight: 100, classes: [], setAttr() {}, toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); } }]));
@@ -3236,9 +3236,9 @@ const heRuleBody = (css, selector) => { const hit = css.split('\n').find(line =>
 integrationTest('hypothesis-evidence: the dialog reads type, strength (hypothesis only), relations, then the parent topic, with the same heading class on each (C1, C2)', () => {
   const hyp = heDialog({}, 1);
   const headings = f => dom.findAll(f.content, c => (c.cls ?? '').split(/\s+/).includes('vam-section-heading'));
-  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Color', 'Topic cover', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the cover switch after the colour (decision 0.28-triage#36)');
+  assert.deepEqual(headings(hyp).map(c => c.text), ['Topic type', 'Strength', 'Relations', 'Markers', 'Links', 'Color', 'Topic cover', 'Parent topic'], 'the marker section sits after the relations (ticket 33), the colour section after the markers (ticket 37), the cover switch after the colour (decision 0.28-triage#36)');
   const plain = heDialog({}, 0);
-  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Color', 'Topic cover', 'Parent topic'], 'no strength for an ordinary topic');
+  assert.deepEqual(headings(plain).map(c => c.text), ['Topic type', 'Relations', 'Markers', 'Links', 'Color', 'Topic cover', 'Parent topic'], 'no strength for an ordinary topic');
   const order = dom.findAll(hyp.content, c => (c.cls ?? '').includes('vam-topic-kinds') || (c.cls ?? '').includes('vam-hypothesis-strengths') || (c.cls ?? '') === 'vam-relation-list' || (c.cls ?? '') === 'vam-topic-tree' || (c.cls ?? '') === 'vam-hint').map(c => c.cls.split(' ')[0]);
   assert.deepEqual(order.slice(0, 4), ['vam-topic-kinds', 'vam-hypothesis-strengths', 'vam-topic-tree', 'vam-hint'], 'type, strength, then the parent tree and its hint (the relations note is a different class)');
   const css = heCss();
@@ -3684,4 +3684,151 @@ integrationTest('topic-color: applying to a branch is one transaction that write
   assert.deepEqual(writes, [], 'choosing the colour it already has writes nothing'); assert.equal(pushed.length, count, 'and adds no history entry');
   await view.changeTopicColor(view.map.nodes.find(n => n.id === root.id), null, false);
   assert.doesNotMatch(contents.get(root.path), /topic-color/, 'clearing removes the key');
+});
+// Topic links (P2): card button, menu, panel section, undo and outline.
+integrationTest('topic-links: opening re-validates, refuses an unsafe href with a Notice, and opens a valid one without opener or referrer', () => {
+  {
+    const { view, notices, opened } = heFixture();
+    assert.equal(view.openTopicLink('https://example.com/a?b=1'), true);
+    assert.deepEqual(opened, [['https://example.com/a?b=1', '_blank', 'noopener,noreferrer']]);
+    for (const bad of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', ' javascript:1', 'data:text/html,x', 'file:///etc/passwd', 'obsidian://open', 'mailto:a@b.c', 'example.com', 'https://u:p@example.com', 42, null]) assert.equal(view.openTopicLink(bad), false, String(bad));
+    assert.equal(opened.length, 1, 'nothing else opened');
+    assert.equal(notices.length, 11);
+  }
+});
+integrationTest('topic-links: the card header shows a button whose label lists the hosts; one link opens directly, several open a keyboard menu', () => {
+  {
+    const f = heFixture({ notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', { links: ['https://a.example/x', 'https://b.example/y'] }], ['other', { links: ['javascript:alert(1)'] }]]) });
+    const { view, opened } = f;
+    view.stageEl = hePatch(dom.element('stage')); view.cardEls = new Map();
+    for (const n of view.map.nodes) view.renderNode(n);
+    const header = i => dom.find(view.stageEl.children[i], c => (c.cls ?? '').split(/\s+/).includes('vam-node-header'));
+    const button = i => dom.find(header(i), c => c.tag === 'button' && (c.cls ?? '').includes('vam-card-links'));
+    assert.equal(button(0).text, '↗'); assert.equal(button(0).attrs['aria-label'], 'Links: a.example');
+    assert.equal(button(1).text, '↗2'); assert.equal(button(1).attrs['aria-label'], 'Links: a.example, b.example');
+    assert.equal(button(2), undefined, 'an unsafe stored value shows nothing');
+    assert.equal(button(0).tabIndex, -1, 'out of the tab order until the card has focus (the focusin handler adds every card button)');
+    const card0 = view.stageEl.children[0]; card0.matches = q => q === ':focus-within'; view.paintCardLinks(card0, header(0), 'fact');
+    assert.equal(button(0).tabIndex, 0, 'repainted while the card is focused: stays reachable by Tab');
+    let stopped = 0;
+    button(0).fire('pointerdown', { stopPropagation() { stopped++; } }); assert.equal(stopped, 1, 'a press is not a card gesture');
+    button(0).click();
+    assert.deepEqual(opened, [['https://a.example/x', '_blank', 'noopener,noreferrer']]);
+    view.contentEl = hePatch(dom.element('content')); view.contentEl.getBoundingClientRect = () => ({ left: 0, top: 0 }); view.contentEl.ownerDocument = { addEventListener() {}, removeEventListener() {} };
+    button(1).getBoundingClientRect = () => ({ left: 5, bottom: 9 });
+    button(1).click();
+    const menu = dom.find(view.contentEl, c => (c.cls ?? '').includes('vam-topic-link-menu'));
+    assert.equal(menu.attrs.role, 'menu');
+    const items = dom.findAll(menu, c => c.tag === 'button');
+    assert.deepEqual(items.map(c => c.text), ['a.example', 'b.example']); assert.ok(items.every(c => c.attrs.role === 'menuitem'));
+    menu.fire('keydown', { key: 'Escape', target: items[0] });
+    assert.equal(view.topicLinkMenu, null, 'Escape closes the menu');
+    button(1).click(); dom.findAll(dom.find(view.contentEl, c => (c.cls ?? '').includes('vam-topic-link-menu')), c => c.tag === 'button')[1].click();
+    assert.deepEqual(opened.at(-1), ['https://b.example/y', '_blank', 'noopener,noreferrer']);
+  }
+});
+integrationTest('topic-links: the panel section lists and opens links in read-only cases, hides editing, and shows errors in an aria-live region', async () => {
+  {
+    for (const options of [{ builtIn: true }, { aim: true }, { integration: true }]) {
+      const f = heFixture({ ...options, notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', {}], ['other', {}]]) });
+      if (options.integration) f.view.integrationMode = true;
+      const panel = dom.element('panel'); f.view.renderLinkSection(panel, f.view.map.nodes[0]);
+      assert.equal(dom.findAll(panel, c => c.tag === 'input').length, 0, `no input ${JSON.stringify(options)}`);
+      assert.deepEqual(dom.findAll(panel, c => c.tag === 'button').map(b => b.attrs['aria-label']), ['Open a.example']);
+      f.view.beginMapTransaction = () => assert.fail('no transaction');
+      assert.equal(await f.view.changeTopicLinks(f.view.map.nodes[0], { add: 'https://z.example' }), null);
+      const bare = dom.element('panel'); f.view.renderLinkSection(bare, f.view.map.nodes[1]); assert.equal(bare.children.length, 0, 'nothing to show, nothing to edit');
+    }
+    const f = heFixture({ notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', {}], ['other', {}]]) });
+    const { view } = f; view.enqueue = work => work();
+    const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+    view.beginMapTransaction = () => tx; view.history = { push() {} }; view.refreshAfterSavedChange = async () => {};
+    const calls = [];
+    view.plugin.repo.writeTopicLinks = async (path, change) => { calls.push(change); const note = view.notes.get('fact'); if ('add' in change) { if (change.add === 'dup') return { ok: false, reason: 'duplicate' }; if (change.add === 'bad') return { ok: false, reason: 'invalid' }; note.links = [...note.links, change.add]; } else note.links = note.links.filter(h => h !== change.remove.href); return { ok: true, next: note.links }; };
+    const panel = dom.element('panel'); view.renderLinkSection(panel, view.map.nodes[0]);
+    const status = dom.find(panel, c => c.attrs['aria-live'] === 'polite');
+    const input = dom.find(panel, c => c.tag === 'input'); assert.equal(input.attrs['aria-label'], 'Add a link');
+    input.value = 'bad'; dom.findAll(panel, c => c.tag === 'button').find(b => b.text === 'Add').click(); await dom.tick();
+    assert.match(status.text, /http:\/\/ or https:\/\//); assert.equal(input.value, 'bad', 'the text stays so it can be fixed');
+    input.value = 'dup'; input.fire('keydown', { key: 'Enter' }); await dom.tick();
+    assert.equal(status.text, 'This link is already on the topic.');
+    input.value = 'https://b.example/'; dom.findAll(panel, c => c.tag === 'button').find(b => b.text === 'Add').click(); await dom.tick();
+    assert.equal(status.text, 'Link added.'); assert.equal(input.value, '');
+    assert.equal(dom.findAll(panel, c => (c.cls ?? '').includes('vam-topic-link-row')).length, 2);
+    dom.findAll(panel, c => c.tag === 'button').find(b => b.attrs['aria-label'] === 'Remove link a.example').click(); await dom.tick();
+    assert.equal(status.text, 'Link removed.'); assert.deepEqual(plain(calls.at(-1)), { remove: { href: 'https://a.example/x' } });
+  }
+});
+integrationTest('topic-links: a refused write leaves no undo step; the link menu takes focus again after the pointer click that opened it blurred it', async () => {
+  const f = heFixture({ notes: heNotes([['fact', { links: [] }], ['hyp', {}], ['other', {}]]) });
+  const { view } = f; const pushed = [];
+  const tx = { rewriteNote(p, write) { tx.write = write; tx.path = p; return tx; }, editMap() { return tx; }, async commit() { await tx.write(tx.path); return { undo() {}, redo() {} }; } };
+  view.beginMapTransaction = () => tx; view.history = { push: e => pushed.push(e) }; view.refreshAfterSavedChange = async () => {};
+  for (const reason of ['invalid', 'duplicate', 'too-many']) {
+    view.plugin.repo.writeTopicLinks = async () => ({ ok: false, reason });
+    assert.deepEqual({ ...(await view.changeTopicLinks(view.map.nodes[0], { add: 'x' })) }, { ok: false, reason });
+  }
+  assert.equal(pushed.length, 0, 'refused writes push no history');
+  view.plugin.repo.writeTopicLinks = async () => ({ ok: true, next: ['https://a.example/'] });
+  assert.equal((await view.changeTopicLinks(view.map.nodes[0], { add: 'https://a.example/' })).ok, true); assert.equal(pushed.length, 1);
+  // The menu: the app blurs focus after the click; a deferred focus puts it back on the first item.
+  const timers = [];
+  const { VisualAgentMapView } = load('main.ts', { obsidian }, { setTimeout: run => { timers.push(run); return timers.length; }, clearTimeout() {} });
+  const menuView = Object.create(VisualAgentMapView.prototype);
+  const doc = { activeElement: null, addEventListener() {}, removeEventListener() {} };
+  const focusable = () => ({ attrs: {}, listeners: {}, setAttr(n, v) { this.attrs[n] = v; }, addEventListener(n, fn) { this.listeners[n] = fn; }, focus() { doc.activeElement = this; }, remove() {}, contains(x) { return x === this || (this.kids ?? []).includes(x); }, getBoundingClientRect: () => ({ left: 0, top: 0, bottom: 0 }), style: {}, createEl() { const el = focusable(); (this.kids ??= []).push(el); return el; }, createDiv() { return focusable(); } });
+  menuView.contentEl = Object.assign(focusable(), { ownerDocument: doc });
+  menuView.linkHost = href => href; menuView.topicLinkMenu = null;
+  const trigger = focusable();
+  menuView.showTopicLinkMenu(trigger, ['https://a.example/', 'https://b.example/']);
+  const first = menuView.topicLinkMenu.menu.kids[0];
+  assert.equal(doc.activeElement, first, 'focus on the first item at once (keyboard open)');
+  doc.activeElement = { body: true };
+  assert.equal(timers.length, 1); timers[0]();
+  assert.equal(doc.activeElement, first, 'focus returns after the pointer blur');
+});
+integrationTest('topic-links: adding is one transaction; one undo restores the exact note text, redo reapplies it, and removing the last link drops the key', async () => {
+  const { fixture, DEFAULT_SETTINGS: settings } = require('../support.cjs');
+  const { begin } = load('experiences/visual-map/map-transaction.ts', { obsidian });
+  const { repo, contents } = fixture('en', { linkIndex: true });
+  repo.settings = { ...settings, language: 'en' };
+  const MAP = 'Agent Workspace/Topics/map-l/Map.md';
+  const doc = { id: 'map-l', title: 'l', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-l');
+  await repo.app.vault.create(MAP, core.serializeMap(doc));
+  const topic = await repo.createNote('Topic', 'gpt-6-luna', doc, MAP, 'workspace');
+  doc.nodes.push(topic); await repo.saveMap(MAP, doc);
+  const { view } = heFixture({ topics: [topic] });
+  const deps = { repo, rebuildDerivedData: async () => {}, onApplied() {}, checkConflict: async () => {} };
+  view.path = MAP; view.plugin.repo = repo; view.map = await repo.readMap(MAP); view.notes = new Map();
+  view.beginMapTransaction = () => begin(deps);
+  view.refreshAfterSavedChange = async () => { view.map = await repo.readMap(MAP); for (const n of view.map.nodes) view.notes.set(n.id, await repo.readNote(n.path, view.map)); };
+  const pushed = []; view.history = { push: entry => pushed.push(entry) };
+  await view.refreshAfterSavedChange();
+  const before = contents.get(topic.path), at = () => view.map.nodes[0];
+  const result = await view.changeTopicLinks(at(), { add: 'https://example.com/p' });
+  assert.equal(result.ok, true); assert.equal(pushed.length, 1);
+  assert.deepEqual(plain(view.notes.get(at().id).links), ['https://example.com/p']); assert.match(contents.get(topic.path), /topic-links/);
+  await pushed[0].undo(); assert.equal(contents.get(topic.path), before, 'one undo gives back the exact note text');
+  await pushed[0].redo(); assert.match(contents.get(topic.path), /https:\/\/example\.com\/p/);
+  await view.refreshAfterSavedChange();
+  assert.equal((await view.changeTopicLinks(at(), { add: 'javascript:alert(1)' })).ok, false);
+  assert.doesNotMatch(contents.get(topic.path), /javascript/);
+  await view.changeTopicLinks(at(), { remove: { href: 'https://example.com/p' } });
+  assert.doesNotMatch(contents.get(topic.path), /topic-links/, 'emptied list removes the key');
+});
+integrationTest('topic-links: the outline marks a row with an aria-hidden arrow and adds the link count to its name; it opens nothing', () => {
+  const { OutlineView } = load('ui/outline-view.ts', { obsidian: { ...obsidian, ItemView: class { constructor() { this.contentEl = dom.element('div'); } }, Notice: class {} } });
+  const view = new OutlineView({ app: {} }, async () => {});
+  const map = { title: 'M', nodes: [{ id: 'a', parentId: null, path: 'a.md' }, { id: 'b', parentId: 'a', path: 'b.md' }] };
+  view.setMap(map, new Map([['a', 'Alpha'], ['b', 'Beta']]), false, new Map([['a', ['done']]]), new Map([['a', ['https://a.example', 'https://b.example']], ['b', ['javascript:1']]]));
+  const [alpha, beta] = dom.findAll(view.contentEl, i => dom.hasCls(i, 'vam-outline-note'));
+  const arrow = dom.findAll(alpha, i => dom.hasCls(i, 'vam-outline-links'));
+  assert.equal(arrow.length, 1); assert.equal(arrow[0].text, '↗'); assert.equal(arrow[0].attrs['aria-hidden'], 'true');
+  assert.equal(alpha.attrs['aria-label'], 'Alpha, Markers: Done, 2 links');
+  assert.equal(dom.findAll(beta, i => dom.hasCls(i, 'vam-outline-links')).length, 0); assert.equal(beta.attrs['aria-label'], undefined);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const fresh = css.split('\n').filter(line => /vam-topic-link|vam-card-links|vam-outline-links/.test(line));
+  assert.ok(fresh.length >= 8 && fresh.every(line => /^\.(vam-view|vam-topic-modal|vam-outline) /.test(line)), 'new rules are scoped');
+  assert.ok(!/@media/.test(fresh.join('\n')));
 });

@@ -47,6 +47,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     originalText: "原文",
     imageTextUntranslated: "画像内の文字は翻訳されません。",
     markerLabel: "マーク：{0}",
+    linksLabel: "リンク：{0}",
+    linkOpen: "リンクを開く：{0}",
     markerNames: {
       done: "完了",
       warning: "警告",
@@ -112,6 +114,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     originalText: "원문",
     imageTextUntranslated: "이미지 안의 글자는 번역되지 않습니다.",
     markerLabel: "표시: {0}",
+    linksLabel: "링크: {0}",
+    linkOpen: "링크 열기: {0}",
     markerNames: {
       done: "완료",
       warning: "경고",
@@ -177,6 +181,8 @@ export const SHARE_VIEWER_UI_EXTRA: Readonly<Record<ShareExtraUiLanguage, ShareV
     originalText: "Original",
     imageTextUntranslated: "El texto dentro de las imágenes no está traducido.",
     markerLabel: "Marcas: {0}",
+    linksLabel: "Enlaces: {0}",
+    linkOpen: "Abrir enlace: {0}",
     markerNames: {
       done: "Hecho",
       warning: "Aviso",

@@ -285,6 +285,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   private outlineTitles = new Map<string, string>();
   private outlineSample = false;
   private outlineMarkers = new Map<string, TopicMarker[]>();
+  private outlineLinks = new Map<string, string[]>();
   private settingTab!: VisualAgentMapSettingTab;
   private detailsLeaf: WorkspaceLeaf | null = null;
   private detailsPath: string | null = null;
@@ -350,9 +351,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     const markers = new Map<string, TopicMarker[]>();
     for (const [id, note] of notes) if (note.markers?.length) markers.set(id, note.markers);
     this.outlineMarkers = markers;
+    const links = new Map<string, string[]>();
+    for (const [id, note] of notes) if (note.links?.length) links.set(id, note.links);
+    this.outlineLinks = links;
     for (const leaf of this.app.workspace.getLeavesOfType(OUTLINE_VIEW_TYPE))
       if (leaf.view instanceof OutlineView) {
-        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample, markers);
+        if (!this.coffeeOutlineActive) leaf.view.setMap(map, titles, sample, markers, links);
       }
   }
   /** Marks the active outline row without rebuilding the outline. */
@@ -374,7 +378,13 @@ export default class VisualAgentMapPlugin extends Plugin {
           }
         );
         if (!this.coffeeOutlineActive)
-          leaf.view.setMap(this.outlineMap, this.outlineTitles, this.outlineSample, this.outlineMarkers);
+          leaf.view.setMap(
+            this.outlineMap,
+            this.outlineTitles,
+            this.outlineSample,
+            this.outlineMarkers,
+            this.outlineLinks
+          );
       }
   }
   /** Called when a map view closes: the outline falls back to another open map, or empties. */

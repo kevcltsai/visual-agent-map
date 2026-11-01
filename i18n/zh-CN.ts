@@ -1457,6 +1457,8 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.note_style_standard_short": "标准",
   "ui.note_style_textbook": "教科书（先导读，再分类）",
   "ui.note_style_textbook_short": "教科书",
+  "ui.block_format_standard": "标准 Obsidian 格式",
+  "ui.block_format_plain": "纯文本",
   "ui.note_style_summary": "精简重点",
   "ui.note_style_plain": "白话说明",
   "ui.note_style_guide": "实用指南",

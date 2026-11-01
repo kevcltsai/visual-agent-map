@@ -2036,6 +2036,50 @@ integrationTest('topic-markers: writeTopicMarkers toggles, keeps unknown values,
   assert.equal(/topic-markers/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
   assert.equal(updatedLine(), before, 'updated is not changed');
 });
+integrationTest('topic-links: readNote reads only valid http(s) links and a note without links has no links field', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  assert.equal('links' in (await repo.readNote(n.path)), false, 'no links key when none are set');
+  const withValue = value => contents.set(n.path, contents.get(n.path).replace(/^topic-links:.*\n(  - .*\n)*/m, '').replace('---\n', `---\ntopic-links: ${value}\n`));
+  withValue('["javascript:alert(1)", "data:text/html,x", 3]');
+  assert.equal('links' in (await repo.readNote(n.path)), false, 'unsafe values read as nothing');
+  withValue('["  https://Example.com/a ", "https://example.com/a", "JaVaScRiPt:x"]');
+  assert.deepEqual([...(await repo.readNote(n.path)).links], ['https://example.com/a']);
+  withValue('{}');
+  assert.equal('links' in (await repo.readNote(n.path)), false);
+});
+
+integrationTest('topic-links: writeTopicLinks adds, removes, reports invalid/duplicate/too-many without writing, keeps unknown values, deletes the key when empty, leaves updated alone', async () => {
+  const { repo, contents } = fixture(); const n = await topicNote(repo);
+  const updatedLine = () => contents.get(n.path).match(/^updated:.*$/m)?.[0];
+  const before = updatedLine();
+  contents.set(n.path, contents.get(n.path).replace('---\n', '---\ncustom: retain me\ntopic-links: [future-x, "https://a.example/"]\n'));
+  const added = await repo.writeTopicLinks(n.path, { add: ' HTTPS://B.example/p ' });
+  assert.equal(added.ok, true);
+  assert.deepEqual([...added.next], ['future-x', 'https://a.example/', 'https://b.example/p']);
+  assert.deepEqual([...(await repo.readNote(n.path)).links], ['https://a.example/', 'https://b.example/p']);
+  assert.match(contents.get(n.path), /"future-x"/, 'an unknown value is kept');
+  assert.match(contents.get(n.path), /custom: retain me/);
+  const snapshot = contents.get(n.path);
+  assert.equal((await repo.writeTopicLinks(n.path, { add: 'javascript:alert(1)' })).reason, 'invalid');
+  assert.equal((await repo.writeTopicLinks(n.path, { add: 'https://A.example' })).reason, 'duplicate');
+  assert.equal(contents.get(n.path), snapshot, 'a refused add writes nothing');
+  await repo.writeTopicLinks(n.path, { remove: { index: 1, href: 'https://wrong.example/' } });
+  assert.deepEqual([...(await repo.readNote(n.path)).links], ['https://a.example/', 'https://b.example/p'], 'a mismatched href removes nothing');
+  await repo.writeTopicLinks(n.path, { remove: { index: 1, href: 'https://a.example/' } });
+  await repo.writeTopicLinks(n.path, { remove: { index: 1, href: 'https://b.example/p' } });
+  assert.deepEqual([...(await repo.readNote(n.path)).links ?? []], []);
+  assert.match(contents.get(n.path), /"future-x"/);
+  await repo.writeTopicLinks(n.path, { remove: { index: 0, href: 'x' } });
+  contents.set(n.path, contents.get(n.path).replace(/^topic-links:\n(  - .*\n)+/m, ''));
+  await repo.writeTopicLinks(n.path, { add: 'https://only.example' });
+  await repo.writeTopicLinks(n.path, { remove: { index: 0, href: 'https://only.example/' } });
+  assert.equal(/topic-links/.test(contents.get(n.path)), false, 'emptying the list deletes the key');
+  for (let i = 0; i < 20; i++) await repo.writeTopicLinks(n.path, { add: `https://e${i}.example/` });
+  assert.equal((await repo.writeTopicLinks(n.path, { add: 'https://over.example/' })).reason, 'too-many');
+  assert.equal((await repo.readNote(n.path)).links.length, 20);
+  assert.equal(updatedLine(), before, 'updated is not changed');
+});
+
 integrationTest('topic-markers: new ids read in whitelist order, one per single-choice group, and toggling keeps other groups and unknown values', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo);
   contents.set(n.path, contents.get(n.path).replace('---\n', '---\ntopic-markers: [smile, future-x, flag-blue, progress-75, progress-25, priority-4, priority-1]\n'));

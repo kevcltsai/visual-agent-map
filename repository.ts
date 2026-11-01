@@ -2,6 +2,7 @@ import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath, parseYaml, s
 import { isOutputOnlyLanguage, resolveAimContentLanguage } from "./experiences/aim/content-language";
 import { resolveMapTextLanguage, textLanguageOf } from "./experiences/visual-map/map-text-language";
 import { readTopicColor, type TopicColor } from "./topic-colors";
+import { addTopicLink, readTopicLinks, removeTopicLink, type AddTopicLinkResult } from "./topic-links";
 import { readTopicMarkers, toggleTopicMarker, type TopicMarker } from "./topic-markers";
 import { createHash } from "node:crypto";
 import {
@@ -108,6 +109,8 @@ export interface Note {
   hypothesisStrength?: HypothesisStrength;
   /** From `topic-markers` frontmatter, whitelisted ids only; absent when there are none. */
   markers?: TopicMarker[];
+  /** From `topic-links` frontmatter, valid http(s) hrefs only; absent when there are none. */
+  links?: string[];
   /** From `topic-color` frontmatter, a whitelisted id only; absent when there is none. */
   color?: TopicColor;
 }
@@ -1274,6 +1277,7 @@ export class Repository {
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
       ...(readTopicKind(fm) === "hypothesis" ? { hypothesisStrength: readHypothesisStrength(fm) } : {}),
       ...(readTopicMarkers(fm).length ? { markers: readTopicMarkers(fm) } : {}),
+      ...(readTopicLinks(fm).length ? { links: readTopicLinks(fm) } : {}),
       ...(readTopicColor(fm) ? { color: readTopicColor(fm) } : {}),
       detailFormatIssues: Array.isArray(fm["detail-format-issues"])
         ? fm["detail-format-issues"].filter((v): v is string => typeof v === "string")
@@ -1635,6 +1639,29 @@ export class Repository {
     await this.app.vault.process(this.file(path), content =>
       setFrontmatterKeys(content, { "topic-markers": toggleTopicMarker(frontmatter(content)["topic-markers"], id) })
     );
+  }
+
+  /**
+   * Adds (`{ add }`) or removes (`{ remove: { index, href } }`) one `topic-links` item, reading the current list inside the
+   * same `vault.process` call. An invalid, duplicate or over-limit address writes nothing and returns the reason; values
+   * this version does not understand are kept, an emptied list removes the key, and `updated` is not bumped.
+   */
+  async writeTopicLinks(
+    path: string,
+    change: { add: string } | { remove: { index: number; href: string } }
+  ): Promise<AddTopicLinkResult> {
+    let result: AddTopicLinkResult = { ok: true, next: [] };
+    await this.app.vault.process(this.file(path), content => {
+      const raw = frontmatter(content)["topic-links"];
+      if ("add" in change) {
+        result = addTopicLink(raw, change.add);
+        return result.ok ? setFrontmatterKeys(content, { "topic-links": result.next }) : content;
+      }
+      const next = removeTopicLink(raw, change.remove.index, change.remove.href);
+      result = { ok: true, next: next ?? [] };
+      return setFrontmatterKeys(content, { "topic-links": next });
+    });
+    return result;
   }
 
   /**

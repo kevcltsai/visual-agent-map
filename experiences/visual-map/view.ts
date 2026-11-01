@@ -4616,7 +4616,10 @@ export class VisualAgentMapView extends ItemView {
         ))
     );
   }
-  /** After "Organize workspace folders" moved maps: follow the open map to its new path (the next synchronize reloads it). */
+  /**
+   * After "Organize workspace folders" or a file-explorer rename moved maps: follow the open map to its new path (the
+   * next synchronize reloads it).
+   */
   relocate(moved: Map<string, string>): void {
     const next = moved.get(this.path);
     if (!next) return;

@@ -815,6 +815,10 @@ export default class VisualAgentMapPlugin extends Plugin {
         // A rename event whose path did not change (replayed after a rolled-back move) has nothing to update.
         if (file.path === oldPath) return;
         const external = !this.writing;
+        // A folder rename reports every file inside it, and each queued handler ends by synchronizing every view. An
+        // open map must follow its Map.md now: if a note's handler ran first, the view would find its old path gone
+        // and close the map as deleted.
+        if (external) for (const view of this.views()) view.relocate(new Map([[oldPath, file.path]]));
         this.runMutation(async () => {
           await this.repo.replaceSourcePath(oldPath, file.path);
           let mapChanged = false;

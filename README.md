@@ -23,7 +23,7 @@ When a map is ready, save it as one HTML file you can open in any browser, even 
 ## Get started
 
 1. In **Obsidian Desktop → Settings → Community plugins → Browse**, find **Visual Agent Map**, then install and enable it. Requires Obsidian **1.13.7+** on desktop.
-2. Open the built-in sample or create a map. For AI features, install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings.
+2. VAM opens a blank mind map on first use: start with one sentence, or add topics yourself. For AI features, install and sign in to [Codex CLI](https://developers.openai.com/codex/cli/) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), then check the CLI in VAM settings.
 3. Choose **＋ New map → New AIM** to try AIM.
 
 The interface is available in English, Traditional Chinese and Simplified Chinese. AI answers follow the language you write in, including Japanese, Korean, Spanish and other languages.

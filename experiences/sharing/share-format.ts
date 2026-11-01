@@ -2,7 +2,7 @@ import type { MapDocument } from "../../map-model";
 import type { RelevanceTier } from "../../note-values";
 import type { ContentLanguage } from "../../i18n";
 import { readTopicColor, readTopicStyle, type TopicColor, type TopicStyle } from "../../topic-colors";
-import { CARD_WIDTH, clampCardWidth } from "../../map-graph";
+import { CARD_WIDTH, clampCardHeight, clampCardWidth } from "../../map-graph";
 import { layoutDirectionFor } from "../../layouts/compose";
 import { layoutOf } from "../../map-layout";
 import { readTopicMarkers, type TopicMarker } from "../../topic-markers";
@@ -88,6 +88,8 @@ export interface ShareNodePayload {
   collapsed: boolean;
   /** Optional (card-resize): a custom card width, 200-560 and not 280. Absent means the standard width; `version` stays 1. */
   width?: number;
+  /** Optional (card-height): a custom card height, 80-720. Absent means as tall as the content; `version` stays 1. */
+  height?: number;
   status: "idea" | "completed";
   title: string;
   summary: string;
@@ -291,6 +293,8 @@ export function buildSharePayload(
     };
     if (node.width !== undefined && clampCardWidth(node.width) !== undefined && node.width !== CARD_WIDTH)
       out.width = clampCardWidth(node.width);
+    if (node.height !== undefined && clampCardHeight(node.height) !== undefined)
+      out.height = clampCardHeight(node.height);
     if (note?.relevance) {
       out.tier = note.relevance.tier;
       if (note.relevance.manual) out.manual = true;

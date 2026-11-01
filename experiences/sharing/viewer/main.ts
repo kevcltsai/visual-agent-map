@@ -1,4 +1,11 @@
-import { applyCollapseLevel, CARD_WIDTH, clampCardWidth, descendants, type MapNode } from "../../../map-graph";
+import {
+  applyCollapseLevel,
+  CARD_WIDTH,
+  clampCardHeight,
+  clampCardWidth,
+  descendants,
+  type MapNode
+} from "../../../map-graph";
 import { arrangeMap } from "../../../map-layout";
 import { fitViewport, focusViewport, insetFromRects, type MapViewport } from "../../visual-map/viewport-inset";
 import type { ShareNodePayload, ShareNodeTranslation, SharePayload } from "../share-format";
@@ -189,6 +196,7 @@ export function startViewer(doc: Document): void {
     if (!item || typeof item.id !== "string" || info.has(item.id)) continue;
     info.set(item.id, item);
     const width = clampCardWidth(item.width);
+    const height = clampCardHeight(item.height);
     nodes.push({
       id: item.id,
       path: item.id,
@@ -196,7 +204,8 @@ export function startViewer(doc: Document): void {
       x: Number.isFinite(item.x) ? item.x : 0,
       y: Number.isFinite(item.y) ? item.y : 0,
       collapsed: !!item.collapsed,
-      ...(width !== undefined && width !== CARD_WIDTH ? { width } : {})
+      ...(width !== undefined && width !== CARD_WIDTH ? { width } : {}),
+      ...(height !== undefined ? { height } : {})
     });
   }
   const byId = new Map(nodes.map(node => [node.id, node]));
@@ -716,6 +725,7 @@ export function startViewer(doc: Document): void {
     card.style.left = `${node.x}px`;
     card.style.top = `${node.y}px`;
     if (node.width) card.style.width = `${node.width}px`;
+    if (node.height) card.style.height = `${node.height}px`;
     placeTexts(id);
   };
   const placeTexts = (parentId: string): void => {
@@ -800,6 +810,14 @@ export function startViewer(doc: Document): void {
       card.append(make("h3", "vam-card-title", String(shown.title ?? "")));
       if (typeof shown.summary === "string" && shown.summary.trim())
         card.append(make("p", "vam-card-summary", shown.summary));
+      if (node.height) {
+        // card-height: a fixed-height card hides what does not fit; the fade and the ellipsis are real elements (the card's ::after is the scan line).
+        const fade = make("span", "vam-card-fade");
+        const more = make("span", "vam-card-more", "…");
+        fade.setAttribute("aria-hidden", "true");
+        more.setAttribute("aria-hidden", "true");
+        card.append(fade, more);
+      }
       card.addEventListener("click", () => {
         if (!suppressClick) select(node.id);
       });
@@ -820,6 +838,14 @@ export function startViewer(doc: Document): void {
       place(node.id);
     }
     renderTexts();
+    markClipped();
+  }
+  /** Marks the fixed-height cards whose content does not fit, so the fade and the ellipsis show (read after layout, not at render). */
+  function markClipped(): void {
+    for (const [id, card] of cards) {
+      if (!byId.get(id)?.height) continue;
+      card.classList.toggle("is-clipped", card.scrollHeight > card.clientHeight + 1);
+    }
   }
   function layout(): void {
     const arranged = arrangeMap(nodes, undefined, id => cards.get(id)?.offsetHeight);
@@ -828,6 +854,7 @@ export function startViewer(doc: Document): void {
       nodes[index].y = placed.y;
     });
     for (const id of cards.keys()) place(id);
+    markClipped();
   }
   /** Rebuilds the cards after a fold change, keeping the card the user acted on where it was on screen. */
   function relayout(focusId?: string, focusButton = false): void {

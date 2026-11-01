@@ -87,6 +87,15 @@
 .vam-boundary-label.is-empty { min-width: 28px; min-height: 12px; }
 .vam-node { --vam-card-bg: var(--background-primary); position: absolute; box-sizing: border-box; width: 280px; padding: 12px 14px 14px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--vam-card-bg); box-shadow: var(--shadow-s); cursor: grab; user-select: none; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
 .vam-node:hover { border-color: var(--background-modifier-border-hover); }
+/* Fixed-height cards (card-height). Obsidian's review forbids clip-path (scripts/check-css.mjs), so a card whose content does not fit (.is-clipped, set by the view and the share viewer after layout) uses overflow: hidden, and everything that used to sit on or beyond the border is moved inside it while clipped: the width handle (right:-5px), the running scan line (top:-1px) and the typed shape's outline (the SVG is inset 2px so its stroke is not cut). The fade and the ellipsis are real elements because ::after is the scan line. */
+.vam-node.is-clipped { overflow: hidden; }
+.vam-node.is-clipped > .vam-card-resize { right: 0; }
+.vam-node.is-clipped:not([data-aim-kind])[data-status="running"]::after { top: 0; }
+.vam-node.is-clipped > .vam-kind-shape { inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
+.vam-card-fade, .vam-card-more { display: none; position: absolute; pointer-events: none; }
+.vam-node.is-clipped > .vam-card-fade { display: block; left: 0; right: 0; bottom: 0; height: 34px; border-radius: 0 0 11px 11px; background: linear-gradient(to bottom, transparent, var(--vam-card-bg) 75%); }
+.vam-node.is-clipped > .vam-card-more { display: block; right: 22px; bottom: 4px; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1; }
+[data-topic-kind="atomic"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="hypothesis"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="evidence"].vam-node.is-clipped > .vam-card-fade, [data-topic-kind="conclusion"].vam-node.is-clipped > .vam-card-fade { display: none; }
 /* The width handle on a card's right edge (card-resize). Quiet until the card is hovered or focused; the share viewer does not collect these classes. */
 .vam-card-resize { position: absolute; top: 12px; right: -5px; bottom: 12px; width: 10px; border-radius: 5px; cursor: ew-resize; opacity: 0; transition: opacity 120ms ease-out, background-color 120ms ease-out; touch-action: none; }
 .vam-node:hover > .vam-card-resize, .vam-node:focus-within > .vam-card-resize { opacity: 1; background: color-mix(in srgb, var(--interactive-accent) 35%, transparent); }

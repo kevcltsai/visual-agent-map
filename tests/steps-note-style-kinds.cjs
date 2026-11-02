@@ -413,8 +413,7 @@ test('kind level (view): topicStyle passes the topic\'s type, a topic without on
 
 test('kind level (view): a missing kind structure raises the kind Notice once per gate and never rewrites the topic', async () => {
   const note = { path: 'T.md', topicKind: 'hypothesis' };
-  // P3 moves the view's Notice to noteStyleByKind; until then it still looks the ref up in the old key, so both hold it.
-  const { view, updates } = await viewWorld({ noteStyleByKind: { hypothesis: 'file:Nope' }, noteTemplateByKind: { hypothesis: 'file:Nope' } }, note);
+  const { view, updates } = await viewWorld({ noteStyleByKind: { hypothesis: 'file:Nope' } }, note);
   const gate = { shown: false };
   const style = await view.detailTemplateFor({ path: 'T.md' }, undefined, undefined, gate);
   assert.deepEqual(plainOf(style.issues.missing), ['file:Nope']);
@@ -428,7 +427,7 @@ test('kind level (view): a missing kind structure raises the kind Notice once pe
 
 test('kind level (view): when the topic\'s own missing structure is the one named by the kind, only the topic\'s Notice shows', async () => {
   const note = { path: 'T.md', topicKind: 'hypothesis', detailTemplateId: 'file:Nope' };
-  const { view } = await viewWorld({ noteTemplateByKind: { hypothesis: 'file:Nope' } }, note);
+  const { view } = await viewWorld({ noteStyleByKind: { hypothesis: 'file:Nope' } }, note);
   await view.detailTemplateFor({ path: 'T.md' });
   assert.equal(notices.length, 1);
   assert.match(notices[0], /Nope/);
@@ -436,8 +435,7 @@ test('kind level (view): when the topic\'s own missing structure is the one name
 });
 
 test('kind level (view): mapStyle with notify and a kind shows the kind Notice for a missing structure; without notify it is silent', async () => {
-  // P3 moves the view's Notice to noteStyleByKind; until then it still looks the ref up in the old key, so both hold it.
-  const { view } = await viewWorld({ noteStyleByKind: { topic: 'file:Nope' }, noteTemplateByKind: { topic: 'file:Nope' } }, {});
+  const { view } = await viewWorld({ noteStyleByKind: { topic: 'file:Nope' } }, {});
   view.mapStyle('en', { kind: 'topic' });
   assert.equal(notices.length, 0);
   view.mapStyle('en', { kind: 'topic', notify: true });
@@ -453,26 +451,46 @@ test('decision 18: keep current (no explicit choice) writes no detail-template t
   assert.deepEqual(updates, []);
 });
 
+test('counterexample 14: a topic detail-template that no longer exists shows its Notice, is not cleared, and a dialog choice of template and tone writes nothing', async () => {
+  const note = { path: 'T.md', detailTemplateId: 'gone-id', toneId: 'gone-tone' };
+  const { view, updates } = await viewWorld({}, note);
+  await view.detailTemplateFor({ path: 'T.md' });
+  assert.equal(notices.length, 1, 'the missing template is told');
+  assert.deepEqual(updates, [], 'detail-template is not cleared');
+  await view.detailTemplateFor({ path: 'T.md' }, 'builtin:textbook', 'plain');
+  await view.detailTemplateFor({ path: 'T.md' }, 'file:Mine', 'plain');
+  assert.deepEqual(updates, [], 'a choice in the dialog holds for this run only');
+});
+
+test('counterexample 1 (view half): the map\'s detailTemplateId / toneId change no request of the view, for every kind', async () => {
+  for (const kind of ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) {
+    const note = { path: 'T.md', ...(kind === 'topic' ? {} : { topicKind: kind }) };
+    const plain = await viewWorld({}, note);
+    const mapped = await viewWorld({}, note);
+    mapped.view.map = { detailTemplateId: 'textbook', toneId: 'plain' };
+    const summary = (view, style) => JSON.stringify({ ref: style.recipe.ref, format: style.formatText, tone: style.toneText, tpl: style.template.id, ctx: style.contextFields, proposal: view.proposalTone(note, { outputLanguage: 'en' }) });
+    assert.equal(summary(mapped.view, mapped.view.topicStyle(note, undefined, undefined, 'en')), summary(plain.view, plain.view.topicStyle(note, undefined, undefined, 'en')), `${kind}: topicStyle`);
+    assert.equal(summary(mapped.view, mapped.view.mapStyle('en', { kind })), summary(plain.view, plain.view.mapStyle('en', { kind })), `${kind}: mapStyle`);
+  }
+});
+
 // P3: the research progress line.
-test('progress label: "Note style: <structure> · <voice> (<source>)" in three languages; run and topic add no bracket', () => {
+test('progress label (was: "(<source>)" with map / default brackets; grilling Q5/Q10/Q12): only the topic-type source names a bracket, in three languages; run and topic add none', () => {
   const label = source => ({ templateName: 'Standard', toneName: 'Plain', templateSource: source });
   const text = (source, lang = 'en') => M.runStyleLabelText(label(source), lang);
-  assert.equal(text('workspace'), 'Note style: Standard · Plain (default)');
-  assert.equal(text('standard'), 'Note style: Standard · Plain (default)');
   assert.equal(text('kind'), 'Note style: Standard · Plain (structure from topic type)');
-  assert.equal(text('map'), 'Note style: Standard · Plain (follows this map)');
   assert.equal(text('run'), 'Note style: Standard · Plain');
   assert.equal(text('topic'), 'Note style: Standard · Plain');
   assert.equal(M.runStyleLabelText({ templateName: '假設結構', toneName: '學術嚴謹', templateSource: 'kind' }, 'zh-TW'), '筆記風格：假設結構 · 學術嚴謹（結構來自議題類型）');
-  assert.equal(text('workspace', 'zh-CN'), '笔记风格：Standard · Plain（跟随默认）');
-  assert.equal(text('map', 'zh-TW'), '筆記風格：Standard · Plain（跟隨這張圖）');
+  assert.equal(text('kind', 'zh-CN'), '笔记风格：Standard · Plain（结构来自议题类型）');
+  for (const retired of ['workspace', 'standard', 'map']) assert.equal(text(retired), 'Note style: Standard · Plain', `${retired} is no source any more`);
 });
 
-test('progress label: the view passes the line only for a style file or a topic-type structure, and the old key has no consumer', () => {
+test('progress label (was: only for a style file or a topic-type structure; grilling Q10/Q12): the line is passed for every style but the topic type\'s built-in general research, and the old key has no consumer', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/topic-run.ts'), 'utf8');
-  assert.match(view, /runStyle\.label\.fileName \|\| runStyle\.label\.templateSource === "kind"\s*\?\s*runStyleLabelText\(runStyle\.label, this\.ports\.settings\(\)\.language\)\s*:\s*undefined/);
+  assert.match(view, /runStyle\.recipe\.source !== "kind" \|\| runStyle\.recipe\.ref !== "builtin:general"\s*\?\s*runStyleLabelText\(runStyle\.label, this\.ports\.settings\(\)\.language\)\s*:\s*undefined/);
   assert.match(view, /progress\?\.begin\(path, progressAttempt, Date\.now\(\), used\.model, styleLabel\)/);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(fs.readFileSync(path.join(__dirname, '..', 'i18n', `${lang}.ts`), 'utf8').includes('progress_note_style_0'), false);
   assert.equal(view.includes('progress_note_style_0'), false);

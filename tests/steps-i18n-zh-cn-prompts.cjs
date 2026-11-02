@@ -122,17 +122,18 @@ test('zh-CN prompt snapshots differ from zh-TW only on language names (one posit
   assert.ok(total > 0, 'the snapshots parameterise at least one language name');
 });
 
-test('zh-CN prompt snapshots: exactly 86 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
+test('zh-CN prompt snapshots: exactly 91 lines carry a research.* text that differs from zh-TW (the dictionary-sourced instructions)', () => {
   const simplified = RESEARCH_KEYS.filter(key => zhCN[key] !== zhTW[key]).map(key => zhCN[key]);
   assert.ok(simplified.length > 0, 'some research.* texts are Simplified');
   const lines = bases.flatMap(base => fs.readFileSync(path.join(directory, cnFile(base)), 'utf8').split('\n').filter(line => simplified.some(text => line.includes(text))));
   // 19 + the three Quick AI mode prompts (service.task-quick, service.task-quick-subtopic, claude.task-quick) + service.synthesize-summary-direction + the four note style file prompts + the note style callout map prompt = 28
   // at 49c1005; + 58 lines in the 58 snapshot files the prompt-assembler safety net added (3190387, none of them existed
-  // at 49c1005; no earlier hit moved) = 86.
-  assert.equal(lines.length, 86);
+  // at 49c1005; no earlier hit moved) = 86; + the 5 per-kind default snapshots service.task-kind-* (zh-CN, P2b of
+  // note-style-recipe), one line each = 91.
+  assert.equal(lines.length, 91);
 });
 
-test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 86 output-language sentences and 79 clauses, none in zh-TW', () => {
+test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 91 output-language sentences and 84 clauses, none in zh-TW', () => {
   const total = { rules: 0, clauses: 0 };
   for (const file of fs.readdirSync(directory).filter(name => /\.zh-CN(\.\d+)?\.txt$/.test(name))) {
     const found = stripVerbatim(fs.readFileSync(path.join(directory, file), 'utf8'));
@@ -141,6 +142,7 @@ test('zh-CN prompt snapshots: the heading-verbatim additions are exactly 86 outp
   for (const file of fs.readdirSync(directory).filter(name => /\.zh(\.\d+)?\.txt$/.test(name)))
     assert.equal(fs.readFileSync(path.join(directory, file), 'utf8').includes('固定標題必須逐字'), false, `${file}: zh-TW has no clause`);
   // 28 and 28 at 49c1005; the 58 snapshots added by 3190387 bring 58 more sentences and 51 more clauses (the 7 decompose
-  // snapshots have the sentence but no detail structure, so no clause).
-  assert.deepEqual(total, { rules: 86, clauses: 79 });
+  // snapshots have the sentence but no detail structure, so no clause); the 5 service.task-kind-* zh-CN snapshots of
+  // note-style-recipe P2b add 5 sentences and 5 clauses.
+  assert.deepEqual(total, { rules: 91, clauses: 84 });
 });

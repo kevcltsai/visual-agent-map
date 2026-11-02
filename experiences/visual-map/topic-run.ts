@@ -871,7 +871,7 @@ export class TopicRuns {
       note
     );
     const styleLabel =
-      runStyle.label.fileName || runStyle.label.templateSource === "kind"
+      runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general"
         ? runStyleLabelText(runStyle.label, this.ports.settings().language)
         : undefined;
     return { note, used, context, styleLabel };

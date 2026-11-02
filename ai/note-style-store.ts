@@ -51,7 +51,6 @@ import {
   type NoteStyleUpgradeMarker,
   type UpgradePlan
 } from "./note-style-upgrade";
-import type { StyleRef } from "./note-style-label";
 export { builtinPairOf };
 
 /**
@@ -122,22 +121,14 @@ export interface RunStyleRequest {
   choice?: StyleLevel;
   /** The topic's stored values: `note-style`, else the old `detail-template` and `tone` as an implicit style. */
   topic?: StyleLevel;
-  /** The kind of the note; absent is "topic". P3 makes it required. */
-  kind?: StyleKind;
+  /** The kind of the note ("topic" for a note with no type). */
+  kind: StyleKind;
   /** The language the note is written in (the interface language is read from the settings). */
   outputLanguage: ContentLanguage;
-  /** Transitional, ignored since P2a of note-style-recipe (a map's style is no level); P3 deletes it. */
-  map?: unknown;
-  /** Transitional, ignored since P2a; P3 deletes it. */
-  toneOnly?: boolean;
-  /** Transitional, the old name of `kind` (used only when `kind` is absent); P3 deletes it. */
-  topicKind?: TopicKind;
 }
 
 /** The level a run's style came from. */
 export type TemplateSource = "run" | "topic" | "kind";
-/** Transitional, these sources no longer exist; the union keeps `ai/note-style-label.ts` compiling until P3. */
-type RetiredSource = "map" | "workspace" | "standard";
 
 /** A remark about a style part that changes nothing in its use (an old format zone that is not read). */
 export type RunStyleNotice = TemplateNotice & { id: string; fileName?: string };
@@ -165,13 +156,11 @@ export interface RunStyle {
   readonly label: Readonly<{
     /** In the interface language. */
     templateName: string;
-    templateSource: TemplateSource | RetiredSource;
+    templateSource: TemplateSource;
     /** The name of the voice that `toneText` really is. */
     toneName: string;
     /** The name inside "Keep current (…)". */
     styleName: string;
-    /** Transitional, never set since P2a; P3 deletes it. */
-    styleRef?: StyleRef;
     /** The file used (with ".md"), for the progress label. */
     fileName?: string;
   }>;
@@ -180,8 +169,6 @@ export interface RunStyle {
     missing: readonly string[];
     blockIssues: readonly BlockIssue[];
     notices: readonly RunStyleNotice[];
-    /** Transitional, never set since P2a; P3 deletes it. */
-    invalid?: Readonly<{ fileName: string; issues: readonly NoteStyleIssue[] }>;
   }>;
 }
 
@@ -470,8 +457,7 @@ export class NoteStyleStore {
   runStyle(request: RunStyleRequest): RunStyle {
     const language = request.outputLanguage;
     // A kind this store does not know (a stored value that is not one) counts as the general topic kind.
-    const asked = request.kind ?? request.topicKind;
-    const kind: StyleKind = asked !== undefined && STYLE_KINDS.includes(asked) ? asked : "topic";
+    const kind: StyleKind = STYLE_KINDS.includes(request.kind) ? request.kind : "topic";
     const missing: string[] = [];
     const miss = (ref: string): void => {
       if (!missing.includes(ref)) missing.push(ref);

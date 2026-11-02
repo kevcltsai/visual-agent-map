@@ -68,6 +68,11 @@ export function matchPreset(templateId: string | undefined, toneId: string | und
   return NOTE_STYLE_PRESETS.find(preset => preset.templateId === template && preset.toneId === tone);
 }
 
+/** The file name behind a `style:<name>` / `file:<name>` template id, or undefined for any other id. */
+export function fileStyleName(templateId: string): string | undefined {
+  return /^(?:style|file):/.test(templateId) ? templateId.replace(/^(?:style|file):/, "") : undefined;
+}
+
 /**
  * The short name of the style a template and tone pair makes: the preset's name, else "Custom: template · tone" using
  * `names` to turn each id into its display name.

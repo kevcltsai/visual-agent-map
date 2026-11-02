@@ -26141,6 +26141,9 @@ function matchPreset(templateId, toneId) {
   const tone2 = toneId || DEFAULT_TONE_ID;
   return NOTE_STYLE_PRESETS.find((preset) => preset.templateId === template2 && preset.toneId === tone2);
 }
+function fileStyleName(templateId) {
+  return /^(?:style|file):/.test(templateId) ? templateId.replace(/^(?:style|file):/, "") : void 0;
+}
 function styleLabel(templateId, toneId, names3, language2) {
   const preset = matchPreset(templateId, toneId);
   if (preset) return translate(language2, preset.short);
@@ -26336,10 +26339,9 @@ var NoteStyleStore = class {
       ...builtinTemplates(noteLanguageOf(settings.language), settings.language),
       ...settings.detailTemplates
     ];
-    const isFileId = (id) => id.startsWith("style:") || id.startsWith("file:");
     const templateName = (id) => {
-      var _a3, _b3;
-      return isFileId(id) ? id.replace(/^(?:style|file):/, "") : (_b3 = (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _b3 : id;
+      var _a3, _b3, _c2;
+      return (_c2 = (_b3 = fileStyleName(id)) != null ? _b3 : (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _c2 : id;
     };
     const chain = [(_b2 = request.choice) == null ? void 0 : _b2.tone, (_c = request.topic) == null ? void 0 : _c.tone, (_d = request.map) == null ? void 0 : _d.tone];
     const tone2 = found.toneDecided && !request.toneOnly ? { text: found.toneText, source: found.toneSource, free: found.toneFree } : this.plainTone(chain, language2);
@@ -26352,7 +26354,7 @@ var NoteStyleStore = class {
     const label = Object.freeze({
       templateName: templateName(template2.id),
       toneName: (_g = tone2.free) != null ? _g : toneName(toneId),
-      styleName: isFileId(template2.id) ? templateName(template2.id) : styleLabel(template2.id, toneId, { template: templateName, tone: toneName }, settings.language),
+      styleName: fileStyleName(template2.id) !== void 0 ? templateName(template2.id) : styleLabel(template2.id, toneId, { template: templateName, tone: toneName }, settings.language),
       ...styleRef ? { styleRef } : {},
       ...found.fileName ? { fileName: found.fileName } : {}
     });
@@ -46218,9 +46220,6 @@ function errorMessage(error) {
 function summaryForPrompt(summary, language2) {
   return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
 }
-function templateInLanguage(template2, language2) {
-  return isBuiltinTemplateId(template2.id) ? builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === template2.id) : template2;
-}
 function formatIssuesPatch(issues, language2) {
   return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
 }
@@ -47650,15 +47649,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     });
     return toneText ? { toneText } : {};
   }
-  /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
-  toneLabelFor(note) {
-    var _a2, _b2;
-    for (const id of [note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId]) {
-      const found = this.noteStyles.toneName(id);
-      if (found) return found;
-    }
-    return (_b2 = this.noteStyles.toneName(DEFAULT_TONE_ID)) != null ? _b2 : DEFAULT_TONE_ID;
-  }
   /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
   toneChoices() {
     return this.noteStyles.toneChoices();
@@ -47680,8 +47670,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   }
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   currentStyleLabel(templateId, toneId) {
-    if (templateId.startsWith("style:") || templateId.startsWith("file:"))
-      return templateId.replace(/^(?:style|file):/, "");
+    const fileName = fileStyleName(templateId);
+    if (fileName !== void 0) return fileName;
     const names3 = (list) => (id) => {
       var _a2, _b2;
       return (_b2 = (_a2 = list.find((item) => item.id === id)) == null ? void 0 : _a2.name) != null ? _b2 : id;
@@ -47729,11 +47719,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       return preset ? { kind: "builtin", id: preset.id } : this.styleRefFor(chosen, void 0);
     }
     return this.styleRefFor((_a2 = this.plugin.settings.defaultDetailTemplateId) != null ? _a2 : STANDARD_TEMPLATE_ID, DEFAULT_TONE_ID);
-  }
-  /** The tone id a topic resolves to now (topic override, else map default, else academic), as toneLabelFor names it. */
-  effectiveToneId(note) {
-    var _a2, _b2;
-    return (_b2 = [note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId].find((id) => this.noteStyles.toneName(id) !== void 0)) != null ? _b2 : DEFAULT_TONE_ID;
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
   openOutlineImport(prefill) {
@@ -56016,6 +56001,7 @@ ${request.requirements}` : preset.text,
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, (_b2 = this.map) == null ? void 0 : _b2.id, synthesisLabel);
+      const current = this.topicStyle(note);
       sources.synthesisTopics = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).map((item) => {
         var _a3, _b3;
         return (_b3 = (_a3 = this.notes.get(item.id)) == null ? void 0 : _a3.title) != null ? _b3 : item.path;
@@ -56095,15 +56081,15 @@ ${request.requirements}` : preset.text,
           sources,
           templates: this.templateChoices(),
           tones: this.toneChoices(),
-          currentTone: this.toneLabelFor(note),
-          currentStyle: this.currentStyleLabel(this.topicStyle(note).template.id, this.effectiveToneId(note)),
-          currentStyleRef: this.styleRefFor(this.topicStyle(note).template.id, this.effectiveToneId(note)),
+          currentTone: current.label.toneName,
+          currentStyle: current.label.styleName,
+          ...current.label.styleRef ? { currentStyleRef: current.label.styleRef } : {},
           currentSummary: note.summary,
           ...existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {},
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: templateInLanguage(this.topicStyle(note).template, this.plugin.settings.language).name,
+          currentTemplate: current.label.templateName,
           topicStatus: note.status,
           childrenCompleted: (_l = (_k = this.map) == null ? void 0 : _k.nodes.filter((item) => {
             var _a3;
@@ -58771,7 +58757,7 @@ ${request.requirements}` : preset.text,
     const selectedLabel = t("ui.reference_selected_topics_included", names3.join(", "));
     const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
-    const mapTemplate = this.mapStyle(settings.language).template;
+    const current = this.mapStyle(settings.language);
     new NextStepModal(
       this.app,
       "",
@@ -58792,11 +58778,11 @@ ${request.requirements}` : preset.text,
         fields: {
           sources,
           templates: this.templateChoices(),
-          currentTemplate: mapTemplate.name,
+          currentTemplate: current.label.templateName,
           tones: this.toneChoices(),
-          currentTone: this.toneLabelFor({}),
-          currentStyle: this.currentStyleLabel(mapTemplate.id, this.effectiveToneId({})),
-          currentStyleRef: this.styleRefFor(mapTemplate.id, this.effectiveToneId({})),
+          currentTone: current.label.toneName,
+          currentStyle: current.label.styleName,
+          ...current.label.styleRef ? { currentStyleRef: current.label.styleRef } : {},
           ...this.outputLanguageMemory()
         },
         ...pending2 ? { pending: { directions: pending2.directions, discard: () => this.discardSelectionSynthesis() } } : {}

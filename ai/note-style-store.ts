@@ -53,7 +53,7 @@ import {
   type UpgradePlan
 } from "./note-style-upgrade";
 
-import { styleLabel, styleRefOf, type StyleRef } from "./note-style-label";
+import { fileStyleName, styleLabel, styleRefOf, type StyleRef } from "./note-style-label";
 
 export { builtinPairOf };
 
@@ -407,9 +407,8 @@ export class NoteStyleStore {
       ...builtinTemplates(noteLanguageOf(settings.language), settings.language),
       ...settings.detailTemplates
     ];
-    const isFileId = (id: string): boolean => id.startsWith("style:") || id.startsWith("file:");
     const templateName = (id: string): string =>
-      isFileId(id) ? id.replace(/^(?:style|file):/, "") : (uiTemplates.find(item => item.id === id)?.name ?? id);
+      fileStyleName(id) ?? uiTemplates.find(item => item.id === id)?.name ?? id;
     const chain = [request.choice?.tone, request.topic?.tone, request.map?.tone];
     // An old style file, or the alias of one, decided the tone together with the template (unless the run asks for the tone only); else the chain, then the workspace.
     const tone: { text?: string; source?: string; free?: string } =
@@ -423,9 +422,10 @@ export class NoteStyleStore {
     const label = Object.freeze({
       templateName: templateName(template.id),
       toneName: tone.free ?? toneName(toneId),
-      styleName: isFileId(template.id)
-        ? templateName(template.id)
-        : styleLabel(template.id, toneId, { template: templateName, tone: toneName }, settings.language),
+      styleName:
+        fileStyleName(template.id) !== undefined
+          ? templateName(template.id)
+          : styleLabel(template.id, toneId, { template: templateName, tone: toneName }, settings.language),
       ...(styleRef ? { styleRef } : {}),
       ...(found.fileName ? { fileName: found.fileName } : {})
     });

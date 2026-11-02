@@ -316,3 +316,13 @@ test('toneOnly: a proposal run takes no tone from the workspace default style fi
   assert.equal(oldFile.store.runStyle({ outputLanguage: 'en' }).toneText, '簡明');
   assert.equal(pair.store.runStyle({ outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
 });
+
+test('P3: the style name of a template and tone pair is the preset name, else "Custom: template · tone"', async () => {
+  const { store } = await world({ detailTemplates: CUSTOM() });
+  const name = (template, tone) => store.runStyle({ outputLanguage: 'en', topic: { template, tone } }).label.styleName;
+  assert.equal(name('standard', 'academic'), 'Standard');
+  assert.equal(name('textbook', 'academic'), 'Textbook');
+  assert.equal(name('standard', 'plain'), 'Plain language');
+  assert.equal(name('A', 'magazine'), 'Custom: Template A · Magazine column');
+  assert.equal(name('textbook', 'plain'), 'Custom: Textbook · Plain explanation');
+});

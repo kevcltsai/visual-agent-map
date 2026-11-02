@@ -229,7 +229,6 @@ import {
   checkCounts,
   countIssueText,
   builtinTemplates,
-  isBuiltinTemplateId,
   STANDARD_TEMPLATE_ID,
   type CountIssue,
   type DetailTemplate
@@ -237,7 +236,7 @@ import {
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { parseBlockRef } from "../../core/blocks/block-files";
-import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
+import { NOTE_STYLE_PRESETS, fileStyleName, styleLabel } from "./note-style";
 import {
   errorNotice,
   actionNotice,
@@ -484,15 +483,6 @@ function errorMessage(error: unknown): string {
 /** A note's stored "no conclusion yet" placeholder is written in the note's own language; in an AI prompt it is shown in the task's output language. */
 function summaryForPrompt(summary: string, language: ContentLanguage): string {
   return isPlaceholder(summary) ? translateNote(noteLanguageOf(language), "note.no_conclusion_yet") : summary;
-}
-/**
- * The built-in Standard and Textbook templates follow the output language, as the fixed Detail headings always did; their
- * display name uses `language` itself, so a Simplified Chinese interface labels the template "标准", not "標準".
- */
-function templateInLanguage(template: DetailTemplate, language: ContentLanguage): DetailTemplate {
-  return isBuiltinTemplateId(template.id)
-    ? builtinTemplates(noteLanguageOf(language), language).find(item => item.id === template.id)!
-    : template;
 }
 /**
  * Unmet section counts to store on the topic; undefined (no count check ran) clears an earlier mark. The text is written
@@ -2136,14 +2126,6 @@ export class VisualAgentMapView extends ItemView {
     });
     return toneText ? { toneText } : {};
   }
-  /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
-  private toneLabelFor(note: Pick<Note, "toneId">): string {
-    for (const id of [note.toneId, this.map?.toneId]) {
-      const found = this.noteStyles.toneName(id);
-      if (found) return found;
-    }
-    return this.noteStyles.toneName(DEFAULT_TONE_ID) ?? DEFAULT_TONE_ID;
-  }
   /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
   private toneChoices(): { id: string; name: string }[] {
     return this.noteStyles.toneChoices();
@@ -2165,8 +2147,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   private currentStyleLabel(templateId: string, toneId: string): string {
-    if (templateId.startsWith("style:") || templateId.startsWith("file:"))
-      return templateId.replace(/^(?:style|file):/, "");
+    const fileName = fileStyleName(templateId);
+    if (fileName !== undefined) return fileName;
     const names = (list: { id: string; name: string }[]) => (id: string) =>
       list.find(item => item.id === id)?.name ?? id;
     return styleLabel(
@@ -2211,10 +2193,6 @@ export class VisualAgentMapView extends ItemView {
       return preset ? { kind: "builtin", id: preset.id } : this.styleRefFor(chosen, undefined);
     }
     return this.styleRefFor(this.plugin.settings.defaultDetailTemplateId ?? STANDARD_TEMPLATE_ID, DEFAULT_TONE_ID);
-  }
-  /** The tone id a topic resolves to now (topic override, else map default, else academic), as toneLabelFor names it. */
-  private effectiveToneId(note: Pick<Note, "toneId">): string {
-    return [note.toneId, this.map?.toneId].find(id => this.noteStyles.toneName(id) !== undefined) ?? DEFAULT_TONE_ID;
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
   openOutlineImport(prefill?: OutlineDraftPrefill): void {
@@ -11170,6 +11148,7 @@ export class VisualAgentMapView extends ItemView {
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, this.map?.id, synthesisLabel);
+      const current = this.topicStyle(note);
       sources.synthesisTopics =
         this.map?.nodes
           .filter(item => item.parentId === node.id)
@@ -11254,15 +11233,15 @@ export class VisualAgentMapView extends ItemView {
           sources,
           templates: this.templateChoices(),
           tones: this.toneChoices(),
-          currentTone: this.toneLabelFor(note),
-          currentStyle: this.currentStyleLabel(this.topicStyle(note).template.id, this.effectiveToneId(note)),
-          currentStyleRef: this.styleRefFor(this.topicStyle(note).template.id, this.effectiveToneId(note)),
+          currentTone: current.label.toneName,
+          currentStyle: current.label.styleName,
+          ...(current.label.styleRef ? { currentStyleRef: current.label.styleRef } : {}),
           currentSummary: note.summary,
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: templateInLanguage(this.topicStyle(note).template, this.plugin.settings.language).name,
+          currentTemplate: current.label.templateName,
           topicStatus: note.status,
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
@@ -14126,8 +14105,7 @@ export class VisualAgentMapView extends ItemView {
     const selectedLabel = t("ui.reference_selected_topics_included", names.join(", "));
     const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
-    // Names stay as before (P3 moves them to the result's label).
-    const mapTemplate = this.mapStyle(settings.language).template;
+    const current = this.mapStyle(settings.language);
     new NextStepModal(
       this.app,
       "",
@@ -14149,11 +14127,11 @@ export class VisualAgentMapView extends ItemView {
         fields: {
           sources,
           templates: this.templateChoices(),
-          currentTemplate: mapTemplate.name,
+          currentTemplate: current.label.templateName,
           tones: this.toneChoices(),
-          currentTone: this.toneLabelFor({}),
-          currentStyle: this.currentStyleLabel(mapTemplate.id, this.effectiveToneId({})),
-          currentStyleRef: this.styleRefFor(mapTemplate.id, this.effectiveToneId({})),
+          currentTone: current.label.toneName,
+          currentStyle: current.label.styleName,
+          ...(current.label.styleRef ? { currentStyleRef: current.label.styleRef } : {}),
           ...this.outputLanguageMemory()
         },
         ...(pending

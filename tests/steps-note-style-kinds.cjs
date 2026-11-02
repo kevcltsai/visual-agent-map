@@ -8,6 +8,7 @@ const { loadSource } = require('./support-replay.cjs');
 const M = loadSource(`
 export { NoteStyleStore } from "./ai/note-style-store";
 export { BUILTIN_BLOCKS, builtinTemplateText } from "./core/blocks/builtin";
+export { builtinBlockIdOfName } from "./core/blocks/block-files";
 export { parseTemplateBlock, splitTemplateZones } from "./core/blocks/template-block";
 export { assembleTaskPrompt, selectionFromContext, promptStepOf } from "./core/steps/task/assemble";
 export { OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
@@ -43,7 +44,7 @@ HEADINGS.atomic['zh-CN'] = HEADINGS.atomic['zh-TW'];
 const NAMES = {
   'zh-TW': { hypothesis: '假設結構', evidence: '證據結構', action: '行動結構', atomic: '原子知識結構' },
   'zh-CN': { hypothesis: '假设结构', evidence: '证据结构', action: '行动结构', atomic: '原子知识结构' },
-  en: { hypothesis: 'Hypothesis', evidence: 'Evidence', action: 'Action', atomic: 'Atomic note' }
+  en: { hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure', atomic: 'Atomic note structure' }
 };
 const IDS = Object.keys(HEADINGS);
 const FOLDER = { 'zh-TW': ['積木', '結構'], en: ['Blocks', 'Templates'] };
@@ -166,21 +167,21 @@ test('kinds: the hypothesis prompt goes through the custom detail structure with
 });
 
 test('kinds: an override file equal to the built-in text is the built-in; a changed one that parses is used as written', async () => {
-  const same = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action.md`]: M.builtinTemplateText('action', 'en') });
+  const same = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action structure.md`]: M.builtinTemplateText('action', 'en') });
   const got = same.store.runStyle({ outputLanguage: 'en' });
   assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS.action.en);
   assert.equal(got.contextFields.styleSelection, undefined);
-  assert.equal(got.label.templateName, 'Action');
-  const changed = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action.md`]: '## Only\nOne section.\n' });
+  assert.equal(got.label.templateName, 'Action structure');
+  const changed = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action structure.md`]: '## Only\nOne section.\n' });
   const used = changed.store.runStyle({ outputLanguage: 'en' });
   assert.deepEqual(JSON.parse(JSON.stringify(names(used.template))), ['Only']);
-  assert.equal(used.contextFields.styleSelection.template.fileName, 'Action.md');
+  assert.equal(used.contextFields.styleSelection.template.fileName, 'Action structure.md');
 });
 
 test('kinds: a broken override of a kind template is stood in for by the same built-in, with the issues; nothing throws', async () => {
   const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
   for (const id of IDS) {
-    const file = { hypothesis: 'Hypothesis', evidence: 'Evidence', action: 'Action', atomic: 'Atomic note' }[id];
+    const file = { hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure', atomic: 'Atomic note structure' }[id];
     const { store, v } = await world({ noteTemplateBlock: `builtin:${id}` }, { [`${TPL}/${file}.md`]: BROKEN });
     let got;
     assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en' }); }, id);
@@ -204,6 +205,23 @@ test('kinds: the built-in names are not mistaken for the legacy ids, and Standar
   const { store } = await world({});
   assert.equal(store.runStyle({ outputLanguage: 'en' }).template.id, 'standard');
   assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic']);
+});
+
+test('kinds: a user file named Evidence / Action / Hypothesis / Atomic note stays a file ("mine"), is not claimed by a built-in, and file:<name> resolves to it', async () => {
+  const OWN = '## Mine A\nbody\n## Mine B\nbody\n';
+  for (const [name, id] of [['Evidence', 'evidence'], ['Action', 'action'], ['Hypothesis', 'hypothesis'], ['Atomic note', 'atomic']]) {
+    assert.equal(M.builtinBlockIdOfName('template', name), undefined, name);
+    const { store, v } = await world({ noteTemplateBlock: `file:${name}` }, { [`${TPL}/${name}.md`]: OWN });
+    const items = store.listBlocks('template');
+    const mine = items.find(item => item.kind === 'file' && item.name === name);
+    assert.ok(mine, `${name} is listed as a file item`);
+    assert.equal(mine.ref, `file:${name}`);
+    assert.equal(mine.modified, false, name);
+    assert.equal(items.find(item => item.ref === `builtin:${id}`).modified, false, `${id} built-in is untouched`);
+    const got = store.runStyle({ outputLanguage: 'en' });
+    assert.deepEqual(plainOf(names(got.template)), ['Mine A', 'Mine B'], name);
+    assert.deepEqual(v.writes, [], name);
+  }
 });
 
 // ---- P2: the topic-kind level of the resolution (ticket 07; decisions #10, #18, #19) ----

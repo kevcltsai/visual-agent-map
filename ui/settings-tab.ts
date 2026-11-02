@@ -490,9 +490,10 @@ export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPl
     if (missing) {
       const parsed = parseBlockRef(missing);
       const name = parsed?.kind === "file" ? parsed.base : parsed?.kind === "builtin" ? parsed.id : missing;
-      writeDesc({ text: t("ui.note_style_kind_missing_0_1", kindName, name), error: true });
+      writeDesc({ text: `⚠ ${t("ui.note_style_kind_missing_0_1", kindName, name)}`, error: true });
     } else if (issue) {
-      writeDesc({ text: t("ui.note_style_kind_issue_0_1", issue.line, styleIssueText(issue)), error: true });
+      const stand = current?.kind === "file" ? t("ui.note_style_standard_short") : (current?.name ?? "");
+      writeDesc({ text: t("ui.note_style_kind_issue_0_1_2", issue.line, styleIssueText(issue), stand), error: true });
     } else writeDesc(undefined);
   };
   setting.addDropdown(dropdown => {

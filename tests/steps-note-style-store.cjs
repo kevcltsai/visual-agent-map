@@ -274,7 +274,7 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   const moved = store.runStyle(request([{ template: 'uuid-1' }]));
   assert.ok(moved.contextFields.styleSelection, 'the old template runs as its block');
   eq(moved.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
-  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard'], ['builtin', 'Textbook'], ['builtin', 'Hypothesis'], ['builtin', 'Evidence'], ['builtin', 'Action'], ['builtin', 'Atomic note'], ['file', 'My notes']]);
+  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard'], ['builtin', 'Textbook'], ['builtin', 'Hypothesis structure'], ['builtin', 'Evidence structure'], ['builtin', 'Action structure'], ['builtin', 'Atomic note structure'], ['file', 'My notes']]);
 });
 
 test('D12 (was export conflicts): a user file with the name (also another case) keeps its bytes; the old template takes a unique name and its id points at it', async () => {

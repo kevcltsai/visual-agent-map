@@ -556,8 +556,8 @@ test('Low 4: after Edit or Save as makes a file, the File location description i
 
 // P3: the "By topic type" block (heading plus six pickers).
 const KIND_TEMPLATES = () => [
-  item('builtin:standard', 'Standard'), item('builtin:textbook', 'Textbook'), item('builtin:hypothesis', 'Hypothesis'),
-  item('builtin:evidence', 'Evidence'), item('builtin:action', 'Action'), item('builtin:atomic', 'Atomic note')
+  item('builtin:standard', 'Standard'), item('builtin:textbook', 'Textbook'), item('builtin:hypothesis', 'Hypothesis structure'),
+  item('builtin:evidence', 'Evidence structure'), item('builtin:action', 'Action structure'), item('builtin:atomic', 'Atomic note structure')
 ];
 function kindRow(kind, { settings = {}, templates = KIND_TEMPLATES() } = {}) {
   const { setting, view } = fakeSetting();
@@ -599,7 +599,7 @@ test('By topic type: the Suggested group exists only for atomic, hypothesis, evi
     const groups = groupsOf(row.view);
     const suggested = groups.find(group => group.label === 'Suggested');
     if (['atomic', 'hypothesis', 'evidence', 'action'].includes(kind)) {
-      const name = { atomic: 'Atomic note', hypothesis: 'Hypothesis', evidence: 'Evidence', action: 'Action' }[kind];
+      const name = { atomic: 'Atomic note structure', hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure' }[kind];
       assert.deepEqual(suggested.options, [name], kind);
       assert.equal(groups.find(group => group.label === 'Built-in').options.includes(name), false, kind);
       assert.equal(groups[0].label, 'Suggested');
@@ -647,7 +647,7 @@ test('By topic type: a structure that is gone shows "Not found: X" selected with
   await flush();
   assert.equal(gone.view.dropdown.selectEl.value, 'file:Gone');
   assert.deepEqual(optionsOf(gone.view)[1], ['file:Gone', 'Not found: Gone']);
-  assert.deepEqual(lines(gone.view), [t('ui.note_style_kind_missing_0_1', 'Hypothesis', 'Gone')]);
+  assert.deepEqual(lines(gone.view), ['⚠ ' + t('ui.note_style_kind_missing_0_1', 'Hypothesis', 'Gone')]);
   assert.deepEqual(errorLines(gone.view), lines(gone.view));
   assert.equal(gone.settings.noteTemplateByKind.hypothesis, 'file:Gone');
   assert.equal(gone.saves.length, 0);
@@ -661,6 +661,39 @@ test('By topic type: a structure that is gone shows "Not found: X" selected with
   assert.equal(lines(bad.view).length, 1);
   assert.match(lines(bad.view)[0], /^⚠ Line 3:/);
   assert.deepEqual(errorLines(bad.view), lines(bad.view));
+});
+
+test('By topic type: a user file named Evidence, saved as file:Evidence, is a listed file option and the row does not say it is missing', async () => {
+  const row = kindRow('evidence', {
+    settings: { noteTemplateByKind: { evidence: 'file:Evidence' } },
+    templates: [...KIND_TEMPLATES(), item('file:Evidence', 'Evidence', { fileName: 'Evidence.md' })]
+  });
+  await flush();
+  assert.equal(row.view.dropdown.selectEl.value, 'file:Evidence');
+  assert.equal(optionsOf(row.view).some(option => /Not found/.test(option[1])), false);
+  assert.deepEqual(lines(row.view), []);
+  assert.deepEqual(groupsOf(row.view).at(-1), { label: 'Mine', options: ['Evidence'] });
+});
+
+test('By topic type: the problem line names the actual stand-in (a broken own file: Standard; a broken built-in override: that built-in) in every language', async () => {
+  const issue = [{ line: 3, code: 'format_heading_repeated', values: [], message: 'x' }];
+  const own = kindRow('action', {
+    settings: { noteTemplateByKind: { action: 'file:Broken' } },
+    templates: [...KIND_TEMPLATES(), item('file:Broken', 'Broken', { fileName: 'Broken.md', issues: issue })]
+  });
+  await flush();
+  assert.match(lines(own.view)[0], /^⚠ Line 3: .* Until it is fixed, topics of this type use the built-in "Standard"\.$/);
+  const override = kindRow('action', {
+    settings: { noteTemplateByKind: { action: 'builtin:action' } },
+    templates: KIND_TEMPLATES().map(entry => (entry.ref === 'builtin:action' ? { ...entry, modified: true, issues: issue } : entry))
+  });
+  await flush();
+  assert.match(lines(override.view)[0], /use the built-in "Action structure"\.$/);
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_issue_0_1_2', 3, 'X。', '標準'), '⚠ 第 3 行：X。修好之前，這個類型的議題會先用內建的「標準」。');
+  assert.equal(i18n.translate('zh-CN', 'ui.note_style_kind_issue_0_1_2', 3, 'X。', '标准'), '⚠ 第 3 行：X。修好之前，这个类型的议题会先用内置的“标准”。');
+  const gone = kindRow('hypothesis', { settings: { noteTemplateByKind: { hypothesis: 'file:Gone' } } });
+  await flush();
+  assert.ok(lines(gone.view)[0].startsWith('⚠ '));
 });
 
 test('the upper Structure row explains the four new built-ins (every language, en within 80 characters)', async () => {

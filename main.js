@@ -1498,10 +1498,10 @@ var en = {
   "ui.note_style_standard_short": "Standard",
   "ui.note_style_textbook": "Textbook (intro, then sections)",
   "ui.note_style_textbook_short": "Textbook",
-  "ui.note_style_hypothesis_short": "Hypothesis",
-  "ui.note_style_evidence_short": "Evidence",
-  "ui.note_style_action_short": "Action",
-  "ui.note_style_atomic_short": "Atomic note",
+  "ui.note_style_hypothesis_short": "Hypothesis structure",
+  "ui.note_style_evidence_short": "Evidence structure",
+  "ui.note_style_action_short": "Action structure",
+  "ui.note_style_atomic_short": "Atomic note structure",
   "ui.block_template_format_heading": "Format rules",
   "ui.block_folder_name": "Blocks",
   "ui.block_folder_template": "Templates",
@@ -1601,7 +1601,7 @@ var en = {
   "ui.note_style_by_kind_desc": "Each type of topic can use its own note structure. A structure chosen on the topic or for a run still wins.",
   "ui.note_style_kind_none": "Not set (use the map or default structure)",
   "ui.note_style_kind_row_aria_0": "Note structure for {0}",
-  "ui.note_style_kind_issue_0_1": "\u26A0 Line {0}: {1} Until it is fixed, topics of this type use the built-in version.",
+  "ui.note_style_kind_issue_0_1_2": '\u26A0 Line {0}: {1} Until it is fixed, topics of this type use the built-in "{2}".',
   "ui.note_style_hypothesis_hint": "Claim, prediction, test, support, counterevidence, judgment.",
   "ui.note_style_evidence_hint": "Content, credibility, and what it supports or refutes.",
   "ui.note_style_action_hint": "Goal, steps, checkpoints and a done-when check.",
@@ -3880,11 +3880,11 @@ var zhCN = {
   "ui.note_style_by_kind_desc": "\u4E0D\u540C\u7C7B\u578B\u7684\u8BAE\u9898\u53EF\u4EE5\u7528\u4E0D\u540C\u7684\u7B14\u8BB0\u7ED3\u6784\u3002\u8BAE\u9898\u6216\u8FD0\u884C\u65F6\u81EA\u5DF1\u9009\u7684\u7ED3\u6784\u4ECD\u7136\u4F18\u5148\u3002",
   "ui.note_style_kind_none": "\u4E0D\u6307\u5B9A\uFF08\u7528\u5FC3\u667A\u56FE\u6216\u9ED8\u8BA4\u7684\u7ED3\u6784\uFF09",
   "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B14\u8BB0\u7ED3\u6784",
-  "ui.note_style_kind_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u7684\u8BAE\u9898\u4F1A\u5148\u7528\u5185\u7F6E\u7248\u672C\u3002",
+  "ui.note_style_kind_issue_0_1_2": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u7684\u8BAE\u9898\u4F1A\u5148\u7528\u5185\u7F6E\u7684\u201C{2}\u201D\u3002",
   "ui.note_style_hypothesis_hint": "\u516B\u4E2A\u5206\u7C7B\uFF1A\u4E3B\u5F20\u3001\u9884\u6D4B\u3001\u9A8C\u8BC1\u65B9\u5F0F\uFF0C\u5230\u652F\u6301\u3001\u53CD\u9A73\u4E0E\u5F53\u524D\u5224\u65AD\u3002",
   "ui.note_style_evidence_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5185\u5BB9\u3001\u53EF\u4FE1\u5EA6\u3001\u652F\u6301\u6216\u53CD\u9A73\uFF0C\u5E76\u9644\u6765\u6E90\u3002",
   "ui.note_style_action_hint": "\u516D\u4E2A\u5206\u7C7B\uFF1A\u76EE\u6807\u3001\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u4E0E\u5B8C\u6210\u6761\u4EF6\u3002",
-  "ui.note_style_atomic_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5B9A\u4E49\u3001\u8BF4\u660E\u3001\u4F8B\u5B50\uFF1B\u4E00\u5219\u7B14\u8BB0\u53EA\u8BB2\u4E00\u4E2A\u6982\u5FF5\u3002",
+  "ui.note_style_atomic_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5B9A\u4E49\u3001\u89E3\u91CA\u3001\u4F8B\u5B50\uFF1B\u4E00\u5219\u7B14\u8BB0\u53EA\u8BB2\u4E00\u4E2A\u6982\u5FF5\u3002",
   "ui.note_style_label_0_1": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}",
   "ui.note_style_label_0_1_2": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}\uFF08{2}\uFF09",
   "ui.note_style_source_kind": "\u7ED3\u6784\u6765\u81EA\u8BAE\u9898\u7C7B\u578B",
@@ -6159,11 +6159,11 @@ var zhTW = {
   "ui.note_style_by_kind_desc": "\u4E0D\u540C\u985E\u578B\u7684\u8B70\u984C\u53EF\u4EE5\u7528\u4E0D\u540C\u7684\u7B46\u8A18\u7D50\u69CB\u3002\u8B70\u984C\u6216\u57F7\u884C\u6642\u81EA\u5DF1\u9078\u7684\u7D50\u69CB\u4ECD\u7136\u512A\u5148\u3002",
   "ui.note_style_kind_none": "\u4E0D\u6307\u5B9A\uFF08\u7528\u5FC3\u667A\u5716\u6216\u9810\u8A2D\u7684\u7D50\u69CB\uFF09",
   "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B46\u8A18\u7D50\u69CB",
-  "ui.note_style_kind_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u9019\u500B\u985E\u578B\u7684\u8B70\u984C\u6703\u5148\u7528\u5167\u5EFA\u7248\u672C\u3002",
+  "ui.note_style_kind_issue_0_1_2": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u9019\u500B\u985E\u578B\u7684\u8B70\u984C\u6703\u5148\u7528\u5167\u5EFA\u7684\u300C{2}\u300D\u3002",
   "ui.note_style_hypothesis_hint": "\u516B\u500B\u5206\u985E\uFF1A\u4E3B\u5F35\u3001\u9810\u6E2C\u3001\u9A57\u8B49\u65B9\u5F0F\uFF0C\u5230\u652F\u6301\u3001\u53CD\u99C1\u8207\u76EE\u524D\u5224\u65B7\u3002",
   "ui.note_style_evidence_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5167\u5BB9\u3001\u53EF\u4FE1\u5EA6\u3001\u652F\u6301\u6216\u53CD\u99C1\uFF0C\u4E26\u9644\u4F86\u6E90\u3002",
   "ui.note_style_action_hint": "\u516D\u500B\u5206\u985E\uFF1A\u76EE\u6A19\u3001\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u8207\u5B8C\u6210\u689D\u4EF6\u3002",
-  "ui.note_style_atomic_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5B9A\u7FA9\u3001\u8AAA\u660E\u3001\u4F8B\u5B50\uFF1B\u4E00\u5247\u7B46\u8A18\u53EA\u8B1B\u4E00\u500B\u6982\u5FF5\u3002",
+  "ui.note_style_atomic_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5B9A\u7FA9\u3001\u89E3\u91CB\u3001\u4F8B\u5B50\uFF1B\u4E00\u5247\u7B46\u8A18\u53EA\u8B1B\u4E00\u500B\u6982\u5FF5\u3002",
   "ui.note_style_label_0_1": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}",
   "ui.note_style_label_0_1_2": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}\uFF08{2}\uFF09",
   "ui.note_style_source_kind": "\u7D50\u69CB\u4F86\u81EA\u8B70\u984C\u985E\u578B",
@@ -63936,7 +63936,7 @@ function renderNoteKindSetting(setting, plugin, kind) {
     if (line) setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : void 0 });
   };
   const render = () => {
-    var _a2;
+    var _a2, _b2;
     if (!picker) return;
     const items = store.listBlocks("template");
     const saved = (_a2 = settings.noteTemplateByKind) == null ? void 0 : _a2[kind];
@@ -63974,9 +63974,10 @@ function renderNoteKindSetting(setting, plugin, kind) {
     if (missing) {
       const parsed = parseBlockRef(missing);
       const name = (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : (parsed == null ? void 0 : parsed.kind) === "builtin" ? parsed.id : missing;
-      writeDesc({ text: t("ui.note_style_kind_missing_0_1", kindName, name), error: true });
+      writeDesc({ text: `\u26A0 ${t("ui.note_style_kind_missing_0_1", kindName, name)}`, error: true });
     } else if (issue2) {
-      writeDesc({ text: t("ui.note_style_kind_issue_0_1", issue2.line, styleIssueText(issue2)), error: true });
+      const stand = (current == null ? void 0 : current.kind) === "file" ? t("ui.note_style_standard_short") : (_b2 = current == null ? void 0 : current.name) != null ? _b2 : "";
+      writeDesc({ text: t("ui.note_style_kind_issue_0_1_2", issue2.line, styleIssueText(issue2), stand), error: true });
     } else writeDesc(void 0);
   };
   setting.addDropdown((dropdown) => {

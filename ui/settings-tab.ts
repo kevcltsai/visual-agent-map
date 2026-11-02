@@ -4,7 +4,8 @@ import { normalizeReasoningLevel } from "../repository";
 import { modelDiscoverySummary, syncModelSelect } from "../core/model-discovery";
 import { NOTE_STYLE_PRESETS } from "../experiences/visual-map/note-style";
 import { clampPreviewScale } from "./preview-utils";
-import { App, Menu, Modal, normalizePath, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Menu, Modal, normalizePath, PluginSettingTab, Setting } from "obsidian";
+import type { SettingDefinition, SettingDefinitionGroup, SettingDefinitionItem, SettingDefinitionPage } from "obsidian";
 import type { ButtonComponent, DropdownComponent, ExtraButtonComponent } from "obsidian";
 import { NameModal } from "./modals/name-modal";
 import type { BlockListItem } from "../ai/note-style-store";
@@ -25,6 +26,18 @@ import type { TopicKind } from "../note-values";
  */
 export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapPlugin): void {
   setting.setName(t("ui.note_style")).setDesc(t("ui.note_style_setting_desc")).setHeading();
+  setting.addButton(button => {
+    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
+    button.buttonEl.addClass("mod-muted");
+  });
+}
+
+/**
+ * The first row of the "Note style" page: the one-line help and the "Preview AI instructions" button on its right.
+ * (`renderNoteStyleSetting` is the same content as a heading; this one is an ordinary row.)
+ */
+export function renderNoteStyleIntro(setting: Setting, plugin: VisualAgentMapPlugin): void {
+  setting.setDesc(t("ui.settings_note_style_intro"));
   setting.addButton(button => {
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
     button.buttonEl.addClass("mod-muted");
@@ -781,264 +794,405 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     const shown = current.startsWith(`${workspace}/`) ? current.slice(workspace.length + 1) : current;
     setting
       .setName(t(label))
-      .setDesc(t("ui.map_folder_name_desc", workspace))
+      .setDesc(t("ui.settings_map_folder_desc_0", workspace))
       .addText(input => {
         input.setPlaceholder(fallback).setValue(shown);
         bindMapFolderInput(this.plugin, key, input);
       });
   }
   getSettingDefinitions(): SettingDefinitionItem[] {
-    const text = (name: string, key: "codexPath" | "claudePath", desc: string): SettingDefinitionItem => ({
-      name,
-      desc,
-      control: { type: "text", key }
-    });
-    const diagnostic = this.plugin.codexDiagnostic();
-    const claudeDiagnostic = this.plugin.claudeDiagnostic();
+    const aiConnectionPage: SettingDefinitionPage = {
+      type: "page",
+      name: t("ui.settings_ai_connection_name"),
+      desc: t("ui.settings_ai_connection_desc"),
+      displayValue: () => this.aiConnectionValue(),
+      status: () => this.aiConnectionStatus(),
+      items: [
+        { name: t("ui.settings_ai_connection_intro") },
+        this.cliGroup(
+          "Codex",
+          "codex",
+          t("ui.settings_codex_path_desc"),
+          "ui.codex_cli_was_not_found_follow_the_installation_guide_to_ins"
+        ),
+        this.cliGroup(
+          "Claude Code",
+          "claude",
+          t("ui.settings_claude_path_desc"),
+          "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"
+        )
+      ]
+    };
+    const noteKindPage: SettingDefinitionPage = {
+      type: "page",
+      name: t("ui.note_style_by_kind"),
+      desc: t("ui.settings_by_kind_desc"),
+      displayValue: () => this.noteKindValue(),
+      status: () => this.noteKindStatus(),
+      items: [
+        { name: t("ui.settings_by_kind_intro") },
+        ...KIND_ROWS.map(kind => ({
+          name: t(`ui.topic_kind_${kind}`),
+          render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
+        }))
+      ]
+    };
+    const noteStylePage: SettingDefinitionPage = {
+      type: "page",
+      name: t("ui.note_style"),
+      desc: t("ui.settings_note_style_page_desc"),
+      displayValue: () => this.noteStyleValue(),
+      status: () => this.noteStyleStatus(),
+      items: [
+        {
+          name: t("ui.settings_note_style_intro"),
+          render: setting => renderNoteStyleIntro(setting, this.plugin)
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_default"),
+          items: [
+            {
+              name: t("ui.settings_structure"),
+              render: setting => {
+                renderNoteBlockSetting(setting, this.plugin, "template", () => this.noteLocationChanged?.());
+                setting.setName(t("ui.settings_structure"));
+              }
+            },
+            {
+              name: t("ui.settings_voice"),
+              render: setting => {
+                renderNoteBlockSetting(setting, this.plugin, "tone", () => this.noteLocationChanged?.());
+                setting.setName(t("ui.settings_voice"));
+              }
+            }
+          ]
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_more"),
+          items: [
+            noteKindPage,
+            {
+              name: t("ui.note_style_folder_path"),
+              render: setting => {
+                this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
+              }
+            }
+          ]
+        }
+      ]
+    };
+    const advancedPage: SettingDefinitionPage = {
+      type: "page",
+      name: t("ui.settings_advanced_name"),
+      desc: t("ui.settings_advanced_desc"),
+      items: [
+        {
+          type: "group",
+          heading: t("ui.settings_group_debug"),
+          items: [
+            {
+              name: t("ui.record_ai_exchanges"),
+              render: setting => {
+                setting
+                  .setName(t("ui.record_ai_exchanges"))
+                  .setDesc(t("ui.settings_record_desc"))
+                  .addToggle(toggle =>
+                    toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async value => {
+                      this.plugin.settings.aiExchangeLoggingEnabled = value;
+                      await this.plugin.saveSettings();
+                    })
+                  );
+              }
+            }
+          ]
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_workspace"),
+          items: [
+            {
+              name: t("ui.settings_workspace_location"),
+              render: setting => {
+                setting
+                  .setName(t("ui.settings_workspace_location"))
+                  .setDesc(
+                    t(
+                      "ui.settings_workspace_location_desc_0_1",
+                      this.plugin.settings.workspaceFolder,
+                      this.plugin.settings.topicsFolder
+                    )
+                  );
+              }
+            },
+            this.actionRow(
+              t("ui.settings_repair_name"),
+              t("ui.settings_repair_desc"),
+              t("ui.repair"),
+              () => void this.plugin.mutate(() => this.plugin.repairWorkspace())
+            ),
+            this.actionRow(
+              t("ui.settings_rebuild_name"),
+              t("ui.settings_rebuild_desc"),
+              t("ui.full_rebuild"),
+              () => void this.plugin.mutate(() => this.plugin.fullRebuild())
+            ),
+            this.actionRow(
+              t("ui.reconnect_existing_workspace"),
+              t("ui.settings_reconnect_desc"),
+              t("ui.scan"),
+              () => void this.plugin.offerWorkspaceReconnect()
+            )
+          ]
+        }
+      ]
+    };
     return [
       {
-        name: t("ui.interface_language"),
-        render: setting => {
-          setting
-            .setName(t("ui.interface_language"))
-            .setDesc(t("ui.interface_language_description"))
-            .addDropdown(dropdown => {
-              for (const option of SUPPORTED_LANGUAGES) dropdown.addOption(option.id, option.label);
-              dropdown.setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
-              dropdown.onChange(value => {
-                void this.plugin.changeLanguage(value);
-              });
-            });
-        }
-      },
-      text(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
-      text(t("ui.claude_cli_path"), "claudePath", t("ui.vam_uses_the_claude_code_cli_installed_on_this_computer")),
-      {
-        name: t("ui.current_model"),
-        desc: t("ui.current_model_description"),
-        render: setting => {
-          this.followCurrentModel();
-          setting
-            .setName(t("ui.current_model"))
-            .setDesc(t("ui.current_model_description"))
-            .addDropdown(dropdown => {
-              const select = (dropdown as unknown as { selectEl: HTMLSelectElement }).selectEl;
-              this.modelSelects.add(select);
-              const selected = this.plugin.settings.cliModel;
-              this.showCurrentModel(select, selected);
-              dropdown.setValue(selected);
-              dropdown.onChange(value => {
-                void this.setControlValue("cliModel", value);
-              });
-            })
-            .addButton(button =>
-              button.setButtonText(t("ui.check_again")).onClick(() => {
-                void this.plugin.refreshModelDiscovery("codex");
-                void this.plugin.refreshModelDiscovery("claude");
-              })
-            );
-          const statusEl = setting.descEl.createDiv({ cls: "vam-model-discovery-status" });
-          this.modelStatusEls.add(statusEl);
-          statusEl.setText(
-            modelDiscoverySummary(this.plugin.modelDiscoveryState("codex"), this.plugin.modelDiscoveryState("claude"))
-          );
-          if (this.plugin.modelDiscoveryState("codex").status === "idle")
-            void this.plugin.refreshModelDiscovery("codex");
-          if (this.plugin.modelDiscoveryState("claude").status === "idle")
-            void this.plugin.refreshModelDiscovery("claude");
-        }
+        type: "group",
+        heading: t("ui.settings_group_general"),
+        items: [
+          {
+            name: t("ui.interface_language"),
+            render: setting => {
+              setting
+                .setName(t("ui.interface_language"))
+                .setDesc(t("ui.settings_language_desc"))
+                .addDropdown(dropdown => {
+                  for (const option of SUPPORTED_LANGUAGES) dropdown.addOption(option.id, option.label);
+                  dropdown.setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
+                  dropdown.onChange(value => {
+                    void this.plugin.changeLanguage(value);
+                  });
+                });
+            }
+          }
+        ]
       },
       {
-        name: t("ui.ai_reasoning_level"),
-        desc: t("ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe"),
-        control: {
-          type: "dropdown",
-          key: "cliReasoning",
-          options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") }
-        }
-      },
-      {
-        name: t("ui.note_style"),
-        render: setting => renderNoteStyleSetting(setting, this.plugin)
-      },
-      {
-        name: t("ui.block_picker_template"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "template", () => this.noteLocationChanged?.())
-      },
-      {
-        name: t("ui.block_picker_tone"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.noteLocationChanged?.())
-      },
-      { name: t("ui.note_style_by_kind"), render: setting => renderNoteKindHeading(setting) },
-      ...KIND_ROWS.map(kind => ({
-        name: t(`ui.topic_kind_${kind}`),
-        render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
-      })),
-      {
-        name: t("ui.note_style_folder_path"),
-        render: setting => {
-          this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
-        }
-      },
-      {
-        name: t("ui.markdown_selection_ai_auto_open"),
-        render: setting => {
-          setting
-            .setName(t("ui.markdown_selection_ai_auto_open"))
-            .setDesc(t("ui.markdown_selection_ai_auto_open_desc"))
-            .addToggle(toggle =>
-              toggle.setValue(this.plugin.settings.markdownSelectionAiAutoOpen).onChange(async value => {
-                this.plugin.settings.markdownSelectionAiAutoOpen = value;
-                await this.plugin.saveSettings();
-              })
-            );
-        }
-      },
-      {
-        name: t("ui.add_diagrams_after_research"),
-        render: setting => {
-          setting
-            .setName(t("ui.add_diagrams_after_research"))
-            .setDesc(t("ui.add_diagrams_after_research_desc"))
-            .addToggle(toggle =>
-              toggle.setValue(this.plugin.settings.addDiagramsAfterResearch).onChange(async value => {
-                this.plugin.settings.addDiagramsAfterResearch = value;
-                await this.plugin.saveSettings();
-              })
-            );
-        }
-      },
-      {
-        name: t("ui.preview_card_size"),
-        render: setting => {
-          setting
-            .setName(t("ui.preview_card_size"))
-            .setDesc(t("ui.preview_card_size_desc"))
-            .addSlider(slider =>
-              slider
-                .setLimits(80, 240, 5)
-                .setValue(clampPreviewScale(this.plugin.settings.previewScale))
-                .onChange(async value => {
-                  this.plugin.settings.previewScale = clampPreviewScale(value);
-                  await this.plugin.saveSettings();
+        type: "group",
+        heading: t("ui.settings_group_ai"),
+        items: [
+          {
+            name: t("ui.settings_model_name"),
+            render: setting => {
+              this.followCurrentModel();
+              setting
+                .setName(t("ui.settings_model_name"))
+                .setDesc(t("ui.settings_model_desc"))
+                .addDropdown(dropdown => {
+                  const select = (dropdown as unknown as { selectEl: HTMLSelectElement }).selectEl;
+                  this.modelSelects.add(select);
+                  const selected = this.plugin.settings.cliModel;
+                  this.showCurrentModel(select, selected);
+                  dropdown.setValue(selected);
+                  dropdown.onChange(value => {
+                    void this.setControlValue("cliModel", value);
+                  });
                 })
-            );
-        }
+                .addButton(button =>
+                  button.setButtonText(t("ui.check_again")).onClick(() => {
+                    void this.plugin.refreshModelDiscovery("codex");
+                    void this.plugin.refreshModelDiscovery("claude");
+                  })
+                );
+              const statusEl = setting.descEl.createDiv({ cls: "vam-model-discovery-status" });
+              this.modelStatusEls.add(statusEl);
+              statusEl.setText(
+                modelDiscoverySummary(
+                  this.plugin.modelDiscoveryState("codex"),
+                  this.plugin.modelDiscoveryState("claude")
+                )
+              );
+              if (this.plugin.modelDiscoveryState("codex").status === "idle")
+                void this.plugin.refreshModelDiscovery("codex");
+              if (this.plugin.modelDiscoveryState("claude").status === "idle")
+                void this.plugin.refreshModelDiscovery("claude");
+            }
+          },
+          {
+            name: t("ui.settings_reasoning_name"),
+            desc: t("ui.settings_reasoning_desc"),
+            control: {
+              type: "dropdown",
+              key: "cliReasoning",
+              options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") }
+            }
+          },
+          aiConnectionPage
+        ]
       },
       {
-        name: t("ui.record_ai_exchanges"),
-        render: setting => {
-          setting
-            .setName(t("ui.record_ai_exchanges"))
-            .setDesc(t("ui.when_enabled_the_20_most_recent_full_requests_and_raw_replie"))
-            .addToggle(toggle =>
-              toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async value => {
-                this.plugin.settings.aiExchangeLoggingEnabled = value;
-                await this.plugin.saveSettings();
-              })
-            );
-        }
+        type: "group",
+        heading: t("ui.settings_group_notes"),
+        items: [
+          noteStylePage,
+          {
+            name: t("ui.settings_selection_ai_name"),
+            render: setting => {
+              setting
+                .setName(t("ui.settings_selection_ai_name"))
+                .setDesc(t("ui.settings_selection_ai_desc"))
+                .addToggle(toggle =>
+                  toggle.setValue(this.plugin.settings.markdownSelectionAiAutoOpen).onChange(async value => {
+                    this.plugin.settings.markdownSelectionAiAutoOpen = value;
+                    await this.plugin.saveSettings();
+                  })
+                );
+            }
+          },
+          {
+            name: t("ui.add_diagrams_after_research"),
+            render: setting => {
+              setting
+                .setName(t("ui.add_diagrams_after_research"))
+                .setDesc(t("ui.settings_diagrams_desc"))
+                .addToggle(toggle =>
+                  toggle.setValue(this.plugin.settings.addDiagramsAfterResearch).onChange(async value => {
+                    this.plugin.settings.addDiagramsAfterResearch = value;
+                    await this.plugin.saveSettings();
+                  })
+                );
+            }
+          }
+        ]
       },
       {
-        name: t("ui.workspace_location"),
-        render: setting => {
-          setting
-            .setName(t("ui.workspace_location"))
-            .setDesc(
-              t(
-                "ui.workspace_location_0_legacy_topics_1",
-                this.plugin.settings.workspaceFolder,
-                this.plugin.settings.topicsFolder
-              )
-            );
-        }
+        type: "group",
+        heading: t("ui.settings_group_map"),
+        items: [
+          {
+            name: t("ui.preview_card_size"),
+            render: setting => {
+              setting
+                .setName(t("ui.preview_card_size"))
+                .setDesc(t("ui.settings_preview_size_desc"))
+                .addSlider(slider =>
+                  slider
+                    .setLimits(80, 240, 5)
+                    .setValue(clampPreviewScale(this.plugin.settings.previewScale))
+                    .onChange(async value => {
+                      this.plugin.settings.previewScale = clampPreviewScale(value);
+                      await this.plugin.saveSettings();
+                    })
+                );
+            }
+          },
+          {
+            name: t("ui.mind_maps_folder"),
+            render: setting =>
+              this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
+          },
+          {
+            name: t("ui.aim_maps_folder"),
+            render: setting => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
+          }
+        ]
       },
       {
-        name: t("ui.mind_maps_folder"),
-        render: setting => this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
-      },
-      {
-        name: t("ui.aim_maps_folder"),
-        render: setting => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
-      },
-      {
-        name: t("ui.repair_agent_workspace"),
-        render: setting => {
-          setting
-            .setName(t("ui.repair_agent_workspace"))
-            .setDesc(t("ui.creates_only_missing_base_folders_it_never_restores_moves_or"))
-            .addButton(button =>
-              button.setButtonText(t("ui.repair")).onClick(() => {
-                void this.plugin.mutate(() => this.plugin.repairWorkspace());
-              })
-            );
-        }
-      },
-      {
-        name: t("ui.refresh_vam_data"),
-        render: setting => {
-          setting
-            .setName(t("ui.refresh_vam_data"))
-            .setDesc(t("ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri"))
-            .addButton(button =>
-              button.setButtonText(t("ui.full_rebuild")).onClick(() => {
-                void this.plugin.mutate(() => this.plugin.fullRebuild());
-              })
-            );
-        }
-      },
-      {
-        name: t("ui.reconnect_existing_workspace"),
-        render: setting => {
-          setting
-            .setName(t("ui.reconnect_existing_workspace"))
-            .setDesc(t("ui.scan_for_recognizable_vam_workspaces_and_reconnect_only_afte"))
-            .addButton(button =>
-              button.setButtonText(t("ui.scan")).onClick(() => {
-                void this.plugin.offerWorkspaceReconnect();
-              })
-            );
-        }
-      },
-      {
-        name: t("ui.codex_app_server_status"),
-        render: setting => {
-          setting
-            .setName(t("ui.codex_app_server_status"))
-            .setDesc(
-              diagnostic.installed
-                ? t("ui.codex_cli_found_0", diagnostic.executable)
-                : t("ui.codex_cli_was_not_found_follow_the_installation_guide_to_ins")
-            );
-          if (!diagnostic.installed)
-            setting.addButton(button =>
-              button.setButtonText(t("ui.installation_guide")).onClick(() => this.plugin.openCodexSetupGuide())
-            );
-          setting.addButton(button =>
-            button.setButtonText(t("ui.check_again")).onClick(() => {
-              void this.plugin.recheckCodex();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.claude_code_status"),
-        render: setting => {
-          setting
-            .setName(t("ui.claude_code_status"))
-            .setDesc(
-              claudeDiagnostic.installed
-                ? t("ui.claude_cli_found_0", claudeDiagnostic.executable)
-                : t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it")
-            );
-          setting.addButton(button =>
-            button.setButtonText(t("ui.check_again")).onClick(() => {
-              void this.plugin.recheckClaude();
-            })
-          );
-        }
+        type: "group",
+        heading: t("ui.settings_group_advanced"),
+        items: [advancedPage]
       }
     ];
+  }
+  /** Entry value of the "AI connection" page: how many of the two CLIs were found. */
+  private aiConnectionValue(): string {
+    const found = [this.plugin.codexDiagnostic().installed, this.plugin.claudeDiagnostic().installed].filter(Boolean);
+    return found.length ? t("ui.settings_connected_count_0", found.length) : t("ui.settings_not_connected");
+  }
+  /** Entry status of the "AI connection" page: needs attention when neither CLI was found. */
+  private aiConnectionStatus(): "warning" | null {
+    return this.plugin.codexDiagnostic().installed || this.plugin.claudeDiagnostic().installed ? null : "warning";
+  }
+  /** Entry value of the "Note style" page: "<structure> · <voice>" by name, falling back to the ref. */
+  private noteStyleValue(): string {
+    try {
+      const shown = shownBlocks(this.plugin);
+      const nameOf = (category: BlockCategory): string =>
+        this.plugin.noteStyles.listBlocks(category).find(item => item.ref === shown[category])?.name ?? shown[category];
+      return `${nameOf("template")} · ${nameOf("tone")}`;
+    } catch {
+      return "";
+    }
+  }
+  /** Entry status of the "Note style" page: a saved structure or voice whose file is gone. */
+  private noteStyleStatus(): "warning" | null {
+    try {
+      return missingBlockRef(this.plugin, "template") || missingBlockRef(this.plugin, "tone") ? "warning" : null;
+    } catch {
+      return null;
+    }
+  }
+  /** Entry value of the "By topic type" page: how many types have their own structure. */
+  private noteKindValue(): string {
+    const count = Object.keys(this.plugin.settings.noteTemplateByKind ?? {}).length;
+    return count ? t("ui.settings_kinds_set_count_0", count) : t("ui.settings_kinds_unset");
+  }
+  /** Entry status of the "By topic type" page: a saved structure that no longer exists. */
+  private noteKindStatus(): "warning" | null {
+    try {
+      const refs = new Set(this.plugin.noteStyles.listBlocks("template").map(item => item.ref));
+      const saved = Object.values(this.plugin.settings.noteTemplateByKind ?? {});
+      return saved.some(ref => ref && !refs.has(ref)) ? "warning" : null;
+    } catch {
+      return null;
+    }
+  }
+  /** One CLI group of the "AI connection" page: status (with install guide and re-check) and the executable path. */
+  private cliGroup(
+    heading: string,
+    provider: "codex" | "claude",
+    pathDesc: string,
+    notFoundDesc: TranslationKey
+  ): SettingDefinitionGroup {
+    const diagnostic = () => (provider === "codex" ? this.plugin.codexDiagnostic() : this.plugin.claudeDiagnostic());
+    return {
+      type: "group",
+      heading,
+      items: [
+        {
+          name: t("ui.settings_status"),
+          render: setting => {
+            const found = diagnostic();
+            setting
+              .setName(t("ui.settings_status"))
+              .setDesc(found.installed ? t("ui.settings_cli_found_0", found.executable) : t(notFoundDesc));
+            if (!found.installed)
+              setting.addButton(button =>
+                button
+                  .setButtonText(t("ui.installation_guide"))
+                  .onClick(() =>
+                    provider === "codex" ? this.plugin.openCodexSetupGuide() : this.plugin.openClaudeSetupGuide()
+                  )
+              );
+            setting.addButton(button =>
+              button.setButtonText(t("ui.check_again")).onClick(() => {
+                void (provider === "codex" ? this.plugin.recheckCodex() : this.plugin.recheckClaude());
+              })
+            );
+          }
+        },
+        {
+          name: t("ui.settings_cli_path"),
+          desc: pathDesc,
+          control: { type: "text", key: provider === "codex" ? "codexPath" : "claudePath" }
+        }
+      ]
+    };
+  }
+  /** A button row of the "Advanced" page: name, one-line help and one button. */
+  private actionRow(name: string, desc: string, label: string, run: () => void): SettingDefinition {
+    return {
+      name,
+      render: setting => {
+        setting
+          .setName(name)
+          .setDesc(desc)
+          .addButton(button => button.setButtonText(label).onClick(run));
+      }
+    };
   }
   async setControlValue(key: string, value: unknown): Promise<void> {
     if (key === "language") {

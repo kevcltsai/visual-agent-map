@@ -10,6 +10,15 @@ export { builtinPresets } from "./ai/prompt-presets";
 export { translate } from "./i18n";
 `);
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
+const FROZEN_FORMATS = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'note-style-frozen', 'legacy-formats.json'), 'utf8'));
+// legacyObsidianFormat(language, { diagrams: false, ... }) as the deleted upgrade module produced it, frozen in
+// tests/fixtures/note-style-frozen/legacy-formats.json. A missing key throws.
+function frozenLegacyFormat(language, preferences) {
+  const key = `${language}:${JSON.stringify(Object.fromEntries(Object.entries(preferences).sort()))}`;
+  const text = FROZEN_FORMATS.legacyFormats[key];
+  if (typeof text !== 'string') throw new Error(`no frozen legacy format for ${key}`);
+  return text;
+}
 
 test('academic rigor tone block is empty; the other tones equal the built-in tone presets', () => {
   for (const language of LANGUAGES) {
@@ -49,7 +58,6 @@ export { parseTemplateBlock, splitTemplateZones, trimFormatBody } from "./core/b
 export { detailStructurePrompt, standardTemplate, textbookTemplate } from "./ai/detail-templates";
 export { detailStructure, customDetailStructure, customDetailRule } from "./core/steps/task/fragments";
 export { noteLanguageOf } from "./i18n";
-export { legacyObsidianFormat } from "./ai/note-style-upgrade";
 `);
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 const STEP_CONTEXTS = {
@@ -361,7 +369,7 @@ test('charts: the prompt asks for charts exactly when the sections or the format
     assert.equal(m.chartsWanted(without, context, language), false);
     assert.equal(m.chartsWanted(selection, context, language), true);
     // What the old diagrams switch did, as the upgrade writes it: a format whose text lacks the mermaid line.
-    const offFormat = m.legacyObsidianFormat(language, { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true });
+    const offFormat = frozenLegacyFormat(language, { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true });
     assert.ok(!offFormat.includes('```mermaid'));
     const off = { ...selection, template: { id: 'standard', body: sections }, format: { id: 'file:F', body: offFormat } };
     assert.equal(m.chartsWanted(off, context, language), false, `${language}: a format without the mermaid line asks for no chart`);

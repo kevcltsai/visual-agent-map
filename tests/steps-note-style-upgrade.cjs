@@ -71,12 +71,11 @@ const dirs = language => {
 };
 const inDir = (v, folder) => Object.fromEntries(Object.entries(v.files).filter(([file]) => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/')).map(([file, text]) => [file.slice(folder.length + 1), text]));
 
-/** The style fields a run gets, as the map view builds them (resolve, tone text, context fields). */
+/** The style fields a run gets, as the map view builds them from runStyle (the three levels are the run's choice, the topic and the map). */
 function fieldsFor(store, levels, ids, language) {
-  const resolved = store.resolve(levels);
-  assert.equal(resolved.invalid, undefined);
-  const toneText = store.toneTextFor(resolved.template, ids, language);
-  return { resolved, fields: { detailTemplate: resolved.template, ...(toneText ? { toneText } : {}), ...store.contextFields(resolved.template, toneText, language) } };
+  const resolved = store.runStyle({ choice: levels[0], topic: levels[1], map: levels[2], outputLanguage: language });
+  assert.equal(resolved.issues.invalid, undefined);
+  return { resolved, fields: { detailTemplate: resolved.template, ...(resolved.toneText ? { toneText: resolved.toneText } : {}), ...resolved.contextFields } };
 }
 const service = new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false });
 /** The five step prompts and the chart answer for one scenario. */
@@ -93,7 +92,7 @@ function promptsOf(store, language, scenario) {
  */
 function oldPromptsOf(w, language, scenario) {
   const got = promptsOf(w.store, language, scenario);
-  const file = got.resolved.fileName && w.v.files[`${FOLDER}/${got.resolved.fileName}`];
+  const file = got.resolved.label.fileName && w.v.files[`${FOLDER}/${got.resolved.label.fileName}`];
   const preferences = file ? M.readLegacyFormatPreferences(file) : undefined;
   if (!preferences) return got;
   const plainFormat = M.inLanguage(M.OBSIDIAN_FORMAT, language), switched = M.legacyObsidianFormat(language, preferences);
@@ -119,8 +118,8 @@ async function compareStyleFile(text, language, label, scenarios = SCENARIOS, pa
     await after.store.refresh();
     const old = oldPromptsOf(before, language, scenario);
     const upgraded = promptsOf(after.store, language, scenario);
-    assert.ok(old.resolved.toneDecided && !old.resolved.block, `${label}/${name}: the old path read the file`);
-    assert.ok(upgraded.resolved.block, `${label}/${name}: the upgraded run uses a block`);
+    assert.ok(old.resolved.label.fileName && !old.resolved.contextFields.styleSelection, `${label}/${name}: the old path read the file`);
+    assert.ok(upgraded.resolved.contextFields.styleSelection, `${label}/${name}: the upgraded run uses a block`);
     old.prompts.forEach((prompt, index) => { assert.equal(upgraded.prompts[index], prompt, `${label} ${language} ${name} step ${index}`); compared++; });
     assert.equal(upgraded.charts, old.charts, `${label} ${language} ${name} charts`);
   }
@@ -215,8 +214,8 @@ test('counter 6 and 7: a file with no tone gives no tone even when the workspace
       const old = oldPromptsOf(before, language, scenario), upgraded = promptsOf(after.store, language, scenario);
       assert.deepEqual(upgraded.prompts, old.prompts, `${language} ${name}`);
     }
-    assert.equal(after.store.toneTextFor(after.store.resolve(SCENARIOS.map.levels).template, [undefined, undefined, undefined], language), undefined);
-    assert.ok(after.store.toneTextFor(after.store.resolve(SCENARIOS['map with its tone'].levels).template, [undefined, undefined, 'plain'], language));
+    assert.equal(promptsOf(after.store, language, SCENARIOS.map).fields.toneText, undefined);
+    assert.ok(promptsOf(after.store, language, SCENARIOS['map with its tone']).fields.toneText);
   }
 });
 
@@ -333,7 +332,7 @@ test('failure: a write that fails at any step sets no marker, changes no key, tr
     // this session still answers as before, from the plan in memory
     await w.store.refresh();
     assert.deepEqual(promptsOf(w.store, 'en', scenario).prompts, wanted, label);
-    assert.equal(promptsOf(w.store, 'en', scenario).resolved.block?.id.startsWith('file:'), true, `${label}: from the memory plan`);
+    assert.equal(promptsOf(w.store, 'en', scenario).resolved.contextFields.styleSelection?.template.id.startsWith('file:'), true, `${label}: from the memory plan`);
     // the next load
     const next = world({}, {}, { v: w.v, settings: w.settings });
     Object.assign(w.v, { failCreateAt: 0, failSave: false, creates: 0 });
@@ -359,7 +358,7 @@ test('failure: the old file that cannot be moved to the trash is told once; the 
   eq(w.settings.noteStyleUpgrade, { version: 1 });
   assert.ok(w.v.files[`${FOLDER}/S.md`], 'the old file stays');
   await w.store.refresh();
-  assert.ok(w.store.resolve([{ template: 'style:S' }]).block, 'the block answers, not the file');
+  assert.ok(w.store.runStyle({ topic: { template: 'style:S' }, outputLanguage: 'en' }).contextFields.styleSelection, 'the block answers, not the file');
 });
 
 test('a file that changed while the upgrade ran is not trashed over', async () => {
@@ -382,7 +381,7 @@ test('counter 14: a run that starts while the upgrade is under way waits for it'
   release();
   await upgrade; await refresh;
   assert.equal(refreshed, true);
-  assert.ok(w.store.resolve([{ template: 'style:S' }]).block);
+  assert.ok(w.store.runStyle({ topic: { template: 'style:S' }, outputLanguage: 'en' }).contextFields.styleSelection);
 });
 
 test('counter 15: keys the user already set are not overwritten; the aliases are still written', async () => {
@@ -444,7 +443,7 @@ test('old custom templates: standard-named sections upgrade to the same prompt (
         const old = oldPromptsOf(before, language, item), upgraded = promptsOf(after.store, language, item);
         assert.deepEqual(upgraded.prompts, old.prompts, `${language} exported=${exported}`);
         assert.equal(upgraded.charts, old.charts);
-        assert.ok(upgraded.resolved.block);
+        assert.ok(upgraded.resolved.contextFields.styleSelection);
       }
       assert.deepEqual(plain(after.settings.detailTemplates), plain(template), 'the old key is kept');
     }
@@ -527,10 +526,10 @@ test('counter 17: an alias whose template block was deleted goes back to the sta
   await w.store.upgradeLegacy();
   delete w.v.files[`${dirs('en').template}/S.md`];
   await w.store.refresh();
-  const resolved = w.store.resolve([{}, {}, { template: 'style:S' }]);
-  eq(resolved.missing, ['style:S']);
+  const resolved = w.store.runStyle({ map: { template: 'style:S' }, outputLanguage: 'en' });
+  eq(resolved.issues.missing, ['style:S']);
   assert.equal(resolved.template.id, 'standard');
-  assert.equal(resolved.block, undefined);
+  assert.equal(resolved.contextFields.styleSelection, undefined);
 });
 
 test('after the upgrade the old sources are not read: a style file that shows up later is not a style', async () => {
@@ -538,8 +537,8 @@ test('after the upgrade the old sources are not read: a style file that shows up
   await w.store.upgradeLegacy();
   w.v.files[`${FOLDER}/Late.md`] = fixture('charts-off.md');
   await w.store.refresh();
-  eq(w.store.resolve([{ template: 'style:Late' }]).missing, ['style:Late']);
-  assert.ok(w.store.resolve([{ template: 'style:S' }]).block);
+  eq(w.store.runStyle({ topic: { template: 'style:Late' }, outputLanguage: 'en' }).issues.missing, ['style:Late']);
+  assert.ok(w.store.runStyle({ topic: { template: 'style:S' }, outputLanguage: 'en' }).contextFields.styleSelection);
 });
 
 test('built-in style files: unchanged canonical files (v1 and v2, any language) make no block and are backed up and trashed; a changed one becomes a block under a name that is not a built-in\'s, reached through pair:<id>', async () => {
@@ -553,9 +552,9 @@ test('built-in style files: unchanged canonical files (v1 and v2, any language) 
     assert.equal(w.v.trashed.length, 5);
     assert.equal(w.settings.noteStyleAliases, undefined);
     await w.store.refresh();
-    const r = w.store.resolve([{ template: 'standard', tone: 'summary' }]);
-    assert.equal(r.block, undefined);
-    assert.equal(r.toneDecided, undefined);
+    const r = w.store.runStyle({ topic: { template: 'standard', tone: 'summary' }, outputLanguage: language });
+    assert.equal(r.contextFields.styleSelection, undefined);
+    assert.equal(r.label.fileName, undefined);
   }
   for (const language of LANGUAGES) {
     const summaryName = M.builtinStyleFileName('summary', language);
@@ -611,11 +610,11 @@ test('decision #20 (locked, CHANGELOG upgrade point 5): the workspace default is
   const names = got => got.resolved.template.sections.map(section => section.name);
   // before: the picked tone selects that tone's own pair, so the edited summary file is not used at all
   assert.ok(!names(old).includes('Look here first'));
-  assert.equal(old.resolved.block, undefined);
+  assert.equal(old.resolved.contextFields.styleSelection, undefined);
   // after: the file's template stays (the static key), and only the tone changes
   assert.equal(names(upgraded)[0], 'Look here first');
   assert.deepEqual(names(upgraded).slice(1), names(old));
-  assert.ok(upgraded.resolved.block);
+  assert.ok(upgraded.resolved.contextFields.styleSelection);
   const toneOf = got => got.fields.toneText;
   assert.ok(toneOf(old), 'the picked tone applies before');
   assert.equal(toneOf(upgraded), toneOf(old), 'and after: the same tone text');

@@ -57,7 +57,7 @@ async function run(styleId, mode) {
   await h.store.refresh();
   assert.equal((await h.store.upgradeLegacy()).status, 'done');
   await h.store.refresh();
-  const fields = h.store.contextFields(styleId ? h.store.resolve([{ template: styleId }]).template : undefined);
+  const fields = h.store.runStyle({ ...(styleId ? { topic: { template: styleId } } : {}), outputLanguage: 'en' }).contextFields;
   const context = { title: 'Topic', summary: 'Sum', rules: '', detail: '', task: 'Do it', ancestors: '', sourceContext: '', mode, researchMode: 'local', researchDepth: 'fast', visualMode: 'auto', outputLanguage: 'en', addCharts: true, ...fields };
   const result = await h.service.askModel(context, 'gpt-6-luna', 'low');
   const applied = [];

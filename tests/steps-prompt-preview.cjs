@@ -11,7 +11,7 @@ export { createTaskStep } from "./core/steps/task/step";
 export { assembledTaskPrompt } from "./core/steps/task/render";
 export { lookupBuiltinBlock, builtinTemplateText } from "./core/blocks/builtin";
 export { textbookTemplate } from "./ai/detail-templates";
-export { NoteStyleStore, runToneText } from "./ai/note-style-store";
+export { NoteStyleStore } from "./ai/note-style-store";
 export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { translate, noteLanguageOf } from "./i18n";
 export { AiTaskService } from "./core/ai-task-service";
@@ -108,24 +108,24 @@ function makeStore(settingsPatch = {}, files = {}) {
   return new M.NoteStyleStore({ settings: () => settings, port, save: async () => undefined });
 }
 
-test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText and contextFields (5 presets, a style file, unset)', async () => {
+test('counter 11: runStyle with no choice gives the workspace fields: template, tone text and context fields (5 presets, a style file, unset)', async () => {
   const cases = [...M.NOTE_STYLE_BUILTIN_IDS.map(id => ({ defaultNoteStyleId: id })), { defaultNoteStyleId: 'style:Own' }, {}, { defaultDetailTemplateId: 'textbook' }];
   assert.equal(cases.length, 8);
   for (const patch of cases) for (const language of LANGUAGES) {
     const store = makeStore({ ...patch, language }, { 'WS/S/Own.md': OWN });
     await store.refresh();
-    const got = store.workspaceStyleFields(language);
-    const resolved = store.resolve([{}, {}]);
+    const resolved = store.runStyle({ outputLanguage: language });
+    const got = { detailTemplate: resolved.template, ...(resolved.toneText ? { toneText: resolved.toneText } : {}), ...resolved.contextFields };
     const label = JSON.stringify(patch) + language;
-    assert.equal(got.invalid, undefined, label);
+    assert.equal(resolved.issues.invalid, undefined, label);
     assert.deepEqual(plain(got.detailTemplate), plain(resolved.template), label);
     // D7 (ticket 04): the workspace tone is the end of the chain, so summary, plain and guide now reach the run
     const workspaceTone = { summary: 'summary', plain: 'plain', guide: 'guide' }[patch.defaultNoteStyleId];
-    const tone = workspaceTone ? M.lookupBuiltinBlock('tone', workspaceTone, language) : M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
+    const tone = workspaceTone ? M.lookupBuiltinBlock('tone', workspaceTone, language) : (patch.defaultNoteStyleId === 'style:Own' ? '簡明' : undefined);
     assert.equal(got.toneText, tone, label);
     assert.equal(got.noteStyle, undefined, label);
     assert.equal(got.styleDiagrams, undefined, label);
-    if (resolved.toneDecided) assert.equal(got.toneText, resolved.toneText, label);
+    if (patch.defaultNoteStyleId === 'style:Own') assert.equal(resolved.label.fileName, 'Own.md', label);
     // the preview of these fields is the prompt a run with the same fields renders
     const preview = M.previewPrompt('research', language, 'codex', got);
     assert.equal(preview.text, renderOf(M.sampleTaskContext('research', language, got), language, 'codex'), label);
@@ -133,26 +133,34 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
   }
   const store = makeStore({ defaultNoteStyleId: 'style:Own' }, { 'WS/S/Own.md': OWN });
   await store.refresh();
-  assert.equal(store.workspaceStyleFields('en').toneText, '簡明');
+  assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, '簡明');
 });
 
 test('counter 9: a default style file that does not parse is returned as invalid, not thrown', async () => {
   const store = makeStore({ defaultNoteStyleId: 'style:Bad' }, { 'WS/S/Bad.md': '---\n語氣: x\n' });
   await store.refresh();
   let got;
-  assert.doesNotThrow(() => { got = store.workspaceStyleFields('en'); });
-  assert.equal(got.invalid.fileName, 'Bad.md');
-  assert.ok(got.invalid.issues[0].line >= 1);
-  assert.equal(got.detailTemplate, undefined);
+  assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en' }); });
+  assert.equal(got.issues.invalid.fileName, 'Bad.md');
+  assert.ok(got.issues.invalid.issues[0].line >= 1);
+  assert.equal(got.contextFields.styleSelection, undefined);
 });
 
-test('runToneText: an old style file (or an alias of one) decides its own tone, else the first tone preset id; academic is nothing', () => {
-  const file = { toneDecided: true, toneText: 'from file' };
-  assert.equal(M.runToneText(file, PRESETS, ['custom-tone-1'], 'en'), 'from file');
-  assert.equal(M.runToneText({ toneDecided: true }, PRESETS, ['custom-tone-1'], 'en'), undefined);
-  assert.equal(M.runToneText(undefined, PRESETS, [undefined, 'custom-tone-1'], 'en'), 'Talk like a pirate.');
-  assert.equal(M.runToneText(undefined, PRESETS, ['academic', 'custom-tone-1'], 'en'), undefined);
-  assert.equal(M.runToneText(undefined, PRESETS, [], 'en'), undefined);
+test('runStyle tone text: an old style file decides its own tone (or none) over a less specific tone, else the first tone preset id; academic is nothing', async () => {
+  const withFile = async (content) => {
+    const store = makeStore({}, { 'WS/S/F.md': content });
+    await store.refresh();
+    return store;
+  };
+  const text = await withFile('---\n語氣: from file\n---\n## A\ntext\n');
+  assert.equal(text.runStyle({ topic: { template: 'style:F' }, map: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'from file');
+  const none = await withFile('---\n---\n## A\ntext\n');
+  assert.equal(none.runStyle({ topic: { template: 'style:F' }, map: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, undefined);
+  const store = makeStore({}, {});
+  await store.refresh();
+  assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
+  assert.equal(store.runStyle({ choice: { tone: 'academic' }, topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, undefined);
+  assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, undefined);
 });
 
 // ---- the service: a broken block never stops a note ----

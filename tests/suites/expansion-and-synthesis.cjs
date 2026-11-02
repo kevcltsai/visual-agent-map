@@ -1802,19 +1802,37 @@ integrationTest('map action: one default note style sets or clears the template 
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, undefined); assert.equal(saved.toneId, undefined);
 });
-integrationTest('Keep current (…) names the effective style: topic, then map, then default for the tone; a preset or "Custom: template · tone"', async () => {
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
-  const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = { ...h.doc };
-  assert.equal(view.effectiveToneId({}), 'academic');
-  view.map.toneId = 'plain'; assert.equal(view.effectiveToneId({}), 'plain');
-  assert.equal(view.effectiveToneId({ toneId: 'guide' }), 'guide', 'the topic wins over the map');
-  assert.equal(view.effectiveToneId({ toneId: 'gone' }), 'plain', 'an unknown topic tone falls through like toneLabelFor');
-  assert.equal(view.currentStyleLabel('standard', 'academic'), 'Standard');
-  assert.equal(view.currentStyleLabel('textbook', 'academic'), 'Textbook');
-  assert.equal(view.currentStyleLabel('standard', 'plain'), 'Plain language');
-  assert.equal(view.currentStyleLabel('A', 'magazine'), 'Custom: Template A · Magazine column');
-  assert.equal(view.currentStyleLabel('textbook', 'plain'), 'Custom: Textbook · Plain explanation');
+integrationTest('run-style P3: "Keep current (…)" in the research and synthesis dialogs names the style and tone the run really uses (workspace tone, topic override, style file tone)', async () => {
+  const FILES = { 'WS/S/Blocks/Tones/Pirate.md': 'Talk like a pirate.', 'WS/S/Own.md': '---\n語氣: 簡明\n---\n## 重點\n說明\n' };
+  const port = { list: async folder => Object.keys(FILES).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes('/')).map(f => f.slice(folder.length + 1)), read: async f => FILES[f], folderExists: folder => Object.keys(FILES).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  const cases = [
+    { name: 'workspace tone only', tone: 'Pirate', style: 'Custom: Standard · Pirate', note: {}, map: {} },
+    { name: 'topic override', tone: 'Plain explanation', style: 'Plain language', note: { toneId: 'plain' }, map: {} },
+    { name: 'map override', tone: 'Plain explanation', style: 'Plain language', note: {}, map: { toneId: 'plain' } },
+    { name: 'style file with its own tone', tone: '簡明', style: 'Own', note: { detailTemplateId: 'style:Own' }, map: {}, mapOnly: { detailTemplateId: 'style:Own' } }
+  ];
+  for (const row of cases) {
+    const opened = [];
+    const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteToneBlock: 'file:Pirate' } });
+    h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
+    await h.plugin.noteStyles.refresh();
+    Object.assign(h.doc, row.mapOnly ?? row.map);
+    await h.repo.updateNote(h.topic.path, row.note);
+    const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
+    const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
+    const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
+    view.openNextStep(h.topic);
+    await until(() => opened.length === 1);
+    assert.equal(opened[0].modelSettings.currentTone, row.tone, `${row.name}: research dialog tone`);
+    assert.equal(opened[0].modelSettings.currentStyle, row.style, `${row.name}: research dialog style`);
+    view.multiSelected = new Set([h.topic.id, other.id]);
+    view.openSelectionSynthesis(null);
+    assert.equal(opened.length, 2);
+    const mapRow = row.note.detailTemplateId ? row : { ...row, tone: row.name === 'topic override' ? 'Pirate' : row.tone, style: row.name === 'topic override' ? 'Custom: Standard · Pirate' : row.style };
+    assert.equal(opened[1].selectionFlow.fields.currentTone, mapRow.tone, `${row.name}: synthesis dialog tone (map only)`);
+    assert.equal(opened[1].selectionFlow.fields.currentStyle, mapRow.style, `${row.name}: synthesis dialog style (map only)`);
+  }
 });
 
 // ---- S2: the chart step runs after the write, in the background, on all three write paths.

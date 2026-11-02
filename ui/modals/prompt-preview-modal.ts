@@ -1,7 +1,13 @@
 import { App, Modal } from "obsidian";
 import type { AiProviderId } from "../../ai/providers/provider";
 import type { NoteStyleStore } from "../../ai/note-style-store";
-import { PREVIEW_STEPS, previewPrompt, type PreviewGroup, type PreviewStep } from "../../core/blocks/prompt-preview";
+import {
+  PREVIEW_STEPS,
+  previewPrompt,
+  type PreviewGroup,
+  type PreviewStep,
+  type PreviewStyleFields
+} from "../../core/blocks/prompt-preview";
 import { styleIssueText } from "../../experiences/visual-map/note-style-picker";
 import { t, type ContentLanguage, type TranslationKey } from "../../i18n";
 
@@ -89,13 +95,20 @@ export class PromptPreviewModal extends Modal {
     const body = this.bodyEl;
     if (!body) return;
     body.empty();
-    const fields = this.store.workspaceStyleFields(this.language);
-    if (fields.invalid) {
-      const first = fields.invalid.issues[0];
+    // A run with no choice of its own: the workspace default style.
+    const style = this.store.runStyle({ outputLanguage: this.language });
+    const { invalid } = style.issues;
+    if (invalid) {
+      const first = invalid.issues[0];
       const reason = first ? styleIssueText(first) : "";
-      this.showProblems([t("ui.preview_style_invalid_0_1_2", fields.invalid.fileName, first?.line ?? 1, reason)]);
+      this.showProblems([t("ui.preview_style_invalid_0_1_2", invalid.fileName, first?.line ?? 1, reason)]);
       return;
     }
+    const fields: PreviewStyleFields = {
+      detailTemplate: style.template,
+      ...(style.toneText ? { toneText: style.toneText } : {}),
+      ...style.contextFields
+    };
     const preview = previewPrompt(this.step, this.language, this.provider, fields);
     this.showProblems(
       preview.issues.map(issue =>

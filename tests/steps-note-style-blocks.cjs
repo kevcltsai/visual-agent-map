@@ -9,7 +9,7 @@ const path = require('node:path');
 const { loadSource } = require('./support-replay.cjs');
 
 const M = loadSource(`
-export { NoteStyleStore, runToneText } from "./ai/note-style-store";
+export { NoteStyleStore } from "./ai/note-style-store";
 export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { previewPrompt, PREVIEW_STEPS } from "./core/blocks/prompt-preview";
 export { lookupBuiltinBlock, builtinTemplateText } from "./core/blocks/builtin";
@@ -75,7 +75,10 @@ async function serviceText(fields) {
   return prompts[0];
 }
 const defaultText = step => M.previewPrompt(step, 'en', 'codex', {}).text;
-const fieldsOf = async (store, language = 'en') => { await store.refresh(); return store.workspaceStyleFields(language); };
+// The style fields a run with no choice of its own gets, built from runStyle the way the preview modal and the map view build them.
+const fieldsFrom = (style) => ({ detailTemplate: style.template, ...(style.toneText ? { toneText: style.toneText } : {}), ...style.contextFields });
+const fieldsNow = (store, language = 'en') => fieldsFrom(store.runStyle({ outputLanguage: language }));
+const fieldsOf = async (store, language = 'en') => { await store.refresh(); return fieldsNow(store, language); };
 
 // ---- counter 1 and D7: nothing new set, no block folder ----
 test('counter 1: with no new key and no block folder the workspace fields equal the 05 baseline (5 presets, style file, old template, unset); only summary, plain and guide now carry their tone (D7)', async () => {
@@ -84,19 +87,20 @@ test('counter 1: with no new key and no block folder the workspace fields equal 
   for (const patch of cases) for (const language of LANGUAGES) {
     const { store } = makeStore({ ...patch, language }, { [`${STYLES}/Own.md`]: OWN });
     await store.refresh();
-    const got = store.workspaceStyleFields(language);
-    const resolved = store.resolve([{}, {}]);
+    const got = fieldsNow(store, language);
+    const resolved = store.runStyle({ outputLanguage: language });
     const label = JSON.stringify(patch) + language;
-    const baseline = M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
+    // the baseline: no tone at all, except a style file (its own tone) and the three presets (their built-in text)
+    const baseline = patch.defaultNoteStyleId === 'style:Own' ? '簡明' : undefined;
     const wanted = toneOf[patch.defaultNoteStyleId] ? M.lookupBuiltinBlock('tone', toneOf[patch.defaultNoteStyleId], language) : baseline;
     assert.equal(got.toneText, wanted, label);
     assert.deepEqual(plain(got.detailTemplate), plain(resolved.template), label);
     assert.equal(got.noteStyle, undefined, label);
     assert.equal(got.styleSelection, undefined, label);
-    assert.equal(resolved.block, undefined, label);
-    assert.equal(resolved.blockIssues, undefined, label);
+    assert.equal(resolved.contextFields.styleSelection, undefined, label);
+    assert.deepEqual(plain(resolved.issues.blockIssues), [], label);
     // the contextFields of a call that names no tone carry no style snapshot any more (P2: noteStyle and styleDiagrams are gone)
-    assert.deepEqual(plain(store.contextFields(resolved.template)), {}, label);
+    assert.deepEqual(plain(resolved.contextFields), {}, label);
     if (!toneOf[patch.defaultNoteStyleId]) {
       // outside the three presets the prompt is the one the baseline fields give
       const old = { detailTemplate: got.detailTemplate, ...(baseline ? { toneText: baseline } : {}), };
@@ -108,13 +112,12 @@ test('counter 1: with no new key and no block folder the workspace fields equal 
 test('D7 chain: a tone the map or topic names beats the workspace tone; academic stays academic; an unknown id falls through', async () => {
   const { store } = makeStore({ defaultNoteStyleId: 'summary' });
   await store.refresh();
-  const template = store.resolve([{}, {}]).template;
   const summary = M.lookupBuiltinBlock('tone', 'summary', 'en');
-  assert.equal(store.toneTextFor(template, [], 'en'), summary);
-  assert.equal(store.toneTextFor(template, [undefined, 'plain'], 'en'), M.lookupBuiltinBlock('tone', 'plain', 'en'));
-  assert.equal(store.toneTextFor(template, ['academic'], 'en'), undefined);
-  assert.equal(store.toneTextFor(template, ['gone-tone', undefined], 'en'), summary);
-  assert.equal(store.toneTextFor(template, ['custom-tone-1'], 'en'), 'Talk like a pirate.');
+  assert.equal(store.runStyle({ outputLanguage: 'en' }).toneText, summary);
+  assert.equal(store.runStyle({ map: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'plain', 'en'));
+  assert.equal(store.runStyle({ choice: { tone: 'academic' }, outputLanguage: 'en' }).toneText, undefined);
+  assert.equal(store.runStyle({ choice: { tone: 'gone-tone' }, outputLanguage: 'en' }).toneText, summary);
+  assert.equal(store.runStyle({ choice: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
 });
 
 test('Later item: a built-in tone cannot be overridden through the promptPresets setting, so its effective text is the built-in text', () => {
@@ -150,10 +153,10 @@ test('counter 3: a changed override or a user block puts body and fileName in st
   for (const item of cases) {
     const { store } = makeStore({ noteTemplateBlock: item.ref }, item.files);
     const fields = await fieldsOf(store);
-    const resolved = store.resolve([{}, {}]);
+    const resolved = store.runStyle({ outputLanguage: 'en' });
     assert.deepEqual(plain(fields.styleSelection.template), { id: item.id, body: item.text, fileName: item.fileName });
     assert.deepEqual(plain(fields.styleSelection.tone), { id: 'academic' });
-    assert.equal(resolved.blockIssues, undefined);
+    assert.deepEqual(plain(resolved.issues.blockIssues), []);
     const parsed = M.parseTemplateBlock(item.text, { id: item.id, name: item.fileName.replace(/\.md$/, '') });
     assert.equal(parsed.ok, true);
     assert.deepEqual(plain(resolved.template.sections), plain(parsed.template.sections));
@@ -170,10 +173,10 @@ test('counter 3: a changed override or a user block puts body and fileName in st
 test('counter 4 (store part): a block with two format headings falls back to the built-in template, names file and line, and the service still produces the note', async () => {
   const { store } = makeStore({ noteTemplateBlock: 'file:Bad' }, { [`${TPL}/Bad.md`]: BROKEN });
   const fields = await fieldsOf(store);
-  const resolved = store.resolve([{}, {}]);
-  assert.equal(resolved.blockIssues.length, 1);
-  assert.equal(resolved.blockIssues[0].fileName, 'Bad.md');
-  assert.equal(resolved.blockIssues[0].line, 5);
+  const resolved = store.runStyle({ outputLanguage: 'en' });
+  assert.equal(resolved.issues.blockIssues.length, 1);
+  assert.equal(resolved.issues.blockIssues[0].fileName, 'Bad.md');
+  assert.equal(resolved.issues.blockIssues[0].line, 5);
   assert.equal(resolved.template.id, 'standard');
   assert.equal(fields.styleSelection.template.body, BROKEN);
   const preview = M.previewPrompt('research', 'en', 'codex', fields);
@@ -184,8 +187,8 @@ test('counter 4 (store part): a block with two format headings falls back to the
   // a broken override of a built-in falls back to the same built-in id
   const textbook = makeStore({ noteTemplateBlock: 'builtin:textbook' }, { [`${TPL}/Textbook.md`]: BROKEN });
   await textbook.store.refresh();
-  assert.equal(textbook.store.resolve([{}, {}]).template.id, 'textbook');
-  assert.equal(textbook.store.resolve([{}, {}]).blockIssues.length, 1);
+  assert.equal(textbook.store.runStyle({ outputLanguage: 'en' }).template.id, 'textbook');
+  assert.equal(textbook.store.runStyle({ outputLanguage: 'en' }).issues.blockIssues.length, 1);
 });
 
 // ---- counter 5 ----
@@ -194,11 +197,11 @@ test('counter 5: a chosen block file that was deleted does not throw and falls b
     const { store } = makeStore({ noteTemplateBlock: ref });
     await store.refresh();
     let resolved;
-    assert.doesNotThrow(() => { resolved = store.resolve([{}, {}]); });
+    assert.doesNotThrow(() => { resolved = store.runStyle({ outputLanguage: 'en' }); });
     assert.equal(resolved.template.id, 'standard', ref);
-    assert.equal(resolved.block, undefined, ref);
-    assert.ok(resolved.missing.includes(ref), ref);
-    const fields = store.workspaceStyleFields('en');
+    assert.equal(resolved.contextFields.styleSelection, undefined, ref);
+    assert.ok(resolved.issues.missing.includes(ref), ref);
+    const fields = fieldsNow(store, 'en');
     assert.equal(fields.styleSelection, undefined, ref);
     for (const step of M.PREVIEW_STEPS) assert.equal(M.previewPrompt(step.id, 'en', 'codex', fields).text, defaultText(step.id), `${ref} ${step.id}`);
   }
@@ -208,24 +211,22 @@ test('counter 5: a chosen block file that was deleted does not throw and falls b
 test('counter 6: a template the map or topic names wins over the workspace block; the workspace tone applies only when no tone is named', async () => {
   const { store } = makeStore({ noteTemplateBlock: 'file:My tpl', noteToneBlock: 'builtin:guide' }, { [`${TPL}/My tpl.md`]: MINE });
   await store.refresh();
-  const mapWins = store.resolve([{ template: 'textbook' }, {}]);
+  const mapWins = store.runStyle({ topic: { template: 'textbook' }, outputLanguage: 'en' });
   assert.equal(mapWins.template.id, 'textbook');
-  assert.equal(mapWins.block, undefined);
-  assert.equal(store.contextFields(mapWins.template, undefined, 'en').styleSelection, undefined);
-  const own = store.resolve([{}, {}]);
-  assert.equal(own.block.id, 'file:My tpl');
+  assert.equal(mapWins.contextFields.styleSelection, undefined);
+  const own = store.runStyle({ outputLanguage: 'en' });
+  assert.equal(own.contextFields.styleSelection.template.id, 'file:My tpl');
   const guide = M.lookupBuiltinBlock('tone', 'guide', 'en');
-  assert.equal(store.toneTextFor(own.template, ['academic'], 'en'), undefined, 'academic named on the map stays academic');
-  assert.equal(store.toneTextFor(own.template, [undefined, undefined], 'en'), guide);
-  assert.equal(store.toneTextFor(mapWins.template, [undefined], 'en'), guide);
-  assert.equal(store.toneTextFor(own.template, ['plain'], 'en'), M.lookupBuiltinBlock('tone', 'plain', 'en'));
+  assert.equal(store.runStyle({ map: { tone: 'academic' }, outputLanguage: 'en' }).toneText, undefined, 'academic named on the map stays academic');
+  assert.equal(own.toneText, guide);
+  assert.equal(mapWins.toneText, guide);
+  assert.equal(store.runStyle({ map: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'plain', 'en'));
   // a tone file only fills the gap when no tone preset is named
   const file = makeStore({ noteToneBlock: 'file:Pirate' }, { [`${TONE}/Pirate.md`]: 'Arr.\n' });
   await file.store.refresh();
-  const t = file.store.resolve([{}, {}]).template;
-  assert.equal(file.store.toneTextFor(t, [], 'en'), 'Arr.');
-  assert.equal(file.store.toneTextFor(t, ['academic'], 'en'), undefined);
-  assert.equal(file.store.toneTextFor(t, ['plain'], 'en'), M.lookupBuiltinBlock('tone', 'plain', 'en'));
+  assert.equal(file.store.runStyle({ outputLanguage: 'en' }).toneText, 'Arr.');
+  assert.equal(file.store.runStyle({ map: { tone: 'academic' }, outputLanguage: 'en' }).toneText, undefined);
+  assert.equal(file.store.runStyle({ map: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'plain', 'en'));
 });
 
 // ---- counter 7: change of tone ----
@@ -274,13 +275,11 @@ test('counter 8: a style file that decides the tone keeps it; the workspace tone
   const files = { [`${STYLES}/Own.md`]: OWN };
   const withDefault = makeStore({ defaultNoteStyleId: 'style:Own', noteToneBlock: 'builtin:summary' }, files);
   await withDefault.store.refresh();
-  const resolved = withDefault.store.resolve([{}, {}]);
-  assert.equal(withDefault.store.workspaceStyleFields('en').toneText, '簡明');
-  assert.equal(withDefault.store.toneTextFor(resolved.template, [], 'en'), '簡明');
+  assert.equal(withDefault.store.runStyle({ outputLanguage: 'en' }).toneText, '簡明');
+  assert.equal(withDefault.store.runStyle({ outputLanguage: 'en' }).label.fileName, 'Own.md');
   const onMap = makeStore({ noteTemplateBlock: 'builtin:standard', noteToneBlock: 'builtin:summary' }, files);
   await onMap.store.refresh();
-  const mapResolved = onMap.store.resolve([{ template: 'style:Own' }, {}]);
-  assert.equal(onMap.store.toneTextFor(mapResolved.template, [], 'en'), '簡明');
+  assert.equal(onMap.store.runStyle({ topic: { template: 'style:Own' }, outputLanguage: 'en' }).toneText, '簡明');
 });
 
 // ---- counter 9: copy ----
@@ -533,7 +532,7 @@ test('counter 4 (preview part): the modal names the same file and line the run r
   assert.equal(shown.length, 1);
   assert.match(shown[0], /Bad\.md/);
   assert.match(shown[0], /\b5\b/);
-  const issue = store.resolve([{}, {}]).blockIssues[0];
+  const issue = store.runStyle({ outputLanguage: 'en' }).issues.blockIssues[0];
   assert.equal(issue.fileName, 'Bad.md');
   assert.equal(issue.line, 5);
   modal.close();
@@ -548,7 +547,7 @@ test('counter 14: changing the step does not touch the live region while the pro
   assert.equal(everything().some(item => item.attrs.role === 'alert'), false, 'no role=alert anywhere');
   assert.equal(everything().filter(item => item.attrs['aria-live']).length, 1, 'one live region only');
   const first = region().children[0];
-  const fields = store.workspaceStyleFields('en');
+  const fields = fieldsNow(store, 'en');
   const withIssue = M.PREVIEW_STEPS.filter(step => M.previewPrompt(step.id, 'en', 'codex', fields).issues.length > 0);
   const without = M.PREVIEW_STEPS.filter(step => !withIssue.includes(step));
   assert.ok(withIssue.length >= 2, 'several steps show the same problem');

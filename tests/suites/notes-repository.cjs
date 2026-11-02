@@ -1031,8 +1031,8 @@ integrationTest('AI merge check: a faithful result is applied with one request a
 });
 integrationTest('AI merge check: the log section of a custom template (renamed) is exempt, so a dated log line is no false positive', async () => {
   const h = await aiMergeHarness({ details: ['Alpha 42 units\n\n### 變更歷史\n- 2026-10-01：建立', '', 'Gamma 7 units'] });
-  const original = h.view.mapDetailTemplate.bind(h.view);
-  h.view.mapDetailTemplate = (...args) => { const template = original(...args); return { ...template, sections: template.sections.map(section => section.role === 'log' ? { ...section, name: '變更歷史', aliases: [] } : section) }; };
+  const original = h.view.noteStyles.runStyle.bind(h.view.noteStyles);
+  h.view.noteStyles.runStyle = request => { const style = original(request); return { ...style, template: { ...style.template, sections: style.template.sections.map(section => section.role === 'log' ? { ...section, name: '變更歷史', aliases: [] } : section) } }; };
   h.answer = async () => ({ ...good, detail: 'Alpha 42 units Gamma 7 units\n\n### 變更歷史\n- 2026-10-20：合併 2 個議題' });
   const { task } = await h.begin(); await h.untilSettled(task);
   assert.equal(h.asks.length, 1); assert.deepEqual(warnings(h), []); assert.ok(await h.mergedNode('AI merged'));

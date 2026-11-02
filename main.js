@@ -47695,23 +47695,17 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     };
   }
   /**
-   * `toneText` and the note style fields for a TaskContext, from one resolution so a template block and its tone choice
-   * (`styleSelection`) agree with the tone text. Spread `tone` where the tone belongs and `style` after the template.
+   * `{ toneText }` for a proposal run (new subtopics, selection synthesis), or nothing when the tone is academic. Only the
+   * tones the run, the topic and the map name are asked: no template level, so a proposal still takes no tone from a style.
    */
-  styleFields(note, options, template2) {
-    var _a2;
-    const language2 = (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language;
-    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, language2, template2);
-    return {
-      tone: toneText ? { toneText } : {},
-      style: this.noteStyles.contextFields(template2, toneText, language2)
-    };
-  }
-  /** `{ toneText }` for a TaskContext, or nothing when the resolved tone is academic. */
-  toneField(note, options, template2) {
-    var _a2;
-    const language2 = (_a2 = options == null ? void 0 : options.outputLanguage) != null ? _a2 : this.plugin.settings.language;
-    const toneText = this.toneTextFor(note, options == null ? void 0 : options.toneId, language2, template2);
+  proposalTone(note, options) {
+    var _a2, _b2;
+    const { toneText } = this.noteStyles.runStyle({
+      choice: { tone: options == null ? void 0 : options.toneId },
+      topic: { tone: note == null ? void 0 : note.toneId },
+      map: { tone: (_a2 = this.map) == null ? void 0 : _a2.toneId },
+      outputLanguage: (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language
+    });
     return toneText ? { toneText } : {};
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
@@ -47726,14 +47720,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
   toneChoices() {
     return this.noteStyles.toneChoices();
-  }
-  /**
-   * Writing tone for an AI run on `note`: this run's choice, then the topic override, then the map default. Academic
-   * (and nothing chosen) yields undefined so prompts stay unchanged.
-   */
-  toneTextFor(note, chosenId, language2 = this.plugin.settings.language, template2) {
-    var _a2;
-    return this.noteStyles.toneTextFor(template2, [chosenId, note == null ? void 0 : note.toneId, (_a2 = this.map) == null ? void 0 : _a2.toneId], language2);
   }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   fieldLinks() {
@@ -49217,9 +49203,14 @@ ${request.requirements}` : preset.text,
     const currentModel = this.plugin.currentModelChoice().model;
     const model = request.shallowResearch && request.model || currentModel;
     await this.noteStyles.refresh();
-    const importStyle = this.styleOrThrow([{ template: request.detailTemplateId }]);
+    const importStyle = this.orThrowInvalid(
+      this.noteStyles.runStyle({
+        choice: { template: request.detailTemplateId },
+        outputLanguage: this.plugin.settings.language
+      })
+    );
     const noticeGate = { shown: false };
-    this.noticeBlockIssues(importStyle, noticeGate);
+    this.noticeBlockIssues(importStyle.issues, noticeGate);
     const { template: template2 } = importStyle;
     let result;
     try {
@@ -49312,7 +49303,7 @@ ${request.requirements}` : preset.text,
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
-        const template2 = this.mapDetailTemplate(settings.language, request.detailTemplateId, true, noticeGate);
+        const template2 = this.mapStyle(settings.language, { template: request.detailTemplateId, notify: true, gate: noticeGate }).template;
         const result = await addOutlineToMap(
           repo,
           map,
@@ -50775,7 +50766,7 @@ ${request.requirements}` : preset.text,
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        detailTemplate: this.mapDetailTemplate(language2, void 0, true)
+        detailTemplate: this.mapStyle(language2, { notify: true }).template
       };
       const ask = (context) => (
         // Each request is its own attempt of one entry: the repair request clears the first request's preview.
@@ -50901,7 +50892,7 @@ ${request.requirements}` : preset.text,
       sourceTexts: notes.flatMap((note) => [note.summary, note.detail, note.newFindings]),
       sourceLinkTexts: notes.map((note) => note.visualReferences),
       allowedTexts: task.sources.map((source) => source.path),
-      logHeadings: this.mapDetailTemplate(this.plugin.settings.language).sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]),
+      logHeadings: this.mapStyle(this.plugin.settings.language).template.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]),
       mergedTexts: [result.summary, result.detail],
       mergedLinkTexts: result.visualReferences.map((reference) => `${reference.imageUrl} ${reference.sourceUrl}`)
     });
@@ -50989,7 +50980,7 @@ ${request.requirements}` : preset.text,
     try {
       if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (content) {
-        const detailTemplate = this.mapDetailTemplate(language2);
+        const detailTemplate = this.mapStyle(language2).template;
         await repo.updateNote(
           created.path,
           {
@@ -51057,7 +51048,7 @@ ${request.requirements}` : preset.text,
    */
   async mergeIntoParent(title, sources, content, before) {
     var _a2, _b2;
-    const [target, ...children] = sources, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = this.mapDetailTemplate(language2);
+    const [target, ...children] = sources, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = this.mapStyle(language2).template;
     const sourceNotes = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
     const name = title.trim(), sourcePaths = [.../* @__PURE__ */ new Set([...sourceNotes[0].sourcePaths, ...children.map((child) => child.path)])];
@@ -57633,7 +57624,7 @@ ${request.requirements}` : preset.text,
             ancestors: await this.ancestorContext(parent, outputLanguage2),
             referenceGroups: options == null ? void 0 : options.referenceGroups,
             outputLanguage: options == null ? void 0 : options.outputLanguage,
-            ...this.toneField(note, options),
+            ...this.proposalTone(note, options),
             mode: "decompose",
             researchMode: (_d = options == null ? void 0 : options.researchMode) != null ? _d : "research",
             researchDepth: (_e = options == null ? void 0 : options.researchDepth) != null ? _e : "normal",
@@ -57761,7 +57752,7 @@ ${request.requirements}` : preset.text,
     const historyMark = this.history.mark();
     const createdByTitle = /* @__PURE__ */ new Map(), newNodes = [];
     await this.noteStyles.refresh();
-    const contributionTemplate = this.mapDetailTemplate(this.plugin.settings.language, detailTemplateId);
+    const contributionTemplate = this.mapStyle(this.plugin.settings.language, { template: detailTemplateId }).template;
     try {
       for (const item of items) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -58372,7 +58363,7 @@ ${request.requirements}` : preset.text,
             referenceDelivery: "direct",
             onProgress: options.onProgress,
             outputLanguage: options.outputLanguage,
-            ...this.toneField(note, options),
+            ...this.proposalTone(note, options),
             mode: "synthesize",
             researchMode: options.researchMode,
             researchDepth: options.researchDepth,
@@ -58828,6 +58819,7 @@ ${request.requirements}` : preset.text,
     const selectedLabel = t("ui.reference_selected_topics_included", names3.join(", "));
     const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
+    const mapTemplate = this.mapStyle(settings.language).template;
     new NextStepModal(
       this.app,
       "",
@@ -58848,11 +58840,11 @@ ${request.requirements}` : preset.text,
         fields: {
           sources,
           templates: this.templateChoices(),
-          currentTemplate: this.mapDetailTemplate(settings.language).name,
+          currentTemplate: mapTemplate.name,
           tones: this.toneChoices(),
           currentTone: this.toneLabelFor({}),
-          currentStyle: this.currentStyleLabel(this.mapDetailTemplate(settings.language).id, this.effectiveToneId({})),
-          currentStyleRef: this.styleRefFor(this.mapDetailTemplate(settings.language).id, this.effectiveToneId({})),
+          currentStyle: this.currentStyleLabel(mapTemplate.id, this.effectiveToneId({})),
+          currentStyleRef: this.styleRefFor(mapTemplate.id, this.effectiveToneId({})),
           ...this.outputLanguageMemory()
         },
         ...pending2 ? { pending: { directions: pending2.directions, discard: () => this.discardSelectionSynthesis() } } : {}
@@ -58985,7 +58977,7 @@ ${request.requirements}` : preset.text,
           referenceDelivery: "direct",
           onProgress: runOptions.onProgress,
           outputLanguage: runOptions.outputLanguage,
-          ...this.toneField(void 0, runOptions),
+          ...this.proposalTone(void 0, runOptions),
           mode: "synthesize",
           researchMode: runOptions.researchMode,
           researchDepth: runOptions.researchDepth,
@@ -59150,9 +59142,13 @@ ${note.detail.trim()}` : "",
     const model = chosen.model;
     const language2 = this.plugin.settings.language;
     await this.noteStyles.refresh();
-    const detailTemplate = this.mapDetailTemplate((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, options == null ? void 0 : options.detailTemplateId, true);
+    const integrationStyle = this.mapStyle((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, {
+      template: options == null ? void 0 : options.detailTemplateId,
+      tone: options == null ? void 0 : options.toneId,
+      notify: true
+    });
+    const detailTemplate = integrationStyle.template;
     try {
-      const integrationStyle = this.styleFields(void 0, options, detailTemplate);
       const integrationContext = {
         title,
         summary: translateNote((_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2, "note.no_conclusion_yet"),
@@ -59171,13 +59167,13 @@ ${note.detail.trim()}` : "",
           this.render();
         },
         outputLanguage: options == null ? void 0 : options.outputLanguage,
-        ...integrationStyle.tone,
+        ...integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {},
         mode: "synthesize",
         researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
         researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
         visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : "auto",
         detailTemplate,
-        ...integrationStyle.style,
+        ...integrationStyle.contextFields,
         addCharts: true
       };
       const result = await this.plugin.askModel(
@@ -59260,7 +59256,7 @@ ${note.detail.trim()}` : "",
       this.path,
       "workspace"
     );
-    const detailTemplate = this.mapDetailTemplate(language2, task.options.detailTemplateId);
+    const detailTemplate = this.mapStyle(language2, { template: task.options.detailTemplateId }).template;
     try {
       await this.plugin.repo.updateNote(
         integrated.path,
@@ -62614,12 +62610,17 @@ ${addition}` : addition });
    */
   topicStyle(note, chosenId, chosenToneId, outputLanguage2 = this.plugin.settings.language) {
     var _a2, _b2;
-    const result = this.noteStyles.runStyle({
-      choice: { template: chosenId, tone: chosenToneId },
-      topic: { template: note.detailTemplateId, tone: note.toneId },
-      map: { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId },
-      outputLanguage: outputLanguage2
-    });
+    return this.orThrowInvalid(
+      this.noteStyles.runStyle({
+        choice: { template: chosenId, tone: chosenToneId },
+        topic: { template: note.detailTemplateId, tone: note.toneId },
+        map: { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId },
+        outputLanguage: outputLanguage2
+      })
+    );
+  }
+  /** A style file that does not parse stops the run with a message naming file and line. */
+  orThrowInvalid(result) {
     const invalid4 = result.issues.invalid;
     if (invalid4) {
       const first = invalid4.issues[0];
@@ -62632,42 +62633,16 @@ ${addition}` : addition });
     return result;
   }
   /**
-   * The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and
-   * line. A template block that does not parse only shows a Notice (file, line, reason) and the run uses the built-in one.
-   */
-  styleOrThrow(levels) {
-    const resolved = this.noteStyles.resolve(levels);
-    if (resolved.invalid) {
-      const first = resolved.invalid.issues[0];
-      const { fileName } = resolved.invalid;
-      const path = `${this.noteStyles.folder()}/${fileName}`;
-      throw new NoteStyleFileError(
-        t("ui.note_style_file_invalid_0_1_2", fileName, first.line, styleIssueText(first)),
-        () => void openVaultFile(this.app, path)
-      );
-    }
-    return resolved;
-  }
-  /**
    * A template block that cannot be read does not stop the run: the built-in template stands in, and the user is told.
    * Only the entry of a run calls this (resolving for a label, a dialog or a write-back never does). `gate` makes a
    * group of runs (a batch) tell the user once.
    */
-  noticeBlockIssues(resolved, gate) {
-    var _a2, _b2;
-    const issue2 = (_a2 = resolved.blockIssues) == null ? void 0 : _a2[0];
+  noticeBlockIssues(issues, gate) {
+    var _a2;
+    const issue2 = issues.blockIssues[0];
     if (!issue2 || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
-    new import_obsidian31.Notice(t("ui.preview_issue_0_1_2", (_b2 = issue2.fileName) != null ? _b2 : issue2.id, issue2.line, styleIssueText(issue2)));
-  }
-  /**
-   * The template a run uses, in the run's language. A template the store resolved from a block (a changed built-in or the
-   * user's own) is kept as it is: swapping in a fresh built-in object would drop its block text from the run.
-   */
-  templateForRun(template2, language2) {
-    const resolution = this.noteStyles.resolutionOf(template2);
-    if (!(resolution == null ? void 0 : resolution.block)) return templateInLanguage(template2, language2);
-    return resolution.blockIssues ? this.noteStyles.rebind(template2, templateInLanguage(template2, language2)) : template2;
+    new import_obsidian31.Notice(t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2)));
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {
@@ -62691,17 +62666,20 @@ ${addition}` : addition });
     return id.startsWith("style:") || id.startsWith("file:") ? t("ui.note_style_file_missing_0", `${id.replace(/^(?:style|file):/, "")}.md`) : t("ui.detail_template_missing_0", id);
   }
   /**
-   * Template for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
-   * choice comes first.
+   * The note style for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
+   * choice comes first. A style file that does not parse stops the run; `notify` shows a template block problem once per `gate`.
    */
-  mapDetailTemplate(language2, chosenId, notify2 = false, gate) {
+  mapStyle(language2, options = {}) {
     var _a2, _b2;
-    const resolved = this.styleOrThrow([
-      { template: chosenId },
-      { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId }
-    ]);
-    if (notify2) this.noticeBlockIssues(resolved, gate);
-    return this.templateForRun(resolved.template, language2);
+    const result = this.orThrowInvalid(
+      this.noteStyles.runStyle({
+        choice: { template: options.template, tone: options.tone },
+        map: { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId },
+        outputLanguage: language2
+      })
+    );
+    if (options.notify) this.noticeBlockIssues(result.issues, options.gate);
+    return result;
   }
   /**
    * The model and reasoning a run really uses: a run-once choice first (never written to the topic), otherwise the
@@ -63136,13 +63114,19 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
     const body = this.bodyEl;
     if (!body) return;
     body.empty();
-    const fields = this.store.workspaceStyleFields(this.language);
-    if (fields.invalid) {
-      const first = fields.invalid.issues[0];
+    const style = this.store.runStyle({ outputLanguage: this.language });
+    const { invalid: invalid4 } = style.issues;
+    if (invalid4) {
+      const first = invalid4.issues[0];
       const reason = first ? styleIssueText(first) : "";
-      this.showProblems([t("ui.preview_style_invalid_0_1_2", fields.invalid.fileName, (_a2 = first == null ? void 0 : first.line) != null ? _a2 : 1, reason)]);
+      this.showProblems([t("ui.preview_style_invalid_0_1_2", invalid4.fileName, (_a2 = first == null ? void 0 : first.line) != null ? _a2 : 1, reason)]);
       return;
     }
+    const fields = {
+      detailTemplate: style.template,
+      ...style.toneText ? { toneText: style.toneText } : {},
+      ...style.contextFields
+    };
     const preview = previewPrompt(this.step, this.language, this.provider, fields);
     this.showProblems(
       preview.issues.map(

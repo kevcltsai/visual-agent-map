@@ -20,7 +20,7 @@ class FakeMenu {
 }
 const notices = [];
 const obsidian = { ...S.obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: FakeModal, Menu: FakeMenu, Notice: dom.makeNotice(notices) };
-const { renderNoteStyleSetting, renderNoteBlockSetting, renderNoteLocationSetting, renderNoteKindSetting, renderNoteKindHeading } = S.load('ui/settings-tab.ts', { obsidian });
+const { renderNoteStyleIntro, renderNoteBlockSetting, renderNoteLocationSetting, renderNoteKindSetting, renderNoteKindHeading } = S.load('ui/settings-tab.ts', { obsidian });
 const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
 const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
 const { parseNoteStyleFile } = loadSource('export { parseNoteStyleFile } from "./ai/note-style-file";');
@@ -122,19 +122,20 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
   return { view, setting, calls, settings: settingsObject, templates, tones, plugin, menu, edit: () => view.buttons[0] };
 }
 
-test('heading: "Note style" is a heading with its help line and a muted Preview AI instructions button that gets the focus back', () => {
+test('intro: the Note style sub-page opens with a plain row (not a heading) holding the help line and a muted Preview AI instructions button that gets the focus back', () => {
   const { setting, view, log, plugin } = row();
-  renderNoteStyleSetting(setting, plugin);
-  assert.equal(view.heading, true);
-  assert.equal(view.name, 'Note style');
-  assert.equal(view.desc, t('ui.note_style_setting_desc'));
+  view.name = t('ui.settings_note_style_intro'); // Obsidian applies the definition name before render
+  renderNoteStyleIntro(setting, plugin);
+  assert.notEqual(view.heading, true, 'an ordinary row, not a heading');
+  assert.equal(view.name, '', 'the sentence is in the description only, not also in the name Obsidian pre-filled');
+  assert.equal(view.desc, t('ui.settings_note_style_intro'));
+  assert.equal(view.desc, 'Default structure and voice for AI notes. A map or topic that sets its own wins.');
   assert.equal(view.buttons.length, 1);
   assert.equal(view.buttons[0].text, 'Preview AI instructions');
   assert.equal(view.buttons[0].buttonEl.hasClass('mod-muted'), true);
   view.buttons[0].click();
   assert.deepEqual(log.previewed, [view.buttons[0].buttonEl]);
 });
-
 test('File location row: the folder path (read-only), a Show in file explorer button, and "no files yet" until a file exists', async () => {
   const none = row({ items: TEMPLATES() });
   renderNoteLocationSetting(none.setting, none.plugin, () => { none.log.refreshed++; });
@@ -151,7 +152,7 @@ test('File location row: the folder path (read-only), a Show in file explorer bu
   const some = row({ items: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
   renderNoteLocationSetting(some.setting, some.plugin, () => {});
   await flush();
-  assert.equal(some.view.desc, 'Structures and voices you edited or created are stored here as plain Markdown files.');
+  assert.equal(some.view.desc, 'Structures and voices you edited or created are stored here.');
   // a folder never made and never chosen is not "not found"
   const fresh = row({ exists: false, items: TEMPLATES() });
   renderNoteLocationSetting(fresh.setting, fresh.plugin, () => {});
@@ -551,7 +552,7 @@ test('Low 4: after Edit or Save as makes a file, the File location description i
   await saved.edit().click();
   await flush();
   assert.equal(changed, 1);
-  assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here as plain Markdown files.');
+  assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here.');
 });
 
 // P3: the "By topic type" block (heading plus six pickers).

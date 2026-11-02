@@ -1541,7 +1541,7 @@ var en = {
   "ui.block_name_taken": "A file or built-in item already has this name. Pick another.",
   "ui.block_notice_saved_as_0": 'Saved as "{0}" and switched to it.',
   "ui.block_notice_open_backup": "Open backup",
-  "ui.note_style_location_desc": "Structures and voices you edited or created are stored here as plain Markdown files.",
+  "ui.note_style_location_desc": "Structures and voices you edited or created are stored here.",
   "ui.note_style_location_empty": "No files yet. The first edit or save creates them.",
   "ui.preview_tone_empty": "(Default voice; no extra instruction)",
   "ui.block_academic_note": "<!-- Academic rigor is the default voice: the AI follows the plugin's fixed neutral, evidence-first rules and gets no extra voice instruction.\n     To change the voice, write it below this comment, for example 'use more metaphors and shorter sentences'. -->",
@@ -2378,7 +2378,54 @@ var en = {
   "ui.clipboard_text_bad_title": "Line {0}: this title has characters or markup that cannot be used in a title, so nothing was pasted.",
   "ui.clipboard_text_vam_note": "This looks like a Visual Agent Map note or map file, not an outline, so nothing was pasted.",
   "ui.clipboard_text_outline_line": "Line {0}: the pasted outline is not valid, so nothing was pasted.",
-  "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted."
+  "ui.clipboard_text_outline": "The pasted outline is not valid, so nothing was pasted.",
+  "ui.settings_group_general": "General",
+  "ui.settings_group_ai": "AI",
+  "ui.settings_group_notes": "Notes",
+  "ui.settings_group_map": "Map",
+  "ui.settings_group_advanced": "Advanced",
+  "ui.settings_group_default": "Default",
+  "ui.settings_group_more": "More",
+  "ui.settings_group_debug": "Debugging",
+  "ui.settings_group_workspace": "Workspace",
+  "ui.settings_language_desc": "Only changes VAM, not Obsidian's language.",
+  "ui.settings_model_name": "Model",
+  "ui.settings_model_desc": "Chat and new AI tasks use this model.",
+  "ui.settings_reasoning_name": "Reasoning level",
+  "ui.settings_reasoning_desc": "Auto: Low for simple tasks, Medium for complex synthesis.",
+  "ui.settings_ai_connection_name": "AI connection",
+  "ui.settings_ai_connection_desc": "Where Codex and Claude Code are installed, and their status.",
+  "ui.settings_connected_count_0": "{0} connected",
+  "ui.settings_not_connected": "Not connected",
+  "ui.settings_ai_connection_intro": "Install either one to use AI.",
+  "ui.settings_status": "Status",
+  "ui.settings_cli_found_0": "Found: {0}",
+  "ui.settings_cli_path": "CLI path",
+  "ui.settings_codex_path_desc": "VAM uses it to start Codex.",
+  "ui.settings_claude_path_desc": "VAM uses it to start Claude Code.",
+  "ui.settings_note_style_page_desc": "The structure and voice AI uses for notes.",
+  "ui.settings_note_style_intro": "Default structure and voice for AI notes. A map or topic that sets its own wins.",
+  "ui.settings_structure": "Structure",
+  "ui.settings_voice": "Voice",
+  "ui.settings_by_kind_desc": "Let types like hypothesis or evidence each use their own structure.",
+  "ui.settings_by_kind_intro": "A structure picked on a topic or for one run still wins.",
+  "ui.settings_kinds_unset": "Not set",
+  "ui.settings_kinds_set_count_0": "{0} set",
+  "ui.settings_selection_ai_name": "Show AI button on selected text",
+  "ui.settings_selection_ai_desc": "Still available from the command palette when off.",
+  "ui.settings_diagrams_desc": "Adds up to three Mermaid diagrams after writing.",
+  "ui.settings_preview_size_desc": "Size of the preview card when you hover a topic.",
+  "ui.settings_map_folder_desc_0": "Inside {0}/. Renaming moves existing files too.",
+  "ui.settings_advanced_name": "Advanced and troubleshooting",
+  "ui.settings_advanced_desc": "Record AI exchanges, repair or rebuild data.",
+  "ui.settings_record_desc": "Keeps the last 1,000 full requests and replies, which may include private notes. Clear them in the debug log.",
+  "ui.settings_workspace_location": "Location",
+  "ui.settings_workspace_location_desc_0_1": "{0}  \xB7  Legacy topics folder (still readable): {1}",
+  "ui.settings_repair_name": "Repair workspace",
+  "ui.settings_repair_desc": "Only recreates missing folders; notes and mind maps are untouched.",
+  "ui.settings_rebuild_name": "Rebuild VAM data",
+  "ui.settings_rebuild_desc": "Rescans and rebuilds the index; originals are not overwritten.",
+  "ui.settings_reconnect_desc": "Reconnects only after you confirm."
 };
 
 // i18n/zh-CN.ts
@@ -3820,7 +3867,7 @@ var zhCN = {
   "ui.block_name_taken": "\u5DF2\u6709\u540C\u540D\u7684\u6587\u4EF6\u6216\u5185\u7F6E\u9879\u76EE\uFF0C\u8BF7\u6362\u4E00\u4E2A\u540D\u79F0\u3002",
   "ui.block_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u4E3A\u201C{0}\u201D\u5E76\u6539\u7528\u5B83\u3002",
   "ui.block_notice_open_backup": "\u6253\u5F00\u5907\u4EFD",
-  "ui.note_style_location_desc": "\u4F60\u6539\u8FC7\u6216\u81EA\u5DF1\u521B\u5EFA\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u5B58\u5728\u8FD9\u91CC\uFF0C\u662F\u666E\u901A Markdown \u6587\u4EF6\u3002",
+  "ui.note_style_location_desc": "\u4F60\u6539\u8FC7\u6216\u65B0\u5EFA\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u5B58\u5728\u8FD9\u91CC\u3002",
   "ui.note_style_location_empty": "\u8FD8\u6CA1\u6709\u6587\u4EF6\u3002\u7B2C\u4E00\u6B21\u7F16\u8F91\u6216\u53E6\u5B58\u65F6\u4F1A\u521B\u5EFA\u3002",
   "ui.preview_tone_empty": "\uFF08\u9ED8\u8BA4\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
   "ui.block_academic_note": "<!-- \u5B66\u672F\u4E25\u8C28\u662F\u9ED8\u8BA4\u53E3\u543B\uFF1AAI \u53EA\u7167\u63D2\u4EF6\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8BC1\u636E\u89C4\u5219\u5199\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u6362\u4E00\u79CD\u5199\u6CD5\uFF0C\u5C31\u5728\u8FD9\u6BB5\u6CE8\u91CA\u4E0B\u9762\u76F4\u63A5\u5199\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u201C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u70B9\u201D\u3002 -->",
@@ -4657,7 +4704,54 @@ var zhCN = {
   "ui.clipboard_text_bad_title": "\u7B2C {0} \u884C\uFF1A\u8FD9\u4E2A\u6807\u9898\u542B\u6709\u4E0D\u80FD\u7528\u5728\u6807\u9898\u7684\u5B57\u7B26\u6216\u6807\u8BB0\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_text_vam_note": "\u8FD9\u770B\u8D77\u6765\u662F Visual Agent Map \u7684\u7B14\u8BB0\u6216\u56FE\u6587\u4EF6\uFF0C\u4E0D\u662F\u5927\u7EB2\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
-  "ui.clipboard_text_outline": "\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002"
+  "ui.clipboard_text_outline": "\u7C98\u8D34\u7684\u5927\u7EB2\u4E0D\u5408\u6CD5\uFF0C\u6CA1\u6709\u7C98\u8D34\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.settings_group_general": "\u5E38\u89C4",
+  "ui.settings_group_ai": "AI",
+  "ui.settings_group_notes": "\u7B14\u8BB0",
+  "ui.settings_group_map": "\u5FC3\u667A\u56FE",
+  "ui.settings_group_advanced": "\u9AD8\u7EA7",
+  "ui.settings_group_default": "\u9ED8\u8BA4",
+  "ui.settings_group_more": "\u66F4\u591A",
+  "ui.settings_group_debug": "\u8C03\u8BD5",
+  "ui.settings_group_workspace": "\u5DE5\u4F5C\u533A",
+  "ui.settings_language_desc": "\u53EA\u5F71\u54CD VAM\uFF0C\u4E0D\u6539 Obsidian \u7684\u8BED\u8A00\u3002",
+  "ui.settings_model_name": "\u6A21\u578B",
+  "ui.settings_model_desc": "\u804A\u5929\u548C\u65B0\u7684 AI \u4EFB\u52A1\u90FD\u7528\u8FD9\u4E2A\u6A21\u578B\u3002",
+  "ui.settings_reasoning_name": "\u63A8\u7406\u7B49\u7EA7",
+  "ui.settings_reasoning_desc": "\u81EA\u52A8\uFF1A\u7B80\u5355\u4EFB\u52A1\u7528 Low\uFF0C\u590D\u6742\u6574\u5408\u7528 Medium\u3002",
+  "ui.settings_ai_connection_name": "AI \u8FDE\u63A5",
+  "ui.settings_ai_connection_desc": "Codex \u4E0E Claude Code \u7684\u5B89\u88C5\u4F4D\u7F6E\u548C\u72B6\u6001\u3002",
+  "ui.settings_connected_count_0": "{0} \u4E2A\u5DF2\u8FDE\u63A5",
+  "ui.settings_not_connected": "\u672A\u8FDE\u63A5",
+  "ui.settings_ai_connection_intro": "\u88C5\u597D\u5176\u4E2D\u4E00\u4E2A\u5C31\u80FD\u7528 AI\u3002",
+  "ui.settings_status": "\u72B6\u6001",
+  "ui.settings_cli_found_0": "\u5DF2\u627E\u5230\uFF1A{0}",
+  "ui.settings_cli_path": "CLI \u8DEF\u5F84",
+  "ui.settings_codex_path_desc": "VAM \u7528\u5B83\u542F\u52A8 Codex\u3002",
+  "ui.settings_claude_path_desc": "VAM \u7528\u5B83\u542F\u52A8 Claude Code\u3002",
+  "ui.settings_note_style_page_desc": "AI \u5199\u7B14\u8BB0\u7528\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u3002",
+  "ui.settings_note_style_intro": "AI \u5199\u7B14\u8BB0\u7684\u9ED8\u8BA4\u7ED3\u6784\u4E0E\u53E3\u543B\u3002\u5FC3\u667A\u56FE\u6216\u8BAE\u9898\u53E6\u5916\u6307\u5B9A\u65F6\uFF0C\u4EE5\u90A3\u8FB9\u4E3A\u51C6\u3002",
+  "ui.settings_structure": "\u7ED3\u6784",
+  "ui.settings_voice": "\u53E3\u543B",
+  "ui.settings_by_kind_desc": "\u8BA9\u5047\u8BBE\u3001\u8BC1\u636E\u7B49\u7C7B\u578B\u5404\u7528\u4E00\u79CD\u7ED3\u6784\u3002",
+  "ui.settings_by_kind_intro": "\u8BAE\u9898\u6216\u5355\u6B21\u8FD0\u884C\u81EA\u5DF1\u9009\u7684\u7ED3\u6784\u4ECD\u4F18\u5148\u3002",
+  "ui.settings_kinds_unset": "\u672A\u8BBE\u7F6E",
+  "ui.settings_kinds_set_count_0": "\u5DF2\u8BBE\u7F6E {0} \u79CD",
+  "ui.settings_selection_ai_name": "\u9009\u4E2D\u6587\u5B57\u65F6\u663E\u793A AI \u6309\u94AE",
+  "ui.settings_selection_ai_desc": "\u5173\u95ED\u540E\u4ECD\u53EF\u4ECE\u547D\u4EE4\u9762\u677F\u4F7F\u7528\u3002",
+  "ui.settings_diagrams_desc": "\u5199\u5B8C\u540E\u6700\u591A\u52A0\u4E09\u5F20 Mermaid \u56FE\u3002",
+  "ui.settings_preview_size_desc": "\u9F20\u6807\u79FB\u5230\u8BAE\u9898\u65F6\uFF0C\u9884\u89C8\u5361\u7684\u5927\u5C0F\u3002",
+  "ui.settings_map_folder_desc_0": "\u5728 {0}/ \u4E0B\u9762\u3002\u6539\u540D\u4F1A\u8FDE\u540C\u65E2\u6709\u6587\u4EF6\u4E00\u8D77\u642C\u3002",
+  "ui.settings_advanced_name": "\u9AD8\u7EA7\u4E0E\u7591\u96BE\u6392\u89E3",
+  "ui.settings_advanced_desc": "\u8BB0\u5F55 AI \u5F80\u8FD4\u3001\u4FEE\u590D\u6216\u91CD\u5EFA\u6570\u636E\u3002",
+  "ui.settings_record_desc": "\u4FDD\u5B58\u6700\u8FD1 1,000 \u6B21\u5B8C\u6574\u8BF7\u6C42\u4E0E\u56DE\u590D\uFF0C\u53EF\u80FD\u542B\u79C1\u4EBA\u7B14\u8BB0\u3002\u53EF\u5728\u8C03\u8BD5\u65E5\u5FD7\u6E05\u9664\u3002",
+  "ui.settings_workspace_location": "\u4F4D\u7F6E",
+  "ui.settings_workspace_location_desc_0_1": "{0}\u3000\xB7\u3000\u65E7\u8BAE\u9898\u6587\u4EF6\u5939\uFF08\u4ECD\u53EF\u8BFB\u53D6\uFF09\uFF1A{1}",
+  "ui.settings_repair_name": "\u4FEE\u590D\u5DE5\u4F5C\u533A",
+  "ui.settings_repair_desc": "\u53EA\u8865\u56DE\u7F3A\u5C11\u7684\u6587\u4EF6\u5939\uFF0C\u4E0D\u52A8\u7B14\u8BB0\u4E0E\u5FC3\u667A\u56FE\u3002",
+  "ui.settings_rebuild_name": "\u91CD\u5EFA VAM \u6570\u636E",
+  "ui.settings_rebuild_desc": "\u91CD\u65B0\u626B\u63CF\u5E76\u91CD\u5EFA\u7D22\u5F15\uFF0C\u4E0D\u8986\u5199\u539F\u6587\u3002",
+  "ui.settings_reconnect_desc": "\u627E\u5230\u540E\u7ECF\u4F60\u786E\u8BA4\u624D\u91CD\u65B0\u8FDE\u63A5\u3002"
 };
 
 // i18n/zh-TW.ts
@@ -6099,7 +6193,7 @@ var zhTW = {
   "ui.block_name_taken": "\u5DF2\u6709\u540C\u540D\u7684\u6A94\u6848\u6216\u5167\u5EFA\u9805\u76EE\uFF0C\u8ACB\u63DB\u4E00\u500B\u540D\u7A31\u3002",
   "ui.block_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u70BA\u300C{0}\u300D\u4E26\u6539\u7528\u5B83\u3002",
   "ui.block_notice_open_backup": "\u958B\u555F\u5099\u4EFD",
-  "ui.note_style_location_desc": "\u4F60\u6539\u904E\u6216\u81EA\u5DF1\u5EFA\u7ACB\u7684\u7D50\u69CB\u8207\u53E3\u543B\u5B58\u5728\u9019\u88E1\uFF0C\u662F\u4E00\u822C Markdown \u6A94\u3002",
+  "ui.note_style_location_desc": "\u4F60\u6539\u904E\u6216\u65B0\u5EFA\u7684\u7D50\u69CB\u8207\u53E3\u543B\u5B58\u5728\u9019\u88E1\u3002",
   "ui.note_style_location_empty": "\u9084\u6C92\u6709\u6A94\u6848\u3002\u7B2C\u4E00\u6B21\u7DE8\u8F2F\u6216\u53E6\u5B58\u6642\u6703\u5EFA\u7ACB\u3002",
   "ui.preview_tone_empty": "\uFF08\u9810\u8A2D\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
   "ui.block_academic_note": "<!-- \u5B78\u8853\u56B4\u8B39\u662F\u9810\u8A2D\u53E3\u543B\uFF1AAI \u53EA\u7167\u5916\u639B\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8B49\u64DA\u898F\u5247\u5BEB\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u63DB\u4E00\u7A2E\u5BEB\u6CD5\uFF0C\u5C31\u5728\u9019\u6BB5\u8A3B\u89E3\u4E0B\u9762\u76F4\u63A5\u5BEB\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u300C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u9EDE\u300D\u3002 -->",
@@ -6936,7 +7030,54 @@ var zhTW = {
   "ui.clipboard_text_bad_title": "\u7B2C {0} \u884C\uFF1A\u9019\u500B\u6A19\u984C\u542B\u6709\u4E0D\u80FD\u7528\u5728\u6A19\u984C\u7684\u5B57\u5143\u6216\u6A19\u8A18\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_text_vam_note": "\u9019\u770B\u8D77\u4F86\u662F Visual Agent Map \u7684\u7B46\u8A18\u6216\u5716\u6A94\uFF0C\u4E0D\u662F\u5927\u7DB1\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.clipboard_text_outline_line": "\u7B2C {0} \u884C\uFF1A\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
-  "ui.clipboard_text_outline": "\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002"
+  "ui.clipboard_text_outline": "\u8CBC\u4E0A\u7684\u5927\u7DB1\u4E0D\u5408\u6CD5\uFF0C\u6C92\u6709\u8CBC\u4E0A\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.settings_group_general": "\u4E00\u822C",
+  "ui.settings_group_ai": "AI",
+  "ui.settings_group_notes": "\u7B46\u8A18",
+  "ui.settings_group_map": "\u5FC3\u667A\u5716",
+  "ui.settings_group_advanced": "\u9032\u968E",
+  "ui.settings_group_default": "\u9810\u8A2D",
+  "ui.settings_group_more": "\u66F4\u591A",
+  "ui.settings_group_debug": "\u5075\u932F",
+  "ui.settings_group_workspace": "\u5DE5\u4F5C\u5340",
+  "ui.settings_language_desc": "\u53EA\u5F71\u97FF VAM\uFF0C\u4E0D\u6539 Obsidian \u7684\u8A9E\u8A00\u3002",
+  "ui.settings_model_name": "\u6A21\u578B",
+  "ui.settings_model_desc": "\u804A\u5929\u548C\u65B0\u7684 AI \u4EFB\u52D9\u90FD\u7528\u9019\u500B\u6A21\u578B\u3002",
+  "ui.settings_reasoning_name": "\u63A8\u7406\u7B49\u7D1A",
+  "ui.settings_reasoning_desc": "\u81EA\u52D5\uFF1A\u7C21\u55AE\u4EFB\u52D9\u7528 Low\uFF0C\u8907\u96DC\u6574\u5408\u7528 Medium\u3002",
+  "ui.settings_ai_connection_name": "AI \u9023\u7DDA",
+  "ui.settings_ai_connection_desc": "Codex \u8207 Claude Code \u7684\u5B89\u88DD\u4F4D\u7F6E\u548C\u72C0\u614B\u3002",
+  "ui.settings_connected_count_0": "{0} \u500B\u5DF2\u9023\u7DDA",
+  "ui.settings_not_connected": "\u672A\u9023\u7DDA",
+  "ui.settings_ai_connection_intro": "\u88DD\u597D\u5176\u4E2D\u4E00\u500B\u5C31\u80FD\u7528 AI\u3002",
+  "ui.settings_status": "\u72C0\u614B",
+  "ui.settings_cli_found_0": "\u5DF2\u627E\u5230\uFF1A{0}",
+  "ui.settings_cli_path": "CLI \u8DEF\u5F91",
+  "ui.settings_codex_path_desc": "VAM \u7528\u5B83\u555F\u52D5 Codex\u3002",
+  "ui.settings_claude_path_desc": "VAM \u7528\u5B83\u555F\u52D5 Claude Code\u3002",
+  "ui.settings_note_style_page_desc": "AI \u5BEB\u7B46\u8A18\u7528\u7684\u7D50\u69CB\u8207\u53E3\u543B\u3002",
+  "ui.settings_note_style_intro": "AI \u5BEB\u7B46\u8A18\u7684\u9810\u8A2D\u7D50\u69CB\u8207\u53E3\u543B\u3002\u5FC3\u667A\u5716\u6216\u8B70\u984C\u53E6\u5916\u6307\u5B9A\u6642\uFF0C\u4EE5\u90A3\u908A\u70BA\u6E96\u3002",
+  "ui.settings_structure": "\u7D50\u69CB",
+  "ui.settings_voice": "\u53E3\u543B",
+  "ui.settings_by_kind_desc": "\u8B93\u5047\u8A2D\u3001\u8B49\u64DA\u7B49\u985E\u578B\u5404\u7528\u4E00\u7A2E\u7D50\u69CB\u3002",
+  "ui.settings_by_kind_intro": "\u8B70\u984C\u6216\u55AE\u6B21\u57F7\u884C\u81EA\u5DF1\u9078\u7684\u7D50\u69CB\u4ECD\u512A\u5148\u3002",
+  "ui.settings_kinds_unset": "\u672A\u8A2D\u5B9A",
+  "ui.settings_kinds_set_count_0": "\u5DF2\u8A2D\u5B9A {0} \u7A2E",
+  "ui.settings_selection_ai_name": "\u9078\u53D6\u6587\u5B57\u6642\u986F\u793A AI \u6309\u9215",
+  "ui.settings_selection_ai_desc": "\u95DC\u9589\u5F8C\u4ECD\u53EF\u5F9E\u547D\u4EE4\u9762\u677F\u4F7F\u7528\u3002",
+  "ui.settings_diagrams_desc": "\u5BEB\u5B8C\u5F8C\u6700\u591A\u52A0\u4E09\u5F35 Mermaid \u5716\u3002",
+  "ui.settings_preview_size_desc": "\u6ED1\u9F20\u79FB\u5230\u8B70\u984C\u6642\uFF0C\u9810\u89BD\u5361\u7684\u5927\u5C0F\u3002",
+  "ui.settings_map_folder_desc_0": "\u5728 {0}/ \u5E95\u4E0B\u3002\u6539\u540D\u6703\u9023\u540C\u65E2\u6709\u6A94\u6848\u4E00\u8D77\u642C\u3002",
+  "ui.settings_advanced_name": "\u9032\u968E\u8207\u7591\u96E3\u6392\u89E3",
+  "ui.settings_advanced_desc": "\u8A18\u9304 AI \u5F80\u8FD4\u3001\u4FEE\u5FA9\u6216\u91CD\u5EFA\u8CC7\u6599\u3002",
+  "ui.settings_record_desc": "\u4FDD\u5B58\u6700\u8FD1 1,000 \u6B21\u5B8C\u6574\u8ACB\u6C42\u8207\u56DE\u8986\uFF0C\u53EF\u80FD\u542B\u79C1\u4EBA\u7B46\u8A18\u3002\u53EF\u5728\u5075\u932F\u65E5\u8A8C\u6E05\u9664\u3002",
+  "ui.settings_workspace_location": "\u4F4D\u7F6E",
+  "ui.settings_workspace_location_desc_0_1": "{0}\u3000\xB7\u3000\u820A\u8B70\u984C\u8CC7\u6599\u593E\uFF08\u4ECD\u53EF\u8B80\u53D6\uFF09\uFF1A{1}",
+  "ui.settings_repair_name": "\u4FEE\u5FA9\u5DE5\u4F5C\u5340",
+  "ui.settings_repair_desc": "\u53EA\u88DC\u56DE\u7F3A\u5C11\u7684\u8CC7\u6599\u593E\uFF0C\u4E0D\u52D5\u7B46\u8A18\u8207\u5FC3\u667A\u5716\u3002",
+  "ui.settings_rebuild_name": "\u91CD\u5EFA VAM \u8CC7\u6599",
+  "ui.settings_rebuild_desc": "\u91CD\u65B0\u6383\u63CF\u4E26\u91CD\u5EFA\u7D22\u5F15\uFF0C\u4E0D\u8986\u5BEB\u539F\u6587\u3002",
+  "ui.settings_reconnect_desc": "\u627E\u5230\u5F8C\u7D93\u4F60\u78BA\u8A8D\u624D\u91CD\u65B0\u9023\u7D50\u3002"
 };
 
 // i18n/languages.ts
@@ -63087,8 +63228,12 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
 
 // ui/settings-tab.ts
 var import_obsidian33 = require("obsidian");
-function renderNoteStyleSetting(setting, plugin) {
-  setting.setName(t("ui.note_style")).setDesc(t("ui.note_style_setting_desc")).setHeading();
+function renderSettingsIntro(setting, text11) {
+  setting.setName("");
+  setting.setDesc(text11);
+}
+function renderNoteStyleIntro(setting, plugin) {
+  renderSettingsIntro(setting, t("ui.settings_note_style_intro"));
   setting.addButton((button) => {
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
     button.buttonEl.addClass("mod-muted");
@@ -63395,9 +63540,6 @@ function renderNoteBlockSetting(setting, plugin, category, onFilesChanged) {
     () => void 0
   );
 }
-function renderNoteKindHeading(setting) {
-  setting.setName(t("ui.note_style_by_kind")).setDesc(t("ui.note_style_by_kind_desc")).setHeading();
-}
 var KIND_ROWS = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
 var KIND_SUGGESTED = /* @__PURE__ */ new Set(["atomic", "hypothesis", "evidence", "action"]);
 function renderNoteKindSetting(setting, plugin, kind) {
@@ -63677,228 +63819,386 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
   renderMapFolderSetting(setting, key2, label, fallback) {
     const workspace = this.plugin.settings.workspaceFolder, current = this.plugin.settings[key2];
     const shown = current.startsWith(`${workspace}/`) ? current.slice(workspace.length + 1) : current;
-    setting.setName(t(label)).setDesc(t("ui.map_folder_name_desc", workspace)).addText((input2) => {
+    setting.setName(t(label)).setDesc(t("ui.settings_map_folder_desc_0", workspace)).addText((input2) => {
       input2.setPlaceholder(fallback).setValue(shown);
       bindMapFolderInput(this.plugin, key2, input2);
     });
   }
   getSettingDefinitions() {
-    const text11 = (name, key2, desc) => ({
-      name,
-      desc,
-      control: { type: "text", key: key2 }
-    });
-    const diagnostic = this.plugin.codexDiagnostic();
-    const claudeDiagnostic = this.plugin.claudeDiagnostic();
+    const aiConnectionPage = {
+      type: "page",
+      name: t("ui.settings_ai_connection_name"),
+      desc: t("ui.settings_ai_connection_desc"),
+      displayValue: () => this.aiConnectionValue(),
+      status: () => this.aiConnectionStatus(),
+      items: [
+        {
+          name: t("ui.settings_ai_connection_intro"),
+          searchable: false,
+          render: (setting) => renderSettingsIntro(setting, t("ui.settings_ai_connection_intro"))
+        },
+        this.cliGroup(
+          "Codex",
+          "codex",
+          t("ui.settings_codex_path_desc"),
+          "ui.codex_cli_was_not_found_follow_the_installation_guide_to_ins"
+        ),
+        this.cliGroup(
+          "Claude Code",
+          "claude",
+          t("ui.settings_claude_path_desc"),
+          "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it"
+        )
+      ]
+    };
+    const noteKindPage = {
+      type: "page",
+      name: t("ui.note_style_by_kind"),
+      desc: t("ui.settings_by_kind_desc"),
+      displayValue: () => this.noteKindValue(),
+      status: () => this.noteKindStatus(),
+      items: [
+        {
+          name: t("ui.settings_by_kind_intro"),
+          searchable: false,
+          render: (setting) => renderSettingsIntro(setting, t("ui.settings_by_kind_intro"))
+        },
+        ...KIND_ROWS.map((kind) => ({
+          name: t(`ui.topic_kind_${kind}`),
+          render: (setting) => renderNoteKindSetting(setting, this.plugin, kind)
+        }))
+      ]
+    };
+    const noteStylePage = {
+      type: "page",
+      name: t("ui.note_style"),
+      desc: t("ui.settings_note_style_page_desc"),
+      displayValue: () => this.noteStyleValue(),
+      status: () => this.noteStyleStatus(),
+      items: [
+        {
+          name: t("ui.settings_note_style_intro"),
+          searchable: false,
+          render: (setting) => renderNoteStyleIntro(setting, this.plugin)
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_default"),
+          items: [
+            {
+              name: t("ui.settings_structure"),
+              render: (setting) => {
+                renderNoteBlockSetting(setting, this.plugin, "template", () => {
+                  var _a2;
+                  return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
+                });
+                setting.setName(t("ui.settings_structure"));
+              }
+            },
+            {
+              name: t("ui.settings_voice"),
+              render: (setting) => {
+                renderNoteBlockSetting(setting, this.plugin, "tone", () => {
+                  var _a2;
+                  return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
+                });
+                setting.setName(t("ui.settings_voice"));
+              }
+            }
+          ]
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_more"),
+          items: [
+            noteKindPage,
+            {
+              name: t("ui.note_style_folder_path"),
+              render: (setting) => {
+                this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
+              }
+            }
+          ]
+        }
+      ]
+    };
+    const advancedPage = {
+      type: "page",
+      name: t("ui.settings_advanced_name"),
+      desc: t("ui.settings_advanced_desc"),
+      items: [
+        {
+          type: "group",
+          heading: t("ui.settings_group_debug"),
+          items: [
+            {
+              name: t("ui.record_ai_exchanges"),
+              render: (setting) => {
+                setting.setName(t("ui.record_ai_exchanges")).setDesc(t("ui.settings_record_desc")).addToggle(
+                  (toggle) => toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async (value) => {
+                    this.plugin.settings.aiExchangeLoggingEnabled = value;
+                    await this.plugin.saveSettings();
+                  })
+                );
+              }
+            }
+          ]
+        },
+        {
+          type: "group",
+          heading: t("ui.settings_group_workspace"),
+          items: [
+            {
+              name: t("ui.settings_workspace_location"),
+              render: (setting) => {
+                setting.setName(t("ui.settings_workspace_location")).setDesc(
+                  t(
+                    "ui.settings_workspace_location_desc_0_1",
+                    this.plugin.settings.workspaceFolder,
+                    this.plugin.settings.topicsFolder
+                  )
+                );
+              }
+            },
+            this.actionRow(
+              t("ui.settings_repair_name"),
+              t("ui.settings_repair_desc"),
+              t("ui.repair"),
+              () => void this.plugin.mutate(() => this.plugin.repairWorkspace())
+            ),
+            this.actionRow(
+              t("ui.settings_rebuild_name"),
+              t("ui.settings_rebuild_desc"),
+              t("ui.full_rebuild"),
+              () => void this.plugin.mutate(() => this.plugin.fullRebuild())
+            ),
+            this.actionRow(
+              t("ui.reconnect_existing_workspace"),
+              t("ui.settings_reconnect_desc"),
+              t("ui.scan"),
+              () => void this.plugin.offerWorkspaceReconnect()
+            )
+          ]
+        }
+      ]
+    };
     return [
       {
-        name: t("ui.interface_language"),
-        render: (setting) => {
-          setting.setName(t("ui.interface_language")).setDesc(t("ui.interface_language_description")).addDropdown((dropdown) => {
-            for (const option of SUPPORTED_LANGUAGES) dropdown.addOption(option.id, option.label);
-            dropdown.setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
-            dropdown.onChange((value) => {
-              void this.plugin.changeLanguage(value);
-            });
-          });
-        }
-      },
-      text11(t("ui.codex_cli_path"), "codexPath", t("ui.vam_uses_this_executable_to_start_codex_app_server")),
-      text11(t("ui.claude_cli_path"), "claudePath", t("ui.vam_uses_the_claude_code_cli_installed_on_this_computer")),
-      {
-        name: t("ui.current_model"),
-        desc: t("ui.current_model_description"),
-        render: (setting) => {
-          this.followCurrentModel();
-          setting.setName(t("ui.current_model")).setDesc(t("ui.current_model_description")).addDropdown((dropdown) => {
-            const select = dropdown.selectEl;
-            this.modelSelects.add(select);
-            const selected = this.plugin.settings.cliModel;
-            this.showCurrentModel(select, selected);
-            dropdown.setValue(selected);
-            dropdown.onChange((value) => {
-              void this.setControlValue("cliModel", value);
-            });
-          }).addButton(
-            (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
-              void this.plugin.refreshModelDiscovery("codex");
-              void this.plugin.refreshModelDiscovery("claude");
-            })
-          );
-          const statusEl = setting.descEl.createDiv({ cls: "vam-model-discovery-status" });
-          this.modelStatusEls.add(statusEl);
-          statusEl.setText(
-            modelDiscoverySummary(this.plugin.modelDiscoveryState("codex"), this.plugin.modelDiscoveryState("claude"))
-          );
-          if (this.plugin.modelDiscoveryState("codex").status === "idle")
-            void this.plugin.refreshModelDiscovery("codex");
-          if (this.plugin.modelDiscoveryState("claude").status === "idle")
-            void this.plugin.refreshModelDiscovery("claude");
-        }
+        type: "group",
+        heading: t("ui.settings_group_general"),
+        items: [
+          {
+            name: t("ui.interface_language"),
+            render: (setting) => {
+              setting.setName(t("ui.interface_language")).setDesc(t("ui.settings_language_desc")).addDropdown((dropdown) => {
+                for (const option of SUPPORTED_LANGUAGES) dropdown.addOption(option.id, option.label);
+                dropdown.setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
+                dropdown.onChange((value) => {
+                  void this.plugin.changeLanguage(value);
+                });
+              });
+            }
+          }
+        ]
       },
       {
-        name: t("ui.ai_reasoning_level"),
-        desc: t("ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe"),
-        control: {
-          type: "dropdown",
-          key: "cliReasoning",
-          options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") }
-        }
+        type: "group",
+        heading: t("ui.settings_group_ai"),
+        items: [
+          {
+            name: t("ui.settings_model_name"),
+            render: (setting) => {
+              this.followCurrentModel();
+              setting.setName(t("ui.settings_model_name")).setDesc(t("ui.settings_model_desc")).addDropdown((dropdown) => {
+                const select = dropdown.selectEl;
+                this.modelSelects.add(select);
+                const selected = this.plugin.settings.cliModel;
+                this.showCurrentModel(select, selected);
+                dropdown.setValue(selected);
+                dropdown.onChange((value) => {
+                  void this.setControlValue("cliModel", value);
+                });
+              }).addButton(
+                (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
+                  void this.plugin.refreshModelDiscovery("codex");
+                  void this.plugin.refreshModelDiscovery("claude");
+                })
+              );
+              const statusEl = setting.descEl.createDiv({ cls: "vam-model-discovery-status" });
+              this.modelStatusEls.add(statusEl);
+              statusEl.setText(
+                modelDiscoverySummary(
+                  this.plugin.modelDiscoveryState("codex"),
+                  this.plugin.modelDiscoveryState("claude")
+                )
+              );
+              if (this.plugin.modelDiscoveryState("codex").status === "idle")
+                void this.plugin.refreshModelDiscovery("codex");
+              if (this.plugin.modelDiscoveryState("claude").status === "idle")
+                void this.plugin.refreshModelDiscovery("claude");
+            }
+          },
+          {
+            name: t("ui.settings_reasoning_name"),
+            desc: t("ui.settings_reasoning_desc"),
+            control: {
+              type: "dropdown",
+              key: "cliReasoning",
+              options: { auto: t("ui.auto"), low: t("ui.low"), medium: t("ui.medium"), high: t("ui.high") }
+            }
+          },
+          aiConnectionPage
+        ]
       },
       {
-        name: t("ui.note_style"),
-        render: (setting) => renderNoteStyleSetting(setting, this.plugin)
+        type: "group",
+        heading: t("ui.settings_group_notes"),
+        items: [
+          noteStylePage,
+          {
+            name: t("ui.settings_selection_ai_name"),
+            render: (setting) => {
+              setting.setName(t("ui.settings_selection_ai_name")).setDesc(t("ui.settings_selection_ai_desc")).addToggle(
+                (toggle) => toggle.setValue(this.plugin.settings.markdownSelectionAiAutoOpen).onChange(async (value) => {
+                  this.plugin.settings.markdownSelectionAiAutoOpen = value;
+                  await this.plugin.saveSettings();
+                })
+              );
+            }
+          },
+          {
+            name: t("ui.add_diagrams_after_research"),
+            render: (setting) => {
+              setting.setName(t("ui.add_diagrams_after_research")).setDesc(t("ui.settings_diagrams_desc")).addToggle(
+                (toggle) => toggle.setValue(this.plugin.settings.addDiagramsAfterResearch).onChange(async (value) => {
+                  this.plugin.settings.addDiagramsAfterResearch = value;
+                  await this.plugin.saveSettings();
+                })
+              );
+            }
+          }
+        ]
       },
       {
-        name: t("ui.block_picker_template"),
-        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "template", () => {
-          var _a2;
-          return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
-        })
+        type: "group",
+        heading: t("ui.settings_group_map"),
+        items: [
+          {
+            name: t("ui.preview_card_size"),
+            render: (setting) => {
+              setting.setName(t("ui.preview_card_size")).setDesc(t("ui.settings_preview_size_desc")).addSlider(
+                (slider) => slider.setLimits(80, 240, 5).setValue(clampPreviewScale(this.plugin.settings.previewScale)).onChange(async (value) => {
+                  this.plugin.settings.previewScale = clampPreviewScale(value);
+                  await this.plugin.saveSettings();
+                })
+              );
+            }
+          },
+          {
+            name: t("ui.mind_maps_folder"),
+            render: (setting) => this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
+          },
+          {
+            name: t("ui.aim_maps_folder"),
+            render: (setting) => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
+          }
+        ]
       },
       {
-        name: t("ui.block_picker_tone"),
-        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "tone", () => {
-          var _a2;
-          return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
-        })
-      },
-      { name: t("ui.note_style_by_kind"), render: (setting) => renderNoteKindHeading(setting) },
-      ...KIND_ROWS.map((kind) => ({
-        name: t(`ui.topic_kind_${kind}`),
-        render: (setting) => renderNoteKindSetting(setting, this.plugin, kind)
-      })),
-      {
-        name: t("ui.note_style_folder_path"),
-        render: (setting) => {
-          this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
-        }
-      },
-      {
-        name: t("ui.markdown_selection_ai_auto_open"),
-        render: (setting) => {
-          setting.setName(t("ui.markdown_selection_ai_auto_open")).setDesc(t("ui.markdown_selection_ai_auto_open_desc")).addToggle(
-            (toggle) => toggle.setValue(this.plugin.settings.markdownSelectionAiAutoOpen).onChange(async (value) => {
-              this.plugin.settings.markdownSelectionAiAutoOpen = value;
-              await this.plugin.saveSettings();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.add_diagrams_after_research"),
-        render: (setting) => {
-          setting.setName(t("ui.add_diagrams_after_research")).setDesc(t("ui.add_diagrams_after_research_desc")).addToggle(
-            (toggle) => toggle.setValue(this.plugin.settings.addDiagramsAfterResearch).onChange(async (value) => {
-              this.plugin.settings.addDiagramsAfterResearch = value;
-              await this.plugin.saveSettings();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.preview_card_size"),
-        render: (setting) => {
-          setting.setName(t("ui.preview_card_size")).setDesc(t("ui.preview_card_size_desc")).addSlider(
-            (slider) => slider.setLimits(80, 240, 5).setValue(clampPreviewScale(this.plugin.settings.previewScale)).onChange(async (value) => {
-              this.plugin.settings.previewScale = clampPreviewScale(value);
-              await this.plugin.saveSettings();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.record_ai_exchanges"),
-        render: (setting) => {
-          setting.setName(t("ui.record_ai_exchanges")).setDesc(t("ui.when_enabled_the_20_most_recent_full_requests_and_raw_replie")).addToggle(
-            (toggle) => toggle.setValue(this.plugin.settings.aiExchangeLoggingEnabled).onChange(async (value) => {
-              this.plugin.settings.aiExchangeLoggingEnabled = value;
-              await this.plugin.saveSettings();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.workspace_location"),
-        render: (setting) => {
-          setting.setName(t("ui.workspace_location")).setDesc(
-            t(
-              "ui.workspace_location_0_legacy_topics_1",
-              this.plugin.settings.workspaceFolder,
-              this.plugin.settings.topicsFolder
-            )
-          );
-        }
-      },
-      {
-        name: t("ui.mind_maps_folder"),
-        render: (setting) => this.renderMapFolderSetting(setting, "mindMapsFolder", "ui.mind_maps_folder", "Mind Maps")
-      },
-      {
-        name: t("ui.aim_maps_folder"),
-        render: (setting) => this.renderMapFolderSetting(setting, "aimFolder", "ui.aim_maps_folder", "AIM")
-      },
-      {
-        name: t("ui.repair_agent_workspace"),
-        render: (setting) => {
-          setting.setName(t("ui.repair_agent_workspace")).setDesc(t("ui.creates_only_missing_base_folders_it_never_restores_moves_or")).addButton(
-            (button) => button.setButtonText(t("ui.repair")).onClick(() => {
-              void this.plugin.mutate(() => this.plugin.repairWorkspace());
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.refresh_vam_data"),
-        render: (setting) => {
-          setting.setName(t("ui.refresh_vam_data")).setDesc(t("ui.rescan_maps_and_topic_notes_then_rebuild_references_and_deri")).addButton(
-            (button) => button.setButtonText(t("ui.full_rebuild")).onClick(() => {
-              void this.plugin.mutate(() => this.plugin.fullRebuild());
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.reconnect_existing_workspace"),
-        render: (setting) => {
-          setting.setName(t("ui.reconnect_existing_workspace")).setDesc(t("ui.scan_for_recognizable_vam_workspaces_and_reconnect_only_afte")).addButton(
-            (button) => button.setButtonText(t("ui.scan")).onClick(() => {
-              void this.plugin.offerWorkspaceReconnect();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.codex_app_server_status"),
-        render: (setting) => {
-          setting.setName(t("ui.codex_app_server_status")).setDesc(
-            diagnostic.installed ? t("ui.codex_cli_found_0", diagnostic.executable) : t("ui.codex_cli_was_not_found_follow_the_installation_guide_to_ins")
-          );
-          if (!diagnostic.installed)
-            setting.addButton(
-              (button) => button.setButtonText(t("ui.installation_guide")).onClick(() => this.plugin.openCodexSetupGuide())
-            );
-          setting.addButton(
-            (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
-              void this.plugin.recheckCodex();
-            })
-          );
-        }
-      },
-      {
-        name: t("ui.claude_code_status"),
-        render: (setting) => {
-          setting.setName(t("ui.claude_code_status")).setDesc(
-            claudeDiagnostic.installed ? t("ui.claude_cli_found_0", claudeDiagnostic.executable) : t("ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it")
-          );
-          setting.addButton(
-            (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
-              void this.plugin.recheckClaude();
-            })
-          );
-        }
+        type: "group",
+        heading: t("ui.settings_group_advanced"),
+        items: [advancedPage]
       }
     ];
+  }
+  /** Entry value of the "AI connection" page: how many of the two CLIs were found. */
+  aiConnectionValue() {
+    const found = [this.plugin.codexDiagnostic().installed, this.plugin.claudeDiagnostic().installed].filter(Boolean);
+    return found.length ? t("ui.settings_connected_count_0", found.length) : t("ui.settings_not_connected");
+  }
+  /** Entry status of the "AI connection" page: needs attention when neither CLI was found. */
+  aiConnectionStatus() {
+    return this.plugin.codexDiagnostic().installed || this.plugin.claudeDiagnostic().installed ? null : "warning";
+  }
+  /** Entry value of the "Note style" page: "<structure> · <voice>" by name, falling back to the ref. */
+  noteStyleValue() {
+    try {
+      const shown = shownBlocks(this.plugin);
+      const nameOf = (category) => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.plugin.noteStyles.listBlocks(category).find((item) => item.ref === shown[category])) == null ? void 0 : _a2.name) != null ? _b2 : shown[category];
+      };
+      return `${nameOf("template")} \xB7 ${nameOf("tone")}`;
+    } catch (e) {
+      return "";
+    }
+  }
+  /** Entry status of the "Note style" page: a saved structure or voice whose file is gone. */
+  noteStyleStatus() {
+    try {
+      return missingBlockRef(this.plugin, "template") || missingBlockRef(this.plugin, "tone") ? "warning" : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  /** Entry value of the "By topic type" page: how many types have their own structure. */
+  noteKindValue() {
+    var _a2;
+    const count = Object.keys((_a2 = this.plugin.settings.noteTemplateByKind) != null ? _a2 : {}).length;
+    return count ? t("ui.settings_kinds_set_count_0", count) : t("ui.settings_kinds_unset");
+  }
+  /** Entry status of the "By topic type" page: a saved structure that no longer exists. */
+  noteKindStatus() {
+    var _a2;
+    try {
+      const refs = new Set(this.plugin.noteStyles.listBlocks("template").map((item) => item.ref));
+      const saved = Object.values((_a2 = this.plugin.settings.noteTemplateByKind) != null ? _a2 : {});
+      return saved.some((ref) => ref && !refs.has(ref)) ? "warning" : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  /** One CLI group of the "AI connection" page: status (with install guide and re-check) and the executable path. */
+  cliGroup(heading, provider, pathDesc, notFoundDesc) {
+    const diagnostic = () => provider === "codex" ? this.plugin.codexDiagnostic() : this.plugin.claudeDiagnostic();
+    return {
+      type: "group",
+      heading,
+      items: [
+        {
+          name: t("ui.settings_status"),
+          render: (setting) => {
+            const found = diagnostic();
+            setting.setName(t("ui.settings_status")).setDesc(found.installed ? t("ui.settings_cli_found_0", found.executable) : t(notFoundDesc));
+            if (!found.installed)
+              setting.addButton(
+                (button) => button.setButtonText(t("ui.installation_guide")).onClick(
+                  () => provider === "codex" ? this.plugin.openCodexSetupGuide() : this.plugin.openClaudeSetupGuide()
+                )
+              );
+            setting.addButton(
+              (button) => button.setButtonText(t("ui.check_again")).onClick(() => {
+                void (provider === "codex" ? this.plugin.recheckCodex() : this.plugin.recheckClaude());
+              })
+            );
+          }
+        },
+        {
+          name: t("ui.settings_cli_path"),
+          desc: pathDesc,
+          control: { type: "text", key: provider === "codex" ? "codexPath" : "claudePath" }
+        }
+      ]
+    };
+  }
+  /** A button row of the "Advanced" page: name, one-line help and one button. */
+  actionRow(name, desc, label, run) {
+    return {
+      name,
+      render: (setting) => {
+        setting.setName(name).setDesc(desc).addButton((button) => button.setButtonText(label).onClick(run));
+      }
+    };
   }
   async setControlValue(key2, value) {
     if (key2 === "language") {

@@ -343,6 +343,10 @@ integrationTest('MS-04: merge model and reasoning follow the upper topic resolut
   assert.deepEqual(plain(await view.mergeModel(null)), { model: 'cur-model', reasoning: 'low' });
 });
 
+/** The rows of a definitions tree, groups and pages opened (the order a person reads them). */
+function flattenDefinitions(items) { return items.flatMap(item => (item.type === 'group' || item.type === 'page') ? flattenDefinitions(item.items || []) : [item]); }
+const MODEL_ROW = /^(Model|模型)$|Current model|目前模型|当前模型/;
+
 function settingsTabHarness(initial = 'gpt-a') {
   const { VisualAgentMapSettingTab } = load('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: class {} } });
   const listeners = new Set(), saved = [];
@@ -360,7 +364,7 @@ function settingsTabHarness(initial = 'gpt-a') {
   const select = { options: [], value: '', isConnected: true, add(option) { this.options.push(option); }, replaceChildren() { this.options = []; } };
   let onChange; const status = { text: '', isConnected: true, setText(v) { this.text = v; } }; const descEl = { createDiv: () => status };
   const setting = { descEl, desc: undefined, setName() { return this; }, setDesc(v) { this.desc = v; return this; }, addDropdown(cb) { cb({ selectEl: select, setValue: v => { select.value = v; }, onChange: fn => { onChange = fn; } }); return this; }, addButton() { return this; } };
-  const item = tab.getSettingDefinitions().find(d => d.render && /Current model|目前模型|当前模型/.test(d.name));
+  const item = flattenDefinitions(tab.getSettingDefinitions()).find(d => d.render && MODEL_ROW.test(d.name));
   item.render(setting);
   return { tab, plugin, select, listeners, saved, status, setting, choose: v => onChange(v) };
 }
@@ -385,7 +389,7 @@ test('MS-02: settings page picks the current model, the chat listener hears it, 
 test('MS-02: the settings page stops listening when it is hidden, and re-rendering never stacks listeners', () => {
   const h = settingsTabHarness();
   assert.equal(h.listeners.size, 1);
-  const again = h.tab.getSettingDefinitions().find(d => d.render && /Current model|目前模型|当前模型/.test(d.name));
+  const again = flattenDefinitions(h.tab.getSettingDefinitions()).find(d => d.render && MODEL_ROW.test(d.name));
   again.render(h.setting);
   assert.equal(h.listeners.size, 1, 'a second render replaces the first subscription');
   h.tab.hide(); assert.equal(h.listeners.size, 0);
@@ -410,4 +414,108 @@ test('N1: a data.json that still carries sampleTourVersionSeen loads without err
   assert.ok(!JSON.stringify(result).includes('sampleTourVersionSeen'));
   assert.equal(result.workspaceInitialized, true);
   assert.equal(result.language, 'en');
+});
+
+// ---- Settings page groups and pages (Obsidian 1.13 type: group / page) ----
+function groupedTab(overrides = {}) {
+  const { VisualAgentMapSettingTab } = load('ui/settings-tab.ts', { obsidian: { ...obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: class {} } });
+  const blocks = { template: [{ ref: 'builtin:standard', name: 'Standard', kind: 'builtin', issues: [] }, { ref: 'file:mine', name: 'Mine', kind: 'file', issues: [] }], tone: [{ ref: 'builtin:academic', name: 'Academic', kind: 'builtin', issues: [] }] };
+  const keys = overrides.keys || { template: 'builtin:standard', tone: 'builtin:academic' };
+  const plugin = {
+    settings: { cliModel: 'm', language: 'en', noteTemplateByKind: undefined, ...(overrides.settings || {}) },
+    subscribeModelDiscovery: () => () => {}, subscribeCurrentModel: () => () => {},
+    codexDiagnostic: () => ({ installed: overrides.codex ?? true, executable: 'codex' }),
+    claudeDiagnostic: () => ({ installed: overrides.claude ?? true, executable: 'claude' }),
+    noteStyles: { listBlocks: category => overrides.blocks?.[category] || blocks[category], effectiveBlockKeys: () => keys }
+  };
+  return { tab: new VisualAgentMapSettingTab({}, plugin), plugin };
+}
+const pagesOf = items => items.flatMap(item => item.type === 'group' ? item.items.filter(x => x.type === 'page') : item.type === 'page' ? [item] : []);
+const allPages = items => items.flatMap(item => item.type === 'page' ? [item, ...allPages(item.items || [])] : item.type === 'group' ? allPages(item.items || []) : []);
+const valueOf = page => typeof page.displayValue === 'function' ? page.displayValue() : page.displayValue;
+const statusOf = page => typeof page.status === 'function' ? page.status() : page.status;
+const pageNamed = (tab, name) => allPages(tab.getSettingDefinitions()).find(p => p.name === name);
+
+test('settings page: five top-level groups in order, eleven rows, three top-level pages and one nested page', () => {
+  const { tab } = groupedTab();
+  const defs = tab.getSettingDefinitions();
+  assert.ok(defs.every(d => d.type === 'group'), 'the top level holds only groups');
+  assert.deepEqual(plain(defs.map(d => d.heading)), ['General', 'AI', 'Notes', 'Map', 'Advanced']);
+  assert.equal(defs.reduce((n, d) => n + d.items.length, 0), 11);
+  assert.deepEqual(plain(pagesOf(defs).map(p => p.name)), ['AI connection', 'Note style', 'Advanced and troubleshooting']);
+  const note = pageNamed(tab, 'Note style');
+  assert.deepEqual(plain(pagesOf(note.items).map(p => p.name)), ['By topic type']);
+  assert.equal(allPages(defs).length, 4);
+});
+
+test('settings page: every control and saved key is still reachable after the regroup', () => {
+  const rows = flattenDefinitions(groupedTab().tab.getSettingDefinitions());
+  assert.ok(rows.some(r => r.control && r.control.key === 'cliReasoning'));
+  assert.ok(rows.some(r => r.control && r.control.key === 'codexPath'));
+  assert.ok(rows.some(r => r.control && r.control.key === 'claudePath'));
+  assert.equal(rows.filter(r => r.render && MODEL_ROW.test(r.name)).length, 1);
+  const names = rows.map(r => r.name);
+  for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Add diagrams after research', 'Reconnect existing Workspace', 'Structure', 'Voice', 'File location', 'Topic']) assert.ok(names.includes(name), `${name} is on the page`);
+});
+
+test('settings page: the three sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
+  const { tab, plugin } = groupedTab();
+  const intros = [["AI connection"], ["By topic type"], ["Note style"]];
+  for (const [pageName] of intros) {
+    const item = pageNamed(tab, pageName).items[0];
+    assert.equal(item.searchable, false, `${pageName} intro is not a search entry`);
+    assert.equal(typeof item.render, 'function', `${pageName} intro has a render`);
+    assert.ok(item.name, 'the definition keeps a name, as Obsidian requires');
+    const view = { name: item.name, desc: '', buttons: [] };
+    const setting = { setName(n) { view.name = n; return this; }, setDesc(d) { view.desc = d; return this; }, addButton(cb) { const b = { text: '', onClick(h) { view.click = h; return this; }, setButtonText(x) { b.text = x; return this; }, buttonEl: { addClass() {} } }; cb(b); view.buttons.push(b); return this; } };
+    item.render(setting);
+    assert.equal(view.name, '', `${pageName} intro: no name left after render`);
+    assert.equal(view.desc, item.name, `${pageName} intro: desc is the intro text`);
+  }
+  const noteItem = pageNamed(tab, 'Note style').items[0];
+  let opened = 0; plugin.openPromptPreview = () => { opened++; };
+  const v = { buttons: [] };
+  noteItem.render({ setName() { return this; }, setDesc() { return this; }, addButton(cb) { const b = { setButtonText() { return this; }, onClick(h) { v.click = h; return this; }, buttonEl: { addClass() {} } }; cb(b); v.buttons.push(b); return this; } });
+  assert.equal(v.buttons.length, 1);
+  v.click();
+  assert.equal(opened, 1, 'the Note style intro button opens the prompt preview');
+});
+
+test('AI connection entry: shows how many CLIs are connected and warns only when none is', () => {
+  for (const [codex, claude, text, status] of [[true, true, '2 connected', null], [true, false, '1 connected', null], [false, true, '1 connected', null], [false, false, 'Not connected', 'warning']]) {
+    const page = pageNamed(groupedTab({ codex, claude }).tab, 'AI connection');
+    assert.equal(valueOf(page), text);
+    assert.equal(statusOf(page), status);
+  }
+  const { tab, plugin } = groupedTab({ codex: false, claude: false });
+  const page = pageNamed(tab, 'AI connection');
+  assert.equal(statusOf(page), 'warning');
+  plugin.codexDiagnostic = () => ({ installed: true, executable: 'codex' });
+  assert.equal(valueOf(page), '1 connected', 'the value is recomputed on every render, not frozen');
+  assert.equal(statusOf(page), null);
+});
+
+test('Note style entry: shows structure and voice names, falls back to the ref, warns when a saved block is gone', () => {
+  const ok = pageNamed(groupedTab().tab, 'Note style');
+  assert.equal(valueOf(ok), 'Standard · Academic');
+  assert.equal(statusOf(ok), null);
+  const unnamed = pageNamed(groupedTab({ blocks: { template: [], tone: [] } }).tab, 'Note style');
+  assert.doesNotThrow(() => valueOf(unnamed));
+  assert.equal(valueOf(unnamed), 'builtin:standard · builtin:academic', 'no name found: the ref is shown');
+  const gone = pageNamed(groupedTab({ keys: { template: 'file:deleted', tone: 'builtin:academic' } }).tab, 'Note style');
+  assert.equal(statusOf(gone), 'warning');
+  assert.doesNotThrow(() => valueOf(gone));
+});
+
+test('By topic type entry: "Not set" with nothing saved, "N set" otherwise, warning for a structure that is gone', () => {
+  const none = pageNamed(groupedTab().tab, 'By topic type');
+  assert.equal(valueOf(none), 'Not set');
+  assert.equal(statusOf(none), null);
+  const two = pageNamed(groupedTab({ settings: { noteTemplateByKind: { hypothesis: 'builtin:standard', evidence: 'file:mine' } } }).tab, 'By topic type');
+  assert.equal(valueOf(two), '2 set');
+  assert.equal(statusOf(two), null);
+  const lost = pageNamed(groupedTab({ settings: { noteTemplateByKind: { action: 'file:deleted' } } }).tab, 'By topic type');
+  assert.equal(valueOf(lost), '1 set');
+  assert.equal(statusOf(lost), 'warning');
+  assert.equal(pageNamed(groupedTab().tab, 'By topic type').items.filter(i => i.render && i.searchable !== false).length, 6, 'six topic types, in KIND_ROWS order');
 });

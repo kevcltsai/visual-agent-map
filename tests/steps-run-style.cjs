@@ -266,7 +266,7 @@ test('slice 11: the result is a frozen value; the same input twice is equal; a l
   assert.equal(counter.saves, 0);
 });
 
-// Slice 12. Values worked out by hand from the code of fba004b (view.mapDetailTemplate + toneTextFor), not from runStyle:
+// Slice 12. Values worked out by hand from the code of fba004b (the view's map-only template lookup and its tone lookup), not from runStyle:
 //  - the run's own tone is not in the tone chain that finds the template (resolve got `{ template: chosenId }` for the run level);
 //    so with the alias pair:standard -> file:S (no tone) the map-only run `standard` is file:S with or without the run tone;
 //  - that alias decides its tone together with the template (toneDecided), and toneTextFor then returns the alias's tone,

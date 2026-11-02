@@ -26174,7 +26174,6 @@ var NoteStyleStore = class {
     __publicField(this, "files", /* @__PURE__ */ new Map());
     /** Block file text by base name (no ".md") for each category, as of the last `refresh()` or block write. */
     __publicField(this, "blocks", { template: /* @__PURE__ */ new Map(), tone: /* @__PURE__ */ new Map() });
-    __publicField(this, "resolutions", /* @__PURE__ */ new WeakMap());
     /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
     __publicField(this, "writeQueue", Promise.resolve());
     /** The one upgrade run of this session (started once; later calls get the same answer). */
@@ -26343,7 +26342,7 @@ var NoteStyleStore = class {
       return isFileId(id) ? id.replace(/^(?:style|file):/, "") : (_b3 = (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _b3 : id;
     };
     const chain = [(_b2 = request.choice) == null ? void 0 : _b2.tone, (_c = request.topic) == null ? void 0 : _c.tone, (_d = request.map) == null ? void 0 : _d.tone];
-    const tone2 = found.toneDecided ? { text: found.toneText, source: found.toneSource, free: found.toneFree } : this.plainTone(chain, language2);
+    const tone2 = found.toneDecided && !request.toneOnly ? { text: found.toneText, source: found.toneSource, free: found.toneFree } : this.plainTone(chain, language2);
     const toneId = (_f = (_e = tone2.free) != null ? _e : tone2.source) != null ? _f : DEFAULT_TONE_ID;
     const toneName = (id) => {
       var _a3;
@@ -26378,7 +26377,7 @@ var NoteStyleStore = class {
   }
   /**
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
-   * added here. Records the answer for `resolutionOf(template)` so tone and context fields follow the same choice.
+   * added here.
    */
   resolve(levels) {
     var _a2;
@@ -26392,51 +26391,11 @@ var NoteStyleStore = class {
       if (!id) continue;
       const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
       const found = isBlock ? this.tryBlock(id, toneChain, noteLanguage) : this.tryId(id, index, all, toneChain, noteLanguage);
-      if (found) return this.remember({ ...found, missing });
+      if (found) return { ...found, missing };
       missing.push(id);
     }
     const standard = (_a2 = this.tryId(STANDARD_TEMPLATE_ID, all.length, all, toneChain, noteLanguage)) != null ? _a2 : this.legacyResult(STANDARD_TEMPLATE_ID, toneChain, noteLanguage);
-    return this.remember({ ...standard, missing });
-  }
-  /** The resolution made for a template object returned by `resolve` (only style-file templates keep their identity). */
-  resolutionOf(template2) {
-    return template2 ? this.resolutions.get(template2) : void 0;
-  }
-  /**
-   * `to` takes the place of `from` in the answer `resolve` gave for it (the built-in template that stands in for an
-   * unreadable block, put into the run's language), so block, issues and context fields still follow it. `to` is copied:
-   * the answer is remembered under the object's identity and a shared object must not carry one run's block into another.
-   */
-  rebind(from, to) {
-    const resolution = this.resolutions.get(from);
-    if (!resolution) return to;
-    const copy = { ...to };
-    this.resolutions.set(copy, { ...resolution, template: copy });
-    return copy;
-  }
-  /**
-   * Fields to spread into a TaskContext: when the template is the workspace's changed or own block, `styleSelection`
-   * (its text, and the tone choice of `toneText`). A call that names no tone and no language gets what it got before.
-   */
-  contextFields(template2, toneText, language2) {
-    const resolution = this.resolutionOf(template2);
-    const fields = {};
-    if (resolution == null ? void 0 : resolution.block)
-      fields.styleSelection = {
-        template: resolution.block,
-        tone: toneChoiceFromText(toneText, language2 != null ? language2 : this.settings.language)
-      };
-    return fields;
-  }
-  /**
-   * The writing tone of a run on `template`: a note style file decides its own; else the first of `ids` that names a tone
-   * preset (academic is nothing); else the workspace tone, which sits at the end of the chain. Academic (and nothing
-   * chosen) is undefined so prompts stay unchanged.
-   */
-  toneTextFor(template2, ids, language2) {
-    const resolution = this.resolutionOf(template2);
-    if (resolution == null ? void 0 : resolution.toneDecided) return resolution.toneText;
-    return this.plainTone(ids, language2).text;
+    return { ...standard, missing };
   }
   /**
    * The tone of the first of `ids` that names a tone (a custom tone preset's id goes through its alias to the tone block;
@@ -26480,20 +26439,6 @@ var NoteStyleStore = class {
   }
   toneTargetText(target, language2) {
     return "id" in target ? resolveToneText(this.settings.promptPresets, [target.id], language2) : target.text.trim() || void 0;
-  }
-  /**
-   * The style fields a run with no choice of its own gets: the same resolution, tone and context fields the map view
-   * spreads into a TaskContext. A default style file that does not parse is returned as `invalid` (the run would not start).
-   */
-  workspaceStyleFields(language2) {
-    const resolved = this.resolve([{}, {}]);
-    if (resolved.invalid) return { invalid: resolved.invalid };
-    const toneText = this.toneTextFor(resolved.template, [], language2);
-    return {
-      detailTemplate: resolved.template,
-      ...toneText ? { toneText } : {},
-      ...this.contextFields(resolved.template, toneText, language2)
-    };
   }
   /**
    * The workspace tone: a built-in tone by id (so the run's chain can apply it), or a text (a changed built-in's file or
@@ -26548,10 +26493,6 @@ var NoteStyleStore = class {
   /** Until the upgrade has finished, the old sources (style files, exported files) are still read. */
   legacyReads() {
     return !this.settings.noteStyleUpgrade;
-  }
-  remember(resolution) {
-    if (resolution.toneDecided || resolution.block) this.resolutions.set(resolution.template, resolution);
-    return resolution;
   }
   workspaceLevel() {
     const settings = this.settings;
@@ -47704,7 +47645,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       choice: { tone: options == null ? void 0 : options.toneId },
       topic: { tone: note == null ? void 0 : note.toneId },
       map: { tone: (_a2 = this.map) == null ? void 0 : _a2.toneId },
-      outputLanguage: (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language
+      outputLanguage: (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language,
+      toneOnly: true
     });
     return toneText ? { toneText } : {};
   }

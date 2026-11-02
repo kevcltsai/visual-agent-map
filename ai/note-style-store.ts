@@ -1,5 +1,4 @@
 import { LANGUAGES, noteLanguageOf, translate, type ContentLanguage, type UiLanguage } from "../i18n";
-import type { TaskContext } from "./types";
 import {
   toneChoiceFromText,
   type BlockChoice,
@@ -204,25 +203,6 @@ interface NamedTone {
 const stripMd = (name: string) => name.replace(/\.md$/i, "");
 const lower = (value: string) => value.toLocaleLowerCase();
 
-/**
- * The writing tone of a run: an old style file or an alias of one decides its own (the answer made with the template, `resolution`), else the
- * first of `ids` that names a tone preset. Academic (and nothing chosen) is undefined so prompts stay unchanged.
- */
-export function runToneText(
-  resolution: StyleResolution | undefined,
-  presets: readonly PromptPreset[] | undefined,
-  ids: readonly (string | undefined)[],
-  language: ContentLanguage
-): string | undefined {
-  if (resolution?.toneDecided) return resolution.toneText;
-  return resolveToneText(presets, ids, language);
-}
-
-/** The style fields of a request that names no style of its own (the workspace default), or the style file that stops it. */
-export type WorkspaceStyleFields =
-  | { invalid: NonNullable<StyleResolution["invalid"]> }
-  | ({ invalid?: undefined } & Pick<TaskContext, "detailTemplate" | "toneText" | "styleSelection">);
-
 export function defaultStylesFolderName(language: UiLanguage): string {
   return translate(language, "ui.note_styles_folder_name");
 }
@@ -232,7 +212,6 @@ export class NoteStyleStore {
   private files = new Map<string, string>();
   /** Block file text by base name (no ".md") for each category, as of the last `refresh()` or block write. */
   private blocks: Record<BlockCategory, Map<string, string>> = { template: new Map(), tone: new Map() };
-  private readonly resolutions = new WeakMap<DetailTemplate, StyleResolution>();
   /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
   private writeQueue: Promise<unknown> = Promise.resolve();
   /** The one upgrade run of this session (started once; later calls get the same answer). */
@@ -473,9 +452,9 @@ export class NoteStyleStore {
 
   /**
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
-   * added here. Records the answer for `resolutionOf(template)` so tone and context fields follow the same choice.
+   * added here.
    */
-  resolve(levels: StyleLevel[]): StyleResolution {
+  private resolve(levels: StyleLevel[]): StyleResolution {
     const settings = this.settings;
     const noteLanguage = noteLanguageOf(settings.language);
     const all = [...levels, this.workspaceLevel()];
@@ -488,66 +467,13 @@ export class NoteStyleStore {
       const found = isBlock
         ? this.tryBlock(id, toneChain, noteLanguage)
         : this.tryId(id, index, all, toneChain, noteLanguage);
-      if (found) return this.remember({ ...found, missing });
+      if (found) return { ...found, missing };
       missing.push(id);
     }
     const standard =
       this.tryId(STANDARD_TEMPLATE_ID, all.length, all, toneChain, noteLanguage) ??
       this.legacyResult(STANDARD_TEMPLATE_ID, toneChain, noteLanguage)!;
-    return this.remember({ ...standard, missing });
-  }
-
-  /** The resolution made for a template object returned by `resolve` (only style-file templates keep their identity). */
-  resolutionOf(template: DetailTemplate | undefined): StyleResolution | undefined {
-    return template ? this.resolutions.get(template) : undefined;
-  }
-
-  /**
-   * `to` takes the place of `from` in the answer `resolve` gave for it (the built-in template that stands in for an
-   * unreadable block, put into the run's language), so block, issues and context fields still follow it. `to` is copied:
-   * the answer is remembered under the object's identity and a shared object must not carry one run's block into another.
-   */
-  rebind(from: DetailTemplate, to: DetailTemplate): DetailTemplate {
-    const resolution = this.resolutions.get(from);
-    if (!resolution) return to;
-    const copy = { ...to };
-    this.resolutions.set(copy, { ...resolution, template: copy });
-    return copy;
-  }
-
-  /**
-   * Fields to spread into a TaskContext: when the template is the workspace's changed or own block, `styleSelection`
-   * (its text, and the tone choice of `toneText`). A call that names no tone and no language gets what it got before.
-   */
-  contextFields(
-    template: DetailTemplate | undefined,
-    toneText?: string,
-    language?: ContentLanguage
-  ): { styleSelection?: StyleSelection } {
-    const resolution = this.resolutionOf(template);
-    const fields: { styleSelection?: StyleSelection } = {};
-    if (resolution?.block)
-      fields.styleSelection = {
-        template: resolution.block,
-        tone: toneChoiceFromText(toneText, language ?? this.settings.language)
-      };
-    return fields;
-  }
-
-  /**
-   * The writing tone of a run on `template`: a note style file decides its own; else the first of `ids` that names a tone
-   * preset (academic is nothing); else the workspace tone, which sits at the end of the chain. Academic (and nothing
-   * chosen) is undefined so prompts stay unchanged.
-   */
-  toneTextFor(
-    template: DetailTemplate | undefined,
-    ids: readonly (string | undefined)[],
-    language: ContentLanguage
-  ): string | undefined {
-    const resolution = this.resolutionOf(template);
-    // An old style file, or the alias of one, decided the tone together with the template.
-    if (resolution?.toneDecided) return resolution.toneText;
-    return this.plainTone(ids, language).text;
+    return { ...standard, missing };
   }
 
   /**
@@ -600,21 +526,6 @@ export class NoteStyleStore {
     return "id" in target
       ? resolveToneText(this.settings.promptPresets, [target.id], language)
       : target.text.trim() || undefined;
-  }
-
-  /**
-   * The style fields a run with no choice of its own gets: the same resolution, tone and context fields the map view
-   * spreads into a TaskContext. A default style file that does not parse is returned as `invalid` (the run would not start).
-   */
-  workspaceStyleFields(language: ContentLanguage): WorkspaceStyleFields {
-    const resolved = this.resolve([{}, {}]);
-    if (resolved.invalid) return { invalid: resolved.invalid };
-    const toneText = this.toneTextFor(resolved.template, [], language);
-    return {
-      detailTemplate: resolved.template,
-      ...(toneText ? { toneText } : {}),
-      ...this.contextFields(resolved.template, toneText, language)
-    };
   }
 
   /**
@@ -676,11 +587,6 @@ export class NoteStyleStore {
     return !this.settings.noteStyleUpgrade;
   }
 
-  private remember(resolution: StyleResolution): StyleResolution {
-    if (resolution.toneDecided || resolution.block) this.resolutions.set(resolution.template, resolution);
-    return resolution;
-  }
-
   private workspaceLevel(): StyleLevel {
     const settings = this.settings;
     const block = this.templateKey();
@@ -737,7 +643,6 @@ export class NoteStyleStore {
     const fileName = `${base}.md`;
     const block: BlockChoice = { id, body: text, fileName };
     const parsed = parseTemplateBlock(text, { id, name: base });
-    // A fresh object per answer: the answer is remembered under the template object's identity.
     if (parsed.ok) return { template: { ...parsed.template }, missing: [], block };
     const fallbackId = this.isBuiltinBlockId("template", id) ? id : STANDARD_TEMPLATE_ID;
     const fallback = resolveTemplate(this.settings.detailTemplates, [fallbackId], noteLanguage).template;

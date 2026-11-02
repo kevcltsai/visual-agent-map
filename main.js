@@ -1610,6 +1610,7 @@ var en = {
   "ui.detail_template_missing_0": 'The note structure "{0}" no longer exists; this topic now uses the next default.',
   "ui.note_styles_folder_name": "Note styles",
   "ui.note_style_file_missing_0": 'The note style file "{0}" is missing; this topic now uses the next default.',
+  "ui.note_style_kind_missing_0_1": 'The structure set for {0} topics, "{1}", was not found; this topic uses the next one in line.',
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
@@ -3875,6 +3876,7 @@ var zhCN = {
   "ui.detail_template_missing_0": "\u7B14\u8BB0\u7ED3\u6784\u201C{0}\u201D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u7ED3\u6784\u3002",
   "ui.note_styles_folder_name": "\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u3002",
+  "ui.note_style_kind_missing_0_1": "\u4E3A\u300C{0}\u300D\u8BAE\u9898\u7C7B\u578B\u6307\u5B9A\u7684\u7B14\u8BB0\u7ED3\u6784\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u7ED3\u6784\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
   "ui.note_style_folder_opened_0": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A{0}",
@@ -6140,6 +6142,7 @@ var zhTW = {
   "ui.detail_template_missing_0": "\u7B46\u8A18\u7D50\u69CB\u300C{0}\u300D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u7D50\u69CB\u3002",
   "ui.note_styles_folder_name": "\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u3002",
+  "ui.note_style_kind_missing_0_1": "\u70BA\u300C{0}\u300D\u8B70\u984C\u985E\u578B\u6307\u5B9A\u7684\u7B46\u8A18\u7D50\u69CB\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u7D50\u69CB\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
   "ui.note_style_folder_opened_0": "\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A{0}",
@@ -26567,6 +26570,16 @@ function styleRefOf(templateId, toneId, aliases = {}) {
 }
 
 // ai/note-style-store.ts
+function normalizeNoteTemplateByKind(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const saved = value;
+  const kept = {};
+  for (const kind of TOPIC_KINDS) {
+    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : void 0;
+    if (typeof ref === "string" && ref && parseBlockRef(ref)) kept[kind] = ref;
+  }
+  return Object.keys(kept).length ? kept : void 0;
+}
 var KIND_BLOCK_IDS = ["hypothesis", "evidence", "action", "atomic"];
 var stripMd3 = (name) => name.replace(/\.md$/i, "");
 var lower3 = (value) => value.toLocaleLowerCase();
@@ -26730,13 +26743,30 @@ var NoteStyleStore = class {
    * the problems found. Reads only what the last `refresh()` loaded; writes nothing and shows nothing.
    */
   runStyle(request) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
     const settings = this.settings;
     const language2 = request.outputLanguage;
     const levels = [{ template: (_a2 = request.choice) == null ? void 0 : _a2.template }];
-    if (request.topic) levels.push(request.topic);
-    if (request.map) levels.push(request.map);
-    const found = this.resolve(levels, language2);
+    const sources = ["run"];
+    if (request.topic) {
+      levels.push(request.topic);
+      sources.push("topic");
+    }
+    const kindRef = this.kindRefOf(request.topicKind);
+    if (kindRef) {
+      levels.push({ template: kindRef });
+      sources.push("kind");
+    }
+    if (request.map) {
+      levels.push(request.map);
+      sources.push("map");
+    }
+    const found = this.resolve(levels, language2, sources);
+    const toneFound = kindRef ? this.resolve(
+      levels.filter((_, index) => sources[index] !== "kind"),
+      language2,
+      sources.filter((source) => source !== "kind")
+    ) : found;
     const template2 = isBuiltinTemplateId(found.template.id) && !(found.block && !found.blockIssues) ? builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === found.template.id) : found.template;
     const uiTemplates = [
       ...builtinTemplates(noteLanguageOf(settings.language), settings.language),
@@ -26747,7 +26777,7 @@ var NoteStyleStore = class {
       return (_d2 = (_c2 = (_b3 = fileStyleName(id)) != null ? _b3 : (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _c2 : this.kindBlockName(id)) != null ? _d2 : id;
     };
     const chain = [(_b2 = request.choice) == null ? void 0 : _b2.tone, (_c = request.topic) == null ? void 0 : _c.tone, (_d = request.map) == null ? void 0 : _d.tone];
-    const tone2 = found.toneDecided && !request.toneOnly ? { text: found.toneText, source: found.toneSource, free: found.toneFree } : this.plainTone(chain, language2);
+    const tone2 = toneFound.toneDecided && !request.toneOnly ? { text: toneFound.toneText, source: toneFound.toneSource, free: toneFound.toneFree } : this.plainTone(chain, language2);
     const toneId = (_f = (_e = tone2.free) != null ? _e : tone2.source) != null ? _f : DEFAULT_TONE_ID;
     const toneName = (id) => {
       var _a3;
@@ -26756,7 +26786,8 @@ var NoteStyleStore = class {
     const styleRef = styleRefOf(template2.id, toneId, settings.noteStyleAliases);
     const label = Object.freeze({
       templateName: templateName(template2.id),
-      toneName: (_g = tone2.free) != null ? _g : toneName(toneId),
+      templateSource: (_g = found.templateSource) != null ? _g : "standard",
+      toneName: (_h = tone2.free) != null ? _h : toneName(toneId),
       styleName: fileStyleName(template2.id) !== void 0 ? templateName(template2.id) : styleLabel(template2.id, toneId, { template: templateName, tone: toneName }, settings.language),
       ...styleRef ? { styleRef } : {},
       ...found.fileName ? { fileName: found.fileName } : {}
@@ -26775,7 +26806,7 @@ var NoteStyleStore = class {
       label,
       issues: Object.freeze({
         missing: Object.freeze([...found.missing]),
-        blockIssues: Object.freeze([...(_h = found.blockIssues) != null ? _h : []]),
+        blockIssues: Object.freeze([...(_i = found.blockIssues) != null ? _i : []]),
         ...found.invalid ? { invalid: Object.freeze({ ...found.invalid }) } : {}
       })
     });
@@ -26784,8 +26815,8 @@ var NoteStyleStore = class {
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
    * added here.
    */
-  resolve(levels, outputLanguage2 = this.settings.language) {
-    var _a2;
+  resolve(levels, outputLanguage2 = this.settings.language, sources) {
+    var _a2, _b2;
     const settings = this.settings;
     const noteLanguage = noteLanguageOf(settings.language);
     const all = [...levels, this.workspaceLevel()];
@@ -26794,13 +26825,22 @@ var NoteStyleStore = class {
     for (let index = 0; index < all.length; index++) {
       const id = all[index].template;
       if (!id) continue;
-      const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
-      const found = isBlock ? this.tryBlock(id, toneChain, noteLanguage, outputLanguage2) : this.tryId(id, index, all, toneChain, noteLanguage, outputLanguage2);
-      if (found) return { ...found, missing };
+      const workspace = index === all.length - 1;
+      const source = workspace ? "workspace" : (_a2 = sources == null ? void 0 : sources[index]) != null ? _a2 : "run";
+      const isBlock = workspace && !!this.templateKey() && id === this.templateKey();
+      const found = isBlock || source === "kind" ? this.tryBlock(id, toneChain, noteLanguage, outputLanguage2) : this.tryId(id, index, all, toneChain, noteLanguage, outputLanguage2);
+      if (found) return { ...found, missing, templateSource: source };
       missing.push(id);
     }
-    const standard = (_a2 = this.tryId(STANDARD_TEMPLATE_ID, all.length, all, toneChain, noteLanguage)) != null ? _a2 : this.legacyResult(STANDARD_TEMPLATE_ID, toneChain, noteLanguage);
-    return { ...standard, missing };
+    const standard = (_b2 = this.tryId(STANDARD_TEMPLATE_ID, all.length, all, toneChain, noteLanguage)) != null ? _b2 : this.legacyResult(STANDARD_TEMPLATE_ID, toneChain, noteLanguage);
+    return { ...standard, missing, templateSource: "standard" };
+  }
+  /** The block ref saved for `kind`, when there is one the store can read as a block ref. */
+  kindRefOf(kind) {
+    const saved = this.settings.noteTemplateByKind;
+    if (!kind || !saved || !Object.prototype.hasOwnProperty.call(saved, kind)) return void 0;
+    const ref = saved[kind];
+    return typeof ref === "string" && parseBlockRef(ref) ? ref : void 0;
   }
   /**
    * The tone of the first of `ids` that names a tone (a custom tone preset's id goes through its alias to the tone block;
@@ -58110,7 +58150,10 @@ ${request.requirements}` : preset.text,
     const historyMark = this.history.mark();
     const createdByTitle = /* @__PURE__ */ new Map(), newNodes = [];
     await this.noteStyles.refresh();
-    const contributionTemplate = this.mapStyle(this.plugin.settings.language, { template: detailTemplateId }).template;
+    const contributionTemplate = this.mapStyle(this.plugin.settings.language, {
+      template: detailTemplateId,
+      kind: "topic"
+    }).template;
     try {
       for (const item of items) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -59525,6 +59568,7 @@ ${note.detail.trim()}` : "",
     const integrationStyle = this.mapStyle((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, {
       template: options == null ? void 0 : options.detailTemplateId,
       tone: options == null ? void 0 : options.toneId,
+      kind: "topic",
       notify: true
     });
     const detailTemplate = integrationStyle.template;
@@ -59636,7 +59680,7 @@ ${note.detail.trim()}` : "",
       this.path,
       "workspace"
     );
-    const detailTemplate = this.mapStyle(language2, { template: task.options.detailTemplateId }).template;
+    const detailTemplate = this.mapStyle(language2, { template: task.options.detailTemplateId, kind: "topic" }).template;
     try {
       await this.plugin.repo.updateNote(
         integrated.path,
@@ -62924,7 +62968,7 @@ ${addition}` : addition });
    * Only an explicit choice is written to the topic; a topic template that no longer exists is reported once and cleared.
    */
   async detailTemplateFor(node, chosenId, chosenToneId, gate, outputLanguage2 = this.plugin.settings.language) {
-    var _a2;
+    var _a2, _b2;
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     else if (chosenId == null ? void 0 : chosenId.startsWith("style:")) await this.plugin.repo.updateNote(node.path, { toneId: "" });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
@@ -62933,6 +62977,7 @@ ${addition}` : addition });
     const resolved = this.topicStyle(note, chosenId, chosenToneId, outputLanguage2);
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
+    this.noticeKindMissing(resolved.issues, (_b2 = note.topicKind) != null ? _b2 : "topic", note.detailTemplateId, gate);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
       if (note.detailTemplateId.startsWith("style:") || note.detailTemplateId.startsWith("file:")) {
         const missingId = note.detailTemplateId;
@@ -62954,12 +62999,13 @@ ${addition}` : addition });
    * at the entry of a run and the built-in template stands in.
    */
   topicStyle(note, chosenId, chosenToneId, outputLanguage2 = this.plugin.settings.language) {
-    var _a2, _b2;
+    var _a2, _b2, _c;
     return this.orThrowInvalid(
       this.noteStyles.runStyle({
         choice: { template: chosenId, tone: chosenToneId },
         topic: { template: note.detailTemplateId, tone: note.toneId },
         map: { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId },
+        topicKind: (_c = note.topicKind) != null ? _c : "topic",
         outputLanguage: outputLanguage2
       })
     );
@@ -62988,6 +63034,17 @@ ${addition}` : addition });
     if (!issue2 || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
     new import_obsidian31.Notice(t("ui.preview_issue_0_1_2", (_a2 = issue2.fileName) != null ? _a2 : issue2.id, issue2.line, styleIssueText(issue2)));
+  }
+  /**
+   * The structure set for a topic type was not found: say so, once per `gate`. The topic's own missing structure is told by
+   * its own Notice, so it is skipped here. Nothing is written to the topic.
+   */
+  noticeKindMissing(issues, kind, topicTemplateId, gate) {
+    var _a2;
+    const ref = (_a2 = this.plugin.settings.noteTemplateByKind) == null ? void 0 : _a2[kind];
+    if (!ref || ref === topicTemplateId || !issues.missing.includes(ref) || (gate == null ? void 0 : gate.shown)) return;
+    if (gate) gate.shown = true;
+    new import_obsidian31.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {
@@ -63020,10 +63077,14 @@ ${addition}` : addition });
       this.noteStyles.runStyle({
         choice: { template: options.template, tone: options.tone },
         map: { template: (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId, tone: (_b2 = this.map) == null ? void 0 : _b2.toneId },
+        ...options.kind ? { topicKind: options.kind } : {},
         outputLanguage: language2
       })
     );
-    if (options.notify) this.noticeBlockIssues(result.issues, options.gate);
+    if (options.notify) {
+      this.noticeBlockIssues(result.issues, options.gate);
+      if (options.kind) this.noticeKindMissing(result.issues, options.kind, void 0, options.gate);
+    }
     return result;
   }
   /**
@@ -70334,6 +70395,7 @@ function settingsFromSaved(saved) {
     ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
     ...typeof (saved == null ? void 0 : saved.noteTemplateBlock) === "string" && saved.noteTemplateBlock ? { noteTemplateBlock: saved.noteTemplateBlock } : {},
     ...typeof (saved == null ? void 0 : saved.noteToneBlock) === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {},
+    ...normalizeNoteTemplateByKind(saved == null ? void 0 : saved.noteTemplateByKind) ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved == null ? void 0 : saved.noteTemplateByKind) } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
     ...(saved == null ? void 0 : saved.noteStyleFiles) && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles) ? {
       noteStyleFiles: Object.fromEntries(

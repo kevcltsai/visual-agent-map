@@ -46,6 +46,7 @@ import {
   type NoteStyleBuiltinId,
   type NoteStyleIssue
 } from "./note-style-file";
+import { TOPIC_KINDS, type TopicKind } from "../note-values";
 import { DEFAULT_TONE_ID, findPreset, listPresets, resolveToneText, type PromptPreset } from "./prompt-presets";
 import {
   BUILTIN_PAIRS,
@@ -94,6 +95,8 @@ export interface NoteStyleSettings {
   noteTemplateBlock?: string;
   /** The workspace tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the old default. */
   noteToneBlock?: string;
+  /** The template block each topic kind uses (`builtin:<id>` or `file:<name>`); a kind with no entry has no kind level. */
+  noteTemplateByKind?: Partial<Record<TopicKind, string>>;
   /** Old ids (style file, old template, built-in style whose file was changed, custom tone preset) -> the blocks that replaced them. */
   noteStyleAliases?: NoteStyleAliases;
   /** Set when the one-time upgrade of the old note style data has finished. */
@@ -116,6 +119,8 @@ export interface RunStyleRequest {
   topic?: StyleLevel;
   /** The mind map's stored values. */
   map?: StyleLevel;
+  /** The topic's type, for the kind level of the structure (between the topic and the map). Not part of `StyleLevel`: it is not a stored style value. */
+  topicKind?: TopicKind;
   /** The language the note is written in (the interface language is read from the settings). */
   outputLanguage: ContentLanguage;
   /** Proposal runs: the tone comes from the tone levels and the workspace tone only, never from the template (a style file or alias that carries its own tone). */
@@ -132,6 +137,8 @@ export interface RunStyle {
   readonly label: Readonly<{
     /** In the interface language. */
     templateName: string;
+    /** The level the structure really came from (a missing one falls to the next; the Standard fallback is "standard"). */
+    templateSource: TemplateSource;
     /** The name of the tone that `toneText` really is. */
     toneName: string;
     /** The name inside "Keep current (…)". */
@@ -150,6 +157,24 @@ export interface RunStyle {
   }>;
 }
 
+/** The level a run's structure came from. */
+export type TemplateSource = "run" | "topic" | "kind" | "map" | "workspace" | "standard";
+
+/**
+ * The kind -> template block map as it may be saved: only known kinds, with a non-empty `builtin:`/`file:` ref. Anything else
+ * (a style file ref, an old template id, free text, a non-object) is dropped; undefined when nothing is left.
+ */
+export function normalizeNoteTemplateByKind(value: unknown): Partial<Record<TopicKind, string>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const saved = value as Record<string, unknown>;
+  const kept: Partial<Record<TopicKind, string>> = {};
+  for (const kind of TOPIC_KINDS) {
+    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : undefined;
+    if (typeof ref === "string" && ref && parseBlockRef(ref)) kept[kind] = ref;
+  }
+  return Object.keys(kept).length ? kept : undefined;
+}
+
 /** The built-in template blocks added for topic kinds; the legacy template path does not know them. */
 const KIND_BLOCK_IDS: readonly string[] = ["hypothesis", "evidence", "action", "atomic"];
 
@@ -158,6 +183,8 @@ export interface StyleResolution {
   /** Template ids that were asked for but could not be used (as `resolveTemplate` reports them). */
   missing: string[];
   toneText?: string;
+  /** The level that gave the answer (set by `resolve`). */
+  templateSource?: TemplateSource;
   /** The file used (with ".md"), for the progress label. */
   fileName?: string;
   /** A style file that was chosen but does not parse: the run must not start. */
@@ -408,9 +435,30 @@ export class NoteStyleStore {
     const language = request.outputLanguage;
     // The run's own tone takes no part in finding the template (only in the tone text); the other levels bring both.
     const levels: StyleLevel[] = [{ template: request.choice?.template }];
-    if (request.topic) levels.push(request.topic);
-    if (request.map) levels.push(request.map);
-    const found = this.resolve(levels, language);
+    const sources: TemplateSource[] = ["run"];
+    if (request.topic) {
+      levels.push(request.topic);
+      sources.push("topic");
+    }
+    // The kind level sits between the topic and the map; with no value for the topic's kind the levels are exactly as before.
+    const kindRef = this.kindRefOf(request.topicKind);
+    if (kindRef) {
+      levels.push({ template: kindRef });
+      sources.push("kind");
+    }
+    if (request.map) {
+      levels.push(request.map);
+      sources.push("map");
+    }
+    const found = this.resolve(levels, language, sources);
+    // Only the structure depends on the kind: the tone is found over the levels without it.
+    const toneFound = kindRef
+      ? this.resolve(
+          levels.filter((_, index) => sources[index] !== "kind"),
+          language,
+          sources.filter(source => source !== "kind")
+        )
+      : found;
     // A template read from a block is used as it is; the built-in stand-in for an unreadable block follows the output language.
     const template =
       isBuiltinTemplateId(found.template.id) && !(found.block && !found.blockIssues)
@@ -425,8 +473,8 @@ export class NoteStyleStore {
     const chain = [request.choice?.tone, request.topic?.tone, request.map?.tone];
     // An old style file, or the alias of one, decided the tone together with the template (unless the run asks for the tone only); else the chain, then the workspace.
     const tone: { text?: string; source?: string; free?: string } =
-      found.toneDecided && !request.toneOnly
-        ? { text: found.toneText, source: found.toneSource, free: found.toneFree }
+      toneFound.toneDecided && !request.toneOnly
+        ? { text: toneFound.toneText, source: toneFound.toneSource, free: toneFound.toneFree }
         : this.plainTone(chain, language);
     // Free text names no tone; it stands for itself, so the style is a custom pair.
     const toneId = tone.free ?? tone.source ?? DEFAULT_TONE_ID;
@@ -434,6 +482,7 @@ export class NoteStyleStore {
     const styleRef = styleRefOf(template.id, toneId, settings.noteStyleAliases);
     const label = Object.freeze({
       templateName: templateName(template.id),
+      templateSource: found.templateSource ?? "standard",
       toneName: tone.free ?? toneName(toneId),
       styleName:
         fileStyleName(template.id) !== undefined
@@ -468,7 +517,11 @@ export class NoteStyleStore {
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
    * added here.
    */
-  private resolve(levels: StyleLevel[], outputLanguage: ContentLanguage = this.settings.language): StyleResolution {
+  private resolve(
+    levels: StyleLevel[],
+    outputLanguage: ContentLanguage = this.settings.language,
+    sources?: readonly TemplateSource[]
+  ): StyleResolution {
     const settings = this.settings;
     const noteLanguage = noteLanguageOf(settings.language);
     const all = [...levels, this.workspaceLevel()];
@@ -477,17 +530,29 @@ export class NoteStyleStore {
     for (let index = 0; index < all.length; index++) {
       const id = all[index].template;
       if (!id) continue;
-      const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
-      const found = isBlock
-        ? this.tryBlock(id, toneChain, noteLanguage, outputLanguage)
-        : this.tryId(id, index, all, toneChain, noteLanguage, outputLanguage);
-      if (found) return { ...found, missing };
+      const workspace = index === all.length - 1;
+      const source: TemplateSource = workspace ? "workspace" : (sources?.[index] ?? "run");
+      const isBlock = workspace && !!this.templateKey() && id === this.templateKey();
+      // The kind level only reads template blocks; its value is never an old template id or a style file.
+      const found =
+        isBlock || source === "kind"
+          ? this.tryBlock(id, toneChain, noteLanguage, outputLanguage)
+          : this.tryId(id, index, all, toneChain, noteLanguage, outputLanguage);
+      if (found) return { ...found, missing, templateSource: source };
       missing.push(id);
     }
     const standard =
       this.tryId(STANDARD_TEMPLATE_ID, all.length, all, toneChain, noteLanguage) ??
       this.legacyResult(STANDARD_TEMPLATE_ID, toneChain, noteLanguage)!;
-    return { ...standard, missing };
+    return { ...standard, missing, templateSource: "standard" };
+  }
+
+  /** The block ref saved for `kind`, when there is one the store can read as a block ref. */
+  private kindRefOf(kind: TopicKind | undefined): string | undefined {
+    const saved = this.settings.noteTemplateByKind;
+    if (!kind || !saved || !Object.prototype.hasOwnProperty.call(saved, kind)) return undefined;
+    const ref = saved[kind];
+    return typeof ref === "string" && parseBlockRef(ref) ? ref : undefined;
   }
 
   /**

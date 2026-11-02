@@ -1659,6 +1659,8 @@ export const en = {
   "ui.detail_template_missing_0": 'The note structure "{0}" no longer exists; this topic now uses the next default.',
   "ui.note_styles_folder_name": "Note styles",
   "ui.note_style_file_missing_0": 'The note style file "{0}" is missing; this topic now uses the next default.',
+  "ui.note_style_kind_missing_0_1":
+    'The structure set for {0} topics, "{1}", was not found; this topic uses the next one in line.',
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",

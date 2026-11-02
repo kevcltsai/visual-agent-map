@@ -35,7 +35,12 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { NoteStyleStore, type NoteStyleUpgradeEvent, type StyleFilePort } from "./ai/note-style-store";
+import {
+  NoteStyleStore,
+  normalizeNoteTemplateByKind,
+  type NoteStyleUpgradeEvent,
+  type StyleFilePort
+} from "./ai/note-style-store";
 import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
@@ -156,6 +161,9 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
       ? { noteTemplateBlock: saved.noteTemplateBlock }
       : {}),
     ...(typeof saved?.noteToneBlock === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {}),
+    ...(normalizeNoteTemplateByKind(saved?.noteTemplateByKind)
+      ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved?.noteTemplateByKind) }
+      : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
       : {}),

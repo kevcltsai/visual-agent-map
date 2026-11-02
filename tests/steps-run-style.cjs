@@ -51,7 +51,7 @@ test('slice 1 (tracer): an empty store with no levels gives Standard, no tone, n
   assert.equal(got.toneText, undefined);
   assert.deepEqual(plain(got.contextFields), {});
   assert.deepEqual(plain(got.issues), { missing: [], blockIssues: [] });
-  assert.deepEqual(plain(got.label), { templateName: 'Standard', toneName: 'Academic rigor', styleName: 'Standard', styleRef: { kind: 'builtin', id: 'standard' } });
+  assert.deepEqual(plain(got.label), { templateName: 'Standard', templateSource: 'standard', toneName: 'Academic rigor', styleName: 'Standard', styleRef: { kind: 'builtin', id: 'standard' } });
 });
 
 test('slice 2: the template comes from the choice, then the topic, then the map, then the workspace default', async () => {

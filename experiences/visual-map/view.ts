@@ -12930,7 +12930,10 @@ export class VisualAgentMapView extends ItemView {
     const createdByTitle = new Map<string, MapNode>(),
       newNodes: MapNode[] = [];
     await this.noteStyles.refresh();
-    const contributionTemplate = this.mapStyle(this.plugin.settings.language, { template: detailTemplateId }).template;
+    const contributionTemplate = this.mapStyle(this.plugin.settings.language, {
+      template: detailTemplateId,
+      kind: "topic"
+    }).template;
     try {
       for (const item of items) {
         if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -14479,6 +14482,7 @@ export class VisualAgentMapView extends ItemView {
     const integrationStyle = this.mapStyle(options?.outputLanguage ?? language, {
       template: options?.detailTemplateId,
       tone: options?.toneId,
+      kind: "topic",
       notify: true
     });
     const detailTemplate = integrationStyle.template;
@@ -14613,7 +14617,7 @@ export class VisualAgentMapView extends ItemView {
       this.path,
       "workspace"
     );
-    const detailTemplate = this.mapStyle(language, { template: task.options.detailTemplateId }).template;
+    const detailTemplate = this.mapStyle(language, { template: task.options.detailTemplateId, kind: "topic" }).template;
     try {
       await this.plugin.repo.updateNote(
         integrated.path,
@@ -18189,6 +18193,7 @@ export class VisualAgentMapView extends ItemView {
     const resolved = this.topicStyle(note, chosenId, chosenToneId, outputLanguage);
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
+    this.noticeKindMissing(resolved.issues, note.topicKind ?? "topic", note.detailTemplateId, gate);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
       if (note.detailTemplateId.startsWith("style:") || note.detailTemplateId.startsWith("file:")) {
         // The file may come back (moved back, restored): the note is not rewritten. The Notice offers another style.
@@ -18219,6 +18224,7 @@ export class VisualAgentMapView extends ItemView {
         choice: { template: chosenId, tone: chosenToneId },
         topic: { template: note.detailTemplateId, tone: note.toneId },
         map: { template: this.map?.detailTemplateId, tone: this.map?.toneId },
+        topicKind: note.topicKind ?? "topic",
         outputLanguage
       })
     );
@@ -18247,6 +18253,21 @@ export class VisualAgentMapView extends ItemView {
     if (!issue || gate?.shown) return;
     if (gate) gate.shown = true;
     new Notice(t("ui.preview_issue_0_1_2", issue.fileName ?? issue.id, issue.line, styleIssueText(issue)));
+  }
+  /**
+   * The structure set for a topic type was not found: say so, once per `gate`. The topic's own missing structure is told by
+   * its own Notice, so it is skipped here. Nothing is written to the topic.
+   */
+  private noticeKindMissing(
+    issues: RunStyle["issues"],
+    kind: TopicKind,
+    topicTemplateId: string | undefined,
+    gate?: { shown: boolean }
+  ): void {
+    const ref = this.plugin.settings.noteTemplateByKind?.[kind];
+    if (!ref || ref === topicTemplateId || !issues.missing.includes(ref) || gate?.shown) return;
+    if (gate) gate.shown = true;
+    new Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   private get noteStyles(): NoteStyleStore {
@@ -18281,16 +18302,20 @@ export class VisualAgentMapView extends ItemView {
    */
   private mapStyle(
     language: ContentLanguage,
-    options: { template?: string; tone?: string; notify?: boolean; gate?: { shown: boolean } } = {}
+    options: { template?: string; tone?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}
   ): RunStyle {
     const result = this.orThrowInvalid(
       this.noteStyles.runStyle({
         choice: { template: options.template, tone: options.tone },
         map: { template: this.map?.detailTemplateId, tone: this.map?.toneId },
+        ...(options.kind ? { topicKind: options.kind } : {}),
         outputLanguage: language
       })
     );
-    if (options.notify) this.noticeBlockIssues(result.issues, options.gate);
+    if (options.notify) {
+      this.noticeBlockIssues(result.issues, options.gate);
+      if (options.kind) this.noticeKindMissing(result.issues, options.kind, undefined, options.gate);
+    }
     return result;
   }
   /**

@@ -184,7 +184,7 @@ test('both writers register the path in plugin.running before they write status 
   // The research run moved into the run module, which registers through TopicRuns.begin (it adds to the same running set).
   const writers = [
     ['experiences/visual-map/view.ts', /this\.plugin\.running\.add\(/],
-    ['experiences/visual-map/topic-run.ts', /this\.begin\(/]
+    ['experiences/visual-map/topic-run.ts', /this\.begin\(path, kind/]
   ].flatMap(([file, registration]) => {
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     return [...source.matchAll(/updateNote\(\s*[^)]*\{\s*status:\s*"running"/g)].map(match => ({ file, registered: registration.test(source.slice(Math.max(0, match.index - 6000), match.index)) }));

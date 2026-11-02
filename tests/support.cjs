@@ -77,14 +77,20 @@ const auditEcho = context => {
 const tree = () => [node('a'), node('b', 'a'), node('c', 'b'), node('d')];
 let TopicRunsClass;
 /** The run module over a view-level plugin double: every port reads the double on use, like the real composition root. */
+let NoteStyleStoreClass;
+/** Starts a research run straight on the plugin's run module, with no view: the callbacks a view would give are test stand-ins. */
+function startResearch(plugin, node, { map, request, runOnce, done, failed, accepted, ...rest } = {}) {
+  return plugin.topicRuns.start(node.path, 'research', { map, request, runOnce, done, failed, accepted, notify: () => {}, ancestors: async () => '', userTexts: () => '', ...rest });
+}
 function attachTopicRuns(plugin) {
   if (plugin.topicRuns) return plugin;
+  NoteStyleStoreClass ??= load('ai/note-style-store.ts', { obsidian: module.exports.obsidian ?? {} }).NoteStyleStore;
   TopicRunsClass ??= load('experiences/visual-map/topic-run.ts', { obsidian: module.exports.obsidian ?? {} }).TopicRuns;
   plugin.topicRuns = new TopicRunsClass({
     aiTasks: () => plugin.aiTasks ?? { chartEligible: () => false }, mutate: () => work => plugin.mutate(work), progress: () => plugin.researchProgress,
     repository: () => plugin.repo, running: () => plugin.running, pendingSuggestions: () => plugin.pendingSuggestions, activeTasks: () => plugin.activeTasks,
     askModel: (...args) => plugin.askModel(...args), settings: () => plugin.settings, exchanges: () => plugin.exchanges, recordFailure: (...args) => plugin.recordFailure(...args),
-    runStyle: () => { throw new Error('the view always passes its own style resolver'); }, resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
+    runStyle: ({ note, outputLanguage }) => (plugin.noteStyles ??= new NoteStyleStoreClass({ settings: () => plugin.settings, port: {}, save: async () => {} })).runStyle({ topic: { template: note.detailTemplateId, tone: note.toneId }, outputLanguage }), resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
     clearOtherHistory: origin => { for (const view of plugin.views?.() ?? []) if (view !== origin) view.clearUndoHistory?.(); },
     refreshViews: () => { for (const view of plugin.views?.() ?? []) view.reloadAfterAiRun?.(); }
   });
@@ -268,4 +274,4 @@ async function coverageThreeAnswers(subject) {
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };
+module.exports = { startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };

@@ -237,11 +237,13 @@ import {
 import {
   emptyNoteStyleStore,
   type NoteStyleStore,
+  type RunStyle,
   type StyleLevel,
   type StyleResolution
 } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { parseBlockRef } from "../../core/blocks/block-files";
+import type { BlockIssue } from "../../core/steps/task/assemble";
 import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
 import {
   errorNotice,
@@ -11204,13 +11206,19 @@ export class VisualAgentMapView extends ItemView {
           const taskLanguage =
             options.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, latest.title);
           const task = researchTopicTask(taskLanguage, latest.title);
-          const detailTemplate = await this.detailTemplateFor(node, options.detailTemplateId, options.toneId);
+          const runStyle = await this.detailTemplateFor(
+            node,
+            options.detailTemplateId,
+            options.toneId,
+            undefined,
+            options.outputLanguage ?? this.plugin.settings.language
+          );
           await this.runAgent(
             node,
             done,
             failed,
             {
-              detailTemplate,
+              runStyle,
               task: [task, options.requirements].filter(Boolean).join("\n\n"),
               referenceGroups: options.referenceGroups,
               onProgress: options.onProgress,
@@ -11268,14 +11276,14 @@ export class VisualAgentMapView extends ItemView {
           templates: this.templateChoices(),
           tones: this.toneChoices(),
           currentTone: this.toneLabelFor(note),
-          currentStyle: this.currentStyleLabel(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
-          currentStyleRef: this.styleRefFor(this.resolveTopicTemplate(note).template.id, this.effectiveToneId(note)),
+          currentStyle: this.currentStyleLabel(this.topicStyle(note).template.id, this.effectiveToneId(note)),
+          currentStyleRef: this.styleRefFor(this.topicStyle(note).template.id, this.effectiveToneId(note)),
           currentSummary: note.summary,
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: templateInLanguage(this.resolveTopicTemplate(note).template, this.plugin.settings.language)
+          currentTemplate: templateInLanguage(this.topicStyle(note).template, this.plugin.settings.language)
             .name,
           topicStatus: note.status,
           childrenCompleted:
@@ -13141,10 +13149,10 @@ export class VisualAgentMapView extends ItemView {
     onResult?: (result: AiResult) => void,
     gate?: { shown: boolean }
   ): Promise<void> {
-    const detailTemplate = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId, gate);
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
       choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
+    const runStyle = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId, gate, outputLanguage);
     let started = false;
     let failure: string | undefined;
     const handle = await this.runAgent(
@@ -13154,7 +13162,7 @@ export class VisualAgentMapView extends ItemView {
         failure = message;
       },
       {
-        detailTemplate,
+        runStyle,
         rules: "",
         referenceGroups: choices.referenceGroups ?? [],
         signal: batchSignal,
@@ -13725,10 +13733,14 @@ export class VisualAgentMapView extends ItemView {
     }
     const language = this.plugin.settings.language;
     const task = direction || synthesisGoalTask(language);
-    const detailTemplate = this.templateForRun(
-      await this.detailTemplateFor(node, options?.detailTemplateId, options?.toneId),
+    const synthesisRun = await this.detailTemplateFor(
+      node,
+      options?.detailTemplateId,
+      options?.toneId,
+      undefined,
       options?.outputLanguage ?? language
     );
+    const detailTemplate = synthesisRun.template;
     this.plugin.abortChartJobs(node.path);
     this.plugin.running.add(node.path);
     await this.plugin.repo.updateNote(node.path, { status: "running" });
@@ -13738,7 +13750,10 @@ export class VisualAgentMapView extends ItemView {
     // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
     try {
-      const synthesisStyle = this.styleFields(note, options, detailTemplate);
+      const synthesisStyle = {
+        tone: synthesisRun.toneText ? { toneText: synthesisRun.toneText } : {},
+        style: synthesisRun.contextFields
+      };
       const synthesisContext: TaskContext = withThinkingOrigin(
         {
           title: note.title,
@@ -18219,17 +18234,18 @@ export class VisualAgentMapView extends ItemView {
     node: MapNode,
     chosenId?: string,
     chosenToneId?: string,
-    gate?: { shown: boolean }
-  ): Promise<DetailTemplate> {
+    gate?: { shown: boolean },
+    outputLanguage: ContentLanguage = this.plugin.settings.language
+  ): Promise<RunStyle> {
     if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
     // Choosing a style file writes it as the topic's template and deletes the topic's own tone; the file decides the tone.
     else if (chosenId?.startsWith("style:")) await this.plugin.repo.updateNote(node.path, { toneId: "" });
     if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     await this.noteStyles.refresh();
-    const resolved = this.resolveTopicTemplate(note, chosenId);
-    const { template, missing } = resolved;
-    this.noticeBlockIssues(resolved, gate);
+    const resolved = this.topicStyle(note, chosenId, chosenToneId, outputLanguage);
+    const { missing } = resolved.issues;
+    this.noticeBlockIssues(resolved.issues, gate);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
       if (note.detailTemplateId.startsWith("style:") || note.detailTemplateId.startsWith("file:")) {
         // The file may come back (moved back, restored): the note is not rewritten. The Notice offers another style.
@@ -18242,15 +18258,36 @@ export class VisualAgentMapView extends ItemView {
         await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
       }
     }
-    return template;
+    return resolved;
   }
-  /** Resolves the topic's content template without notifying or writing anything (see detailTemplateFor). */
-  private resolveTopicTemplate(note: Note, chosenId?: string): StyleBlockResult {
-    return this.styleOrThrow([
-      { template: chosenId },
-      { template: note.detailTemplateId, tone: note.toneId },
-      { template: this.map?.detailTemplateId, tone: this.map?.toneId }
-    ]);
+  /**
+   * The note style of a topic run without notifying or writing anything (see detailTemplateFor). A style file that does
+   * not parse stops the run with a message naming file and line; a template block that does not parse only shows a Notice
+   * at the entry of a run and the built-in template stands in.
+   */
+  private topicStyle(
+    note: Note,
+    chosenId?: string,
+    chosenToneId?: string,
+    outputLanguage: ContentLanguage = this.plugin.settings.language
+  ): RunStyle {
+    const result = this.noteStyles.runStyle({
+      choice: { template: chosenId, tone: chosenToneId },
+      topic: { template: note.detailTemplateId, tone: note.toneId },
+      map: { template: this.map?.detailTemplateId, tone: this.map?.toneId },
+      outputLanguage
+    });
+    const invalid = result.issues.invalid;
+    if (invalid) {
+      const first = invalid.issues[0];
+      // Only an old style file that the upgrade has not moved yet can be invalid; it is opened where it lies.
+      const path = `${this.noteStyles.folder()}/${invalid.fileName}`;
+      throw new NoteStyleFileError(
+        t("ui.note_style_file_invalid_0_1_2", invalid.fileName, first.line, styleIssueText(first)),
+        () => void openVaultFile(this.app, path)
+      );
+    }
+    return result;
   }
   /**
    * The note style the levels resolve to; a style file that does not parse stops the run with a message naming file and
@@ -18275,7 +18312,7 @@ export class VisualAgentMapView extends ItemView {
    * Only the entry of a run calls this (resolving for a label, a dialog or a write-back never does). `gate` makes a
    * group of runs (a batch) tell the user once.
    */
-  private noticeBlockIssues(resolved: Pick<StyleResolution, "blockIssues">, gate?: { shown: boolean }): void {
+  private noticeBlockIssues(resolved: { blockIssues?: readonly BlockIssue[] }, gate?: { shown: boolean }): void {
     const issue = resolved.blockIssues?.[0];
     if (!issue || gate?.shown) return;
     if (gate) gate.shown = true;
@@ -18352,10 +18389,11 @@ export class VisualAgentMapView extends ItemView {
     node: MapNode,
     done?: (result: AiResult) => void,
     failed?: (message: string) => void,
-    overrides?: Partial<TaskContext>,
+    request?: Partial<TaskContext> & { runStyle?: RunStyle },
     onLaunchAccepted?: () => void,
     runOnce?: RunOnceModel
   ): Promise<AgentTaskHandle | null> {
+    const { runStyle: givenStyle, ...overrides } = request ?? {};
     const taskPath = node.path;
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     const used = await this.modelFor(note, node.path, runOnce);
@@ -18369,11 +18407,16 @@ export class VisualAgentMapView extends ItemView {
       failed?.(t("ui.ai_running_ai"));
       return null;
     }
-    const detailTemplate = this.templateForRun(
-      overrides?.detailTemplate ?? (await this.detailTemplateFor(node)),
-      overrides?.outputLanguage ?? this.plugin.settings.language
-    );
-    const style = this.styleFields(note, overrides, detailTemplate);
+    const runStyle =
+      givenStyle ??
+      (await this.detailTemplateFor(
+        node,
+        undefined,
+        undefined,
+        undefined,
+        overrides?.outputLanguage ?? this.plugin.settings.language
+      ));
+    const detailTemplate = runStyle.template;
     const context: TaskContext = withThinkingOrigin(
       {
         title: note.title,
@@ -18389,10 +18432,10 @@ export class VisualAgentMapView extends ItemView {
         researchMode: note.researchMode,
         researchDepth: "normal",
         visualMode: note.visualMode,
-        ...style.tone,
+        ...(runStyle.toneText ? { toneText: runStyle.toneText } : {}),
         ...overrides,
         detailTemplate,
-        ...style.style,
+        ...runStyle.contextFields,
         addCharts: overrides?.addCharts ?? true
       },
       note
@@ -18415,7 +18458,7 @@ export class VisualAgentMapView extends ItemView {
       progressAttempt,
       Date.now(),
       used.model,
-      this.noteStyles.resolutionOf(detailTemplate)?.fileName
+      runStyle.label.fileName
     );
     const observer: ResearchObserver = {
       onAttempt: id => {

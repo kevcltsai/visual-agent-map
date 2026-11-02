@@ -84,6 +84,30 @@ import {
   type TransactionEntry
 } from "./map-transaction";
 import { TopicSelection, type SelectionChange } from "./topic-selection";
+
+/** Transitional (removed in P3f): a copy of the module's multi-select set whose edits are written back to the module. */
+class WriteThroughSet extends Set<string> {
+  private readonly owner: TopicSelection;
+  constructor(owner: TopicSelection) {
+    super();
+    this.owner = owner;
+    for (const id of owner.state.multiSelected) super.add(id);
+  }
+  override add(id: string): this {
+    super.add(id);
+    this.owner.replaceMulti(this);
+    return this;
+  }
+  override delete(id: string): boolean {
+    const had = super.delete(id);
+    this.owner.replaceMulti(this);
+    return had;
+  }
+  override clear(): void {
+    super.clear();
+    this.owner.replaceMulti(this);
+  }
+}
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
@@ -807,8 +831,19 @@ export class VisualAgentMapView extends ItemView {
   private relevanceContext: string | undefined;
   /** Selection rules (P2a: the old fields below stay in step until P3f removes them). */
   private selection = new TopicSelection();
-  private selected: string | null = null;
-  private multiSelected = new Set<string>();
+  /** Transitional (removed in P3f): the old fields read and write through the module so unconverted code keeps working. */
+  private get selected(): string | null {
+    return this.selection.state.selected;
+  }
+  private set selected(id: string | null) {
+    this.selection.setSelected(id);
+  }
+  private get multiSelected(): Set<string> {
+    return new WriteThroughSet(this.selection);
+  }
+  private set multiSelected(ids: Iterable<string>) {
+    this.selection.replaceMulti(ids);
+  }
   /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
   private structureHighlight = new Set<string>();
   /** How many times the map was repainted; a run compares it to repaint once, not twice. */
@@ -965,7 +1000,16 @@ export class VisualAgentMapView extends ItemView {
   private announcedStages = new Map<string, string>();
   /** The unsaved-summary line of each synthesis/merge status bar (a plain element outside every live region). */
   private taskPreviewEls = new Map<string, HTMLElement>();
-  private integrationMode = false;
+  private get integrationMode(): boolean {
+    return this.selection.state.multiSelectMode;
+  }
+  private set integrationMode(on: boolean) {
+    if (on === this.selection.state.multiSelectMode) return;
+    const { selected, multiSelected } = this.selection.state;
+    this.selection.toggleMultiSelect();
+    this.selection.setSelected(selected);
+    this.selection.replaceMulti(multiSelected);
+  }
   private dragging = false;
   // A repaint asked for mid-drag waits here; the drag's settle runs it once.
   private renderAfterDrag = false;
@@ -993,7 +1037,14 @@ export class VisualAgentMapView extends ItemView {
   /** Where each label sits, so expanding or collapsing its text keeps it in place. */
   private relationLabelAt = new Map<string, { x: number; y: number }>();
   /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
-  private selectedRelation: string | null = null;
+  private get selectedRelation(): string | null {
+    return this.selection.state.selectedRelation;
+  }
+  private set selectedRelation(key: string | null) {
+    const current = this.selection.state.selectedRelation;
+    if (key !== null) this.selection.selectRelation(key);
+    else if (current !== null) this.selection.deselectRelation(current);
+  }
   /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
   private hoverRelation: string | null = null;
   private previewRelation: string | null = null;
@@ -1013,7 +1064,12 @@ export class VisualAgentMapView extends ItemView {
   /** Space held down: a drag pans the map even while selecting topics. */
   private spaceHeld = false;
   /** The single card in the tab order (roving tabindex); arrows move between the rest. */
-  private tabStopId: string | null = null;
+  private get tabStopId(): string | null {
+    return this.selection.state.tabStopId;
+  }
+  private set tabStopId(id: string | null) {
+    this.selection.moveTabStop(id);
+  }
   /** Card element per topic id, rebuilt on every render, so a selection change touches only the affected cards. */
   private cardEls = new Map<string, HTMLElement>();
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
@@ -5199,8 +5255,7 @@ export class VisualAgentMapView extends ItemView {
         this.removeAimReferences(map, ids, prior.nodes);
       })
       .commit();
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.afterRemove();
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
@@ -6439,7 +6494,7 @@ export class VisualAgentMapView extends ItemView {
         }
       }, false);
       await this.plugin.rebuildDerivedData();
-      this.selected = child.id;
+      this.selection.setSelected(child.id);
       this.announcer?.setText(t("ui.text_node_promoted"));
     } finally {
       this.focusNodeId = null;
@@ -7436,8 +7491,7 @@ export class VisualAgentMapView extends ItemView {
         );
       throw error;
     }
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.afterRemove();
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
@@ -7484,7 +7538,7 @@ export class VisualAgentMapView extends ItemView {
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
       }
     });
-    if (clearSelection) this.multiSelected.clear();
+    this.selection.afterMove(clearSelection);
     this.render();
   }
   private assertAimReferencesRemain(
@@ -7726,7 +7780,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (cross) await cross.finish(entry);
     else this.history.push(this.copyEntry(entry));
-    this.multiSelected.clear();
+    this.selection.afterPaste();
     await this.refreshAfterSavedChange();
     return copies.filter(copy => copy.parentId === (target?.id ?? null));
   }
@@ -7926,7 +7980,7 @@ export class VisualAgentMapView extends ItemView {
       );
       const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
       if (landed) {
-        this.selected = landed.id;
+        this.selection.setSelected(landed.id);
         this.render();
         this.focusNode(landed);
       }
@@ -7958,7 +8012,7 @@ export class VisualAgentMapView extends ItemView {
         this.refreshCutMarks();
         const moved = this.map?.nodes.find(node => node.id === roots[0].id);
         if (moved) {
-          this.selected = moved.id;
+          this.selection.setSelected(moved.id);
           this.render();
           this.focusNode(moved);
         }
@@ -8011,7 +8065,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const placed = this.map?.nodes.find(node => node.id === tops[0]?.id);
     if (placed) {
-      this.selected = placed.id;
+      this.selection.setSelected(placed.id);
       this.render();
       this.focusNode(placed);
     }
@@ -8326,7 +8380,7 @@ export class VisualAgentMapView extends ItemView {
         });
       })
       .commit();
-    this.selected = id;
+    this.selection.setSelected(id);
     this.history.push(entry);
     await this.refreshAfterSavedChange();
     const node = this.map?.nodes.find(item => item.id === id);
@@ -12675,7 +12729,7 @@ export class VisualAgentMapView extends ItemView {
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
-    this.selected = node.id;
+    this.selection.setSelected(node.id);
     await this.mapChangeSnapshots(
       map => {
         map.nodes.push(node);

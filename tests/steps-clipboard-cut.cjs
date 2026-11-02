@@ -69,7 +69,7 @@ async function harness({ aim = false } = {}) {
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = stage; view.contentEl = content;
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
-  view.render = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
+  view.render = () => { view.cardEls.clear(); stage.children = []; view.selection.moveTabStop(view.defaultTabStop(view.map.nodes)); for (const n of view.map.nodes) view.renderNode(n); };
   await view.hydrate(); view.render();
   return { repo, app, contents, view, plugin, sessionFor: bundle.sessionFor, ids, notices, map: () => view.map, saved: () => repo.readMap(MAP), notes: () => view.notes, history: () => view.history.past.length };
 }
@@ -85,8 +85,8 @@ const clipboardEvent = (target, data = {}) => {
   return event;
 };
 const copyOf = (h, ids, target = card) => {
-  h.view.selected = null; h.view.multiSelected.clear();
-  if (ids.length === 1) h.view.selected = h.ids[ids[0]]; else for (const key of ids) h.view.multiSelected.add(h.ids[key]);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  if (ids.length === 1) h.view.selection.setSelected(h.ids[ids[0]]); else for (const key of ids) h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent(target);
   h.view.onClipboardEvent('copy', event);
   h.lastRaw = event.clipboardData.store.get(MIME);
@@ -97,8 +97,8 @@ const clipboardModule = load('experiences/visual-map/clipboard.ts', { obsidian }
 const parse = text => JSON.parse(JSON.stringify(clipboardModule.parseClipboard(text)));
 const files = h => [...h.contents.keys()].filter(p => p.endsWith('.md')).sort();
 const cutOf = (h, ids, target = card) => {
-  h.view.selected = null; h.view.multiSelected.clear();
-  if (ids.length === 1) h.view.selected = h.ids[ids[0]]; else for (const key of ids) h.view.multiSelected.add(h.ids[key]);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  if (ids.length === 1) h.view.selection.setSelected(h.ids[ids[0]]); else for (const key of ids) h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent(target);
   h.view.onClipboardEvent('cut', event);
   h.lastRaw = event.clipboardData.store.get(MIME);
@@ -128,7 +128,7 @@ test('P5 cut then paste under another card moves the same notes: one history ste
   const h = await harness();
   cutOf(h, ['branch']);
   const raw = h.lastRaw, filesBefore = files(h), pathsBefore = h.map().nodes.map(n => n.path);
-  h.view.selected = h.ids.other; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
   const event = pasteOf(h, { [MIME]: raw });
   assert.equal(event.defaultPrevented, true);
   await until(() => parentOf(h, 'branch') === h.ids.other); await tick(); await tick();
@@ -146,7 +146,7 @@ test('P5 cut then paste with nothing selected moves the branch to the top level'
   const h = await harness();
   cutOf(h, ['branch']);
   const raw = h.lastRaw;
-  h.view.selected = null; h.view.multiSelected.clear();
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
   pasteOf(h, { [MIME]: raw });
   await until(() => parentOf(h, 'branch') === null); await tick(); await tick();
   assert.equal(h.map().nodes.length, 5); assert.equal(h.history(), 1);
@@ -161,7 +161,7 @@ test('P5 cut, then copy something else, then paste: the source does not move and
   const cutRaw = h.lastRaw;
   copyOf(h, ['leaf']);
   assert.deepEqual(marked(h), [], 'the mark goes at the copy');
-  h.view.selected = h.ids.other; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
   // Pasting the old cut string now is not a match: it is only a payload, so it makes copies and moves nothing.
   pasteOf(h, { [MIME]: cutRaw });
   await until(() => h.map().nodes.length === 7); await tick(); await tick();
@@ -176,7 +176,7 @@ test('P5 cut, then a copy elsewhere in the window (outside the view), cancels th
   assert.deepEqual(marked(h), ['leaf']);
   const outside = clipboardEvent(body); h.view.onClipboardEvent('copy', outside);
   assert.deepEqual(marked(h), []);
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   pasteOf(h, { [MIME]: h.lastRaw });
   await until(() => h.map().nodes.length === 6); await tick(); await tick();
   assert.equal(parentOf(h, 'leaf'), h.ids.root, 'the leaf was copied, not moved');
@@ -185,7 +185,7 @@ test('P5 cut, then a copy elsewhere in the window (outside the view), cancels th
 test('P5 cut, then a paste of something else (a mismatch) drops the mark and moves nothing', async () => {
   const h = await harness();
   cutOf(h, ['leaf']);
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   pasteOf(h, { 'text/plain': 'something else' });
   await tick(); await tick();
   assert.deepEqual(marked(h), []);
@@ -197,7 +197,7 @@ test('P5 cut: pasting into its own branch or a descendant is refused and the map
   for (const target of ['branch', 'kid']) {
     cutOf(h, ['branch']);
     const raw = h.lastRaw, before = JSON.stringify(h.map().nodes);
-    h.view.selected = h.ids[target]; h.view.multiSelected.clear();
+    h.view.selection.setSelected(h.ids[target]); h.view.selection.replaceMulti([]);
     pasteOf(h, { [MIME]: raw });
     await tick(); await tick();
     assert.equal(JSON.stringify(h.map().nodes), before, `${target}: map unchanged`);
@@ -209,7 +209,7 @@ test('P5 cut: pasting into its own branch or a descendant is refused and the map
 test('P5 cut: a read-only map (AIM, topic selection mode) cannot be cut', async () => {
   const cases = {
     aim: h => { h.view.map.aim = { version: 1 }; },
-    integration: h => { h.view.integrationMode = true; }
+    integration: h => { h.view.selection.toggleMultiSelect(); }
   };
   for (const [name, arrange] of Object.entries(cases)) {
     const h = await harness();
@@ -237,7 +237,7 @@ test('P5 cut: when the source changed after the cut, the paste moves nothing and
   const raw = h.lastRaw;
   h.view.map.nodes.find(n => n.id === h.ids.kid).parentId = h.ids.root;
   await h.repo.saveMap(MAP, h.view.map);
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   pasteOf(h, { [MIME]: raw });
   await until(() => h.map().nodes.length === 7); await tick(); await tick();
   assert.equal(parentOf(h, 'branch'), h.ids.root, 'not moved');

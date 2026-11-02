@@ -46480,6 +46480,28 @@ var MergeTopicsModal = class extends import_obsidian30.Modal {
 };
 
 // experiences/visual-map/view.ts
+var WriteThroughSet = class extends Set {
+  constructor(owner) {
+    super();
+    __publicField(this, "owner");
+    this.owner = owner;
+    for (const id of owner.state.multiSelected) super.add(id);
+  }
+  add(id) {
+    super.add(id);
+    this.owner.replaceMulti(this);
+    return this;
+  }
+  delete(id) {
+    const had = super.delete(id);
+    this.owner.replaceMulti(this);
+    return had;
+  }
+  clear() {
+    super.clear();
+    this.owner.replaceMulti(this);
+  }
+};
 var BRANCH_DIRECTIONS = ["right", "left", "down", "up"];
 var BRANCH_LABEL = {
   right: "ui.layout_direction_right",
@@ -46708,8 +46730,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "relevanceContext");
     /** Selection rules (P2a: the old fields below stay in step until P3f removes them). */
     __publicField(this, "selection", new TopicSelection());
-    __publicField(this, "selected", null);
-    __publicField(this, "multiSelected", /* @__PURE__ */ new Set());
     /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
     __publicField(this, "structureHighlight", /* @__PURE__ */ new Set());
     /** How many times the map was repainted; a run compares it to repaint once, not twice. */
@@ -46808,7 +46828,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "announcedStages", /* @__PURE__ */ new Map());
     /** The unsaved-summary line of each synthesis/merge status bar (a plain element outside every live region). */
     __publicField(this, "taskPreviewEls", /* @__PURE__ */ new Map());
-    __publicField(this, "integrationMode", false);
     __publicField(this, "dragging", false);
     // A repaint asked for mid-drag waits here; the drag's settle runs it once.
     __publicField(this, "renderAfterDrag", false);
@@ -46835,8 +46854,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "relationExpanded", /* @__PURE__ */ new Set());
     /** Where each label sits, so expanding or collapsing its text keeps it in place. */
     __publicField(this, "relationLabelAt", /* @__PURE__ */ new Map());
-    /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
-    __publicField(this, "selectedRelation", null);
     /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
     __publicField(this, "hoverRelation", null);
     __publicField(this, "previewRelation", null);
@@ -46855,8 +46872,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "focusResizeAxis", "width");
     /** Space held down: a drag pans the map even while selecting topics. */
     __publicField(this, "spaceHeld", false);
-    /** The single card in the tab order (roving tabindex); arrows move between the rest. */
-    __publicField(this, "tabStopId", null);
     /** Card element per topic id, rebuilt on every render, so a selection change touches only the affected cards. */
     __publicField(this, "cardEls", /* @__PURE__ */ new Map());
     /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
@@ -46962,6 +46977,45 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
+  }
+  /** Transitional (removed in P3f): the old fields read and write through the module so unconverted code keeps working. */
+  get selected() {
+    return this.selection.state.selected;
+  }
+  set selected(id) {
+    this.selection.setSelected(id);
+  }
+  get multiSelected() {
+    return new WriteThroughSet(this.selection);
+  }
+  set multiSelected(ids) {
+    this.selection.replaceMulti(ids);
+  }
+  get integrationMode() {
+    return this.selection.state.multiSelectMode;
+  }
+  set integrationMode(on) {
+    if (on === this.selection.state.multiSelectMode) return;
+    const { selected, multiSelected } = this.selection.state;
+    this.selection.toggleMultiSelect();
+    this.selection.setSelected(selected);
+    this.selection.replaceMulti(multiSelected);
+  }
+  /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
+  get selectedRelation() {
+    return this.selection.state.selectedRelation;
+  }
+  set selectedRelation(key2) {
+    const current = this.selection.state.selectedRelation;
+    if (key2 !== null) this.selection.selectRelation(key2);
+    else if (current !== null) this.selection.deselectRelation(current);
+  }
+  /** The single card in the tab order (roving tabindex); arrows move between the rest. */
+  get tabStopId() {
+    return this.selection.state.tabStopId;
+  }
+  set tabStopId(id) {
+    this.selection.moveTabStop(id);
   }
   isTextId(id) {
     var _a2, _b2;
@@ -50808,8 +50862,7 @@ ${request.requirements}` : preset.text,
       }
       this.removeAimReferences(map, ids, prior.nodes);
     }).commit();
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.afterRemove();
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
@@ -51956,7 +52009,7 @@ ${request.requirements}` : preset.text,
         }
       }, false);
       await this.plugin.rebuildDerivedData();
-      this.selected = child.id;
+      this.selection.setSelected(child.id);
       (_c = this.announcer) == null ? void 0 : _c.setText(t("ui.text_node_promoted"));
     } finally {
       this.focusNodeId = null;
@@ -52905,8 +52958,7 @@ ${request.requirements}` : preset.text,
         );
       throw error;
     }
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.afterRemove();
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
@@ -52955,7 +53007,7 @@ ${request.requirements}` : preset.text,
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id), this.cardHeightOf, layoutOf(map));
       }
     });
-    if (clearSelection) this.multiSelected.clear();
+    this.selection.afterMove(clearSelection);
     this.render();
   }
   assertAimReferencesRemain(map, ids, moving = false, removableQuestionNodeIds = /* @__PURE__ */ new Set()) {
@@ -53145,7 +53197,7 @@ ${request.requirements}` : preset.text,
     }
     if (cross) await cross.finish(entry);
     else this.history.push(this.copyEntry(entry));
-    this.multiSelected.clear();
+    this.selection.afterPaste();
     await this.refreshAfterSavedChange();
     return copies.filter((copy) => {
       var _a3;
@@ -53345,7 +53397,7 @@ ${request.requirements}` : preset.text,
         return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
       });
       if (landed) {
-        this.selected = landed.id;
+        this.selection.setSelected(landed.id);
         this.render();
         this.focusNode(landed);
       }
@@ -53371,7 +53423,7 @@ ${request.requirements}` : preset.text,
         this.refreshCutMarks();
         const moved = (_e = this.map) == null ? void 0 : _e.nodes.find((node) => node.id === roots[0].id);
         if (moved) {
-          this.selected = moved.id;
+          this.selection.setSelected(moved.id);
           this.render();
           this.focusNode(moved);
         }
@@ -53423,7 +53475,7 @@ ${request.requirements}` : preset.text,
       return node.id === ((_a3 = tops[0]) == null ? void 0 : _a3.id);
     });
     if (placed) {
-      this.selected = placed.id;
+      this.selection.setSelected(placed.id);
       this.render();
       this.focusNode(placed);
     }
@@ -53700,7 +53752,7 @@ ${request.requirements}` : preset.text,
         collapsed: false
       });
     }).commit();
-    this.selected = id;
+    this.selection.setSelected(id);
     this.history.push(entry);
     await this.refreshAfterSavedChange();
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === id);
@@ -57740,7 +57792,7 @@ ${request.requirements}` : preset.text,
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
-    this.selected = node.id;
+    this.selection.setSelected(node.id);
     await this.mapChangeSnapshots(
       (map) => {
         map.nodes.push(node);

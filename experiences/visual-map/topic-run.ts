@@ -6,6 +6,7 @@
 import { noteLanguageOf, t, type ContentLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
+import type { ReferenceGroup } from "../../ai/reference-materials";
 import type { ResearchObserver, ResearchPreviewFields, ResearchStageName } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
 import { checkCounts } from "../../ai/detail-templates";
@@ -242,6 +243,51 @@ export interface IntegrateChildrenStart {
   onSettled?: () => Promise<void>;
 }
 
+/**
+ * What a selection-synthesis run needs from the entry that starts it (the view). The run belongs to a map, not to one
+ * topic: it registers nothing in the running set and no stop controller (the view's waiting task holds `signal`'s
+ * controller, which only the view can stop; ticket 05 changes that). The view keeps the task state it shows.
+ */
+export interface SynthesizeSelectionStart {
+  /** "directions" asks for suggested directions; "draft" writes the new topic. */
+  step: "directions" | "draft";
+  /** The stop signal of the view's waiting task. */
+  signal: AbortSignal;
+  /** The model for the selected topics. */
+  model: () => Promise<{ model: string; reasoning?: ReasoningLevel }>;
+  /** The selected topics' notes as one reference group; read again before anything is saved to compare. */
+  readSources: () => Promise<ReferenceGroup>;
+  /** Registers the waiting task for the sources just read and redraws. */
+  begin: (sources: ReferenceGroup) => void;
+  startProgress: (model: string) => { observer?: ResearchObserver; end: () => void };
+  buildContext: (sources: ReferenceGroup) => Promise<TaskContext>;
+  /** Called once the AI accepted the request. */
+  accepted: () => void;
+  /** False when the waiting task was discarded or replaced meanwhile. */
+  current: () => boolean;
+  /** True when the open map is no longer the one the run started with. */
+  mapChanged: () => boolean;
+  /** The sources as the waiting task recorded them (compared with a fresh read). */
+  recordedSources: () => string;
+  /** Directions step: the found directions (at most 2) are stored and offered; null suggestions go to `noDirections`. */
+  found: (items: Suggestion[]) => void;
+  noDirections: () => void;
+  /** Draft step: true when the view was closed. */
+  closed: () => boolean;
+  /** Draft step: marks the task as applying and returns the undo mark taken before the write. */
+  applying: () => unknown;
+  /** Draft step: creates the topic; throws without writing when the sources or the map changed. */
+  write: (result: AiResult) => Promise<void>;
+  written: (undoMark: unknown) => void;
+  /** Draft step: an error after the task existed; may rethrow (the view decides which errors reach `fail`). */
+  draftFailed: (error: unknown) => void;
+  /** Draft step: the run ended without throwing. */
+  finished: () => void;
+  fail: (error: unknown) => void;
+  /** Runs last, whatever happened. */
+  settled: () => void;
+}
+
 export interface TopicRunHandle {
   readonly path: string;
   readonly kind: TopicRunKind;
@@ -306,11 +352,14 @@ export class TopicRuns {
   start(path: string, kind: "integrateDirection", options: IntegrateDirectionStart): Promise<void>;
   /** Rewrites a topic from its children and the chosen sources, unless it changed meanwhile. Resolves when the run is over. */
   start(path: string, kind: "integrateChildren", options: IntegrateChildrenStart): Promise<void>;
+  /** Synthesizes the selected topics into a new topic: directions first, then the draft. `path` is the map's. Resolves when the run is over. */
+  start(path: string, kind: "synthesizeSelection", options: SynthesizeSelectionStart): Promise<void>;
   async start(
     path: string,
-    kind: "research" | "proposeChildren" | "integrateDirection" | "integrateChildren",
-    options: ResearchStart | ProposeStart | IntegrateDirectionStart | IntegrateChildrenStart
+    kind: TopicRunKind,
+    options: ResearchStart | ProposeStart | IntegrateDirectionStart | IntegrateChildrenStart | SynthesizeSelectionStart
   ): Promise<AgentTaskHandle | null | void> {
+    if (kind === "synthesizeSelection") return this.runSelection(options as SynthesizeSelectionStart);
     if (kind === "proposeChildren") return this.runProposal(path, options as ProposeStart);
     if (kind === "integrateDirection") return this.runDirections(path, options as IntegrateDirectionStart);
     if (kind === "integrateChildren") return this.runIntegration(path, options as IntegrateChildrenStart);
@@ -631,6 +680,74 @@ export class TopicRuns {
       progress.end();
       this.freeReplaceable(path, controller, handle);
       await options.onSettled?.();
+    }
+  }
+
+  private async runSelection(options: SynthesizeSelectionStart): Promise<void> {
+    const aborted = (): DOMException => new DOMException("Aborted", "AbortError");
+    const changed = (): Error => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    let progress: { end: () => void } | undefined;
+    try {
+      const chosen = await options.model();
+      const sources = await options.readSources();
+      options.begin(sources);
+      const taskProgress = options.startProgress(chosen.model);
+      const context = await options.buildContext(sources);
+      const ask = (): Promise<AiResult> =>
+        this.ports.askModel(
+          context,
+          chosen.model,
+          chosen.reasoning,
+          options.signal,
+          undefined,
+          options.accepted,
+          undefined,
+          taskProgress.observer
+        );
+      if (options.step === "draft") {
+        const draft = async (): Promise<void> => {
+          try {
+            const result = await ask();
+            // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
+            taskProgress.end();
+            if (!options.current()) return;
+            if (options.signal.aborted || options.mapChanged())
+              throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
+            const latest = await options.readSources();
+            if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
+            // Stop pressed while the sources were re-read still wins: nothing is written.
+            if (options.signal.aborted) throw aborted();
+            if (options.closed()) throw changed();
+            const mark = options.applying();
+            await this.ports.mutate()(() => options.write(result));
+            options.written(mark);
+          } catch (error) {
+            if (!options.current()) return;
+            options.draftFailed(error);
+          } finally {
+            taskProgress.end();
+          }
+        };
+        await draft();
+        options.finished();
+        return;
+      }
+      progress = taskProgress;
+      const result = await ask();
+      taskProgress.end();
+      options.accepted();
+      if (!options.current()) return;
+      if (options.signal.aborted || options.mapChanged()) throw aborted();
+      const latest = await options.readSources();
+      if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
+      const angles = result.suggestions.slice(0, 2);
+      if (!angles.length) options.noDirections();
+      else options.found(angles);
+    } catch (error) {
+      options.fail(error);
+    } finally {
+      progress?.end();
+      options.settled();
     }
   }
 

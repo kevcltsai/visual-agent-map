@@ -748,3 +748,86 @@ test('the view integration entries no longer touch the running set; they go thro
   const body = src.slice(src.indexOf('private async proposeIntegrationDirections('), src.indexOf('private async startSynthesis('));
   assert.doesNotMatch(body, /running\.(add|delete)/); assert.match(body, /topicRuns\.start\(node\.path, "integrateDirection"/); assert.match(body, /topicRuns\.start\(node\.path, "integrateChildren"/);
 });
+
+// ---- selection synthesis (ticket 04b): synthesizeSelection ----
+const selectionRuns = ({ ask, mutate } = {}) => {
+  const h = { events: [], asks: [], writes: [], fails: [], found: [], noDir: 0, sourcesNow: 'S1', current: true, mapChanged: false, closed: false, progressEnds: 0, task: null };
+  h.runs = new TopicRuns(ports({
+    mutate: mutate ?? (() => work => work()),
+    askModel: ask ?? (async (context, model, reasoning, signal, _e, accepted) => { h.asks.push({ context, model, reasoning, signal }); accepted(); return { summary: 'S', detail: 'D', visualReferences: [], suggestions: [sugg('A1'), sugg('A2'), sugg('A3')] }; })
+  }));
+  h.ctl = new AbortController();
+  h.opts = (step, over = {}) => ({
+    step, signal: h.ctl.signal, model: async () => ({ model: 'mx', reasoning: 'low' }),
+    readSources: async () => ({ id: 'g', name: 'g', location: 'M.md', documents: [{ path: 'a.md', content: h.sourcesNow }] }),
+    begin: group => { h.task = { sourceContent: JSON.stringify(group.documents) }; h.events.push('begin'); },
+    startProgress: () => ({ end: () => { h.progressEnds++; } }), buildContext: async () => ({ title: 'T', mode: 'synthesize' }),
+    accepted: () => h.events.push('accepted'), current: () => h.current, mapChanged: () => h.mapChanged, recordedSources: () => h.task.sourceContent,
+    found: items => h.found.push(items), noDirections: () => { h.noDir++; }, closed: () => h.closed,
+    applying: () => { h.events.push('applying'); return 'mark'; }, write: async result => { h.writes.push(result); }, written: mark => h.events.push(['written', mark]),
+    draftFailed: error => { h.events.push(['draftFailed', error.message]); }, finished: () => h.events.push('finished'),
+    fail: error => h.fails.push(error), settled: () => h.events.push('settled'), ...over
+  });
+  return h;
+};
+
+test('synthesizeSelection directions: asks, offers at most 2 directions, registers nothing in the running set', async () => {
+  const h = selectionRuns();
+  await h.runs.start('M.md', 'synthesizeSelection', h.opts('directions'));
+  assert.equal(h.asks[0].model, 'mx'); assert.equal(h.found.length, 1); assert.equal(h.found[0].length, 2); assert.deepEqual(h.fails, []);
+  assert.deepEqual(h.events, ['begin', 'accepted', 'accepted', 'settled']);
+  assert.equal(h.runs.isRunning('M.md'), false); assert.equal(h.runs.running.size, 0);
+  assert.ok(h.progressEnds >= 2);
+});
+
+test('synthesizeSelection directions: Stop or a changed map discards the answer; changed sources and an empty answer are reported', async () => {
+  const stopped = selectionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); stopped.ctl.abort(); return { suggestions: [sugg('X')] }; } });
+  await stopped.runs.start('M.md', 'synthesizeSelection', stopped.opts('directions'));
+  assert.equal(stopped.found.length, 0); assert.equal(stopped.fails.length, 1); // the sandbox has no DOMException, so only the count is checked here
+  const moved = selectionRuns(); moved.mapChanged = true;
+  await moved.runs.start('M.md', 'synthesizeSelection', moved.opts('directions'));
+  assert.equal(moved.found.length, 0); assert.equal(moved.fails.length, 1);
+  const stale = selectionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); stale.sourcesNow = 'S2'; return { suggestions: [sugg('X')] }; } });
+  await stale.runs.start('M.md', 'synthesizeSelection', stale.opts('directions'));
+  assert.equal(stale.found.length, 0); assert.equal(stale.fails.length, 1);
+  const none = selectionRuns({ ask: async () => ({ suggestions: [] }) });
+  await none.runs.start('M.md', 'synthesizeSelection', none.opts('directions'));
+  assert.equal(none.noDir, 1); assert.deepEqual(none.fails, []);
+  const gone = selectionRuns(); gone.current = false;
+  await gone.runs.start('M.md', 'synthesizeSelection', gone.opts('directions'));
+  assert.equal(gone.found.length, 0); assert.equal(gone.noDir, 0); assert.deepEqual(gone.fails, []);
+});
+
+test('synthesizeSelection draft: a normal run writes once through the mutate queue, then reports finished', async () => {
+  const queued = []; const h = selectionRuns({ mutate: () => async work => { queued.push('in'); await work(); queued.push('out'); } });
+  await h.runs.start('M.md', 'synthesizeSelection', h.opts('draft'));
+  assert.equal(h.writes.length, 1); assert.deepEqual(queued, ['in', 'out']); assert.deepEqual(h.fails, []);
+  assert.deepEqual(h.events, ['begin', 'accepted', 'applying', ['written', 'mark'], 'finished', 'settled']);
+});
+
+test('synthesizeSelection draft: Stop, changed sources, a changed map and a closed view write nothing', async () => {
+  const stopped = selectionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); stopped.ctl.abort(); return { summary: 'S', detail: 'D', suggestions: [] }; } });
+  await stopped.runs.start('M.md', 'synthesizeSelection', stopped.opts('draft'));
+  assert.equal(stopped.writes.length, 0); assert.ok(stopped.events.some(e => Array.isArray(e) && e[0] === 'draftFailed'));
+  const stale = selectionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); stale.sourcesNow = 'S2'; return { summary: 'S', detail: 'D', suggestions: [] }; } });
+  await stale.runs.start('M.md', 'synthesizeSelection', stale.opts('draft'));
+  assert.equal(stale.writes.length, 0); assert.ok(stale.events.some(e => Array.isArray(e) && e[0] === 'draftFailed'));
+  const moved = selectionRuns(); moved.mapChanged = true;
+  await moved.runs.start('M.md', 'synthesizeSelection', moved.opts('draft'));
+  assert.equal(moved.writes.length, 0); assert.ok(moved.events.some(e => Array.isArray(e) && e[0] === 'draftFailed'));
+  const closed = selectionRuns(); closed.closed = true;
+  await closed.runs.start('M.md', 'synthesizeSelection', closed.opts('draft'));
+  assert.equal(closed.writes.length, 0);
+  const gone = selectionRuns(); gone.current = false;
+  await gone.runs.start('M.md', 'synthesizeSelection', gone.opts('draft'));
+  assert.equal(gone.writes.length, 0); assert.ok(gone.events.includes('finished'), '307bcd7: a discarded task still ends the draft step normally');
+});
+
+test('synthesizeSelection draft: a thrown draftFailed or a failing write reaches fail; the view selection entry goes through the module', async () => {
+  const h = selectionRuns({ ask: async () => { throw new Error('boom'); } });
+  await h.runs.start('M.md', 'synthesizeSelection', h.opts('draft', { draftFailed: error => { throw error; } }));
+  assert.equal(h.fails.length, 1); assert.equal(h.fails[0].message, 'boom'); assert.ok(!h.events.includes('finished'));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const body = src.slice(src.indexOf('private async startSelectionSynthesis('), src.indexOf('private discardSelectionSynthesis('));
+  assert.match(body, /topicRuns\.start\(mapPath, "synthesizeSelection"/); assert.doesNotMatch(body, /plugin\.askModel|running\.(add|delete)/);
+});

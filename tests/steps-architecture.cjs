@@ -259,8 +259,8 @@ const EXCHANGE_WRITE_ALLOWED = [
 const ACTIVE_TASKS_SET_ALLOWED = [
   { file: 'core/ai-calls.ts', count: 1, reason: 'the per-call registration' },
   { file: 'experiences/visual-map/expansion-batch.ts', count: 1, reason: 'batch Stop key (parent path), a whole-job key' },
-  { file: 'experiences/visual-map/view.ts', count: 3, reason: 'UI leftover, waits for C1' },
-  { file: 'experiences/visual-map/topic-run.ts', count: 1, reason: 'research run registers its controller for the Stop buttons' },
+  { file: 'experiences/visual-map/view.ts', count: 2, reason: 'UI leftover, waits for C1' },
+  { file: 'experiences/visual-map/topic-run.ts', count: 2, reason: 'the research and proposal runs register their controller for the Stop buttons' },
   { file: 'experiences/coffee-tables/handoff-modal.ts', count: 1, reason: 'reframe-modal key, a whole-job Stop key around one registered AiCalls call' }
 ];
 const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/coffee-tables/handoff-modal.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts', 'experiences/visual-map/topic-run.ts'];

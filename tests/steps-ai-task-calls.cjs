@@ -592,3 +592,13 @@ test('top write-back: a template with a count section and a reply that is short 
   await merge.service.askModel({ ...repairInput(), updateMode: 'merge' }, 'gpt-6-luna', 'low', undefined, merge.mark);
   assert.equal(merge.state.calls.length, 2, 'a merge still repairs the counts');
 });
+
+test('fresh write-back: the count repair prompt shows the first reply Detail so that it can adjust only the short sections', async () => {
+  const marker = '第一次回覆的研究內容-XYZ';
+  const first = `${detailWith(2)}\n\n${marker}`;
+  const h = rig({ language: 'zh-TW', handler: call => answer(call, replyWith(call.n === 1 ? first : detailWith(3))) });
+  await h.service.askModel({ ...repairInput(), updateMode: 'fresh' }, 'gpt-6-luna', 'low', undefined, h.mark);
+  assert.equal(h.state.calls.length, 2);
+  assert.ok(!h.state.calls[0].prompt.includes(marker), 'the first call still hides the old Detail');
+  assert.ok(h.state.calls[1].prompt.includes(marker), 'the repair call carries the first reply');
+});

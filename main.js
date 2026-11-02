@@ -33910,6 +33910,9 @@ var AiTaskService = class {
             const repaired = await this.execute(
               {
                 ...input2,
+                // A fresh write-back hides the old Detail from the model; the repair is told to adjust the first reply,
+                // so it has to see that reply.
+                updateMode: input2.updateMode === "fresh" ? void 0 : input2.updateMode,
                 detail: result.detail,
                 summary: result.summary,
                 task: repairCounts(

@@ -46926,6 +46926,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
+    /** Apply step for a relation-line change: only the line highlight is repainted. */
+    __publicField(this, "syncRelationOnly", () => this.syncRelationClasses());
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     __publicField(this, "noStyleFiles");
@@ -47089,14 +47091,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
       if (event.key === "Escape") {
-        const previous = this.selected, touched = [...this.multiSelected];
-        const wasSelecting = this.integrationMode;
-        this.selected = null;
-        this.multiSelected.clear();
-        this.selectedRelation = null;
-        this.integrationMode = false;
-        if (wasSelecting) this.render();
-        else this.commitSelection(previous, null, touched);
+        this.runSelection((selection) => selection.escape());
       }
     });
     await this.plugin.ready;
@@ -54889,7 +54884,14 @@ ${request.requirements}` : preset.text,
     if (this.selected && !shown.some((node) => node.id === this.selected)) this.selected = null;
     this.multiSelected = new Set([...this.multiSelected].filter((id) => shown.some((node) => node.id === id)));
     if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
-    this.tabStopId = this.defaultTabStop(shown);
+    this.runSelection(
+      (selection) => selection.resetTabStop(shown.map((node) => {
+        var _a3;
+        return { id: node.id, parentId: (_a3 = node.parentId) != null ? _a3 : null };
+      })),
+      () => {
+      }
+    );
     this.renderingCard = true;
     try {
       for (const node of shown) this.renderNode(node);
@@ -55650,9 +55652,10 @@ ${request.requirements}` : preset.text,
     if (view && rect2 && (rect2.left < view.left || rect2.right > view.right || rect2.top < view.top || rect2.bottom > view.bottom))
       this.focusNode(target, false);
     if (this.integrationMode) {
-      const previous = this.tabStopId;
-      this.tabStopId = target.id;
-      this.paintCards([previous, target.id]);
+      this.runSelection(
+        (selection) => selection.moveTabStop(target.id),
+        (change2) => this.paintCards(change2.touched)
+      );
     } else {
       this.focusNodeId = target.id;
       try {
@@ -55702,10 +55705,23 @@ ${request.requirements}` : preset.text,
    */
   applySelectionState(prevId, nextId, touched = []) {
     var _a2;
-    this.selectedRelation = null;
-    const previousStop = this.tabStopId;
-    this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
-    this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
+    const shown = (this.map ? this.canvasNodes() : []).map((node) => {
+      var _a3;
+      return { id: node.id, parentId: (_a3 = node.parentId) != null ? _a3 : null };
+    });
+    const stops = [];
+    this.runSelection(
+      (selection) => {
+        const relation = selection.state.selectedRelation;
+        if (relation) selection.deselectRelation(relation);
+        const change2 = selection.resetTabStop(shown);
+        stops.push(...change2.touched);
+        return change2;
+      },
+      () => {
+      }
+    );
+    this.paintCards([prevId, nextId, ...stops, ...touched]);
     if (this.integrationMode && ((_a2 = this.selectionBarEl) == null ? void 0 : _a2.isConnected)) {
       const workspace = this.selectionBarEl.parentElement;
       if (workspace) {
@@ -55733,7 +55749,7 @@ ${request.requirements}` : preset.text,
     this.applySelectionState(prevId, nextId, touched);
   }
   /** Bring the module up to the old fields (P2a bridge: other paths still write them), run one operation, copy back. */
-  runSelection(operation) {
+  runSelection(operation, apply = (change2) => this.applySelectionChange(change2)) {
     const sel = this.selection;
     if (sel.state.multiSelectMode !== this.integrationMode) sel.toggleMultiSelect();
     sel.replaceMulti(this.multiSelected);
@@ -55751,7 +55767,7 @@ ${request.requirements}` : preset.text,
     this.integrationMode = state.multiSelectMode;
     this.selectedRelation = state.selectedRelation;
     this.tabStopId = state.tabStopId;
-    this.applySelectionChange(change2);
+    apply(change2);
   }
   /** Mode changed: render the whole map. Only the selection changed: repaint the touched cards, bar and outline. */
   applySelectionChange(change2) {
@@ -56079,11 +56095,14 @@ ${request.requirements}` : preset.text,
     const current = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === node.id);
     if (!current) return false;
     if (!this.integrationMode) {
-      const previous = this.selected, touched = [...this.multiSelected];
-      this.selected = current.id;
-      this.multiSelected.clear();
-      if (collapsed.length) this.render();
-      else this.commitSelection(previous, current.id, touched);
+      if (collapsed.length) {
+        this.runSelection(
+          (selection) => selection.click(current.id),
+          () => {
+          }
+        );
+        this.render();
+      } else this.runSelection((selection) => selection.click(current.id));
     } else this.render();
     this.focusNode(current);
     return true;
@@ -56829,16 +56848,14 @@ ${request.requirements}` : preset.text,
       }, false);
       const result = outcome.value;
       if (result === null) {
-        if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
-        this.syncRelationClasses();
+        this.runSelection((selection) => selection.deselectRelation(relationIdentity(current)), this.syncRelationOnly);
         onChanged == null ? void 0 : onChanged();
         close == null ? void 0 : close();
         return;
       }
       if (result) {
         current = result;
-        this.selectedRelation = relationIdentity(current);
-        this.syncRelationClasses();
+        this.runSelection((selection) => selection.selectRelation(relationIdentity(current)), this.syncRelationOnly);
       }
       if (repaint) paint();
       onChanged == null ? void 0 : onChanged();
@@ -59697,20 +59714,13 @@ ${note.detail.trim()}` : "",
         item.card.removeClass("is-marquee-remove");
       }
       if (!hits.size) return;
-      if (mode === "marquee-subtract") {
-        const removed = [...hits].filter((id) => this.multiSelected.has(id));
-        if (!removed.length) return;
-        for (const id of removed) this.multiSelected.delete(id);
-        this.commitSelection(this.selected, this.selected, removed);
-        return;
-      }
-      for (const id of hits) this.multiSelected.add(id);
-      if (mode === "marquee-enter") {
-        this.integrationMode = true;
-        if (!this.closed) this.render();
-        return;
-      }
-      this.commitSelection(this.selected, this.selected, hits);
+      const how = mode === "marquee-subtract" ? "subtract" : mode === "marquee-enter" ? "enter" : "add";
+      this.runSelection(
+        (selection) => selection.marquee(hits, how, { canMultiSelect: true }),
+        (change2) => {
+          if (change2.multiSelectModeChanged || change2.touched.length) this.applySelectionChange(change2);
+        }
+      );
     };
     viewport.addEventListener("pointermove", move);
     viewport.addEventListener("pointerup", up);
@@ -59831,15 +59841,9 @@ ${note.detail.trim()}` : "",
         viewport.removeClass("is-panning");
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
-        if (!moved && event.button === 0 && this.selectedRelation) {
-          this.selectedRelation = null;
-          this.syncRelationClasses();
-        }
-        if (!moved && !this.integrationMode && event.button === 0) {
-          const previous = this.selected, touched = [...this.multiSelected];
-          this.selected = null;
-          this.multiSelected.clear();
-          this.commitSelection(previous, null, touched);
+        if (!moved && event.button === 0) {
+          if (this.integrationMode) this.runSelection((selection) => selection.clickEmpty(), this.syncRelationOnly);
+          else this.runSelection((selection) => selection.clickEmpty());
         }
       };
       viewport.addEventListener("pointermove", move);
@@ -62648,13 +62652,11 @@ ${addition}` : addition });
       const key2 = link.key;
       hit.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
-        this.selectedRelation = key2;
-        this.syncRelationClasses();
+        this.runSelection((selection) => selection.selectRelation(key2), this.syncRelationOnly);
       });
       hit.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.selectedRelation = key2;
-        this.syncRelationClasses();
+        this.runSelection((selection) => selection.selectRelation(key2), this.syncRelationOnly);
         this.openRelationEditor(link.relation);
       });
       hit.addEventListener("pointerenter", () => {
@@ -62675,7 +62677,11 @@ ${addition}` : addition });
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
     }
-    if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
+    this.runSelection(
+      (selection) => selection.pruneRelation(new Set(this.relationEls.keys())),
+      () => {
+      }
+    );
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
@@ -62787,12 +62793,10 @@ ${addition}` : addition });
     row.setAttr("role", "group");
     row.setAttr("aria-label", ariaLabel);
     row.addEventListener("focus", () => {
-      this.selectedRelation = key2;
-      this.syncRelationClasses();
+      this.runSelection((selection) => selection.selectRelation(key2), this.syncRelationOnly);
     });
     row.addEventListener("blur", () => {
-      if (this.selectedRelation === key2) this.selectedRelation = null;
-      this.syncRelationClasses();
+      this.runSelection((selection) => selection.deselectRelation(key2), this.syncRelationOnly);
     });
     row.addEventListener("mouseenter", () => {
       this.previewRelation = key2;

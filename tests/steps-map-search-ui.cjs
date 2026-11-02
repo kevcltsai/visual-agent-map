@@ -64,7 +64,7 @@ async function harness({ collapse = true } = {}) {
     view.contentEl.empty(); const overlay = view.contentEl.createDiv('vam-canvas-overlay');
     const makeDiv = overlay.createDiv.bind(overlay); // records caret restores on the search field
     overlay.createDiv = value => { const box = makeDiv(value); const makeEl = box.createEl.bind(box); box.createEl = (name, v) => { const el = makeEl(name, v); if (name === 'input') el.setSelectionRange = (a, b) => carets.push([a, b]); return el; }; return box; };
-    view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes);
+    view.cardEls.clear(); stage.children = []; view.runSelection(s => s.resetTabStop(view.map.nodes.map(n => ({ id: n.id, parentId: n.parentId ?? null }))), () => {});
     for (const n of visible()) { view.renderNode(n); }
     for (const [id, card] of view.cardEls) { card.focus = () => { doc.activeElement = card; }; card.contains = other => other === card; card.nodeId = id; }
   };

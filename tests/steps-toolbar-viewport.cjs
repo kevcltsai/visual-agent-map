@@ -7,6 +7,13 @@ const path = require('node:path');
 const support = require('./support.cjs');
 const { obsidian, DEFAULT_SETTINGS } = support;
 const { load } = require('./support-replay.cjs');
+// Sets the selection through the module bridge: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.multiSelected]) => view.runSelection(s => {
+  const keep = s.state.selected;
+  if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
+  s.setSelected(keep);
+  return s.replaceMulti(ids);
+}, () => {});
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -23,7 +30,7 @@ function fakeEl(tag = 'div', init = {}) {
 }
 function bareView(plugin, extra = {}) {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
-  return Object.assign(Object.create(VisualAgentMapView.prototype), { plugin, renderingCard: false, ...extra });
+  return Object.assign(Object.create(VisualAgentMapView.prototype), { plugin, renderingCard: false, selection: new (load('experiences/visual-map/topic-selection.ts').TopicSelection)(), ...extra });
 }
 
 const inset = load('experiences/visual-map/viewport-inset.ts');
@@ -62,6 +69,7 @@ function makeView() {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
   const writes = [];
   const view = Object.create(VisualAgentMapView.prototype);
+  view.selection = new (load('experiences/visual-map/topic-selection.ts').TopicSelection)();
   const nodes = [
     { id: 'a', path: 'a.md', parentId: null, x: 0, y: 0 },
     { id: 'b', path: 'b.md', parentId: 'a', x: 400, y: 2000 }
@@ -79,7 +87,7 @@ function makeView() {
   view.relevanceSortOn = () => false;
   view.canvasNodes = () => nodes;
   view.transform = () => {};
-  view.selectMapNode = node => { view.selected = node.id; };
+  view.selectMapNode = node => view.runSelection(s => s.setSelected(node.id), () => {});
   return { view, writes, nodes };
 }
 
@@ -182,7 +190,7 @@ test('bar children keep the same order and fixed labels at counts 0-3 (names spa
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const shapes = [];
   for (const ids of [[], ['a'], ['a', 'b'], ['a', 'b', 'c']]) {
-    view.multiSelected = new Set(ids);
+    setSelection(view, false, ids);
     const bar = view.renderSelectionBar(fakeEl());
     assert.equal(bar.children[0].tag, 'span');
     shapes.push(bar.children.slice(1).map(c => c.text).join('|'));

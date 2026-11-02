@@ -5,6 +5,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
+// Sets the selection through the module bridge: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.multiSelected]) => view.runSelection(s => {
+  const keep = s.state.selected;
+  if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
+  s.setSelected(keep);
+  return s.replaceMulti(ids);
+}, () => {});
 const { element, tick } = dom;
 // A card-sized DOM stand-in (one handler per event name, like the view's own selection tests).
 const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, focused: 0, isConnected: true,
@@ -56,7 +63,7 @@ async function harness({ language = 'en' } = {}) {
   let renders = 0;
   view.hydrate = reload;
   view.render = () => { renders++; build(); };
-  const build = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
+  const build = () => { view.cardEls.clear(); stage.children = []; view.runSelection(s => s.resetTabStop(view.map.nodes.map(n => ({ id: n.id, parentId: n.parentId ?? null }))), () => {}); for (const n of view.map.nodes) view.renderNode(n); };
   await reload(); build();
   const added = [];
   view.addNode = async (parent, title) => { added.push(parent ? parent.id : null); };
@@ -180,8 +187,8 @@ test('A4: F2 on the view scope renames the focused card and passes through when 
   assert.equal(fire(), true, 'focus elsewhere: left to Obsidian'); assert.deepEqual(modalNames(h), []);
   doc.activeElement = h.card('leaf');
   assert.equal(fire(), false, 'a focused card: handled'); assert.deepEqual(modalNames(h), ['NameModal']);
-  h.view.integrationMode = true; assert.equal(fire(), true, 'selection mode: passes through'); assert.equal(h.modals.length, 1);
-  h.view.integrationMode = false; h.view.closed = true; assert.equal(fire(), true, 'closed view: passes through');
+  setSelection(h.view, true); assert.equal(fire(), true, 'selection mode: passes through'); assert.equal(h.modals.length, 1);
+  setSelection(h.view, false); h.view.closed = true; assert.equal(fire(), true, 'closed view: passes through');
   h.view.closed = false;
   const card = h.card('leaf'); card.handlers.get('keydown')({ key: 'F2', target: card, defaultPrevented: true, preventDefault() {} });
   assert.equal(h.modals.length, 1, 'the card handler does not open a second dialog when the scope already handled F2');
@@ -191,7 +198,7 @@ test('A4: an AIM map and selection mode ignore the new keys and the title double
   for (const mode of ['aim', 'select']) {
     const h = await harness();
     if (mode === 'aim') h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
-    if (mode === 'select') h.view.integrationMode = true;
+    if (mode === 'select') setSelection(h.view, true);
     h.build();
     for (const [key, init] of [['Delete', {}], ['Backspace', {}], ['Enter', { ctrlKey: true }], ['Enter', { shiftKey: true }]]) {
       const event = send(h, 'leaf', key, init);

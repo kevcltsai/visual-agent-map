@@ -2600,8 +2600,9 @@ integrationTest('hypothesis-evidence: a selected line is is-selected and both en
 });
 integrationTest('hypothesis-evidence: the Escape key handler and the blank-canvas release clear the line selection (source wiring)', () => {
   const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(src, /if \(event\.key === "Escape"\) \{[\s\S]{0,260}this\.selectedRelation = null;/, 'Escape');
-  assert.match(src, /if \(!moved && event\.button === 0 && this\.selectedRelation\) \{\s*this\.selectedRelation = null;/, 'blank canvas release');
+  // The module's escape and clickEmpty end the line selection (tests/steps-topic-selection.cjs); the view must call them.
+  assert.match(src, /if \(event\.key === "Escape"\) \{[\s\S]{0,260}selection\.escape\(\)/, 'Escape');
+  assert.match(src, /if \(!moved && event\.button === 0\) \{[\s\S]{0,400}selection\.clickEmpty\(\)/, 'blank canvas release');
 });
 integrationTest('hypothesis-evidence: a panel row is focusable, named by direction, relation and other topic, and focus selects its line while hover previews it', () => {
   const { view, ev, pre } = heLines();

@@ -3,6 +3,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
+// Sets the selection through the module bridge: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.multiSelected]) => view.runSelection(s => {
+  const keep = s.state.selected;
+  if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
+  s.setSelected(keep);
+  return s.replaceMulti(ids);
+}, () => {});
 
 // root(0,0) -> a(400,0) -> c(800,0); root -> b(400,200); root -> d(400,400). Every card is 280 x 100, zoom 1.
 // The fake card rect equals its position, so a pointer's client position is also its map position.
@@ -147,14 +154,14 @@ test('the highlight moves with the pointer and a drag onto the chat is still a r
 
 test('a single-card drag keeps the picked cards picked', () => {
   const h = harness();
-  h.view.multiSelected = new Set(['a']);
+  setSelection(h.view, h.view.integrationMode, ['a']);
   h.drag('d', 450, 250); h.drop('d', 450, 250);
   assert.deepEqual([...h.view.multiSelected], ['a']);
 });
 
 test('group drag: dropping the picked branches on a card outside them moves them under it in one change', async () => {
   const h = harness();
-  h.view.integrationMode = true; h.view.multiSelected = new Set(['a', 'c', 'b']);
+  setSelection(h.view, true, ['a', 'c', 'b']);
   h.drag('a', 450, 450); assert.deepEqual(h.lit(), ['d']);
   h.drop('a', 450, 450);
   await new Promise(resolve => setImmediate(resolve));
@@ -167,7 +174,7 @@ test('group drag: dropping the picked branches on a card outside them moves them
 test('group drag: a picked card or a descendant of one is refused with a Notice, nothing is written', () => {
   for (const [x, y] of [[450, 250], [850, 50]]) {
     const h = harness();
-    h.view.integrationMode = true; h.view.multiSelected = new Set(['a', 'b']);
+    setSelection(h.view, true, ['a', 'b']);
     h.drag('a', x, y); assert.deepEqual(h.lit(), [], `${x},${y}`);
     h.drop('a', x, y);
     assert.equal(h.changes.length, 0); assert.deepEqual(h.notes, [CIRCULAR]);
@@ -177,13 +184,13 @@ test('group drag: a picked card or a descendant of one is refused with a Notice,
 
 test('group drag: empty space still moves the whole group, and a timeline group may still drop on a card', () => {
   const h = harness();
-  h.view.integrationMode = true; h.view.multiSelected = new Set(['a', 'b']);
+  setSelection(h.view, true, ['a', 'b']);
   h.drag('a', 1500, 900); h.drop('a', 1500, 900);
   assert.equal(h.changes.length, 1); const after = h.saved();
   assert.equal(after.a.parentId, 'root'); assert.equal(after.a.x, 400 + 1500 - 410);
   const t = harness();
   t.doc.layout = { direction: 'timeline' };
-  t.view.integrationMode = true; t.view.multiSelected = new Set(['a']);
+  setSelection(t.view, true, ['a']);
   t.drag('a', 450, 450); t.drop('a', 450, 450);
   assert.equal(t.saved().a.parentId, 'd'); assert.deepEqual(t.notes, []);
 });

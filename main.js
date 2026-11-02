@@ -71659,7 +71659,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       void this.finishStartup();
     });
     this.app.workspace.onLayoutReady(() => {
-      void this.migrateNoteStyles();
+      void this.migrateNoteStyles().then(() => this.refreshNoteStyles());
     });
     this.registerVaultEvents();
   }
@@ -71703,6 +71703,17 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         t("log.initialization_incomplete_0", error instanceof Error ? error.message : String(error))
       );
       console.warn("Visual Agent Map initialization", error);
+    }
+  }
+  /** Reads the style files into the store once at start (read only), so a `file:` style resolves on its first use. */
+  async refreshNoteStyles() {
+    try {
+      await this.noteStyles.refresh();
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note styles were not read at start: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   /**

@@ -16,7 +16,7 @@ async function onloadWrites(saved, options = {}) {
   const listeners = [];
   const vault = {
     adapter: { exists: async () => false, list: async () => ({ files: [], folders: [] }), read: async () => '', write: record('adapter.write'), mkdir: record('adapter.mkdir') },
-    getAbstractFileByPath: () => null, getMarkdownFiles: () => [], getFiles: () => [], getAllLoadedFiles: () => [], getRoot: () => ({ children: [] }),
+    getAbstractFileByPath: path => options.tree?.get(path) ?? null, read: async file => options.contents?.[file.path] ?? '', getMarkdownFiles: () => [], getFiles: () => [], getAllLoadedFiles: () => [], getRoot: () => ({ children: [] }),
     on: (name, handler) => { listeners.push(name); return { name, handler }; },
     create: record('create'), createFolder: record('createFolder'), modify: record('modify'), process: record('process'), rename: record('rename'), trash: record('trash'), delete: record('delete')
   };
@@ -174,4 +174,21 @@ test('counter 4b (main): when only the maps record cannot be saved (the marker e
   await second.migrate();
   assert.equal(notices.length, 1);
   assert.match(notices[0], /Taiwan trip/);
+});
+
+// T7 finding (decision #38): nothing refreshed the style cache at start, so a `file:` style was missing on its first use.
+test('onload refreshes the style cache once the conversion is done: a file: style in the folder resolves at once, and the refresh writes nothing', async () => {
+  const { TFile, TFolder } = S.obsidian;
+  const tree = new Map();
+  const folder = path => { const item = new TFolder(path); tree.set(path, item); return item; };
+  const styles = folder('WS/Styles/Styles');
+  const file = new TFile('WS/Styles/Styles/Mix.md');
+  styles.children.push(file);
+  tree.set(file.path, file);
+  const contents = { [file.path]: '---\nstructure: Standard six\n---\n' };
+  const { plugin, writes } = await onloadWrites({ ...BASE, noteStyleRecipe: { migrated: 1, mapsNotified: true }, noteStyleByKind: { topic: 'file:Mix' } }, { tree, contents });
+  const got = plugin.noteStyles.runStyle({ outputLanguage: 'en' });
+  assert.equal(got.label.styleName, 'Mix');
+  assert.equal(got.issues.missing.length, 0);
+  assert.deepEqual(writes.filter(([name]) => ['create', 'createFolder', 'trash', 'trashFile'].includes(name)), []);
 });

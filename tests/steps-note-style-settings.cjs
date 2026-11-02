@@ -20,7 +20,7 @@ class FakeMenu {
 }
 const notices = [];
 const obsidian = { ...S.obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: FakeModal, Menu: FakeMenu, Notice: dom.makeNotice(notices) };
-const { renderNoteStyleSetting, renderNoteBlockSetting, renderNoteLocationSetting } = S.load('ui/settings-tab.ts', { obsidian });
+const { renderNoteStyleSetting, renderNoteBlockSetting, renderNoteLocationSetting, renderNoteKindSetting, renderNoteKindHeading } = S.load('ui/settings-tab.ts', { obsidian });
 const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
 const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
 const { parseNoteStyleFile } = loadSource('export { parseNoteStyleFile } from "./ai/note-style-file";');
@@ -552,4 +552,156 @@ test('Low 4: after Edit or Save as makes a file, the File location description i
   await flush();
   assert.equal(changed, 1);
   assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here as plain Markdown files.');
+});
+
+// P3: the "By topic type" block (heading plus six pickers).
+const KIND_TEMPLATES = () => [
+  item('builtin:standard', 'Standard'), item('builtin:textbook', 'Textbook'), item('builtin:hypothesis', 'Hypothesis structure'),
+  item('builtin:evidence', 'Evidence structure'), item('builtin:action', 'Action structure'), item('builtin:atomic', 'Atomic note structure')
+];
+function kindRow(kind, { settings = {}, templates = KIND_TEMPLATES() } = {}) {
+  const { setting, view } = fakeSetting();
+  const saves = [];
+  const settingsObject = { language: 'en', ...settings };
+  const plugin = {
+    settings: settingsObject, saveSettings: async () => { saves.push(JSON.stringify(settingsObject.noteTemplateByKind ?? null)); },
+    noteStyles: { refresh: async () => {}, listBlocks: () => templates }
+  };
+  renderNoteKindSetting(setting, plugin, kind);
+  return { view, setting, settings: settingsObject, saves };
+}
+const KIND_ORDER = ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action'];
+
+test('By topic type: a sub-heading with its help line, then six pickers named after the types, each defaulting to "Not set" and having no buttons', async () => {
+  const { setting, view } = fakeSetting();
+  renderNoteKindHeading(setting);
+  assert.equal(view.heading, true);
+  assert.equal(view.name, 'By topic type');
+  assert.match(view.desc, /still wins/);
+  for (const kind of KIND_ORDER) {
+    const row = kindRow(kind);
+    await flush();
+    assert.equal(row.view.name, t(`ui.topic_kind_${kind}`));
+    assert.equal(row.view.dropdown.selectEl.value, '');
+    assert.deepEqual(optionsOf(row.view)[0], ['', 'Not set (use the map or default structure)']);
+    assert.equal(row.view.buttons.length + row.view.extras.length, 0, 'only a picker');
+    assert.deepEqual(lines(row.view), []);
+  }
+  const source = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
+  const order = source.match(/const KIND_ROWS[^=]*= (\[[^\]]*\])/)[1];
+  assert.deepEqual(JSON.parse(order.replace(/\s/g, '')), KIND_ORDER);
+});
+
+test('By topic type: the Suggested group exists only for atomic, hypothesis, evidence and action, holds its own built-in, and the Built-in group drops it', async () => {
+  for (const kind of KIND_ORDER) {
+    const row = kindRow(kind, { templates: [...KIND_TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
+    await flush();
+    const groups = groupsOf(row.view);
+    const suggested = groups.find(group => group.label === 'Suggested');
+    if (['atomic', 'hypothesis', 'evidence', 'action'].includes(kind)) {
+      const name = { atomic: 'Atomic note structure', hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure' }[kind];
+      assert.deepEqual(suggested.options, [name], kind);
+      assert.equal(groups.find(group => group.label === 'Built-in').options.includes(name), false, kind);
+      assert.equal(groups[0].label, 'Suggested');
+    } else {
+      assert.equal(suggested, undefined, kind);
+      assert.equal(groups.find(group => group.label === 'Built-in').options.length, 6, kind);
+    }
+    assert.deepEqual(groups.at(-1), { label: 'Mine', options: ['Mine'] });
+  }
+});
+
+test('By topic type: choosing writes the ref; "Not set" deletes the kind and, when empty, the whole key', async () => {
+  const a = kindRow('hypothesis');
+  await flush();
+  await a.view.dropdown.change('builtin:hypothesis');
+  assert.deepEqual({ ...a.settings.noteTemplateByKind }, { hypothesis: 'builtin:hypothesis' });
+  const b = kindRow('evidence', { settings: { noteTemplateByKind: { hypothesis: 'builtin:hypothesis', evidence: 'builtin:evidence' } } });
+  await flush();
+  assert.equal(b.view.dropdown.selectEl.value, 'builtin:evidence');
+  await b.view.dropdown.change('');
+  assert.deepEqual({ ...b.settings.noteTemplateByKind }, { hypothesis: 'builtin:hypothesis' });
+  assert.equal(b.view.dropdown.selectEl.value, '');
+  const c = kindRow('hypothesis', { settings: { noteTemplateByKind: { hypothesis: 'builtin:hypothesis' } } });
+  await flush();
+  await c.view.dropdown.change('');
+  assert.equal('noteTemplateByKind' in c.settings, false, 'no empty object is left in data.json');
+  assert.equal(c.saves.length, 1);
+  const d = kindRow('topic');
+  await flush();
+  await d.view.dropdown.change('');
+  assert.equal('noteTemplateByKind' in d.settings, false);
+});
+
+test('By topic type: every picker is named "Note structure for <type>" (zh-TW: "<類型>的筆記結構")', async () => {
+  for (const kind of KIND_ORDER) {
+    const row = kindRow(kind);
+    assert.equal(row.view.dropdown.selectEl.attrs['aria-label'], `Note structure for ${t(`ui.topic_kind_${kind}`)}`);
+  }
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_row_aria_0', i18n.translate('zh-TW', 'ui.topic_kind_hypothesis')), '假設的筆記結構');
+  assert.equal(new Set(KIND_ORDER.map(kind => kindRow(kind).view.dropdown.selectEl.attrs['aria-label'])).size, 6);
+});
+
+test('By topic type: a structure that is gone shows "Not found: X" selected with an error line and is not rewritten; a file with a problem is marked with its first issue', async () => {
+  const gone = kindRow('hypothesis', { settings: { noteTemplateByKind: { hypothesis: 'file:Gone' } } });
+  await flush();
+  assert.equal(gone.view.dropdown.selectEl.value, 'file:Gone');
+  assert.deepEqual(optionsOf(gone.view)[1], ['file:Gone', 'Not found: Gone']);
+  assert.deepEqual(lines(gone.view), ['⚠ ' + t('ui.note_style_kind_missing_0_1', 'Hypothesis', 'Gone')]);
+  assert.deepEqual(errorLines(gone.view), lines(gone.view));
+  assert.equal(gone.settings.noteTemplateByKind.hypothesis, 'file:Gone');
+  assert.equal(gone.saves.length, 0);
+  const bad = kindRow('action', {
+    settings: { noteTemplateByKind: { action: 'file:Broken' } },
+    templates: [...KIND_TEMPLATES(), item('file:Broken', 'Broken', { fileName: 'Broken.md', issues: [{ line: 3, code: 'format_heading_repeated', values: [], message: 'x' }] })]
+  });
+  await flush();
+  assert.equal(bad.view.dropdown.selectEl.value, 'file:Broken');
+  assert.deepEqual(optionsOf(bad.view).find(option => option[0] === 'file:Broken'), ['file:Broken', 'Broken (has a problem)']);
+  assert.equal(lines(bad.view).length, 1);
+  assert.match(lines(bad.view)[0], /^⚠ Line 3:/);
+  assert.deepEqual(errorLines(bad.view), lines(bad.view));
+});
+
+test('By topic type: a user file named Evidence, saved as file:Evidence, is a listed file option and the row does not say it is missing', async () => {
+  const row = kindRow('evidence', {
+    settings: { noteTemplateByKind: { evidence: 'file:Evidence' } },
+    templates: [...KIND_TEMPLATES(), item('file:Evidence', 'Evidence', { fileName: 'Evidence.md' })]
+  });
+  await flush();
+  assert.equal(row.view.dropdown.selectEl.value, 'file:Evidence');
+  assert.equal(optionsOf(row.view).some(option => /Not found/.test(option[1])), false);
+  assert.deepEqual(lines(row.view), []);
+  assert.deepEqual(groupsOf(row.view).at(-1), { label: 'Mine', options: ['Evidence'] });
+});
+
+test('By topic type: the problem line names the actual stand-in (a broken own file: Standard; a broken built-in override: that built-in) in every language', async () => {
+  const issue = [{ line: 3, code: 'format_heading_repeated', values: [], message: 'x' }];
+  const own = kindRow('action', {
+    settings: { noteTemplateByKind: { action: 'file:Broken' } },
+    templates: [...KIND_TEMPLATES(), item('file:Broken', 'Broken', { fileName: 'Broken.md', issues: issue })]
+  });
+  await flush();
+  assert.match(lines(own.view)[0], /^⚠ Line 3: .* Until it is fixed, topics of this type use the built-in "Standard"\.$/);
+  const override = kindRow('action', {
+    settings: { noteTemplateByKind: { action: 'builtin:action' } },
+    templates: KIND_TEMPLATES().map(entry => (entry.ref === 'builtin:action' ? { ...entry, modified: true, issues: issue } : entry))
+  });
+  await flush();
+  assert.match(lines(override.view)[0], /use the built-in "Action structure"\.$/);
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_kind_issue_0_1_2', 3, 'X。', '標準'), '⚠ 第 3 行：X。修好之前，這個類型的議題會先用內建的「標準」。');
+  assert.equal(i18n.translate('zh-CN', 'ui.note_style_kind_issue_0_1_2', 3, 'X。', '标准'), '⚠ 第 3 行：X。修好之前，这个类型的议题会先用内置的“标准”。');
+  const gone = kindRow('hypothesis', { settings: { noteTemplateByKind: { hypothesis: 'file:Gone' } } });
+  await flush();
+  assert.ok(lines(gone.view)[0].startsWith('⚠ '));
+});
+
+test('the upper Structure row explains the four new built-ins (every language, en within 80 characters)', async () => {
+  for (const id of ['hypothesis', 'evidence', 'action', 'atomic']) {
+    const state = blockRow('template', { settings: { noteTemplateBlock: `builtin:${id}` }, templates: [...TEMPLATES(), item(`builtin:${id}`, id)] });
+    await flush();
+    assert.deepEqual(lines(state.view), [t(`ui.note_style_${id}_hint`)]);
+    assert.ok(t(`ui.note_style_${id}_hint`).length <= 80, id);
+    for (const lang of ['zh-TW', 'zh-CN']) assert.notEqual(i18n.translate(lang, `ui.note_style_${id}_hint`), i18n.translate('en', `ui.note_style_${id}_hint`));
+  }
 });

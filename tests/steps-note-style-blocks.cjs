@@ -301,7 +301,7 @@ test('counter 9: copy gives a unique name ("x (my version)", "x (my version) (2)
     const items = store.listBlocks('template');
     assert.ok(items.some(item => item.ref === first && item.kind === 'file'));
     assert.ok(items.some(item => item.ref === second && item.kind === 'file'));
-    assert.deepEqual(plain(items.filter(item => item.kind === 'builtin').map(item => item.ref)), ['builtin:standard', 'builtin:textbook']);
+    assert.deepEqual(plain(items.filter(item => item.kind === 'builtin').map(item => item.ref)), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic']);
   }
   // a user's file of that name, created after the last refresh, is not touched
   const { store, v } = makeStore({});

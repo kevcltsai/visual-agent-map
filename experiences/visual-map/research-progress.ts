@@ -16,7 +16,7 @@ export interface ResearchProgress {
   preview?: ResearchPreview;
   /** The model that runs this task; shown after the stage name. */
   model?: string;
-  /** The note style file this run follows (with ".md"); shown after the model. Absent for built-in and old styles. */
+  /** The note style line ("Note style: … · …"); shown after the model. Absent unless a style file or a topic-type structure applies. */
   style?: string;
 }
 export interface ResearchProgressClock {

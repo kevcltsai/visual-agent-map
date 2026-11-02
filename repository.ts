@@ -133,6 +133,8 @@ export interface Settings {
   noteTemplateBlock?: string;
   /** Workspace default tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the tone of the old default. */
   noteToneBlock?: string;
+  /** The template block each topic type uses (`builtin:<id>` or `file:<name>`); a type with no entry follows the map and the workspace. */
+  noteTemplateByKind?: Partial<Record<TopicKind, string>>;
   /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */

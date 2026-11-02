@@ -17,6 +17,7 @@ import {
 } from "../core/blocks/block-files";
 import type { BlockCategory } from "../core/blocks/builtin";
 import { styleIssueText } from "../experiences/visual-map/note-style-picker";
+import type { TopicKind } from "../note-values";
 
 /**
  * "Note style" heading: the title, the one-line help and the "Preview AI instructions" button on its right. The rows
@@ -162,7 +163,14 @@ function writeShown(plugin: VisualAgentMapPlugin, changed?: { category: BlockCat
 
 /** The effect line of a built-in block (what it does to the notes), by category and id. */
 const BLOCK_HINTS: Record<BlockCategory, Record<string, TranslationKey>> = {
-  template: { standard: "ui.note_style_standard_hint", textbook: "ui.note_style_textbook_hint" },
+  template: {
+    standard: "ui.note_style_standard_hint",
+    textbook: "ui.note_style_textbook_hint",
+    hypothesis: "ui.note_style_hypothesis_hint",
+    evidence: "ui.note_style_evidence_hint",
+    action: "ui.note_style_action_hint",
+    atomic: "ui.note_style_atomic_hint"
+  },
   tone: {
     academic: "ui.tone_hint_academic",
     plain: "ui.tone_hint_plain",
@@ -395,6 +403,112 @@ export function renderNoteBlockSetting(
     const moreLabel = t(isTemplate ? "ui.block_more_template" : "ui.block_more_tone");
     button.setIcon("more-horizontal").setTooltip(moreLabel).onClick(showMenu);
     button.extraSettingsEl.setAttr("aria-label", moreLabel);
+  });
+  render();
+  void store.refresh().then(
+    () => {
+      loaded = true;
+      render();
+    },
+    () => undefined
+  );
+}
+
+/** The "By topic type" sub-heading and its one-line help. */
+export function renderNoteKindHeading(setting: Setting): void {
+  setting.setName(t("ui.note_style_by_kind")).setDesc(t("ui.note_style_by_kind_desc")).setHeading();
+}
+
+/** The rows, in the order the page shows them. */
+const KIND_ROWS: readonly TopicKind[] = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
+
+/** Topic types that have a built-in structure of their own, offered first in that type's picker. */
+const KIND_SUGGESTED: ReadonlySet<TopicKind> = new Set<TopicKind>(["atomic", "hypothesis", "evidence", "action"]);
+
+/**
+ * One "By topic type" row: a single picker (no Edit, no more-actions menu) for the structure topics of `kind` use when
+ * neither the run nor the topic picked one. "Not set" removes the kind from `noteTemplateByKind` (and the whole key when
+ * it is empty). A saved structure that is gone shows "Not found: X" selected; one with a problem is marked, with its
+ * first problem on the description line. The saved value is never rewritten except by the user's pick.
+ */
+export function renderNoteKindSetting(setting: Setting, plugin: VisualAgentMapPlugin, kind: TopicKind): void {
+  const { noteStyles: store, settings } = plugin;
+  const kindName = t(`ui.topic_kind_${kind}`);
+  setting.setName(kindName);
+  setting.descEl.setAttr("aria-live", "polite");
+  setting.settingEl.addClass("vam-block-row");
+  let loaded = false;
+  let picker: DropdownComponent | undefined;
+  let shownDesc: string | undefined;
+  const writeDesc = (line: { text: string; error?: boolean } | undefined): void => {
+    const key = line ? `${line.error ? "!" : ""}${line.text}` : "";
+    if (key === shownDesc) return;
+    shownDesc = key;
+    setting.descEl.empty();
+    if (line) setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : undefined });
+  };
+  const render = (): void => {
+    if (!picker) return;
+    const items = store.listBlocks("template");
+    const saved = settings.noteTemplateByKind?.[kind];
+    const missing = loaded && saved && !items.some(item => item.ref === saved) ? saved : undefined;
+    picker.selectEl.replaceChildren();
+    picker.addOption("", t("ui.note_style_kind_none"));
+    const optionText = (item: BlockListItem): string =>
+      item.issues.length
+        ? t("ui.note_style_unusable_option_0", item.name)
+        : item.modified
+          ? t("ui.block_modified_0", item.name)
+          : item.name;
+    const addGroup = (title: string, group: BlockListItem[]): void => {
+      if (!group.length) return;
+      const groupEl = picker!.selectEl.createEl("optgroup", { attr: { label: title } });
+      for (const item of group) groupEl.createEl("option", { value: item.ref, text: optionText(item) });
+    };
+    if (missing) {
+      const parsed = parseBlockRef(missing);
+      const name = parsed?.kind === "file" ? parsed.base : parsed?.kind === "builtin" ? parsed.id : missing;
+      picker.addOption(missing, t("ui.block_missing_option_0", name));
+    }
+    const suggestedRef = KIND_SUGGESTED.has(kind) ? builtinRef(kind) : undefined;
+    const builtins = items.filter(item => item.kind === "builtin");
+    addGroup(
+      t("ui.suggested"),
+      builtins.filter(item => item.ref === suggestedRef)
+    );
+    addGroup(
+      t("ui.block_group_builtin"),
+      builtins.filter(item => item.ref !== suggestedRef)
+    );
+    addGroup(
+      t("ui.note_style_group_folder"),
+      items.filter(item => item.kind === "file")
+    );
+    picker.setValue(saved && (missing || items.some(item => item.ref === saved)) ? saved : "");
+    const current = saved ? items.find(item => item.ref === saved) : undefined;
+    const issue = current?.issues[0];
+    if (missing) {
+      const parsed = parseBlockRef(missing);
+      const name = parsed?.kind === "file" ? parsed.base : parsed?.kind === "builtin" ? parsed.id : missing;
+      writeDesc({ text: `⚠ ${t("ui.note_style_kind_missing_0_1", kindName, name)}`, error: true });
+    } else if (issue) {
+      const stand = current?.kind === "file" ? t("ui.note_style_standard_short") : (current?.name ?? "");
+      writeDesc({ text: t("ui.note_style_kind_issue_0_1_2", issue.line, styleIssueText(issue), stand), error: true });
+    } else writeDesc(undefined);
+  };
+  setting.addDropdown(dropdown => {
+    picker = dropdown;
+    dropdown.selectEl.setAttr("aria-label", t("ui.note_style_kind_row_aria_0", kindName));
+    dropdown.onChange(async value => {
+      if (value === "") {
+        if (settings.noteTemplateByKind) {
+          delete settings.noteTemplateByKind[kind];
+          if (!Object.keys(settings.noteTemplateByKind).length) delete settings.noteTemplateByKind;
+        }
+      } else settings.noteTemplateByKind = { ...settings.noteTemplateByKind, [kind]: value };
+      await plugin.saveSettings();
+      render();
+    });
   });
   render();
   void store.refresh().then(
@@ -755,6 +869,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
         name: t("ui.block_picker_tone"),
         render: setting => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.noteLocationChanged?.())
       },
+      { name: t("ui.note_style_by_kind"), render: setting => renderNoteKindHeading(setting) },
+      ...KIND_ROWS.map(kind => ({
+        name: t(`ui.topic_kind_${kind}`),
+        render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
+      })),
       {
         name: t("ui.note_style_folder_path"),
         render: setting => {

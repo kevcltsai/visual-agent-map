@@ -16,6 +16,18 @@ import StandardEn from "./template/standard.en.md";
 import TextbookZhTW from "./template/textbook.zh-TW.md";
 import TextbookZhCN from "./template/textbook.zh-CN.md";
 import TextbookEn from "./template/textbook.en.md";
+import HypothesisZhTW from "./template/hypothesis.zh-TW.md";
+import HypothesisZhCN from "./template/hypothesis.zh-CN.md";
+import HypothesisEn from "./template/hypothesis.en.md";
+import EvidenceZhTW from "./template/evidence.zh-TW.md";
+import EvidenceZhCN from "./template/evidence.zh-CN.md";
+import EvidenceEn from "./template/evidence.en.md";
+import ActionZhTW from "./template/action.zh-TW.md";
+import ActionZhCN from "./template/action.zh-CN.md";
+import ActionEn from "./template/action.en.md";
+import AtomicZhTW from "./template/atomic.zh-TW.md";
+import AtomicZhCN from "./template/atomic.zh-CN.md";
+import AtomicEn from "./template/atomic.en.md";
 
 /**
  * Built-in note-style blocks: one registry of the text a block contributes to the task prompt, per category. Bodies
@@ -88,6 +100,10 @@ export function builtinTemplateText(id: string, language: ContentLanguage): stri
 export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   template("standard", "ui.note_style_standard_short", [StandardZhTW, StandardZhCN, StandardEn]),
   template("textbook", "ui.note_style_textbook_short", [TextbookZhTW, TextbookZhCN, TextbookEn]),
+  template("hypothesis", "ui.note_style_hypothesis_short", [HypothesisZhTW, HypothesisZhCN, HypothesisEn]),
+  template("evidence", "ui.note_style_evidence_short", [EvidenceZhTW, EvidenceZhCN, EvidenceEn]),
+  template("action", "ui.note_style_action_short", [ActionZhTW, ActionZhCN, ActionEn]),
+  template("atomic", "ui.note_style_atomic_short", [AtomicZhTW, AtomicZhCN, AtomicEn]),
   tone("academic", "ui.preset_name_academic"),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine"),

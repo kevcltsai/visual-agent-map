@@ -300,14 +300,14 @@ integrationTest('Visual Map close fences late Planner rendering and reopen start
     syncOutline() {}, releaseOutline() {} };
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app: {} }, plugin);
   view.contentEl = { addClass() {}, tabIndex: 0 }; view.registerDomEvent = () => {};
-  view.path = created.mapPath; view.map = created.map; view.notes.set(created.root.id, await repo.readNote(created.root.path)); view.selected = created.root.id; view.render = () => { renders++; };
+  view.path = created.mapPath; view.map = created.map; view.notes.set(created.root.id, await repo.readNote(created.root.path)); view.selection.setSelected(created.root.id); view.render = () => { renders++; };
   await view.onOpen(); const work = view.planAimFromSelection();
   while (!resolvePlanner) await new Promise(resolve => setTimeout(resolve, 0));
   await view.onClose(); const rendersAtClose = renders;
   resolvePlanner(); await work;
   assert.equal(renders, rendersAtClose, 'late Planner completion cannot render after close');
   assert.equal((await repo.readMap(created.mapPath)).nodes.some(node => node.aimKind === 'question'), false);
-  await view.onOpen(); view.selected = created.root.id;
+  await view.onOpen(); view.selection.setSelected(created.root.id);
   await view.planAimFromSelection();
   assert.equal(call, 2); assert.equal((await repo.readMap(created.mapPath)).nodes.some(node => node.aimKind === 'question'), true);
 });
@@ -324,7 +324,7 @@ integrationTest('Visual Map close during Planner question save lets the started 
   const plugin = { repo, settings: { language: 'zh-TW', cliModel: 'gpt-6-luna' }, mutate: async work => work(), syncOutline() {}, releaseOutline() {},
     askModel: async () => ({ summary: '偏好熟度？', detail: '請使用者選擇。', suggestions: [{ title: '偏紅', task: '', contribution: '', parentTitle: '' }, { title: '較熟', task: '', contribution: '', parentTitle: '' }], visualReferences: [] }) };
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const view = new VisualAgentMapView({ app: {} }, plugin);
-  view.path = created.mapPath; view.map = created.map; view.notes.set(created.root.id, await repo.readNote(created.root.path)); view.selected = created.root.id;
+  view.path = created.mapPath; view.map = created.map; view.notes.set(created.root.id, await repo.readNote(created.root.path)); view.selection.setSelected(created.root.id);
   let renders = 0; view.render = () => { renders++; };
   const work = view.planAimFromSelection(); await noteStarted; await view.onClose(); const rendersAtClose = renders;
   releaseNote(); await work; await mapCommitted;
@@ -417,7 +417,7 @@ integrationTest('Visual Map protects the AIM root and allows recoverable questio
   await flow.answerAndResearch(created.mapPath, question.node.id, { requestId: 'protect-a', selections: [question.options[0].id], freeText: '' }, 'gpt-6-luna', 'low');
   const map = await repo.readMap(created.mapPath), original = plain(map);
   const { VisualAgentMapView } = load('main.ts', { obsidian }); const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
-  const view = new VisualAgentMapView({ app }, plugin); view.path = created.mapPath; view.map = map; view.render = () => {}; view.hydrate = async () => {}; view.multiSelected = new Set([created.root.id]);
+  const view = new VisualAgentMapView({ app }, plugin); view.path = created.mapPath; view.map = map; view.render = () => {}; view.hydrate = async () => {}; view.selection.replaceMulti([created.root.id]);
   await assert.rejects(view.removeSelected(), /referenced by saved branches/);
   assert.deepEqual(plain(await repo.readMap(created.mapPath)), original);
   assert.equal((await repo.collectionFiles(created.mapPath, 'Unassigned')).length, 0);

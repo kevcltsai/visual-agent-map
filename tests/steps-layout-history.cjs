@@ -134,7 +134,7 @@ test('FG20-06: Move to... lays the moved branches out clear of the target\'s chi
     ['Src', 'Root', 420, 700], ['Leaf1', 'Src', 760, 700], ['Leaf2', 'Src', 760, 924], ['Solo', 'Root', 420, 1200]];
   const h = await harness(spec, { Kid1: 200, Kid2: 200, Leaf1: 300, Leaf2: 300, Solo: 250 });
   const before = h.positions();
-  h.view.multiSelected = new Set([h.node('Src').id, h.node('Solo').id]);
+  h.view.selection.replaceMulti([h.node('Src').id, h.node('Solo').id]);
   h.view.mergeUnlocked = () => true;
   await h.view.moveBranches(h.view.selectedRoots(), h.node('Target'));
   assert.equal(h.node('Src').parentId, h.node('Target').id);
@@ -142,7 +142,7 @@ test('FG20-06: Move to... lays the moved branches out clear of the target\'s chi
   assert.deepEqual(h.overlaps(), []);
   assert.ok(h.node('Leaf1').x > h.node('Target').x, 'descendants moved with their root');
   assert.equal(h.node('Kid1').y, 80, 'existing children stay put'); assert.equal(h.node('Kid2').y, 304);
-  assert.equal(h.view.multiSelected.size, 0);
+  assert.equal(h.view.selection.state.multiSelected.size, 0);
   await h.view.travel(false);
   assert.equal(h.positions(), before, 'one undo restores parents and positions');
   assert.equal(h.view.history.canUndo, false, 'one history entry');
@@ -152,7 +152,7 @@ test('FG20-06: Copy to... lays the copies out clear of the target\'s children; o
   const spec = [['Root', null, 80, 80], ['Target', 'Root', 420, 80], ['Kid1', 'Target', 760, 80], ['Kid2', 'Target', 760, 304],
     ['Src', 'Root', 420, 700], ['Leaf', 'Src', 760, 700]];
   const h = await harness(spec, { Kid1: 200, Kid2: 200, Leaf: 300, Src: 200 });
-  h.view.multiSelected = new Set([h.node('Src').id]);
+  h.view.selection.replaceMulti([h.node('Src').id]);
   h.view.mergeUnlocked = () => true;
   const count = h.view.map.nodes.length;
   await h.view.copySelected(h.node('Target'));

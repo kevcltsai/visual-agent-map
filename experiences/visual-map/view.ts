@@ -1573,6 +1573,11 @@ export class VisualAgentMapView extends ItemView {
     (back ?? this.contentEl).focus({ preventScroll: true });
   }
   /** The topics a presentation visits: the reading order of what is drawn (folded branches are one stop, not their descendants). */
+  /** The selection a presentation session keeps (the presentation state stores a plain array). */
+  private stashSelection(): { selected: string | null; multiSelected: string[] } {
+    const stash = this.selection.stash();
+    return { selected: stash.selected, multiSelected: [...stash.multiSelected] };
+  }
   private presentationOrder(): string[] {
     if (!this.map) return [];
     const shown = new Set(this.canvasNodes().map(node => node.id));
@@ -1613,8 +1618,7 @@ export class VisualAgentMapView extends ItemView {
       order,
       currentId: first,
       viewport: { ...this.map.viewport },
-      selected: this.selected,
-      multiSelected: [...this.multiSelected],
+      ...this.stashSelection(),
       returnNodeId: card ? card[0] : null,
       returnEl: card ? null : active
     };
@@ -1747,11 +1751,11 @@ export class VisualAgentMapView extends ItemView {
     for (const card of this.cardEls.values()) card.toggleClass("is-presenting", false);
     if (!restore || this.closed || !this.map) return;
     const ids = new Set(this.map.nodes.map(node => node.id));
-    const previous = this.selected,
-      touched = [...this.multiSelected];
-    this.selected = session.selected !== null && ids.has(session.selected) ? session.selected : null;
-    this.multiSelected = new Set(session.multiSelected.filter(id => ids.has(id)));
-    this.commitSelection(previous, this.selected, [...touched, ...this.multiSelected]);
+    const previous = this.selection.state.selected,
+      touched = [...this.selection.state.multiSelected];
+    this.selection.restore(session, ids);
+    const restored = this.selection.state;
+    this.commitSelection(previous, restored.selected, [...touched, ...restored.multiSelected]);
     if (!this.map) return;
     this.map.viewport = { ...session.viewport };
     this.transform();
@@ -2054,9 +2058,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.dropMapBackground();
     this.path = path;
     this.map = map;
-    this.integrationMode = false;
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.exitMultiSelect("openMap");
     this.history.clear();
     this.restoreCrossProxies();
     await this.hydrate(isCurrent);
@@ -2113,7 +2115,7 @@ export class VisualAgentMapView extends ItemView {
           if (!isCurrent()) return;
           await this.openMapInMutation(created.mapPath);
           if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
-          this.selected = created.root.id;
+          this.selection.setSelected(created.root.id);
           this.render();
           this.focusNode(created.root);
         }),
@@ -3985,7 +3987,7 @@ export class VisualAgentMapView extends ItemView {
         }
         const placed = this.map?.nodes.find(node => node.id === top.id);
         if (placed) {
-          this.selected = placed.id;
+          this.selection.setSelected(placed.id);
           this.render();
           this.focusNode(placed);
         }
@@ -4210,7 +4212,7 @@ export class VisualAgentMapView extends ItemView {
       if (result.status === "waiting-user") {
         const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
         if (question) {
-          this.selected = question.id;
+          this.selection.setSelected(question.id);
           this.render();
           this.focusNode(question);
         }
@@ -4402,7 +4404,7 @@ export class VisualAgentMapView extends ItemView {
       );
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
       if (result.status === "question") {
-        this.selected = result.node.id;
+        this.selection.setSelected(result.node.id);
         this.render();
         this.focusNode(result.node);
         new Notice(t("ui.aim_question_ready"));
@@ -4412,7 +4414,7 @@ export class VisualAgentMapView extends ItemView {
         else if (outcome.status === "waiting-user") {
           const question = this.map?.nodes.find(item => item.id === outcome.questionNodeId);
           if (question) {
-            this.selected = question.id;
+            this.selection.setSelected(question.id);
             this.render();
             this.focusNode(question);
           }
@@ -4461,7 +4463,7 @@ export class VisualAgentMapView extends ItemView {
       if (result.status === "waiting-user") {
         const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
         if (question) {
-          this.selected = question.id;
+          this.selection.setSelected(question.id);
           this.render();
           this.focusNode(question);
         }
@@ -4512,7 +4514,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       // Select the new question so the toolbar answers it, not the previously selected one; the finally block re-renders after reloading the map.
       if (result.status === "waiting-user") {
-        this.selected = result.questionNodeId;
+        this.selection.setSelected(result.questionNodeId);
         new Notice(t("ui.aim_waiting_user"));
       } else if (result.status === "partial") new Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
@@ -4602,7 +4604,7 @@ export class VisualAgentMapView extends ItemView {
           if (result.status === "waiting-user") {
             const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
             if (question) {
-              this.selected = question.id;
+              this.selection.setSelected(question.id);
               this.render();
               this.focusNode(question);
             }
@@ -9454,7 +9456,7 @@ export class VisualAgentMapView extends ItemView {
             actions,
             t("ui.aim_answer_pending_question"),
             () => {
-              this.selected = pending.id;
+              this.selection.setSelected(pending.id);
               this.render();
               this.focusNode(pending);
               this.openAimAnswer(pending);
@@ -9574,8 +9576,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map.aim) this.renderBackgroundBars(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
     if (!this.map.nodes.length) {
-      this.integrationMode = false;
-      this.multiSelected.clear();
+      this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
     const aimMode = !!this.map.aim;
@@ -9654,8 +9655,7 @@ export class VisualAgentMapView extends ItemView {
     this.edgesEl.setAttribute("aria-hidden", "true");
     this.stageEl.appendChild(this.edgesEl);
     const shown = this.canvasNodes();
-    if (this.selected && !shown.some(node => node.id === this.selected)) this.selected = null;
-    this.multiSelected = new Set([...this.multiSelected].filter(id => shown.some(node => node.id === id)));
+    this.selection.prune(new Set(shown.map(node => node.id)));
     if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.runSelection(
       selection => selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null }))),
@@ -11377,7 +11377,7 @@ export class VisualAgentMapView extends ItemView {
               () => {
                 close?.();
                 if (sourceNode) {
-                  this.selected = sourceNode.id;
+                  this.selection.setSelected(sourceNode.id);
                   this.render();
                   this.focusNode(sourceNode);
                 } else if (file instanceof TFile) void this.plugin.openDetails(file);

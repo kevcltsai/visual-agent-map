@@ -61,7 +61,7 @@ async function harness() {
   const visible = () => view.map.nodes.filter(n => { for (let p = n.parentId; p;) { const a = view.map.nodes.find(x => x.id === p); if (!a) break; if (a.collapsed) return false; p = a.parentId; } return true; });
   const build = () => {
     view.contentEl.empty(); view.contentEl.createDiv('vam-canvas-overlay');
-    view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes);
+    view.cardEls.clear(); stage.children = []; view.selection.moveTabStop(view.defaultTabStop(view.map.nodes));
     for (const n of visible()) view.renderNode(n);
     for (const [id, card] of view.cardEls) { card.focus = () => { doc.activeElement = card; }; card.contains = other => other === card; card.nodeId = id; }
   };
@@ -114,7 +114,7 @@ test('42: pure helpers: key table, start position, no-wrap stepping and the neig
 
 test('42: starting takes the reading order without the folded descendants, begins at the selected topic and speaks it', async () => {
   const h = await harness();
-  h.view.selected = h.ids.beta;
+  h.view.selection.setSelected(h.ids.beta);
   h.view.startPresentation();
   assert.deepEqual(plain(h.view.presentation.order), [h.ids.root, h.ids.alpha, h.ids.beta, h.ids.branch], 'folded branch listed, its descendant not');
   assert.equal(h.current(), h.ids.beta);
@@ -133,13 +133,13 @@ test('42: starting takes the reading order without the folded descendants, begin
 
 test('42: without a selection it starts at the first topic; selection mode and an empty map refuse', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   assert.equal(h.current(), h.ids.root);
   h.view.exitPresentation(); assert.equal(h.view.presentation, null);
-  h.view.integrationMode = true;
+  h.view.selection.toggleMultiSelect();
   assert.equal(h.view.canPresent(), false); h.view.startPresentation();
   assert.equal(h.view.presentation, null, 'not while selecting topics');
-  h.view.integrationMode = false;
+  h.view.selection.exitMultiSelect('emptyMap');
   assert.equal(h.view.canPresent(), true);
   h.view.map.nodes = []; assert.equal(h.view.canPresent(), false); h.view.startPresentation();
   assert.equal(h.view.presentation, null, 'not on an empty map');
@@ -147,7 +147,7 @@ test('42: without a selection it starts at the first topic; selection mode and a
 
 test('42: next / previous keys move one topic, are taken from the cards and speak the position', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   for (const [key, init, expect] of [['ArrowRight', {}, 'alpha'], ['ArrowDown', {}, 'beta'], [' ', {}, 'branch'], ['ArrowLeft', {}, 'beta'], ['ArrowUp', {}, 'alpha'], [' ', { shiftKey: true }, 'root'], ['PageDown', {}, 'alpha'], ['PageUp', {}, 'root']]) {
     const e = h.press(key, init);
     assert.equal(h.current(), h.ids[expect], `${key}`);
@@ -157,12 +157,12 @@ test('42: next / previous keys move one topic, are taken from the cards and spea
   h.press('End'); assert.equal(h.current(), h.ids.branch); assert.equal(h.spoken(), 'Presentation 4/4: Branch');
   h.press('Home'); assert.equal(h.current(), h.ids.root);
   assert.deepEqual(h.spied, [], 'no card key handler ran: ArrowLeft never walked to a parent card');
-  assert.equal(h.view.selected, null, 'the selection is untouched');
+  assert.equal(h.view.selection.state.selected, null, 'the selection is untouched');
 });
 
 test('42: at either end the position stays and the end is spoken; nothing wraps', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   h.press('ArrowLeft'); assert.equal(h.current(), h.ids.root); assert.equal(h.spoken(), 'Already the first topic');
   h.press('End'); h.press(' '); assert.equal(h.current(), h.ids.branch); assert.equal(h.spoken(), 'Already the last topic');
   h.press('ArrowRight'); assert.equal(h.current(), h.ids.branch);
@@ -170,7 +170,7 @@ test('42: at either end the position stays and the end is spoken; nothing wraps'
 
 test('42: a folded branch is presented as itself, never its descendants', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   assert.ok(!h.view.presentation.order.includes(h.ids.inner));
   h.press('End'); h.press(' ');
   assert.equal(h.current(), h.ids.branch);
@@ -179,7 +179,7 @@ test('42: a folded branch is presented as itself, never its descendants', async 
 
 test('42: Delete, Backspace, Enter, F2, Mod+Enter and Shift+Enter do nothing during a presentation; they work again afterwards', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   const notes = h.view.map.nodes.length, history = h.view.history.past.length, files = [...h.contents.keys()].join('|');
   for (const [key, init] of [['Delete', {}], ['Backspace', {}], ['Enter', {}], ['F2', {}], ['Enter', { metaKey: true }], ['Enter', { ctrlKey: true }], ['Enter', { shiftKey: true }]]) {
     const e = h.press(key, init, h.card('alpha'));
@@ -195,7 +195,7 @@ test('42: Delete, Backspace, Enter, F2, Mod+Enter and Shift+Enter do nothing dur
 
 test('42: keys in a text field or the chat are left alone; composition is ignored', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   const input = element('input'); input.closest = selector => (selector.includes('input') ? input : null);
   const e = h.press('ArrowRight', {}, input); assert.equal(e.stopped, false); assert.equal(h.current(), h.ids.root);
   const chat = element('div'); chat.closest = selector => (selector.includes('.vam-map-chat') ? chat : null);
@@ -214,7 +214,7 @@ test('42: Mod+Z, Mod+Shift+Z, F2, Mod+Enter, Shift+Enter and Mod+F on the view s
   h.view.travel = async () => { travelled++; }; h.view.renameNode = () => { renamed++; };
   const scopeKey = (key, mods) => h.view.scope.keys.find(k => k.key === key && k.modifiers.length === mods.length && mods.every(m => k.modifiers.includes(m)));
   const fire = (key, mods) => scopeKey(key, mods).func({ key, isComposing: false, defaultPrevented: false, target: element('div') }, {});
-  h.view.selected = null; h.doc.activeElement = h.card('alpha');
+  h.view.selection.setSelected(null); h.doc.activeElement = h.card('alpha');
   assert.equal(fire('z', ['Mod']), false); await h.settle(); assert.equal(travelled, 1, 'outside a presentation undo runs');
   h.view.startPresentation();
   assert.equal(fire('z', ['Mod']), false); assert.equal(fire('z', ['Mod', 'Shift']), false); assert.equal(fire('Z', ['Mod', 'Shift']), false); await h.settle();
@@ -228,7 +228,7 @@ test('42: Mod+Z, Mod+Shift+Z, F2, Mod+Enter, Shift+Enter and Mod+F on the view s
 
 test('42: a render that removes the current topic moves to the neighbour instead of throwing; an emptied map ends the presentation', async () => {
   const h = await harness();
-  h.view.selected = h.ids.beta; h.view.startPresentation();
+  h.view.selection.setSelected(h.ids.beta); h.view.startPresentation();
   h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.beta);
   assert.doesNotThrow(() => h.view.render());
   assert.equal(h.current(), h.ids.branch, 'the following topic');
@@ -248,16 +248,16 @@ test('42: leaving restores viewport, selection and focus in memory only; Map.md 
   const h = await harness();
   const diskBefore = h.contents.get(MAP);
   const before = JSON.parse(JSON.stringify(h.view.map.viewport));
-  h.view.selected = h.ids.alpha; h.view.multiSelected = new Set([h.ids.beta]);
+  h.view.selection.setSelected(h.ids.alpha); h.view.selection.replaceMulti([h.ids.beta]);
   h.doc.activeElement = h.card('alpha');
   h.view.startPresentation();
   h.press('End');
   assert.notDeepEqual(h.view.map.viewport, before, 'the camera moved during the presentation');
-  h.view.selected = h.ids.root; h.view.multiSelected = new Set(); // a click during the presentation
+  h.view.selection.setSelected(h.ids.root); h.view.selection.replaceMulti([]); // a click during the presentation
   const e = h.press('Escape');
   assert.equal(e.defaultPrevented && e.stopped, true);
   assert.deepEqual(plain(h.view.map.viewport), before, 'same viewport as on entry');
-  assert.equal(h.view.selected, h.ids.alpha); assert.deepEqual(plain([...h.view.multiSelected]), [h.ids.beta]);
+  assert.equal(h.view.selection.state.selected, h.ids.alpha); assert.deepEqual(plain([...h.view.selection.state.multiSelected]), [h.ids.beta]);
   assert.equal(h.doc.activeElement, h.card('alpha'), 'focus back on the original card');
   assert.equal(h.spoken(), 'Left the presentation');
   assert.equal(h.view.presentation, null);
@@ -270,12 +270,12 @@ test('42: leaving restores viewport, selection and focus in memory only; Map.md 
 
 test('42: leaving after the original focus target is gone puts focus on the map pane; a selected card removed meanwhile is dropped', async () => {
   const h = await harness();
-  h.view.selected = h.ids.beta; h.doc.activeElement = h.card('beta');
+  h.view.selection.setSelected(h.ids.beta); h.doc.activeElement = h.card('beta');
   h.view.startPresentation();
   h.view.map.nodes = h.view.map.nodes.filter(n => n.id !== h.ids.beta);
   h.view.render();
   h.press('Escape');
-  assert.equal(h.view.selected, null, 'a topic that no longer exists is not reselected');
+  assert.equal(h.view.selection.state.selected, null, 'a topic that no longer exists is not reselected');
   assert.equal(h.doc.activeElement, h.view.contentEl);
 });
 
@@ -319,7 +319,7 @@ test('42: the order follows the layout direction: vertical layouts sort siblings
   const h = await harness();
   const nodes = h.view.map.nodes;
   Object.assign(nodes.find(n => n.id === h.ids.alpha), { x: 600, y: 300 }); Object.assign(nodes.find(n => n.id === h.ids.beta), { x: 200, y: 400 });
-  h.view.selected = null; h.view.startPresentation();
+  h.view.selection.setSelected(null); h.view.startPresentation();
   const order = () => plain(h.view.presentation.order);
   assert.ok(order().indexOf(h.ids.alpha) < order().indexOf(h.ids.beta), 'right layout: by y');
   h.view.exitPresentation();

@@ -646,7 +646,7 @@ integrationTest('importOutline as a new tree: a new top-level topic in the open 
   assert.equal(byTitle.get('A').parentId, top.id); assert.equal(byTitle.get('A1').parentId, byTitle.get('A').id); assert.equal(byTitle.get('B').parentId, top.id);
   for (const item of fresh) for (const old of before) assert.ok(!overlaps(item, old), 'no overlap');
   assert.deepEqual(plain(h.view.map.nodes.map(item => item.id)), plain(saved.nodes.map(item => item.id)), 'the open view holds the written map');
-  assert.equal(h.view.selected, top.id);
+  assert.equal(h.view.selection.state.selected, top.id);
   const topNote = await h.repo.readNote(top.path);
   assert.match(topNote.detail, /Imported from an outline \(\d{4}-\d\d-\d\d\): \[\[Inbox\/o\.md\]\]/);
   for (const item of fresh) assert.equal((await h.repo.readNote(item.path)).model, 'gpt-6-luna', 'tree uses the workspace model');
@@ -683,7 +683,7 @@ integrationTest('importOutline under the selected topic: the outline root become
   assert.match((await h.repo.readNote(sub.path)).detail, /### History\n\n- Imported from an outline/);
   assert.equal(saved.detailTemplateId, undefined, 'the map default is untouched');
   for (const item of fresh) for (const old of before) assert.ok(!overlaps(item, old));
-  assert.equal(h.view.selected, sub.id);
+  assert.equal(h.view.selection.state.selected, sub.id);
 });
 
 integrationTest('importOutline under the selected topic with shallow research: researches only the outline root descendants with the chosen model', async () => {
@@ -772,7 +772,7 @@ integrationTest('importOutline under a topic that is no longer on the map reject
 integrationTest('the import window gets its target from the open view: editable map, selection title, AIM', async () => {
   const h = await placementHarness();
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'editable' });
-  h.view.selected = h.oldChild.id; h.view.notes.set(h.oldChild.id, await h.repo.readNote(h.oldChild.path));
+  h.view.selection.setSelected(h.oldChild.id); h.view.notes.set(h.oldChild.id, await h.repo.readNote(h.oldChild.path));
   assert.deepEqual(plain(h.view.outlineImportTarget()), { map: 'editable', selected: { id: h.oldChild.id, title: 'Old child' } });
   h.view.map = { ...h.view.map, aim: { version: 1 } };
   assert.equal(h.view.outlineImportTarget().map, 'aim');
@@ -797,18 +797,18 @@ integrationTest('importOutline under a topic removed from Map.md meanwhile: choo
   assert.equal(fresh.filter(item => item.parentId === sub.id).length, 2);
   for (const item of fresh) assert.ok(!overlaps(item, saved.nodes.find(node => node.id === h.oldRoot.id)));
   for (const item of fresh) assert.ok(h.app.vault.getAbstractFileByPath(item.path), 'note present');
-  assert.equal(h.view.selected, sub.id);
+  assert.equal(h.view.selection.state.selected, sub.id);
 });
 
 integrationTest('importOutline into the open map: a Map.md save failure rolls the import back, keeps the selection and skips research', async () => {
   const h = await placementHarness();
   realTrash(h);
   const files = h.notesInFolder();
-  h.view.selected = h.oldRoot.id;
+  h.view.selection.setSelected(h.oldRoot.id);
   h.repo.saveMap = async () => { throw new Error('locked'); };
   await assert.rejects(h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, placement: { kind: 'under', parentId: h.oldRoot.id } }), /locked/);
   assert.deepEqual(h.notesInFolder(), files, 'the Vault is as before');
-  assert.equal(h.view.selected, h.oldRoot.id, 'selection unchanged');
+  assert.equal(h.view.selection.state.selected, h.oldRoot.id, 'selection unchanged');
   assert.equal(h.researched.length, 0);
   assert.deepEqual(plain(h.view.map.nodes.map(item => item.id)), plain([h.oldRoot.id, h.oldChild.id]));
 });

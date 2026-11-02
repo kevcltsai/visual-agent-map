@@ -47400,6 +47400,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     (back != null ? back : this.contentEl).focus({ preventScroll: true });
   }
   /** The topics a presentation visits: the reading order of what is drawn (folded branches are one stop, not their descendants). */
+  /** The selection a presentation session keeps (the presentation state stores a plain array). */
+  stashSelection() {
+    const stash = this.selection.stash();
+    return { selected: stash.selected, multiSelected: [...stash.multiSelected] };
+  }
   presentationOrder() {
     var _a2;
     if (!this.map) return [];
@@ -47438,8 +47443,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       order,
       currentId: first,
       viewport: { ...this.map.viewport },
-      selected: this.selected,
-      multiSelected: [...this.multiSelected],
+      ...this.stashSelection(),
       returnNodeId: card ? card[0] : null,
       returnEl: card ? null : active
     };
@@ -47575,10 +47579,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     for (const card2 of this.cardEls.values()) card2.toggleClass("is-presenting", false);
     if (!restore || this.closed || !this.map) return;
     const ids = new Set(this.map.nodes.map((node) => node.id));
-    const previous = this.selected, touched = [...this.multiSelected];
-    this.selected = session.selected !== null && ids.has(session.selected) ? session.selected : null;
-    this.multiSelected = new Set(session.multiSelected.filter((id) => ids.has(id)));
-    this.commitSelection(previous, this.selected, [...touched, ...this.multiSelected]);
+    const previous = this.selection.state.selected, touched = [...this.selection.state.multiSelected];
+    this.selection.restore(session, ids);
+    const restored = this.selection.state;
+    this.commitSelection(previous, restored.selected, [...touched, ...restored.multiSelected]);
     if (!this.map) return;
     this.map.viewport = { ...session.viewport };
     this.transform();
@@ -47874,9 +47878,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     if (this.path !== path) this.dropMapBackground();
     this.path = path;
     this.map = map;
-    this.integrationMode = false;
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.exitMultiSelect("openMap");
     this.history.clear();
     this.restoreCrossProxies();
     await this.hydrate(isCurrent);
@@ -47935,7 +47937,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
         if (!isCurrent()) return;
         await this.openMapInMutation(created.mapPath);
         if (!isCurrent() || this.path !== created.mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== created.map.id) return;
-        this.selected = created.root.id;
+        this.selection.setSelected(created.root.id);
         this.render();
         this.focusNode(created.root);
       }),
@@ -49665,7 +49667,7 @@ ${request.requirements}` : preset.text,
         }
         const placed = (_b3 = this.map) == null ? void 0 : _b3.nodes.find((node) => node.id === top2.id);
         if (placed) {
-          this.selected = placed.id;
+          this.selection.setSelected(placed.id);
           this.render();
           this.focusNode(placed);
         }
@@ -49871,7 +49873,7 @@ ${request.requirements}` : preset.text,
       if (result.status === "waiting-user") {
         const question2 = (_g = this.map) == null ? void 0 : _g.nodes.find((item) => item.id === result.questionNodeId);
         if (question2) {
-          this.selected = question2.id;
+          this.selection.setSelected(question2.id);
           this.render();
           this.focusNode(question2);
         }
@@ -50052,7 +50054,7 @@ ${request.requirements}` : preset.text,
       );
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
       if (result.status === "question") {
-        this.selected = result.node.id;
+        this.selection.setSelected(result.node.id);
         this.render();
         this.focusNode(result.node);
         new import_obsidian31.Notice(t("ui.aim_question_ready"));
@@ -50062,7 +50064,7 @@ ${request.requirements}` : preset.text,
         else if (outcome.status === "waiting-user") {
           const question = (_f = this.map) == null ? void 0 : _f.nodes.find((item) => item.id === outcome.questionNodeId);
           if (question) {
-            this.selected = question.id;
+            this.selection.setSelected(question.id);
             this.render();
             this.focusNode(question);
           }
@@ -50110,7 +50112,7 @@ ${request.requirements}` : preset.text,
       if (result.status === "waiting-user") {
         const question = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === result.questionNodeId);
         if (question) {
-          this.selected = question.id;
+          this.selection.setSelected(question.id);
           this.render();
           this.focusNode(question);
         }
@@ -50160,7 +50162,7 @@ ${request.requirements}` : preset.text,
       this.noticeDocumentReadyElsewhere(result.status, epoch, mapPath);
       if (!isCurrent()) return;
       if (result.status === "waiting-user") {
-        this.selected = result.questionNodeId;
+        this.selection.setSelected(result.questionNodeId);
         new import_obsidian31.Notice(t("ui.aim_waiting_user"));
       } else if (result.status === "partial") new import_obsidian31.Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
@@ -50240,7 +50242,7 @@ ${request.requirements}` : preset.text,
           if (result.status === "waiting-user") {
             const question = (_c2 = this.map) == null ? void 0 : _c2.nodes.find((item) => item.id === result.questionNodeId);
             if (question) {
-              this.selected = question.id;
+              this.selection.setSelected(question.id);
               this.render();
               this.focusNode(question);
             }
@@ -54752,7 +54754,7 @@ ${request.requirements}` : preset.text,
             actions,
             t("ui.aim_answer_pending_question"),
             () => {
-              this.selected = pending2.id;
+              this.selection.setSelected(pending2.id);
               this.render();
               this.focusNode(pending2);
               this.openAimAnswer(pending2);
@@ -54856,8 +54858,7 @@ ${request.requirements}` : preset.text,
     if (!this.map.aim) this.renderRelevanceStatus(this.contentEl);
     if (!this.map.aim) this.renderBackgroundBars(this.contentEl);
     if (!this.map.nodes.length) {
-      this.integrationMode = false;
-      this.multiSelected.clear();
+      this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
     const aimMode = !!this.map.aim;
@@ -54929,8 +54930,7 @@ ${request.requirements}` : preset.text,
     this.edgesEl.setAttribute("aria-hidden", "true");
     this.stageEl.appendChild(this.edgesEl);
     const shown = this.canvasNodes();
-    if (this.selected && !shown.some((node) => node.id === this.selected)) this.selected = null;
-    this.multiSelected = new Set([...this.multiSelected].filter((id) => shown.some((node) => node.id === id)));
+    this.selection.prune(new Set(shown.map((node) => node.id)));
     if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
     this.runSelection(
       (selection) => selection.resetTabStop(shown.map((node) => {
@@ -56510,7 +56510,7 @@ ${request.requirements}` : preset.text,
               () => {
                 close == null ? void 0 : close();
                 if (sourceNode) {
-                  this.selected = sourceNode.id;
+                  this.selection.setSelected(sourceNode.id);
                   this.render();
                   this.focusNode(sourceNode);
                 } else if (file instanceof import_obsidian31.TFile) void this.plugin.openDetails(file);

@@ -68454,8 +68454,6 @@ var CHART_JOB_LIMIT = 3;
 var TopicRuns = class {
   constructor(ports) {
     this.ports = ports;
-    /** Topics with a run in flight. The plugin exposes this same object as `running`. */
-    __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "controllers", /* @__PURE__ */ new Map());
     __publicField(this, "disposed", false);
     /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
@@ -68466,6 +68464,10 @@ var TopicRuns = class {
     /** Jobs waiting for a free slot, first in first out. */
     __publicField(this, "chartQueue", []);
     __publicField(this, "chartRunning", 0);
+  }
+  /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
+  get running() {
+    return this.ports.running();
   }
   /** Registers a run for the topic. Returns null when the topic already has one or the module is disposed. */
   begin(path, kind) {
@@ -68483,6 +68485,10 @@ var TopicRuns = class {
         this.running.delete(path);
       }
     };
+  }
+  /** The current store of suggestions awaiting a decision (onload swaps the plugin's for the persisted one). */
+  get pendingSuggestions() {
+    return this.ports.pendingSuggestions();
   }
   isRunning(path) {
     return this.controllers.has(path);
@@ -70226,6 +70232,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       report: (event) => this.reportNoteStyleUpgrade(event)
     }));
     __publicField(this, "ready", Promise.resolve());
+    /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
     __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "quickExpandPending", /* @__PURE__ */ new Set());
     __publicField(this, "aiCalls", new AiCalls({
@@ -70244,10 +70251,13 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       mutate: () => (work) => this.mutate(work),
       progress: () => this.researchProgress,
       repository: () => this.repo,
-      isUnloaded: () => this.unloaded
+      isUnloaded: () => this.unloaded,
+      running: () => this.running,
+      pendingSuggestions: () => this.pendingSuggestions
     }));
     __publicField(this, "expansionBatches", /* @__PURE__ */ new Map());
     __publicField(this, "expansionCoordinator", new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches));
+    /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
     __publicField(this, "pendingResearchOptions", /* @__PURE__ */ new Map());
     __publicField(this, "logs", debugLog);
@@ -71140,7 +71150,7 @@ ${t("ui.organize_link_wait_hint")}`;
   resetCodexRuntime() {
     this.expansionCoordinator.stopAll();
     this.aiCalls.stopAll();
-    this.abortChartJobs();
+    this.topicRuns.stopAll();
     this.modelDiscovery.invalidate("codex");
     this.aiRuntime.reset();
   }
@@ -71185,7 +71195,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   onunload() {
     var _a2, _b2;
-    this.abortChartJobs();
+    this.topicRuns.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());
     this.coffeeManager = null;

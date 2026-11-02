@@ -4,7 +4,7 @@
  * plugin replaces some of those objects after construction.
  */
 import { t } from "../../i18n";
-import type { AiResult, TaskContext } from "../../ai/types";
+import type { AiResult, Suggestion, TaskContext } from "../../ai/types";
 
 /** Chart steps that may run at once; further jobs wait in a first-in-first-out queue. */
 export const CHART_JOB_LIMIT = 3;
@@ -50,6 +50,9 @@ export interface TopicRunPorts {
   progress(): ChartProgress;
   repository(): { isDisposed?(): boolean } | undefined;
   isUnloaded(): boolean;
+  /** The plugin's own Set and Map, read on every use: tests and onload replace them. */
+  running(): Set<string>;
+  pendingSuggestions(): Map<string, Suggestion[]>;
 }
 
 export interface TopicRunHandle {
@@ -61,8 +64,10 @@ export interface TopicRunHandle {
 }
 
 export class TopicRuns {
-  /** Topics with a run in flight. The plugin exposes this same object as `running`. */
-  readonly running = new Set<string>();
+  /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
+  get running(): Set<string> {
+    return this.ports.running();
+  }
   private readonly controllers = new Map<string, AbortController>();
   private disposed = false;
   /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
@@ -92,6 +97,11 @@ export class TopicRuns {
         this.running.delete(path);
       }
     };
+  }
+
+  /** The current store of suggestions awaiting a decision (onload swaps the plugin's for the persisted one). */
+  get pendingSuggestions(): Map<string, Suggestion[]> {
+    return this.ports.pendingSuggestions();
   }
 
   isRunning(path: string): boolean {

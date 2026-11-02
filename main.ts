@@ -227,6 +227,7 @@ export default class VisualAgentMapPlugin extends Plugin {
     report: event => this.reportNoteStyleUpgrade(event)
   });
   ready: Promise<void> = Promise.resolve();
+  /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
   readonly running = new Set<string>();
   readonly quickExpandPending = new Set<string>();
   readonly aiCalls = new AiCalls({
@@ -249,10 +250,13 @@ export default class VisualAgentMapPlugin extends Plugin {
     mutate: () => work => this.mutate(work),
     progress: () => this.researchProgress,
     repository: () => this.repo,
-    isUnloaded: () => this.unloaded
+    isUnloaded: () => this.unloaded,
+    running: () => this.running,
+    pendingSuggestions: () => this.pendingSuggestions
   });
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);
+  /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
   pendingSuggestions: Map<string, Suggestion[]> = new Map();
   readonly pendingResearchOptions = new Map<string, TaskOptions>();
   readonly logs: LogManager = debugLog;
@@ -1177,7 +1181,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   resetCodexRuntime(): void {
     this.expansionCoordinator.stopAll();
     this.aiCalls.stopAll();
-    this.abortChartJobs();
+    this.topicRuns.stopAll();
     this.modelDiscovery.invalidate("codex");
     this.aiRuntime.reset();
   }
@@ -1230,7 +1234,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   }
   onunload(): void {
     // Background diagram jobs stop before the repository does, so none can apply a result after the vault is released.
-    this.abortChartJobs();
+    this.topicRuns.dispose();
     // In-flight work (a long Obsidian rename, a queued mutation) must not write into the vault after this point.
     this.repo?.dispose();
     void this.coffeeManager?.stop();

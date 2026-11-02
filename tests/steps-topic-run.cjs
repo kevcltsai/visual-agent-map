@@ -6,7 +6,7 @@ const path = require('node:path');
 const { load } = require('./support.cjs');
 
 const { TopicRuns } = load('experiences/visual-map/topic-run.ts', {});
-const ports = (extra = {}) => ({ aiTasks: () => ({}), mutate: () => work => work(), progress: () => ({}), repository: () => undefined, isUnloaded: () => false, ...extra });
+const ports = (extra = {}) => ({ running: (set => () => set)(new Set()), pendingSuggestions: (map => () => map)(new Map()), aiTasks: () => ({}), mutate: () => work => work(), progress: () => ({}), repository: () => undefined, isUnloaded: () => false, ...extra });
 const fresh = extra => new TopicRuns(ports(extra));
 
 test('begin registers a run: isRunning, a live signal and the running set', () => {
@@ -159,4 +159,48 @@ test('ports are read on every use, so a replaced aiTasks takes effect', async ()
   const withProgress = fresh({ aiTasks: () => tasks, progress: () => ({ begin() {}, stage() {}, end: () => events.push('end') }) });
   withProgress.addChartsAfterWrite(job('A.md')); await delay(5);
   assert.deepEqual(seen, ['body']);
+});
+
+// ---- pending suggestions and the real Plugin ----
+test('pendingSuggestions returns the store the port currently holds, also after it is replaced', () => {
+  let store = new Map();
+  const runs = fresh({ pendingSuggestions: () => store });
+  assert.equal(runs.pendingSuggestions, store);
+  store = new Map();
+  assert.equal(runs.pendingSuggestions, store);
+});
+
+const S = require('./support.cjs');
+const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
+function realPlugin() {
+  const plugin = new Plugin();
+  plugin.app = { vault: {}, fileManager: {}, workspace: { getLeavesOfType: () => [] } };
+  plugin.logs = { appendLog() {} };
+  return plugin;
+}
+
+test('the real Plugin shares running and pendingSuggestions with its TopicRuns, also after onload replaces the suggestions', () => {
+  const plugin = realPlugin();
+  assert.equal(plugin.running, plugin.topicRuns.running);
+  assert.equal(plugin.pendingSuggestions, plugin.topicRuns.pendingSuggestions);
+  const replaced = new Map();
+  plugin.pendingSuggestions = replaced;
+  assert.equal(plugin.topicRuns.pendingSuggestions, replaced); assert.equal(plugin.pendingSuggestions, replaced);
+  plugin.topicRuns.begin('A.md', 'research');
+  assert.equal(plugin.running.has('A.md'), true);
+});
+
+test('resetCodexRuntime stops every registered run; onunload disposes TopicRuns before the repository', () => {
+  const plugin = realPlugin();
+  const handle = plugin.topicRuns.begin('A.md', 'research');
+  plugin.expansionCoordinator = { stopAll() {} }; plugin.modelDiscovery = { invalidate() {} }; plugin.aiRuntime = { reset() {}, dispose() {} };
+  plugin.resetCodexRuntime();
+  assert.equal(handle.signal.aborted, true);
+  const second = plugin.topicRuns.begin('B.md', 'research');
+  const order = [];
+  second.signal.addEventListener('abort', () => order.push('stop'));
+  plugin.repo = { dispose() { order.push('dispose'); } };
+  plugin.onunload();
+  assert.deepEqual(order, ['stop', 'dispose']);
+  assert.equal(plugin.topicRuns.begin('C.md', 'research'), null);
 });

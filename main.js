@@ -58848,6 +58848,11 @@ ${request.requirements}` : preset.text,
     const abortBeforeAcceptance = () => controller.abort();
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    const releaseStarting = () => {
+      this.selectionStarting = false;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      this.render();
+    };
     let own2;
     const runOptions = {
       ...base,
@@ -58905,7 +58910,10 @@ ${request.requirements}` : preset.text,
       step,
       signal: controller.signal,
       stop: () => controller.abort(),
-      refused: () => failed(t("ui.ai_running_ai")),
+      refused: () => {
+        releaseStarting();
+        failed(t("ui.ai_running_ai"));
+      },
       model: async () => modelChoice = await this.selectionModel(sources),
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: (group) => {
@@ -59059,11 +59067,7 @@ ${request.requirements}` : preset.text,
       },
       finished: markAccepted,
       fail: fail2,
-      settled: () => {
-        this.selectionStarting = false;
-        modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-        this.render();
-      }
+      settled: releaseStarting
     });
   }
   discardSelectionSynthesis() {

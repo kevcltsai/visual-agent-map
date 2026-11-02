@@ -14041,6 +14041,12 @@ export class VisualAgentMapView extends ItemView {
     const abortBeforeAcceptance = (): void => controller.abort();
     if (modalSignal?.aborted) controller.abort();
     else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    // Shared by settled and refused, so a start the registry refuses does not keep this view blocked or leak the listener.
+    const releaseStarting = (): void => {
+      this.selectionStarting = false;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      this.render();
+    };
     let own: NonNullable<VisualAgentMapView["integrationTask"]> | undefined;
     const runOptions: TaskOptions = {
       ...base,
@@ -14106,7 +14112,10 @@ export class VisualAgentMapView extends ItemView {
       step,
       signal: controller.signal,
       stop: () => controller.abort(),
-      refused: () => failed(t("ui.ai_running_ai")),
+      refused: () => {
+        releaseStarting();
+        failed(t("ui.ai_running_ai"));
+      },
       model: async () => (modelChoice = await this.selectionModel(sources)),
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: group => {
@@ -14260,11 +14269,7 @@ export class VisualAgentMapView extends ItemView {
       },
       finished: markAccepted,
       fail,
-      settled: () => {
-        this.selectionStarting = false;
-        modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-        this.render();
-      }
+      settled: releaseStarting
     });
   }
   private discardSelectionSynthesis(): void {

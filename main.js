@@ -21,7 +21,6 @@ var __publicField = (obj, key2, value) => __defNormalProp(obj, typeof key2 !== "
 // main.ts
 var main_exports = {};
 __export(main_exports, {
-  CHART_JOB_LIMIT: () => CHART_JOB_LIMIT,
   ChildProposalModal: () => ChildProposalModal,
   DraftReviewModal: () => DraftReviewModal,
   NextStepModal: () => NextStepModal,
@@ -68450,6 +68449,144 @@ var ResearchProgressStore = class {
   }
 };
 
+// experiences/visual-map/topic-run.ts
+var CHART_JOB_LIMIT = 3;
+var TopicRuns = class {
+  constructor(ports) {
+    this.ports = ports;
+    /** Topics with a run in flight. The plugin exposes this same object as `running`. */
+    __publicField(this, "running", /* @__PURE__ */ new Set());
+    __publicField(this, "controllers", /* @__PURE__ */ new Map());
+    __publicField(this, "disposed", false);
+    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
+    __publicField(this, "charts", /* @__PURE__ */ new Map());
+    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
+    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
+    __publicField(this, "chartProgressSeq", 0);
+    /** Jobs waiting for a free slot, first in first out. */
+    __publicField(this, "chartQueue", []);
+    __publicField(this, "chartRunning", 0);
+  }
+  /** Registers a run for the topic. Returns null when the topic already has one or the module is disposed. */
+  begin(path, kind) {
+    if (this.disposed || this.controllers.has(path)) return null;
+    const controller = new AbortController();
+    this.controllers.set(path, controller);
+    this.running.add(path);
+    return {
+      path,
+      kind,
+      signal: controller.signal,
+      release: () => {
+        if (this.controllers.get(path) !== controller) return;
+        this.controllers.delete(path);
+        this.running.delete(path);
+      }
+    };
+  }
+  isRunning(path) {
+    return this.controllers.has(path);
+  }
+  stop(path) {
+    var _a2;
+    (_a2 = this.controllers.get(path)) == null ? void 0 : _a2.abort();
+  }
+  stopAll() {
+    for (const controller of this.controllers.values()) controller.abort();
+    this.abortCharts();
+  }
+  get chartJobs() {
+    return this.charts;
+  }
+  /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
+  abortCharts(path) {
+    for (const [key2, controller] of [...this.charts])
+      if (path === void 0 || key2 === path) {
+        controller.abort();
+        this.charts.delete(key2);
+        this.endChartProgress(key2);
+        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
+        if (queued >= 0) this.chartQueue.splice(queued, 1);
+      }
+  }
+  endChartProgress(path) {
+    const id = this.chartProgressIds.get(path);
+    if (id === void 0) return;
+    this.chartProgressIds.delete(path);
+    this.ports.progress().end(path, id);
+  }
+  pumpChartQueue() {
+    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
+      this.chartRunning++;
+      this.chartQueue.shift().start();
+    }
+  }
+  /**
+   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
+   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
+   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
+   * write time or is running again; only then are the diagrams not applied.
+   */
+  addChartsAfterWrite(job) {
+    var _a2, _b2;
+    if ((_b2 = (_a2 = this.ports.repository()) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
+    if (!this.ports.aiTasks().chartEligible(job.context) || !job.detail.trim()) return;
+    this.abortCharts(job.path);
+    const controller = new AbortController();
+    this.charts.set(job.path, controller);
+    const progressId = `charts-${++this.chartProgressSeq}`;
+    this.chartProgressIds.set(job.path, progressId);
+    this.ports.progress().begin(job.path, progressId, Date.now(), job.model);
+    this.ports.progress().stage(job.path, progressId, "charts", Date.now());
+    let exchangeId = "";
+    const run = async () => {
+      try {
+        const detail = await this.ports.aiTasks().chartDetail({
+          input: job.context,
+          detail: job.detail,
+          countIssues: job.countIssues,
+          model: job.model,
+          signal: controller.signal,
+          onExchange: (id) => {
+            exchangeId = id;
+          }
+        });
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        if (detail === job.detail) return;
+        let applied = false;
+        await this.ports.mutate()(async () => {
+          applied = !controller.signal.aborted && await job.apply(detail);
+        });
+        if (!applied) this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stale_not_applied"));
+      } catch (error) {
+        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError")
+          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stopped_not_applied"));
+        else {
+          console.warn("Visual Agent Map chart step", error);
+          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
+        }
+      } finally {
+        if (this.charts.get(job.path) === controller) this.charts.delete(job.path);
+        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
+        this.chartRunning--;
+        this.pumpChartQueue();
+      }
+    };
+    this.chartQueue.push({
+      controller,
+      start: () => {
+        void run();
+      }
+    });
+    this.pumpChartQueue();
+  }
+  /** Stops every run and refuses new ones. */
+  dispose() {
+    this.disposed = true;
+    this.stopAll();
+  }
+};
+
 // core/steps/reframe/language.en.md
 var language_en_default4 = "Write in {{language}}.\n";
 
@@ -70074,7 +70211,6 @@ function settingsFromSaved(saved) {
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
-var CHART_JOB_LIMIT = 3;
 var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
   constructor() {
     super(...arguments);
@@ -70098,18 +70234,18 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       releaseWarm: () => this.aiRuntime.releaseWarm()
     }));
     __publicField(this, "activeTasks", this.aiCalls.activeTasks);
-    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
-    __publicField(this, "chartJobs", /* @__PURE__ */ new Map());
     /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
     __publicField(this, "unloaded", false);
     /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
     __publicField(this, "researchProgress", new ResearchProgressStore());
-    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
-    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
-    __publicField(this, "chartProgressSeq", 0);
-    /** Jobs waiting for a free slot, first in first out. */
-    __publicField(this, "chartQueue", []);
-    __publicField(this, "chartRunning", 0);
+    /** Owns the background chart queue. Every port is read on use: tests and onload replace these objects after construction. */
+    __publicField(this, "topicRuns", new TopicRuns({
+      aiTasks: () => this.aiTasks,
+      mutate: () => (work) => this.mutate(work),
+      progress: () => this.researchProgress,
+      repository: () => this.repo,
+      isUnloaded: () => this.unloaded
+    }));
     __publicField(this, "expansionBatches", /* @__PURE__ */ new Map());
     __publicField(this, "expansionCoordinator", new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches));
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
@@ -70193,6 +70329,10 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     __publicField(this, "firstInstallMapPath", null);
     __publicField(this, "languageSwitchPending", false);
     __publicField(this, "unreadableReported", /* @__PURE__ */ new Map());
+  }
+  /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
+  get chartJobs() {
+    return this.topicRuns.chartJobs;
   }
   recordFailure(context, error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -71602,85 +71742,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortChartJobs(path) {
-    for (const [key2, controller] of [...this.chartJobs])
-      if (path === void 0 || key2 === path) {
-        controller.abort();
-        this.chartJobs.delete(key2);
-        this.endChartProgress(key2);
-        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
-        if (queued >= 0) this.chartQueue.splice(queued, 1);
-      }
+    this.topicRuns.abortCharts(path);
   }
-  endChartProgress(path) {
-    const id = this.chartProgressIds.get(path);
-    if (id === void 0) return;
-    this.chartProgressIds.delete(path);
-    this.researchProgress.end(path, id);
-  }
-  pumpChartQueue() {
-    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
-      this.chartRunning++;
-      this.chartQueue.shift().start();
-    }
-  }
-  /**
-   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
-   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
-   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
-   * write time or is running again; only then are the diagrams not applied.
-   */
+  /** Runs the chart step in the background for a note that was just written; see {@link TopicRuns.addChartsAfterWrite}. */
   addChartsAfterWrite(job) {
-    var _a2, _b2;
-    if ((_b2 = (_a2 = this.repo) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
-    if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
-    this.abortChartJobs(job.path);
-    const controller = new AbortController();
-    this.chartJobs.set(job.path, controller);
-    const progressId = `charts-${++this.chartProgressSeq}`;
-    this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
-    this.researchProgress.stage(job.path, progressId, "charts", Date.now());
-    let exchangeId = "";
-    const run = async () => {
-      try {
-        const detail = await this.aiTasks.chartDetail({
-          input: job.context,
-          detail: job.detail,
-          countIssues: job.countIssues,
-          model: job.model,
-          signal: controller.signal,
-          onExchange: (id) => {
-            exchangeId = id;
-          }
-        });
-        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (detail === job.detail) return;
-        let applied = false;
-        await this.mutate(async () => {
-          applied = !controller.signal.aborted && await job.apply(detail);
-        });
-        if (!applied) this.aiTasks.failExchange(exchangeId, t("log.chart_stale_not_applied"));
-      } catch (error) {
-        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError")
-          this.aiTasks.failExchange(exchangeId, t("log.chart_stopped_not_applied"));
-        else {
-          console.warn("Visual Agent Map chart step", error);
-          this.aiTasks.failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
-        }
-      } finally {
-        if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
-        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
-        this.chartRunning--;
-        this.pumpChartQueue();
-      }
-    };
-    this.chartQueue.push({
-      controller,
-      start: () => {
-        void run();
-      }
-    });
-    this.pumpChartQueue();
+    this.topicRuns.addChartsAfterWrite(job);
   }
   /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
   async addAimDiagrams(request) {

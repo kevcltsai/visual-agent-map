@@ -391,6 +391,7 @@ import {
 } from "../aim/manual-flow";
 import { AimRunStore } from "../aim/research-run-store";
 import type { AimProgressEvent } from "../aim/manual-flow-support";
+import { AIM_MAX_SECTIONS } from "../aim/aim-note-style";
 import { matchAimFailedReportTargets } from "../aim/retry-targets";
 import { aimRepairHint, aimTimedOut } from "../aim/failure-hint";
 import { canvasPointerIntent } from "./canvas-gestures";
@@ -1132,6 +1133,7 @@ export class VisualAgentMapView extends ItemView {
     );
     this.aimManual.onProgress = event => this.onAimProgress(event);
     this.aimManual.addDiagrams = request => plugin.addAimDiagrams(request);
+    this.aimManual.noteStyle = language => this.aimNoteStyle(language);
     // openMapInMutation already owns the repository queue. Startup recovery must persist
     // directly within that scope instead of attempting to enqueue the same operation again.
     this.aimRecovery = new AimManualFlow(
@@ -1141,6 +1143,7 @@ export class VisualAgentMapView extends ItemView {
         plugin.askModel(context, model, reasoning, signal, undefined, undefined, onWebSearchEvent)
     );
     this.aimRecovery.addDiagrams = request => plugin.addAimDiagrams(request);
+    this.aimRecovery.noteStyle = language => this.aimNoteStyle(language);
   }
   getViewType(): string {
     return VIEW_TYPE;
@@ -18018,6 +18021,27 @@ export class VisualAgentMapView extends ItemView {
     if (gate) gate.shown = true;
     new Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
+  /**
+   * The note style of the AIM conclusion note (the "aim" row). A row that cannot be read, or whose structure the AIM
+   * outline cannot hold (0 or more than 12 sections), falls back to the AIM report; the user is told once per map in
+   * this view. Nothing is written.
+   */
+  private aimNoteStyle(language: ContentLanguage): RunStyle | undefined {
+    // A plugin test double without settings has no styles: the AIM report.
+    if (!this.plugin.settings) return undefined;
+    const style = this.noteStyles.runStyle({ kind: "aim", outputLanguage: language });
+    const ref = this.plugin.settings.noteStyleByKind?.aim;
+    const sections = style.template.sections.length;
+    const unusable = !style.recipe.aimDelivery && (sections === 0 || sections > AIM_MAX_SECTIONS);
+    if (ref && (style.issues.missing.includes(ref) || unusable) && !this.aimStyleNoticed.has(this.path)) {
+      this.aimStyleNoticed.add(this.path);
+      new Notice(
+        t("ui.note_style_kind_missing_0_1", t("ui.note_style_kind_aim"), ref.replace(/^(?:builtin|file):/, ""))
+      );
+    }
+    return style;
+  }
+  private readonly aimStyleNoticed = new Set<string>();
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   private get noteStyles(): NoteStyleStore {
     return (

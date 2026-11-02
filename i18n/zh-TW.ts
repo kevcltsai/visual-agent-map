@@ -1584,6 +1584,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.detail_template_missing_0": "筆記結構「{0}」已不存在，這個議題改用下一順位的預設結構。",
   "ui.note_styles_folder_name": "筆記風格",
   "ui.note_style_file_missing_0": "找不到筆記風格檔「{0}」，這個議題改用下一順位的預設。",
+  "ui.note_style_kind_aim": "AIM 結論筆記",
   "ui.note_style_kind_missing_0_1": "為「{0}」議題類型指定的筆記結構「{1}」找不到，這個議題改用下一順位的結構。",
   "ui.note_style_file_invalid_0_1_2": "筆記風格檔「{0}」有問題（第 {1} 行）：{2}",
   "ui.note_style_open_folder_command": "開啟筆記風格資料夾",

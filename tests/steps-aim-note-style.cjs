@@ -161,3 +161,97 @@ test('the structured delivery phases never carry the note format, so the contrac
   const { calls } = await run({ noteStyle: lean() });
   for (const call of calls) if (phaseOf(call) !== 'delivery-writing') assert.ok(!('aimNoteFormat' in call), phaseOf(call));
 });
+
+// ---- P2: the flow reads the style from the view's port; the map tone is no longer read (needs the support fixtures) ----
+const S = require('./support.cjs');
+const dom = require('./support-dom.cjs');
+const { AimManualFlow } = S.load('experiences/aim/manual-flow.ts');
+const { AimRunStore } = S.load('experiences/aim/research-run-store.ts');
+const { createAimMap } = S.load('experiences/aim/create-map.ts');
+const MODEL = 'gpt-6-luna';
+const PLAIN_STYLE = runStyle([section('Answer', 'The answer.')], { toneText: 'Write in plain words.' });
+
+async function concludeSeen({ toneId, port, afterRun } = {}) {
+  const data = S.fixture();
+  const model = S.coverageModel();
+  const created = await createAimMap(data.repo, MODEL, { requestId: 'style-flow', topic: 'style', context: 'Initial clarification: known background.', minimumAnswersBeforeConclusion: 3 });
+  const repo = new S.Repository(data.app, { ...S.DEFAULT_SETTINGS, language: 'en' });
+  if (toneId) {
+    const doc = await repo.readMap(created.mapPath);
+    doc.toneId = toneId;
+    await repo.saveMap(created.mapPath, doc);
+  }
+  const seen = [];
+  const flow = new AimManualFlow(repo, new AimRunStore(repo), (context, ...rest) => {
+    seen.push({ phase: M.aimPhase(context.task), structured: !!context.aimContract, hasTone: 'toneText' in context, toneText: context.toneText });
+    return model.ask(context, ...rest);
+  });
+  if (port) flow.noteStyle = port;
+  let question = (await flow.planNextQuestion(created.mapPath, created.root.id, MODEL, 'low', 'q')).node;
+  for (let round = 1; round <= 3; round++) {
+    const outcome = await flow.answerAndResearch(created.mapPath, question.id, { requestId: `a-${round}`, selections: [question.aimQuestion.options[0].id], freeText: `Specific condition ${round}` }, MODEL, 'low');
+    if (round < 3) question = (await repo.readMap(created.mapPath)).nodes.find(node => node.id === outcome.questionNodeId);
+  }
+  await afterRun?.(repo, created);
+  return seen;
+}
+
+test('counter 4: the map tone is no longer read by AIM, so no context has a toneText key', async () => {
+  const seen = await concludeSeen({ toneId: 'plain' });
+  assert.ok(seen.some(item => item.phase === 'subtopic-research') && seen.some(item => item.phase === 'delivery-writing'));
+  assert.ok(!seen.some(item => item.hasTone));
+});
+
+test('counter 5: a plain-voice style tones only the final document; research and contract calls carry none', async () => {
+  const seen = await concludeSeen({ toneId: 'magazine', port: () => PLAIN_STYLE });
+  const writing = seen.filter(item => item.phase === 'delivery-writing');
+  assert.ok(writing.length > 0 && writing.every(item => item.toneText === 'Write in plain words.'));
+  assert.ok(seen.filter(item => item.phase !== 'delivery-writing').every(item => !item.hasTone), 'no other call has the key');
+});
+
+test('counter 10: an AIM run writes neither noteStyleByKind nor the map tone', async () => {
+  const settingsBefore = JSON.stringify(S.DEFAULT_SETTINGS.noteStyleByKind ?? null);
+  let toneAfter;
+  await concludeSeen({ toneId: 'magazine', port: () => PLAIN_STYLE, afterRun: async (repo, created) => { toneAfter = (await repo.readMap(created.mapPath)).toneId; } });
+  assert.equal(toneAfter, 'magazine');
+  assert.equal(JSON.stringify(S.DEFAULT_SETTINGS.noteStyleByKind ?? null), settingsBefore);
+});
+
+test('counter 6: an AIM row that cannot be read, or has 0 or 13 sections, falls back to the AIM report with one Notice per map', () => {
+  const notices = [];
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: dom.makeNotice(notices) } });
+  const aimDefault = { recipe: { ref: 'builtin:aim', name: 'AIM', source: 'default', aimDelivery: true }, template: { id: 'standard', name: 'S', sections: [section('x')] }, formatText: '', issues: { missing: ['file:Gone'], blockIssues: [] } };
+  const writes = [];
+  let answer = aimDefault;
+  const plugin = {
+    repo: S.fixture().repo,
+    settings: { ...S.DEFAULT_SETTINGS, noteStyleByKind: { aim: 'file:Gone' } },
+    noteStyles: { runStyle: request => { assert.equal(request.kind, 'aim'); return answer; }, create: () => writes.push('create'), createFolder: () => writes.push('createFolder'), trash: () => writes.push('trash') }
+  };
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  view.path = 'Maps/A.md';
+  assert.equal(M.aimNoteStyleOf(view.aimNoteStyle('en')), undefined);
+  assert.equal(notices.length, 1, 'missing row: one Notice');
+  view.aimNoteStyle('en');
+  assert.equal(notices.length, 1, 'the same map path is told once');
+  view.path = 'Maps/B.md';
+  answer = runStyle(Array.from({ length: 13 }, (_, i) => section(`S${i}`)), { issues: { missing: [], blockIssues: [] } });
+  assert.equal(M.aimNoteStyleOf(view.aimNoteStyle('en')), undefined);
+  assert.equal(notices.length, 2, '13 sections: a Notice for another map');
+  view.path = 'Maps/C.md';
+  answer = runStyle([], { issues: { missing: [], blockIssues: [] } });
+  assert.equal(M.aimNoteStyleOf(view.aimNoteStyle('en')), undefined);
+  assert.equal(notices.length, 3, '0 sections: a Notice');
+  view.path = 'Maps/D.md';
+  answer = runStyle(HYPOTHESIS, { issues: { missing: [], blockIssues: [] } });
+  assert.ok(M.aimNoteStyleOf(view.aimNoteStyle('en')), 'a usable style stands');
+  assert.equal(notices.length, 3);
+  assert.deepEqual(writes, [], 'the store port is never written');
+});
+
+test('counter 6: a flow whose port returns the AIM report style sends the same contexts as no port', async () => {
+  const aimStyleRow = { recipe: { ref: 'builtin:aim', name: 'AIM', source: 'default', aimDelivery: true }, template: { id: 'standard', name: 'S', sections: [section('x')] }, formatText: '' };
+  const none = await concludeSeen();
+  const report = await concludeSeen({ port: () => aimStyleRow });
+  assert.deepEqual(report, none);
+});

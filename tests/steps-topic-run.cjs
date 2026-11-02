@@ -859,3 +859,67 @@ test('04c: the view never touches the running set, the pending store or topic-ru
   assert.doesNotMatch(rest, /plugin\.activeTasks\??\.(set|delete|get|has)\((?!key|this\.chatTaskKey)/);
   assert.doesNotMatch(src, /import \{ PendingSuggestions \}/);
 });
+
+// ---- ticket 05a: one start per topic, and every kind of run is stoppable through the registry ----
+// Each kind gets the same harness: a run whose model call waits on a gate and records the signal it was given.
+function lifecycleKind(kind) {
+  const gate = {}; const waiting = new Promise(resolve => { gate.release = resolve; });
+  const asked = [];
+  const slowAsk = async (_c, _m, _r, signal, _e, accepted) => { asked.push(signal); accepted?.(); await waiting; return { summary: 'S', detail: 'D', visualReferences: [], suggestions: [sugg('X')] }; };
+  const path = kind === 'synthesizeSelection' ? 'M.md' : 'A.md';
+  let h; let start;
+  if (kind === 'research') { h = researchRuns({ ask: slowAsk }); start = () => h.runs.start(path, kind, h.options({ runOnce: { model: 'm1' } })); }
+  if (kind === 'proposeChildren') { h = proposalRuns({ ask: slowAsk }); start = () => h.runs.start(path, kind, h.opts()); }
+  if (kind === 'integrateDirection') { h = directionRuns({ ask: slowAsk }); start = () => h.runs.start(path, kind, h.opts()); }
+  if (kind === 'integrateChildren') { h = integrateRuns({ ask: slowAsk }); start = () => h.runs.start(path, kind, h.opts()); }
+  if (kind === 'synthesizeSelection') { h = selectionRuns({ ask: slowAsk }); start = () => h.runs.start(path, kind, h.opts('directions', { stop: () => h.ctl.abort(), refused: () => {} })); }
+  return { h, path, start, asked, release: gate.release };
+}
+const everyKind = ['research', 'proposeChildren', 'integrateDirection', 'integrateChildren', 'synthesizeSelection'];
+
+test('05: two starts of the same topic at once run only once, for every kind of run', async () => {
+  for (const kind of everyKind) {
+    const run = lifecycleKind(kind);
+    const both = [run.start(), run.start()];
+    await settle(20);
+    assert.equal(run.asked.length, 1, kind + ': the model is asked once');
+    run.release(); await Promise.all(both.map(p => p.then(handle => handle?.finished)));
+    await settle();
+    assert.equal(run.h.runs.isRunning(run.path), false, kind + ': the topic is freed when the one run ends');
+  }
+});
+
+test('05: stop(path) stops a run of every kind', async () => {
+  for (const kind of everyKind) {
+    const run = lifecycleKind(kind);
+    const started = run.start(); await settle();
+    assert.equal(run.asked.length, 1, kind + ': the run is waiting for the model');
+    run.h.runs.stop(run.path);
+    assert.equal(run.asked[0].aborted, true, kind + ': stop(path) aborts the signal the model call got');
+    run.release(); await started; await settle();
+    assert.equal(run.h.runs.isRunning(run.path), false, kind + ': stopped run frees the topic');
+  }
+});
+
+test('05: stopAll (resetting Codex) stops a run of every kind, selection synthesis and integrations included', async () => {
+  for (const kind of everyKind) {
+    const run = lifecycleKind(kind);
+    const started = run.start(); await settle();
+    run.h.runs.stopAll();
+    assert.equal(run.asked[0].aborted, true, kind + ': stopAll aborts the signal the model call got');
+    run.release(); await started; await settle();
+    assert.equal(run.h.runs.isRunning(run.path), false);
+  }
+});
+
+test('05: dispose stops every run in flight and refuses a new start, for every kind', async () => {
+  for (const kind of everyKind) {
+    const run = lifecycleKind(kind);
+    const started = run.start(); await settle();
+    run.h.runs.dispose();
+    assert.equal(run.asked[0].aborted, true, kind + ': dispose aborts the signal the model call got');
+    run.release(); await started; await settle();
+    await run.start();
+    assert.equal(run.asked.length, 1, kind + ': nothing starts after dispose');
+  }
+});

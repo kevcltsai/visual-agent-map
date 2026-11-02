@@ -19836,327 +19836,8 @@ function withThinkingOrigin(context, note) {
   };
 }
 
-// experiences/visual-map/relation-geometry.ts
-var MIN_CONTROL = 16;
-var MAX_CONTROL = 60;
-function axisGap(aStart, aSize, bStart, bSize) {
-  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
-}
-var centreOf = (box) => ({
-  x: box.x + box.width / 2,
-  y: box.y + box.height / 2
-});
-function nearestSides(a, b) {
-  const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
-  if (horizontal < 0 && vertical < 0) {
-    const from = centreOf(a), to = centreOf(b);
-    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
-  }
-  if (horizontal >= vertical) {
-    const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
-    return {
-      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
-      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign2, ny: 0 },
-      gap: horizontal
-    };
-  }
-  const downward = centreOf(b).y >= centreOf(a).y, sign = downward ? 1 : -1;
-  return {
-    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
-    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
-    gap: vertical
-  };
-}
-var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
-function curveOf(a, b) {
-  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
-  return {
-    p1: { x: from.x, y: from.y },
-    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
-    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
-    p2: { x: to.x, y: to.y }
-  };
-}
-function relationPathData(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
-  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
-}
-function relationLabelPoint(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
-  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
-}
-function treeEdgePathData(parent, child, direction, depth = 1) {
-  if (direction === "radial") return relationPathData(parent, child);
-  if (direction === "timeline" && depth >= 2)
-    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
-  if (direction === "fishbone")
-    return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
-  if (direction === "down" || direction === "up") {
-    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, bend2 = Math.max(60, Math.abs(y22 - y12) / 2), sign = down ? 1 : -1;
-    return `M ${x12} ${y12} C ${x12} ${y12 + sign * bend2}, ${x22} ${y22 - sign * bend2}, ${x22} ${y22}`;
-  }
-  const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
-  const leftward = direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
-  if (leftward) {
-    const x12 = parent.x, x22 = child.x + child.width, bend2 = Math.max(60, Math.abs(x22 - x12) / 2);
-    return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
-  }
-  const x1 = parent.x + parent.width, x2 = child.x, bend = Math.max(60, Math.abs(x2 - x1) / 2);
-  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
-}
-var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
-function fishboneBone(parent, child) {
-  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2, above = childY < parentY, x = child.x + child.width / 2, y = above ? child.y + child.height : child.y;
-  return { jointX: x + Math.abs(parentY - y) * BONE_RUN2, parentY, x, y };
-}
-function fishboneSpinePathData(head, topics) {
-  if (!topics.length) return "";
-  const end = Math.min(...topics.map((topic) => fishboneBone(head, topic).jointX));
-  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
-}
-function fishboneEdgePathData(parent, child, depth) {
-  if (depth <= 1) {
-    const { jointX, parentY: parentY2, x: x2, y: y2 } = fishboneBone(parent, child);
-    return `M ${jointX} ${parentY2} L ${x2} ${y2}`;
-  }
-  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2;
-  const above = childY > parentY, x = parent.x + parent.width / 2, y = above ? parent.y + parent.height : parent.y, boneX = x + Math.abs(childY - y) * BONE_RUN2;
-  return `M ${boneX} ${childY} L ${child.x + child.width} ${childY}`;
-}
-
-// topic-markers.ts
-var TOPIC_MARKERS = [
-  "done",
-  "warning",
-  "star",
-  "priority-1",
-  "priority-2",
-  "priority-3",
-  "priority-4",
-  "priority-5",
-  "progress-0",
-  "progress-25",
-  "progress-50",
-  "progress-75",
-  "progress-100",
-  "flag-red",
-  "flag-yellow",
-  "flag-green",
-  "flag-blue",
-  "smile",
-  "neutral",
-  "sad",
-  "question"
-];
-var TOPIC_MARKER_GROUPS = [
-  { group: "status", single: false, ids: ["done", "warning", "star"] },
-  { group: "priority", single: true, ids: ["priority-1", "priority-2", "priority-3", "priority-4", "priority-5"] },
-  {
-    group: "progress",
-    single: true,
-    ids: ["progress-0", "progress-25", "progress-50", "progress-75", "progress-100"]
-  },
-  { group: "flag", single: false, ids: ["flag-red", "flag-yellow", "flag-green", "flag-blue"] },
-  { group: "face", single: false, ids: ["smile", "neutral", "sad", "question"] }
-];
-function markerGroup(id) {
-  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).group;
-}
-function isSingleChoiceMarker(id) {
-  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).single;
-}
-var SYMBOLS = {
-  done: "\u2713",
-  warning: "\u26A0",
-  star: "\u2605",
-  "priority-1": "P1",
-  "priority-2": "P2",
-  "priority-3": "P3",
-  "priority-4": "P4",
-  "priority-5": "P5",
-  "progress-0": "\u25CB",
-  "progress-25": "\u25D4",
-  "progress-50": "\u25D1",
-  "progress-75": "\u25D5",
-  "progress-100": "\u25CF",
-  "flag-red": "\u2691R",
-  "flag-yellow": "\u2691Y",
-  "flag-green": "\u2691G",
-  "flag-blue": "\u2691B",
-  smile: "\u263A",
-  neutral: "-_-",
-  sad: "\u2639",
-  question: "?"
-};
-var LABEL_KEYS = {
-  done: "share.viewer_marker_done",
-  warning: "share.viewer_marker_warning",
-  star: "share.viewer_marker_star",
-  "priority-1": "share.viewer_marker_priority_1",
-  "priority-2": "share.viewer_marker_priority_2",
-  "priority-3": "share.viewer_marker_priority_3",
-  "priority-4": "share.viewer_marker_priority_4",
-  "priority-5": "share.viewer_marker_priority_5",
-  "progress-0": "share.viewer_marker_progress_0",
-  "progress-25": "share.viewer_marker_progress_25",
-  "progress-50": "share.viewer_marker_progress_50",
-  "progress-75": "share.viewer_marker_progress_75",
-  "progress-100": "share.viewer_marker_progress_100",
-  "flag-red": "share.viewer_marker_flag_red",
-  "flag-yellow": "share.viewer_marker_flag_yellow",
-  "flag-green": "share.viewer_marker_flag_green",
-  "flag-blue": "share.viewer_marker_flag_blue",
-  smile: "share.viewer_marker_smile",
-  neutral: "share.viewer_marker_neutral",
-  sad: "share.viewer_marker_sad",
-  question: "share.viewer_marker_question"
-};
-function readTopicMarkers(fm) {
-  const raw = fm["topic-markers"];
-  if (!Array.isArray(raw)) return [];
-  const seen = /* @__PURE__ */ new Set();
-  return TOPIC_MARKERS.filter((id) => {
-    if (!raw.includes(id)) return false;
-    if (!isSingleChoiceMarker(id)) return true;
-    const group = markerGroup(id);
-    if (seen.has(group)) return false;
-    seen.add(group);
-    return true;
-  });
-}
-function toggleTopicMarker(raw, id) {
-  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const group = TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id));
-  const groupIds = group.ids;
-  let next;
-  if (group.single) {
-    const shown = groupIds.find((g) => current.includes(g));
-    const rest = current.filter((v) => typeof v !== "string" || !groupIds.includes(v));
-    next = shown === id ? rest : [...rest, id];
-  } else if (current.includes(id)) next = current.filter((v) => v !== id);
-  else next = [...current, id];
-  return next.length ? next : null;
-}
-function markerSymbol(id) {
-  return SYMBOLS[id];
-}
-function markerLabelKey(id) {
-  return LABEL_KEYS[id];
-}
-
-// topic-links.ts
-var TOPIC_LINKS_MAX = 20;
-var TOPIC_LINK_MAX_LENGTH = 2048;
-function normalizeTopicLink(value) {
-  if (typeof value !== "string") return null;
-  const text11 = value.trim();
-  if (!text11 || text11.length > TOPIC_LINK_MAX_LENGTH) return null;
-  if (/[\x00-\x20\x7f-\x9f\u2028\u2029]/.test(text11)) return null;
-  if (!/^https?:\/\//i.test(text11)) return null;
-  let url;
-  try {
-    url = new URL(text11);
-  } catch (e) {
-    return null;
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-  if (!url.hostname || url.username || url.password) return null;
-  if (url.href.length > TOPIC_LINK_MAX_LENGTH) return null;
-  return url.href;
-}
-function readTopicLinks(fm) {
-  const raw = fm["topic-links"];
-  const items = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of items) {
-    const href = normalizeTopicLink(item);
-    if (!href || seen.has(href)) continue;
-    seen.add(href);
-    out.push(href);
-    if (out.length >= TOPIC_LINKS_MAX) break;
-  }
-  return out;
-}
-function addTopicLink(raw, input2) {
-  const href = normalizeTopicLink(input2);
-  if (!href) return { ok: false, reason: "invalid" };
-  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const valid = readTopicLinks({ "topic-links": current });
-  if (valid.includes(href)) return { ok: false, reason: "duplicate" };
-  if (valid.length >= TOPIC_LINKS_MAX) return { ok: false, reason: "too-many" };
-  return { ok: true, next: [...current, href] };
-}
-function removeTopicLink(raw, href) {
-  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const next = current.filter((item) => typeof item !== "string" || normalizeTopicLink(item) !== href);
-  return next.length ? next : null;
-}
-
-// topic-colors.ts
-var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
-function readTopicColor(fm) {
-  const raw = fm["topic-color"];
-  return TOPIC_COLORS.find((id) => id === raw);
-}
-function colorLabelKey(id) {
-  return `share.viewer_color_${id}`;
-}
-var TOPIC_STYLES = ["bold", "text-small", "text-large", "border-thick", "line-thick"];
-var TEXT_SIZES = ["text-small", "text-large"];
-function rawStyleList(raw) {
-  return Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-}
-function readTopicStyle(fm) {
-  const list = rawStyleList(fm["topic-style"]);
-  const size = list.find((v) => TEXT_SIZES.some((s) => s === v));
-  return TOPIC_STYLES.filter((id) => TEXT_SIZES.includes(id) ? id === size : list.includes(id));
-}
-function toggleTopicStyle(raw, token) {
-  const current = rawStyleList(raw);
-  const shown = readTopicStyle({ "topic-style": raw });
-  const drop = (ids) => current.filter((v) => typeof v !== "string" || !ids.includes(v));
-  let next;
-  if (TEXT_SIZES.includes(token)) next = shown.includes(token) ? drop(TEXT_SIZES) : [...drop(TEXT_SIZES), token];
-  else next = shown.includes(token) ? drop([token]) : [...current, token];
-  return next.length ? next : null;
-}
-function setTopicStyle(raw, styles) {
-  const wanted = readTopicStyle({ "topic-style": styles });
-  const rest = rawStyleList(raw).filter((v) => typeof v !== "string" || !TOPIC_STYLES.some((id) => id === v));
-  const next = [...rest, ...wanted];
-  return next.length ? next : null;
-}
-var STYLE_LABEL_KEYS = {
-  bold: "ui.topic_style_bold",
-  "text-small": "ui.topic_style_size_small",
-  "text-large": "ui.topic_style_size_large",
-  "border-thick": "ui.topic_style_border_thick",
-  "line-thick": "ui.topic_style_line_thick"
-};
-function styleLabelKey(id) {
-  return STYLE_LABEL_KEYS[id];
-}
-function branchNoteIds(nodes, id) {
-  return [id, ...descendants(nodes, id)];
-}
-
-// repository.ts
-var import_obsidian11 = require("obsidian");
-var import_node_crypto5 = require("node:crypto");
-
-// ai/model-resolution.ts
-var FALLBACK_MODEL = "gpt-5.6-luna";
-function resolveTaskModel(input2) {
-  var _a2, _b2, _c, _d, _e, _f;
-  const once = (_b2 = (_a2 = input2.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
-  if (once) {
-    return { model: once, reasoning: (_d = (_c = input2.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input2.current.reasoning, origin: "run-once" };
-  }
-  const own2 = (_f = (_e = input2.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
-  if (input2.override && own2) return { model: own2, reasoning: input2.override.reasoning, origin: "override" };
-  return { model: input2.current.model, reasoning: input2.current.reasoning, origin: "current" };
-}
+// experiences/visual-map/note-write-helpers.ts
+var import_node_crypto6 = require("node:crypto");
 
 // ai/markdown-blocks.ts
 function fencedLines(lines) {
@@ -20796,6 +20477,242 @@ ${rules.join("\n")}` : ""
     rules: rules.length ? `
 ${rules.join("\n")}` : ""
   });
+}
+
+// repository.ts
+var import_obsidian11 = require("obsidian");
+
+// topic-colors.ts
+var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
+function readTopicColor(fm) {
+  const raw = fm["topic-color"];
+  return TOPIC_COLORS.find((id) => id === raw);
+}
+function colorLabelKey(id) {
+  return `share.viewer_color_${id}`;
+}
+var TOPIC_STYLES = ["bold", "text-small", "text-large", "border-thick", "line-thick"];
+var TEXT_SIZES = ["text-small", "text-large"];
+function rawStyleList(raw) {
+  return Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+}
+function readTopicStyle(fm) {
+  const list = rawStyleList(fm["topic-style"]);
+  const size = list.find((v) => TEXT_SIZES.some((s) => s === v));
+  return TOPIC_STYLES.filter((id) => TEXT_SIZES.includes(id) ? id === size : list.includes(id));
+}
+function toggleTopicStyle(raw, token) {
+  const current = rawStyleList(raw);
+  const shown = readTopicStyle({ "topic-style": raw });
+  const drop = (ids) => current.filter((v) => typeof v !== "string" || !ids.includes(v));
+  let next;
+  if (TEXT_SIZES.includes(token)) next = shown.includes(token) ? drop(TEXT_SIZES) : [...drop(TEXT_SIZES), token];
+  else next = shown.includes(token) ? drop([token]) : [...current, token];
+  return next.length ? next : null;
+}
+function setTopicStyle(raw, styles) {
+  const wanted = readTopicStyle({ "topic-style": styles });
+  const rest = rawStyleList(raw).filter((v) => typeof v !== "string" || !TOPIC_STYLES.some((id) => id === v));
+  const next = [...rest, ...wanted];
+  return next.length ? next : null;
+}
+var STYLE_LABEL_KEYS = {
+  bold: "ui.topic_style_bold",
+  "text-small": "ui.topic_style_size_small",
+  "text-large": "ui.topic_style_size_large",
+  "border-thick": "ui.topic_style_border_thick",
+  "line-thick": "ui.topic_style_line_thick"
+};
+function styleLabelKey(id) {
+  return STYLE_LABEL_KEYS[id];
+}
+function branchNoteIds(nodes, id) {
+  return [id, ...descendants(nodes, id)];
+}
+
+// topic-links.ts
+var TOPIC_LINKS_MAX = 20;
+var TOPIC_LINK_MAX_LENGTH = 2048;
+function normalizeTopicLink(value) {
+  if (typeof value !== "string") return null;
+  const text11 = value.trim();
+  if (!text11 || text11.length > TOPIC_LINK_MAX_LENGTH) return null;
+  if (/[\x00-\x20\x7f-\x9f\u2028\u2029]/.test(text11)) return null;
+  if (!/^https?:\/\//i.test(text11)) return null;
+  let url;
+  try {
+    url = new URL(text11);
+  } catch (e) {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (!url.hostname || url.username || url.password) return null;
+  if (url.href.length > TOPIC_LINK_MAX_LENGTH) return null;
+  return url.href;
+}
+function readTopicLinks(fm) {
+  const raw = fm["topic-links"];
+  const items = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const item of items) {
+    const href = normalizeTopicLink(item);
+    if (!href || seen.has(href)) continue;
+    seen.add(href);
+    out.push(href);
+    if (out.length >= TOPIC_LINKS_MAX) break;
+  }
+  return out;
+}
+function addTopicLink(raw, input2) {
+  const href = normalizeTopicLink(input2);
+  if (!href) return { ok: false, reason: "invalid" };
+  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const valid = readTopicLinks({ "topic-links": current });
+  if (valid.includes(href)) return { ok: false, reason: "duplicate" };
+  if (valid.length >= TOPIC_LINKS_MAX) return { ok: false, reason: "too-many" };
+  return { ok: true, next: [...current, href] };
+}
+function removeTopicLink(raw, href) {
+  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const next = current.filter((item) => typeof item !== "string" || normalizeTopicLink(item) !== href);
+  return next.length ? next : null;
+}
+
+// topic-markers.ts
+var TOPIC_MARKERS = [
+  "done",
+  "warning",
+  "star",
+  "priority-1",
+  "priority-2",
+  "priority-3",
+  "priority-4",
+  "priority-5",
+  "progress-0",
+  "progress-25",
+  "progress-50",
+  "progress-75",
+  "progress-100",
+  "flag-red",
+  "flag-yellow",
+  "flag-green",
+  "flag-blue",
+  "smile",
+  "neutral",
+  "sad",
+  "question"
+];
+var TOPIC_MARKER_GROUPS = [
+  { group: "status", single: false, ids: ["done", "warning", "star"] },
+  { group: "priority", single: true, ids: ["priority-1", "priority-2", "priority-3", "priority-4", "priority-5"] },
+  {
+    group: "progress",
+    single: true,
+    ids: ["progress-0", "progress-25", "progress-50", "progress-75", "progress-100"]
+  },
+  { group: "flag", single: false, ids: ["flag-red", "flag-yellow", "flag-green", "flag-blue"] },
+  { group: "face", single: false, ids: ["smile", "neutral", "sad", "question"] }
+];
+function markerGroup(id) {
+  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).group;
+}
+function isSingleChoiceMarker(id) {
+  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).single;
+}
+var SYMBOLS = {
+  done: "\u2713",
+  warning: "\u26A0",
+  star: "\u2605",
+  "priority-1": "P1",
+  "priority-2": "P2",
+  "priority-3": "P3",
+  "priority-4": "P4",
+  "priority-5": "P5",
+  "progress-0": "\u25CB",
+  "progress-25": "\u25D4",
+  "progress-50": "\u25D1",
+  "progress-75": "\u25D5",
+  "progress-100": "\u25CF",
+  "flag-red": "\u2691R",
+  "flag-yellow": "\u2691Y",
+  "flag-green": "\u2691G",
+  "flag-blue": "\u2691B",
+  smile: "\u263A",
+  neutral: "-_-",
+  sad: "\u2639",
+  question: "?"
+};
+var LABEL_KEYS = {
+  done: "share.viewer_marker_done",
+  warning: "share.viewer_marker_warning",
+  star: "share.viewer_marker_star",
+  "priority-1": "share.viewer_marker_priority_1",
+  "priority-2": "share.viewer_marker_priority_2",
+  "priority-3": "share.viewer_marker_priority_3",
+  "priority-4": "share.viewer_marker_priority_4",
+  "priority-5": "share.viewer_marker_priority_5",
+  "progress-0": "share.viewer_marker_progress_0",
+  "progress-25": "share.viewer_marker_progress_25",
+  "progress-50": "share.viewer_marker_progress_50",
+  "progress-75": "share.viewer_marker_progress_75",
+  "progress-100": "share.viewer_marker_progress_100",
+  "flag-red": "share.viewer_marker_flag_red",
+  "flag-yellow": "share.viewer_marker_flag_yellow",
+  "flag-green": "share.viewer_marker_flag_green",
+  "flag-blue": "share.viewer_marker_flag_blue",
+  smile: "share.viewer_marker_smile",
+  neutral: "share.viewer_marker_neutral",
+  sad: "share.viewer_marker_sad",
+  question: "share.viewer_marker_question"
+};
+function readTopicMarkers(fm) {
+  const raw = fm["topic-markers"];
+  if (!Array.isArray(raw)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  return TOPIC_MARKERS.filter((id) => {
+    if (!raw.includes(id)) return false;
+    if (!isSingleChoiceMarker(id)) return true;
+    const group = markerGroup(id);
+    if (seen.has(group)) return false;
+    seen.add(group);
+    return true;
+  });
+}
+function toggleTopicMarker(raw, id) {
+  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const group = TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id));
+  const groupIds = group.ids;
+  let next;
+  if (group.single) {
+    const shown = groupIds.find((g) => current.includes(g));
+    const rest = current.filter((v) => typeof v !== "string" || !groupIds.includes(v));
+    next = shown === id ? rest : [...rest, id];
+  } else if (current.includes(id)) next = current.filter((v) => v !== id);
+  else next = [...current, id];
+  return next.length ? next : null;
+}
+function markerSymbol(id) {
+  return SYMBOLS[id];
+}
+function markerLabelKey(id) {
+  return LABEL_KEYS[id];
+}
+
+// repository.ts
+var import_node_crypto5 = require("node:crypto");
+
+// ai/model-resolution.ts
+var FALLBACK_MODEL = "gpt-5.6-luna";
+function resolveTaskModel(input2) {
+  var _a2, _b2, _c, _d, _e, _f;
+  const once = (_b2 = (_a2 = input2.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
+  if (once) {
+    return { model: once, reasoning: (_d = (_c = input2.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input2.current.reasoning, origin: "run-once" };
+  }
+  const own2 = (_f = (_e = input2.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
+  if (input2.override && own2) return { model: own2, reasoning: input2.override.reasoning, origin: "override" };
+  return { model: input2.current.model, reasoning: input2.current.reasoning, origin: "current" };
 }
 
 // core/map-chat-layout.ts
@@ -23524,6 +23441,103 @@ ${body}`;
   }
 };
 
+// experiences/visual-map/note-write-helpers.ts
+function summaryForPrompt(summary, language2) {
+  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
+}
+function formatIssuesPatch(issues, language2) {
+  return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
+}
+var originBaseline = (origin) => (0, import_node_crypto6.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
+
+// experiences/visual-map/relation-geometry.ts
+var MIN_CONTROL = 16;
+var MAX_CONTROL = 60;
+function axisGap(aStart, aSize, bStart, bSize) {
+  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
+}
+var centreOf = (box) => ({
+  x: box.x + box.width / 2,
+  y: box.y + box.height / 2
+});
+function nearestSides(a, b) {
+  const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
+  if (horizontal < 0 && vertical < 0) {
+    const from = centreOf(a), to = centreOf(b);
+    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
+  }
+  if (horizontal >= vertical) {
+    const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
+    return {
+      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
+      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign2, ny: 0 },
+      gap: horizontal
+    };
+  }
+  const downward = centreOf(b).y >= centreOf(a).y, sign = downward ? 1 : -1;
+  return {
+    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
+    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
+    gap: vertical
+  };
+}
+var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
+function curveOf(a, b) {
+  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
+  return {
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
+  };
+}
+function relationPathData(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+function relationLabelPoint(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+function treeEdgePathData(parent, child, direction, depth = 1) {
+  if (direction === "radial") return relationPathData(parent, child);
+  if (direction === "timeline" && depth >= 2)
+    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
+  if (direction === "fishbone")
+    return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
+  if (direction === "down" || direction === "up") {
+    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, bend2 = Math.max(60, Math.abs(y22 - y12) / 2), sign = down ? 1 : -1;
+    return `M ${x12} ${y12} C ${x12} ${y12 + sign * bend2}, ${x22} ${y22 - sign * bend2}, ${x22} ${y22}`;
+  }
+  const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
+  const leftward = direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
+  if (leftward) {
+    const x12 = parent.x, x22 = child.x + child.width, bend2 = Math.max(60, Math.abs(x22 - x12) / 2);
+    return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
+  }
+  const x1 = parent.x + parent.width, x2 = child.x, bend = Math.max(60, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+}
+var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
+function fishboneBone(parent, child) {
+  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2, above = childY < parentY, x = child.x + child.width / 2, y = above ? child.y + child.height : child.y;
+  return { jointX: x + Math.abs(parentY - y) * BONE_RUN2, parentY, x, y };
+}
+function fishboneSpinePathData(head, topics) {
+  if (!topics.length) return "";
+  const end = Math.min(...topics.map((topic) => fishboneBone(head, topic).jointX));
+  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
+}
+function fishboneEdgePathData(parent, child, depth) {
+  if (depth <= 1) {
+    const { jointX, parentY: parentY2, x: x2, y: y2 } = fishboneBone(parent, child);
+    return `M ${jointX} ${parentY2} L ${x2} ${y2}`;
+  }
+  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2;
+  const above = childY > parentY, x = parent.x + parent.width / 2, y = above ? parent.y + parent.height : parent.y, boneX = x + Math.abs(childY - y) * BONE_RUN2;
+  return `M ${boneX} ${childY} L ${child.x + child.width} ${childY}`;
+}
+
 // experiences/visual-map/card-cover.ts
 var COVER_KEY = "topic-cover";
 var IMAGE_EXTENSION2 = /\.(?:png|jpe?g|gif|webp)$/i;
@@ -23665,7 +23679,7 @@ function shapeInsets(kind, content) {
 }
 
 // experiences/visual-map/view.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 var import_obsidian31 = require("obsidian");
 
 // ai/result-utils.ts
@@ -30173,7 +30187,7 @@ async function loadableImages(candidates, signal) {
 }
 
 // core/ai-task-service.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 
 // ai/context-builder.ts
 var estimateTokens = (value) => Math.ceil((value || "").length / 4);
@@ -30259,7 +30273,7 @@ function isSearchNotPerformed(error) {
 }
 
 // core/ai-calls.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var AiCalls = class {
   constructor(options) {
     this.options = options;
@@ -30322,7 +30336,7 @@ var AiCalls = class {
       requestLog = "request-and-prompt",
       stopped = () => new Error(t("ui.ai_task_cancelled"))
     } = options;
-    const key2 = `${options.taskName}:${(0, import_node_crypto6.randomUUID)()}`;
+    const key2 = `${options.taskName}:${(0, import_node_crypto7.randomUUID)()}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     options.signal.addEventListener("abort", abort, { once: true });
@@ -30330,7 +30344,7 @@ var AiCalls = class {
     this.activeTasks.set(key2, controller);
     const started = this.options.exchanges();
     const log = () => started ? this.options.exchanges() : void 0;
-    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto6.randomUUID)();
+    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto7.randomUUID)();
     const milestones = {};
     let milestonesWritten = false;
     const writeMilestones = () => {
@@ -32974,7 +32988,7 @@ var AiTaskService = class {
     for (; ; ) {
       if (taskSignal == null ? void 0 : taskSignal.aborted) throw cancelled();
       attemptNumber++;
-      const attemptId = (0, import_node_crypto7.randomUUID)();
+      const attemptId = (0, import_node_crypto8.randomUUID)();
       const controller = new AbortController();
       const onTaskAbort = () => controller.abort();
       taskSignal == null ? void 0 : taskSignal.addEventListener("abort", onTaskAbort, { once: true });
@@ -32993,7 +33007,7 @@ var AiTaskService = class {
         if ((taskSignal == null ? void 0 : taskSignal.aborted) || !live() || firstEvent) return;
         resendRequested = true;
         disarm();
-        promisedId = (0, import_node_crypto7.randomUUID)();
+        promisedId = (0, import_node_crypto8.randomUUID)();
         extra.resentAs = promisedId;
         controller.abort();
       };
@@ -34065,7 +34079,7 @@ var PendingSuggestions = class extends Map {
 };
 
 // experiences/aim/create-map.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 
 // experiences/aim/outcome-expectations.ts
 var goals = ["auto", "execute", "understand", "explore", "custom"];
@@ -34161,7 +34175,7 @@ async function createAimMap(repository, model, input2) {
     const notePath = repository.unique(repository.topicFolder(mapPath, "Notes"), topic);
     const chosenReasoning = normalizeReasoningLevel((_f = input2.reasoning) != null ? _f : repository.settings.cliReasoning);
     draft = {
-      nodeId: (0, import_node_crypto8.randomUUID)(),
+      nodeId: (0, import_node_crypto9.randomUUID)(),
       notePath,
       title: topic,
       context: rootContext,
@@ -40140,7 +40154,7 @@ var TopicTreeModal = class extends import_obsidian25.Modal {
 
 // ui/modals/aim-start-modal.ts
 var import_obsidian26 = require("obsidian");
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 var AimStartModal = class extends import_obsidian26.Modal {
   constructor(app, submit, models = [], defaultModel = FALLBACK_MODEL, defaultReasoning = "low", refreshModels) {
     super(app);
@@ -40149,7 +40163,7 @@ var AimStartModal = class extends import_obsidian26.Modal {
     this.defaultModel = defaultModel;
     this.defaultReasoning = defaultReasoning;
     this.refreshModels = refreshModels;
-    __publicField(this, "requestId", (0, import_node_crypto9.randomUUID)());
+    __publicField(this, "requestId", (0, import_node_crypto10.randomUUID)());
   }
   onOpen() {
     this.titleEl.setText(t("ui.aim_start_title"));
@@ -40305,7 +40319,7 @@ var AimStartModal = class extends import_obsidian26.Modal {
     answerCount.setAttr("aria-label", t("ui.aim_minimum_answers"));
     answerCountLabel.createEl("p", { cls: "vam-hint", text: t("ui.aim_answer_target_hint") });
     const newRequest = () => {
-      this.requestId = (0, import_node_crypto9.randomUUID)();
+      this.requestId = (0, import_node_crypto10.randomUUID)();
     };
     topic.addEventListener("input", newRequest);
     context.addEventListener("input", newRequest);
@@ -40424,9 +40438,9 @@ var AimStartModal = class extends import_obsidian26.Modal {
 
 // ui/modals/aim-answer-modal.ts
 var import_obsidian27 = require("obsidian");
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var AimAnswerModal = class extends import_obsidian27.Modal {
-  constructor(app, question, options, submit, requestId = (0, import_node_crypto10.randomUUID)()) {
+  constructor(app, question, options, submit, requestId = (0, import_node_crypto11.randomUUID)()) {
     super(app);
     this.question = question;
     this.options = options;
@@ -40449,7 +40463,7 @@ var AimAnswerModal = class extends import_obsidian27.Modal {
       label.createSpan({ text: option.label });
       boxes.set(option.id, input2);
       input2.addEventListener("change", () => {
-        this.requestId = (0, import_node_crypto10.randomUUID)();
+        this.requestId = (0, import_node_crypto11.randomUUID)();
         if (input2.checked && option.id === "__aim_unknown__") {
           for (const [id, peer] of boxes) if (id !== option.id) peer.checked = false;
         } else if (input2.checked) {
@@ -40463,7 +40477,7 @@ var AimAnswerModal = class extends import_obsidian27.Modal {
     const freeText = freeTextLabel.createEl("textarea", { attr: { rows: "3" } });
     freeText.setAttr("aria-label", t("ui.aim_free_text"));
     freeText.addEventListener("input", () => {
-      this.requestId = (0, import_node_crypto10.randomUUID)();
+      this.requestId = (0, import_node_crypto11.randomUUID)();
     });
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending2 = false, submitButton;
@@ -40689,7 +40703,7 @@ function deduplicateAimRequest(context) {
 }
 
 // experiences/aim/final-delivery.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 
 // experiences/aim/steps/delivery-outline/task.md
 var task_default = "You are the final-delivery Synthesizer. Design the actual document needed to answer the original user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return the outline in aim.sections: each section has heading, purpose (what the reader can do or understand after it), searchTask (specific web search needed, or empty if already supported), evidenceIds and dependencies (supplied source IDs). Choose a suitable structure, not a fixed template. Open with a section that gives the direct answer or recommendation. Give every section a distinct purpose so no two sections cover the same advice or caveats; gather the items the user must still confirm in at most one section; use no more sections than the answer needs (usually 3 to 5). Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Earlier rounds are part of this answer: the user's earlier answers and their saved results (earlier documents and research) carry into this document, integrated with the current research. Update what the current research changes, and drop an earlier finding only when a later answer replaces it. Do not ask the user or deliver the document yet.\nSupplied evidence IDs and reports:\n{{sourceCatalog}}\n";
@@ -40741,7 +40755,7 @@ ${renderTemplate(open_items_default, { openItems })}` : task;
 
 // experiences/aim/final-delivery.ts
 var DOCUMENT_KEY = "document";
-var fingerprint = (value) => (0, import_node_crypto11.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+var fingerprint = (value) => (0, import_node_crypto12.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
 function parseDeliveryOutline(detail) {
   const marker5 = detail.match(/<!--\s*aim-delivery-outline\s+([\s\S]*?)\s*-->/);
   if (!marker5) throw new Error("Final delivery outline is missing; no conclusion was saved.");
@@ -41031,7 +41045,7 @@ ${draft.detail}`
 }
 
 // experiences/aim/manual-flow.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 
 // experiences/aim/search-diagnostic.ts
 function createSearchDiagnostic(researchTurn) {
@@ -42078,7 +42092,7 @@ var OTHER_ROUTE_REUSE_LIMIT = 6;
 var SEARCH_NOT_PERFORMED2 = /did not perform web search|沒有實際執行網路搜尋/;
 var CHECKLIST_QUESTION_LIMIT = 5;
 var _AimManualFlow = class _AimManualFlow {
-  constructor(repository, runs, askModel, id = import_node_crypto12.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
+  constructor(repository, runs, askModel, id = import_node_crypto13.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
     this.repository = repository;
     this.runs = runs;
     this.askModel = askModel;
@@ -42318,7 +42332,7 @@ ${(_d = context.task) != null ? _d : ""}`
       readable.map(async (id) => {
         const ref = this.evidenceReports.get(id);
         const note = await this.repository.readNote(ref.path);
-        if ((0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash)
+        if ((0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash)
           throw new Error("AIM evidence changed after indexing; retry with the updated report.");
         return `Evidence ID: ${id}
 Full report:
@@ -44370,7 +44384,7 @@ ${note.detail}`
         });
         this.evidenceReports.set(`${result.nodeId}-v${result.version}`, {
           path: result.notePath,
-          hash: (0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex")
+          hash: (0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex")
         });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
@@ -44890,7 +44904,7 @@ ${dependencyReports}` : "")
     try {
       await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
       const supplementalReports = [];
-      const sourceFingerprint = (0, import_node_crypto12.createHash)("sha256").update(
+      const sourceFingerprint = (0, import_node_crypto13.createHash)("sha256").update(
         JSON.stringify({
           detail: contextBase.detail,
           ancestors: contextBase.ancestors,
@@ -44930,7 +44944,7 @@ ${report.detail}`
         return [
           ...(_a3 = resumeDelivery == null ? void 0 : resumeDelivery.evidence) != null ? _a3 : initialDeliveryEvidence,
           ...supplementalReports.map((item) => ({
-            id: `followup-${(0, import_node_crypto12.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
+            id: `followup-${(0, import_node_crypto13.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
             hash: researchContentHash(item),
             detail: `## ${item.target.title}
 
@@ -45432,7 +45446,7 @@ ${beforeSearch.detail}`,
         const evidenceId = `${result.nodeId}-v${result.version}`;
         this.evidenceReports.set(evidenceId, {
           path: result.notePath,
-          hash: (0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex")
+          hash: (0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex")
         });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
@@ -45445,7 +45459,7 @@ ${evidenceCard(evidenceId, note.summary, note.detail)}`
         evidence.push(note);
         sources.push({
           id: evidenceId,
-          hash: (0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex"),
+          hash: (0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex"),
           detail: `## ${note.title}
 
 ${note.summary}
@@ -45480,12 +45494,12 @@ __publicField(_AimManualFlow, "continuationRuns", /* @__PURE__ */ new Map());
 var AimManualFlow = _AimManualFlow;
 
 // experiences/aim/research-run-store.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 function isRunningAttempt(run, attempt, handle) {
   return run.currentAttemptId === handle.attemptId && attempt.status === "running" && attempt.inputSnapshotHash === handle.inputSnapshotHash;
 }
 var _AimRunStore = class _AimRunStore {
-  constructor(repository, id = import_node_crypto13.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
+  constructor(repository, id = import_node_crypto14.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
     this.repository = repository;
     this.id = id;
     this.now = now;
@@ -46272,7 +46286,7 @@ var _AimRunStore = class _AimRunStore {
     return state;
   }
   snapshotHash(value) {
-    return (0, import_node_crypto13.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+    return (0, import_node_crypto14.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
   }
   liveKey(mapPath, runId, attemptId) {
     return `${mapPath}
@@ -46505,13 +46519,6 @@ function errorMessage(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
-function summaryForPrompt(summary, language2) {
-  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
-}
-function formatIssuesPatch(issues, language2) {
-  return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
-}
-var originBaseline = (origin) => (0, import_node_crypto14.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   var _a2, _b2;
   if (activeQuestionNodeId === questionNodeId) return "running";
@@ -47633,6 +47640,17 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   }
   syncOutline() {
     this.plugin.syncOutline(this.map, this.notes, this);
+  }
+  /** Another view changed a note by AI: this view's undo steps no longer match it. */
+  clearUndoHistory() {
+    this.history.clear();
+  }
+  /** An AI run settled: reload and redraw once the queue is free. */
+  reloadAfterAiRun() {
+    this.enqueue(async () => {
+      await this.hydrate();
+      this.render();
+    });
   }
   enqueue(work) {
     void this.plugin.mutate(work).catch(() => {
@@ -49984,7 +50002,7 @@ ${request.requirements}` : preset.text,
       }
       this.aimActivityKind = "planning";
       this.render();
-      const result = await this.planAimQuestion(node.id, (0, import_node_crypto14.randomUUID)(), parentBranchId, controller.signal);
+      const result = await this.planAimQuestion(node.id, (0, import_node_crypto15.randomUUID)(), parentBranchId, controller.signal);
       this.noticeDocumentReadyElsewhere(
         result.status === "question" ? void 0 : (_e = result.outcome) == null ? void 0 : _e.status,
         epoch,
@@ -50205,7 +50223,7 @@ ${request.requirements}` : preset.text,
           }
         }
       },
-      (_d = this.aimAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto14.randomUUID)()
+      (_d = this.aimAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto15.randomUUID)()
     ).open();
   }
   changed(file) {
@@ -51826,7 +51844,7 @@ ${request.requirements}` : preset.text,
   async addFreeText(point) {
     var _a2;
     if (!this.map || !this.canEditText()) return;
-    const id = `txt-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, at = point != null ? point : { x: 0, y: 0 };
+    const id = `txt-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, at = point != null ? point : { x: 0, y: 0 };
     this.pendingTextEditId = id;
     await this.mapChange((map) => {
       var _a3;
@@ -52015,7 +52033,7 @@ ${request.requirements}` : preset.text,
         await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
         return;
       }
-      const id = `txt-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`;
+      const id = `txt-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`;
       this.pendingTextEditId = id;
       await this.mapChange((map) => {
         var _a3;
@@ -52190,7 +52208,7 @@ ${request.requirements}` : preset.text,
     }
     if (this.suspendSummaryEdit) this.suspendSummaryEdit();
     this.summaryEditDraft = null;
-    this.pendingSummary = { id: `sum-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, members: check.members };
+    this.pendingSummary = { id: `sum-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, members: check.members };
     this.render();
   }
   /**
@@ -52473,7 +52491,7 @@ ${request.requirements}` : preset.text,
     if (!this.map || this.map.aim) return null;
     const known = new Set(this.map.nodes.map((node) => node.id)), members = [...new Set(ids)].filter((id2) => known.has(id2));
     if (!members.length) return null;
-    const id = `frame-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, text11 = label.trim();
+    const id = `frame-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, text11 = label.trim();
     this.focusItemId = id;
     const frame = { id, kind: "boundary", members, ...text11 ? { label: text11 } : {} };
     await this.mapChange((map) => {
@@ -52829,7 +52847,7 @@ ${request.requirements}` : preset.text,
       }
       const name = safeImageName(file.name, accepted.mime);
       if (!name) continue;
-      const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
+      const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
       try {
         if (stale()) return;
         this.focusItemId = id;
@@ -68469,9 +68487,13 @@ var TopicRuns = class {
   get running() {
     return this.ports.running();
   }
-  /** Registers a run for the topic. Returns null when the topic already has one or the module is disposed. */
-  begin(path, kind) {
-    if (this.disposed || this.controllers.has(path)) return null;
+  /**
+   * Registers a run for the topic. Returns null when the topic already has one or the module is disposed.
+   * `replace` (the research run only, until ticket 05) takes the topic over from a run that is still registered: the
+   * older run is not stopped, and its release then no longer frees the topic.
+   */
+  begin(path, kind, options = {}) {
+    if (this.disposed || !options.replace && this.controllers.has(path)) return null;
     const controller = new AbortController();
     this.controllers.set(path, controller);
     this.running.add(path);
@@ -68485,6 +68507,233 @@ var TopicRuns = class {
         this.running.delete(path);
       }
     };
+  }
+  /**
+   * Runs a research on one topic: reads the note, resolves model and style, registers (the topic is `running`), asks
+   * the model, then checks the note against what the run started from and writes the answer in one mutate. Resolves
+   * with null when the run did not start, otherwise with a handle whose `finished` settles when the run is over.
+   * The caller says what the run should look like; this decides when each step happens.
+   */
+  async start(path, kind, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    if (this.disposed) return null;
+    const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
+    const settings = () => this.ports.settings();
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map);
+    const used = ((_b2 = options.runOnce) == null ? void 0 : _b2.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
+    if (!((_c = overrides.task) != null ? _c : note.prompt)) {
+      const message = t("ui.enter_a_question_or_task_for_ai_first");
+      if (options.failed) options.failed(message);
+      else (_d = options.notify) == null ? void 0 : _d.call(options, message);
+      return null;
+    }
+    if (this.running.has(path)) {
+      (_e = options.failed) == null ? void 0 : _e.call(options, t("ui.ai_running_ai"));
+      return null;
+    }
+    const outputLanguage2 = (_f = overrides.outputLanguage) != null ? _f : settings().language;
+    const runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
+    const detailTemplate = runStyle.template;
+    const context = withThinkingOrigin(
+      {
+        title: note.title,
+        summary: summaryForPrompt(note.summary, outputLanguage2),
+        rules: "",
+        detail: note.detail,
+        task: note.prompt,
+        ancestors: (_h = await ((_g = options.ancestors) == null ? void 0 : _g.call(options, outputLanguage2))) != null ? _h : "",
+        userTexts: (_j = (_i = options.userTexts) == null ? void 0 : _i.call(options)) != null ? _j : "",
+        workingFindings: note.newFindings,
+        sourceContext: "",
+        mode: "task",
+        researchMode: note.researchMode,
+        researchDepth: "normal",
+        visualMode: note.visualMode,
+        ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
+        ...overrides,
+        detailTemplate,
+        ...runStyle.contextFields,
+        addCharts: (_k = overrides.addCharts) != null ? _k : true
+      },
+      note
+    );
+    const language2 = settings().language;
+    this.pendingSuggestions.delete(path);
+    this.abortCharts(path);
+    const handle = this.begin(path, kind, { replace: true });
+    if (!handle) return null;
+    const controller = this.controllers.get(path);
+    const activeTasks = this.ports.activeTasks();
+    const abortFromTaskModal = () => controller.abort();
+    if ((_l = overrides.signal) == null ? void 0 : _l.aborted) controller.abort();
+    else (_m = overrides.signal) == null ? void 0 : _m.addEventListener("abort", abortFromTaskModal, { once: true });
+    activeTasks.set(path, controller);
+    const progress = this.ports.progress();
+    let progressAttempt = "starting";
+    progress.begin(path, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
+    const observer = {
+      onAttempt: (id) => {
+        progressAttempt = id;
+        progress.newAttempt(path, id, Date.now());
+      },
+      onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress.preview(path, id, fields != null ? fields : {}),
+      onSlow: (id, slow, resend) => progress.markSlow(path, id, slow, resend)
+    };
+    const releaseRun = () => {
+      var _a3;
+      (_a3 = overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+    };
+    const fail2 = (message) => {
+      var _a3;
+      if (options.failed) options.failed(message);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    const releaseStartup = () => {
+      progress.end(path, progressAttempt);
+      releaseRun();
+    };
+    let startupStatusAttempted = false;
+    try {
+      startupStatusAttempted = true;
+      await repo.updateNote(path, { status: "running" });
+      await ((_n = options.onStarted) == null ? void 0 : _n.call(options));
+      if (controller.signal.aborted) {
+        try {
+          await repo.updateNote(path, { status: note.status });
+        } finally {
+          releaseStartup();
+        }
+        return null;
+      }
+    } catch (error) {
+      try {
+        if (startupStatusAttempted) await repo.updateNote(path, { status: note.status });
+      } catch (e) {
+      } finally {
+        releaseStartup();
+      }
+      throw error;
+    }
+    let exchangeId = "";
+    let resolveAccepted;
+    const acceptedPromise = new Promise((resolve) => {
+      resolveAccepted = resolve;
+    });
+    let requestAccepted = false;
+    const markAccepted = () => {
+      var _a3;
+      if (requestAccepted) return;
+      requestAccepted = true;
+      resolveAccepted(true);
+      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
+    };
+    const exchanges = () => settings().aiExchangeLoggingEnabled ? this.ports.exchanges() : void 0;
+    const completion = this.ports.askModel(
+      context,
+      used.model,
+      used.reasoning,
+      controller.signal,
+      (id) => {
+        exchangeId = id;
+      },
+      markAccepted,
+      void 0,
+      observer
+    ).then(
+      (result) => this.ports.mutate()(async () => {
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+        progress.end(path, progressAttempt);
+        const latest = await repo.readNote(path, options.map);
+        const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
+        if (controller.signal.aborted || stale) {
+          await repo.updateNote(path, { status: note.status });
+          if (exchangeId)
+            (_a3 = exchanges()) == null ? void 0 : _a3.failed(
+              exchangeId,
+              t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+            );
+          if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          return;
+        }
+        await repo.updateNote(
+          path,
+          {
+            summary: result.summary,
+            detail: canonicalDetail(
+              result.detail,
+              noteLanguageOf((_b3 = context.outputLanguage) != null ? _b3 : settings().language),
+              context.detailTemplate
+            ),
+            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
+            newFindings: "",
+            status: "completed",
+            // The topic remembers the mode of its latest research (Quick is stored as local).
+            ...context.researchMode ? { researchMode: context.researchMode } : {},
+            ...formatIssuesPatch(result.formatIssues, language2)
+          },
+          { detailTemplate: context.detailTemplate }
+        );
+        const saved = await repo.readNote(path, options.map);
+        (_c2 = options.onWritten) == null ? void 0 : _c2.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_d2 = exchanges()) == null ? void 0 : _d2.completed(exchangeId);
+        this.ports.clearOtherHistory(options.origin);
+        (_f2 = options.queueCharts) == null ? void 0 : _f2.call(options, {
+          path,
+          saved,
+          context,
+          detail: saved.detail,
+          formatIssues: result.formatIssues,
+          model: used.model,
+          language: (_e2 = context.outputLanguage) != null ? _e2 : settings().language,
+          template: context.detailTemplate
+        });
+        if (result.suggestions.length) {
+          this.pendingSuggestions.set(
+            path,
+            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
+          );
+          try {
+            await ((_h2 = (_g2 = this.pendingSuggestions).flush) == null ? void 0 : _h2.call(_g2));
+          } catch (error) {
+            (_i2 = options.notify) == null ? void 0 : _i2.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
+          }
+        }
+        (_j2 = options.done) == null ? void 0 : _j2.call(options, result);
+      })
+    ).catch(
+      (error) => this.ports.mutate()(async () => {
+        var _a3, _b3, _c2;
+        progress.end(path, progressAttempt);
+        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
+          await repo.updateNote(path, { status: note.status });
+          fail2(t("ui.research_stopped_existing_content_was_preserved"));
+          return;
+        }
+        console.error("Visual Agent Map AI task", error);
+        if (exchangeId && ((_b3 = (_a3 = exchanges()) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
+          (_c2 = exchanges()) == null ? void 0 : _c2.failed(
+            exchangeId,
+            t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
+          );
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail2(this.ports.recordFailure(t("log.ai_task_failed"), error));
+      })
+    ).finally(() => {
+      progress.end(path, progressAttempt);
+      releaseRun();
+      this.ports.refreshViews();
+    }).catch(() => {
+    });
+    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
+    if (!accepted) {
+      await completion;
+      return null;
+    }
+    return { finished: completion };
   }
   /** The current store of suggestions awaiting a decision (onload swaps the plugin's for the persisted one). */
   get pendingSuggestions() {
@@ -70251,9 +70500,24 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       mutate: () => (work) => this.mutate(work),
       progress: () => this.researchProgress,
       repository: () => this.repo,
-      isUnloaded: () => this.unloaded,
       running: () => this.running,
-      pendingSuggestions: () => this.pendingSuggestions
+      pendingSuggestions: () => this.pendingSuggestions,
+      activeTasks: () => this.activeTasks,
+      askModel: (...args) => this.askModel(...args),
+      settings: () => this.settings,
+      exchanges: () => this.exchanges,
+      recordFailure: (context, error) => this.recordFailure(context, error),
+      runStyle: ({ note, outputLanguage: outputLanguage2 }) => this.noteStyles.runStyle({
+        topic: { template: note.detailTemplateId, tone: note.toneId },
+        outputLanguage: outputLanguage2
+      }),
+      resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
+      clearOtherHistory: (origin) => {
+        for (const view of this.views()) if (view !== origin) view.clearUndoHistory();
+      },
+      refreshViews: () => {
+        for (const view of this.views()) view.reloadAfterAiRun();
+      }
     }));
     __publicField(this, "expansionBatches", /* @__PURE__ */ new Map());
     __publicField(this, "expansionCoordinator", new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches));

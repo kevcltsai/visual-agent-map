@@ -87,6 +87,9 @@ import { TopicSelection, type SelectionChange } from "./topic-selection";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
+import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
+
+export { formatIssuesPatch };
 import {
   fishboneSpinePathData,
   relationLabelPoint,
@@ -114,7 +117,7 @@ import {
 } from "../../topic-colors";
 import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import {
   noteLanguageOf,
@@ -226,14 +229,7 @@ import {
   isPlaceholder
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import {
-  checkCounts,
-  countIssueText,
-  builtinTemplates,
-  STANDARD_TEMPLATE_ID,
-  type CountIssue,
-  type DetailTemplate
-} from "../../ai/detail-templates";
+import { checkCounts, builtinTemplates, STANDARD_TEMPLATE_ID, type DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { parseBlockRef } from "../../core/blocks/block-files";
@@ -481,24 +477,6 @@ function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
 }
-/** A note's stored "no conclusion yet" placeholder is written in the note's own language; in an AI prompt it is shown in the task's output language. */
-function summaryForPrompt(summary: string, language: ContentLanguage): string {
-  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language), "note.no_conclusion_yet") : summary;
-}
-/**
- * Unmet section counts to store on the topic; undefined (no count check ran) clears an earlier mark. The text is written
- * into the note's frontmatter, so it is in the note language, never a display-only interface language.
- */
-export function formatIssuesPatch(
-  issues: CountIssue[] | undefined,
-  language: ContentLanguage
-): Pick<NotePatch, "detailFormatIssues"> {
-  return { detailFormatIssues: (issues ?? []).map(issue => countIssueText(issue, noteLanguageOf(language))) };
-}
-const originBaseline = (origin?: string): string =>
-  createHash("sha256")
-    .update(origin ?? "")
-    .digest("hex");
 
 /** What resolving a note style gives a view: the template, the ids that could not be used and, for a block, why. */
 type AimQuestionStatus = "running" | "completed" | "partial" | "failed" | "cancelled" | "not_started";
@@ -1813,6 +1791,17 @@ export class VisualAgentMapView extends ItemView {
   }
   syncOutline(): void {
     this.plugin.syncOutline(this.map, this.notes, this);
+  }
+  /** Another view changed a note by AI: this view's undo steps no longer match it. */
+  clearUndoHistory(): void {
+    this.history.clear();
+  }
+  /** An AI run settled: reload and redraw once the queue is free. */
+  reloadAfterAiRun(): void {
+    this.enqueue(async () => {
+      await this.hydrate();
+      this.render();
+    });
   }
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});

@@ -250,9 +250,25 @@ export default class VisualAgentMapPlugin extends Plugin {
     mutate: () => work => this.mutate(work),
     progress: () => this.researchProgress,
     repository: () => this.repo,
-    isUnloaded: () => this.unloaded,
     running: () => this.running,
-    pendingSuggestions: () => this.pendingSuggestions
+    pendingSuggestions: () => this.pendingSuggestions,
+    activeTasks: () => this.activeTasks,
+    askModel: (...args) => this.askModel(...args),
+    settings: () => this.settings,
+    exchanges: () => this.exchanges,
+    recordFailure: (context, error) => this.recordFailure(context, error),
+    runStyle: ({ note, outputLanguage }) =>
+      this.noteStyles.runStyle({
+        topic: { template: note.detailTemplateId, tone: note.toneId },
+        outputLanguage
+      }),
+    resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
+    clearOtherHistory: origin => {
+      for (const view of this.views()) if (view !== origin) view.clearUndoHistory();
+    },
+    refreshViews: () => {
+      for (const view of this.views()) view.reloadAfterAiRun();
+    }
   });
   readonly expansionBatches = new Map<string, ExpansionBatchState>();
   readonly expansionCoordinator = new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches);

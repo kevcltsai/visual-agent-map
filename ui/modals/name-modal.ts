@@ -9,8 +9,11 @@ export class NameModal extends Modal {
     private titleText: string,
     private value: string,
     private submit: (value: string) => void,
-    /** `allowEmpty` lets the field stay blank (an optional label); the default still refuses an empty name. */
-    private options: { allowEmpty?: boolean } = {}
+    /**
+     * `allowEmpty` lets the field stay blank (an optional label); the default still refuses an empty name. `problem`
+     * is an extra check for a typed name (for example one already taken): its text shows live and blocks saving.
+     */
+    private options: { allowEmpty?: boolean; problem?: (value: string) => string } = {}
   ) {
     super(app);
   }
@@ -25,13 +28,14 @@ export class NameModal extends Modal {
     const save = (): void => {
       const value = input.value.trim();
       if (this.options.allowEmpty ? !!value && !!titleProblemText(value) : !value || !!titleProblemText(value)) return;
+      if (value && this.options.problem?.(value)) return;
       this.close();
       this.submit(value);
     };
     // An empty name cannot be saved; say so instead of ignoring the press.
     const check = (): void => {
       const empty = !input.value.trim();
-      const problem = empty ? "" : titleProblemText(input.value);
+      const problem = empty ? "" : titleProblemText(input.value) || (this.options.problem?.(input.value.trim()) ?? "");
       const blankOk = empty && !!this.options.allowEmpty;
       saveButton.disabled = (empty && !blankOk) || !!problem;
       status.setText(empty && !blankOk ? t("ui.name_required") : problem);

@@ -1,28 +1,61 @@
 import type VisualAgentMapPlugin from "../main";
-import { SUPPORTED_LANGUAGES, t } from "../i18n";
+import { SUPPORTED_LANGUAGES, t, type TranslationKey } from "../i18n";
 import { normalizeReasoningLevel } from "../repository";
 import { modelDiscoverySummary, syncModelSelect } from "../core/model-discovery";
 import { NOTE_STYLE_PRESETS } from "../experiences/visual-map/note-style";
 import { clampPreviewScale } from "./preview-utils";
-import { App, Modal, normalizePath, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
-import type { ButtonComponent, DropdownComponent } from "obsidian";
-import { builtinRef } from "../core/blocks/block-files";
+import { App, Menu, Modal, normalizePath, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import type { ButtonComponent, DropdownComponent, ExtraButtonComponent } from "obsidian";
+import { NameModal } from "./modals/name-modal";
+import type { BlockListItem } from "../ai/note-style-store";
+import {
+  builtinBlockNames,
+  builtinRef,
+  cleanBlockName,
+  copyBlockName,
+  parseBlockRef
+} from "../core/blocks/block-files";
 import type { BlockCategory } from "../core/blocks/builtin";
 import { styleIssueText } from "../experiences/visual-map/note-style-picker";
 
 /**
- * "Note style" row: the style folder (the Template and Tone rows below it pick the workspace default). A folder that
- * is gone (renamed while the plugin was off) shows "Style folder not found" and lets the user pick it again.
+ * "Note style" heading: the title, the one-line help and the "Preview AI instructions" button on its right. The rows
+ * below it (structure, voice, file location) do the work.
  */
-export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapPlugin, refresh: () => void): void {
+export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapPlugin): void {
+  setting.setName(t("ui.note_style")).setDesc(t("ui.note_style_setting_desc")).setHeading();
+  setting.addButton(button => {
+    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
+    button.buttonEl.addClass("mod-muted");
+  });
+}
+
+/**
+ * "File location" row: where the files you edited or created are, with "Show in file explorer". A folder that is gone
+ * (renamed while the plugin was off) shows "File location not found" and lets the user pick it again; a folder that was
+ * never made says there are no files yet.
+ */
+export function renderNoteLocationSetting(
+  setting: Setting,
+  plugin: VisualAgentMapPlugin,
+  refresh: () => void
+): () => void {
   const store = plugin.noteStyles;
   const settings = plugin.settings;
-  const missing = !store.folderExists();
-  setting
-    .setName(t("ui.note_style"))
-    .setDesc(missing ? t("ui.note_style_folder_missing_desc_0", store.folder()) : t("ui.note_style_setting_desc"));
+  const missing = !store.folderExists() && !!settings.noteStylesFolder;
+  let loaded = false;
+  const hasFiles = (): boolean =>
+    (["template", "tone"] as const).some(category =>
+      store.listBlocks(category).some(item => item.fileName !== undefined)
+    );
+  const describe = (): void => {
+    if (missing) return;
+    setting.setDesc(t(loaded && !hasFiles() ? "ui.note_style_location_empty" : "ui.note_style_location_desc"));
+  };
   if (missing) {
-    setting.nameEl.setText(`${t("ui.note_style")} · ${t("ui.note_style_folder_missing")}`);
+    setting
+      .setName(t("ui.note_style_folder_missing"))
+      .setDesc(t("ui.note_style_folder_missing_desc_0", store.folder()));
     let input = "";
     setting.addText(text => {
       input = store.folder();
@@ -42,6 +75,8 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
       })
     );
   } else {
+    setting.setName(t("ui.note_style_folder_path"));
+    describe();
     setting.addText(text => {
       text.setValue(store.folder()).setDisabled(true);
       text.inputEl.setAttr("aria-label", t("ui.note_style_folder_path"));
@@ -53,9 +88,18 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
       refresh();
     })
   );
-  setting.addButton(button =>
-    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl))
-  );
+  /** Reads the files again and rewrites the description (after a row made or saved a file). */
+  const update = (): void => {
+    void store.refresh().then(
+      () => {
+        loaded = true;
+        describe();
+      },
+      () => undefined
+    );
+  };
+  update();
+  return update;
 }
 
 /** What the two pickers show: a block ref for each. */
@@ -110,19 +154,50 @@ function writeShown(plugin: VisualAgentMapPlugin, changed?: { category: BlockCat
   const next: Record<BlockCategory, string | undefined> = { template: shown.template, tone: shown.tone };
   for (const category of ["template", "tone"] as const) {
     if (changed?.category === category) next[category] = changed.value;
-    else if (!saved[category] && held[category]) next[category] = undefined;
+    else if ((!saved[category] && held[category]) || missingBlockRef(plugin, category)) next[category] = undefined;
   }
   if (next.template !== undefined) settings.noteTemplateBlock = next.template;
   if (next.tone !== undefined) settings.noteToneBlock = next.tone;
 }
 
+/** The effect line of a built-in block (what it does to the notes), by category and id. */
+const BLOCK_HINTS: Record<BlockCategory, Record<string, TranslationKey>> = {
+  template: { standard: "ui.note_style_standard_hint", textbook: "ui.note_style_textbook_hint" },
+  tone: {
+    academic: "ui.tone_hint_academic",
+    plain: "ui.tone_hint_plain",
+    magazine: "ui.tone_hint_magazine",
+    summary: "ui.tone_hint_summary",
+    guide: "ui.tone_hint_guide",
+    auto: "ui.tone_hint_auto"
+  }
+};
+
+/** The saved choice of `category` when no block of that ref exists any more (renamed or deleted file); else undefined. */
+export function missingBlockRef(plugin: VisualAgentMapPlugin, category: BlockCategory): string | undefined {
+  const { noteStyles: store } = plugin;
+  const key = store.effectiveBlockKeys()[category];
+  if (!key) return undefined;
+  return store.listBlocks(category).some(item => item.ref === key) ? undefined : key;
+}
+
 /**
- * The "Template" or "Tone" row of the note style setting: a picker over the built-in and the user's own blocks, and the
- * buttons Open, Copy and Restore default. The first action writes both shown values into the settings, so what the rows
- * show is what runs use. Buttons are off while an action runs; focus stays on the button used, or on the picker when the
- * choice changed.
+ * The "Structure" or "Voice" row of the note style setting: a picker over the built-in and the user's own blocks (two
+ * groups), one "Edit" button, and a "More actions" button that opens a menu with only the actions that apply (Save as my
+ * own, Restore built-in, Show in file explorer). The first action writes both shown values into the settings, so what
+ * the rows show is what runs use. Controls are off while an action runs; focus stays on the control used, or on the
+ * picker when the choice changed.
+ *
+ * The first line of the description says what the block does; a second line appears only when the block needs a word
+ * (edited, has a problem, not found). A saved choice whose block is gone shows "Not found: <name>" and offers no Edit;
+ * the saved value is not rewritten.
  */
-export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapPlugin, category: BlockCategory): void {
+export function renderNoteBlockSetting(
+  setting: Setting,
+  plugin: VisualAgentMapPlugin,
+  category: BlockCategory,
+  onFilesChanged?: () => void
+): void {
   const { noteStyles: store } = plugin;
   const isTemplate = category === "template";
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
@@ -132,42 +207,79 @@ export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapP
   // The description is a live region: it is written only when its text changes, so a screen reader does not repeat it.
   let shownDesc: string | undefined;
   let busy = false;
+  // Until the first read of the block files is done, a saved file choice is not called "not found".
+  let loaded = false;
   let picker: DropdownComponent | undefined;
-  let openButton: ButtonComponent | undefined;
-  let copyButton: ButtonComponent | undefined;
-  let restoreButton: ButtonComponent | undefined;
+  let editButton: ButtonComponent | undefined;
+  let moreButton: ExtraButtonComponent | undefined;
+  let current: BlockListItem | undefined;
+  let missing: string | undefined;
   const lock = (button: ButtonComponent | undefined, disabled: boolean): void => {
     button?.setDisabled(disabled);
     button?.buttonEl.setAttr("aria-disabled", String(disabled));
   };
+  const writeDesc = (lines: { text: string; error?: boolean }[]): void => {
+    const key = lines.map(line => `${line.error ? "!" : ""}${line.text}`).join("\n");
+    if (key === shownDesc) return;
+    shownDesc = key;
+    setting.descEl.empty();
+    for (const line of lines)
+      setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : undefined });
+  };
   const render = (): void => {
     if (!picker) return;
-    const shown = shownBlocks(plugin);
     const items = store.listBlocks(category);
     picker.selectEl.replaceChildren();
-    for (const item of items)
-      picker.addOption(item.ref, item.modified ? t("ui.block_modified_0", item.name) : item.name);
-    const value = shown[category];
+    missing = loaded ? missingBlockRef(plugin, category) : undefined;
+    const optionText = (item: BlockListItem): string =>
+      item.issues.length
+        ? t("ui.note_style_unusable_option_0", item.name)
+        : item.modified
+          ? t("ui.block_modified_0", item.name)
+          : item.name;
+    const addGroup = (title: string, group: BlockListItem[]): void => {
+      if (!group.length) return;
+      const groupEl = picker!.selectEl.createEl("optgroup", { attr: { label: title } });
+      for (const item of group) groupEl.createEl("option", { value: item.ref, text: optionText(item) });
+    };
+    const missingName = (): string => {
+      const parsed = parseBlockRef(missing);
+      return parsed?.kind === "file" ? parsed.base : parsed?.kind === "builtin" ? parsed.id : (missing ?? "");
+    };
+    if (missing) picker.addOption(missing, t("ui.block_missing_option_0", missingName()));
+    addGroup(
+      t("ui.block_group_builtin"),
+      items.filter(item => item.kind === "builtin")
+    );
+    addGroup(
+      t("ui.note_style_group_folder"),
+      items.filter(item => item.kind === "file")
+    );
+    const value = missing ?? shownBlocks(plugin)[category];
     picker.setValue(value);
-    const item = items.find(entry => entry.ref === value);
-    const restorable = item?.kind === "builtin" && item.fileName !== undefined;
+    current = missing ? undefined : items.find(entry => entry.ref === value);
     picker.setDisabled(busy);
-    lock(openButton, busy);
-    lock(copyButton, busy);
-    lock(restoreButton, busy || !restorable);
-    const parts: string[] = [];
-    if (item) {
-      const issue = item.issues[0];
+    lock(editButton, busy);
+    if (missing) editButton?.buttonEl.hide();
+    else editButton?.buttonEl.show();
+    moreButton?.setDisabled(busy);
+    const fallback = isTemplate ? "template" : "tone";
+    const lines: { text: string; error?: boolean }[] = [];
+    if (missing) lines.push({ text: t(`ui.block_status_missing_${fallback}_0`, missingName()), error: true });
+    else if (current) {
+      const builtinId = parseBlockRef(current.ref);
+      if (current.kind === "file") lines.push({ text: t(`ui.block_status_own_${fallback}`) });
+      else if (builtinId?.kind === "builtin" && BLOCK_HINTS[category][builtinId.id])
+        lines.push({ text: t(BLOCK_HINTS[category][builtinId.id]) });
+      const issue = current.issues[0];
       if (issue)
-        parts.push(t("ui.block_status_issue_0_1_2", item.fileName ?? item.name, issue.line, styleIssueText(issue)));
-      if (item.kind === "file") parts.push(t("ui.block_status_own"));
-      else if (item.modified) parts.push(t("ui.block_status_modified"));
-      else parts.push(t(item.fileName === undefined ? "ui.block_status_builtin_none" : "ui.block_status_builtin_file"));
+        lines.push({
+          text: t(`ui.block_status_issue_${fallback}_0_1`, issue.line, styleIssueText(issue)),
+          error: true
+        });
+      else if (current.modified) lines.push({ text: t(`ui.block_status_modified_${fallback}`) });
     }
-    const desc = parts.join(" ");
-    if (desc === shownDesc) return;
-    shownDesc = desc;
-    setting.setDesc(desc);
+    writeDesc(lines);
   };
   /** Writes the two shown values into the settings, then runs `action`. */
   const act = async (action: (ref: string) => Promise<void>, target: () => HTMLElement | undefined): Promise<void> => {
@@ -185,7 +297,75 @@ export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapP
       busy = false;
       render();
       target()?.focus();
+      onFilesChanged?.();
     }
+  };
+  /** Asks for a name (the default is "<name> (my version)"; a taken name is refused as it is typed), then saves, selects and opens. */
+  const saveAs = (): void => {
+    const item = current;
+    if (busy || !item) return;
+    const items = store.listBlocks(category);
+    const reserved = new Set<string>();
+    for (const entry of items) {
+      reserved.add(entry.name.toLocaleLowerCase());
+      const parsed = parseBlockRef(entry.ref);
+      if (parsed?.kind === "builtin")
+        for (const name of builtinBlockNames(category, parsed.id)) reserved.add(name.toLocaleLowerCase());
+    }
+    const suggested = copyBlockName(category, item.name, plugin.settings.language, reserved);
+    new NameModal(
+      plugin.app,
+      t("ui.block_save_as_title"),
+      suggested,
+      name =>
+        void act(
+          async ref => {
+            const created = await plugin.copyBlock(category, ref, name);
+            if (created) await plugin.openBlock(category, created);
+          },
+          () => picker?.selectEl
+        ),
+      {
+        problem: value => {
+          const cleaned = cleanBlockName(value).toLocaleLowerCase();
+          return !cleaned || reserved.has(cleaned) ? t("ui.block_name_taken") : "";
+        }
+      }
+    ).open();
+  };
+  const showMenu = (): void => {
+    if (busy || !moreButton) return;
+    const menu = new Menu();
+    const item = current;
+    if (item)
+      menu.addItem(entry =>
+        entry
+          .setTitle(t("ui.block_copy"))
+          .setIcon("copy")
+          .onClick(() => saveAs())
+      );
+    if (item?.kind === "builtin" && item.modified)
+      menu.addItem(entry =>
+        entry
+          .setTitle(t("ui.block_restore"))
+          .setIcon("rotate-ccw")
+          .onClick(() =>
+            act(
+              ref => plugin.restoreBlock(category, ref).then(() => undefined),
+              () => moreButton?.extraSettingsEl
+            )
+          )
+      );
+    menu.addItem(entry =>
+      entry
+        .setTitle(t("ui.note_style_open_folder"))
+        .setIcon("folder-open")
+        .onClick(() => {
+          void plugin.openNoteStylesFolder().then(() => moreButton?.extraSettingsEl.focus());
+        })
+    );
+    const rect = moreButton.extraSettingsEl.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom });
   };
   setting.addDropdown(dropdown => {
     picker = dropdown;
@@ -200,35 +380,30 @@ export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapP
     });
   });
   setting.addButton(button => {
-    openButton = button;
-    button.setButtonText(t("ui.block_open")).onClick(() =>
+    editButton = button;
+    button.setButtonText(t("ui.block_open"));
+    button.buttonEl.setAttr("aria-label", t(isTemplate ? "ui.block_edit_aria_template" : "ui.block_edit_aria_tone"));
+    button.onClick(() =>
       act(
         ref => plugin.openBlock(category, ref).then(() => undefined),
-        () => openButton?.buttonEl
+        () => editButton?.buttonEl
       )
     );
   });
-  setting.addButton(button => {
-    copyButton = button;
-    button.setButtonText(t("ui.block_copy")).onClick(() =>
-      act(
-        ref => plugin.copyBlock(category, ref).then(() => undefined),
-        () => picker?.selectEl
-      )
-    );
-  });
-  setting.addButton(button => {
-    restoreButton = button;
-    button.setButtonText(t("ui.block_restore")).onClick(() =>
-      act(
-        ref => plugin.restoreBlock(category, ref).then(() => undefined),
-        () =>
-          restoreButton?.buttonEl.getAttribute("aria-disabled") === "true" ? picker?.selectEl : restoreButton?.buttonEl
-      )
-    );
+  setting.addExtraButton(button => {
+    moreButton = button;
+    const moreLabel = t(isTemplate ? "ui.block_more_template" : "ui.block_more_tone");
+    button.setIcon("more-horizontal").setTooltip(moreLabel).onClick(showMenu);
+    button.extraSettingsEl.setAttr("aria-label", moreLabel);
   });
   render();
-  void store.refresh().then(render, () => undefined);
+  void store.refresh().then(
+    () => {
+      loaded = true;
+      render();
+    },
+    () => undefined
+  );
 }
 
 export const CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
@@ -410,6 +585,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
   private readonly modelSelects = new Set<HTMLSelectElement>();
   private readonly modelStatusEls = new Set<HTMLElement>();
   private unsubscribeCurrentModel: (() => void) | null = null;
+  /** Rewrites the File location row's description (it follows the Structure and Voice rows making files). */
+  private noteLocationChanged: (() => void) | undefined;
   constructor(
     app: App,
     private plugin: VisualAgentMapPlugin
@@ -568,15 +745,21 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       },
       {
         name: t("ui.note_style"),
-        render: setting => renderNoteStyleSetting(setting, this.plugin, () => this.update())
+        render: setting => renderNoteStyleSetting(setting, this.plugin)
       },
       {
         name: t("ui.block_picker_template"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "template")
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "template", () => this.noteLocationChanged?.())
       },
       {
         name: t("ui.block_picker_tone"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone")
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.noteLocationChanged?.())
+      },
+      {
+        name: t("ui.note_style_folder_path"),
+        render: setting => {
+          this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
+        }
       },
       {
         name: t("ui.markdown_selection_ai_auto_open"),

@@ -1,4 +1,11 @@
-import { instructionLanguageOf, noteLanguageOf, type ContentLanguage, type TranslationKey } from "../../i18n";
+import {
+  instructionLanguageOf,
+  noteLanguageOf,
+  translate,
+  type ContentLanguage,
+  type TranslationKey,
+  type UiLanguage
+} from "../../i18n";
 import { CANONICAL_LANGUAGES, type NoteStyleLanguage } from "../../ai/note-style-file";
 import { templateFormatHeading } from "./template-block";
 import { builtinPresets } from "../../ai/prompt-presets";
@@ -99,4 +106,17 @@ export function findBuiltinBlock(category: BlockCategory, id: string): BuiltinBl
 /** The text of the built-in block, in the language's instruction language. */
 export function lookupBuiltinBlock(category: BlockCategory, id: string, language: ContentLanguage): string {
   return findBuiltinBlock(category, id).body(language);
+}
+
+/**
+ * The file text "Edit" writes for academic rigor, which is the default voice and has no built-in text: only a note that
+ * says so. A tone file is read without HTML comments (`stripToneComments`), so this file counts as unmodified.
+ */
+export function academicToneNote(language: UiLanguage): string {
+  return `${translate(language, "ui.block_academic_note")}\n`;
+}
+
+/** A tone file's text without its HTML comments; text without a comment is returned as it is (a lone "<" stays). */
+export function stripToneComments(text: string): string {
+  return /<!--[\s\S]*?-->/.test(text) ? text.replace(/<!--[\s\S]*?-->/g, "").trim() : text;
 }

@@ -91,23 +91,23 @@ test('settings row: read-only folder path, open-folder and preview buttons, no p
   assert.equal(log.texts[0].disabled, true);
   assert.equal(log.texts[0].value, 'WS/Styles');
   assert.equal(log.dropdown, undefined);
-  assert.equal(log.buttons[0].text, 'Open block folder');
+  assert.equal(log.buttons[0].text, 'Show in file explorer');
   await log.buttons[0].click();
   assert.equal(log.opened, 1);
-  assert.equal(log.buttons[1].text, 'Preview full prompt');
+  assert.equal(log.buttons[1].text, 'Preview AI instructions');
 });
 
 test('Template and Tone rows: pickers with a label, the built-ins first, a changed built-in marked', async () => {
   const template = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook'), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
   await flush();
-  assert.equal(template.view.name, 'Template');
-  assert.equal(template.view.attrs['aria-label'], 'Note style template');
+  assert.equal(template.view.name, 'Structure');
+  assert.equal(template.view.attrs['aria-label'], 'Note style structure');
   assert.equal(template.view.descAttrs['aria-live'], 'polite');
   assert.deepEqual(template.view.options, [['builtin:standard', 'Standard (modified)'], ['builtin:textbook', 'Textbook'], ['file:Mine', 'Mine']]);
-  assert.deepEqual(template.view.buttons.map(button => button.text), ['Open', 'Copy', 'Restore default']);
+  assert.deepEqual(template.view.buttons.map(button => button.text), ['Edit', 'Save as my own…', 'Restore built-in']);
   const tone = blockRow('tone');
-  assert.equal(tone.view.name, 'Tone');
-  assert.equal(tone.view.attrs['aria-label'], 'Note style tone');
+  assert.equal(tone.view.name, 'Voice');
+  assert.equal(tone.view.attrs['aria-label'], 'Note style voice');
   assert.equal(tone.view.options.length, 6);
 });
 
@@ -158,21 +158,21 @@ test('Restore default is off, aria-disabled and explained when it does not apply
   const restore = none.view.buttons[2];
   assert.equal(restore.disabled, true);
   assert.equal(restore.attrs['aria-disabled'], 'true');
-  assert.match(none.view.desc, /no file yet/);
+  assert.match(none.view.desc, /Built-in version\./);
   assert.equal(none.view.buttons[0].disabled, false);
   const own = blockRow('template', { settings: { noteTemplateBlock: 'file:Mine' }, templates: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
   assert.equal(own.view.buttons[2].disabled, true);
-  assert.match(own.view.desc, /Your own block/);
+  assert.match(own.view.desc, /created yourself/);
   const changed = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook')] });
   assert.equal(changed.view.buttons[2].disabled, false);
   assert.equal(changed.view.buttons[2].attrs['aria-disabled'], 'false');
-  assert.match(changed.view.desc, /backup first/);
+  assert.match(changed.view.desc, /AI writes with your version/);
 });
 
 test('an unreadable template block says which line, in the row text', async () => {
   const bad = item('file:Bad', 'Bad', { fileName: 'Bad.md', issues: [{ line: 7, code: 'format_heading_repeated', values: [], message: 'x' }] });
   const view = blockRow('template', { settings: { noteTemplateBlock: 'file:Bad' }, templates: [...TEMPLATES(), bad] }).view;
-  assert.match(view.desc, /Bad\.md cannot be read \(line 7\)/);
+  assert.match(view.desc, /"Bad\.md" has a problem \(line 7\)/);
 });
 
 test('Open, Copy and Restore ask the plugin, lock the buttons meanwhile and keep focus where it belongs', async () => {
@@ -191,7 +191,7 @@ test('Open, Copy and Restore ask the plugin, lock the buttons meanwhile and keep
   release();
   await pending;
   assert.equal(open.view.disabled, false);
-  assert.equal(open.view.focusedEl, 'Open');
+  assert.equal(open.view.focusedEl, 'Edit');
 
   const copy = blockRow('tone');
   await copy.view.buttons[1].click();
@@ -243,7 +243,7 @@ test('the settings page has no tone presets row and the modal file no longer off
 
 test('settings row: a missing folder says so and can be chosen again', async () => {
   const { log, settings } = row({ exists: false });
-  assert.match(log.name, /Style folder not found/);
+  assert.match(log.name, /File location not found/);
   assert.equal(log.texts[0].disabled, false);
   log.texts[0].change(' WS/Moved ');
   await log.buttons[0].click();

@@ -50,12 +50,12 @@ test('note style field: a template block sends only its file: id; a built-in sen
 test('note style field: a block that does not parse cannot be chosen and shows its reason and an Open this file button; a built-in is never unusable', () => {
   const h = build([good, bad]);
   const option = value => dom.find(h.select, i => i.tag === 'option' && i.value === value);
-  assert.equal(option('file:Broken').disabled, true); assert.match(option('file:Broken').text, /Broken \(cannot be used\)/);
+  assert.equal(option('file:Broken').disabled, true); assert.match(option('file:Broken').text, /Broken \(has a problem\)/);
   assert.equal(option('preset:plain').disabled, false);
   assert.equal(option('file:Mine').disabled, false);
   const rows = dom.findAll(h.parent, i => dom.hasCls(i, 'vam-note-style-problem'));
   assert.equal(rows.length, 1); assert.equal(rows[0].attrs?.role ?? rows[0].role, 'status');
-  assert.match(rows.map(r => dom.texts ? dom.texts(r).join(' ') : r.children.map(c => c.text).join(' ')).join('|'), /"Broken\.md" cannot be chosen \(line 4\): Section 2: another section already uses this name\./);
+  assert.match(rows.map(r => dom.texts ? dom.texts(r).join(' ') : r.children.map(c => c.text).join(' ')).join('|'), /"Broken\.md" has a problem and cannot be chosen \(line 4\): Section 2: another section already uses this name\./);
   const open = dom.findAll(h.parent, i => i.tag === 'button' && i.text === 'Open this file');
   assert.equal(open.length, 1);
   open[0].click();

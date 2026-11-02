@@ -286,6 +286,38 @@ test('counter 7 (AI semantics): for every custom template and tone of the fixtur
   assert.equal(differences.length, 3 * 2 * 4, 'the template with the custom log section differs in four of the five steps, with and without a tone, in three languages');
 });
 
+test('counter 7b (AI semantics): the default template of the fixture, before the conversion as {template: id} and after it as a topic with no setting (the converted style file of the general topic), gives the same prompt in all five steps and three languages', async () => {
+  const fieldsFrom = style => ({ detailTemplate: style.template, ...(style.toneText ? { toneText: style.toneText } : {}), ...style.contextFields });
+  const defaults = [T_WEEKLY, T_FIELD, T_CONCLUSION, T_TEXTBOOK, 'textbook'];
+  let compared = 0, differences = 0;
+  for (const language of LANGUAGES) for (const id of defaults) {
+    const old = world({ language, defaultDetailTemplateId: id });
+    await old.store.refresh();
+    const before = old.store.runStyle({ topic: { template: id }, kind: 'topic', outputLanguage: language });
+    const next = world({ language, defaultDetailTemplateId: id });
+    assert.equal((await next.store.migrateLegacy({ mapsWithStyle: [] })).status, 'done');
+    assert.ok(next.settings.noteStyleByKind?.topic, `${language} ${id}: the converted topic style is set`);
+    await next.store.refresh();
+    const after = next.store.runStyle({ topic: {}, kind: 'topic', outputLanguage: language });
+    assert.equal(after.issues.invalid, undefined);
+    eq(after.issues.missing, [], 'nothing missing');
+    M.PREVIEW_STEPS.forEach(step => {
+      compared++;
+      const a = M.previewPrompt(step.id, language, 'codex', fieldsFrom(before)).text, b = M.previewPrompt(step.id, language, 'codex', fieldsFrom(after)).text;
+      if (a === b) return;
+      differences++;
+      assert.equal(id, T_FIELD, `${language} ${id} ${step.id}: only the template with a custom log section may differ`);
+      const kept = new Set(b.split('\n')), had = new Set(a.split('\n'));
+      const lost = a.split('\n').filter(line => !kept.has(line)), gained = b.split('\n').filter(line => !had.has(line));
+      assert.equal(lost.length, 1, `${language} ${step.id}: one line is lost`);
+      assert.match(lost[0], /History/);
+      assert.deepEqual(gained, []);
+    });
+  }
+  assert.equal(compared, 3 * defaults.length * M.PREVIEW_STEPS.length);
+  assert.equal(differences, 3 * 4, 'only the custom-log-section template differs, in four of five steps, per language');
+});
+
 test('counter 8: a template whose converted text does not read back the same (a description line that starts with "## ") is skipped: no file, no table entry, still read from detailTemplates; the other templates convert and the marker is set', async () => {
   const broken = { id: 'bad', name: 'Broken', sections: [{ id: 's', name: 'S', description: 'text\n## not a section', role: 'none', aliases: [] }] };
   const { store, v, settings } = world({ detailTemplates: [broken, ...plain(DATA.detailTemplates)], defaultDetailTemplateId: undefined });
@@ -336,12 +368,36 @@ test('counter 10 (D5): maps with a style of their own are handed back once, with
   assert.equal(early.v.ops.filter(op => op[0] !== 'save').length, 0, 'no file is written');
 });
 
-test('counter 10b: a save that fails while recording the maps is "failed", is not told, and leaves the marker as it was', async () => {
+test('counter 10b: a save that fails while only recording the maps (the marker exists) is not "failed": no maps are told, the marker stays as it was, and the next try records them', async () => {
   const w = world({ noteStyleRecipe: { migrated: 1 } });
   w.v.failSave = true;
   const result = await w.store.migrateLegacy({ mapsWithStyle: ['M'] });
-  eq([result.status, result.notify], ['failed', undefined]);
+  eq([result.status, result.notify], ['already', undefined]);
+  assert.match(result.error, /save failed/);
   eq(w.settings.noteStyleRecipe, { migrated: 1 });
+  w.v.failSave = false;
+  eq((await w.store.migrateLegacy({ mapsWithStyle: ['M'] })).notify, { maps: ['M'] });
+});
+
+test('counter 10c (R1-L1): once the conversion has finished (done, failed or already) the refresh fence is cleared, so refresh() no longer waits on it', async () => {
+  for (const patch of [{}, { noteStyleRecipe: { migrated: 1, mapsNotified: true } }]) {
+    const w = world(patch);
+    await w.store.migrateLegacy({ mapsWithStyle: [] });
+    assert.equal(w.store.migration, undefined);
+  }
+  const failing = world();
+  failing.v.failSave = true;
+  assert.equal((await failing.store.migrateLegacy({ mapsWithStyle: [] })).status, 'failed');
+  assert.equal(failing.store.migration, undefined);
+  const w = world();
+  let open;
+  w.v.gate = new Promise(resolve => { open = resolve; });
+  const running = w.store.migrateLegacy({ mapsWithStyle: [] });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(w.store.migration, 'the fence is held while writing');
+  w.v.gate = null; open();
+  await running;
+  assert.equal(w.store.migration, undefined);
 });
 
 test('counter 11 (async lifecycle): refresh() started while the conversion is writing waits for it and then reads the new files; a failed conversion does not make refresh() reject', async () => {

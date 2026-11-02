@@ -27153,10 +27153,10 @@ var NoteStyleStore = class {
    */
   migrateLegacy(input2) {
     const run = this.serial(() => this.runMigration(input2.mapsWithStyle));
-    const tracked = run.finally(() => {
-      if (this.migration === tracked) this.migration = void 0;
+    const fence = run.catch(() => void 0).then(() => {
+      if (this.migration === fence) this.migration = void 0;
     });
-    this.migration = tracked.catch(() => void 0);
+    this.migration = fence;
     return run;
   }
   async runMigration(mapsWithStyle) {
@@ -27172,7 +27172,7 @@ var NoteStyleStore = class {
           await this.deps.save();
         } catch (error) {
           settings.noteStyleRecipe = marker5;
-          throw error;
+          return { status: "already", error: error instanceof Error ? error.message : String(error) };
         }
         return { status: "already", ...maps.length ? { notify: { maps } } : {} };
       }
@@ -71725,7 +71725,9 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         ...new Set([...found].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, name]) => name))
       ];
       const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
-      if (result.status === "failed") {
+      if (result.status === "already" && result.error) {
+        this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
+      } else if (result.status === "failed") {
         this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
         new import_obsidian40.Notice(t("ui.note_style_migrate_failed"));
       } else if (result.notify) {

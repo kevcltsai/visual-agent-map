@@ -897,7 +897,9 @@ export default class VisualAgentMapPlugin extends Plugin {
         ...new Set([...found].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, name]) => name))
       ];
       const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
-      if (result.status === "failed") {
+      if (result.status === "already" && result.error) {
+        this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
+      } else if (result.status === "failed") {
         this.logs.appendLog("warn", `Note style conversion failed: ${result.error ?? "unknown error"}`);
         new Notice(t("ui.note_style_migrate_failed"));
       } else if (result.notify) {

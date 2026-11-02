@@ -193,7 +193,7 @@ export interface BlockListItem {
 export interface MigrationResult {
   status: "already" | "done" | "failed";
   notify?: { maps: string[]; defaultName?: string };
-  /** The message of the error behind `failed`. */
+  /** The message of the error behind `failed`, or of the save that could not record the maps on an `already` result. */
   error?: string;
 }
 
@@ -953,10 +953,12 @@ export class NoteStyleStore {
    */
   migrateLegacy(input: { mapsWithStyle: string[] }): Promise<MigrationResult> {
     const run = this.serial(() => this.runMigration(input.mapsWithStyle));
-    const tracked = run.finally(() => {
-      if (this.migration === tracked) this.migration = undefined;
-    });
-    this.migration = tracked.catch(() => undefined);
+    const fence: Promise<unknown> = run
+      .catch(() => undefined)
+      .then(() => {
+        if (this.migration === fence) this.migration = undefined;
+      });
+    this.migration = fence;
     return run;
   }
 
@@ -972,8 +974,9 @@ export class NoteStyleStore {
         try {
           await this.deps.save();
         } catch (error) {
+          // The conversion itself finished earlier: only the record of the maps is missing, so it is tried again next load.
           settings.noteStyleRecipe = marker;
-          throw error;
+          return { status: "already", error: error instanceof Error ? error.message : String(error) };
         }
         return { status: "already", ...(maps.length ? { notify: { maps } } : {}) };
       }

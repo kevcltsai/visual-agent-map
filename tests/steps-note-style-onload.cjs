@@ -158,3 +158,20 @@ test('counter 4 (main): a failed conversion shows the failure notice and logs a 
   assert.match(notices[0], /Taiwan trip/);
   assert.equal(saves.at(-1).noteStyleRecipe.migrated, 1);
 });
+
+const MARKED = { ...BASE, noteStyleRecipe: { migrated: 1 } };
+test('counter 4b (main): when only the maps record cannot be saved (the marker exists), the failure notice is not shown; a warning is logged and the next load tells the maps', async () => {
+  const saves = [];
+  let failing = true;
+  const maps = [mapOf('WS/Maps/A/Map.md', 'Taiwan trip', { detailTemplateId: 'textbook' })];
+  const first = await lateLoad(MARKED, maps, { saves, failSave: () => failing });
+  const logBefore = first.plugin.logs.getLogs().length;
+  await first.migrate();
+  assert.equal(notices.length, 0);
+  assert.ok(first.plugin.logs.getLogs().slice(logBefore).some(entry => entry.level === 'warn' && /disk full/.test(entry.message)));
+  failing = false;
+  const second = await lateLoad(MARKED, maps, { saves });
+  await second.migrate();
+  assert.equal(notices.length, 1);
+  assert.match(notices[0], /Taiwan trip/);
+});

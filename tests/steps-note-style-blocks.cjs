@@ -91,15 +91,15 @@ test('counter 1: with no new key and no block folder the workspace fields equal 
     const wanted = toneOf[patch.defaultNoteStyleId] ? M.lookupBuiltinBlock('tone', toneOf[patch.defaultNoteStyleId], language) : baseline;
     assert.equal(got.toneText, wanted, label);
     assert.deepEqual(plain(got.detailTemplate), plain(resolved.template), label);
-    assert.deepEqual(plain(got.noteStyle), plain(store.contextFields(resolved.template).noteStyle), label);
+    assert.equal(got.noteStyle, undefined, label);
     assert.equal(got.styleSelection, undefined, label);
     assert.equal(resolved.block, undefined, label);
     assert.equal(resolved.blockIssues, undefined, label);
-    // the contextFields of a call that names no tone are the old ones
-    assert.deepEqual(plain(store.contextFields(resolved.template)), plain(resolved.noteStyle ? { noteStyle: resolved.noteStyle, ...(resolved.noteStyle.diagrams ? {} : { styleDiagrams: false }) } : {}), label);
+    // the contextFields of a call that names no tone carry no style snapshot any more (P2: noteStyle and styleDiagrams are gone)
+    assert.deepEqual(plain(store.contextFields(resolved.template)), {}, label);
     if (!toneOf[patch.defaultNoteStyleId]) {
       // outside the three presets the prompt is the one the baseline fields give
-      const old = { detailTemplate: got.detailTemplate, ...(baseline ? { toneText: baseline } : {}), ...(got.noteStyle ? { noteStyle: got.noteStyle } : {}), ...(got.styleDiagrams === false ? { styleDiagrams: false } : {}) };
+      const old = { detailTemplate: got.detailTemplate, ...(baseline ? { toneText: baseline } : {}), };
       for (const step of M.PREVIEW_STEPS) assert.equal(M.previewPrompt(step.id, language, 'codex', got).text, M.previewPrompt(step.id, language, 'codex', old).text, `${label} ${step.id}`);
     }
   }

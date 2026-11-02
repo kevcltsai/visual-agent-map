@@ -32,9 +32,11 @@ import {
   TFolder,
   View,
   WorkspaceLeaf,
-  type Command
+  type Command,
+  type TAbstractFile
 } from "obsidian";
-import { NoteStyleStore, type StyleFilePort } from "./ai/note-style-store";
+import { NoteStyleStore, type NoteStyleUpgradeEvent, type StyleFilePort } from "./ai/note-style-store";
+import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
@@ -162,6 +164,12 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
           )
         }
       : {}),
+    ...(normalizeNoteStyleAliases(saved?.noteStyleAliases)
+      ? { noteStyleAliases: normalizeNoteStyleAliases(saved?.noteStyleAliases) }
+      : {}),
+    ...(normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade)
+      ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade) }
+      : {}),
     coffeeStyles: Array.isArray(saved?.coffeeStyles)
       ? saved.coffeeStyles.filter(
           (item: unknown): item is { id: string; name: string; prompt: string } =>
@@ -217,7 +225,8 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
     port: this.noteStylePort(),
-    save: () => this.saveSettings()
+    save: () => this.saveSettings(),
+    report: event => this.reportNoteStyleUpgrade(event)
   });
   ready: Promise<void> = Promise.resolve();
   readonly running = new Set<string>();
@@ -750,6 +759,8 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     this.app.workspace.onLayoutReady(() => {
+      // The one-time upgrade of the old note style data starts here, after the settings are loaded and the workspace is ready.
+      void this.noteStyles.startUpgrade(this.ready);
       void this.finishStartup();
     });
     this.registerVaultEvents();
@@ -1234,6 +1245,12 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.unloaded = true;
     this.aiRuntime.dispose();
   }
+  /** Says once what the note style upgrade could not do (it never stops the plugin). */
+  private reportNoteStyleUpgrade(event: NoteStyleUpgradeEvent): void {
+    if (event.kind === "failed") new Notice(t("ui.note_style_upgrade_failed"));
+    else if (event.kind === "skipped") new Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
+    else new Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
+  }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   private noteStylePort(): StyleFilePort {
     const folderAt = (path: string) => {
@@ -1267,7 +1284,7 @@ export default class VisualAgentMapPlugin extends Plugin {
       }
     };
   }
-  /** Folder rename, "restore default" in the file menu, and the two commands. Nothing here creates a file on load. */
+  /** Folder rename and the command that opens the block folder. Nothing here creates a file on load. */
   private registerNoteStyleEntrypoints(): void {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
@@ -1275,55 +1292,22 @@ export default class VisualAgentMapPlugin extends Plugin {
           void this.noteStyles.followFolderRename(normalizePath(oldPath), file.path).catch(() => undefined);
       })
     );
-    const restore = async (file: TFile): Promise<void> => {
-      try {
-        if (await this.noteStyles.restoreDefault(file.path)) new Notice(t("ui.note_style_restored_0", file.basename));
-      } catch (error) {
-        new Notice(error instanceof Error ? error.message : String(error));
-      }
-    };
-    const isBuiltinStyleFile = (file: unknown): file is TFile =>
-      file instanceof TFile &&
-      file.extension === "md" &&
-      file.parent?.path === normalizePath(this.noteStyles.folder()) &&
-      !!this.noteStyles.builtinIdOfFile(file.name);
-    this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file) => {
-        if (isBuiltinStyleFile(file))
-          menu.addItem(item =>
-            item
-              .setTitle(t("ui.note_style_restore_menu"))
-              .setIcon("rotate-ccw")
-              .onClick(() => {
-                void restore(file);
-              })
-          );
-      })
-    );
     this.addLocalizedCommand("open-note-styles-folder", "ui.note_style_open_folder_command", () => {
       void this.openNoteStylesFolder();
     });
-    this.localizedCommands.push({
-      command: this.addCommand({
-        id: "restore-note-style-default",
-        name: t("ui.note_style_restore_command"),
-        callback: () => {
-          const file = this.app.workspace.getActiveFile();
-          if (isBuiltinStyleFile(file)) void restore(file);
-          else new Notice(t("ui.note_style_restore_not_builtin"));
-        }
-      }),
-      key: "ui.note_style_restore_command"
-    });
   }
-  /** Creates the style folder and files (idempotent), shows where they are and opens the first style file. */
+  /** Creates the block folders (Templates and Tones) when they are missing, shows where they are and reveals the folder. */
   async openNoteStylesFolder(): Promise<string | null> {
     try {
-      const folder = await this.noteStyles.ensureStyleFolder();
+      const folder = await this.noteStyles.ensureBlockFolder();
       new Notice(t("ui.note_style_folder_opened_0", folder));
-      const first = this.noteStyles.list()[0];
-      const file = first && this.app.vault.getAbstractFileByPath(normalizePath(`${folder}/${first.fileName}`));
-      if (file instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(file);
+      const target = this.app.vault.getAbstractFileByPath(normalizePath(folder));
+      if (target) {
+        // Best effort: the file explorer shows the folder when it is open; the Notice names the path either way.
+        const explorer = this.app.workspace.getLeavesOfType?.("file-explorer")?.[0]?.view as
+          { revealInFolder?: (item: TAbstractFile) => void } | undefined;
+        explorer?.revealInFolder?.(target);
+      }
       return folder;
     } catch (error) {
       new Notice(error instanceof Error ? error.message : String(error));

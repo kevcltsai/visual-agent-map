@@ -123,9 +123,9 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
     const workspaceTone = { summary: 'summary', plain: 'plain', guide: 'guide' }[patch.defaultNoteStyleId];
     const tone = workspaceTone ? M.lookupBuiltinBlock('tone', workspaceTone, language) : M.runToneText(resolved, PRESETS, [undefined, undefined, undefined], language);
     assert.equal(got.toneText, tone, label);
-    assert.deepEqual(plain(got.noteStyle), plain(store.contextFields(resolved.template).noteStyle), label);
-    assert.equal(got.styleDiagrams, store.contextFields(resolved.template).styleDiagrams, label);
-    if (resolved.noteStyle) assert.equal(got.toneText, resolved.toneText, label);
+    assert.equal(got.noteStyle, undefined, label);
+    assert.equal(got.styleDiagrams, undefined, label);
+    if (resolved.toneDecided) assert.equal(got.toneText, resolved.toneText, label);
     // the preview of these fields is the prompt a run with the same fields renders
     const preview = M.previewPrompt('research', language, 'codex', got);
     assert.equal(preview.text, renderOf(M.sampleTaskContext('research', language, got), language, 'codex'), label);
@@ -133,7 +133,7 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
   }
   const store = makeStore({ defaultNoteStyleId: 'style:Own' }, { 'WS/S/Own.md': OWN });
   await store.refresh();
-  assert.equal(store.workspaceStyleFields('en').noteStyle.tone, '簡明');
+  assert.equal(store.workspaceStyleFields('en').toneText, '簡明');
 });
 
 test('counter 9: a default style file that does not parse is returned as invalid, not thrown', async () => {
@@ -146,10 +146,10 @@ test('counter 9: a default style file that does not parse is returned as invalid
   assert.equal(got.detailTemplate, undefined);
 });
 
-test('runToneText: a style file decides its own tone, else the first tone preset id; academic is nothing', () => {
-  const file = { noteStyle: {}, toneText: 'from file' };
+test('runToneText: an old style file (or an alias of one) decides its own tone, else the first tone preset id; academic is nothing', () => {
+  const file = { toneDecided: true, toneText: 'from file' };
   assert.equal(M.runToneText(file, PRESETS, ['custom-tone-1'], 'en'), 'from file');
-  assert.equal(M.runToneText({ noteStyle: {} }, PRESETS, ['custom-tone-1'], 'en'), undefined);
+  assert.equal(M.runToneText({ toneDecided: true }, PRESETS, ['custom-tone-1'], 'en'), undefined);
   assert.equal(M.runToneText(undefined, PRESETS, [undefined, 'custom-tone-1'], 'en'), 'Talk like a pirate.');
   assert.equal(M.runToneText(undefined, PRESETS, ['academic', 'custom-tone-1'], 'en'), undefined);
   assert.equal(M.runToneText(undefined, PRESETS, [], 'en'), undefined);
@@ -199,7 +199,7 @@ test('F1: the unreadable-block and invalid-style notices never end a reason with
   const i18n = S.load('i18n.ts');
   const obsidian = { ...S.obsidian, PluginSettingTab: class {}, Setting: class {}, Modal: class {} };
   const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
-  const codes = ['file_long', 'tone_long', 'frontmatter_unclosed', 'frontmatter_line', 'value_invalid', 'key_duplicate', 'no_sections', 'count_invalid', 'comment_unclosed', 'format_heading_repeated'];
+  const codes = ['file_long', 'tone_long', 'frontmatter_unclosed', 'key_duplicate', 'no_sections', 'count_invalid', 'comment_unclosed', 'format_heading_repeated'];
   const doubled = /[。．.！!？?]\s*[。．.！!？?]/;
   try {
     for (const language of LANGUAGES) {

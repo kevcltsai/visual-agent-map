@@ -29,7 +29,8 @@ test('onload and layout-ready write nothing to the vault: no create, modify, cre
   assert.equal(error, undefined, String(error?.stack));
   assert.deepEqual(writes, []);
   assert.ok(listeners.includes('rename'), 'the folder-rename listener is registered at load');
-  // Control: the recorder sees a user action (opening the style folder), so the empty list above is not a blind spot.
-  await plugin.noteStyles.ensureStyleFolder().catch(() => undefined);
-  assert.ok(writes.length > 0, 'ensureStyleFolder writes through the same recorder');
+  // Control: the recorder sees a user action (opening the block folder), so the empty list above is not a blind spot.
+  await plugin.noteStyles.ensureBlockFolder().catch(() => undefined);
+  assert.ok(writes.some(([name]) => name === 'createFolder'), 'ensureBlockFolder writes through the same recorder');
+  assert.ok(!writes.some(([name]) => name === 'create'), 'and writes no file: the five built-in style files are not written any more');
 });

@@ -47,10 +47,10 @@ const TEMPLATES = () => [item('builtin:standard', 'Standard'), item('builtin:tex
 const TONES = () => ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'].map(id => item(`builtin:${id}`, id));
 
 // One Template or Tone row against a fake plugin and store; `calls` records what the buttons asked of the plugin.
-function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), list = [], old = [], hold = {} } = {}) {
+function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {}, pending } = {}) {
   const calls = [];
   const view = { options: [], value: undefined, disabled: false, attrs: {}, focused: 0, buttons: [], desc: '', descAttrs: {}, name: '', classes: [], descWrites: 0 };
-  const settingsObject = { language: 'en', ...settings };
+  const settingsObject = { language: 'en', detailTemplates: [], ...settings };
   const setting = {
     descEl: { setAttr: (k, v) => { view.descAttrs[k] = v; } },
     settingEl: { addClass: name => { view.classes.push(name); } },
@@ -76,11 +76,14 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
     openBlock: async (...args) => { calls.push(['open', ...args]); await (hold.open ?? Promise.resolve()); return true; },
     copyBlock: async (...args) => { calls.push(['copy', ...args]); settingsObject[args[0] === 'template' ? 'noteTemplateBlock' : 'noteToneBlock'] = 'file:Copy'; (args[0] === 'template' ? templates : tones).push(item('file:Copy', 'Copy')); return 'file:Copy'; },
     restoreBlock: async (...args) => { calls.push(['restore', ...args]); const target = (args[0] === 'template' ? templates : tones).find(entry => entry.ref === args[1]); delete target.fileName; target.modified = false; return true; },
-    noteStyles: { list: () => list, unexportedTemplates: () => old, refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones) }
+    noteStyles: {
+      refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones),
+      // as the store: what is saved, else what an unfinished upgrade holds in memory
+      effectiveBlockKeys: () => ({ template: settingsObject.noteTemplateBlock || pending?.template, tone: settingsObject.noteToneBlock || pending?.tone, pending: pending !== undefined })
+    }
   };
-  let refreshed = 0;
-  renderNoteBlockSetting(setting, plugin, category, () => { refreshed++; });
-  return { view, calls, settings: settingsObject, templates, tones, refreshed: () => refreshed };
+  renderNoteBlockSetting(setting, plugin, category);
+  return { view, calls, settings: settingsObject, templates, tones };
 }
 
 test('settings row: read-only folder path, open-folder and preview buttons, no picker of its own', async () => {
@@ -88,7 +91,7 @@ test('settings row: read-only folder path, open-folder and preview buttons, no p
   assert.equal(log.texts[0].disabled, true);
   assert.equal(log.texts[0].value, 'WS/Styles');
   assert.equal(log.dropdown, undefined);
-  assert.equal(log.buttons[0].text, 'Open style folder');
+  assert.equal(log.buttons[0].text, 'Open block folder');
   await log.buttons[0].click();
   assert.equal(log.opened, 1);
   assert.equal(log.buttons[1].text, 'Preview full prompt');
@@ -127,7 +130,27 @@ test('changing a picker writes both shown values into the settings', async () =>
   assert.equal(tone.settings.noteTemplateBlock, 'builtin:textbook');
   assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
   assert.equal(tone.calls.at(-1)[0], 'save');
-  assert.equal(tone.refreshed(), 0);
+});
+
+test('M1: the rows show the blocks the runs use, also while an upgrade has not been saved', async () => {
+  const pending = { template: 'file:Upgraded', tone: 'file:Calm' };
+  const templates = [...TEMPLATES(), item('file:Upgraded', 'Upgraded')];
+  const tones = [...TONES(), item('file:Calm', 'Calm')];
+  assert.equal(blockRow('template', { pending, templates, tones }).view.value, 'file:Upgraded');
+  assert.equal(blockRow('tone', { pending, templates, tones }).view.value, 'file:Calm');
+});
+
+test('M1: after a failed upgrade, changing only the tone does not write the standard template over the pending one', async () => {
+  const pending = { template: 'file:Upgraded' };
+  const templates = [...TEMPLATES(), item('file:Upgraded', 'Upgraded')];
+  const tone = blockRow('tone', { pending, templates });
+  await tone.view.change('builtin:guide');
+  assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
+  assert.equal(tone.settings.noteTemplateBlock, undefined, 'the pending template stays unsaved, so a retry still writes it');
+  const open = blockRow('template', { pending, templates });
+  await open.view.buttons[0].click();
+  assert.equal(open.settings.noteTemplateBlock, undefined);
+  assert.equal(open.calls.find(call => call[0] === 'open')[2], 'file:Upgraded');
 });
 
 test('Restore default is off, aria-disabled and explained when it does not apply', async () => {
@@ -183,27 +206,39 @@ test('Open, Copy and Restore ask the plugin, lock the buttons meanwhile and keep
   assert.equal(restore.view.focusedEl, 'select', 'focus moves to the picker when the button turns off');
 });
 
-test('an old style file as the default shows its own item, turns the tone off and says why; choosing it again clears the new keys', async () => {
-  const legacy = { settings: { defaultNoteStyleId: 'style:Mine' }, list: [{ kind: 'file', id: 'style:Mine', name: 'Mine', issues: [] }] };
-  const template = blockRow('template', legacy);
-  assert.deepEqual(template.view.options[0], ['legacy:', 'Mine (old style file)']);
-  assert.equal(template.view.value, 'legacy:');
-  assert.match(template.view.desc, /still an old style file/);
-  assert.ok(template.view.buttons.every(button => button.disabled));
-  const tone = blockRow('tone', legacy);
-  assert.equal(tone.view.disabled, true);
-  assert.match(tone.view.desc, /old style file Mine/);
-  assert.ok(tone.view.buttons.every(button => button.disabled));
+// 06 P4: the old "an old style file as the default" item is gone (the upgrade moves the file to a template block and writes the keys).
+test('after the upgrade the default is a block: no "(old style file)" item in either row, the block is selected and the tone row stays usable', async () => {
+  const upgraded = { settings: { defaultNoteStyleId: 'style:Mine', noteTemplateBlock: 'file:Mine', noteToneBlock: 'builtin:plain' }, templates: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] };
+  const template = blockRow('template', upgraded);
+  assert.equal(template.view.value, 'file:Mine');
+  assert.equal(template.view.options.some(option => option[0] === 'legacy:' || /old style file/.test(option[1])), false);
+  assert.doesNotMatch(template.view.desc, /old style file/);
+  assert.equal(template.view.buttons[0].disabled, false);
+  const tone = blockRow('tone', upgraded);
+  assert.equal(tone.view.value, 'builtin:plain');
+  assert.equal(tone.view.disabled, false, 'the tone row is not turned off by an old default any more');
+  assert.ok(tone.view.buttons.slice(0, 2).every(button => button.disabled === false));
+  assert.doesNotMatch(tone.view.desc, /old style file/);
   await tone.view.buttons[1].click();
-  assert.equal(tone.calls.length, 0, 'disabled controls do not act');
+  assert.deepEqual(tone.calls.find(call => call[0] === 'copy'), ['copy', 'tone', 'builtin:plain'], 'Copy acts on the shown tone');
   await template.view.change('builtin:textbook');
   assert.equal(template.settings.noteTemplateBlock, 'builtin:textbook');
-  assert.equal(template.settings.noteToneBlock, 'builtin:academic');
-  assert.equal(template.refreshed(), 1, 'the other row is rebuilt');
-  const again = blockRow('template', { ...legacy, settings: { ...legacy.settings, noteTemplateBlock: 'builtin:standard', noteToneBlock: 'builtin:plain' } });
-  assert.equal(again.view.options.some(option => option[0] === 'legacy:'), false, 'once a block is chosen the default is not old any more');
-  const oldTemplate = blockRow('template', { settings: { defaultNoteStyleId: 'u1' }, old: [{ id: 'u1', name: 'Old one' }] });
-  assert.equal(oldTemplate.view.options[0][1], 'Old one (old style file)');
+  assert.equal(template.settings.noteToneBlock, 'builtin:plain', 'the other shown value is kept');
+});
+
+test('a default that is not a built-in and has no block key yet shows the standard template (O2 is gone: there is no old-style-file item)', async () => {
+  const oldTemplate = blockRow('template', { settings: { defaultNoteStyleId: 'u1', detailTemplates: [{ id: 'u1', name: 'Old one' }] } });
+  assert.equal(oldTemplate.view.value, 'builtin:standard');
+  assert.equal(oldTemplate.view.options.length, 2);
+  assert.equal(oldTemplate.view.options.some(option => /Old one|legacy/.test(option.join(' '))), false);
+  assert.equal(oldTemplate.calls.length, 0, 'nothing is written until the user acts');
+});
+
+test('the settings page has no tone presets row and the modal file no longer offers the settings renderer', () => {
+  const tab = fs.readFileSync(path.join(root, 'ui/settings-tab.ts'), 'utf8');
+  assert.ok(!/tone_presets|renderTonePresetsSetting|LEGACY_PICK|legacyName/.test(tab));
+  const modal = fs.readFileSync(path.join(root, 'ui/modals/prompt-presets-modal.ts'), 'utf8');
+  assert.ok(!/renderTonePresetsSetting|ui\.tone_preset|"tone"/.test(modal), 'the library lists outline presets only');
 });
 
 test('settings row: a missing folder says so and can be chosen again', async () => {
@@ -221,8 +256,7 @@ test('every style-file problem has a translated message in en, zh-TW and zh-CN, 
     file_long: `---\n圖表: 關\n---\n## A\n${'x'.repeat(8100)}`,
     tone_long: `---\n語氣: ${'x'.repeat(1100)}\n---\n## A\nx`,
     frontmatter_unclosed: '---\n圖表: 關\n## A\nx',
-    frontmatter_line: '---\nno colon here\n---\n## A\nx',
-    value_invalid: '---\n圖表: maybe\n---\n## A\nx',
+    // P2: frontmatter_line and value_invalid are no longer raised by the parser (the old switches are skipped there)
     no_sections: 'just text',
     count_invalid: '## A\n數量: abc\nx',
     comment_unclosed: '## A\n%% never closed\nx'

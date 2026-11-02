@@ -5,12 +5,12 @@ const { test, integrationTest, load, plain, obsidian, node, map } = require('../
 const dom = require('../support-dom.cjs');
 const { hasCls, element, find, findAll, byLabel, button, buttons, tick } = dom;
 
-// ---- tone presets library -------------------------------------------------------------------------------------
+// ---- outline presets library (06 P4: the tone library is gone, tones are blocks; the modal lists the outline kind only) --------
 function presetsHarness(settings = {}) {
   const Modal = dom.makeModal();
   const mod = load('ui/modals/prompt-presets-modal.ts', { obsidian: { ...obsidian, Modal } });
   const plugin = { settings: { language: 'en', promptPresets: [], ...settings }, saves: 0, async saveSettings() { this.saves++; } };
-  const modal = new mod.PromptPresetsModal({}, plugin, 'tone'); modal.open();
+  const modal = new mod.PromptPresetsModal({}, plugin); modal.open();
   const rows = () => findAll(modal.contentEl, i => i.cls === 'vam-template-row');
   const names = () => rows().map(r => find(r, i => i.tag === 'strong').text);
   const row = name => rows().find(r => find(r, i => i.tag === 'strong').text === name);
@@ -18,76 +18,86 @@ function presetsHarness(settings = {}) {
   const click = async (root, text) => { const b = button(root, text); assert.ok(b, `button ${text}`); b.click(); await tick(); };
   return { modal, plugin, rows, names, row, rowButtons, click };
 }
-test('tone library: built-ins offer View and Duplicate only; custom tones can be edited, renamed, duplicated and deleted', async () => {
-  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Be brief.' }, { id: 'tree', kind: 'outline', name: 'Tree', text: 'x' }] });
-  assert.deepEqual(h.names(), ['Plain explanation', 'Magazine column', 'Key-point summary', 'Practical guide', 'Academic rigor', 'AI choice', 'Mine'], 'outline presets are not listed');
-  assert.deepEqual(plain(h.rowButtons('Academic rigor')), ['View', 'Duplicate']);
+// Replaces 'tone library: built-ins offer View and Duplicate only...' (same flow, outline kind).
+test('outline library: built-ins offer View and Duplicate only; custom presets can be edited, renamed, duplicated and deleted', async () => {
+  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'outline', name: 'Mine', text: 'Be brief.' }, { id: 'warm', kind: 'tone', name: 'Warm', text: 'x' }] });
+  assert.deepEqual(h.names(), ['Knowledge tree generator', 'Mine'], 'tone presets are not listed');
+  assert.deepEqual(plain(h.rowButtons('Knowledge tree generator')), ['View', 'Duplicate']);
   assert.deepEqual(plain(h.rowButtons('Mine')), ['Edit', 'Duplicate', 'Delete']);
-  assert.ok(find(h.row('Academic rigor'), i => i.cls === 'vam-template-tag' && i.text === 'Built-in'));
+  assert.ok(find(h.row('Knowledge tree generator'), i => i.cls === 'vam-template-tag' && i.text === 'Built-in'));
   // A built-in opens read-only.
-  await h.click(h.row('Academic rigor'), 'View');
-  assert.equal(byLabel(h.modal.contentEl, 'Tone name').disabled, true);
-  assert.equal(byLabel(h.modal.contentEl, 'Describe the tone').disabled, true);
+  await h.click(h.row('Knowledge tree generator'), 'View');
+  assert.equal(byLabel(h.modal.contentEl, 'Preset name').disabled, true);
+  assert.equal(byLabel(h.modal.contentEl, 'Preset instructions').disabled, true);
   assert.equal(button(h.modal.modalEl, 'Save'), undefined);
   await h.click(h.modal.modalEl, 'Close');
-  // Duplicate a built-in: becomes an editable custom tone with the same text.
-  await h.click(h.row('Magazine column'), 'Duplicate');
+  // Duplicate a built-in: becomes an editable custom outline preset with the same text.
+  await h.click(h.row('Knowledge tree generator'), 'Duplicate');
   assert.equal(h.plugin.promptPresets, undefined);
-  const copy = h.plugin.settings.promptPresets.find(item => item.name === 'Magazine column copy');
-  assert.ok(copy && copy.kind === 'tone' && copy.text.length > 10);
+  const copy = h.plugin.settings.promptPresets.find(item => item.name === 'Knowledge tree generator copy');
+  assert.ok(copy && copy.kind === 'outline' && copy.text.length > 10);
   assert.equal(h.plugin.saves, 1);
   // Edit and rename a custom one; Cancel discards, Save persists.
   await h.click(h.row('Mine'), 'Edit');
-  byLabel(h.modal.contentEl, 'Tone name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Tone name').fire('input');
-  byLabel(h.modal.contentEl, 'Describe the tone').value = 'New voice.';
+  byLabel(h.modal.contentEl, 'Preset name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Preset name').fire('input');
+  byLabel(h.modal.contentEl, 'Preset instructions').value = 'New voice.';
   await h.click(h.modal.modalEl, 'Cancel');
   assert.equal(h.plugin.settings.promptPresets.find(item => item.id === 'mine').name, 'Mine');
   await h.click(h.row('Mine'), 'Edit');
-  byLabel(h.modal.contentEl, 'Tone name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Tone name').fire('input');
-  byLabel(h.modal.contentEl, 'Describe the tone').value = 'New voice.';
+  byLabel(h.modal.contentEl, 'Preset name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Preset name').fire('input');
+  byLabel(h.modal.contentEl, 'Preset instructions').value = 'New voice.';
   await h.click(h.modal.modalEl, 'Save');
-  assert.deepEqual(plain(h.plugin.settings.promptPresets.find(item => item.id === 'mine')), { id: 'mine', kind: 'tone', name: 'Renamed', text: 'New voice.' });
+  assert.deepEqual(plain(h.plugin.settings.promptPresets.find(item => item.id === 'mine')), { id: 'mine', kind: 'outline', name: 'Renamed', text: 'New voice.' });
   assert.ok(h.names().includes('Renamed'));
   // A blank name cannot be saved and says why.
   await h.click(h.row('Renamed'), 'Edit');
-  byLabel(h.modal.contentEl, 'Tone name').value = '  '; byLabel(h.modal.contentEl, 'Tone name').fire('input');
+  byLabel(h.modal.contentEl, 'Preset name').value = '  '; byLabel(h.modal.contentEl, 'Preset name').fire('input');
   assert.equal(button(h.modal.modalEl, 'Save').disabled, true);
   assert.ok(find(h.modal.modalEl, i => i.text === 'Enter a name before saving.'));
   await h.click(h.modal.modalEl, 'Cancel');
 });
-test('tone library: delete asks twice (armed for five seconds) and New tone opens an editor that saves a custom tone', async () => {
-  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Be brief.' }] });
+// Replaces 'tone library: delete asks twice ... New tone ...' (same flow, outline kind).
+test('outline library: delete asks twice (armed for five seconds) and New preset opens an editor that saves a custom outline preset', async () => {
+  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'outline', name: 'Mine', text: 'Be brief.' }] });
   const del = find(h.row('Mine'), i => i.tag === 'button' && i.text === 'Delete');
   del.click();
   assert.equal(h.plugin.settings.promptPresets.length, 1, 'the first press only arms');
-  assert.equal(del.text, 'Delete tone?');
+  assert.equal(del.text, 'Delete preset?');
   assert.ok(find(h.modal.modalEl, i => /Press again within 5 seconds/.test(i.text)));
   del.click(); await tick();
   assert.deepEqual(plain(h.plugin.settings.promptPresets), []);
   assert.equal(h.plugin.saves, 1);
-  await h.click(h.modal.modalEl, 'New tone');
-  assert.equal(byLabel(h.modal.contentEl, 'Tone name').value, 'My tone');
-  byLabel(h.modal.contentEl, 'Describe the tone').value = 'Warm and concrete.';
+  await h.click(h.modal.modalEl, 'New preset');
+  assert.equal(byLabel(h.modal.contentEl, 'Preset name').value, 'My outline preset');
+  byLabel(h.modal.contentEl, 'Preset instructions').value = 'Warm and concrete.';
   await h.click(h.modal.modalEl, 'Save');
-  assert.deepEqual(plain(h.plugin.settings.promptPresets.map(item => [item.kind, item.name, item.text])), [['tone', 'My tone', 'Warm and concrete.']]);
+  assert.deepEqual(plain(h.plugin.settings.promptPresets.map(item => [item.kind, item.name, item.text])), [['outline', 'My outline preset', 'Warm and concrete.']]);
 });
 
 // ---- tone pickers -----------------------------------------------------------------------------------------------
-integrationTest('map default tone picker: lists built-in and custom tones, marks the current one, sets and clears map.toneId', async () => {
+integrationTest('map default tone picker: lists built-in tones and tone blocks, marks the current one, sets and clears map.toneId', async () => {
   const opened = [];
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
-  const plugin = { settings: { language: 'en', promptPresets: [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'x' }] } };
+  // 06 P3: the custom tone presets are tone blocks now (the upgrade moved them); the picker's data source is the block folder.
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  const settings = { language: 'en', workspaceFolder: 'WS', noteStylesFolder: 'WS/S', detailTemplates: [], promptPresets: [] };
+  const port = { list: async folder => (folder === 'WS/S/Blocks/Tones' ? ['Mine.md'] : []), read: async () => 'x', folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
+  const plugin = { settings, noteStyles: new NoteStyleStore({ settings: () => settings, port, save: async () => {} }) };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.map = map([node('a')]); view.enqueue = work => work();
   view.mapChange = async change => { change(view.map); };
-  view.chooseMapTone();
+  view.chooseMapTone(); await tick();
   const choices = opened.at(-1).choices;
-  assert.deepEqual(plain(choices.map(c => c.label)), ['Use the default (Academic rigor)', 'Plain explanation', 'Magazine column', 'Key-point summary', 'Practical guide', 'Academic rigor', 'AI choice', 'Mine']);
+  assert.deepEqual(plain(choices.map(c => c.label)).slice(0, 1).concat(plain(choices.map(c => c.label)).slice(-1)), ['Use the default (Academic rigor)', 'Mine']);
+  assert.equal(choices.length, 1 + 6 + 1, 'use-the-default, the six built-in tones, the tone block');
   assert.equal(choices[0].description, 'Current setting');
-  await choices[2].action(); await tick();
+  const magazine = choices.find(c => c.label === 'Magazine column');
+  await magazine.action(); await tick();
   assert.equal(view.map.toneId, 'magazine');
-  view.chooseMapTone();
-  assert.equal(opened.at(-1).choices[2].description, 'Current setting');
+  view.chooseMapTone(); await tick();
+  assert.equal(opened.at(-1).choices.find(c => c.label === 'Magazine column').description, 'Current setting');
+  await choices.find(c => c.label === 'Mine').action(); await tick();
+  assert.equal(view.map.toneId, 'file:Mine', 'a tone block is stored as file:<name>');
   await choices[0].action(); await tick();
   assert.equal('toneId' in view.map, false);
 });
@@ -108,7 +118,7 @@ integrationTest('multi-select research dialog: the tone picker defaults to keepi
   assert.equal(submitted[1].toneId, 'plain');
 });
 
-integrationTest('tone picker: the research dialog has no tone library link any more; the tone library still opens straight into the editor', () => {
+integrationTest('tone picker: the research dialog has no tone library link any more; the preset library (outline kind) still opens straight into the editor', () => {
   const Modal = dom.makeModal();
   const { MultiResearchModal } = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const models = { list: () => [], watch: () => () => {} };
@@ -118,9 +128,9 @@ integrationTest('tone picker: the research dialog has no tone library link any m
   assert.equal(byLabel(modal.contentEl, 'Writing tone'), undefined, 'no tone select: the tone comes with the note style');
   assert.equal(button(modal.contentEl, 'Edit tones…'), undefined);
   const presets = load('ui/modals/prompt-presets-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const host = { settings: { language: 'en', promptPresets: [{ id: 'custom-1', kind: 'tone', name: 'Mine', text: 'Short and warm.' }] }, saveSettings: async () => {} };
-  const library = new presets.PromptPresetsModal({}, host, 'tone', () => {}, 'custom-1'); library.open();
-  assert.equal(byLabel(library.contentEl, 'Tone text')?.value ?? findAll(library.contentEl, i => i.tag === 'textarea')[0].value, 'Short and warm.', 'opens straight into the editor');
+  const host = { settings: { language: 'en', promptPresets: [{ id: 'custom-1', kind: 'outline', name: 'Mine', text: 'Short and warm.' }] }, saveSettings: async () => {} };
+  const library = new presets.PromptPresetsModal({}, host, () => {}, 'custom-1'); library.open();
+  assert.equal(byLabel(library.contentEl, 'Preset instructions')?.value ?? findAll(library.contentEl, i => i.tag === 'textarea')[0].value, 'Short and warm.', 'opens straight into the editor');
 });
 
 integrationTest('template and model pickers: the edit link opens the template library at the chosen template, the fix link checks the chosen model', () => {
@@ -129,7 +139,7 @@ integrationTest('template and model pickers: the edit link opens the template li
   const models = { list: () => [{ id: 'gpt-a', label: 'Codex · gpt-a' }], watch: () => () => {} };
   const templates = [{ id: 'standard', name: 'Standard' }, { id: 'mine', name: 'Mine' }];
   const opened = [], repaired = [];
-  const styles = { refresh: async () => {}, list: () => [], unexported: () => [{ id: 'mine', name: 'Mine' }], edit: async ref => { opened.push(ref); } };
+  const styles = { refresh: async () => {}, list: () => [{ kind: 'file', id: 'file:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] }], edit: async ref => { opened.push(ref); } };
   const modal = new MultiResearchModal({}, ['A', 'B'], models, templates, () => {}, [], undefined, { repair: model => repaired.push(model), styles });
   modal.open();
   // The template and tone selects are gone; "Edit this style" opens the file of the chosen style.
@@ -137,9 +147,9 @@ integrationTest('template and model pickers: the edit link opens the template li
   assert.equal(button(modal.contentEl, 'Edit templates…'), undefined);
   const select = byLabel(modal.contentEl, 'Note style');
   assert.equal(button(modal.contentEl, 'Edit this style').disabled, true, 'nothing to edit while "each topic\'s current style" is chosen');
-  select.value = 'legacy:mine'; select.fire('change');
+  select.value = 'file:Mine'; select.fire('change');
   button(modal.contentEl, 'Edit this style').click();
-  assert.deepEqual(plain(opened), [{ kind: 'legacy', id: 'mine' }], 'the style file opens for the chosen style');
+  assert.deepEqual(plain(opened), [{ kind: 'file', id: 'file:Mine' }], 'the template block opens for the chosen style');
   byLabel(modal.contentEl, 'Model').value = 'gpt-a';
   button(modal.contentEl, 'Fix connection…').click();
   assert.deepEqual(repaired, ['gpt-a'], 'the fix link checks the chosen model');
@@ -149,7 +159,7 @@ integrationTest('template and model pickers: the edit link opens the template li
 });
 integrationTest('Next Step: the model field offers Fix connection and the template field offers Edit templates', () => {
   const repaired = [];
-  const h = nextStepHarness({ plugin: { repairConnection: model => repaired.push(model), noteStyles: { refresh: async () => {}, list: () => [], unexportedTemplates: () => [] } }, modelSettings: { templates: [{ id: 'standard', name: 'Standard' }], currentTemplate: 'Standard' } });
+  const h = nextStepHarness({ plugin: { repairConnection: model => repaired.push(model), noteStyles: { refresh: async () => {}, listBlocks: () => [] } }, modelSettings: { templates: [{ id: 'standard', name: 'Standard' }], currentTemplate: 'Standard' } });
   assert.ok(button(h.modal.contentEl, 'Edit this style'), 'the note style field offers an edit link');
   assert.equal(button(h.modal.contentEl, 'Edit templates…'), undefined, 'the template library link is gone');
   button(h.modal.contentEl, 'Fix connection…').click();
@@ -993,14 +1003,20 @@ integrationTest('multi-select synthesis: pressing hides the dialog; directions, 
 integrationTest('multi-select synthesis: the chosen content template reaches the draft and the saved topic', async () => {
   const h = await synthesisHarness();
   const section = (id, name) => ({ id, name, description: '', role: 'none', aliases: [] });
-  h.plugin.settings.detailTemplates = [{ id: 't1', name: 'Brief', sections: [section('key', 'Key points'), section('more', 'Further')] }];
+  // 06 P3: the user's own template is a template block (file:Brief), read from the Templates block folder.
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  Object.assign(h.plugin.settings, { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' });
+  const dir = 'WS/S/Blocks/Templates';
+  const port = { list: async folder => (folder === dir ? ['Brief.md'] : []), read: async () => '## Key points\nThe main idea.\n\n## Further\nMore detail.\n', folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
+  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
+  await h.plugin.noteStyles.refresh();
   const modal = await h.openSelection();
   const name = byLabel(modal.contentEl, 'New topic name'); name.value = 'Cooking water'; name.input();
-  // An old custom template is chosen in the Note style select itself.
-  const style = byLabel(modal.contentEl, 'Note style'); style.value = 'legacy:t1'; style.fire('change');
+  // A template block is chosen in the Note style select itself.
+  const style = byLabel(modal.contentEl, 'Note style'); style.value = 'file:Brief'; style.fire('change');
   visibleBar(modal, 'Skip suggestions and synthesize now').click();
   await untilAsync(async () => (await h.repo.readMap(h.mapPath)).nodes.length === 3 + 1);
-  assert.equal(h.calls.at(-1).context.detailTemplate?.id, 't1', 'the draft is written for the chosen template');
+  assert.equal(h.calls.at(-1).context.detailTemplate?.id, 'file:Brief', 'the draft is written for the chosen template');
   const saved = await h.repo.readMap(h.mapPath);
   assert.match((await h.repo.readNote(saved.nodes.at(-1).path)).detail, /Key points/, 'the saved topic uses the chosen template');
 });
@@ -1108,21 +1124,22 @@ integrationTest('Next Step: the Note style select lists the presets, hints what 
   pick(select, 'preset:plain');
   pick(select, ''); assert.equal(find(h.modal.contentEl, i => i.text === 'Six sections in everyday words; jargon is explained the first time it appears.'), undefined, 'the first option has no hint');
 });
-integrationTest('Next Step: a preset sends its template and tone; an old custom template sends only its id; choosing the first option again sends nothing', async () => {
-  const settings = { tones, templates: [{ id: 'standard', name: 'Standard' }, { id: 'mine', name: 'Mine' }], currentTone: 'Academic rigor', currentTemplate: 'Standard', currentStyle: 'Standard' };
-  const h = nextStepHarness({ modelSettings: settings });
+integrationTest('Next Step: a preset sends its template and tone; a template block sends only its file: id; choosing the first option again sends nothing', async () => {
+  const settings = { tones, templates: [{ id: 'standard', name: 'Standard' }], currentTone: 'Academic rigor', currentTemplate: 'Standard', currentStyle: 'Standard' };
+  const plugin = { noteStyles: { refresh: async () => {}, listBlocks: category => (category === 'template' ? [{ ref: 'file:Mine', kind: 'file', name: 'Mine', fileName: 'Mine.md', modified: false, issues: [] }] : []), ensureBlockFile: async () => ({ path: 'x', base: 'Mine' }) } };
+  const h = nextStepHarness({ modelSettings: settings, plugin });
   const select = styleSelect(h.modal.contentEl);
-  pick(select, 'legacy:mine');
-  assert.ok(find(h.modal.contentEl, i => hasCls(i, 'vam-next-source-summary') && /Mine/.test(i.text)), 'the output summary names the old template');
+  pick(select, 'file:Mine');
+  assert.ok(find(h.modal.contentEl, i => hasCls(i, 'vam-next-source-summary') && /Mine/.test(i.text)), 'the output summary names the template block');
   pick(select, 'preset:summary');
   button(h.actions(), 'Confirm research task').click(); await tick(); await tick();
   assert.equal(h.calls.research[0].detailTemplateId, 'standard'); assert.equal(h.calls.research[0].toneId, 'summary');
-  const second = nextStepHarness({ modelSettings: settings });
-  pick(styleSelect(second.modal.contentEl), 'legacy:mine');
+  const second = nextStepHarness({ modelSettings: settings, plugin });
+  pick(styleSelect(second.modal.contentEl), 'file:Mine');
   button(second.actions(), 'Confirm research task').click(); await tick(); await tick();
-  assert.equal(second.calls.research[0].detailTemplateId, 'mine'); assert.equal('toneId' in second.calls.research[0], false, 'no tone is sent with an old template');
-  const back = nextStepHarness({ modelSettings: settings });
-  pick(styleSelect(back.modal.contentEl), 'legacy:mine'); pick(styleSelect(back.modal.contentEl), '');
+  assert.equal(second.calls.research[0].detailTemplateId, 'file:Mine'); assert.equal('toneId' in second.calls.research[0], false, 'no tone is sent with a template block');
+  const back = nextStepHarness({ modelSettings: settings, plugin });
+  pick(styleSelect(back.modal.contentEl), 'file:Mine'); pick(styleSelect(back.modal.contentEl), '');
   button(back.actions(), 'Confirm research task').click(); await tick(); await tick();
   assert.equal('detailTemplateId' in back.calls.research[0], false, 'going back to the first option sends nothing'); assert.equal('toneId' in back.calls.research[0], false);
 });

@@ -31,6 +31,18 @@ async function recordContext(name, builder, language, context, model) {
 
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 
+// Ticket 06 P2: the old note style switches no longer reach the prompt. A style file is turned into the block the upgrade
+// writes for it (the switches are applied to the format rules zone there) and goes in as the request's styleSelection;
+// the snapshot files stay what they were (the old file and its switches produced exactly this prompt).
+function upgradedSelection(text, language) {
+  const { planNoteStyleUpgrade } = loadModule('ai/note-style-upgrade.ts');
+  const none = new Map();
+  const plan = planNoteStyleUpgrade({ language, files: new Map([['S', text]]), detailTemplates: [], promptPresets: undefined, noteStyleFiles: undefined, blocks: { template: none, tone: none } });
+  const blocks = plan.blocks.filter(block => block.category === 'template');
+  assert.equal(blocks.length, 1, 'the style file upgrades into one template block');
+  return { template: { id: 'style:S', body: blocks[0].text }, tone: { id: 'academic' } };
+}
+
 test('collect snapshots: AiTaskService general task prompt', async () => {
   for (const [language, tag] of LANGUAGES) {
     const ctx = { ...base, outputLanguage: language };
@@ -53,14 +65,17 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
 
 test('collect snapshots: note style files (parsed file sections, intro layout, every format preference off)', async () => {
   const { parseNoteStyleFile } = loadModule('ai/note-style-file.ts');
-  const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return result.style; };
+  const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return { style: result.style, text }; };
   const sectionsStyle = parsed('---\n語氣: 親切白話\n---\n## 核心結論\n數量: 3\n用 1–3 句講最重要的結論。\n> [!summary]\n> 先講結論。\n\n## 證據與來源\n列出來源。\n\n## 更新紀錄\n一行摘要。\n');
   const introStyle = parsed('---\n語氣: 親切白話\n圖表: 關\n---\n先用 2–4 段導讀帶讀者進入主題。\n\n## 核心結論\n> [!summary]\n> 用 1–3 句講最重要的結論。\n\n## 常見誤解\n> [!warning]\n> 用「初學者常以為…，其實…」的句型。\n');
   const offStyle = parsed('---\n方框: 指定\n圖表: 關\n表格: 關\n待辦清單: 關\n螢光標記: 關\n---\n## 核心結論\n講結論。\n');
   const calloutStyle = parsed('---\n方框: 自動\n結論方框: abstract\n風險方框: caution\n問題方框: 關\n技巧方框: example\n---\n## 核心結論\n講結論。\n');
   for (const [language, tag] of LANGUAGES) {
     const ctx = { ...base, outputLanguage: language };
-    const withStyle = style => ({ ...ctx, detailTemplate: style.template, noteStyle: style, toneText: undefined });
+    // NOTE: the intro-layout snapshots below are reference output of the OLD path (a request carrying the old template object
+    // in the intro layout, see the intro hook in core/steps/task/assemble.ts). Production never sends this prompt; the
+    // upgrade turns such a file into a block with a lead. Kept as is until the owner decides at wrap-up.
+    const withStyle = ({ style, text }) => ({ ...ctx, detailTemplate: style.template, styleSelection: upgradedSelection(text, language), toneText: undefined });
     await recordContext(`service.task-style-file-sections.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file (sections layout, count, callout instruction, sources and log roles)', language, withStyle(sectionsStyle));
     await recordContext(`service.task-style-file-intro.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file in the intro layout (lead-in, empty sections omitted, diagrams off)', language, withStyle(introStyle));
     await recordContext(`service.task-style-file-callout-map.${tag}`, 'AiTaskService instructions: mode task with a note style file that remaps the summary, risk and tip callouts and turns the question callout off', language, withStyle(calloutStyle));
@@ -70,7 +85,7 @@ test('collect snapshots: note style files (parsed file sections, intro layout, e
 
 test('collect snapshots: style combinations per step (safety net before the prompt assembler)', async () => {
   const { parseNoteStyleFile } = loadModule('ai/note-style-file.ts');
-  const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return result.style; };
+  const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return { style: result.style, text }; };
   const body = '## 核心結論\n數量: 3\n用 1–3 句講最重要的結論。\n> [!summary]\n> 先講結論。\n\n## 證據與來源\n列出來源。\n\n## 更新紀錄\n一行摘要。\n';
   const withHead = head => parsed(`---\n${head}\n---\n${body}`);
   const styles = {
@@ -87,7 +102,7 @@ test('collect snapshots: style combinations per step (safety net before the prom
   const claude = 'claude:sonnet';
   for (const [language, tag] of LANGUAGES) {
     const ctx = { ...base, outputLanguage: language };
-    const withStyle = (context, style) => ({ ...context, detailTemplate: style.template, noteStyle: style, toneText: undefined });
+    const withStyle = (context, { style, text }) => ({ ...context, detailTemplate: style.template, styleSelection: upgradedSelection(text, language), toneText: undefined });
     const textbook = loadModule('ai/detail-templates.ts').textbookTemplate(loadModule('i18n.ts').noteLanguageOf(language));
     const tone = language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。';
     // Research (task): the remaining single-preference files.

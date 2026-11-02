@@ -29,20 +29,30 @@ import {
   type DetailTemplate
 } from "./detail-templates";
 import {
-  builtinStyleFileName,
-  canonicalContent,
   CANONICAL_LANGUAGES,
-  CANONICAL_VERSIONS,
   matchCanonical,
   normalizeStyleContent,
   NOTE_STYLE_BUILTIN_IDS,
   parseNoteStyleFile,
   serializeLegacyV1,
-  type NoteStyle,
   type NoteStyleBuiltinId,
   type NoteStyleIssue
 } from "./note-style-file";
 import { DEFAULT_TONE_ID, findPreset, listPresets, resolveToneText, type PromptPreset } from "./prompt-presets";
+import {
+  BUILTIN_PAIRS,
+  builtinPairOf,
+  builtinStyleFileBase,
+  NOTE_STYLE_UPGRADE_VERSION,
+  pairAliasKey,
+  planNoteStyleUpgrade,
+  type NoteStyleAlias,
+  type NoteStyleAliases,
+  type NoteStyleUpgradeMarker,
+  type UpgradePlan
+} from "./note-style-upgrade";
+
+export { builtinPairOf };
 
 /**
  * Finds the note style of a run: which template (and tone) a topic, map or workspace resolves to, reading the style files
@@ -74,6 +84,10 @@ export interface NoteStyleSettings {
   noteTemplateBlock?: string;
   /** The workspace tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the old default. */
   noteToneBlock?: string;
+  /** Old ids (style file, old template, built-in style whose file was changed, custom tone preset) -> the blocks that replaced them. */
+  noteStyleAliases?: NoteStyleAliases;
+  /** Set when the one-time upgrade of the old note style data has finished. */
+  noteStyleUpgrade?: NoteStyleUpgradeMarker;
   workspaceFolder: string;
   language: UiLanguage;
 }
@@ -89,8 +103,6 @@ export interface StyleResolution {
   /** Template ids that were asked for but could not be used (as `resolveTemplate` reports them). */
   missing: string[];
   toneText?: string;
-  /** Set when a style file decided the template; absent for built-in and old paths. */
-  noteStyle?: NoteStyle;
   /** The file used (with ".md"), for the progress label. */
   fileName?: string;
   /** A style file that was chosen but does not parse: the run must not start. */
@@ -99,6 +111,8 @@ export interface StyleResolution {
   block?: BlockChoice;
   /** Set with `block` when its text cannot be read: the built-in template stands in, and these say why. */
   blockIssues?: BlockIssue[];
+  /** Set when the answer decided the tone as well (an old style file, or an alias of one): `toneText` is the run's tone, nothing else is asked. */
+  toneDecided?: true;
 }
 
 /** One entry of a block picker. */
@@ -115,39 +129,27 @@ export interface BlockListItem {
   issues: NoteStyleIssue[];
 }
 
+/** What the one-time upgrade could not do; each is shown to the user once. */
+export type NoteStyleUpgradeEvent =
+  { kind: "failed" } | { kind: "trash-failed"; names: string[] } | { kind: "skipped"; names: string[] };
+
+export interface NoteStyleUpgradeResult {
+  status: "done" | "already" | "failed";
+  /** Old style files that do not read: they were not upgraded and stay where they are. */
+  skipped: string[];
+  /** Old files that were upgraded but could not be moved to the trash. */
+  trashFailed: string[];
+}
+
 export type RestoreBlockResult =
   | { ok: true; backup: string }
   | { ok: false; reason: "not-builtin" | "no-override" | "read-failed" | "backup-failed" | "trash-failed" };
 
-export type StyleListItem =
-  | { kind: "builtin"; id: NoteStyleBuiltinId; fileName: string; issues: NoteStyleIssue[] }
-  | { kind: "file"; id: string; name: string; fileName: string; issues: NoteStyleIssue[] }
-  | { kind: "legacy"; id: string; name: string; fileName: string; issues: NoteStyleIssue[] };
-
 const stripMd = (name: string) => name.replace(/\.md$/i, "");
 const lower = (value: string) => value.toLocaleLowerCase();
-const SAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
-
-/** Ids of the built-in styles as stored pairs (template id plus tone id); the same table the note-style menu uses. */
-const BUILTIN_PAIRS: Record<NoteStyleBuiltinId, { template: string; tone: string }> = {
-  standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
-  textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
-  summary: { template: STANDARD_TEMPLATE_ID, tone: "summary" },
-  plain: { template: STANDARD_TEMPLATE_ID, tone: "plain" },
-  guide: { template: STANDARD_TEMPLATE_ID, tone: "guide" }
-};
-
-export function builtinPairOf(
-  templateId: string | undefined,
-  toneId: string | undefined
-): NoteStyleBuiltinId | undefined {
-  const template = templateId || STANDARD_TEMPLATE_ID;
-  const tone = toneId || DEFAULT_TONE_ID;
-  return NOTE_STYLE_BUILTIN_IDS.find(id => BUILTIN_PAIRS[id].template === template && BUILTIN_PAIRS[id].tone === tone);
-}
 
 /**
- * The writing tone of a run: a note style file decides its own (the answer made with the template, `resolution`), else the
+ * The writing tone of a run: an old style file or an alias of one decides its own (the answer made with the template, `resolution`), else the
  * first of `ids` that names a tone preset. Academic (and nothing chosen) is undefined so prompts stay unchanged.
  */
 export function runToneText(
@@ -156,17 +158,14 @@ export function runToneText(
   ids: readonly (string | undefined)[],
   language: ContentLanguage
 ): string | undefined {
-  if (resolution?.noteStyle) return resolution.toneText;
+  if (resolution?.toneDecided) return resolution.toneText;
   return resolveToneText(presets, ids, language);
 }
 
 /** The style fields of a request that names no style of its own (the workspace default), or the style file that stops it. */
 export type WorkspaceStyleFields =
   | { invalid: NonNullable<StyleResolution["invalid"]> }
-  | ({ invalid?: undefined } & Pick<
-      TaskContext,
-      "detailTemplate" | "toneText" | "noteStyle" | "styleDiagrams" | "styleSelection"
-    >);
+  | ({ invalid?: undefined } & Pick<TaskContext, "detailTemplate" | "toneText" | "styleSelection">);
 
 export function defaultStylesFolderName(language: UiLanguage): string {
   return translate(language, "ui.note_styles_folder_name");
@@ -180,6 +179,10 @@ export class NoteStyleStore {
   private readonly resolutions = new WeakMap<DetailTemplate, StyleResolution>();
   /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
   private writeQueue: Promise<unknown> = Promise.resolve();
+  /** The one upgrade run of this session (started once; later calls get the same answer). */
+  private upgradeRun?: Promise<NoteStyleUpgradeResult>;
+  /** An upgrade that could not be written out: its blocks, aliases and keys answer in memory until the next load retries it. */
+  private pending?: Pick<UpgradePlan, "blocks" | "aliases" | "keys">;
 
   constructor(
     private readonly deps: {
@@ -188,6 +191,8 @@ export class NoteStyleStore {
       save: () => Promise<void>;
       /** The clock for backup names; tests inject one. */
       now?: () => Date;
+      /** Told what the upgrade could not do, so the plugin can say so once. */
+      report?: (event: NoteStyleUpgradeEvent) => void;
     }
   ) {}
 
@@ -203,6 +208,12 @@ export class NoteStyleStore {
 
   /** Reads every style file of the folder once. Call at the start of a run; later calls in the run see this snapshot. */
   async refresh(): Promise<void> {
+    // A run waits for an upgrade that is under way: it must not see half of it.
+    if (this.upgradeRun) await this.upgradeRun;
+    await this.load();
+  }
+
+  private async load(): Promise<void> {
     const folder = this.folder();
     const next = new Map<string, string>();
     let names: string[] = [];
@@ -263,6 +274,10 @@ export class NoteStyleStore {
         }
       }
     }
+    // An upgrade that was not written out still answers from memory.
+    for (const block of this.pending?.blocks ?? [])
+      if (![...next[block.category].keys()].some(base => lower(base) === lower(block.base)))
+        next[block.category].set(block.base, block.text);
     this.blocks = next;
   }
 
@@ -321,58 +336,9 @@ export class NoteStyleStore {
 
   // ---- identification of files ----
 
-  private builtinNames(id: NoteStyleBuiltinId): string[] {
-    const preferred = this.settings.language;
-    const languages = [preferred, ...CANONICAL_LANGUAGES.filter(language => language !== preferred)];
-    return [...new Set(languages.map(language => builtinStyleFileName(id, language)))];
-  }
-
-  /** True when `text` is a built-in's file (canonical, or edited but still carrying its usage comment). */
-  private isBuiltinFile(id: NoteStyleBuiltinId, text: string): boolean {
-    if (matchCanonical(text)?.id === id) return true;
-    for (const version of CANONICAL_VERSIONS)
-      for (const language of CANONICAL_LANGUAGES) {
-        const canonical = version[id][language];
-        const comment = /%%[^\n]*/.exec(canonical)?.[0];
-        const name = builtinStyleFileName(id, language);
-        const at = comment ? comment.indexOf(name) : -1;
-        if (comment && at >= 0 && text.includes(comment.slice(0, at + name.length + 1))) return true;
-      }
-    return false;
-  }
-
   /** The base name of the file that holds a built-in style now, if one is in the folder. */
   private builtinFile(id: NoteStyleBuiltinId): string | undefined {
-    for (const name of this.builtinNames(id)) {
-      const matches = [...this.files.keys()]
-        .filter(
-          base =>
-            lower(base) === lower(name) || new RegExp(`^${escapeRegExp(lower(name))} \\(\\d+\\)$`).test(lower(base))
-        )
-        .sort();
-      const found = matches.find(base => this.isBuiltinFile(id, this.files.get(base)!));
-      if (found) return found;
-    }
-    return undefined;
-  }
-
-  /**
-   * The built-in a file base name stands for ("restore default" applies to it). The name alone is not enough: a user's own
-   * file that happens to be called "Standard" is a `style:` file. When the snapshot holds the file its content must be a
-   * built-in's file; `restoreDefault` checks the live content again.
-   */
-  builtinIdOfFile(baseName: string): { id: NoteStyleBuiltinId; language: UiLanguage } | undefined {
-    const base = stripMd(baseName);
-    const key = lower(base);
-    for (const id of NOTE_STYLE_BUILTIN_IDS)
-      for (const language of CANONICAL_LANGUAGES) {
-        const name = lower(builtinStyleFileName(id, language));
-        if (key !== name && !new RegExp(`^${escapeRegExp(name)} \\(\\d+\\)$`).test(key)) continue;
-        const held = [...this.files.keys()].find(item => lower(item) === key);
-        if (held !== undefined && !this.isBuiltinFile(id, this.files.get(held)!)) continue;
-        return { id, language };
-      }
-    return undefined;
+    return builtinStyleFileBase(this.files, id, this.settings.language);
   }
 
   private legacyUnchanged(template: DetailTemplate | undefined, text: string): boolean {
@@ -398,7 +364,7 @@ export class NoteStyleStore {
     for (let index = 0; index < all.length; index++) {
       const id = all[index].template;
       if (!id) continue;
-      const isBlock = index === all.length - 1 && !!settings.noteTemplateBlock && id === settings.noteTemplateBlock;
+      const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
       const found = isBlock
         ? this.tryBlock(id, toneChain, noteLanguage)
         : this.tryId(id, index, all, toneChain, noteLanguage);
@@ -430,20 +396,16 @@ export class NoteStyleStore {
   }
 
   /**
-   * Fields to spread into a TaskContext: the style snapshot, `styleDiagrams: false` only when the file turns charts off,
-   * and, when the template is the workspace's changed or own block, `styleSelection` (its text, and the tone choice of
-   * `toneText`). A call that names no tone and no language gets what it got before.
+   * Fields to spread into a TaskContext: when the template is the workspace's changed or own block, `styleSelection`
+   * (its text, and the tone choice of `toneText`). A call that names no tone and no language gets what it got before.
    */
   contextFields(
     template: DetailTemplate | undefined,
     toneText?: string,
     language?: ContentLanguage
-  ): { noteStyle?: NoteStyle; styleDiagrams?: false; styleSelection?: StyleSelection } {
+  ): { styleSelection?: StyleSelection } {
     const resolution = this.resolutionOf(template);
-    const style = resolution?.noteStyle;
-    const fields: { noteStyle?: NoteStyle; styleDiagrams?: false; styleSelection?: StyleSelection } = style
-      ? { noteStyle: style, ...(style.diagrams ? {} : { styleDiagrams: false as const }) }
-      : {};
+    const fields: { styleSelection?: StyleSelection } = {};
     if (resolution?.block)
       fields.styleSelection = {
         template: resolution.block,
@@ -463,14 +425,60 @@ export class NoteStyleStore {
     language: ContentLanguage
   ): string | undefined {
     const resolution = this.resolutionOf(template);
-    const presets = this.settings.promptPresets;
-    if (resolution?.noteStyle) return runToneText(resolution, presets, ids, language);
+    // An old style file, or the alias of one, decided the tone together with the template.
+    if (resolution?.toneDecided) return resolution.toneText;
+    return this.plainTone(ids, language).text;
+  }
+
+  /**
+   * The tone of the first of `ids` that names a tone (a custom tone preset's id goes through its alias to the tone block;
+   * academic is no text), else the workspace tone: a built-in tone by id, or a text that fills the gap only when no tone
+   * is named by the run, topic or map.
+   */
+  private plainTone(
+    ids: readonly (string | undefined)[],
+    language: ContentLanguage
+  ): { named: boolean; text?: string } {
+    const own = this.namedTone(ids, language);
+    if (own.named) return own;
     const workspace = this.workspaceTone();
-    if (!workspace) return resolveToneText(presets, ids, language);
-    if ("id" in workspace) return resolveToneText(presets, [...ids, workspace.id], language);
-    // The workspace tone is a text: it fills the gap only when no tone preset is named by the run, topic or map.
-    if (ids.some(id => findPreset(presets, "tone", id, language))) return resolveToneText(presets, ids, language);
-    return workspace.text.trim() || undefined;
+    if (!workspace) return own;
+    if ("id" in workspace) return this.namedTone([workspace.id], language);
+    return { named: true, text: workspace.text.trim() || undefined };
+  }
+
+  /** The first of `ids` that names a tone decides: `named`, and its text (undefined for academic or an empty text). */
+  private namedTone(
+    ids: readonly (string | undefined)[],
+    language: ContentLanguage
+  ): { named: boolean; text?: string } {
+    const presets = this.settings.promptPresets;
+    for (const id of ids) {
+      if (!id) continue;
+      if (parseBlockRef(id)?.kind === "file") {
+        // A tone block the map, topic or run picked; the file being gone means the id names nothing any more.
+        const target = this.toneByRef(id);
+        if (target) return { named: true, text: this.toneTargetText(target, language) };
+        continue;
+      }
+      const alias = this.aliasOf(id);
+      if (alias?.tone && !alias.template) {
+        // A tone block the id was moved to; the file being gone means the id names nothing any more.
+        const target = this.toneByRef(alias.tone);
+        if (target) return { named: true, text: this.toneTargetText(target, language) };
+        continue;
+      }
+      const found = findPreset(presets, "tone", id, language);
+      if (found)
+        return { named: true, text: found.id === DEFAULT_TONE_ID ? undefined : found.text.trim() || undefined };
+    }
+    return { named: false };
+  }
+
+  private toneTargetText(target: { id: string } | { text: string }, language: ContentLanguage): string | undefined {
+    return "id" in target
+      ? resolveToneText(this.settings.promptPresets, [target.id], language)
+      : target.text.trim() || undefined;
   }
 
   /**
@@ -494,33 +502,68 @@ export class NoteStyleStore {
    */
   private workspaceTone(): { id: string } | { text: string } | undefined {
     const settings = this.settings;
-    if (settings.noteToneBlock) {
-      const ref = parseBlockRef(settings.noteToneBlock);
-      if (ref?.kind === "builtin") {
-        if (!this.isBuiltinBlockId("tone", ref.id)) return undefined;
-        const base = this.overrideBase("tone", ref.id);
-        const text = base === undefined ? undefined : this.blocks.tone.get(base);
-        if (text !== undefined && !isUnmodifiedBlock("tone", ref.id, text)) return { text };
-        return { id: ref.id };
-      }
-      if (ref?.kind === "file") {
-        const text = this.blocks.tone.get(ref.base);
-        return text === undefined ? undefined : { text };
-      }
-      return undefined;
-    }
+    const key = this.toneKey();
+    if (key) return this.toneByRef(key);
     const preset = NOTE_STYLE_BUILTIN_IDS.find(id => id === settings.defaultNoteStyleId);
     return preset ? { id: BUILTIN_PAIRS[preset].tone } : undefined;
   }
 
+  /** A tone block ref as a tone: a built-in by id (so the run's chain can apply it), or the text of a changed built-in or own file. */
+  private toneByRef(ref: string): { id: string } | { text: string } | undefined {
+    const parsed = parseBlockRef(ref);
+    if (parsed?.kind === "builtin") {
+      if (!this.isBuiltinBlockId("tone", parsed.id)) return undefined;
+      const base = this.overrideBase("tone", parsed.id);
+      const text = base === undefined ? undefined : this.blocks.tone.get(base);
+      if (text !== undefined && !isUnmodifiedBlock("tone", parsed.id, text)) return { text };
+      return { id: parsed.id };
+    }
+    if (parsed?.kind === "file") {
+      const text = this.blocks.tone.get(parsed.base);
+      return text === undefined ? undefined : { text };
+    }
+    return undefined;
+  }
+
+  // ---- upgrade state the resolution reads: what is saved, else what an unfinished upgrade holds in memory ----
+
+  private templateKey(): string | undefined {
+    return this.settings.noteTemplateBlock || this.pending?.keys.noteTemplateBlock;
+  }
+
+  private toneKey(): string | undefined {
+    return this.settings.noteToneBlock || this.pending?.keys.noteToneBlock;
+  }
+
+  /**
+   * The template and tone blocks the runs use: what is saved, else what an unfinished upgrade holds in memory. Read-only;
+   * the settings page shows these, so a failed or unfinished upgrade does not show the standard template over the result.
+   */
+  effectiveBlockKeys(): { template?: string; tone?: string; pending: boolean } {
+    return { template: this.templateKey(), tone: this.toneKey(), pending: this.pending !== undefined };
+  }
+
+  private aliasOf(key: string): NoteStyleAlias | undefined {
+    const saved = this.settings.noteStyleAliases;
+    if (saved && Object.prototype.hasOwnProperty.call(saved, key)) return saved[key];
+    const held = this.pending?.aliases;
+    return held && Object.prototype.hasOwnProperty.call(held, key) ? held[key] : undefined;
+  }
+
+  /** Until the upgrade has finished, the old sources (style files, exported files) are still read. */
+  private legacyReads(): boolean {
+    return !this.settings.noteStyleUpgrade;
+  }
+
   private remember(resolution: StyleResolution): StyleResolution {
-    if (resolution.noteStyle || resolution.block) this.resolutions.set(resolution.template, resolution);
+    if (resolution.toneDecided || resolution.block) this.resolutions.set(resolution.template, resolution);
     return resolution;
   }
 
   private workspaceLevel(): StyleLevel {
     const settings = this.settings;
-    if (settings.noteTemplateBlock) return { template: settings.noteTemplateBlock };
+    const block = this.templateKey();
+    if (block) return { template: block };
     const chosen = settings.defaultNoteStyleId;
     if (chosen) {
       const preset = NOTE_STYLE_BUILTIN_IDS.find(id => id === chosen);
@@ -593,13 +636,20 @@ export class NoteStyleStore {
     noteLanguage: ReturnType<typeof noteLanguageOf>
   ): StyleResolution | undefined {
     const settings = this.settings;
+    // A template block the user wrote, picked at the map, topic or run level (the map file stores `file:<name>`).
+    if (parseBlockRef(id)?.kind === "file") return this.tryBlock(id, toneChain, noteLanguage);
     if (id.startsWith("style:")) {
+      const aliased = this.tryAlias(id, "user", level, toneChain, noteLanguage);
+      if (aliased) return aliased;
+      if (!this.legacyReads()) return undefined;
       const base = id.slice("style:".length);
       const text = this.files.get(base);
       if (text === undefined) return undefined;
       return this.fromFile(parseNoteStyleFile(text, { id, name: base }), `${base}.md`, level, toneChain, "user");
     }
-    const exported = settings.noteStyleFiles?.[id];
+    const aliasedOld = this.tryAlias(id, "legacy", level, toneChain, noteLanguage);
+    if (aliasedOld) return aliasedOld;
+    const exported = this.legacyReads() ? settings.noteStyleFiles?.[id] : undefined;
     if (exported) {
       const base = stripMd(exported);
       const text = this.files.get(base);
@@ -611,9 +661,13 @@ export class NoteStyleStore {
       }
     }
     if (id === STANDARD_TEMPLATE_ID || id === TEXTBOOK_TEMPLATE_ID) {
-      const tone = toneChain.find(toneId => findPreset(settings.promptPresets, "tone", toneId, settings.language));
+      const tone = toneChain.find(toneId => this.namedTone([toneId], settings.language).named);
       const builtin = builtinPairOf(id, tone);
-      const base = builtin ? this.builtinFile(builtin) : undefined;
+      const aliasedPair = builtin
+        ? this.tryAlias(pairAliasKey(builtin), "pair", level, toneChain, noteLanguage)
+        : undefined;
+      if (aliasedPair) return aliasedPair;
+      const base = builtin && this.legacyReads() ? this.builtinFile(builtin) : undefined;
       if (builtin && base !== undefined) {
         const text = this.files.get(base)!;
         if (matchCanonical(text)?.id !== builtin)
@@ -627,6 +681,40 @@ export class NoteStyleStore {
       }
     }
     return this.legacyResult(id, toneChain, noteLanguage);
+  }
+
+  /**
+   * An old id that the upgrade moved to a template block (`alias.template`), answered as the old file was: the block, and
+   * the tone the file decided. A style file's tone is its own unless the same or a more specific level names one; an old
+   * template's whole chain (and the workspace tone) is asked first; a built-in style's file always decides its own.
+   * Absent when the id has no alias or its block file is gone (the caller goes on as for a file that is missing).
+   */
+  private tryAlias(
+    key: string,
+    kind: "user" | "legacy" | "pair",
+    level: number,
+    toneChain: (string | undefined)[],
+    noteLanguage: ReturnType<typeof noteLanguageOf>
+  ): StyleResolution | undefined {
+    const alias = this.aliasOf(key);
+    if (!alias?.template) return undefined;
+    const found = this.tryBlock(alias.template, toneChain, noteLanguage);
+    if (!found) return undefined;
+    const language = this.settings.language;
+    const target = alias.tone ? this.toneByRef(alias.tone) : undefined;
+    const own = target ? this.toneTargetText(target, language) : undefined;
+    let toneText: string | undefined;
+    if (kind === "pair") toneText = own;
+    else if (kind === "user") {
+      const named = this.namedTone(toneChain.slice(0, level + 1), language);
+      toneText = named.named ? named.text : own;
+    } else {
+      // An old template had no tone of its own: the usual chain decides.
+      if (!alias.tone) return found;
+      const named = this.plainTone(toneChain, language);
+      toneText = named.named ? named.text : own;
+    }
+    return { ...found, ...(toneText ? { toneText } : {}), toneDecided: true };
   }
 
   private fromFile(
@@ -652,7 +740,7 @@ export class NoteStyleStore {
       if (known !== undefined) toneText = resolveToneText(settings.promptPresets, chain, settings.language);
       else if (style.tone) toneText = this.toneFromFile(style.tone);
     } else if (style.tone) toneText = this.toneFromFile(style.tone);
-    return { template: style.template, missing: [], ...(toneText ? { toneText } : {}), noteStyle: style, fileName };
+    return { template: style.template, missing: [], ...(toneText ? { toneText } : {}), toneDecided: true, fileName };
   }
 
   /** `語氣` is the name or id of an existing tone (its full text is used), else free text. */
@@ -669,116 +757,26 @@ export class NoteStyleStore {
     return raw.trim() || undefined;
   }
 
-  // ---- lists for the entries ----
+  // ---- the tone choices of the map pickers ----
 
-  /** Every style in the folder with its parse result, for the pickers (call `refresh()` first). */
-  list(): StyleListItem[] {
-    const settings = this.settings;
-    const exportedBy = new Map<string, string>(
-      Object.entries(settings.noteStyleFiles ?? {}).map(([uuid, name]) => [lower(stripMd(name)), uuid])
-    );
-    const items: StyleListItem[] = [];
-    for (const [base, text] of [...this.files].sort(([a], [b]) => a.localeCompare(b))) {
-      const builtin = NOTE_STYLE_BUILTIN_IDS.find(id => this.builtinFile(id) === base);
-      const uuid = exportedBy.get(lower(base));
-      const id = builtin ? builtin : (uuid ?? `style:${base}`);
-      const parsed = parseNoteStyleFile(text, { id: typeof id === "string" ? id : base, name: base });
-      const issues = parsed.ok ? [] : parsed.issues;
-      if (builtin) items.push({ kind: "builtin", id: builtin, fileName: `${base}.md`, issues });
-      else if (uuid) items.push({ kind: "legacy", id: uuid, name: base, fileName: `${base}.md`, issues });
-      else items.push({ kind: "file", id: `style:${base}`, name: base, fileName: `${base}.md`, issues });
-    }
-    return items;
+  /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
+  toneChoices(): { id: string; name: string }[] {
+    return this.listBlocks("tone").map(item => {
+      const parsed = parseBlockRef(item.ref);
+      return { id: parsed?.kind === "builtin" ? parsed.id : item.ref, name: item.name };
+    });
   }
 
-  /** Old custom templates that have no style file yet (still pickable as before). */
-  unexportedTemplates(): DetailTemplate[] {
-    const map = this.settings.noteStyleFiles ?? {};
-    return this.settings.detailTemplates.filter(template => !map[template.id]);
-  }
-
-  // ---- writing files (only on a user action) ----
-
-  private uniqueName(base: string, taken: Set<string>): string {
-    let name = base;
-    for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
-    return name;
-  }
-
-  /**
-   * Creates the folder and the files that do not exist yet: the five built-ins, and an export of every old custom template.
-   * Safe to run again. Never overwrites: a name taken by another file gets a unique name instead.
-   */
-  async ensureStyleFolder(): Promise<string> {
-    const settings = this.settings;
-    const { port } = this.deps;
-    const folder = this.folder();
-    let dirty = false;
-    if (!settings.noteStylesFolder) {
-      settings.noteStylesFolder = folder;
-      dirty = true;
-    }
-    await port.createFolder(folder);
-    await this.refresh();
-    const taken = new Set([...this.files.keys()].map(lower));
-    const write = async (base: string, content: string) => {
-      await port.create(`${folder}/${base}.md`, content);
-      this.files.set(base, content);
-      taken.add(lower(base));
-    };
-    for (const id of NOTE_STYLE_BUILTIN_IDS) {
-      if (this.builtinFile(id) !== undefined) continue;
-      await write(
-        this.uniqueName(builtinStyleFileName(id, settings.language), taken),
-        canonicalContent(id, settings.language)
-      );
-    }
-    const map = { ...(settings.noteStyleFiles ?? {}) };
-    const claimed = new Set(Object.values(map).map(name => lower(stripMd(name))));
-    for (const template of settings.detailTemplates) {
-      if (map[template.id]) continue;
-      const wanted = template.name.replace(SAFE_NAME, " ").replace(/\s+/g, " ").trim() || "Style";
-      const existing = [...this.files.keys()].find(base => lower(base) === lower(wanted));
-      if (
-        existing !== undefined &&
-        !claimed.has(lower(existing)) &&
-        this.legacyUnchanged(template, this.files.get(existing)!)
-      ) {
-        map[template.id] = `${existing}.md`;
-        claimed.add(lower(existing));
-        dirty = true;
-        continue;
-      }
-      const base = this.uniqueName(wanted, taken);
-      await write(base, serializeLegacyV1(template, settings.language));
-      map[template.id] = `${base}.md`;
-      claimed.add(lower(base));
-      dirty = true;
-    }
-    if (Object.keys(map).length && JSON.stringify(map) !== JSON.stringify(settings.noteStyleFiles ?? {})) {
-      settings.noteStyleFiles = map;
-      dirty = true;
-    }
-    if (dirty) await this.deps.save();
-    return folder;
-  }
-
-  /** Moves the built-in's file to the trash, then writes its standard content again. */
-  async restoreDefault(path: string): Promise<boolean> {
-    const name = path.split("/").pop() ?? path;
-    const builtin = this.builtinIdOfFile(name);
-    if (!builtin) return false;
-    let live: string;
-    try {
-      live = await this.deps.port.read(path);
-    } catch {
-      return false;
-    }
-    if (!this.isBuiltinFile(builtin.id, live)) return false;
-    await this.deps.port.trash(path);
-    await this.deps.port.create(path, canonicalContent(builtin.id, builtin.language));
-    this.files.set(stripMd(name), canonicalContent(builtin.id, builtin.language));
-    return true;
+  /** The name of a stored tone id: a built-in tone, a tone block, a custom preset moved to a block (its alias), or an old preset not moved. */
+  toneName(id: string | undefined): string | undefined {
+    if (!id) return undefined;
+    const alias = this.aliasOf(id);
+    let ref: string | undefined;
+    if (alias?.tone && !alias.template) ref = alias.tone;
+    else if (parseBlockRef(id)?.kind === "file") ref = id;
+    else if (this.isBuiltinBlockId("tone", id)) ref = builtinRef(id);
+    const named = ref ? this.listBlocks("tone").find(item => item.ref === ref)?.name : undefined;
+    return named ?? findPreset(this.settings.promptPresets, "tone", id, this.settings.language)?.name;
   }
 
   // ---- writing block files (only on a user action; a file is never overwritten) ----
@@ -791,6 +789,30 @@ export class NoteStyleStore {
 
   private takenNames(category: BlockCategory): Set<string> {
     return new Set([...this.blocks[category].keys()].map(lower));
+  }
+
+  /**
+   * Remembers the style folder in the settings when it has no saved path, so a later change of interface language does
+   * not move it. A saved path is never replaced. Call it before anything is created in the folder.
+   */
+  private async pinFolder(): Promise<void> {
+    if (this.settings.noteStylesFolder) return;
+    this.settings.noteStylesFolder = this.folder();
+    await this.deps.save();
+  }
+
+  /**
+   * Creates the block folders (Templates and Tones) when they are missing, and remembers the style folder in the settings
+   * so a later change of interface language does not move it. Writes no block file. Returns the block folder.
+   */
+  ensureBlockFolder(): Promise<string> {
+    return this.serial(async () => {
+      const { port } = this.deps;
+      await this.pinFolder();
+      const dirs = this.blockDirectories();
+      for (const path of [dirs.root, dirs.template, dirs.tone]) await port.createFolder(path);
+      return dirs.root;
+    });
   }
 
   /**
@@ -817,6 +839,7 @@ export class NoteStyleStore {
         this.takenNames(category)
       );
       const text = builtinBlockText(category, parsed.id, language);
+      await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text);
       this.blocks[category].set(base, text);
@@ -850,6 +873,7 @@ export class NoteStyleStore {
       } else throw new Error(`Unknown block: ${ref}`);
       const dir = this.blockDirectories()[category];
       const base = copyBlockName(category, name, language, this.takenNames(category));
+      await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text);
       this.blocks[category].set(base, text);
@@ -891,6 +915,7 @@ export class NoteStyleStore {
         } catch {
           present = [];
         }
+        await this.pinFolder();
         await port.createFolder(dirs.backup);
         backup = `${dirs.backup}/${backupName(base, this.deps.now?.() ?? new Date(), new Set(present.map(lower)))}`;
         await port.create(backup, live);
@@ -907,6 +932,141 @@ export class NoteStyleStore {
     });
   }
 
+  // ---- the one-time upgrade of the old note style data (the only write that is not a user action) ----
+
+  /**
+   * Starts the upgrade once (`after` is awaited first, for example the plugin's start-up); later calls get the same
+   * promise. It never rejects: a failure is reported once, the unfinished upgrade answers from memory this session, and
+   * the next load tries again. `refresh()` waits for it.
+   */
+  startUpgrade(after?: Promise<unknown>): Promise<NoteStyleUpgradeResult> {
+    this.upgradeRun ??= (async (): Promise<NoteStyleUpgradeResult> => {
+      try {
+        if (after) await after.catch(() => undefined);
+        return await this.runUpgrade();
+      } catch {
+        this.deps.report?.({ kind: "failed" });
+        return { status: "failed", skipped: [], trashFailed: [] };
+      }
+    })();
+    return this.upgradeRun;
+  }
+
+  upgradeLegacy(): Promise<NoteStyleUpgradeResult> {
+    return this.startUpgrade();
+  }
+
+  /**
+   * Order: the plan is applied in memory, then backups of the old files, the block files, data.json (new keys, aliases,
+   * marker), and only then the old files go to the trash. A failure before the marker leaves the marker, the keys and the
+   * old files alone. Nothing is ever overwritten: a name taken by other text was given a new name by the plan.
+   */
+  private async runUpgrade(): Promise<NoteStyleUpgradeResult> {
+    const settings = this.settings;
+    if (settings.noteStyleUpgrade) return { status: "already", skipped: [], trashFailed: [] };
+    await this.load();
+    const plan = planNoteStyleUpgrade({
+      language: settings.language,
+      files: this.files,
+      detailTemplates: settings.detailTemplates,
+      promptPresets: settings.promptPresets,
+      noteStyleFiles: settings.noteStyleFiles,
+      defaultNoteStyleId: settings.defaultNoteStyleId,
+      defaultDetailTemplateId: settings.defaultDetailTemplateId,
+      noteTemplateBlock: settings.noteTemplateBlock,
+      noteToneBlock: settings.noteToneBlock,
+      blocks: this.blocks
+    });
+    // From here the plan answers in memory, whatever happens to the writes.
+    if (!plan.nothing) {
+      this.pending = { blocks: plan.blocks, aliases: plan.aliases, keys: plan.keys };
+      for (const block of plan.blocks) this.blocks[block.category].set(block.base, block.text);
+    }
+    try {
+      // Block actions of the user wait behind the upgrade's writes, as they wait behind each other.
+      await this.serial(() => this.writeUpgrade(plan));
+    } catch {
+      this.deps.report?.({ kind: "failed" });
+      return { status: "failed", skipped: plan.skipped, trashFailed: [] };
+    }
+    this.pending = undefined;
+    const trashFailed = await this.trashUpgraded(plan);
+    if (plan.skipped.length) this.deps.report?.({ kind: "skipped", names: plan.skipped });
+    if (trashFailed.length) this.deps.report?.({ kind: "trash-failed", names: trashFailed });
+    return { status: "done", skipped: plan.skipped, trashFailed };
+  }
+
+  private async writeUpgrade(plan: UpgradePlan): Promise<void> {
+    const { port } = this.deps;
+    const settings = this.settings;
+    const dirs = this.blockDirectories();
+    // The folders are about to be made: the path they get is the one kept, whatever the interface language becomes.
+    const pinned = settings.noteStylesFolder ? undefined : this.folder();
+    if (plan.oldFiles.length) {
+      let present: string[] = [];
+      try {
+        present = await port.list(dirs.backup);
+      } catch {
+        present = [];
+      }
+      await port.createFolder(dirs.backup);
+      const taken = new Set(present.map(lower));
+      const now = this.deps.now?.() ?? new Date();
+      for (const old of plan.oldFiles) {
+        const name = backupName(old.base, now, taken);
+        taken.add(lower(name));
+        await port.create(`${dirs.backup}/${name}`, old.text);
+      }
+    }
+    for (const category of ["tone", "template"] as const) {
+      const items = plan.blocks.filter(block => block.category === category);
+      if (!items.length) continue;
+      await port.createFolder(dirs[category]);
+      for (const item of items) await port.create(`${dirs[category]}/${item.base}.md`, item.text);
+    }
+    // data.json: the new keys only where they have no value, the aliases, then the marker; undone when the save fails.
+    const before = {
+      noteStylesFolder: settings.noteStylesFolder,
+      noteTemplateBlock: settings.noteTemplateBlock,
+      noteToneBlock: settings.noteToneBlock,
+      noteStyleAliases: settings.noteStyleAliases,
+      noteStyleUpgrade: settings.noteStyleUpgrade
+    };
+    if (pinned !== undefined && (plan.oldFiles.length || plan.blocks.length)) settings.noteStylesFolder = pinned;
+    if (plan.keys.noteTemplateBlock && !settings.noteTemplateBlock)
+      settings.noteTemplateBlock = plan.keys.noteTemplateBlock;
+    if (plan.keys.noteToneBlock && !settings.noteToneBlock) settings.noteToneBlock = plan.keys.noteToneBlock;
+    if (Object.keys(plan.aliases).length) settings.noteStyleAliases = { ...plan.aliases, ...settings.noteStyleAliases };
+    settings.noteStyleUpgrade = { version: NOTE_STYLE_UPGRADE_VERSION };
+    try {
+      await this.deps.save();
+    } catch (error) {
+      for (const [key, value] of Object.entries(before)) {
+        if (value === undefined) delete settings[key as keyof typeof before];
+        else (settings as unknown as Record<string, unknown>)[key] = value;
+      }
+      throw error;
+    }
+  }
+
+  /** The old files that became blocks go to the trash, each only while it still holds the text that was backed up. */
+  private async trashUpgraded(plan: UpgradePlan): Promise<string[]> {
+    const { port } = this.deps;
+    const folder = this.folder();
+    const failed: string[] = [];
+    for (const old of plan.oldFiles) {
+      const path = `${folder}/${old.base}.md`;
+      try {
+        if ((await port.read(path)) !== old.text) throw new Error("changed");
+        await port.trash(path);
+        this.files.delete(old.base);
+      } catch {
+        failed.push(old.base);
+      }
+    }
+    return failed;
+  }
+
   /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */
   async followFolderRename(oldPath: string, newPath: string): Promise<boolean> {
     if (oldPath !== this.folder()) return false;
@@ -919,10 +1079,6 @@ export class NoteStyleStore {
   folderExists(): boolean {
     return this.deps.port.folderExists(this.folder());
   }
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** An exported file's sections take the role and old names of the same-named section of the original template. */

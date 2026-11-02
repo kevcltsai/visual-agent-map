@@ -137,6 +137,10 @@ export interface Settings {
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */
   noteStyleFiles?: Record<string, string>;
+  /** Old ids (style file, old template, built-in style whose file was changed, custom tone preset) -> the blocks that replaced them; written by the upgrade. */
+  noteStyleAliases?: Record<string, { template?: string; tone?: string }>;
+  /** Set when the one-time upgrade of the old note style data has finished; the old sources are not read after it. */
+  noteStyleUpgrade?: { version: number };
   coffeeStyles?: CoffeeStyle[];
   /** Custom tone/outline presets; built-ins live in ai/prompt-presets.ts. Absent = none. */
   promptPresets?: PromptPreset[];

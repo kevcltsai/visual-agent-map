@@ -62,58 +62,11 @@ export interface NoteStyleSection extends DetailSection {
   /** 1-based line of the section's "##" heading. */
   line: number;
 }
-/** The four callout types a style file can remap (the prompt's summary / warning / question / tip lines). */
-export const CALLOUT_MAP_KEYS = ["summary", "warning", "question", "tip"] as const;
-export type CalloutMapKey = (typeof CALLOUT_MAP_KEYS)[number];
-/** Only entries that differ from the default are present; "off" removes the prompt line. */
-export type CalloutMap = Partial<Record<CalloutMapKey, string>>;
-/**
- * Obsidian's built-in callout types and aliases, lower-case (source: https://help.obsidian.md/callouts, checked
- * 2026-11-01). Custom CSS types are not accepted.
- */
-export const OBSIDIAN_CALLOUT_TYPES: ReadonlySet<string> = new Set([
-  "note",
-  "abstract",
-  "summary",
-  "tldr",
-  "info",
-  "todo",
-  "tip",
-  "hint",
-  "important",
-  "success",
-  "check",
-  "done",
-  "question",
-  "help",
-  "faq",
-  "warning",
-  "caution",
-  "attention",
-  "failure",
-  "fail",
-  "missing",
-  "danger",
-  "error",
-  "bug",
-  "example",
-  "quote",
-  "cite"
-]);
-
 export interface NoteStyle {
   id: string;
   name: string;
   /** Raw `語氣` value: free text, or the name or id of an existing tone (resolved by the store). Undefined when absent. */
   tone?: string;
-  /** "auto": the AI picks callouts as today, plus the ones the file places. "placed": only the file's. */
-  callouts: "auto" | "placed";
-  diagrams: boolean;
-  tables: boolean;
-  tasks: boolean;
-  highlight: boolean;
-  /** Callout type per prompt line, only where the file changes the default; empty when nothing changes. */
-  calloutMap: CalloutMap;
   layout: "intro" | "sections";
   /** Text before the first "##", comments removed and trimmed; empty for the sections layout. */
   intro: string;
@@ -247,39 +200,8 @@ const issue = (line: number, code: string, message: string, ...values: (string |
   message
 });
 
-const FRONTMATTER_KEYS: Record<string, "tone" | "callouts" | "diagrams" | "tables" | "tasks" | "highlight"> = {
-  語氣: "tone",
-  语气: "tone",
-  tone: "tone",
-  方框: "callouts",
-  callouts: "callouts",
-  圖表: "diagrams",
-  图表: "diagrams",
-  diagrams: "diagrams",
-  表格: "tables",
-  tables: "tables",
-  待辦清單: "tasks",
-  待办清单: "tasks",
-  tasks: "tasks",
-  螢光標記: "highlight",
-  荧光标记: "highlight",
-  highlight: "highlight"
-};
-const CALLOUT_KEYS: Record<string, CalloutMapKey> = {
-  結論方框: "summary",
-  结论方框: "summary",
-  "summary callout": "summary",
-  風險方框: "warning",
-  风险方框: "warning",
-  "risk callout": "warning",
-  問題方框: "question",
-  问题方框: "question",
-  "question callout": "question",
-  技巧方框: "tip",
-  "tip callout": "tip"
-};
-const ON = new Set(["開", "开", "on", "true"]);
-const OFF = new Set(["關", "关", "off", "false"]);
+/** The only frontmatter key still read: the tone. Every other line is skipped (the old switches live in the upgrade module). */
+const TONE_KEYS = new Set(["語氣", "语气", "tone"]);
 const COMMENT_MARK = "%%";
 
 /**
@@ -382,23 +304,8 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     );
   const lines = all.split("\n");
 
-  // frontmatter
-  const flags: {
-    tone?: string;
-    callouts: "auto" | "placed";
-    diagrams: boolean;
-    tables: boolean;
-    tasks: boolean;
-    highlight: boolean;
-  } = {
-    callouts: "placed",
-    diagrams: true,
-    tables: true,
-    tasks: true,
-    highlight: true
-  };
-  const calloutMap: CalloutMap = {};
-  const calloutSeen = new Set<CalloutMapKey>();
+  // frontmatter: only the tone is read; any other line is skipped, and the only error is a frontmatter that never closes
+  let tone: string | undefined;
   let bodyStart = 0;
   if (lines[0].trimEnd() === "---") {
     const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
@@ -411,69 +318,19 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
         const raw = lines[index];
         if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
         const pair = /^([^:：]+?)\s*[:：]\s*(.*)$/.exec(raw);
-        if (!pair) {
-          issues.push(issue(index + 1, "frontmatter_line", `Line ${index + 1} is not "key: value".`));
-          continue;
-        }
-        const keyName = pair[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
+        if (!pair || !TONE_KEYS.has(pair[1].trim().toLocaleLowerCase().replace(/\s+/g, " "))) continue;
         let value = pair[2].trim();
         if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
-        const where = index + 1;
-        const calloutField = CALLOUT_KEYS[keyName];
-        if (calloutField) {
-          const lower = value.toLocaleLowerCase();
-          if (calloutSeen.has(calloutField))
-            issues.push(
-              issue(where, "key_duplicate", `Line ${where}: "${pair[1].trim()}" is written twice.`, pair[1].trim())
-            );
-          else {
-            calloutSeen.add(calloutField);
-            if (OFF.has(lower)) calloutMap[calloutField] = "off";
-            else if (OBSIDIAN_CALLOUT_TYPES.has(lower)) {
-              if (lower !== calloutField) calloutMap[calloutField] = lower;
-            } else
-              issues.push(
-                issue(
-                  where,
-                  "value_invalid",
-                  `Line ${where}: "${value}" is not an Obsidian callout type.`,
-                  pair[1].trim(),
-                  value
-                )
-              );
-          }
-          continue;
-        }
-        const field = FRONTMATTER_KEYS[keyName];
-        if (!field) continue;
-        if (field === "tone") {
-          if (value.length > NOTE_STYLE_LIMITS.tone)
-            issues.push(
-              issue(
-                where,
-                "tone_long",
-                `The tone is over ${NOTE_STYLE_LIMITS.tone} characters.`,
-                NOTE_STYLE_LIMITS.tone
-              )
-            );
-          else flags.tone = value || undefined;
-        } else if (field === "callouts") {
-          const key = value.toLocaleLowerCase();
-          if (key === "自動" || key === "自动" || key === "auto") flags.callouts = "auto";
-          else if (key === "指定" || key === "placed") flags.callouts = "placed";
-          else
-            issues.push(
-              issue(where, "value_invalid", `Line ${where}: "${value}" is not auto or placed.`, pair[1].trim(), value)
-            );
-        } else {
-          const key = value.toLocaleLowerCase();
-          if (ON.has(key)) flags[field] = true;
-          else if (OFF.has(key)) flags[field] = false;
-          else
-            issues.push(
-              issue(where, "value_invalid", `Line ${where}: "${value}" is not on or off.`, pair[1].trim(), value)
-            );
-        }
+        if (value.length > NOTE_STYLE_LIMITS.tone)
+          issues.push(
+            issue(
+              index + 1,
+              "tone_long",
+              `The tone is over ${NOTE_STYLE_LIMITS.tone} characters.`,
+              NOTE_STYLE_LIMITS.tone
+            )
+          );
+        else tone = value || undefined;
       }
     }
   }
@@ -552,13 +409,7 @@ export function parseNoteStyleFile(text: string, options: { id: string; name: st
     style: {
       id: options.id,
       name: options.name,
-      ...(flags.tone ? { tone: flags.tone } : {}),
-      callouts: flags.callouts,
-      diagrams: flags.diagrams,
-      tables: flags.tables,
-      tasks: flags.tasks,
-      highlight: flags.highlight,
-      calloutMap,
+      ...(tone ? { tone } : {}),
       layout: intro ? "intro" : "sections",
       intro,
       sections,

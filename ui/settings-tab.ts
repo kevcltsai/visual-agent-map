@@ -3,7 +3,6 @@ import { SUPPORTED_LANGUAGES, t } from "../i18n";
 import { normalizeReasoningLevel } from "../repository";
 import { modelDiscoverySummary, syncModelSelect } from "../core/model-discovery";
 import { NOTE_STYLE_PRESETS } from "../experiences/visual-map/note-style";
-import { renderTonePresetsSetting } from "./modals/prompt-presets-modal";
 import { clampPreviewScale } from "./preview-utils";
 import { App, Modal, normalizePath, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import type { ButtonComponent, DropdownComponent } from "obsidian";
@@ -59,20 +58,16 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
   );
 }
 
-/** The value of the template picker's "old style file" item; it is not a block ref, so it never reaches a setting. */
-export const LEGACY_PICK = "legacy:";
-
-/** What the two pickers show now: a block ref for each, or an old default (a style file or old template) in place of the template. */
+/** What the two pickers show: a block ref for each. */
 export interface ShownBlocks {
   template: string;
   tone: string;
-  /** Set when the workspace default is still an old style file or old template: its name. */
-  legacyName?: string;
 }
 
 /**
  * The choice the pickers show, in the terms the run uses: the new settings when set (a block that is gone shows as the
- * standard template or the academic tone, as the run falls back), else what the old `defaultNoteStyleId` stands for.
+ * standard template or the academic tone, as the run falls back), else what the old `defaultNoteStyleId` stands for (the
+ * upgrade has moved an old style file or template to a block and written the new key, so only a built-in id is read here).
  */
 export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
   const { settings, noteStyles: store } = plugin;
@@ -81,13 +76,8 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
   const standard = NOTE_STYLE_PRESETS[0];
   const has = (category: BlockCategory, ref: string | undefined): ref is string =>
     ref !== undefined && store.listBlocks(category).some(item => item.ref === ref);
-  const keyed = settings.noteTemplateBlock;
-  let legacyName: string | undefined;
-  if (!keyed && !preset) {
-    const old = store.list().find(item => item.kind !== "builtin" && item.id === chosen);
-    const unexported = store.unexportedTemplates().find(item => item.id === chosen);
-    legacyName = (old && "name" in old ? old.name : undefined) ?? unexported?.name ?? chosen.replace(/^style:/, "");
-  }
+  const effective = store.effectiveBlockKeys();
+  const keyed = effective.template;
   const template = keyed
     ? has("template", keyed)
       ? keyed
@@ -95,17 +85,35 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
     : preset
       ? builtinRef(preset.templateId)
       : builtinRef(standard.templateId);
-  const toneKey = settings.noteToneBlock;
+  const toneKey = effective.tone;
   const tone = toneKey
     ? has("tone", toneKey)
       ? toneKey
       : builtinRef(standard.toneId)
     : builtinRef((preset ?? standard).toneId);
-  return {
-    template: legacyName === undefined ? template : LEGACY_PICK,
-    tone,
-    ...(legacyName !== undefined ? { legacyName } : {})
+  return { template, tone };
+}
+
+/**
+ * Writes the shown blocks into the settings, so what the rows show is what runs use. `changed` is the one the user just
+ * picked. A key an unfinished upgrade holds in memory (not saved yet) is left alone, so a retry still brings in its
+ * result: the other row's shown value is not written over it.
+ */
+function writeShown(plugin: VisualAgentMapPlugin, changed?: { category: BlockCategory; value: string }): void {
+  const { settings, noteStyles: store } = plugin;
+  const shown = shownBlocks(plugin);
+  const held = store.effectiveBlockKeys();
+  const saved: Record<BlockCategory, string | undefined> = {
+    template: settings.noteTemplateBlock,
+    tone: settings.noteToneBlock
   };
+  const next: Record<BlockCategory, string | undefined> = { template: shown.template, tone: shown.tone };
+  for (const category of ["template", "tone"] as const) {
+    if (changed?.category === category) next[category] = changed.value;
+    else if (!saved[category] && held[category]) next[category] = undefined;
+  }
+  if (next.template !== undefined) settings.noteTemplateBlock = next.template;
+  if (next.tone !== undefined) settings.noteToneBlock = next.tone;
 }
 
 /**
@@ -114,13 +122,8 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
  * show is what runs use. Buttons are off while an action runs; focus stays on the button used, or on the picker when the
  * choice changed.
  */
-export function renderNoteBlockSetting(
-  setting: Setting,
-  plugin: VisualAgentMapPlugin,
-  category: BlockCategory,
-  refresh: () => void
-): void {
-  const { settings, noteStyles: store } = plugin;
+export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapPlugin, category: BlockCategory): void {
+  const { noteStyles: store } = plugin;
   const isTemplate = category === "template";
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
   setting.setName(label);
@@ -140,26 +143,20 @@ export function renderNoteBlockSetting(
   const render = (): void => {
     if (!picker) return;
     const shown = shownBlocks(plugin);
-    const legacy = shown.legacyName !== undefined;
     const items = store.listBlocks(category);
     picker.selectEl.replaceChildren();
-    if (isTemplate && legacy) picker.addOption(LEGACY_PICK, t("ui.block_legacy_0", shown.legacyName ?? ""));
     for (const item of items)
       picker.addOption(item.ref, item.modified ? t("ui.block_modified_0", item.name) : item.name);
     const value = shown[category];
     picker.setValue(value);
     const item = items.find(entry => entry.ref === value);
-    const restorable = !legacy && item?.kind === "builtin" && item.fileName !== undefined;
-    picker.setDisabled(busy || (!isTemplate && legacy));
-    lock(openButton, busy || legacy);
-    lock(copyButton, busy || legacy);
+    const restorable = item?.kind === "builtin" && item.fileName !== undefined;
+    picker.setDisabled(busy);
+    lock(openButton, busy);
+    lock(copyButton, busy);
     lock(restoreButton, busy || !restorable);
     const parts: string[] = [];
-    if (legacy)
-      parts.push(
-        t(isTemplate ? "ui.block_status_legacy_template" : "ui.block_status_legacy_tone", shown.legacyName ?? "")
-      );
-    else if (item) {
+    if (item) {
       const issue = item.issues[0];
       if (issue)
         parts.push(t("ui.block_status_issue_0_1_2", item.fileName ?? item.name, issue.line, styleIssueText(issue)));
@@ -172,19 +169,16 @@ export function renderNoteBlockSetting(
     shownDesc = desc;
     setting.setDesc(desc);
   };
-  /** Writes the two shown values into the settings (not when an old default still decides), then runs `action`. */
+  /** Writes the two shown values into the settings, then runs `action`. */
   const act = async (action: (ref: string) => Promise<void>, target: () => HTMLElement | undefined): Promise<void> => {
     if (busy) return;
     busy = true;
     render();
     try {
       const shown = shownBlocks(plugin);
-      if (shown.legacyName === undefined) {
-        settings.noteTemplateBlock = shown.template;
-        settings.noteToneBlock = shown.tone;
-        await plugin.saveSettings();
-        await action(shown[category]);
-      }
+      writeShown(plugin);
+      await plugin.saveSettings();
+      await action(shown[category]);
     } catch {
       /* The plugin methods report their failures in a Notice. */
     } finally {
@@ -200,17 +194,9 @@ export function renderNoteBlockSetting(
       t(isTemplate ? "ui.block_picker_template_aria" : "ui.block_picker_tone_aria")
     );
     dropdown.onChange(async value => {
-      const shown = shownBlocks(plugin);
-      if (value === LEGACY_PICK) {
-        delete settings.noteTemplateBlock;
-        delete settings.noteToneBlock;
-      } else {
-        settings.noteTemplateBlock = isTemplate ? value : shown.template;
-        settings.noteToneBlock = isTemplate ? shown.tone : value;
-      }
+      writeShown(plugin, { category, value });
       await plugin.saveSettings();
-      if (shown.legacyName !== undefined || value === LEGACY_PICK) refresh();
-      else render();
+      render();
     });
   });
   setting.addButton(button => {
@@ -586,15 +572,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       },
       {
         name: t("ui.block_picker_template"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "template", () => this.update())
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "template")
       },
       {
         name: t("ui.block_picker_tone"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.update())
-      },
-      {
-        name: t("ui.tone_presets"),
-        render: setting => renderTonePresetsSetting(setting, this.app, this.plugin, () => this.update())
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone")
       },
       {
         name: t("ui.markdown_selection_ai_auto_open"),

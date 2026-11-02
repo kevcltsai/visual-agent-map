@@ -3,16 +3,25 @@
  * It imports neither obsidian nor the view; everything it needs from the plugin comes through lazy ports, because the
  * plugin replaces some of those objects after construction.
  */
-import { noteLanguageOf, t, type ContentLanguage, type UiLanguage } from "../../i18n";
+import { noteLanguageOf, t, type ContentLanguage, type NoteLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import type { ReferenceGroup } from "../../ai/reference-materials";
 import type { ResearchObserver, ResearchPreviewFields, ResearchStageName } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { checkCounts } from "../../ai/detail-templates";
+import { checkCounts, standardTemplate } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import { failureReason, type Note, type NotePatch } from "../../repository";
 import type { RunStyle } from "../../ai/note-style-store";
+import type { UpdateMode } from "../../ai/note-style-recipe";
+import {
+  chartPreserves,
+  composeWriteback,
+  type WritebackInput,
+  type WritebackMode,
+  type WritebackRecord,
+  type WritebackResult
+} from "../../ai/note-writeback";
 import { runStyleLabelText } from "../../ai/note-style-label";
 import type { MapDocument } from "../../map-model";
 import type { AgentTaskHandle, RunOnceModel } from "./modals";
@@ -116,13 +125,38 @@ export interface TopicRunPorts {
   clearOtherHistory(origin: unknown): void;
   /** Every open view reloads and redraws after a run settles. */
   refreshViews(): void;
+  /** Test seam: replaces the pure write-back composer (a test uses it to prove a failed top invariant writes nothing). */
+  composeWriteback?: (input: WritebackInput) => WritebackResult;
   /** The plugin's own Set and Map, read on every use: tests and onload replace them. */
   running(): Set<string>;
   pendingSuggestions(): Map<string, Suggestion[]>;
 }
 
+/** The backup and raw-read hooks the "fresh" write-back needs; the view builds them over the vault. */
+export interface WritebackHooks {
+  /** Copies the note file (its whole text, `content`) to the backup folder; never throws. */
+  backupNote?: (path: string, content: string) => Promise<{ ok: true; path: string } | { ok: false }>;
+  /** The whole text of the note file as it is on disk now. */
+  readRaw?: (path: string) => Promise<string>;
+}
+
+/** The job the view's chart step gets after a write-back. */
+export interface QueuedCharts {
+  path: string;
+  saved: Note;
+  context: TaskContext;
+  detail: string;
+  formatIssues?: AiResult["formatIssues"];
+  model: string;
+  language: ContentLanguage;
+  template?: DetailTemplate;
+  /** "top": the diagrams may only be applied when `preserve` accepts the diagrammed text. */
+  updateMode?: UpdateMode;
+  preserve?: (charted: string) => boolean;
+}
+
 /** What a research run needs from the entry that starts it (the view); every function is optional where a run can go on without it. */
-export interface ResearchStart {
+export interface ResearchStart extends WritebackHooks {
   /** The caller's identity: the view that started the run keeps its undo, every other view clears its history. */
   origin?: unknown;
   map?: MapDocument;
@@ -143,16 +177,7 @@ export interface ResearchStart {
   /** The note before and after the write, for the starting view's undo. */
   onWritten?: (change: { before: Note; after: Note }) => void;
   /** Queues the background chart step for the note that was just written. */
-  queueCharts?: (job: {
-    path: string;
-    saved: Note;
-    context: TaskContext;
-    detail: string;
-    formatIssues?: AiResult["formatIssues"];
-    model: string;
-    language: ContentLanguage;
-    template?: DetailTemplate;
-  }) => void;
+  queueCharts?: (job: QueuedCharts) => void;
 }
 
 /** What a child-topic proposal run needs from the entry that starts it (the view). */
@@ -205,6 +230,8 @@ export interface IntegrateDirectionStart {
 /** The view-side checks an integrate-children run makes again before it writes. */
 export interface IntegratePrepared {
   detailTemplate: DetailTemplate;
+  /** How the result is written back; absent means merge. */
+  updateMode?: UpdateMode;
   /** True when the map, its open view or the topic's children are no longer what the run started with. */
   viewChanged: () => boolean;
   /** True when the child sources read now differ from the ones the run started with. */
@@ -221,7 +248,7 @@ export type IntegrateWrite = (
 ) => void | Promise<void>;
 
 /** What an integrate-children run needs from the entry that starts it (the view). */
-export interface IntegrateChildrenStart {
+export interface IntegrateChildrenStart extends WritebackHooks {
   map: () => MapDocument | undefined;
   runOnce?: RunOnceModel;
   signal?: AbortSignal;
@@ -665,26 +692,68 @@ export class TopicRuns {
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
           if (noteSnapshot(latest) !== snapshot) throw changed();
-          const canonicalOnly = canonicalDetail(detail, noteLanguageOf(outputLanguage), detailTemplate);
-          // An edited draft is checked again so the topic's format mark matches what is saved.
-          const issues =
-            result.formatIssues && detail !== result.detail
-              ? checkCounts(canonicalOnly, detailTemplate)
-              : result.formatIssues;
-          // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
+          const mode: WritebackMode = prepared.updateMode ?? "merge";
+          const noteLanguage = noteLanguageOf(outputLanguage);
           const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
-          const canonical = carryForwardSources(
-            canonicalOnly,
-            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-            [summary, canonicalOnly, references],
-            outputLanguage,
-            detailTemplate
-          );
+          let written: string;
+          let issues: AiResult["formatIssues"];
+          let record: WritebackRecord | undefined;
+          if (mode === "top") {
+            // New findings only; the old Detail stays as it is. No count check was made, so there is nothing to mark.
+            issues = [];
+            const composed = await this.composeWrite({
+              mode,
+              path,
+              oldDetail: latest.detail,
+              aiDetail: detail,
+              summary,
+              template: detailTemplate,
+              language: noteLanguage,
+              signal,
+              hooks: options
+            });
+            if (!composed.ok) throw new Error(composed.message);
+            written = composed.detail;
+            record = composed.record;
+          } else {
+            const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
+            // An edited draft is checked again so the topic's format mark matches what is saved.
+            issues =
+              result.formatIssues && detail !== result.detail
+                ? checkCounts(canonicalOnly, detailTemplate)
+                : result.formatIssues;
+            // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
+            // "Only the new content" does not read the old Detail, so nothing is carried there.
+            const carried =
+              mode === "fresh"
+                ? canonicalOnly
+                : carryForwardSources(
+                    canonicalOnly,
+                    [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+                    [summary, canonicalOnly, references],
+                    outputLanguage,
+                    detailTemplate
+                  );
+            const composed = await this.composeWrite({
+              mode,
+              path,
+              oldDetail: latest.detail,
+              aiDetail: carried,
+              summary,
+              template: detailTemplate,
+              language: noteLanguage,
+              signal,
+              hooks: options
+            });
+            if (!composed.ok) throw new Error(composed.message);
+            written = composed.detail;
+            record = composed.record;
+          }
           await repo.updateNote(
             path,
             {
               summary,
-              detail: canonical,
+              detail: written,
               visualReferences: references,
               // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
               ...(options.findingsSent() ? { newFindings: "" } : {}),
@@ -703,7 +772,8 @@ export class TopicRuns {
             formatIssues: issues,
             model: used.model,
             language: outputLanguage,
-            template: detailTemplate
+            template: detailTemplate,
+            ...(mode === "top" && record ? this.chartGuard(mode, record) : {})
           });
         });
       // The result is written directly (no draft review); a write that fails or finds the topic changed writes
@@ -822,6 +892,59 @@ export class TopicRuns {
     }
   }
 
+  /** What the chart step needs to keep a "top" write-back's old text: the diagrammed text must still hold it, byte for byte. */
+  private chartGuard(mode: WritebackMode, record: WritebackRecord): Pick<QueuedCharts, "updateMode" | "preserve"> {
+    return { updateMode: mode, preserve: charted => chartPreserves(record, charted) };
+  }
+
+  /**
+   * Builds the text to save for one of the three write-back ways. Runs inside the mutation queue after the stale fence.
+   * `top`: pure insert, blocked when the old text would not come back. `fresh`: the whole note file is backed up first and
+   * read again just before the write; anything that fails or differs means nothing is written (`message` says why).
+   */
+  private async composeWrite(input: {
+    mode: WritebackMode;
+    path: string;
+    oldDetail: string;
+    aiDetail: string;
+    summary: string;
+    template: DetailTemplate;
+    language: NoteLanguage;
+    signal: AbortSignal;
+    hooks: WritebackHooks;
+  }): Promise<{ ok: true; detail: string; record: WritebackRecord } | { ok: false; message: string }> {
+    const { mode, path, signal, hooks } = input;
+    const base = {
+      mode,
+      oldDetail: input.oldDetail,
+      aiDetail: input.aiDetail,
+      summary: input.summary,
+      template: input.template,
+      language: input.language
+    };
+    const compose = this.ports.composeWriteback ?? composeWriteback;
+    if (mode !== "fresh") {
+      const composed = compose({ ...base, now: new Date() });
+      return composed.ok ? composed : { ok: false, message: t("ui.writeback_top_failed") };
+    }
+    const stopped = { ok: false as const, message: t("ui.research_stopped_existing_content_was_preserved") };
+    const failed = { ok: false as const, message: t("ui.writeback_backup_failed") };
+    if (!hooks.backupNote || !hooks.readRaw) return failed;
+    if (signal.aborted) return stopped;
+    try {
+      const before = await hooks.readRaw(path);
+      const backup = await hooks.backupNote(path, before);
+      if (!backup.ok) return failed;
+      const composed = compose({ ...base, now: new Date(), backupPath: backup.path });
+      if (!composed.ok) return failed;
+      if ((await hooks.readRaw(path)) !== before) return failed;
+      if (signal.aborted) return stopped;
+      return composed;
+    } catch {
+      return failed;
+    }
+  }
+
   /** Reads the note, resolves the model and style and builds the request; null (after telling the entry) when the topic has no task. */
   private async researchPrelude(
     path: string,
@@ -866,6 +989,7 @@ export class TopicRuns {
         ...overrides,
         detailTemplate,
         ...runStyle.contextFields,
+        updateMode: runStyle.updateMode,
         addCharts: overrides.addCharts ?? true
       },
       note
@@ -1017,21 +1141,39 @@ export class TopicRuns {
             if (stale) fail(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
             return;
           }
+          // Write-back comes after the stale fence: the old Detail is `latest.detail`, which equals the one the run started with.
+          const mode: WritebackMode = context.updateMode ?? "merge";
+          const writeLanguage = noteLanguageOf(context.outputLanguage ?? settings().language);
+          const composed = await this.composeWrite({
+            mode,
+            path,
+            oldDetail: latest.detail,
+            // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
+            aiDetail:
+              mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, context.detailTemplate),
+            summary: result.summary,
+            template: context.detailTemplate ?? standardTemplate(writeLanguage),
+            language: writeLanguage,
+            signal: controller.signal,
+            hooks: options
+          });
+          if (!composed.ok) {
+            await repo.updateNote(path, { status: note.status });
+            if (exchangeId) exchanges()?.failed(exchangeId, composed.message);
+            fail(composed.message);
+            return;
+          }
           await repo.updateNote(
             path,
             {
               summary: result.summary,
-              detail: canonicalDetail(
-                result.detail,
-                noteLanguageOf(context.outputLanguage ?? settings().language),
-                context.detailTemplate
-              ),
+              detail: composed.detail,
               visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
               newFindings: "",
               status: "completed",
               // The topic remembers the mode of its latest research (Quick is stored as local).
               ...(context.researchMode ? { researchMode: context.researchMode } : {}),
-              ...formatIssuesPatch(result.formatIssues, language)
+              ...(mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language))
             },
             { detailTemplate: context.detailTemplate }
           );
@@ -1044,10 +1186,11 @@ export class TopicRuns {
             saved,
             context,
             detail: saved.detail,
-            formatIssues: result.formatIssues,
+            formatIssues: mode === "top" ? [] : result.formatIssues,
             model: used.model,
             language: context.outputLanguage ?? settings().language,
-            template: context.detailTemplate
+            template: context.detailTemplate,
+            ...(mode === "top" ? this.chartGuard(mode, composed.record) : {})
           });
           if (result.suggestions.length) {
             this.pendingSuggestions.set(

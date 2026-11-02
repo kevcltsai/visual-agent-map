@@ -465,3 +465,319 @@ test('backupNote failures never throw and never claim success: create throws, re
   const broken = { ...makePort(), list: async () => { throw new Error('list'); }, folderExists: async () => true };
   assert.deepEqual(plain(await W.backupNote(broken, input)), { ok: false });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// P3: the wiring. A real view over a fake vault and the plugin's run module; only the model answer, the chart queue and
+// (where a test says so) the composer are replaced. The old note, the written note and the vault files are read back.
+
+const S = require('./support.cjs');
+const L = loadSource('export { translate } from "./i18n";');
+const TRANSLATED = key => ['zh-TW', 'zh-CN', 'en'].map(language => L.translate(language, key));
+const MSG = {
+  stale: TRANSLATED('ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved'),
+  topFailed: TRANSLATED('ui.writeback_top_failed'),
+  backupFailed: TRANSLATED('ui.writeback_backup_failed'),
+  stopped: TRANSLATED('ui.research_stopped_existing_content_was_preserved')
+};
+const MAP_PATH = 'Agent Workspace/Topics/map-a/Map.md';
+const BACKUP_FILE = /(?:備份|Backups|备份)\/(?:筆記|Notes|笔记)\/主題 \d{4}-\d{2}-\d{2} \d{6}(?: \(\d+\))?\.md$/;
+const backupKeys = files => [...files.keys()].filter(key => BACKUP_FILE.test(key));
+const anyBackupFolder = files => [...files.keys()].some(key => /(?:備份|Backups|备份)/.test(key));
+
+async function wiring({ kind = 'hypothesis', detail = OLD, reply, language = 'zh-TW' } = {}) {
+  const { repo, app, contents, files } = S.fixture(language);
+  const mapDoc = { id: 'map-a', title: 'map-a', version: 1, nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
+  await repo.ensureTopicFolders('Agent Workspace/Topics/map-a');
+  await app.vault.create(MAP_PATH, S.core.serializeMap(mapDoc));
+  const node = await repo.createNote('主題', 'model-a', mapDoc, MAP_PATH, 'workspace', { topicKind: kind });
+  mapDoc.nodes.push(node);
+  await repo.saveMap(MAP_PATH, mapDoc);
+  await repo.updateNote(node.path, { detail, summary: '舊摘要', status: 'completed' });
+  const calls = { asks: [], jobs: [], exchanges: [], failed: [], composed: 0 };
+  const host = S.withExpansionCoordinator({
+    repo, settings: { ...S.DEFAULT_SETTINGS, language, cliModel: 'gpt-6-luna', cliReasoning: 'low', aiExchangeLoggingEnabled: true },
+    running: new Set(), pendingSuggestions: new Map(), pendingResearchOptions: new Map(), rebuildDerivedData: async () => {}, views: () => [],
+    recordFailure: (_label, error) => String(error?.message ?? error), mutate: async work => work(),
+    exchanges: { failed: (id, why) => calls.exchanges.push(['failed', id, why]), completed: id => calls.exchanges.push(['completed', id]), getEntries: () => [] },
+    researchProgress: { get: () => undefined, begin() {}, newAttempt() {}, stage() {}, preview() {}, markSlow() {}, end() {} },
+    askModel: async (context, _model, _reasoning, _signal, onExchange, accepted) => {
+      calls.asks.push(context); onExchange?.('ex1'); accepted?.();
+      return typeof reply === 'function' ? reply(context, host) : reply;
+    },
+    addChartsAfterWrite: job => calls.jobs.push(job)
+  });
+  repo.settings = host.settings;
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: class {} } });
+  const view = new VisualAgentMapView({ app }, S.attachTopicRuns(host));
+  Object.assign(view, { path: MAP_PATH, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate: async () => {}, ancestorContext: async () => '', updateHistoryButtons() {} });
+  const before = await repo.readNote(node.path);
+  const run = async (request = {}, over = {}) => {
+    const handle = await view.runAgent(node, undefined, message => calls.failed.push(message), { task: 'go', researchMode: 'local', outputLanguage: language, ...request });
+    await handle?.finished;
+    return handle;
+  };
+  const wrap = fn => { const original = host.topicRuns.ports.composeWriteback; host.topicRuns.ports.composeWriteback = fn; return original; };
+  return { repo, app, contents, files, node, view, host, calls, before, run, saved: () => repo.readNote(node.path), raw: () => contents.get(node.path), wrap };
+}
+const reply = (detail, extra = {}) => ({ summary: '新摘要', detail, visualReferences: [], suggestions: [], ...extra });
+const hypothesisReply = context => {
+  const [first, second] = context.detailTemplate.sections;
+  return reply(`### ${first.name}\n\n新假設 N1\n\n### ${second.name}\n\n新證據 N2`);
+};
+// A failed write-back restores the status, which moves the `updated` stamp; everything else must be byte for byte the same.
+const stable = text => String(text).replace(/^updated: .*$/m, 'updated: <t>');
+const fresh = async w => ({ ...(await w.view.detailTemplateFor(w.node)), updateMode: 'fresh' });
+
+test('top through the real run: old text stays, new sections go on top with a dated heading, one log line is added, one AI call (counterexamples 11, 14, 15)', async () => {
+  const w = await wiring({ reply: hypothesisReply });
+  await w.run();
+  const saved = await w.saved();
+  assert.equal(w.calls.asks.length, 1, 'one AI call');
+  assert.equal(w.calls.asks[0].updateMode, 'top', 'the topic type decides the way: hypothesis is top');
+  keepsOldLines(w.before.detail, saved.detail);
+  assert.ok(saved.detail.includes('新假設 N1') && saved.detail.includes('新證據 N2'));
+  assert.ok(saved.detail.includes(`#### ${W.formatDate(new Date())}`), 'a dated heading above the new content');
+  assert.ok(saved.detail.indexOf('新假設 N1') < saved.detail.indexOf('舊結論 CANARY-舊判斷-4821'), 'the new section comes before the first old heading');
+  assert.ok(saved.detail.indexOf('導讀：這是一段教科書導讀。') < saved.detail.indexOf('新假設 N1'), 'the lead-in stays first');
+  assert.equal(logBody(saved.detail).length, logBody(w.before.detail).length + 1, 'exactly one log line more');
+  assert.equal(w.calls.jobs.length, 1, 'a chart job is queued with the write-back'); assert.equal(w.calls.jobs[0].detail, saved.detail);
+  assert.deepEqual(w.calls.exchanges, [['completed', 'ex1']]);
+  assert.equal(saved.summary, '新摘要');
+});
+
+test('top: repository round trip keeps every old line in order, also with visual references, and the chart guard accepts the saved text (counterexample 15)', async () => {
+  const references = [{ title: '圖', imageUrl: 'https://example.com/a.png', sourceUrl: 'https://example.com', palette: ['#ffffff'], description: '示意圖', formula: '' }];
+  const w = await wiring({ reply: context => ({ ...hypothesisReply(context), visualReferences: references }) });
+  await w.run();
+  const saved = await w.saved();
+  keepsOldLines(w.before.detail, saved.detail);
+  assert.ok(saved.detail.includes('新假設 N1'));
+  const stored = w.raw();
+  assert.ok(stored.includes('舊結論 CANARY-舊判斷-4821[^1]') && stored.includes('[^src-1]: [[舊來源]]'));
+});
+
+test('top: undo covers the write-back: onWritten gets the old Detail as before and the written one as after, and undo restores the old Detail byte for byte (counterexample 11)', async () => {
+  const w = await wiring({ reply: hypothesisReply });
+  await w.run();
+  const saved = await w.saved();
+  assert.equal(w.view.history.canUndo, true);
+  await w.view.history.undo().undo();
+  const restored = await w.saved();
+  assert.equal(restored.detail, w.before.detail);
+  assert.notEqual(saved.detail, w.before.detail);
+});
+
+test('merge through the real run: undo restores the old Detail and the log gains exactly one line when the AI wrote none (counterexamples 9, 11)', async () => {
+  const w = await wiring({ kind: 'topic', reply: () => reply(OLD.replace('舊結論', '新結論')) });
+  await w.run();
+  const saved = await w.saved();
+  assert.equal(w.calls.asks[0].updateMode, 'merge');
+  assert.ok(saved.detail.includes('新結論'));
+  assert.equal(logBody(saved.detail).length, logBody(w.before.detail).length + 1);
+  await w.view.history.undo().undo();
+  assert.equal((await w.saved()).detail, w.before.detail);
+});
+
+test('fresh through the real run: the whole note file is backed up byte for byte first, the old log lines stay, one line names the backup, undo restores (counterexamples 8, 11)', async () => {
+  // The run marks the note as running before it asks, so the file at write time (not the file before the run) is what is backed up.
+  const w = await wiring({ kind: 'topic', reply: () => { w.atAnswer = w.raw(); return reply(`### ${names.core}\n\n全新結論 F1\n\n### ${names.log}\n\n2099-01-01　AI 的紀錄`); } });
+  await w.run({ runStyle: await fresh(w) });
+  const rawBefore = w.atAnswer;
+  const saved = await w.saved();
+  const backups = backupKeys(w.files);
+  assert.equal(backups.length, 1, [...w.files.keys()].join('\n'));
+  assert.equal(w.contents.get(backups[0]), rawBefore, 'the backup is the whole note file, byte for byte');
+  assert.ok(saved.detail.includes('全新結論 F1') && !saved.detail.includes('CANARY-舊判斷-4821'), 'only the new content');
+  const log = logBody(saved.detail);
+  assert.deepEqual(log.slice(0, 2), ['2026-01-01　舊紀錄一', '2026-02-01　舊紀錄二'], 'old log lines first, unchanged');
+  assert.equal(log.length, 3);
+  assert.ok(log[2].includes(backups[0]) && !log.some(line => line.includes('AI 的紀錄')));
+  await w.view.history.undo().undo();
+  assert.equal((await w.saved()).detail, w.before.detail);
+  assert.equal(w.calls.asks.length, 1);
+});
+
+test('fresh: a backup that cannot be made or checked writes nothing and says so (counterexample 7: create throws, read differs, createFolder throws, a changed file)', async () => {
+  const faults = {
+    'create throws': w => { const original = w.app.vault.create; w.app.vault.create = async (path, text) => { if (BACKUP_FILE.test(path)) throw new Error('disk full'); return original(path, text); }; },
+    'read differs': w => { const original = w.app.vault.read; w.app.vault.read = async file => (BACKUP_FILE.test(file.path) ? 'something else' : original(file)); },
+    'createFolder throws': w => { const original = w.app.vault.createFolder; w.app.vault.createFolder = async path => { if (/(?:備份|Backups|备份)/.test(path)) throw new Error('read only'); return original(path); }; },
+    'file changed before the write': w => { const original = w.app.vault.read; w.app.vault.read = async file => { const text = await original(file); return file.path === w.node.path && backupKeys(w.files).length ? `${text}\nedited` : text; }; }
+  };
+  for (const [label, install] of Object.entries(faults)) {
+    const w = await wiring({ kind: 'topic', reply: () => reply(`### ${names.core}\n\n全新結論 F1`) });
+    const rawBefore = w.raw();
+    install(w);
+    await w.run({ runStyle: await fresh(w) });
+    assert.equal(stable(w.raw()), stable(rawBefore), `${label}: the note is byte for byte what it was`);
+    assert.ok(MSG.backupFailed.includes(w.calls.failed[0]), `${label}: ${w.calls.failed[0]}`);
+    assert.deepEqual(w.calls.exchanges.map(entry => entry[0]), ['failed']);
+    assert.equal(w.view.history.canUndo, false, `${label}: no undo entry`);
+  }
+});
+
+test('fresh: missing backup or read hooks count as a failed backup and write nothing (counterexample 7)', async () => {
+  const w = await wiring({ kind: 'topic', reply: () => reply(`### ${names.core}\n\n全新結論 F1`) });
+  const rawBefore = w.raw();
+  const runStyle = await fresh(w);
+  for (const missing of [['backupNote'], ['readRaw'], ['backupNote', 'readRaw']]) {
+    const original = Object.getPrototypeOf(w.view).writebackHooks;
+    w.view.writebackHooks = function () { const hooks = original.call(this); for (const key of missing) delete hooks[key]; return hooks; };
+    await w.run({ runStyle });
+    assert.equal(stable(w.raw()), stable(rawBefore), missing.join('+'));
+    assert.ok(MSG.backupFailed.includes(w.calls.failed.at(-1)), missing.join('+'));
+    assert.equal(anyBackupFolder(w.files), false, 'nothing is created');
+  }
+});
+
+test('top invariant failure writes nothing: the note is byte for byte what it was, the Notice and the exchange say why (counterexample 2)', async () => {
+  const w = await wiring({ reply: hypothesisReply });
+  const rawBefore = w.raw();
+  w.wrap(() => ({ ok: false, reason: 'top_invariant' }));
+  await w.run();
+  assert.equal(stable(w.raw()), stable(rawBefore));
+  assert.ok(MSG.topFailed.includes(w.calls.failed[0]));
+  assert.deepEqual(w.calls.exchanges.map(entry => entry[0]), ['failed']);
+  assert.ok(MSG.topFailed.includes(w.calls.exchanges[0][2]));
+  assert.equal(w.view.history.canUndo, false);
+  assert.equal(w.calls.jobs.length, 0);
+});
+
+test('the stale fence comes first: a topic changed while the AI worked is neither composed nor backed up (counterexample 10)', async () => {
+  for (const mode of ['top', 'fresh']) {
+    const w = await wiring({ kind: mode === 'top' ? 'hypothesis' : 'topic', reply: async (context, host) => { await host.repo.updateNote(w.node.path, { detail: `${w.before.detail}\n改過` }); return hypothesisReply(context); } });
+    const original = w.wrap(() => { w.calls.composed++; return { ok: false, reason: 'top_invariant' }; });
+    assert.equal(original, undefined);
+    const edited = `${w.before.detail}\n改過`;
+    await w.run(mode === 'fresh' ? { runStyle: await fresh(w) } : {});
+    assert.equal(w.calls.composed, 0, `${mode}: composeWriteback is not called`);
+    assert.equal(anyBackupFolder(w.files), false, `${mode}: no backup`);
+    assert.equal((await w.saved()).detail, edited, `${mode}: the user's edit stands`);
+    assert.ok(MSG.stale.includes(w.calls.failed[0]), `${mode}: ${w.calls.failed[0]}`);
+  }
+});
+
+test('Stop before the write: nothing is composed and no backup is made (counterexample 10)', async () => {
+  for (const mode of ['top', 'fresh']) {
+    const w = await wiring({ kind: mode === 'top' ? 'hypothesis' : 'topic', reply: async context => { w.host.activeTasks.get(w.node.path).abort(); return hypothesisReply(context); } });
+    w.wrap(() => { w.calls.composed++; return { ok: false, reason: 'top_invariant' }; });
+    const rawBefore = w.raw();
+    await w.run(mode === 'fresh' ? { runStyle: await fresh(w) } : {});
+    assert.equal(w.calls.composed, 0, mode);
+    assert.equal(anyBackupFolder(w.files), false, mode);
+    assert.equal(stable(w.raw()), stable(rawBefore), mode);
+  }
+});
+
+test('top chart guard: a diagram step that changes one old character is dropped, one that only adds a diagram to the new content is applied with the lead-in still first (counterexample 5)', async () => {
+  const w = await wiring({ reply: hypothesisReply });
+  await w.run();
+  const written = await w.saved();
+  assert.equal(w.calls.jobs.length, 1, 'a chart job was queued');
+  const [job] = w.calls.jobs;
+  const damaged = written.detail.replace('舊知識 K1', '舊知識 K2');
+  assert.equal(await job.apply(damaged), false, 'an altered old character drops the diagrams');
+  assert.equal((await w.saved()).detail, written.detail, 'the note equals the write-back result');
+  const charted = written.detail.replace('新假設 N1', `新假設 N1\n\n${FENCE}mermaid\ngraph TD\nX-->Y\n${FENCE}`);
+  assert.equal(await job.apply(charted), true);
+  const after = await w.saved();
+  assert.equal(after.detail, charted, 'the whole Detail is not normalized');
+  assert.ok(after.detail.startsWith('導讀：這是一段教科書導讀。'), 'the lead-in is still first');
+  keepsOldLines(w.before.detail, after.detail);
+});
+
+test('merge keeps the old chart path: the diagrammed Detail is still normalized as a whole', async () => {
+  const w = await wiring({ kind: 'topic', reply: () => reply(OLD.replace('舊結論', '新結論')) });
+  await w.run();
+  const [job] = w.calls.jobs;
+  const written = await w.saved();
+  assert.equal(await job.apply(`${written.detail}\n`), true);
+});
+
+test('map chat starts no run of its own: its research goes through view.runAgent and the run module, so a hypothesis topic gets a top write-back (counterexample 14)', async () => {
+  const fs = require('node:fs');
+  const read = file => fs.readFileSync(require('node:path').join(S.root, file), 'utf8');
+  const chat = read('experiences/visual-map/map-chat.ts');
+  assert.doesNotMatch(chat, /topicRuns|updateNote|note-writeback/, 'map-chat.ts does not write a note or start a run');
+  const view = read('experiences/visual-map/view.ts');
+  assert.equal(view.match(/topicRuns\.start\([^)]*"research"/g)?.length, 1, 'one place starts a research run: runAgent');
+  // The request a map-chat or dialog research gives runAgent carries a task and a language, never an update mode; the topic decides.
+  const w = await wiring({ reply: hypothesisReply });
+  await w.run({ task: '地圖對話的研究任務', referenceGroups: [], rules: '', addCharts: false });
+  const saved = await w.saved();
+  assert.equal(w.calls.asks[0].updateMode, 'top');
+  assert.ok(saved.detail.indexOf('新假設 N1') < saved.detail.indexOf('舊結論'));
+  keepsOldLines(w.before.detail, saved.detail);
+});
+
+test('integrate children: top keeps the old text, fresh backs up and does not carry old links, merge adds one log line (counterexamples 8, 9)', async () => {
+  const integrate = async (w, runStyle) => {
+    const extra = { referenceGroups: [{ id: 'g', name: 'G', location: 'x', documents: [{ path: 'S.md', content: '來源內容' }] }], outputLanguage: 'zh-TW', researchMode: 'local' };
+    const original = w.view.detailTemplateFor;
+    if (runStyle) w.view.detailTemplateFor = async (...args) => ({ ...(await original.apply(w.view, args)), updateMode: runStyle });
+    await w.view.integrateChildren(w.node, extra, '', async (_result, write, summary, detail) => { await write(summary, detail); }, message => w.calls.failed.push(message));
+    w.view.detailTemplateFor = original;
+  };
+  const top = await wiring({ reply: hypothesisReply });
+  await integrate(top);
+  assert.equal(top.calls.asks[0].updateMode, 'top');
+  keepsOldLines(top.before.detail, (await top.saved()).detail);
+  assert.ok((await top.saved()).detail.includes('新假設 N1'));
+  assert.equal(top.calls.jobs.length, 1);
+  assert.equal(await top.calls.jobs[0].apply((await top.saved()).detail.replace('舊知識 K1', '舊知識 K2')), false, 'the chart guard is on for an integration too');
+  assert.equal(logBody((await top.saved()).detail).length, logBody(top.before.detail).length + 1);
+  await top.view.history.undo().undo();
+  assert.equal((await top.saved()).detail, top.before.detail, 'undo covers the integration write');
+
+  let rawBefore = '';
+  const freshRun = await wiring({ kind: 'topic', reply: () => { rawBefore = freshRun.raw(); return reply(`### ${names.core}\n\n全新整合 F2`); } });
+  await integrate(freshRun, 'fresh');
+  assert.equal(backupKeys(freshRun.files).length, 1);
+  // An integration puts the status back before it writes, so the backup differs from the file at answer time in the status and stamp only.
+  const loose = text => stable(text).replace(/^status: .*$/m, 'status: <s>');
+  assert.equal(loose(freshRun.contents.get(backupKeys(freshRun.files)[0])), loose(rawBefore));
+  const freshSaved = await freshRun.saved();
+  assert.ok(freshSaved.detail.includes('全新整合 F2') && !freshSaved.detail.includes('舊來源'), 'old links are not carried');
+  assert.equal(logBody(freshSaved.detail).length, logBody(freshRun.before.detail).length + 1);
+
+  const merge = await wiring({ kind: 'topic', reply: () => reply(OLD.replace('舊結論', '新結論')) });
+  await integrate(merge);
+  const mergeSaved = await merge.saved();
+  assert.ok(mergeSaved.detail.includes('新結論'));
+  assert.equal(logBody(mergeSaved.detail).length, logBody(merge.before.detail).length + 1);
+});
+
+test('integrate children: a failed top invariant or a failed backup writes nothing and reports why (counterexamples 2, 7)', async () => {
+  const run = async w => {
+    await w.view.integrateChildren(w.node, { referenceGroups: [{ id: 'g', name: 'G', location: 'x', documents: [{ path: 'S.md', content: 'x' }] }], outputLanguage: 'zh-TW', researchMode: 'local' }, '', async (_r, write, summary, detail) => { await write(summary, detail); }, message => w.calls.failed.push(message));
+  };
+  const top = await wiring({ reply: hypothesisReply });
+  const topRaw = top.raw();
+  top.wrap(() => ({ ok: false, reason: 'top_invariant' }));
+  await run(top);
+  assert.equal(stable(top.raw()), stable(topRaw));
+  assert.ok(top.calls.failed.some(message => MSG.topFailed.some(text => message.includes(text))), top.calls.failed.join('|'));
+
+  const fr = await wiring({ kind: 'topic', reply: () => reply(`### ${names.core}\n\n全新`) });
+  const frRaw = fr.raw();
+  const original = fr.view.detailTemplateFor;
+  fr.view.detailTemplateFor = async (...args) => ({ ...(await original.apply(fr.view, args)), updateMode: 'fresh' });
+  fr.view.writebackHooks = () => ({});
+  await run(fr);
+  assert.equal(stable(fr.raw()), stable(frRaw));
+  assert.ok(fr.calls.failed.some(message => MSG.backupFailed.some(text => message.includes(text))), fr.calls.failed.join('|'));
+  assert.equal(anyBackupFolder(fr.files), false);
+});
+
+test('not touched by the write-back: merge-topics and AIM never import it, and the module is used by the run module and the view only (counterexample 12)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const walk = dir => fs.readdirSync(path.join(S.root, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? (entry.name === 'node_modules' || entry.name === 'tests' ? [] : walk(path.join(dir, entry.name))) : /\.ts$/.test(entry.name) ? [path.join(dir, entry.name)] : []);
+  const users = ['experiences', 'core', 'ai'].flatMap(walk).filter(file => /note-writeback/.test(fs.readFileSync(path.join(S.root, file), 'utf8')));
+  assert.deepEqual(users.sort(), ['experiences/visual-map/topic-run.ts', 'experiences/visual-map/view.ts']);
+  const run = fs.readFileSync(path.join(S.root, 'experiences/visual-map/topic-run.ts'), 'utf8');
+  assert.equal(run.match(/composeWriteback\b/g).length >= 1, true);
+  const selection = run.slice(run.indexOf('private async runSelection'), run.indexOf('private chartGuard'));
+  assert.ok(selection.length > 1000);
+  assert.doesNotMatch(selection, /composeWrite|updateMode|chartGuard/, 'selection synthesis does not go through the write-back');
+});

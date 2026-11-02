@@ -123,6 +123,7 @@ import {
   noteLanguageOf,
   t,
   topicStatusLabel,
+  translate,
   translateNote,
   type TranslationKey,
   type ContentLanguage
@@ -137,6 +138,7 @@ import {
   Notice,
   Scope,
   TFile,
+  TFolder,
   WorkspaceLeaf,
   setIcon,
   setTooltip
@@ -230,7 +232,11 @@ import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils
 import { builtinTemplates, STANDARD_TEMPLATE_ID, type DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
-import { parseBlockRef } from "../../core/blocks/block-files";
+import { parseBlockRef, resolveBlockFolder } from "../../core/blocks/block-files";
+import { CANONICAL_LANGUAGES } from "../../ai/note-style-file";
+import type { UpdateMode } from "../../ai/note-style-recipe";
+import { backupNote } from "../../ai/note-writeback";
+import type { WritebackHooks } from "./topic-run";
 import { NOTE_STYLE_PRESETS, fileStyleName, styleLabel } from "./note-style";
 import {
   errorNotice,
@@ -8453,6 +8459,8 @@ export class VisualAgentMapView extends ItemView {
     model: string;
     language: ContentLanguage;
     template?: DetailTemplate;
+    updateMode?: UpdateMode;
+    preserve?: (charted: string) => boolean;
   }): void {
     const path = job.path;
     const snapshot = this.chartSnapshot(job.saved);
@@ -8467,9 +8475,13 @@ export class VisualAgentMapView extends ItemView {
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
         if (this.chartSnapshot(latest) !== snapshot) return false;
+        // "Add new findings on top": the diagrams may only touch the new text. The whole Detail is not normalized (that
+        // would move the old text); the diagrammed text must still hold every old piece, or the diagrams are dropped.
+        const top = job.updateMode === "top";
+        if (top && !job.preserve?.(charted)) return false;
         await this.plugin.repo.updateNote(
           path,
-          { detail: canonicalDetail(charted, noteLanguageOf(job.language), job.template) },
+          { detail: top ? charted : canonicalDetail(charted, noteLanguageOf(job.language), job.template) },
           { detailTemplate: job.template }
         );
         const after = await this.plugin.repo.readNote(path, map);
@@ -13602,6 +13614,7 @@ export class VisualAgentMapView extends ItemView {
     let task = "";
     let childSources: ReferenceGroup | undefined;
     await this.plugin.topicRuns.start(node.path, "integrateChildren", {
+      ...this.writebackHooks(),
       map: () => this.map ?? undefined,
       runOnce: options?.runOnce,
       signal: options?.signal,
@@ -13626,6 +13639,7 @@ export class VisualAgentMapView extends ItemView {
         synthesisRun = run;
         return {
           detailTemplate,
+          updateMode: run.updateMode,
           viewChanged: () =>
             options?.signal?.aborted === true ||
             this.closed ||
@@ -13672,6 +13686,7 @@ export class VisualAgentMapView extends ItemView {
             visualMode: options?.visualMode ?? note.visualMode,
             detailTemplate: run.template,
             ...synthesisStyle.style,
+            updateMode: run.updateMode,
             addCharts: true
           },
           note
@@ -18078,6 +18093,52 @@ export class VisualAgentMapView extends ItemView {
     return { model, reasoning };
   }
   /**
+   * What the "only the new content" write-back needs from the vault: the whole text of the note file and a byte-exact backup
+   * of it under `<style folder>/<Backups>/<Notes>/`. Each folder level is the first spelling that already exists. The
+   * folders are created only when a backup is made.
+   */
+  private writebackHooks(): WritebackHooks {
+    const vault = this.app.vault;
+    const folderAt = (path: string): TFolder | null => {
+      const found = vault.getAbstractFileByPath(path);
+      return found instanceof TFolder ? found : null;
+    };
+    return {
+      readRaw: async path => {
+        const file = vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error(path);
+        return vault.read(file);
+      },
+      backupNote: (path, content) => {
+        const language = this.plugin.settings.language;
+        const exists = (candidate: string): boolean => folderAt(candidate) !== null;
+        const backups = resolveBlockFolder(this.noteStyles.folder(), "backup", exists, language);
+        const names = [...new Set(CANONICAL_LANGUAGES.map(code => translate(code, "ui.style_folder_backup_notes")))];
+        const notes =
+          names.find(name => exists(`${backups}/${name}`)) ?? translate(language, "ui.style_folder_backup_notes");
+        return backupNote(
+          {
+            folderExists: async candidate => exists(candidate),
+            list: async folder =>
+              (folderAt(folder)?.children ?? []).filter(child => child instanceof TFile).map(child => child.name),
+            createFolder: async folder => {
+              await vault.createFolder(folder);
+            },
+            create: async (file, text) => {
+              await vault.create(file, text);
+            },
+            read: async file => {
+              const found = vault.getAbstractFileByPath(file);
+              if (!(found instanceof TFile)) throw new Error(file);
+              return vault.read(found);
+            }
+          },
+          { notePath: path, content, folder: `${backups}/${notes}`, now: new Date() }
+        );
+      }
+    };
+  }
+  /**
    * Starts a research on one topic through the plugin's run module. The module owns registration, progress, the stale
    * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
    * and the undo step.
@@ -18091,6 +18152,7 @@ export class VisualAgentMapView extends ItemView {
     runOnce?: RunOnceModel
   ): Promise<AgentTaskHandle | null> {
     return this.plugin.topicRuns.start(node.path, "research", {
+      ...this.writebackHooks(),
       origin: this,
       map: this.map ?? undefined,
       request,

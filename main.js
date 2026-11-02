@@ -23377,8 +23377,8 @@ ${body}`);
     const inScope = (path) => !scope || extra.has(path) || roots.some((root) => path.startsWith(`${root}/`));
     const ownership2 = /* @__PURE__ */ new Map();
     const topics = /* @__PURE__ */ new Map();
-    const scan2 = await this.scanMaps();
-    for (const { file: mapFile, map } of scan2.readable) {
+    const scan3 = await this.scanMaps();
+    for (const { file: mapFile, map } of scan3.readable) {
       topics.set(map.id, { map, mapPath: mapFile.path });
       for (const node of map.nodes) {
         const existing = ownership2.get(node.path);
@@ -23394,7 +23394,7 @@ ${body}`);
     }
     for (const file of nodeFiles.values()) {
       if (!inScope(file.path)) continue;
-      if (scan2.skippedRoots.some((root) => file.path.startsWith(`${root}/`) && !ownership2.has(file.path))) continue;
+      if (scan3.skippedRoots.some((root) => file.path.startsWith(`${root}/`) && !ownership2.has(file.path))) continue;
       const cached = await this.app.vault.cachedRead(file), derived = this.derivedNoteContent(file, cached, ownership2, topics);
       if (derived === null || derived === cached) continue;
       await this.app.vault.process(
@@ -24290,12 +24290,12 @@ function outsideInlineCode(line, edit) {
 function sourceDefinitions(detail) {
   const lines = detail.split("\n");
   const code = fencedLines(lines);
-  const definitions = /* @__PURE__ */ new Map();
+  const definitions2 = /* @__PURE__ */ new Map();
   lines.forEach((line, index) => {
     const definition = code[index] ? null : sourceFootnoteDefinition(line);
-    if (definition) definitions.set(definition.label, definition.target);
+    if (definition) definitions2.set(definition.label, definition.target);
   });
-  return definitions;
+  return definitions2;
 }
 function footnoteDefinitionLabels(content) {
   const lines = content.split("\n");
@@ -27833,6 +27833,404 @@ function emptyNoteStyleStore(settings) {
   });
 }
 
+// ai/note-writeback.ts
+var LOG_LINE_SUMMARY_LIMIT = 60;
+var DATE_PREFIX = /^(?:[-*+][ \t]+)?\d{4}-\d{2}-\d{2}[ \t\u3000:：]*/;
+var FOOTNOTE_REF = /\[\^([^\]\s]+)\]/g;
+var FOOTNOTE_DEF = /^\[\^([^\]\s]+)\]:/;
+function formatDate(now) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+function formatTime(now) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+var placeholderTexts = () => /* @__PURE__ */ new Set([
+  ...NOTE_LANGUAGES.map((locale) => translate(locale, "note.no_new_information").replace(/[.。]$/, "")),
+  "No new content this time",
+  "\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9"
+]);
+var isPlaceholder2 = (text11) => placeholderTexts().has(text11.trim().replace(/[.。]$/, ""));
+function classifier(template2, language2) {
+  const lookup = sectionLookup(template2);
+  const logIndex = template2.sections.findIndex((section3) => section3.role === "log");
+  const sourcesIndex = template2.sections.findIndex((section3) => section3.role === "sources");
+  const logNames = new Set(
+    [...NOTE_LANGUAGES, language2].map((locale) => translate(locale, "detail.update_log").toLocaleLowerCase())
+  );
+  return {
+    classify(text11) {
+      const key2 = text11.toLocaleLowerCase();
+      const index = lookup.get(key2);
+      if (index !== void 0) return `t${index}`;
+      if (logIndex < 0 && logNames.has(key2)) return "log";
+      return `h:${key2}`;
+    },
+    logKey: logIndex >= 0 ? `t${logIndex}` : "log",
+    sourcesKey: sourcesIndex >= 0 ? `t${sourcesIndex}` : null
+  };
+}
+function scan2(text11, classify2) {
+  const lines = text11.split("\n");
+  const starts = [];
+  let position = 0;
+  for (const line of lines) {
+    starts.push(position);
+    position += line.length + 1;
+  }
+  const code = fencedLines(lines);
+  const headings = [];
+  lines.forEach((line, index) => {
+    if (code[index]) return;
+    const match = /^###\s+(.+?)\s*$/.exec(line);
+    if (match) headings.push({ line: index, text: match[1], key: classify2.classify(match[1]) });
+  });
+  return { text: text11, lines, starts, code, headings };
+}
+var lineEnd = (view, line) => view.starts[line] + view.lines[line].length;
+function sectionRange(view, key2) {
+  var _a2, _b2;
+  const position = view.headings.findIndex((heading2) => heading2.key === key2);
+  if (position < 0) return null;
+  const heading = view.headings[position];
+  return { heading, from: heading.line + 1, to: (_b2 = (_a2 = view.headings[position + 1]) == null ? void 0 : _a2.line) != null ? _b2 : view.lines.length };
+}
+function definitions(view) {
+  const found = [];
+  for (let index = 0; index < view.lines.length; index++) {
+    const match = view.code[index] ? null : FOOTNOTE_DEF.exec(view.lines[index]);
+    if (!match) continue;
+    let last = index;
+    while (last + 1 < view.lines.length && !view.code[last + 1] && /^(?: {2,}|\t)\S/.test(view.lines[last + 1])) last++;
+    const text11 = view.lines.slice(index, last + 1).join("\n");
+    found.push({
+      label: match[1],
+      first: index,
+      last,
+      text: text11,
+      target: text11.slice(match[0].length).replace(/\s+/g, " ").trim()
+    });
+    index = last;
+  }
+  return found;
+}
+function lastContentLine(view, from, to) {
+  const definition = /* @__PURE__ */ new Set();
+  for (const item of definitions(view)) for (let line = item.first; line <= item.last; line++) definition.add(line);
+  for (let index = to - 1; index >= from; index--) if (view.lines[index].trim() && !definition.has(index)) return index;
+  return -1;
+}
+var summaryLine = (now, summary) => `${formatDate(now)}\u3000${Array.from(summary.replace(/\s+/g, " ").trim()).slice(0, LOG_LINE_SUMMARY_LIMIT).join("")}`;
+function logLines(view, key2) {
+  const range = sectionRange(view, key2);
+  if (!range) return [];
+  return view.lines.slice(range.from, range.to).filter((line) => line.trim() && !isPlaceholder2(line));
+}
+function logHeadingName(template2, language2) {
+  var _a2, _b2;
+  return (_b2 = (_a2 = template2.sections.find((section3) => section3.role === "log")) == null ? void 0 : _a2.name) != null ? _b2 : translate(language2, "detail.update_log");
+}
+function withLogLines(detail, view, key2, heading, linesFor) {
+  const range = sectionRange(view, key2);
+  const existing = range ? logLines(view, key2) : [];
+  const body = linesFor(existing).join("\n");
+  if (!range) return `${detail.trimEnd()}
+
+### ${heading}
+
+${body}`;
+  const before = view.lines.slice(0, range.from).join("\n");
+  const after = range.to < view.lines.length ? `
+
+${view.lines.slice(range.to).join("\n")}` : "";
+  return `${before}
+
+${body}${after}`;
+}
+function mergeLogLines(existing, oldLines, summary, now) {
+  const old = new Set(oldLines.map((line) => line.trim()));
+  const added = existing.filter((line) => !old.has(line.trim()));
+  const kept = existing.filter((line) => old.has(line.trim()));
+  if (added.length === 1) return [...kept, added[0]];
+  if (added.length === 0) return [...kept, summaryLine(now, summary)];
+  const [first, ...rest] = added;
+  return [...kept, [first, ...rest.map((line) => line.trim().replace(DATE_PREFIX, "").trim())].join("\uFF1B")];
+}
+function replySections(reply, classify2, template2) {
+  const view = scan2(reply, classify2);
+  const found = /* @__PURE__ */ new Map();
+  view.headings.forEach((heading, position) => {
+    var _a2, _b2, _c, _d;
+    const to = (_b2 = (_a2 = view.headings[position + 1]) == null ? void 0 : _a2.line) != null ? _b2 : view.lines.length;
+    const body = view.lines.slice(heading.line + 1, to);
+    const existing = found.get(heading.key);
+    const part = body.join("\n");
+    if (existing) {
+      existing.body = `${existing.body}
+
+${part}`;
+      return;
+    }
+    const index = heading.key.startsWith("t") ? Number(heading.key.slice(1)) : -1;
+    const section3 = index >= 0 ? template2.sections[index] : void 0;
+    found.set(heading.key, {
+      key: heading.key,
+      name: (_c = section3 == null ? void 0 : section3.name) != null ? _c : heading.text,
+      role: (_d = section3 == null ? void 0 : section3.role) != null ? _d : heading.key === "log" ? "log" : "none",
+      body: part
+    });
+  });
+  const sections = [...found.values()];
+  const order = (section3) => section3.key.startsWith("t") ? Number(section3.key.slice(1)) : 1e6;
+  return sections.map((section3, position) => ({ section: section3, position })).sort((a, b) => order(a.section) - order(b.section) || a.position - b.position).map((item) => item.section);
+}
+function deepenHeadings(body) {
+  const lines = body.split("\n");
+  const code = fencedLines(lines);
+  return lines.map((line, index) => {
+    const match = code[index] ? null : /^(#{1,6})([ \t]+.*|[ \t]*)$/.exec(line);
+    return match && match[1].length < 5 ? `#####${match[2]}` : line;
+  }).join("\n");
+}
+function relabel(text11, map) {
+  if (!map.size) return text11;
+  const lines = text11.split("\n");
+  const code = fencedLines(lines);
+  return lines.map(
+    (line, index) => code[index] ? line : line.replace(FOOTNOTE_REF, (whole, label) => map.has(label) ? `[^${map.get(label)}]` : whole)
+  ).join("\n");
+}
+function composeTop(input2) {
+  const { oldDetail: old, template: template2, language: language2, now } = input2;
+  const classify2 = classifier(template2, language2);
+  const oldView = scan2(old, classify2);
+  const date = formatDate(now);
+  const sections = replySections(input2.aiDetail, classify2, template2).filter((section3) => section3.key !== classify2.logKey);
+  const oldDefinitions = definitions(oldView);
+  const oldTargets = new Map(oldDefinitions.map((item) => [item.label, item.target]));
+  let counter = 0;
+  oldView.lines.forEach((line, index) => {
+    if (oldView.code[index]) return;
+    for (const match of line.matchAll(FOOTNOTE_REF))
+      if (/^\d+$/.test(match[1])) counter = Math.max(counter, Number(match[1]));
+  });
+  const used = /* @__PURE__ */ new Set([...oldTargets.keys()]);
+  const map = /* @__PURE__ */ new Map();
+  const newDefinitions = [];
+  const seen = /* @__PURE__ */ new Set();
+  const bodies = sections.map((section3) => {
+    const lines = section3.body.split("\n");
+    const view = { lines, code: fencedLines(lines) };
+    const defined = definitions(view);
+    const drop = /* @__PURE__ */ new Set();
+    for (const item of defined) {
+      for (let line = item.first; line <= item.last; line++) drop.add(line);
+      if (seen.has(item.label)) continue;
+      seen.add(item.label);
+      if (oldTargets.get(item.label) === item.target) continue;
+      let label = item.label;
+      if (/^\d+$/.test(label)) {
+        counter++;
+        label = String(counter);
+      } else if (used.has(label)) {
+        let suffix = 2;
+        while (used.has(`${label}-${suffix}`)) suffix++;
+        label = `${label}-${suffix}`;
+      }
+      used.add(label);
+      if (label !== item.label) map.set(item.label, label);
+      newDefinitions.push({ label: item.label, text: item.text });
+    }
+    return lines.filter((_line, index) => !drop.has(index)).join("\n");
+  });
+  const plan = [];
+  const endParts = [];
+  const batch = [];
+  const bodyOf = (index, dated) => {
+    const body = relabel(bodies[index].trim(), map);
+    return dated ? deepenHeadings(body) : body;
+  };
+  const needsBlank = (at) => old[at] === "\n" && at + 1 < old.length && old[at + 1] !== "\n";
+  sections.forEach((section3, index) => {
+    const content = bodies[index].trim();
+    if (!content || isPlaceholder2(content)) return;
+    const dated = section3.role !== "sources";
+    const body = bodyOf(index, dated);
+    const range = sectionRange(oldView, section3.key);
+    if (!range) {
+      batch.push(dated ? `### ${section3.name}
+
+#### ${date}
+
+${body}` : `### ${section3.name}
+
+${body}`);
+      return;
+    }
+    if (dated) {
+      const at2 = lineEnd(oldView, range.heading.line);
+      plan.push({ at: at2, text: `
+
+#### ${date}
+
+${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
+      return;
+    }
+    const last = lastContentLine(oldView, range.from, range.to);
+    const existing = new Set(oldView.lines.slice(range.from, range.to).map((line) => line.trim()));
+    const items = body.split("\n").filter((line) => !line.trim() || !existing.has(line.trim())).join("\n").trim();
+    if (!items) return;
+    const at = lineEnd(oldView, last >= 0 ? last : range.heading.line);
+    plan.push({
+      at,
+      text: `${last >= 0 ? "\n" : "\n\n"}${items}${last >= 0 || !needsBlank(at) ? "" : "\n"}`,
+      order: 0
+    });
+  });
+  if (batch.length) {
+    if (oldView.headings.length) {
+      const at = oldView.starts[oldView.headings[0].line];
+      const lead = at > 0 && old.slice(at - 2, at) !== "\n\n" ? "\n" : "";
+      plan.push({ at, text: `${lead}${batch.join("\n\n")}
+
+`, order: 0 });
+    } else endParts.push(batch.join("\n\n"));
+  }
+  const logLine = summaryLine(now, input2.summary);
+  const logRange = sectionRange(oldView, classify2.logKey);
+  if (logRange) {
+    const content = lastContentLine(oldView, logRange.from, logRange.to);
+    const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
+    plan.push({
+      at,
+      text: `${content >= 0 ? "\n" : "\n\n"}${logLine}${content >= 0 || !needsBlank(at) ? "" : "\n"}`,
+      order: 1
+    });
+  } else endParts.push(`### ${logHeadingName(template2, language2)}
+
+${logLine}`);
+  if (newDefinitions.length) {
+    const text11 = newDefinitions.map((item) => item.text.replace(/^\[\^([^\]\s]+)\]/, (_whole, label) => {
+      var _a2;
+      return `[^${(_a2 = map.get(label)) != null ? _a2 : label}]`;
+    })).join("\n");
+    const last = oldDefinitions[oldDefinitions.length - 1];
+    if (last) plan.push({ at: lineEnd(oldView, last.last), text: `
+${text11}`, order: -1 });
+    else endParts.push(text11);
+  }
+  if (endParts.length) {
+    const separator = !old ? "" : old.endsWith("\n\n") ? "" : old.endsWith("\n") ? "\n" : "\n\n";
+    plan.push({ at: old.length, text: `${separator}${endParts.join("\n\n")}`, order: 2 });
+  }
+  plan.sort((a, b) => a.at - b.at || a.order - b.order);
+  let detail = "";
+  let cursor = 0;
+  const inserts = [];
+  for (const item of plan) {
+    detail += old.slice(cursor, item.at);
+    inserts.push({ offset: detail.length, text: item.text });
+    detail += item.text;
+    cursor = item.at;
+  }
+  detail += old.slice(cursor);
+  if (input2.afterAssemble) detail = input2.afterAssemble(detail);
+  const record = recordOf(detail, inserts);
+  return verifyInserts(old, detail, inserts) ? { ok: true, detail, record } : { ok: false, reason: "top_invariant" };
+}
+function recordOf(detail, inserts) {
+  const kept = [];
+  let position = 0;
+  for (const insert of inserts) {
+    kept.push(detail.slice(position, insert.offset));
+    position = insert.offset + insert.text.length;
+  }
+  kept.push(detail.slice(position));
+  return { inserts, kept };
+}
+function verifyInserts(oldDetail, detail, inserts) {
+  const pieces = [];
+  let position = 0;
+  for (const insert of inserts) {
+    if (!insert.text || insert.offset < position || insert.offset + insert.text.length > detail.length) return false;
+    if (detail.slice(insert.offset, insert.offset + insert.text.length) !== insert.text) return false;
+    pieces.push(detail.slice(position, insert.offset));
+    position = insert.offset + insert.text.length;
+  }
+  pieces.push(detail.slice(position));
+  return pieces.join("") === oldDetail;
+}
+function chartPreserves(record, charted) {
+  var _a2;
+  let position = 0;
+  let first = true;
+  for (const piece of record.kept) {
+    if (!piece) {
+      first = false;
+      continue;
+    }
+    const found = first && ((_a2 = record.inserts[0]) == null ? void 0 : _a2.offset) !== 0 ? charted.startsWith(piece) ? 0 : -1 : charted.indexOf(piece, position);
+    if (found < 0) return false;
+    position = found + piece.length;
+    first = false;
+  }
+  return true;
+}
+function composeWriteback(input2) {
+  var _a2;
+  if (input2.mode === "top") return composeTop(input2);
+  const classify2 = classifier(input2.template, input2.language);
+  const key2 = classify2.logKey;
+  const heading = logHeadingName(input2.template, input2.language);
+  const view = scan2(input2.aiDetail, classify2);
+  let detail;
+  if (input2.mode === "merge") {
+    const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
+    detail = withLogLines(
+      input2.aiDetail,
+      view,
+      key2,
+      heading,
+      (existing) => mergeLogLines(existing, oldLines, input2.summary, input2.now)
+    );
+  } else {
+    const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
+    const line = `${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
+    detail = withLogLines(input2.aiDetail, view, key2, heading, () => [...oldLines, line]);
+  }
+  return { ok: true, detail, record: { inserts: [], kept: [detail] } };
+}
+async function backupNote(port, input2) {
+  var _a2;
+  try {
+    const folder = input2.folder.replace(/\/+$/, "");
+    const parts = folder.split("/").filter(Boolean);
+    let exists = true;
+    for (let index = 0; index < parts.length; index++) {
+      const path2 = parts.slice(0, index + 1).join("/");
+      if (await port.folderExists(path2)) continue;
+      exists = false;
+      await port.createFolder(path2);
+    }
+    const taken = new Set(
+      exists ? (await port.list(folder)).map((name2) => {
+        var _a3;
+        return ((_a3 = name2.split("/").pop()) != null ? _a3 : name2).toLocaleLowerCase();
+      }) : []
+    );
+    const base = ((_a2 = input2.notePath.split("/").pop()) != null ? _a2 : input2.notePath).replace(/\.md$/i, "");
+    const stem = `${base} ${formatDate(input2.now)} ${formatTime(input2.now)}`;
+    let name = `${stem}.md`;
+    for (let attempt = 1; taken.has(name.toLocaleLowerCase()); attempt++) name = `${stem} (${attempt}).md`;
+    const path = `${folder}/${name}`;
+    await port.create(path, input2.content);
+    return await port.read(path) === input2.content ? { ok: true, path } : { ok: false };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+
 // ai/note-style-label.ts
 var NOTE_STYLE_PRESETS = [
   {
@@ -28280,9 +28678,9 @@ var INVISIBLE = /[\s\u200b-\u200d\u2060\ufeff\u00ad]/g;
 var MAX_REPLY_CHARS = 5e4;
 var MAX_REPLY_NODES = 2e3;
 var WIKI = /\[\[([^[\]\n]+)\]\]/y;
-function bracketTable(scan2) {
-  if (scan2.brackets) return scan2.brackets;
-  const { src } = scan2;
+function bracketTable(scan3) {
+  if (scan3.brackets) return scan3.brackets;
+  const { src } = scan3;
   const table = new Int32Array(src.length).fill(-1);
   const stack = [];
   for (let at = 0; at < src.length; at++) {
@@ -28291,11 +28689,11 @@ function bracketTable(scan2) {
     else if (ch === "[") stack.push(at);
     else if (ch === "]" && stack.length) table[stack.pop()] = at;
   }
-  return scan2.brackets = table;
+  return scan3.brackets = table;
 }
-function parenTable(scan2) {
-  if (scan2.parens) return scan2.parens;
-  const { src } = scan2;
+function parenTable(scan3) {
+  if (scan3.parens) return scan3.parens;
+  const { src } = scan3;
   const table = new Int32Array(src.length).fill(-1);
   let stack = [];
   for (let at = 0; at < src.length; at++) {
@@ -28305,15 +28703,15 @@ function parenTable(scan2) {
     else if (ch === ")" && stack.length) table[stack.pop()] = at;
     else if (ch === "\n") stack = [];
   }
-  return scan2.parens = table;
+  return scan3.parens = table;
 }
-function bracketLink(scan2, open) {
+function bracketLink(scan3, open) {
   var _a2;
-  const { src } = scan2;
+  const { src } = scan3;
   if (src[open] !== "[") return null;
-  const close = bracketTable(scan2)[open];
+  const close = bracketTable(scan3)[open];
   if (close < 0 || src[close + 1] !== "(") return null;
-  const at = parenTable(scan2)[close + 1];
+  const at = parenTable(scan3)[close + 1];
   if (at < 0) return null;
   let dest = src.slice(close + 2, at).trim();
   if (dest.startsWith("<")) {
@@ -28332,16 +28730,16 @@ function wikiAt(src, at) {
   return { end: at + match[0].length, target, label: alias.join("|").trim() || target };
 }
 var DELIMITERS = ["**", "__", "~~", "*", "_"];
-function formatAt(scan2, at, depth) {
+function formatAt(scan3, at, depth) {
   var _a2;
-  const { src } = scan2;
+  const { src } = scan3;
   const delimiter2 = DELIMITERS.find((item) => src.startsWith(item, at));
   if (!delimiter2 || depth >= MAX_INLINE_DEPTH) return null;
   const underscore = delimiter2[0] === "_";
   if (underscore && at > 0 && ALNUM.test(src[at - 1])) return null;
   const start = at + delimiter2.length;
   if (start >= src.length || /\s/.test(src[start])) return null;
-  if (start >= ((_a2 = scan2.noClose[delimiter2]) != null ? _a2 : Infinity)) return null;
+  if (start >= ((_a2 = scan3.noClose[delimiter2]) != null ? _a2 : Infinity)) return null;
   for (let close = src.indexOf(delimiter2, start + 1); close >= 0; close = src.indexOf(delimiter2, close + 1)) {
     if (/\s/.test(src[close - 1])) continue;
     const after = src[close + delimiter2.length];
@@ -28353,7 +28751,7 @@ function formatAt(scan2, at, depth) {
       node: { t: "fmt", tag, c: parseInline(src.slice(start, close), depth + 1, true) }
     };
   }
-  scan2.noClose[delimiter2] = start;
+  scan3.noClose[delimiter2] = start;
   return null;
 }
 function bareUrlAt(src, at) {
@@ -28383,7 +28781,7 @@ function visibleLength(nodes) {
 }
 function parseInline(src, depth = 0, links = true, ends) {
   var _a2;
-  const scan2 = { src, noClose: {} };
+  const scan3 = { src, noClose: {} };
   const out = [];
   let buf = "";
   const push = (node, end) => {
@@ -28435,7 +28833,7 @@ function parseInline(src, depth = 0, links = true, ends) {
     }
     if (ch === "!" && src[at + 1] === "[") {
       const wiki = src.startsWith("[[", at + 1) ? wikiAt(src, at + 1) : null;
-      const link = wiki ? null : bracketLink(scan2, at + 1);
+      const link = wiki ? null : bracketLink(scan3, at + 1);
       const end = (_a2 = wiki == null ? void 0 : wiki.end) != null ? _a2 : link == null ? void 0 : link.end;
       if (end !== void 0) {
         buf += src.slice(at, end);
@@ -28464,7 +28862,7 @@ function parseInline(src, depth = 0, links = true, ends) {
         at = wiki.end;
         continue;
       }
-      const link = bracketLink(scan2, at);
+      const link = bracketLink(scan3, at);
       if (link) {
         if (links && HTTP_URL.test(link.dest)) {
           flush(at);
@@ -28479,7 +28877,7 @@ function parseInline(src, depth = 0, links = true, ends) {
       }
     }
     if (ch === "*" || ch === "_" || ch === "~") {
-      const format = formatAt(scan2, at, depth);
+      const format = formatAt(scan3, at, depth);
       if (format) {
         flush(at);
         push(format.node, format.end);
@@ -54348,12 +54746,15 @@ ${request.requirements}` : preset.text,
       countIssues: job.formatIssues,
       model: job.model,
       apply: async (charted) => {
+        var _a3;
         if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
         if (this.chartSnapshot(latest) !== snapshot) return false;
+        const top = job.updateMode === "top";
+        if (top && !((_a3 = job.preserve) == null ? void 0 : _a3.call(job, charted))) return false;
         await this.plugin.repo.updateNote(
           path,
-          { detail: canonicalDetail(charted, noteLanguageOf(job.language), job.template) },
+          { detail: top ? charted : canonicalDetail(charted, noteLanguageOf(job.language), job.template) },
           { detailTemplate: job.template }
         );
         const after = await this.plugin.repo.readNote(path, map);
@@ -59117,6 +59518,7 @@ ${request.requirements}` : preset.text,
     let task = "";
     let childSources;
     await this.plugin.topicRuns.start(node.path, "integrateChildren", {
+      ...this.writebackHooks(),
       map: () => {
         var _a3;
         return (_a3 = this.map) != null ? _a3 : void 0;
@@ -59145,6 +59547,7 @@ ${request.requirements}` : preset.text,
         synthesisRun = run;
         return {
           detailTemplate,
+          updateMode: run.updateMode,
           viewChanged: () => {
             var _a4, _b2;
             return ((_a4 = options == null ? void 0 : options.signal) == null ? void 0 : _a4.aborted) === true || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || childIds2() !== startIds;
@@ -59190,6 +59593,7 @@ ${request.requirements}` : preset.text,
             visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
             detailTemplate: run.template,
             ...synthesisStyle.style,
+            updateMode: run.updateMode,
             addCharts: true
           },
           note
@@ -63233,6 +63637,54 @@ ${addition}` : addition });
     return { model, reasoning };
   }
   /**
+   * What the "only the new content" write-back needs from the vault: the whole text of the note file and a byte-exact backup
+   * of it under `<style folder>/<Backups>/<Notes>/`. Each folder level is the first spelling that already exists. The
+   * folders are created only when a backup is made.
+   */
+  writebackHooks() {
+    const vault = this.app.vault;
+    const folderAt = (path) => {
+      const found = vault.getAbstractFileByPath(path);
+      return found instanceof import_obsidian31.TFolder ? found : null;
+    };
+    return {
+      readRaw: async (path) => {
+        const file = vault.getAbstractFileByPath(path);
+        if (!(file instanceof import_obsidian31.TFile)) throw new Error(path);
+        return vault.read(file);
+      },
+      backupNote: (path, content) => {
+        var _a2;
+        const language2 = this.plugin.settings.language;
+        const exists = (candidate) => folderAt(candidate) !== null;
+        const backups = resolveBlockFolder(this.noteStyles.folder(), "backup", exists, language2);
+        const names3 = [...new Set(CANONICAL_LANGUAGES.map((code) => translate(code, "ui.style_folder_backup_notes")))];
+        const notes = (_a2 = names3.find((name) => exists(`${backups}/${name}`))) != null ? _a2 : translate(language2, "ui.style_folder_backup_notes");
+        return backupNote(
+          {
+            folderExists: async (candidate) => exists(candidate),
+            list: async (folder) => {
+              var _a3, _b2;
+              return ((_b2 = (_a3 = folderAt(folder)) == null ? void 0 : _a3.children) != null ? _b2 : []).filter((child) => child instanceof import_obsidian31.TFile).map((child) => child.name);
+            },
+            createFolder: async (folder) => {
+              await vault.createFolder(folder);
+            },
+            create: async (file, text11) => {
+              await vault.create(file, text11);
+            },
+            read: async (file) => {
+              const found = vault.getAbstractFileByPath(file);
+              if (!(found instanceof import_obsidian31.TFile)) throw new Error(file);
+              return vault.read(found);
+            }
+          },
+          { notePath: path, content, folder: `${backups}/${notes}`, now: /* @__PURE__ */ new Date() }
+        );
+      }
+    };
+  }
+  /**
    * Starts a research on one topic through the plugin's run module. The module owns registration, progress, the stale
    * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
    * and the undo step.
@@ -63240,6 +63692,7 @@ ${addition}` : addition });
   runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
     var _a2;
     return this.plugin.topicRuns.start(node.path, "research", {
+      ...this.writebackHooks(),
       origin: this,
       map: (_a2 = this.map) != null ? _a2 : void 0,
       request,
@@ -69471,26 +69924,63 @@ var TopicRuns = class {
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       await repo.updateNote(path, { status: note.status });
       const save = async (summary, detail) => this.ports.mutate()(async () => {
-        var _a3;
+        var _a3, _b3;
         if (signal.aborted || prepared.viewChanged()) throw changed();
         if (await prepared.sourcesChanged()) throw changed();
         const latest = await repo.readNote(path, options.map());
         if (noteSnapshot(latest) !== snapshot) throw changed();
-        const canonicalOnly = canonicalDetail(detail, noteLanguageOf(outputLanguage2), detailTemplate);
-        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
+        const mode = (_a3 = prepared.updateMode) != null ? _a3 : "merge";
+        const noteLanguage = noteLanguageOf(outputLanguage2);
         const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
-        const canonical = carryForwardSources(
-          canonicalOnly,
-          [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-          [summary, canonicalOnly, references2],
-          outputLanguage2,
-          detailTemplate
-        );
+        let written2;
+        let issues;
+        let record;
+        if (mode === "top") {
+          issues = [];
+          const composed = await this.composeWrite({
+            mode,
+            path,
+            oldDetail: latest.detail,
+            aiDetail: detail,
+            summary,
+            template: detailTemplate,
+            language: noteLanguage,
+            signal,
+            hooks: options
+          });
+          if (!composed.ok) throw new Error(composed.message);
+          written2 = composed.detail;
+          record = composed.record;
+        } else {
+          const canonicalOnly = canonicalDetail(detail, noteLanguage, detailTemplate);
+          issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
+          const carried = mode === "fresh" ? canonicalOnly : carryForwardSources(
+            canonicalOnly,
+            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+            [summary, canonicalOnly, references2],
+            outputLanguage2,
+            detailTemplate
+          );
+          const composed = await this.composeWrite({
+            mode,
+            path,
+            oldDetail: latest.detail,
+            aiDetail: carried,
+            summary,
+            template: detailTemplate,
+            language: noteLanguage,
+            signal,
+            hooks: options
+          });
+          if (!composed.ok) throw new Error(composed.message);
+          written2 = composed.detail;
+          record = composed.record;
+        }
         await repo.updateNote(
           path,
           {
             summary,
-            detail: canonical,
+            detail: written2,
             visualReferences: references2,
             // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
             ...options.findingsSent() ? { newFindings: "" } : {},
@@ -69501,7 +69991,7 @@ var TopicRuns = class {
         );
         const saved = await repo.readNote(path, options.map());
         await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
-        (_a3 = options.queueCharts) == null ? void 0 : _a3.call(options, {
+        (_b3 = options.queueCharts) == null ? void 0 : _b3.call(options, {
           path,
           saved,
           context,
@@ -69509,7 +69999,8 @@ var TopicRuns = class {
           formatIssues: issues,
           model: used.model,
           language: outputLanguage2,
-          template: detailTemplate
+          template: detailTemplate,
+          ...mode === "top" && record ? this.chartGuard(mode, record) : {}
         });
       });
       try {
@@ -69620,6 +70111,48 @@ var TopicRuns = class {
       options.settled();
     }
   }
+  /** What the chart step needs to keep a "top" write-back's old text: the diagrammed text must still hold it, byte for byte. */
+  chartGuard(mode, record) {
+    return { updateMode: mode, preserve: (charted) => chartPreserves(record, charted) };
+  }
+  /**
+   * Builds the text to save for one of the three write-back ways. Runs inside the mutation queue after the stale fence.
+   * `top`: pure insert, blocked when the old text would not come back. `fresh`: the whole note file is backed up first and
+   * read again just before the write; anything that fails or differs means nothing is written (`message` says why).
+   */
+  async composeWrite(input2) {
+    var _a2;
+    const { mode, path, signal, hooks } = input2;
+    const base = {
+      mode,
+      oldDetail: input2.oldDetail,
+      aiDetail: input2.aiDetail,
+      summary: input2.summary,
+      template: input2.template,
+      language: input2.language
+    };
+    const compose = (_a2 = this.ports.composeWriteback) != null ? _a2 : composeWriteback;
+    if (mode !== "fresh") {
+      const composed = compose({ ...base, now: /* @__PURE__ */ new Date() });
+      return composed.ok ? composed : { ok: false, message: t("ui.writeback_top_failed") };
+    }
+    const stopped = { ok: false, message: t("ui.research_stopped_existing_content_was_preserved") };
+    const failed = { ok: false, message: t("ui.writeback_backup_failed") };
+    if (!hooks.backupNote || !hooks.readRaw) return failed;
+    if (signal.aborted) return stopped;
+    try {
+      const before = await hooks.readRaw(path);
+      const backup = await hooks.backupNote(path, before);
+      if (!backup.ok) return failed;
+      const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
+      if (!composed.ok) return failed;
+      if (await hooks.readRaw(path) !== before) return failed;
+      if (signal.aborted) return stopped;
+      return composed;
+    } catch (e) {
+      return failed;
+    }
+  }
   /** Reads the note, resolves the model and style and builds the request; null (after telling the entry) when the topic has no task. */
   async researchPrelude(path, options, givenStyle, overrides) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
@@ -69654,6 +70187,7 @@ var TopicRuns = class {
         ...overrides,
         detailTemplate,
         ...runStyle.contextFields,
+        updateMode: runStyle.updateMode,
         addCharts: (_i = overrides.addCharts) != null ? _i : true
       },
       note
@@ -69770,7 +70304,7 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f, _g, _h, _i, _j;
+        var _a3, _b3, _c2, _d2, _e2, _f, _g, _h, _i, _j, _k, _l, _m;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -69784,37 +70318,54 @@ var TopicRuns = class {
           if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
           return;
         }
+        const mode = (_b3 = context.updateMode) != null ? _b3 : "merge";
+        const writeLanguage = noteLanguageOf((_c2 = context.outputLanguage) != null ? _c2 : settings().language);
+        const composed = await this.composeWrite({
+          mode,
+          path,
+          oldDetail: latest.detail,
+          // top gets the raw reply (new findings only); merge and fresh get the canonical Detail.
+          aiDetail: mode === "top" ? result.detail : canonicalDetail(result.detail, writeLanguage, context.detailTemplate),
+          summary: result.summary,
+          template: (_d2 = context.detailTemplate) != null ? _d2 : standardTemplate(writeLanguage),
+          language: writeLanguage,
+          signal: controller.signal,
+          hooks: options
+        });
+        if (!composed.ok) {
+          await repo.updateNote(path, { status: note.status });
+          if (exchangeId) (_e2 = exchanges()) == null ? void 0 : _e2.failed(exchangeId, composed.message);
+          fail2(composed.message);
+          return;
+        }
         await repo.updateNote(
           path,
           {
             summary: result.summary,
-            detail: canonicalDetail(
-              result.detail,
-              noteLanguageOf((_b3 = context.outputLanguage) != null ? _b3 : settings().language),
-              context.detailTemplate
-            ),
+            detail: composed.detail,
             visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
             newFindings: "",
             status: "completed",
             // The topic remembers the mode of its latest research (Quick is stored as local).
             ...context.researchMode ? { researchMode: context.researchMode } : {},
-            ...formatIssuesPatch(result.formatIssues, language2)
+            ...mode === "top" ? { detailFormatIssues: [] } : formatIssuesPatch(result.formatIssues, language2)
           },
           { detailTemplate: context.detailTemplate }
         );
         const saved = await repo.readNote(path, options.map);
-        (_c2 = options.onWritten) == null ? void 0 : _c2.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_d2 = exchanges()) == null ? void 0 : _d2.completed(exchangeId);
+        (_f = options.onWritten) == null ? void 0 : _f.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_g = exchanges()) == null ? void 0 : _g.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
-        (_f = options.queueCharts) == null ? void 0 : _f.call(options, {
+        (_i = options.queueCharts) == null ? void 0 : _i.call(options, {
           path,
           saved,
           context,
           detail: saved.detail,
-          formatIssues: result.formatIssues,
+          formatIssues: mode === "top" ? [] : result.formatIssues,
           model: used.model,
-          language: (_e2 = context.outputLanguage) != null ? _e2 : settings().language,
-          template: context.detailTemplate
+          language: (_h = context.outputLanguage) != null ? _h : settings().language,
+          template: context.detailTemplate,
+          ...mode === "top" ? this.chartGuard(mode, composed.record) : {}
         });
         if (result.suggestions.length) {
           this.pendingSuggestions.set(
@@ -69822,12 +70373,12 @@ var TopicRuns = class {
             result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
           );
           try {
-            await ((_h = (_g = this.pendingSuggestions).flush) == null ? void 0 : _h.call(_g));
+            await ((_k = (_j = this.pendingSuggestions).flush) == null ? void 0 : _k.call(_j));
           } catch (error) {
-            (_i = options.notify) == null ? void 0 : _i.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
+            (_l = options.notify) == null ? void 0 : _l.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
           }
         }
-        (_j = options.done) == null ? void 0 : _j.call(options, result);
+        (_m = options.done) == null ? void 0 : _m.call(options, result);
       })
     ).catch(
       (error) => this.ports.mutate()(async () => {

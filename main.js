@@ -1498,6 +1498,10 @@ var en = {
   "ui.note_style_standard_short": "Standard",
   "ui.note_style_textbook": "Textbook (intro, then sections)",
   "ui.note_style_textbook_short": "Textbook",
+  "ui.note_style_hypothesis_short": "Hypothesis",
+  "ui.note_style_evidence_short": "Evidence",
+  "ui.note_style_action_short": "Action",
+  "ui.note_style_atomic_short": "Atomic note",
   "ui.block_template_format_heading": "Format rules",
   "ui.block_folder_name": "Blocks",
   "ui.block_folder_template": "Templates",
@@ -3759,6 +3763,10 @@ var zhCN = {
   "ui.note_style_standard_short": "\u6807\u51C6",
   "ui.note_style_textbook": "\u6559\u79D1\u4E66\uFF08\u5148\u5BFC\u8BFB\uFF0C\u518D\u5206\u7C7B\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
+  "ui.note_style_hypothesis_short": "\u5047\u8BBE\u7ED3\u6784",
+  "ui.note_style_evidence_short": "\u8BC1\u636E\u7ED3\u6784",
+  "ui.note_style_action_short": "\u884C\u52A8\u7ED3\u6784",
+  "ui.note_style_atomic_short": "\u539F\u5B50\u77E5\u8BC6\u7ED3\u6784",
   "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
   "ui.block_folder_name": "\u79EF\u6728",
   "ui.block_folder_template": "\u6A21\u677F",
@@ -6020,6 +6028,10 @@ var zhTW = {
   "ui.note_style_standard_short": "\u6A19\u6E96",
   "ui.note_style_textbook": "\u6559\u79D1\u66F8\uFF08\u5148\u5C0E\u8B80\uFF0C\u518D\u5206\u985E\uFF09",
   "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
+  "ui.note_style_hypothesis_short": "\u5047\u8A2D\u7D50\u69CB",
+  "ui.note_style_evidence_short": "\u8B49\u64DA\u7D50\u69CB",
+  "ui.note_style_action_short": "\u884C\u52D5\u7D50\u69CB",
+  "ui.note_style_atomic_short": "\u539F\u5B50\u77E5\u8B58\u7D50\u69CB",
   "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
   "ui.block_folder_name": "\u7A4D\u6728",
   "ui.block_folder_template": "\u6A21\u677F",
@@ -25395,6 +25407,42 @@ var textbook_zh_CN_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005
 // core/blocks/template/textbook.en.md
 var textbook_en_default3 = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
+// core/blocks/template/hypothesis.zh-TW.md
+var hypothesis_zh_TW_default = "## \u4E3B\u5F35\n\u7528\u4E00\u53E5\u8A71\u5BEB\u51FA\u9019\u500B\u5047\u8A2D\u4E3B\u5F35\u4EC0\u9EBC\uFF0C\u53EF\u88AB\u9A57\u8B49\u6216\u63A8\u7FFB\u3002\n\n## \u9810\u6E2C\n\u5982\u679C\u4E3B\u5F35\u6210\u7ACB\uFF0C\u61C9\u8A72\u89C0\u5BDF\u5230\u4EC0\u9EBC\uFF1B\u5BEB\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u7D50\u679C\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u600E\u9EBC\u78BA\u8A8D\u6216\u63A8\u7FFB\uFF1A\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u652F\u6301\n\u652F\u6301\u4E3B\u5F35\u7684\u8B49\u64DA\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\u3002\n\n## \u53CD\u99C1\n\u8207\u4E3B\u5F35\u885D\u7A81\u7684\u8B49\u64DA\u6216\u53CD\u4F8B\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\uFF1B\u6C92\u6709\u5C31\u8AAA\u9084\u6C92\u627E\u5230\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u7D9C\u5408\u652F\u6301\u8207\u53CD\u99C1\uFF0C\u5BEB\u76EE\u524D\u5F37\u5F31\uFF08\u5F31\uFF0F\u4E2D\uFF0F\u5F37\uFF09\u8207\u9084\u7F3A\u54EA\u4E9B\u8B49\u64DA\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/hypothesis.zh-CN.md
+var hypothesis_zh_CN_default = "## \u4E3B\u5F35\n\u7528\u4E00\u53E5\u8A71\u5BEB\u51FA\u9019\u500B\u5047\u8A2D\u4E3B\u5F35\u4EC0\u9EBC\uFF0C\u53EF\u88AB\u9A57\u8B49\u6216\u63A8\u7FFB\u3002\n\n## \u9810\u6E2C\n\u5982\u679C\u4E3B\u5F35\u6210\u7ACB\uFF0C\u61C9\u8A72\u89C0\u5BDF\u5230\u4EC0\u9EBC\uFF1B\u5BEB\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u7D50\u679C\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u600E\u9EBC\u78BA\u8A8D\u6216\u63A8\u7FFB\uFF1A\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u652F\u6301\n\u652F\u6301\u4E3B\u5F35\u7684\u8B49\u64DA\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\u3002\n\n## \u53CD\u99C1\n\u8207\u4E3B\u5F35\u885D\u7A81\u7684\u8B49\u64DA\u6216\u53CD\u4F8B\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\uFF1B\u6C92\u6709\u5C31\u8AAA\u9084\u6C92\u627E\u5230\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u7D9C\u5408\u652F\u6301\u8207\u53CD\u99C1\uFF0C\u5BEB\u76EE\u524D\u5F37\u5F31\uFF08\u5F31\uFF0F\u4E2D\uFF0F\u5F37\uFF09\u8207\u9084\u7F3A\u54EA\u4E9B\u8B49\u64DA\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/hypothesis.en.md
+var hypothesis_en_default = "## Claim\nState in one sentence what this hypothesis claims, so that it can be tested or refuted.\n\n## Prediction\nWhat should be observed if the claim holds; write concrete results that can be checked.\n\n## How to test\nHow to confirm or refute it: what data to look for, what comparison or experiment to run.\n\n## Support\nEvidence that supports the claim; give the source and strength of each point.\n\n## Counterevidence\nEvidence or counterexamples that conflict with the claim; give the source and strength of each point; if there is none, say none has been found yet.\n\n## Current judgment\nWeigh the support against the counterevidence; state the current strength (weak, medium or strong) and what evidence is still missing.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+
+// core/blocks/template/evidence.zh-TW.md
+var evidence_zh_TW_default = "## \u5167\u5BB9\n\u9019\u5247\u8B49\u64DA\u5177\u9AD4\u8AAA\u4E86\u4EC0\u9EBC\uFF1A\u4E8B\u5BE6\u3001\u6578\u64DA\u6216\u89C0\u5BDF\uFF0C\u4E0D\u52A0\u63A8\u8AD6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53EF\u4FE1\u5EA6\n\u4F86\u6E90\u985E\u578B\u3001\u65B9\u6CD5\u3001\u6A23\u672C\u8207\u6642\u9593\uFF0C\u8A55\u4F30\u53EF\u4FE1\u5EA6\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\u4E26\u8AAA\u660E\u7406\u7531\u3002\n\n## \u652F\u6301\u6216\u53CD\u99C1\n\u9019\u5247\u8B49\u64DA\u652F\u6301\u6216\u53CD\u99C1\u54EA\u500B\u5047\u8A2D\u3001\u54EA\u4E00\u9EDE\uFF1B\u6C92\u6709\u9023\u5230\u5047\u8A2D\u5C31\u5BEB\u300C\u5C1A\u672A\u9023\u5230\u5047\u8A2D\u300D\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/evidence.zh-CN.md
+var evidence_zh_CN_default = "## \u5167\u5BB9\n\u9019\u5247\u8B49\u64DA\u5177\u9AD4\u8AAA\u4E86\u4EC0\u9EBC\uFF1A\u4E8B\u5BE6\u3001\u6578\u64DA\u6216\u89C0\u5BDF\uFF0C\u4E0D\u52A0\u63A8\u8AD6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53EF\u4FE1\u5EA6\n\u4F86\u6E90\u985E\u578B\u3001\u65B9\u6CD5\u3001\u6A23\u672C\u8207\u6642\u9593\uFF0C\u8A55\u4F30\u53EF\u4FE1\u5EA6\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\u4E26\u8AAA\u660E\u7406\u7531\u3002\n\n## \u652F\u6301\u6216\u53CD\u99C1\n\u9019\u5247\u8B49\u64DA\u652F\u6301\u6216\u53CD\u99C1\u54EA\u500B\u5047\u8A2D\u3001\u54EA\u4E00\u9EDE\uFF1B\u6C92\u6709\u9023\u5230\u5047\u8A2D\u5C31\u5BEB\u300C\u5C1A\u672A\u9023\u5230\u5047\u8A2D\u300D\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/evidence.en.md
+var evidence_en_default = '## Content\nWhat this piece of evidence says: the facts, data or observations, without inference.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Credibility\nThe source type, method, sample and date; rate the credibility (low, medium or high) and give the reason.\n\n## Supports or refutes\nWhich hypothesis and which point this evidence supports or refutes; if it is not linked to a hypothesis, write "Not linked to a hypothesis yet".\n\n## Update log\nAdd only one line saying what this update changed.\n';
+
+// core/blocks/template/action.zh-TW.md
+var action_zh_TW_default = "## \u76EE\u6A19\n\u9019\u500B\u884C\u52D5\u8981\u9054\u6210\u4EC0\u9EBC\uFF0C\u7528\u53EF\u8861\u91CF\u7684\u65B9\u5F0F\u5BEB\u3002\n\n## \u6B65\u9A5F\n\u4F9D\u9806\u5E8F\u5217\u51FA\u8981\u505A\u7684\u4E8B\uFF0C\u6BCF\u6B65\u4E00\u884C\uFF0C\u7528\u6709\u5E8F\u6E05\u55AE\u3002\n\n## \u6AA2\u67E5\u9EDE\n\u9014\u4E2D\u7528\u4F86\u78BA\u8A8D\u65B9\u5411\u6B63\u78BA\u7684\u6642\u9593\u9EDE\u6216\u6307\u6A19\u3002\n\n## \u5B8C\u6210\u689D\u4EF6\n\u505A\u5230\u4EC0\u9EBC\u5C31\u7B97\u5B8C\u6210\uFF1B\u5BEB\u53EF\u6AA2\u67E5\u7684\u689D\u4EF6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/action.zh-CN.md
+var action_zh_CN_default = "## \u76EE\u6A19\n\u9019\u500B\u884C\u52D5\u8981\u9054\u6210\u4EC0\u9EBC\uFF0C\u7528\u53EF\u8861\u91CF\u7684\u65B9\u5F0F\u5BEB\u3002\n\n## \u6B65\u9A5F\n\u4F9D\u9806\u5E8F\u5217\u51FA\u8981\u505A\u7684\u4E8B\uFF0C\u6BCF\u6B65\u4E00\u884C\uFF0C\u7528\u6709\u5E8F\u6E05\u55AE\u3002\n\n## \u6AA2\u67E5\u9EDE\n\u9014\u4E2D\u7528\u4F86\u78BA\u8A8D\u65B9\u5411\u6B63\u78BA\u7684\u6642\u9593\u9EDE\u6216\u6307\u6A19\u3002\n\n## \u5B8C\u6210\u689D\u4EF6\n\u505A\u5230\u4EC0\u9EBC\u5C31\u7B97\u5B8C\u6210\uFF1B\u5BEB\u53EF\u6AA2\u67E5\u7684\u689D\u4EF6\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/action.en.md
+var action_en_default = "## Goal\nWhat this action should achieve, stated in a measurable way.\n\n## Steps\nList what to do in order, one step per line, as a numbered list.\n\n## Checkpoints\nThe times or indicators used along the way to confirm the direction is right.\n\n## Done when\nWhat counts as finished; write conditions that can be checked.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+
+// core/blocks/template/atomic.zh-TW.md
+var atomic_zh_TW_default = "## \u5B9A\u7FA9\n\u4E00\u53E5\u8A71\u5B9A\u7FA9\u9019\u500B\u6982\u5FF5\uFF0C\u4E0D\u8D85\u904E 40 \u5B57\u3002\n\n## \u89E3\u91CB\n\u6700\u591A\u4E09\u53E5\uFF0C\u8AAA\u660E\u5B83\u70BA\u4EC0\u9EBC\u6210\u7ACB\u3001\u548C\u76F8\u8FD1\u6982\u5FF5\u5DEE\u5728\u54EA\u3002\n\n## \u4F8B\u5B50\n\u4E00\u500B\u5177\u9AD4\u4F8B\u5B50\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/atomic.zh-CN.md
+var atomic_zh_CN_default = "## \u5B9A\u7FA9\n\u4E00\u53E5\u8A71\u5B9A\u7FA9\u9019\u500B\u6982\u5FF5\uFF0C\u4E0D\u8D85\u904E 40 \u5B57\u3002\n\n## \u89E3\u91CB\n\u6700\u591A\u4E09\u53E5\uFF0C\u8AAA\u660E\u5B83\u70BA\u4EC0\u9EBC\u6210\u7ACB\u3001\u548C\u76F8\u8FD1\u6982\u5FF5\u5DEE\u5728\u54EA\u3002\n\n## \u4F8B\u5B50\n\u4E00\u500B\u5177\u9AD4\u4F8B\u5B50\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/atomic.en.md
+var atomic_en_default = "## Definition\nDefine the concept in one sentence of no more than 25 words.\n\n## Explanation\nAt most three sentences on why it holds and how it differs from nearby concepts.\n\n## Example\nOne concrete example.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+
 // core/blocks/builtin.ts
 var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
 var tone = (id, nameKey) => ({
@@ -25435,6 +25483,10 @@ ${(_b2 = block.format) == null ? void 0 : _b2.call(block, language2)}`;
 var BUILTIN_BLOCKS = [
   template("standard", "ui.note_style_standard_short", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
   template("textbook", "ui.note_style_textbook_short", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
+  template("hypothesis", "ui.note_style_hypothesis_short", [hypothesis_zh_TW_default, hypothesis_zh_CN_default, hypothesis_en_default]),
+  template("evidence", "ui.note_style_evidence_short", [evidence_zh_TW_default, evidence_zh_CN_default, evidence_en_default]),
+  template("action", "ui.note_style_action_short", [action_zh_TW_default, action_zh_CN_default, action_en_default]),
+  template("atomic", "ui.note_style_atomic_short", [atomic_zh_TW_default, atomic_zh_CN_default, atomic_en_default]),
   tone("academic", "ui.preset_name_academic"),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine"),
@@ -26515,6 +26567,7 @@ function styleRefOf(templateId, toneId, aliases = {}) {
 }
 
 // ai/note-style-store.ts
+var KIND_BLOCK_IDS = ["hypothesis", "evidence", "action", "atomic"];
 var stripMd3 = (name) => name.replace(/\.md$/i, "");
 var lower3 = (value) => value.toLocaleLowerCase();
 function defaultStylesFolderName(language2) {
@@ -26683,15 +26736,15 @@ var NoteStyleStore = class {
     const levels = [{ template: (_a2 = request.choice) == null ? void 0 : _a2.template }];
     if (request.topic) levels.push(request.topic);
     if (request.map) levels.push(request.map);
-    const found = this.resolve(levels);
+    const found = this.resolve(levels, language2);
     const template2 = isBuiltinTemplateId(found.template.id) && !(found.block && !found.blockIssues) ? builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === found.template.id) : found.template;
     const uiTemplates = [
       ...builtinTemplates(noteLanguageOf(settings.language), settings.language),
       ...settings.detailTemplates
     ];
     const templateName = (id) => {
-      var _a3, _b3, _c2;
-      return (_c2 = (_b3 = fileStyleName(id)) != null ? _b3 : (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _c2 : id;
+      var _a3, _b3, _c2, _d2;
+      return (_d2 = (_c2 = (_b3 = fileStyleName(id)) != null ? _b3 : (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _c2 : this.kindBlockName(id)) != null ? _d2 : id;
     };
     const chain = [(_b2 = request.choice) == null ? void 0 : _b2.tone, (_c = request.topic) == null ? void 0 : _c.tone, (_d = request.map) == null ? void 0 : _d.tone];
     const tone2 = found.toneDecided && !request.toneOnly ? { text: found.toneText, source: found.toneSource, free: found.toneFree } : this.plainTone(chain, language2);
@@ -26731,7 +26784,7 @@ var NoteStyleStore = class {
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
    * added here.
    */
-  resolve(levels) {
+  resolve(levels, outputLanguage2 = this.settings.language) {
     var _a2;
     const settings = this.settings;
     const noteLanguage = noteLanguageOf(settings.language);
@@ -26742,7 +26795,7 @@ var NoteStyleStore = class {
       const id = all[index].template;
       if (!id) continue;
       const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
-      const found = isBlock ? this.tryBlock(id, toneChain, noteLanguage) : this.tryId(id, index, all, toneChain, noteLanguage);
+      const found = isBlock ? this.tryBlock(id, toneChain, noteLanguage, outputLanguage2) : this.tryId(id, index, all, toneChain, noteLanguage, outputLanguage2);
       if (found) return { ...found, missing };
       missing.push(id);
     }
@@ -26859,6 +26912,29 @@ var NoteStyleStore = class {
     }
     return { template: settings.defaultDetailTemplateId };
   }
+  /** The display name of a topic-kind built-in template id (Hypothesis, Evidence, Action, Atomic note); undefined for any other id. */
+  kindBlockName(id) {
+    return KIND_BLOCK_IDS.includes(id) ? translate(this.settings.language, findBuiltinBlock("template", id).nameKey) : void 0;
+  }
+  /**
+   * An unmodified topic-kind built-in. The legacy path knows only Standard and Textbook, so the template is parsed from the
+   * built-in text in the output language. It carries no block: the prompt takes the template as the request's own and
+   * puts it together as a custom detail structure with the Obsidian format rules.
+   */
+  kindBlockResult(id, toneChain, outputLanguage2) {
+    var _a2;
+    const settings = this.settings;
+    const parsed = parseTemplateBlock(builtinTemplateText(id, outputLanguage2), {
+      id,
+      name: (_a2 = this.kindBlockName(id)) != null ? _a2 : id
+    });
+    if (!parsed.ok) throw new Error(`Built-in template ${id} does not parse`);
+    return {
+      template: { ...parsed.template },
+      missing: [],
+      toneText: resolveToneText(settings.promptPresets, toneChain, settings.language)
+    };
+  }
   legacyResult(id, toneChain, noteLanguage) {
     const settings = this.settings;
     const { template: template2, missing } = resolveTemplate(settings.detailTemplates, [id], noteLanguage);
@@ -26875,7 +26951,7 @@ var NoteStyleStore = class {
    * gives the built-in template (the same id when it is a built-in, else Standard) with the block and its issues. A file
    * that is gone is not found (the caller falls back to Standard).
    */
-  tryBlock(ref, toneChain, noteLanguage) {
+  tryBlock(ref, toneChain, noteLanguage, outputLanguage2 = this.settings.language) {
     const parsedRef = parseBlockRef(ref);
     if (!parsedRef) return void 0;
     const map = this.blocks.template;
@@ -26886,7 +26962,7 @@ var NoteStyleStore = class {
       id = parsedRef.id;
       const override = this.overrideBase("template", id);
       if (override === void 0 || isUnmodifiedBlock("template", id, map.get(override)))
-        return this.legacyResult(id, toneChain, noteLanguage);
+        return KIND_BLOCK_IDS.includes(id) ? this.kindBlockResult(id, toneChain, outputLanguage2) : this.legacyResult(id, toneChain, noteLanguage);
       base = override;
     } else {
       if (!map.has(parsedRef.base)) return void 0;
@@ -26899,7 +26975,7 @@ var NoteStyleStore = class {
     const parsed = parseTemplateBlock(text11, { id, name: base });
     if (parsed.ok) return { template: { ...parsed.template }, missing: [], block };
     const fallbackId = this.isBuiltinBlockId("template", id) ? id : STANDARD_TEMPLATE_ID;
-    const fallback = resolveTemplate(this.settings.detailTemplates, [fallbackId], noteLanguage).template;
+    const fallback = KIND_BLOCK_IDS.includes(fallbackId) ? this.kindBlockResult(fallbackId, toneChain, outputLanguage2).template : resolveTemplate(this.settings.detailTemplates, [fallbackId], noteLanguage).template;
     return {
       template: { ...fallback },
       missing: [],
@@ -26907,10 +26983,10 @@ var NoteStyleStore = class {
       blockIssues: parsed.issues.map((issue2) => ({ ...issue2, category: "template", id, fileName }))
     };
   }
-  tryId(id, level, all, toneChain, noteLanguage) {
+  tryId(id, level, all, toneChain, noteLanguage, outputLanguage2 = this.settings.language) {
     var _a2, _b2, _c, _d;
     const settings = this.settings;
-    if (((_a2 = parseBlockRef(id)) == null ? void 0 : _a2.kind) === "file") return this.tryBlock(id, toneChain, noteLanguage);
+    if (((_a2 = parseBlockRef(id)) == null ? void 0 : _a2.kind) === "file") return this.tryBlock(id, toneChain, noteLanguage, outputLanguage2);
     if (id.startsWith("style:")) {
       const aliased = this.tryAlias(id, "user", level, toneChain, noteLanguage);
       if (aliased) return aliased;

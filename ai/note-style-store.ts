@@ -21,6 +21,7 @@ import {
 import {
   academicToneNote,
   BUILTIN_BLOCKS,
+  builtinTemplateText,
   findBuiltinBlock,
   stripToneComments,
   type BlockCategory
@@ -148,6 +149,9 @@ export interface RunStyle {
     invalid?: Readonly<{ fileName: string; issues: readonly NoteStyleIssue[] }>;
   }>;
 }
+
+/** The built-in template blocks added for topic kinds; the legacy template path does not know them. */
+const KIND_BLOCK_IDS: readonly string[] = ["hypothesis", "evidence", "action", "atomic"];
 
 export interface StyleResolution {
   template: DetailTemplate;
@@ -406,7 +410,7 @@ export class NoteStyleStore {
     const levels: StyleLevel[] = [{ template: request.choice?.template }];
     if (request.topic) levels.push(request.topic);
     if (request.map) levels.push(request.map);
-    const found = this.resolve(levels);
+    const found = this.resolve(levels, language);
     // A template read from a block is used as it is; the built-in stand-in for an unreadable block follows the output language.
     const template =
       isBuiltinTemplateId(found.template.id) && !(found.block && !found.blockIssues)
@@ -417,7 +421,7 @@ export class NoteStyleStore {
       ...settings.detailTemplates
     ];
     const templateName = (id: string): string =>
-      fileStyleName(id) ?? uiTemplates.find(item => item.id === id)?.name ?? id;
+      fileStyleName(id) ?? uiTemplates.find(item => item.id === id)?.name ?? this.kindBlockName(id) ?? id;
     const chain = [request.choice?.tone, request.topic?.tone, request.map?.tone];
     // An old style file, or the alias of one, decided the tone together with the template (unless the run asks for the tone only); else the chain, then the workspace.
     const tone: { text?: string; source?: string; free?: string } =
@@ -464,7 +468,7 @@ export class NoteStyleStore {
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
    * added here.
    */
-  private resolve(levels: StyleLevel[]): StyleResolution {
+  private resolve(levels: StyleLevel[], outputLanguage: ContentLanguage = this.settings.language): StyleResolution {
     const settings = this.settings;
     const noteLanguage = noteLanguageOf(settings.language);
     const all = [...levels, this.workspaceLevel()];
@@ -475,8 +479,8 @@ export class NoteStyleStore {
       if (!id) continue;
       const isBlock = index === all.length - 1 && !!this.templateKey() && id === this.templateKey();
       const found = isBlock
-        ? this.tryBlock(id, toneChain, noteLanguage)
-        : this.tryId(id, index, all, toneChain, noteLanguage);
+        ? this.tryBlock(id, toneChain, noteLanguage, outputLanguage)
+        : this.tryId(id, index, all, toneChain, noteLanguage, outputLanguage);
       if (found) return { ...found, missing };
       missing.push(id);
     }
@@ -611,6 +615,36 @@ export class NoteStyleStore {
     return { template: settings.defaultDetailTemplateId };
   }
 
+  /** The display name of a topic-kind built-in template id (Hypothesis, Evidence, Action, Atomic note); undefined for any other id. */
+  private kindBlockName(id: string): string | undefined {
+    return KIND_BLOCK_IDS.includes(id)
+      ? translate(this.settings.language, findBuiltinBlock("template", id).nameKey)
+      : undefined;
+  }
+
+  /**
+   * An unmodified topic-kind built-in. The legacy path knows only Standard and Textbook, so the template is parsed from the
+   * built-in text in the output language. It carries no block: the prompt takes the template as the request's own and
+   * puts it together as a custom detail structure with the Obsidian format rules.
+   */
+  private kindBlockResult(
+    id: string,
+    toneChain: (string | undefined)[],
+    outputLanguage: ContentLanguage
+  ): StyleResolution {
+    const settings = this.settings;
+    const parsed = parseTemplateBlock(builtinTemplateText(id, outputLanguage), {
+      id,
+      name: this.kindBlockName(id) ?? id
+    });
+    if (!parsed.ok) throw new Error(`Built-in template ${id} does not parse`);
+    return {
+      template: { ...parsed.template },
+      missing: [],
+      toneText: resolveToneText(settings.promptPresets, toneChain, settings.language)
+    };
+  }
+
   private legacyResult(id: string, toneChain: (string | undefined)[], noteLanguage: ReturnType<typeof noteLanguageOf>) {
     const settings = this.settings;
     const { template, missing } = resolveTemplate(settings.detailTemplates, [id], noteLanguage);
@@ -631,7 +665,8 @@ export class NoteStyleStore {
   private tryBlock(
     ref: string,
     toneChain: (string | undefined)[],
-    noteLanguage: ReturnType<typeof noteLanguageOf>
+    noteLanguage: ReturnType<typeof noteLanguageOf>,
+    outputLanguage: ContentLanguage = this.settings.language
   ): StyleResolution | undefined {
     const parsedRef = parseBlockRef(ref);
     if (!parsedRef) return undefined;
@@ -643,7 +678,9 @@ export class NoteStyleStore {
       id = parsedRef.id;
       const override = this.overrideBase("template", id);
       if (override === undefined || isUnmodifiedBlock("template", id, map.get(override)!))
-        return this.legacyResult(id, toneChain, noteLanguage);
+        return KIND_BLOCK_IDS.includes(id)
+          ? this.kindBlockResult(id, toneChain, outputLanguage)
+          : this.legacyResult(id, toneChain, noteLanguage);
       base = override;
     } else {
       if (!map.has(parsedRef.base)) return undefined;
@@ -656,7 +693,9 @@ export class NoteStyleStore {
     const parsed = parseTemplateBlock(text, { id, name: base });
     if (parsed.ok) return { template: { ...parsed.template }, missing: [], block };
     const fallbackId = this.isBuiltinBlockId("template", id) ? id : STANDARD_TEMPLATE_ID;
-    const fallback = resolveTemplate(this.settings.detailTemplates, [fallbackId], noteLanguage).template;
+    const fallback = KIND_BLOCK_IDS.includes(fallbackId)
+      ? this.kindBlockResult(fallbackId, toneChain, outputLanguage).template
+      : resolveTemplate(this.settings.detailTemplates, [fallbackId], noteLanguage).template;
     return {
       template: { ...fallback },
       missing: [],
@@ -670,11 +709,12 @@ export class NoteStyleStore {
     level: number,
     all: StyleLevel[],
     toneChain: (string | undefined)[],
-    noteLanguage: ReturnType<typeof noteLanguageOf>
+    noteLanguage: ReturnType<typeof noteLanguageOf>,
+    outputLanguage: ContentLanguage = this.settings.language
   ): StyleResolution | undefined {
     const settings = this.settings;
     // A template block the user wrote, picked at the map, topic or run level (the map file stores `file:<name>`).
-    if (parseBlockRef(id)?.kind === "file") return this.tryBlock(id, toneChain, noteLanguage);
+    if (parseBlockRef(id)?.kind === "file") return this.tryBlock(id, toneChain, noteLanguage, outputLanguage);
     if (id.startsWith("style:")) {
       const aliased = this.tryAlias(id, "user", level, toneChain, noteLanguage);
       if (aliased) return aliased;

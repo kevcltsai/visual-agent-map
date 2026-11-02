@@ -392,3 +392,61 @@ test('research: the module still imports neither obsidian nor the view and drops
   const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/topic-run.ts'), 'utf8');
   assert.doesNotMatch(src, /isUnloaded/);
 });
+
+// ---- the view hands its research entry to the module (02b) ----
+const viewSource = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+const methodText = name => { const start = viewSource.indexOf(`  private ${name}(`); return viewSource.slice(start, viewSource.indexOf('\n  }\n', start)); };
+
+test('the view research entry holds no registration, progress, model or write code of its own', () => {
+  const body = methodText('runAgent');
+  assert.ok(body.length > 100);
+  assert.doesNotMatch(body, /\.running\b|activeTasks|askModel|updateNote|researchProgress|pendingSuggestions/);
+  assert.match(body, /topicRuns\.start\(node\.path, "research"/);
+});
+
+function viewOverDouble(start) {
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: class {} } });
+  const plugin = { settings: { ...S.DEFAULT_SETTINGS, language: 'en' }, running: new Set(), activeTasks: new Map(), topicRuns: { start }, views: () => [] };
+  const view = new VisualAgentMapView({ app: {} }, plugin);
+  Object.assign(view, { map: { id: 'm', nodes: [], viewport: {} }, contentEl: { querySelector: () => null }, render() {}, hydrate: async () => {} });
+  return { view, plugin };
+}
+
+test('view.runAgent passes the topic, the request, the run-once model and the callbacks to the module and registers nothing itself', async () => {
+  const seen = [];
+  const { view, plugin } = viewOverDouble(async (p, kind, options) => { seen.push([p, kind, options]); return { finished: Promise.resolve() }; });
+  const done = () => {}; const failed = () => {}; const accepted = () => {}; const runOnce = { model: 'claude:sonnet' };
+  const handle = await view.runAgent({ id: 'n1', path: 'A.md' }, done, failed, { task: 'go' }, accepted, runOnce);
+  assert.ok(handle); assert.equal(seen.length, 1);
+  const [p, kind, options] = seen[0];
+  assert.equal(p, 'A.md'); assert.equal(kind, 'research'); assert.equal(options.origin, view);
+  assert.deepEqual(options.request, { task: 'go' }); assert.equal(options.runOnce, runOnce);
+  assert.equal(options.done, done); assert.equal(options.failed, failed); assert.equal(options.accepted, accepted);
+  assert.equal(plugin.running.size, 0); assert.equal(plugin.activeTasks.size, 0);
+});
+
+test('the undo data the module reports becomes one undo step of the starting view', async () => {
+  let captured;
+  const { view } = viewOverDouble(async (_p, _kind, options) => { captured = options; return null; });
+  await view.runAgent({ id: 'n1', path: 'A.md' });
+  const before = { summary: 'old', detail: 'old', visualReferences: '', newFindings: '', status: 'idea' }; const after = { ...before, summary: 'new', status: 'completed' };
+  assert.equal(view.history.canUndo, false);
+  captured.onWritten({ before, after });
+  assert.equal(view.history.canUndo, true);
+});
+
+test('a plugin that has no TopicRuns fails the view research entry loudly instead of running unregistered', async () => {
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: class {} } });
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...S.DEFAULT_SETTINGS } });
+  await assert.rejects(async () => view.runAgent({ id: 'n1', path: 'A.md' }), /reading 'start'/);
+});
+
+test('the plugin clears the undo history of every other view and redraws all views through the view methods', () => {
+  const plugin = realPlugin();
+  const calls = [];
+  const other = { clearUndoHistory: () => calls.push('clear-other'), reloadAfterAiRun: () => calls.push('reload-other') };
+  const origin = { clearUndoHistory: () => calls.push('clear-origin'), reloadAfterAiRun: () => calls.push('reload-origin') };
+  plugin.views = () => [origin, other];
+  plugin.topicRuns.ports.clearOtherHistory(origin); plugin.topicRuns.ports.refreshViews();
+  assert.deepEqual(calls, ['clear-other', 'reload-origin', 'reload-other']);
+});

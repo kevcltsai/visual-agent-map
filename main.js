@@ -62903,249 +62903,49 @@ ${addition}` : addition });
     const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, (_a2 = this.map) != null ? _a2 : void 0, runOnce);
     return { model, reasoning };
   }
-  async runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
-    const { runStyle: givenStyle, ...overrides } = request != null ? request : {};
-    const taskPath = node.path;
-    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-    const used = await this.modelFor(note, node.path, runOnce);
-    if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
-      const message = t("ui.enter_a_question_or_task_for_ai_first");
-      if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
-      return null;
-    }
-    if (this.plugin.running.has(node.path)) {
-      failed == null ? void 0 : failed(t("ui.ai_running_ai"));
-      return null;
-    }
-    const runStyle = givenStyle != null ? givenStyle : await this.detailTemplateFor(
-      node,
-      void 0,
-      void 0,
-      void 0,
-      (_c = overrides == null ? void 0 : overrides.outputLanguage) != null ? _c : this.plugin.settings.language
-    );
-    const detailTemplate = runStyle.template;
-    const context = withThinkingOrigin(
-      {
-        title: note.title,
-        summary: summaryForPrompt(note.summary, (_d = overrides == null ? void 0 : overrides.outputLanguage) != null ? _d : this.plugin.settings.language),
-        rules: "",
-        detail: note.detail,
-        task: note.prompt,
-        ancestors: await this.ancestorContext(node, (_e = overrides == null ? void 0 : overrides.outputLanguage) != null ? _e : this.plugin.settings.language),
-        userTexts: this.userTextContext(node.id),
-        workingFindings: note.newFindings,
-        sourceContext: "",
-        mode: "task",
-        researchMode: note.researchMode,
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
-        ...overrides,
-        detailTemplate,
-        ...runStyle.contextFields,
-        addCharts: (_f = overrides == null ? void 0 : overrides.addCharts) != null ? _f : true
+  /**
+   * Starts a research on one topic through the plugin's run module. The module owns registration, progress, the stale
+   * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
+   * and the undo step.
+   */
+  runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
+    var _a2;
+    return this.plugin.topicRuns.start(node.path, "research", {
+      origin: this,
+      map: (_a2 = this.map) != null ? _a2 : void 0,
+      request,
+      runOnce,
+      done,
+      failed,
+      notify: (message) => new import_obsidian31.Notice(message),
+      accepted: onLaunchAccepted,
+      resolveStyle: (language2) => this.detailTemplateFor(node, void 0, void 0, void 0, language2),
+      ancestors: (language2) => this.ancestorContext(node, language2),
+      userTexts: () => this.userTextContext(node.id),
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
       },
-      note
-    );
-    const language2 = this.plugin.settings.language;
-    this.plugin.pendingSuggestions.delete(node.path);
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    const controller = new AbortController();
-    const abortFromTaskModal = () => controller.abort();
-    if ((_g = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _g.aborted) controller.abort();
-    else (_h = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _h.addEventListener("abort", abortFromTaskModal, { once: true });
-    this.plugin.activeTasks.set(taskPath, controller);
-    const progress = this.plugin.researchProgress;
-    let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
-    const observer = {
-      onAttempt: (id) => {
-        progressAttempt = id;
-        progress == null ? void 0 : progress.newAttempt(taskPath, id, Date.now());
-      },
-      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(taskPath, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(taskPath, id, fields != null ? fields : {}),
-      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(taskPath, id, slow, resend)
-    };
-    const releaseStartup = () => {
-      var _a3;
-      progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-      (_a3 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
-      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-      this.plugin.running.delete(taskPath);
-    };
-    let startupStatusAttempted = false;
-    try {
-      startupStatusAttempted = true;
-      await this.plugin.repo.updateNote(node.path, { status: "running" });
-      await this.hydrate();
-      this.render();
-      if (controller.signal.aborted) {
-        try {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-        } finally {
-          releaseStartup();
-        }
-        return null;
-      }
-    } catch (error) {
-      try {
-        if (startupStatusAttempted) await this.plugin.repo.updateNote(node.path, { status: note.status });
-      } catch (e) {
-      } finally {
-        releaseStartup();
-      }
-      throw error;
-    }
-    let exchangeId = "";
-    let resolveAccepted;
-    const acceptedPromise = new Promise((resolve) => {
-      resolveAccepted = resolve;
+      onWritten: ({ before, after }) => this.recordNoteWrite(
+        node.path,
+        before,
+        after,
+        [
+          "summary",
+          "detail",
+          "visualReferences",
+          "newFindings",
+          "previewSection",
+          "previewInitialized",
+          "previewAutoHash",
+          "status",
+          "lastError",
+          "researchMode"
+        ],
+        t("ui.research_task")
+      ),
+      queueCharts: (job) => this.queueCharts(job)
     });
-    let requestAccepted = false;
-    const markAccepted = () => {
-      if (requestAccepted) return;
-      requestAccepted = true;
-      resolveAccepted(true);
-      onLaunchAccepted == null ? void 0 : onLaunchAccepted();
-    };
-    const completion = this.plugin.askModel(
-      context,
-      used.model,
-      used.reasoning,
-      controller.signal,
-      (id) => {
-        exchangeId = id;
-      },
-      markAccepted,
-      void 0,
-      observer
-    ).then(
-      (result) => this.plugin.mutate(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2;
-        progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-        const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
-        const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-        if (controller.signal.aborted || stale) {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-          if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled)
-            (_b3 = this.plugin.exchanges) == null ? void 0 : _b3.failed(
-              exchangeId,
-              t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
-            );
-          if (stale) {
-            if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-            else new import_obsidian31.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-          }
-          return;
-        }
-        await this.plugin.repo.updateNote(
-          node.path,
-          {
-            summary: result.summary,
-            detail: canonicalDetail(
-              result.detail,
-              noteLanguageOf((_c2 = context.outputLanguage) != null ? _c2 : this.plugin.settings.language),
-              context.detailTemplate
-            ),
-            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
-            newFindings: "",
-            status: "completed",
-            // The topic remembers the mode of its latest research (Quick is stored as local).
-            ...context.researchMode ? { researchMode: context.researchMode } : {},
-            ...formatIssuesPatch(result.formatIssues, language2)
-          },
-          { detailTemplate: context.detailTemplate }
-        );
-        const saved = await this.plugin.repo.readNote(node.path, (_d2 = this.map) != null ? _d2 : void 0);
-        this.recordNoteWrite(
-          node.path,
-          { ...latest, status: note.status },
-          saved,
-          [
-            "summary",
-            "detail",
-            "visualReferences",
-            "newFindings",
-            "previewSection",
-            "previewInitialized",
-            "previewAutoHash",
-            "status",
-            "lastError",
-            "researchMode"
-          ],
-          t("ui.research_task")
-        );
-        if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) (_e2 = this.plugin.exchanges) == null ? void 0 : _e2.completed(exchangeId);
-        for (const view of this.plugin.views()) if (view !== this) view.history.clear();
-        this.queueCharts({
-          path: node.path,
-          saved,
-          context,
-          detail: saved.detail,
-          formatIssues: result.formatIssues,
-          model: used.model,
-          language: (_f2 = context.outputLanguage) != null ? _f2 : this.plugin.settings.language,
-          template: context.detailTemplate
-        });
-        if (result.suggestions.length) {
-          this.plugin.pendingSuggestions.set(
-            node.path,
-            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-          );
-          try {
-            await ((_h2 = (_g2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h2.call(_g2));
-          } catch (error) {
-            const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
-            new import_obsidian31.Notice(message);
-          }
-        }
-        done == null ? void 0 : done(result);
-      })
-    ).catch(
-      (error) => this.plugin.mutate(async () => {
-        var _a3, _b3;
-        progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-          if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-          return;
-        }
-        console.error("Visual Agent Map AI task", error);
-        if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled && ((_b3 = (_a3 = this.plugin.exchanges) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
-          this.plugin.exchanges.failed(
-            exchangeId,
-            t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
-          );
-        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-        const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
-        if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
-      })
-    ).finally(() => {
-      var _a3;
-      progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-      (_a3 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
-      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-      this.plugin.running.delete(taskPath);
-      for (const view of this.plugin.views())
-        view.enqueue(async () => {
-          await view.hydrate();
-          view.render();
-        });
-    }).catch(() => {
-    });
-    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
-    if (!accepted) {
-      await completion;
-      return null;
-    }
-    return { finished: completion };
   }
 };
 
@@ -68571,15 +68371,15 @@ var TopicRuns = class {
     activeTasks.set(path, controller);
     const progress = this.ports.progress();
     let progressAttempt = "starting";
-    progress.begin(path, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
+    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
-        progress.newAttempt(path, id, Date.now());
+        progress == null ? void 0 : progress.newAttempt(path, id, Date.now());
       },
-      onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress.preview(path, id, fields != null ? fields : {}),
-      onSlow: (id, slow, resend) => progress.markSlow(path, id, slow, resend)
+      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(path, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(path, id, fields != null ? fields : {}),
+      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(path, id, slow, resend)
     };
     const releaseRun = () => {
       var _a3;
@@ -68593,7 +68393,7 @@ var TopicRuns = class {
       else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
     };
     const releaseStartup = () => {
-      progress.end(path, progressAttempt);
+      progress == null ? void 0 : progress.end(path, progressAttempt);
       releaseRun();
     };
     let startupStatusAttempted = false;
@@ -68646,7 +68446,7 @@ var TopicRuns = class {
     ).then(
       (result) => this.ports.mutate()(async () => {
         var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
-        progress.end(path, progressAttempt);
+        progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
         if (controller.signal.aborted || stale) {
@@ -68707,7 +68507,7 @@ var TopicRuns = class {
     ).catch(
       (error) => this.ports.mutate()(async () => {
         var _a3, _b3, _c2;
-        progress.end(path, progressAttempt);
+        progress == null ? void 0 : progress.end(path, progressAttempt);
         if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
           await repo.updateNote(path, { status: note.status });
           fail2(t("ui.research_stopped_existing_content_was_preserved"));
@@ -68723,7 +68523,7 @@ var TopicRuns = class {
         fail2(this.ports.recordFailure(t("log.ai_task_failed"), error));
       })
     ).finally(() => {
-      progress.end(path, progressAttempt);
+      progress == null ? void 0 : progress.end(path, progressAttempt);
       releaseRun();
       this.ports.refreshViews();
     }).catch(() => {

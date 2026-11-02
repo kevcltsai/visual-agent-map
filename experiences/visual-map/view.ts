@@ -18295,7 +18295,12 @@ export class VisualAgentMapView extends ItemView {
     const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, this.map ?? undefined, runOnce);
     return { model, reasoning };
   }
-  private async runAgent(
+  /**
+   * Starts a research on one topic through the plugin's run module. The module owns registration, progress, the stale
+   * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
+   * and the undo step.
+   */
+  private runAgent(
     node: MapNode,
     done?: (result: AiResult) => void,
     failed?: (message: string) => void,
@@ -18303,271 +18308,42 @@ export class VisualAgentMapView extends ItemView {
     onLaunchAccepted?: () => void,
     runOnce?: RunOnceModel
   ): Promise<AgentTaskHandle | null> {
-    const { runStyle: givenStyle, ...overrides } = request ?? {};
-    const taskPath = node.path;
-    const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    const used = await this.modelFor(note, node.path, runOnce);
-    if (!(overrides?.task ?? note.prompt)) {
-      const message = t("ui.enter_a_question_or_task_for_ai_first");
-      if (failed) failed(message);
-      else new Notice(message);
-      return null;
-    }
-    if (this.plugin.running.has(node.path)) {
-      failed?.(t("ui.ai_running_ai"));
-      return null;
-    }
-    const runStyle =
-      givenStyle ??
-      (await this.detailTemplateFor(
-        node,
-        undefined,
-        undefined,
-        undefined,
-        overrides?.outputLanguage ?? this.plugin.settings.language
-      ));
-    const detailTemplate = runStyle.template;
-    const context: TaskContext = withThinkingOrigin(
-      {
-        title: note.title,
-        summary: summaryForPrompt(note.summary, overrides?.outputLanguage ?? this.plugin.settings.language),
-        rules: "",
-        detail: note.detail,
-        task: note.prompt,
-        ancestors: await this.ancestorContext(node, overrides?.outputLanguage ?? this.plugin.settings.language),
-        userTexts: this.userTextContext(node.id),
-        workingFindings: note.newFindings,
-        sourceContext: "",
-        mode: "task",
-        researchMode: note.researchMode,
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        ...(runStyle.toneText ? { toneText: runStyle.toneText } : {}),
-        ...overrides,
-        detailTemplate,
-        ...runStyle.contextFields,
-        addCharts: overrides?.addCharts ?? true
+    return this.plugin.topicRuns.start(node.path, "research", {
+      origin: this,
+      map: this.map ?? undefined,
+      request,
+      runOnce,
+      done,
+      failed,
+      notify: message => new Notice(message),
+      accepted: onLaunchAccepted,
+      resolveStyle: language => this.detailTemplateFor(node, undefined, undefined, undefined, language),
+      ancestors: language => this.ancestorContext(node, language),
+      userTexts: () => this.userTextContext(node.id),
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
       },
-      note
-    );
-    const language = this.plugin.settings.language;
-    this.plugin.pendingSuggestions.delete(node.path);
-    // A diagram job still running for the previous result of this note must not land on the new run.
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    const controller = new AbortController();
-    const abortFromTaskModal = (): void => controller.abort();
-    if (overrides?.signal?.aborted) controller.abort();
-    else overrides?.signal?.addEventListener("abort", abortFromTaskModal, { once: true });
-    this.plugin.activeTasks.set(taskPath, controller);
-    // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
-    const progress = this.plugin.researchProgress;
-    let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
-    const observer: ResearchObserver = {
-      onAttempt: id => {
-        progressAttempt = id;
-        progress?.newAttempt(taskPath, id, Date.now());
-      },
-      onStage: (id, stage, query) => progress?.stage(taskPath, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress?.preview(taskPath, id, fields ?? {}),
-      onSlow: (id, slow, resend) => progress?.markSlow(taskPath, id, slow, resend)
-    };
-    const releaseStartup = (): void => {
-      progress?.end(taskPath, progressAttempt);
-      overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
-      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-      this.plugin.running.delete(taskPath);
-    };
-    let startupStatusAttempted = false;
-    try {
-      startupStatusAttempted = true;
-      await this.plugin.repo.updateNote(node.path, { status: "running" });
-      await this.hydrate();
-      this.render();
-      if (controller.signal.aborted) {
-        try {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-        } finally {
-          releaseStartup();
-        }
-        return null;
-      }
-    } catch (error) {
-      try {
-        if (startupStatusAttempted) await this.plugin.repo.updateNote(node.path, { status: note.status });
-      } catch {
-        /* Keep the startup error; the registered task still must be released. */
-      } finally {
-        releaseStartup();
-      }
-      throw error;
-    }
-    // Leave the mutation queue immediately: independent branches can run concurrently.
-    let exchangeId = "";
-    let resolveAccepted!: (accepted: boolean) => void;
-    const acceptedPromise = new Promise<boolean>(resolve => {
-      resolveAccepted = resolve;
+      onWritten: ({ before, after }) =>
+        this.recordNoteWrite(
+          node.path,
+          before,
+          after,
+          [
+            "summary",
+            "detail",
+            "visualReferences",
+            "newFindings",
+            "previewSection",
+            "previewInitialized",
+            "previewAutoHash",
+            "status",
+            "lastError",
+            "researchMode"
+          ],
+          t("ui.research_task")
+        ),
+      queueCharts: job => this.queueCharts(job)
     });
-    let requestAccepted = false;
-    const markAccepted = (): void => {
-      if (requestAccepted) return;
-      requestAccepted = true;
-      resolveAccepted(true);
-      onLaunchAccepted?.();
-    };
-    const completion = this.plugin
-      .askModel(
-        context,
-        used.model,
-        used.reasoning,
-        controller.signal,
-        id => {
-          exchangeId = id;
-        },
-        markAccepted,
-        undefined,
-        observer
-      )
-      .then(result =>
-        this.plugin.mutate(async () => {
-          // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-          progress?.end(taskPath, progressAttempt);
-          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          const stale =
-            latest.thinkingOrigin !== note.thinkingOrigin ||
-            latest.title !== note.title ||
-            latest.prompt !== note.prompt ||
-            latest.rules !== note.rules ||
-            latest.detail !== note.detail ||
-            latest.summary !== note.summary ||
-            latest.model !== note.model ||
-            latest.reasoning !== note.reasoning ||
-            latest.researchMode !== note.researchMode ||
-            latest.visualMode !== note.visualMode ||
-            latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") ||
-            JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-          if (controller.signal.aborted || stale) {
-            await this.plugin.repo.updateNote(node.path, { status: note.status });
-            if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled)
-              this.plugin.exchanges?.failed(
-                exchangeId,
-                t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
-              );
-            if (stale) {
-              if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-              else new Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-            }
-            return;
-          }
-          await this.plugin.repo.updateNote(
-            node.path,
-            {
-              summary: result.summary,
-              detail: canonicalDetail(
-                result.detail,
-                noteLanguageOf(context.outputLanguage ?? this.plugin.settings.language),
-                context.detailTemplate
-              ),
-              visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
-              newFindings: "",
-              status: "completed",
-              // The topic remembers the mode of its latest research (Quick is stored as local).
-              ...(context.researchMode ? { researchMode: context.researchMode } : {}),
-              ...formatIssuesPatch(result.formatIssues, language)
-            },
-            { detailTemplate: context.detailTemplate }
-          );
-          const saved = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          this.recordNoteWrite(
-            node.path,
-            { ...latest, status: note.status },
-            saved,
-            [
-              "summary",
-              "detail",
-              "visualReferences",
-              "newFindings",
-              "previewSection",
-              "previewInitialized",
-              "previewAutoHash",
-              "status",
-              "lastError",
-              "researchMode"
-            ],
-            t("ui.research_task")
-          );
-          if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);
-          for (const view of this.plugin.views()) if (view !== this) view.history.clear();
-          this.queueCharts({
-            path: node.path,
-            saved,
-            context,
-            detail: saved.detail,
-            formatIssues: result.formatIssues,
-            model: used.model,
-            language: context.outputLanguage ?? this.plugin.settings.language,
-            template: context.detailTemplate
-          });
-          if (result.suggestions.length) {
-            this.plugin.pendingSuggestions.set(
-              node.path,
-              result.suggestions
-                .slice(0, 7)
-                .map(item => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-            );
-            try {
-              await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-            } catch (error) {
-              const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
-              new Notice(message);
-            }
-          }
-          done?.(result);
-        })
-      )
-      .catch(error =>
-        this.plugin.mutate(async () => {
-          progress?.end(taskPath, progressAttempt);
-          if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
-            await this.plugin.repo.updateNote(node.path, { status: note.status });
-            if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-            else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-            return;
-          }
-          console.error("Visual Agent Map AI task", error);
-          if (
-            exchangeId &&
-            this.plugin.settings.aiExchangeLoggingEnabled &&
-            this.plugin.exchanges?.getEntries().find(item => item.id === exchangeId)?.status === "parsed"
-          )
-            this.plugin.exchanges.failed(
-              exchangeId,
-              t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
-            );
-          await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-          const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
-          if (failed) failed(message);
-          else new Notice(message);
-        })
-      )
-      .finally(() => {
-        progress?.end(taskPath, progressAttempt);
-        overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
-        if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-        this.plugin.running.delete(taskPath);
-        for (const view of this.plugin.views())
-          view.enqueue(async () => {
-            await view.hydrate();
-            view.render();
-          });
-      })
-      .catch(() => {});
-    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
-    if (!accepted) {
-      await completion;
-      return null;
-    }
-    return { finished: completion };
   }
 }

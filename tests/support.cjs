@@ -75,12 +75,33 @@ const auditEcho = context => {
   return { summary: review.summary, detail: `<!-- aim-review ${JSON.stringify(marker)} -->\n${review.detail}`, suggestions, visualReferences: [] };
 };
 const tree = () => [node('a'), node('b', 'a'), node('c', 'b'), node('d')];
+let TopicRunsClass;
+/** The run module over a view-level plugin double: every port reads the double on use, like the real composition root. */
+function attachTopicRuns(plugin) {
+  if (plugin.topicRuns) return plugin;
+  TopicRunsClass ??= load('experiences/visual-map/topic-run.ts', { obsidian: module.exports.obsidian ?? {} }).TopicRuns;
+  plugin.topicRuns = new TopicRunsClass({
+    aiTasks: () => plugin.aiTasks ?? { chartEligible: () => false }, mutate: () => work => plugin.mutate(work), progress: () => plugin.researchProgress,
+    repository: () => plugin.repo, running: () => plugin.running, pendingSuggestions: () => plugin.pendingSuggestions, activeTasks: () => plugin.activeTasks,
+    askModel: (...args) => plugin.askModel(...args), settings: () => plugin.settings, exchanges: () => plugin.exchanges, recordFailure: (...args) => plugin.recordFailure(...args),
+    runStyle: () => { throw new Error('the view always passes its own style resolver'); }, resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
+    clearOtherHistory: origin => { for (const view of plugin.views?.() ?? []) if (view !== origin) view.clearUndoHistory?.(); },
+    refreshViews: () => { for (const view of plugin.views?.() ?? []) view.reloadAfterAiRun?.(); }
+  });
+  // The chart queue of the double stays the double's: the view-level tests spy on these two calls.
+  return plugin;
+}
+/** Replaces the research run at the module seam (TopicRuns.start); the stub gets what view.runAgent used to get: node, done, failed, request, accepted, runOnce. */
+function researchSeam(view) {
+  return { set run(stub) { view.plugin.topicRuns.start = (path, _kind, options) => stub(view.map?.nodes.find(node => node.path === path) ?? { path }, options.done, options.failed, options.request, options.accepted, options.runOnce); } };
+}
 function withExpansionCoordinator(plugin) {
   const { ShallowExpansionCoordinator } = load('experiences/visual-map/expansion-batch.ts');
   plugin.activeTasks ??= new Map(); plugin.expansionBatches = new Map(); plugin.quickExpandPending ??= new Set();
   // Background chart jobs belong to the real plugin; the view-level doubles only need the two calls to exist.
   plugin.abortChartJobs ??= () => {}; plugin.addChartsAfterWrite ??= () => {};
   plugin.expansionCoordinator = new ShallowExpansionCoordinator(plugin.activeTasks, plugin.expansionBatches);
+  attachTopicRuns(plugin);
   // The real plugin resolves the current model one way (ADR-021); a double over settings answers the same.
   plugin.currentModelChoice ??= () => ({ model: plugin.settings.cliModel, reasoning: normalizeReasoningLevel(plugin.settings.cliReasoning) });
   return plugin;
@@ -247,4 +268,4 @@ async function coverageThreeAnswers(subject) {
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };
+module.exports = { researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };

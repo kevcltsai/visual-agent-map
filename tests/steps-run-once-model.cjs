@@ -3,6 +3,7 @@
 // run-once choice (research, expansion, synthesis, the progress model, the multi-research batch). The dialog menus
 // (P6b) and the outline import window (P6c) are covered further down in this file.
 const { test } = require('node:test');
+const { attachTopicRuns } = require('./support.cjs');
 const assert = require('node:assert/strict');
 const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
@@ -39,7 +40,7 @@ async function harness(topics, plugin = {}) {
   });
   repo.settings = host.settings;
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
-  const view = new VisualAgentMapView({ app }, host);
+  const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
   Object.assign(view, { path: MAP, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate: async () => {}, ancestorContext: async () => '', queueCharts() {} });
   const raw = node => contents.get(node.path);
   return { repo, view, host, nodes, calls, confirms, progress, raw };

@@ -267,17 +267,18 @@ export class TopicRuns {
     else overrides.signal?.addEventListener("abort", abortFromTaskModal, { once: true });
     activeTasks.set(path, controller);
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
-    const progress = this.ports.progress();
+    // A plugin double without a progress store runs without progress lines.
+    const progress = this.ports.progress() as RunProgress | undefined;
     let progressAttempt = "starting";
-    progress.begin(path, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
+    progress?.begin(path, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;
-        progress.newAttempt(path, id, Date.now());
+        progress?.newAttempt(path, id, Date.now());
       },
-      onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress.preview(path, id, fields ?? {}),
-      onSlow: (id, slow, resend) => progress.markSlow(path, id, slow, resend)
+      onStage: (id, stage, query) => progress?.stage(path, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress?.preview(path, id, fields ?? {}),
+      onSlow: (id, slow, resend) => progress?.markSlow(path, id, slow, resend)
     };
     const releaseRun = (): void => {
       overrides.signal?.removeEventListener("abort", abortFromTaskModal);
@@ -289,7 +290,7 @@ export class TopicRuns {
       else options.notify?.(message);
     };
     const releaseStartup = (): void => {
-      progress.end(path, progressAttempt);
+      progress?.end(path, progressAttempt);
       releaseRun();
     };
     let startupStatusAttempted = false;
@@ -346,7 +347,7 @@ export class TopicRuns {
       .then(result =>
         this.ports.mutate()(async () => {
           // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-          progress.end(path, progressAttempt);
+          progress?.end(path, progressAttempt);
           const latest = await repo.readNote(path, options.map);
           const stale =
             latest.thinkingOrigin !== note.thinkingOrigin ||
@@ -421,7 +422,7 @@ export class TopicRuns {
       )
       .catch(error =>
         this.ports.mutate()(async () => {
-          progress.end(path, progressAttempt);
+          progress?.end(path, progressAttempt);
           if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
             await repo.updateNote(path, { status: note.status });
             fail(t("ui.research_stopped_existing_content_was_preserved"));
@@ -443,7 +444,7 @@ export class TopicRuns {
         })
       )
       .finally(() => {
-        progress.end(path, progressAttempt);
+        progress?.end(path, progressAttempt);
         releaseRun();
         this.ports.refreshViews();
       })

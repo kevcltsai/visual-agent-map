@@ -1505,7 +1505,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.block_name_taken": "已有同名的檔案或內建項目，請換一個名稱。",
   "ui.block_notice_saved_as_0": "已另存為「{0}」並改用它。",
   "ui.block_notice_open_backup": "開啟備份",
-  "ui.note_style_location_desc": "你改過或自己建立的結構與口吻存在這裡，是一般 Markdown 檔。",
+  "ui.note_style_location_desc": "你改過或新建的結構與口吻存在這裡。",
   "ui.note_style_location_empty": "還沒有檔案。第一次編輯或另存時會建立。",
   "ui.preview_tone_empty": "（預設口吻，不另加指示）",
   "ui.block_academic_note":

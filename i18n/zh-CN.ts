@@ -1503,7 +1503,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.block_name_taken": "已有同名的文件或内置项目，请换一个名称。",
   "ui.block_notice_saved_as_0": "已另存为“{0}”并改用它。",
   "ui.block_notice_open_backup": "打开备份",
-  "ui.note_style_location_desc": "你改过或自己创建的结构与口吻存在这里，是普通 Markdown 文件。",
+  "ui.note_style_location_desc": "你改过或新建的结构与口吻存在这里。",
   "ui.note_style_location_empty": "还没有文件。第一次编辑或另存时会创建。",
   "ui.preview_tone_empty": "（默认口吻，不另加指示）",
   "ui.block_academic_note":

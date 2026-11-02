@@ -1587,7 +1587,7 @@ export const en = {
   "ui.block_name_taken": "A file or built-in item already has this name. Pick another.",
   "ui.block_notice_saved_as_0": 'Saved as "{0}" and switched to it.',
   "ui.block_notice_open_backup": "Open backup",
-  "ui.note_style_location_desc": "Structures and voices you edited or created are stored here as plain Markdown files.",
+  "ui.note_style_location_desc": "Structures and voices you edited or created are stored here.",
   "ui.note_style_location_empty": "No files yet. The first edit or save creates them.",
   "ui.preview_tone_empty": "(Default voice; no extra instruction)",
   "ui.block_academic_note":

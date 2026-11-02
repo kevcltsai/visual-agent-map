@@ -21,20 +21,7 @@ import { styleIssueText } from "../experiences/visual-map/note-style-picker";
 import type { TopicKind } from "../note-values";
 
 /**
- * "Note style" heading: the title, the one-line help and the "Preview AI instructions" button on its right. The rows
- * below it (structure, voice, file location) do the work.
- */
-export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapPlugin): void {
-  setting.setName(t("ui.note_style")).setDesc(t("ui.note_style_setting_desc")).setHeading();
-  setting.addButton(button => {
-    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
-    button.buttonEl.addClass("mod-muted");
-  });
-}
-
-/**
  * The first row of the "Note style" page: the one-line help and the "Preview AI instructions" button on its right.
- * (`renderNoteStyleSetting` is the same content as a heading; this one is an ordinary row.)
  */
 export function renderNoteStyleIntro(setting: Setting, plugin: VisualAgentMapPlugin): void {
   setting.setDesc(t("ui.settings_note_style_intro"));

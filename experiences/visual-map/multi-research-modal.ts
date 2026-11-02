@@ -2,7 +2,7 @@ import { App, Modal } from "obsidian";
 import { t } from "../../i18n";
 import type { ResearchDepth, ResearchMode } from "../../ai/types";
 import type { MapAiMode } from "./ai-mode";
-import { modelField, noteStyleField, type FieldLinks, type ManageTones, type ModelChoices } from "./research-fields";
+import { modelField, noteStyleField, type FieldLinks, type ModelChoices } from "./research-fields";
 import { modalActions } from "../../ui/modals/action-bar";
 
 export interface MultiResearchRequest {
@@ -34,7 +34,8 @@ export class MultiResearchModal extends Modal {
     private templates: { id: string; name: string }[],
     private submit: (request: MultiResearchRequest) => void,
     private tones: { id: string; name: string }[] = [],
-    _manageTones?: ManageTones,
+    /** The old "Manage tones" callback slot: the tone library link is gone (the tones are blocks now); callers pass nothing. */
+    _retired?: undefined,
     private links: FieldLinks = {},
     /** The mode each listed topic will run in (parallel to `names`), shown beside its name. */
     private modes: MapAiMode[] = []

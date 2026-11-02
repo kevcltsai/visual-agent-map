@@ -1,10 +1,8 @@
 import { t } from "../../i18n";
 import { DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
-import { STANDARD_TEMPLATE_ID, TEXTBOOK_TEMPLATE_ID } from "../../ai/detail-templates";
 import { DEFAULT_TONE_ID } from "../../ai/prompt-presets";
-import type { StyleListItem } from "../../ai/note-style-store";
 import { matchPreset, NOTE_STYLE_PRESETS } from "./note-style";
-import { styleProblem, type StylePicker, type StyleRef } from "./note-style-picker";
+import { styleProblem, type StyleListItem, type StylePicker, type StyleRef } from "./note-style-picker";
 
 /** Live model choices: the list fills in as model discovery finishes. */
 export interface ModelChoices {
@@ -135,17 +133,10 @@ export function modelField(
   };
 }
 
-/** Opens a library (tones, templates) at `selected` when given, and reports the refreshed list once it closes. */
-export type ManageChoices = (
-  selected: string | undefined,
-  refreshed: (choices: { id: string; name: string }[]) => void
-) => void;
-export type ManageTones = ManageChoices;
 /** The small links a research dialog can show beside its model and template fields. */
 export interface FieldLinks {
   repair?: (model: string | undefined) => void;
-  manageTones?: ManageChoices;
-  /** The style folder for the note-style field. */
+  /** The template blocks of the user for the note-style field. */
   styles?: StylePicker;
   /** The style in force, for "Edit this style" while the first option is selected. */
   currentStyleRef?: StyleRef;
@@ -156,7 +147,7 @@ const STYLE_CUSTOM = "custom";
 const stylePreset = (id: string): string => `preset:${id}`;
 
 export interface NoteStyleFieldOptions {
-  /** The style folder (files, old templates, editing); without it only the five built-ins are listed. */
+  /** The template blocks (the user's own, editing); without it only the five built-ins are listed. */
   styles?: StylePicker;
   /** Names for the "Custom: template · tone" label of an older pair. */
   templates: { id: string; name: string }[];
@@ -184,15 +175,15 @@ export interface NoteStyleField {
   name: () => string;
   /** Restores an earlier pair: a built-in or file when it equals one, else "Custom: X · Y"; nothing set means the first option. */
   set: (templateId: string | undefined, toneId: string | undefined) => void;
-  /** Re-reads the style folder and redraws the list, keeping the choice. */
+  /** Re-reads the block folders and redraws the list, keeping the choice. */
   reload: () => Promise<void>;
 }
 
 /**
- * The one "Note style" select: keep/default, the five built-ins, the files of the style folder and the old custom
- * templates that have no file yet. A built-in sends its template and tone pair; a file or old template sends one id. A file
- * that does not parse is listed but cannot be chosen, with its reason beneath. An older template-and-tone pair that is none
- * of these stays selectable as "Custom: X · Y". "Edit this style" opens the file of the chosen style.
+ * The one "Note style" select: keep/default, the five built-ins and the template blocks the user wrote. A built-in sends
+ * its template and tone pair; a template block sends one id (`file:<name>`). A block that does not parse is listed but
+ * cannot be chosen, with its reason beneath. An older template-and-tone pair that is none of these stays selectable as
+ * "Custom: X · Y". "Edit this style" opens the file of the chosen style.
  */
 export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptions): NoteStyleField {
   const { field, head } = linkedField(parent, t("ui.note_style"));
@@ -210,23 +201,20 @@ export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptio
     id: string | undefined,
     fallback?: string
   ): string | undefined =>
-    (id ? (list.find(item => item.id === id)?.name ?? id.replace(/^style:/, "")) : undefined) ?? fallback;
+    (id ? (list.find(item => item.id === id)?.name ?? id.replace(/^(?:style|file):/, "")) : undefined) ?? fallback;
   const customName = (): string =>
     t(
       "ui.note_style_custom_0_1",
       nameOf(options.templates, custom?.template, options.currentTemplate) ?? "",
       nameOf(options.tones, custom?.tone, options.currentTone) ?? ""
     );
-  /** The picker rows other than the built-ins: files (and exported old templates), then old templates without a file. */
+  /** The picker rows other than the built-ins: the template blocks of the user (their value is their `file:<name>` id). */
   let items: StyleListItem[] = [];
-  let unexported: { id: string; name: string }[] = [];
-  const fileValue = (item: StyleListItem): string => `${item.kind}:${item.id}`;
   const refOf = (value: string): StyleRef | undefined => {
     if (value === STYLE_KEEP) return options.currentRef;
     const chosen = preset(value);
     if (chosen) return { kind: "builtin", id: chosen.id };
-    const found = value.match(/^(file|legacy):(.*)$/s);
-    return found ? { kind: found[1] as "file" | "legacy", id: found[2] } : undefined;
+    return value.startsWith("file:") ? { kind: "file", id: value } : undefined;
   };
   /** Every option drawn and whether it can be chosen (the DOM's own option list is not needed). */
   let entries: { value: string; disabled: boolean }[] = [];
@@ -237,36 +225,19 @@ export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptio
     select.createEl("option", { value: STYLE_KEEP, text: options.keepLabel });
     const broken: StyleListItem[] = [];
     for (const item of NOTE_STYLE_PRESETS) {
-      const bad = items.find(entry => entry.kind === "builtin" && entry.id === item.id && entry.issues.length);
-      if (bad) broken.push(bad);
-      const option = select.createEl("option", {
-        value: stylePreset(item.id),
-        text: bad ? t("ui.note_style_unusable_option_0", t(item.name)) : t(item.name)
-      });
-      option.disabled = !!bad;
-      entries.push({ value: stylePreset(item.id), disabled: !!bad });
+      select.createEl("option", { value: stylePreset(item.id), text: t(item.name) });
+      entries.push({ value: stylePreset(item.id), disabled: false });
     }
-    const files = items.filter(
-      (entry): entry is Exclude<StyleListItem, { kind: "builtin" }> => entry.kind !== "builtin"
-    );
-    if (files.length) {
+    if (items.length) {
       const group = select.createEl("optgroup", { attr: { label: t("ui.note_style_group_folder") } });
-      for (const item of files) {
-        const name = item.name;
+      for (const item of items) {
         if (item.issues.length) broken.push(item);
         const option = group.createEl("option", {
-          value: fileValue(item),
-          text: item.issues.length ? t("ui.note_style_unusable_option_0", name) : name
+          value: item.id,
+          text: item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name
         });
         option.disabled = item.issues.length > 0;
-        entries.push({ value: fileValue(item), disabled: item.issues.length > 0 });
-      }
-    }
-    if (unexported.length) {
-      const group = select.createEl("optgroup", { attr: { label: t("ui.note_style_group_legacy") } });
-      for (const old of unexported) {
-        group.createEl("option", { value: `legacy:${old.id}`, text: old.name });
-        entries.push({ value: `legacy:${old.id}`, disabled: false });
+        entries.push({ value: item.id, disabled: item.issues.length > 0 });
       }
     }
     if (custom) {
@@ -298,10 +269,6 @@ export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptio
   };
   const load = (): void => {
     items = picker?.list() ?? [];
-    // Without a style folder (no store) the old custom templates the dialog was given are listed as they were.
-    unexported =
-      picker?.unexported() ??
-      options.templates.filter(item => item.id !== STANDARD_TEMPLATE_ID && item.id !== TEXTBOOK_TEMPLATE_ID);
     build();
   };
   load();
@@ -313,18 +280,13 @@ export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptio
   });
   refresh(false);
   const chosenPreset = () => preset(select.value);
-  const chosenFile = (): { id: string } | undefined => {
-    const found = select.value.match(/^(?:file|legacy):(.*)$/s);
-    return found ? { id: found[1] } : undefined;
-  };
+  const chosenFile = (): { id: string } | undefined =>
+    select.value.startsWith("file:") ? { id: select.value } : undefined;
   const nameFromList = (): string => {
     const file = chosenFile();
     return file
       ? (nameOf(
-          [
-            ...items.flatMap(item => (item.kind === "builtin" ? [] : [{ id: item.id, name: item.name }])),
-            ...unexported
-          ],
+          items.map(item => ({ id: item.id, name: item.name })),
           file.id
         ) ?? "")
       : "";
@@ -355,9 +317,7 @@ export function noteStyleField(parent: HTMLElement, options: NoteStyleFieldOptio
       const plainTone = !nextTone || nextTone === DEFAULT_TONE_ID;
       const fileOption =
         nextTemplate && plainTone
-          ? entries.find(
-              entry => !entry.disabled && /^(file|legacy):/.test(entry.value) && refOf(entry.value)?.id === nextTemplate
-            )
+          ? entries.find(entry => !entry.disabled && entry.value.startsWith("file:") && entry.value === nextTemplate)
           : undefined;
       if (matched) select.value = stylePreset(matched.id);
       else if (fileOption) select.value = fileOption.value;

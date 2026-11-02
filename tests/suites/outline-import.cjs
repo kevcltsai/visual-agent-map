@@ -251,23 +251,25 @@ test('outline modal: AI mode and model show only with shallow research and are s
 test('outline modal: the content template select sits in the research options and is sent only with shallow research', async () => {
   const h = modalHarness(); const requests = [];
   const templates = [{ id: 'standard', name: 'Standard' }, { id: 't1', name: 'Template one' }];
+  // 06 P3: the user's own templates are template blocks (file:<name>) in the picker; the old "template without a file" group is gone.
+  const styles = { refresh: async () => {}, list: () => [{ kind: 'file', id: 'file:Template one', name: 'Template one', fileName: 'Template one.md', issues: [] }], edit: async () => {} };
   const submit = async (shallowOn, picked) => {
-    const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, templates);
+    const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, templates, undefined, undefined, undefined, { styles });
     modal.open();
     const options = h.find(modal.contentEl, item => /vam-outline-research-options/.test(item.cls));
     const select = h.find(options, item => item.tag === 'select' && item['aria-label'] === 'Note style');
     assert.ok(select, 'inside the research options');
     assert.deepEqual(plain(select.children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
-    assert.deepEqual(plain(h.find(select, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['legacy:t1', 'Template one']]);
+    assert.deepEqual(plain(h.find(select, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['file:Template one', 'Template one']]);
     const textarea = h.find(modal.contentEl, item => item.tag === 'textarea'); textarea.value = '# R\n## A'; textarea.listeners.input();
-    select.value = picked ? `legacy:${picked}` : '';
+    select.value = picked ? `file:${picked}` : '';
     const shallow = h.find(modal.contentEl, item => item.tag === 'input' && item.type === 'checkbox'); shallow.checked = shallowOn; shallow.listeners.change();
     h.find(modal.modalEl, item => item.tag === 'button' && item.text === 'Add to mind map').listeners.click();
     await new Promise(resolve => setTimeout(resolve, 0));
     return requests.at(-1);
   };
-  assert.equal('detailTemplateId' in await submit(false, 't1'), false, 'ignored while shallow research is off');
-  assert.equal((await submit(true, 't1')).detailTemplateId, 't1');
+  assert.equal('detailTemplateId' in await submit(false, 'Template one'), false, 'ignored while shallow research is off');
+  assert.equal((await submit(true, 'Template one')).detailTemplateId, 'file:Template one');
   assert.equal('detailTemplateId' in await submit(true, ''), false);
 });
 

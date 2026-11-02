@@ -119,8 +119,8 @@ async function compareStyleFile(text, language, label, scenarios = SCENARIOS, pa
     await after.store.refresh();
     const old = oldPromptsOf(before, language, scenario);
     const upgraded = promptsOf(after.store, language, scenario);
-    assert.ok(old.resolved.noteStyle, `${label}/${name}: the old path read the file`);
-    assert.ok(upgraded.resolved.block && !upgraded.resolved.noteStyle, `${label}/${name}: the upgraded run uses a block`);
+    assert.ok(old.resolved.toneDecided && !old.resolved.block, `${label}/${name}: the old path read the file`);
+    assert.ok(upgraded.resolved.block, `${label}/${name}: the upgraded run uses a block`);
     old.prompts.forEach((prompt, index) => { assert.equal(upgraded.prompts[index], prompt, `${label} ${language} ${name} step ${index}`); compared++; });
     assert.equal(upgraded.charts, old.charts, `${label} ${language} ${name} charts`);
   }
@@ -444,7 +444,7 @@ test('old custom templates: standard-named sections upgrade to the same prompt (
         const old = oldPromptsOf(before, language, item), upgraded = promptsOf(after.store, language, item);
         assert.deepEqual(upgraded.prompts, old.prompts, `${language} exported=${exported}`);
         assert.equal(upgraded.charts, old.charts);
-        assert.ok(upgraded.resolved.block && !upgraded.resolved.noteStyle);
+        assert.ok(upgraded.resolved.block);
       }
       assert.deepEqual(plain(after.settings.detailTemplates), plain(template), 'the old key is kept');
     }
@@ -555,7 +555,7 @@ test('built-in style files: unchanged canonical files (v1 and v2, any language) 
     await w.store.refresh();
     const r = w.store.resolve([{ template: 'standard', tone: 'summary' }]);
     assert.equal(r.block, undefined);
-    assert.equal(r.noteStyle, undefined);
+    assert.equal(r.toneDecided, undefined);
   }
   for (const language of LANGUAGES) {
     const summaryName = M.builtinStyleFileName('summary', language);

@@ -1721,71 +1721,83 @@ integrationTest('multi research with a chosen template records it on each starte
   assert.equal((await h.repo.readNote(second.path)).detailTemplateId, 'A');
   assert.equal((await h.repo.readNote(third.path)).detailTemplateId, undefined);
 });
-integrationTest('map action: an old custom template is chosen in the map style list; it is written and the map tone is deleted; the default clears both', async () => {
+// 06 P3: the map style list reads the template blocks of the user (file:<name>) in place of the old style files and old templates.
+async function installTemplateBlocks(plugin, files) {
+  Object.assign(plugin.settings, { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' });
+  const dir = 'WS/S/Blocks/Templates';
+  const held = Object.fromEntries(Object.entries(files).map(([name, text]) => [`${dir}/${name}.md`, text]));
+  const port = { list: async folder => Object.keys(held).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => held[f], folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
+  const { NoteStyleStore } = load('ai/note-style-store.ts');
+  plugin.noteStyles = new NoteStyleStore({ settings: () => plugin.settings, port, save: async () => {} });
+  await plugin.noteStyles.refresh();
+}
+const TEMPLATE_BLOCKS = { 'Template A': '## A\ntext\n', 'Template B': '## B\ntext\n', 'Template C': '## C\ntext\n' };
+integrationTest('map action: a template block is chosen in the map style list; it is written as file:<name> and the map tone stays; the default clears both', async () => {
   const opened = [];
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
+  const h = await templateHarness({ language: 'en' });
+  await installTemplateBlocks(h.plugin, TEMPLATE_BLOCKS);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
   const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {}; view.enqueue = work => work();
-  view.chooseMapStyle();
+  view.chooseMapStyle(); await new Promise(resolve => setTimeout(resolve, 0));
   const choices = opened.at(-1).choices;
-  assert.deepEqual(plain(choices.map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
-  assert.deepEqual(plain(choices.map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', '']);
+  assert.equal(choices.at(-1).label, 'Edit this style', 'a picker with a block folder offers the edit row last');
+  assert.deepEqual(plain(choices.slice(0, -1).map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
+  assert.deepEqual(plain(choices.slice(0, 9).map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', '']);
   await choices[7].action();
-  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'B');
-  assert.equal(view.map.detailTemplateId, 'B');
-  view.chooseMapStyle();
-  assert.deepEqual(plain(opened.at(-1).choices.map(choice => choice.description ?? '')), ['', '', '', '', '', '', '', 'Current setting', ''], 'the current map value is marked');
+  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'file:Template B');
+  assert.equal(view.map.detailTemplateId, 'file:Template B');
+  view.chooseMapStyle(); await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(plain(opened.at(-1).choices.slice(0, 9).map(choice => choice.description ?? '')), ['', '', '', '', '', '', '', 'Current setting', ''], 'the current map value is marked');
   await choices[0].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === undefined);
   assert.equal(view.map.detailTemplateId, undefined);
 });
 integrationTest('map action: one default note style sets or clears the template and tone together; AIM keeps its tone-only entry', async () => {
   const opened = [];
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
+  const h = await templateHarness({ language: 'en' });
+  await installTemplateBlocks(h.plugin, TEMPLATE_BLOCKS);
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
   const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {}; view.enqueue = work => work();
-  view.chooseMapStyle();
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+  view.chooseMapStyle(); await settle();
   let modal = opened.at(-1);
   assert.equal(modal.titleText, 'Default note style for this map'); assert.equal(modal.description, 'New topics, and topics without their own style, use it.');
-  assert.deepEqual(plain(modal.choices.map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
-  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', ''], 'no value stored: the default is current');
+  assert.deepEqual(plain(modal.choices.slice(0, 9).map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
+  assert.deepEqual(plain(modal.choices.slice(0, 9).map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', ''], 'no value stored: the default is current');
   await modal.choices[2].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'textbook');
   let saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, 'textbook'); assert.equal(saved.toneId, 'academic', 'a preset always stores both values');
-  view.chooseMapStyle(); modal = opened.at(-1);
-  assert.deepEqual(plain(modal.choices.map(choice => choice.description ?? '')), ['', '', 'Current setting', '', '', '', '', '', ''], 'the matching preset is marked');
+  view.chooseMapStyle(); await settle(); modal = opened.at(-1);
+  assert.deepEqual(plain(modal.choices.slice(0, 9).map(choice => choice.description ?? '')), ['', '', 'Current setting', '', '', '', '', '', ''], 'the matching preset is marked');
   await modal.choices[3].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).toneId === 'summary');
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, 'standard'); assert.equal(saved.toneId, 'summary');
-  // An old template with a tone of its own is marked on the old template's row.
-  await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
-  view.chooseMapStyle(); modal = opened.at(-1);
-  assert.deepEqual(plain(modal.choices.filter(choice => choice.description).map(choice => [choice.label, choice.description])), [['Template A', 'Current setting']]);
-  // Choosing an old template keeps the map's tone; only a style file deletes the layer's tone (see the style: case below).
+  // A template block with a tone of the map is marked on the block's row.
+  await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'file:Template A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
+  view.chooseMapStyle(); await settle(); modal = opened.at(-1);
+  assert.deepEqual(plain(modal.choices.slice(0, 9).filter(choice => choice.description).map(choice => [choice.label, choice.description])), [['Template A', 'Current setting']]);
+  // Choosing a template block keeps the map's tone: the tone is its own choice now.
   await modal.choices.find(choice => choice.label === 'Template B').action();
-  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'B');
+  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'file:Template B');
   saved = await h.repo.readMap(h.mapPath);
-  assert.equal(saved.toneId, 'magazine', 'an old template keeps the tone');
-  view.chooseMapStyle(); await opened.at(-1).choices.find(choice => choice.label === 'Textbook (intro, then sections)').action();
+  assert.equal(saved.toneId, 'magazine', 'a template block keeps the tone');
+  view.chooseMapStyle(); await settle(); await opened.at(-1).choices.find(choice => choice.label === 'Textbook (intro, then sections)').action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'textbook');
-  // A style file from the folder is written as the template and deletes the map's tone; a file that does not parse can only be opened.
-  const bad = { kind: 'file', id: 'style:Broken', name: 'Broken', fileName: 'Broken.md', issues: [{ line: 3, code: 'no_sections', values: [], message: 'x' }] };
-  const good = { kind: 'file', id: 'style:Mine', name: 'Mine', fileName: 'Mine.md', issues: [] };
-  const edited = [];
-  h.plugin.noteStyles = { refresh: async () => {}, list: () => [bad, good], unexportedTemplates: () => [], ensureStyleFolder: async () => 'F' };
-  await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
-  view.chooseMapStyle(); await new Promise(resolve => setTimeout(resolve, 0)); modal = opened.at(-1);
+  // A template block that does not parse is listed with its reason and can only be opened; the readable one is written as the template.
+  await installTemplateBlocks(h.plugin, { Broken: 'no sections here\n', Mine: '## A\ntext\n' });
+  await h.repo.updateMap(h.mapPath, map => { map.detailTemplateId = 'file:Template A'; map.toneId = 'magazine'; }); view.map = await h.repo.readMap(h.mapPath);
+  view.chooseMapStyle(); await settle(); modal = opened.at(-1);
   const brokenRow = modal.choices.find(choice => choice.label === 'Broken');
-  assert.match(brokenRow.description, /Broken\.md.*line 3.*The file has no ## section/); assert.equal(brokenRow.buttonLabel, 'Open this file');
+  assert.match(brokenRow.description, /Broken\.md.*line \d+.*The file has no ## section/); assert.equal(brokenRow.buttonLabel, 'Open this file');
   await modal.choices.find(choice => choice.label === 'Mine').action();
-  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'style:Mine');
+  await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'file:Mine');
   saved = await h.repo.readMap(h.mapPath);
-  assert.equal(saved.toneId, undefined, 'choosing a style file deletes the map tone'); assert.equal(edited.length, 0);
+  assert.equal(saved.toneId, 'magazine', 'choosing a template block keeps the map tone');
   delete h.plugin.noteStyles;
   // Default clears both.
-  view.chooseMapStyle(); await opened.at(-1).choices[0].action();
+  view.chooseMapStyle(); await settle(); await opened.at(-1).choices[0].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).toneId === undefined);
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, undefined); assert.equal(saved.toneId, undefined);

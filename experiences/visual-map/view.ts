@@ -84,7 +84,6 @@ import {
   type TransactionEntry
 } from "./map-transaction";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
-import { PromptPresetsModal } from "../../ui/modals/prompt-presets-modal";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
 import {
@@ -242,13 +241,14 @@ import {
   type StyleResolution
 } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
+import { parseBlockRef } from "../../core/blocks/block-files";
 import { NOTE_STYLE_PRESETS, styleLabel } from "./note-style";
 import {
   errorNotice,
   actionNotice,
   NoteStyleFileError,
   openStyleChooser,
-  openStyleFile,
+  openVaultFile,
   stylePickerFor,
   styleRefOf,
   type StylePicker,
@@ -2153,18 +2153,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The name of the tone this topic resolves to now (topic override, else map default, else academic). */
   private toneLabelFor(note: Pick<Note, "toneId">): string {
-    const settings = this.plugin.settings;
-    const ids = [note.toneId, this.map?.toneId];
-    for (const id of ids) {
-      const found = listPresets(settings.promptPresets, "tone", settings.language).find(item => item.id === id);
-      if (found) return found.name;
+    for (const id of [note.toneId, this.map?.toneId]) {
+      const found = this.noteStyles.toneName(id);
+      if (found) return found;
     }
-    return listPresets(settings.promptPresets, "tone", settings.language).find(item => item.id === "academic")!.name;
+    return this.noteStyles.toneName(DEFAULT_TONE_ID) ?? DEFAULT_TONE_ID;
   }
-  /** Built-in plus custom writing tones, for the tone selects. */
+  /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
   private toneChoices(): { id: string; name: string }[] {
-    const settings = this.plugin.settings;
-    return listPresets(settings.promptPresets, "tone", settings.language).map(({ id, name }) => ({ id, name }));
+    return this.noteStyles.toneChoices();
   }
   /**
    * Writing tone for an AI run on `note`: this run's choice, then the topic override, then the map default. Academic
@@ -2183,8 +2180,6 @@ export class VisualAgentMapView extends ItemView {
   private fieldLinks(): FieldLinks {
     return {
       repair: model => this.plugin.repairConnection(model),
-      manageTones: (selected, refreshed) =>
-        new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
       styles: this.stylePicker(),
       ...(this.defaultStyleRef() ? { currentStyleRef: this.defaultStyleRef() } : {})
     };
@@ -2198,7 +2193,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
   private currentStyleLabel(templateId: string, toneId: string): string {
-    if (templateId.startsWith("style:")) return templateId.slice("style:".length);
+    if (templateId.startsWith("style:") || templateId.startsWith("file:"))
+      return templateId.replace(/^(?:style|file):/, "");
     const names = (list: { id: string; name: string }[]) => (id: string) =>
       list.find(item => item.id === id)?.name ?? id;
     return styleLabel(
@@ -2210,6 +2206,10 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Name of the workspace default note style (default template, academic tone) for "Use the default (…)". */
   private defaultStyleLabel(): string {
+    // The workspace template block decides once it is set (the upgrade sets it from the old default).
+    const block = this.plugin.settings.noteTemplateBlock;
+    const named = block ? this.noteStyles.listBlocks("template").find(item => item.ref === block)?.name : undefined;
+    if (named) return named;
     const chosen = this.plugin.settings.defaultNoteStyleId;
     const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
     if (preset) return t(preset.short);
@@ -2224,13 +2224,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The style behind a stored pair, for "Edit this style" on the first option of a picker. */
   private styleRefFor(templateId: string | undefined, toneId: string | undefined): StyleRef | undefined {
-    return styleRefOf(
-      templateId,
-      toneId,
-      this.plugin.settings.detailTemplates.map(item => item.id)
-    );
+    return styleRefOf(templateId, toneId, this.plugin.settings.noteStyleAliases);
   }
   private defaultStyleRef(): StyleRef | undefined {
+    const block = parseBlockRef(this.plugin.settings.noteTemplateBlock);
+    if (block?.kind === "file") return { kind: "file", id: this.plugin.settings.noteTemplateBlock! };
+    if (block?.kind === "builtin") {
+      const preset = NOTE_STYLE_PRESETS.find(item => item.templateId === block.id && item.toneId === DEFAULT_TONE_ID);
+      if (preset) return { kind: "builtin", id: preset.id };
+    }
     const chosen = this.plugin.settings.defaultNoteStyleId;
     if (chosen) {
       const preset = NOTE_STYLE_PRESETS.find(item => item.id === chosen);
@@ -2240,9 +2242,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The tone id a topic resolves to now (topic override, else map default, else academic), as toneLabelFor names it. */
   private effectiveToneId(note: Pick<Note, "toneId">): string {
-    const settings = this.plugin.settings;
-    const known = listPresets(settings.promptPresets, "tone", settings.language);
-    return [note.toneId, this.map?.toneId].find(id => known.some(item => item.id === id)) ?? DEFAULT_TONE_ID;
+    return [note.toneId, this.map?.toneId].find(id => this.noteStyles.toneName(id) !== undefined) ?? DEFAULT_TONE_ID;
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
   openOutlineImport(prefill?: OutlineDraftPrefill): void {
@@ -9053,7 +9053,6 @@ export class VisualAgentMapView extends ItemView {
             ]
           : [])
       ],
-      oldTemplates: this.plugin.settings.detailTemplates.map(({ id, name }) => ({ id, name })),
       ...(known ? { current: known } : {}),
       ...(unset ? { editRef: this.defaultStyleRef() } : {}),
       // Only a style file deletes the layer's tone; an old template keeps the tone the map already has.
@@ -9070,10 +9069,16 @@ export class VisualAgentMapView extends ItemView {
       );
     const current = this.map?.toneId;
     const mark = (id: string | undefined) => (id === current ? { description: t("ui.detail_template_current") } : {});
-    new ChoiceModal(this.app, t("ui.tone_map_default"), t("ui.tone_map_default_desc"), [
-      { label: t("ui.tone_use_default"), ...mark(undefined), action: () => apply(undefined) },
-      ...this.toneChoices().map(({ id, name }) => ({ label: name, ...mark(id), action: () => apply(id) }))
-    ]).open();
+    // The tone blocks are read when the list opens, so a block written a moment ago is in it.
+    void this.noteStyles
+      .refresh()
+      .catch(() => undefined)
+      .then(() =>
+        new ChoiceModal(this.app, t("ui.tone_map_default"), t("ui.tone_map_default_desc"), [
+          { label: t("ui.tone_use_default"), ...mark(undefined), action: () => apply(undefined) },
+          ...this.toneChoices().map(({ id, name }) => ({ label: name, ...mark(id), action: () => apply(id) }))
+        ]).open()
+      );
   }
   private aimActiveForPath(path: string): boolean {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some(leaf => {
@@ -13190,8 +13195,7 @@ export class VisualAgentMapView extends ItemView {
       this.templateChoices(),
       request => void this.startMultiResearch(request, retryBatchKey),
       this.toneChoices(),
-      (selected, refreshed) =>
-        new PromptPresetsModal(this.app, this.plugin, "tone", () => refreshed(this.toneChoices()), selected).open(),
+      undefined,
       this.fieldLinks(),
       shown.map(item => item.mode)
     ).open();
@@ -18227,7 +18231,7 @@ export class VisualAgentMapView extends ItemView {
     const { template, missing } = resolved;
     this.noticeBlockIssues(resolved, gate);
     if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      if (note.detailTemplateId.startsWith("style:")) {
+      if (note.detailTemplateId.startsWith("style:") || note.detailTemplateId.startsWith("file:")) {
         // The file may come back (moved back, restored): the note is not rewritten. The Notice offers another style.
         const missingId = note.detailTemplateId;
         actionNotice(this.missingTemplateMessage(missingId), t("ui.note_style_switch"), () =>
@@ -18257,12 +18261,11 @@ export class VisualAgentMapView extends ItemView {
     if (resolved.invalid) {
       const first = resolved.invalid.issues[0];
       const { fileName } = resolved.invalid;
-      const base = fileName.replace(/\.md$/i, "");
-      const builtin = NOTE_STYLE_PRESETS.find(item => this.noteStyles.builtinIdOfFile(base)?.id === item.id);
-      const ref: StyleRef = builtin ? { kind: "builtin", id: builtin.id } : { kind: "file", id: `style:${base}` };
+      // Only an old style file that the upgrade has not moved yet can be invalid; it is opened where it lies.
+      const path = `${this.noteStyles.folder()}/${fileName}`;
       throw new NoteStyleFileError(
         t("ui.note_style_file_invalid_0_1_2", fileName, first.line, styleIssueText(first)),
-        () => void openStyleFile(this.app, this.noteStyles, ref)
+        () => void openVaultFile(this.app, path)
       );
     }
     return resolved;
@@ -18311,8 +18314,8 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   private missingTemplateMessage(id: string): string {
-    return id.startsWith("style:")
-      ? t("ui.note_style_file_missing_0", `${id.slice("style:".length)}.md`)
+    return id.startsWith("style:") || id.startsWith("file:")
+      ? t("ui.note_style_file_missing_0", `${id.replace(/^(?:style|file):/, "")}.md`)
       : t("ui.detail_template_missing_0", id);
   }
   /**

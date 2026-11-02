@@ -1,27 +1,38 @@
 import { Notice, normalizePath, TFile, type App } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
-import { STANDARD_TEMPLATE_ID } from "../../ai/detail-templates";
-import { builtinPairOf, type NoteStyleStore, type StyleListItem } from "../../ai/note-style-store";
+import { builtinPairOf, type NoteStyleAliases } from "../../ai/note-style-upgrade";
+import type { NoteStyleStore } from "../../ai/note-style-store";
+import { builtinRef, parseBlockRef } from "../../core/blocks/block-files";
 import { t, type TranslationKey } from "../../i18n";
 import type { NoteStyleIssue } from "../../ai/note-style-file";
 import { backgroundResultNotice } from "../../ui/background-run";
 import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
 import { NOTE_STYLE_PRESETS } from "./note-style";
 
-/** Which style a picker row stands for: a built-in id, `style:<name>` of a file, or the uuid of an old custom template. */
+/** Which style a picker row stands for: a built-in style id, or `file:<name>` of a template block the user wrote. */
 export interface StyleRef {
-  kind: "builtin" | "file" | "legacy";
+  kind: "builtin" | "file";
   id: string;
 }
 
-/** What the four note-style entries need from the style folder (absent in a test double: only the built-ins are listed). */
+/** One template block of the user in a picker, with the reasons it cannot be read (empty when it can). */
+export interface StyleListItem {
+  kind: "file";
+  /** `file:<name>`, as the map, topic or run stores it. */
+  id: string;
+  name: string;
+  /** The file (with ".md") in the Templates block folder. */
+  fileName: string;
+  issues: NoteStyleIssue[];
+}
+
+/** What the four note-style entries need from the block folders (absent in a test double: only the built-ins are listed). */
 export interface StylePicker {
-  /** Re-reads the folder; call `list()` afterwards. */
+  /** Re-reads the block folders; call `list()` afterwards. */
   refresh(): Promise<void>;
+  /** The user's own template blocks. */
   list(): StyleListItem[];
-  /** Old custom templates that have no file yet (they stay pickable). */
-  unexported(): { id: string; name: string }[];
-  /** Creates the folder and files when needed, then opens the style's file in a new tab. */
+  /** Opens the template block behind a style in a new tab (a built-in with no file gets one first). */
   edit(ref: StyleRef): Promise<void>;
 }
 
@@ -53,42 +64,56 @@ export function stylePickerFor(app: App, plugin: VisualAgentMapPlugin): StylePic
   if (!store) return undefined;
   return {
     refresh: () => store.refresh(),
-    list: () => store.list(),
-    unexported: () => store.unexportedTemplates().map(({ id, name }) => ({ id, name })),
+    list: () =>
+      store
+        .listBlocks("template")
+        .flatMap((item): StyleListItem[] =>
+          item.kind === "file" && item.fileName !== undefined
+            ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }]
+            : []
+        ),
     edit: ref => openStyleFile(app, store, ref)
   };
 }
 
-/** Opens the file of a style in a new tab (creating the folder and files first, as "Open the styles folder" does). */
+/** Opens a file of the vault in a new tab; false when it is not there. */
+export async function openVaultFile(app: App, path: string): Promise<boolean> {
+  const file = app.vault.getAbstractFileByPath(normalizePath(path));
+  if (!(file instanceof TFile)) return false;
+  await app.workspace.getLeaf("tab").openFile(file);
+  return true;
+}
+
+/** Opens the template block behind a style in a new tab (a built-in with no file gets one first, as "Open" in the settings does). */
 export async function openStyleFile(app: App, store: NoteStyleStore, ref: StyleRef): Promise<void> {
+  const name = ref.kind === "file" ? `${ref.id.slice("file:".length)}.md` : ref.id;
   try {
-    const folder = await store.ensureStyleFolder();
-    const item = store.list().find(entry => entry.kind === ref.kind && entry.id === ref.id);
-    if (!item) {
-      new Notice(
-        t("ui.note_style_edit_missing_0", ref.kind === "file" ? `${ref.id.slice("style:".length)}.md` : ref.id)
-      );
-      return;
-    }
-    const file = app.vault.getAbstractFileByPath(normalizePath(`${folder}/${item.fileName}`));
-    if (file instanceof TFile) await app.workspace.getLeaf("tab").openFile(file);
-    else new Notice(t("ui.note_style_edit_missing_0", item.fileName));
-  } catch (error) {
-    new Notice(error instanceof Error ? error.message : String(error));
+    const blockRef =
+      ref.kind === "file"
+        ? ref.id
+        : builtinRef(NOTE_STYLE_PRESETS.find(item => item.id === ref.id)?.templateId ?? ref.id);
+    const { path } = await store.ensureBlockFile("template", blockRef);
+    if (!(await openVaultFile(app, path))) new Notice(t("ui.note_style_edit_missing_0", name));
+  } catch {
+    new Notice(t("ui.note_style_edit_missing_0", name));
   }
 }
 
-/** The style a stored template and tone pair stands for, when it is a built-in, a file or an old template. */
+/**
+ * The style a stored template and tone pair stands for, when it is a built-in or a template block of the user. An old id
+ * the upgrade moved to a block (`aliases`) stands for that block.
+ */
 export function styleRefOf(
   templateId: string | undefined,
   toneId: string | undefined,
-  oldTemplateIds: readonly string[] = []
+  aliases: NoteStyleAliases = {}
 ): StyleRef | undefined {
   const builtin = builtinPairOf(templateId, toneId);
   if (builtin) return { kind: "builtin", id: builtin };
-  if (templateId?.startsWith("style:")) return { kind: "file", id: templateId };
-  if (templateId && templateId !== STANDARD_TEMPLATE_ID && oldTemplateIds.includes(templateId))
-    return { kind: "legacy", id: templateId };
+  if (parseBlockRef(templateId)?.kind === "file" && templateId) return { kind: "file", id: templateId };
+  const moved =
+    templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : undefined;
+  if (moved?.template && parseBlockRef(moved.template)?.kind === "file") return { kind: "file", id: moved.template };
   return undefined;
 }
 
@@ -127,13 +152,11 @@ export interface StyleChooserOptions {
   current?: StyleRef;
   /** The style "Edit this style" opens when none is set (e.g. the workspace default); falls back to current. */
   editRef?: StyleRef;
-  /** Old custom templates to list when there is no style folder (a plugin without a store). */
-  oldTemplates?: { id: string; name: string }[];
-  /** The pair to store for the chosen style; a file style comes without a tone (the caller deletes the layer's tone). */
+  /** The pair to store for the chosen style; a template block comes without a tone (the layer's tone stays). */
   pick: (templateId: string, toneId: string | undefined) => void;
 }
 
-/** A list of every usable style: five built-ins, the files, old templates; a bad file shows its reason and opens instead. */
+/** A list of every usable style: five built-ins and the user's template blocks; a bad block shows its reason and opens instead. */
 export async function openStyleChooser(
   app: App,
   picker: StylePicker | undefined,
@@ -144,8 +167,6 @@ export async function openStyleChooser(
   const same = (ref: StyleRef): boolean => options.current?.kind === ref.kind && options.current.id === ref.id;
   const mark = (ref: StyleRef): { description?: string } =>
     same(ref) ? { description: t("ui.detail_template_current") } : {};
-  const issueOf = (kind: StyleRef["kind"], id: string): StyleListItem | undefined =>
-    items.find(item => item.kind === kind && item.id === id && item.issues.length);
   const bad = (item: StyleListItem, label: string): Choice => ({
     label,
     description: styleProblem(item),
@@ -155,15 +176,9 @@ export async function openStyleChooser(
   const choices: Choice[] = [...(options.leading ?? [])];
   for (const preset of NOTE_STYLE_PRESETS) {
     const ref: StyleRef = { kind: "builtin", id: preset.id };
-    const broken = issueOf("builtin", preset.id);
-    choices.push(
-      broken
-        ? bad(broken, t(preset.name))
-        : { label: t(preset.name), ...mark(ref), action: () => options.pick(preset.templateId, preset.toneId) }
-    );
+    choices.push({ label: t(preset.name), ...mark(ref), action: () => options.pick(preset.templateId, preset.toneId) });
   }
   for (const item of items) {
-    if (item.kind === "builtin") continue;
     if (item.issues.length) {
       choices.push(bad(item, item.name));
       continue;
@@ -173,13 +188,6 @@ export async function openStyleChooser(
       label: item.name,
       ...mark(ref),
       action: () => options.pick(item.id, undefined)
-    });
-  }
-  for (const old of picker?.unexported() ?? options.oldTemplates ?? []) {
-    choices.push({
-      label: old.name,
-      ...mark({ kind: "legacy", id: old.id }),
-      action: () => options.pick(old.id, undefined)
     });
   }
   const editRef = options.current ?? options.editRef;

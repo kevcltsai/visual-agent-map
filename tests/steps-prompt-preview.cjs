@@ -125,7 +125,7 @@ test('counter 11: workspaceStyleFields equals resolve([{}, {}]) with runToneText
     assert.equal(got.toneText, tone, label);
     assert.equal(got.noteStyle, undefined, label);
     assert.equal(got.styleDiagrams, undefined, label);
-    if (resolved.noteStyle) assert.equal(got.toneText, resolved.toneText, label);
+    if (resolved.toneDecided) assert.equal(got.toneText, resolved.toneText, label);
     // the preview of these fields is the prompt a run with the same fields renders
     const preview = M.previewPrompt('research', language, 'codex', got);
     assert.equal(preview.text, renderOf(M.sampleTaskContext('research', language, got), language, 'codex'), label);
@@ -146,10 +146,10 @@ test('counter 9: a default style file that does not parse is returned as invalid
   assert.equal(got.detailTemplate, undefined);
 });
 
-test('runToneText: a style file decides its own tone, else the first tone preset id; academic is nothing', () => {
-  const file = { noteStyle: {}, toneText: 'from file' };
+test('runToneText: an old style file (or an alias of one) decides its own tone, else the first tone preset id; academic is nothing', () => {
+  const file = { toneDecided: true, toneText: 'from file' };
   assert.equal(M.runToneText(file, PRESETS, ['custom-tone-1'], 'en'), 'from file');
-  assert.equal(M.runToneText({ noteStyle: {} }, PRESETS, ['custom-tone-1'], 'en'), undefined);
+  assert.equal(M.runToneText({ toneDecided: true }, PRESETS, ['custom-tone-1'], 'en'), undefined);
   assert.equal(M.runToneText(undefined, PRESETS, [undefined, 'custom-tone-1'], 'en'), 'Talk like a pirate.');
   assert.equal(M.runToneText(undefined, PRESETS, ['academic', 'custom-tone-1'], 'en'), undefined);
   assert.equal(M.runToneText(undefined, PRESETS, [], 'en'), undefined);

@@ -84,9 +84,7 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
   const keyed = settings.noteTemplateBlock;
   let legacyName: string | undefined;
   if (!keyed && !preset) {
-    const old = store.list().find(item => item.kind !== "builtin" && item.id === chosen);
-    const unexported = store.unexportedTemplates().find(item => item.id === chosen);
-    legacyName = (old && "name" in old ? old.name : undefined) ?? unexported?.name ?? chosen.replace(/^style:/, "");
+    legacyName = settings.detailTemplates.find(item => item.id === chosen)?.name ?? chosen.replace(/^style:/, "");
   }
   const template = keyed
     ? has("template", keyed)

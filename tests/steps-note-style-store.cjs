@@ -11,6 +11,7 @@ export { resolveTemplate, standardTemplate, textbookTemplate, normalizeTemplates
 export { resolveToneText } from "./ai/prompt-presets";
 export { canonicalDetail } from "./ai/result-utils";
 export { AiTaskService } from "./core/ai-task-service";
+export { builtinBlockText } from "./core/blocks/block-files";
 `);
 const plain = value => JSON.parse(JSON.stringify(value));
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
@@ -63,7 +64,7 @@ test('no folder, no new keys: resolution equals resolveTemplate + resolveToneTex
     eq(got.template, want.template);
     eq(got.missing, want.missing);
     assert.equal(got.toneText, M.resolveToneText(PRESETS, [undefined, noteTone, mapTone], 'en'));
-    assert.equal(got.noteStyle, undefined);
+    assert.equal(got.toneDecided, undefined);
     assert.equal(got.invalid, undefined);
   }
 });
@@ -81,7 +82,7 @@ test('unchanged files take today\'s path: builtins in any written language, CRLF
       const want = todayTemplate(settings, [templateId], readLanguage);
       eq(got.template, want.template);
       assert.equal(got.toneText, M.resolveToneText(PRESETS, [toneId], readLanguage));
-      assert.equal(got.noteStyle, undefined, `${templateId}/${toneId} ${writeLanguage}->${readLanguage}`);
+      assert.equal(got.toneDecided, undefined, `${templateId}/${toneId} ${writeLanguage}->${readLanguage}`);
     }
   }
   // the three new keys missing (downgrade) with the exported file still in the folder
@@ -98,7 +99,7 @@ test('an edited built-in file decides template and tone; an edited exported file
   });
   await store.refresh();
   const summary = store.resolve([{ template: 'standard', tone: 'summary' }]);
-  assert.ok(summary.noteStyle);
+  assert.ok(summary.toneDecided);
   assert.equal(summary.fileName, 'Key points.md');
   const legacy = store.resolve([{ template: 'uuid-1', tone: 'plain' }]);
   assert.equal(legacy.fileName, 'My notes.md');
@@ -128,11 +129,10 @@ test('tone: the file\'s tone is a name or free text; a same or more specific lev
   assert.equal(same.toneText, M.resolveToneText(PRESETS, ['plain'], 'en'));
   // the style is chosen at the workspace: every tone level is more specific
   const ws = store.resolve([{ tone: 'plain' }]);
-  assert.equal(ws.noteStyle.name, 'Own');
+  assert.equal(ws.fileName, 'Own.md');
   assert.equal(ws.toneText, M.resolveToneText(PRESETS, ['plain'], 'en'));
   // academic at a specific level means no tone text and beats the file
   assert.equal(store.resolve([{ template: 'style:Free', tone: 'academic' }]).toneText, undefined);
-  assert.equal(store.resolve([{ template: 'style:Own' }]).noteStyle.diagrams, undefined, 'the switches are not part of the parsed file any more (P2); the upgrade reads them');
 });
 
 // Scope 5 matrix: topic x map in {none, template only, tone only, template + tone}, x workspace in {none, textbook,
@@ -174,16 +174,16 @@ test('resolution matrix (topic x map x workspace x file tone): 4 x 4 x 4 x 2 = 1
     if (chosen?.startsWith('style:')) {
       const base = chosen.slice(6);
       assert.equal(got.fileName, `${base}.md`, label);
-      assert.ok(got.noteStyle, label);
+      assert.ok(got.toneDecided, label);
       const own = tones.slice(0, at + 1).find(Boolean);
       assert.equal(got.toneText, own ? M.resolveToneText(PRESETS, [own], 'en') : fileTone[base], label);
     } else if (chosen === 'uuid-1') {
       assert.equal(got.fileName, 'My notes.md', label);
-      assert.ok(got.noteStyle, label);
+      assert.ok(got.toneDecided, label);
       assert.equal(got.toneText, M.resolveToneText(PRESETS, tones, 'en'), label);
     } else {
       // no style file decides: today's template and tone
-      assert.equal(got.noteStyle, undefined, label);
+      assert.equal(got.toneDecided, undefined, label);
       eq(got.template, todayTemplate(settings, [undefined, undefined, chosen]).template);
       assert.equal(got.toneText, M.resolveToneText(PRESETS, tones, 'en'), label);
     }
@@ -213,11 +213,11 @@ test('lifecycle: rename, move out and back, delete, and a new file with the old 
   const note = 'WS/S/A.md';
   const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { [note]: FREE });
   await store.refresh();
-  assert.ok(store.resolve([{ template: 'style:A' }]).noteStyle);
+  assert.ok(store.resolve([{ template: 'style:A' }]).toneDecided);
   v.files['WS/S/B.md'] = v.files[note]; delete v.files[note]; // renamed
   await store.refresh();
   eq(store.resolve([{ template: 'style:A' }]).missing, ['style:A']);
-  assert.ok(store.resolve([{ template: 'style:B' }]).noteStyle);
+  assert.ok(store.resolve([{ template: 'style:B' }]).toneDecided);
   v.files[note] = '---\ntone: New A.\n---\n## X\nnew\n'; // someone creates A again: that is style A (contract), label shows A.md
   await store.refresh();
   const again = store.resolve([{ template: 'style:A' }]);
@@ -228,7 +228,7 @@ test('lifecycle: rename, move out and back, delete, and a new file with the old 
   eq(store.resolve([{ template: 'style:A' }]).missing, ['style:A']);
   v.files[note] = v.files['WS/Other/A.md']; // moved back
   await store.refresh();
-  assert.ok(store.resolve([{ template: 'style:A' }]).noteStyle);
+  assert.ok(store.resolve([{ template: 'style:A' }]).toneDecided);
 });
 
 test('snapshot: a file edited after refresh() changes nothing until the next refresh()', async () => {
@@ -241,102 +241,123 @@ test('snapshot: a file edited after refresh() changes nothing until the next ref
   assert.equal(store.resolve([{ template: 'style:A' }]).toneText, 'Changed.');
 });
 
-test('ensureStyleFolder: idempotent, five built-ins plus legacy export, detailTemplates and promptPresets unchanged, onload-style reads create nothing', async () => {
+const BLOCKS = 'WS/Note styles/Blocks';
+const TEMPLATES_DIR = `${BLOCKS}/Templates`;
+
+test('D12 (was ensureStyleFolder): no style file is written any more; opening the block folder writes only folders; the old template becomes one block once; the old keys are kept', async () => {
   const templates = M.normalizeTemplates([LEGACY]);
-  const { store, v, settings, saves } = makeStore({ detailTemplates: templates });
+  const { store, v, settings } = makeStore({ detailTemplates: templates, promptPresets: [] });
   const templatesBefore = plain(settings.detailTemplates), presetsBefore = plain(settings.promptPresets);
   await store.refresh();
   assert.deepEqual(v.writes, [], 'refresh writes nothing');
   assert.equal(settings.noteStylesFolder, undefined);
-  const folder = await store.ensureStyleFolder();
-  assert.equal(folder, 'WS/Note styles');
-  assert.equal(settings.noteStylesFolder, 'WS/Note styles');
+  assert.equal(store.ensureStyleFolder, undefined);
+  assert.equal(store.unexportedTemplates, undefined);
+  assert.equal(store.list, undefined);
+  assert.equal(await store.ensureBlockFolder(), BLOCKS);
+  assert.equal(settings.noteStylesFolder, 'WS/Note styles', 'the folder is remembered, as ensureStyleFolder did');
+  assert.deepEqual(v.writes, [], 'only folders: not even the five built-in style files');
+  assert.ok(v.folders.has(TEMPLATES_DIR) && v.folders.has(`${BLOCKS}/Tones`));
+  assert.equal((await store.upgradeLegacy()).status, 'done');
+  eq(v.writes, [`${TEMPLATES_DIR}/My notes.md`]);
   const after = JSON.stringify(v.files);
-  assert.equal(v.writes.length, 6);
-  eq(Object.keys(settings.noteStyleFiles), ['uuid-1']);
-  await store.ensureStyleFolder();
+  await store.upgradeLegacy();
   assert.equal(JSON.stringify(v.files), after);
-  assert.equal(v.writes.length, 6);
+  assert.equal(v.writes.length, 1);
   eq(settings.detailTemplates, templatesBefore);
   eq(settings.promptPresets, presetsBefore);
-  assert.ok(saves() >= 1);
-  // the written files are all "unchanged": resolution still equals today's
+  assert.equal(settings.noteStyleFiles, undefined, 'nothing is exported to a style file any more');
   await store.refresh();
-  assert.equal(store.resolve([{ template: 'standard', tone: 'summary' }]).noteStyle, undefined);
-  assert.equal(store.resolve([{ template: 'uuid-1' }]).noteStyle, undefined);
-  assert.equal(store.list().filter(item => item.kind === 'builtin').length, 5);
-  assert.equal(store.list().find(item => item.kind === 'legacy').id, 'uuid-1');
+  assert.equal(store.resolve([{ template: 'standard', tone: 'summary' }]).toneDecided, undefined);
+  const moved = store.resolve([{ template: 'uuid-1' }]);
+  assert.ok(moved.block, 'the old template runs as its block');
+  eq(moved.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
+  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard'], ['builtin', 'Textbook'], ['file', 'My notes']]);
 });
 
-test('export conflicts: a different file (also different case) keeps its bytes, the export gets a unique name; builtin names taken by users too', async () => {
-  const { store, v, settings } = makeStore({ noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]) }, {
-    'WS/S/my NOTES.md': 'the user\'s own file\n',
-    'WS/S/Standard.md': '---\ntone: mine\n---\n## Mine\nstuff\n'
+test('D12 (was export conflicts): a user file with the name (also another case) keeps its bytes; the old template takes a unique name and its id points at it', async () => {
+  const { store, v, settings } = makeStore({ noteStylesFolder: 'WS/Note styles', detailTemplates: M.normalizeTemplates([LEGACY]) }, {
+    [`${TEMPLATES_DIR}/my NOTES.md`]: 'the user\'s own file\n'
   });
-  await store.ensureStyleFolder();
-  assert.equal(v.files['WS/S/my NOTES.md'], 'the user\'s own file\n');
-  assert.equal(v.files['WS/S/Standard.md'], '---\ntone: mine\n---\n## Mine\nstuff\n');
-  assert.equal(settings.noteStyleFiles['uuid-1'], 'My notes (2).md');
-  assert.ok(v.files['WS/S/My notes (2).md']);
-  assert.ok(v.files['WS/S/Standard (2).md'], 'built-in written under a unique name');
-  // the legacy uuid still resolves as before
+  await store.upgradeLegacy();
+  assert.equal(v.files[`${TEMPLATES_DIR}/my NOTES.md`], 'the user\'s own file\n');
+  assert.ok(v.files[`${TEMPLATES_DIR}/My notes (2).md`]);
+  assert.equal(settings.noteStyleAliases['uuid-1'].template, 'file:My notes (2)');
   await store.refresh();
-  eq(store.resolve([{ template: 'uuid-1' }]).template, todayTemplate(settings, ['uuid-1']).template);
-  // the user's own file is a plain style
-  assert.ok(store.resolve([{ template: 'style:Standard' }]).noteStyle);
+  eq(store.resolve([{ template: 'uuid-1' }]).template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
+  assert.equal(Object.keys(v.files).filter(path => path.startsWith(TEMPLATES_DIR)).length, 2);
 });
 
-test('lost mapping (downgrade): an unchanged export is adopted again, a changed one is not and the uuid keeps the data.json template', async () => {
-  const exported = M.serializeLegacyV1(LEGACY, 'en');
-  const a = makeStore({ noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]) }, { 'WS/S/My notes.md': exported });
-  await a.store.ensureStyleFolder();
-  assert.equal(a.settings.noteStyleFiles['uuid-1'], 'My notes.md');
-  assert.equal(Object.keys(a.v.files).filter(path => /My notes/.test(path)).length, 1);
-  const changed = exported.replace('What we found.', 'Edited by hand.');
-  const b = makeStore({ noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]) }, { 'WS/S/My notes.md': changed });
-  await b.store.ensureStyleFolder();
-  assert.equal(b.v.files['WS/S/My notes.md'], changed);
-  assert.equal(b.settings.noteStyleFiles['uuid-1'], 'My notes (2).md');
-  eq(b.store.resolve([{ template: 'uuid-1' }]).template, todayTemplate(b.settings, ['uuid-1']).template);
+test('D12 (was lost mapping): a block file with the upgrade\'s own text is reused, a changed one is not and the old template takes a new name', async () => {
+  const first = makeStore({ noteStylesFolder: 'WS/Note styles', promptPresets: [], detailTemplates: M.normalizeTemplates([LEGACY]) });
+  await first.store.upgradeLegacy();
+  const written = first.v.files[`${TEMPLATES_DIR}/My notes.md`];
+  assert.ok(written);
+  const same = makeStore({ noteStylesFolder: 'WS/Note styles', promptPresets: [], detailTemplates: M.normalizeTemplates([LEGACY]) }, { [`${TEMPLATES_DIR}/My notes.md`]: written });
+  await same.store.upgradeLegacy();
+  assert.deepEqual(same.v.writes, [], 'nothing new was written');
+  assert.equal(same.settings.noteStyleAliases['uuid-1'].template, 'file:My notes');
+  const changed = written.replace('What we found.', 'Edited by hand.');
+  assert.notEqual(changed, written);
+  const other = makeStore({ noteStylesFolder: 'WS/Note styles', detailTemplates: M.normalizeTemplates([LEGACY]) }, { [`${TEMPLATES_DIR}/My notes.md`]: changed });
+  await other.store.upgradeLegacy();
+  assert.equal(other.v.files[`${TEMPLATES_DIR}/My notes.md`], changed);
+  assert.equal(other.settings.noteStyleAliases['uuid-1'].template, 'file:My notes (2)');
 });
 
-test('restore default: trash first, then the standard content; a non-builtin file is refused', async () => {
-  const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': M.canonicalContent('textbook', 'en').replace('3–5', '9'), 'WS/S/Mine.md': 'x', 'WS/S/Standard.md': '---\ntone: mine\n---\n## Mine\nstuff\n', 'WS/S/Plain.md': 'x' });
+test('D12 (was restore default): the old restoreDefault and builtinIdOfFile are gone; restoreBlock backs a changed built-in up, then trashes it, and refuses an own block', async () => {
+  const { store, v } = makeStore({ noteStylesFolder: 'WS/Note styles' }, {
+    [`${TEMPLATES_DIR}/Textbook.md`]: M.builtinBlockText('template', 'textbook', 'en') + '\nA line of mine.\n',
+    [`${TEMPLATES_DIR}/Mine.md`]: '## A\ntext\n'
+  });
+  assert.equal(store.restoreDefault, undefined);
+  assert.equal(store.builtinIdOfFile, undefined);
   const order = [];
   const trash = v.port.trash, create = v.port.create;
   v.port.trash = async path => { order.push('trash'); return trash(path); };
   v.port.create = async (path, content) => { order.push('create'); return create(path, content); };
-  assert.equal(await store.restoreDefault('WS/S/Mine.md'), false);
-  // a user's file called like a built-in is a style: file, so it is neither offered nor restored (before and after refresh())
-  assert.equal(await store.restoreDefault('WS/S/Standard.md'), false);
-  assert.equal(await store.restoreDefault('WS/S/Plain.md'), false);
+  const refused = await store.restoreBlock('template', 'file:Mine');
+  assert.deepEqual(plain(refused), { ok: false, reason: 'not-builtin' });
   assert.equal(order.length, 0);
-  await store.refresh();
-  assert.equal(store.builtinIdOfFile('Standard.md'), undefined);
-  assert.equal(store.builtinIdOfFile('Standard'), undefined);
-  assert.equal(store.builtinIdOfFile('Textbook.md').id, 'textbook');
-  assert.equal(await store.restoreDefault('WS/S/Standard.md'), false);
-  assert.equal(await store.restoreDefault('WS/S/Textbook.md'), true);
-  eq(order, ['trash', 'create']);
-  eq(v.trashed.map(item => item.path), ['WS/S/Textbook.md']);
-  assert.match(v.trashed[0].content, /Textbook|9/);
-  assert.equal(v.files['WS/S/Standard.md'], '---\ntone: mine\n---\n## Mine\nstuff\n');
-  assert.equal(v.files['WS/S/Textbook.md'], M.canonicalContent('textbook', 'en'));
+  const done = await store.restoreBlock('template', 'builtin:textbook');
+  assert.equal(done.ok, true);
+  eq(order, ['create', 'trash']);
+  assert.match(v.files[done.backup], /A line of mine/);
+  eq(v.trashed.map(item => item.path), [`${TEMPLATES_DIR}/Textbook.md`]);
+  assert.equal(v.files[`${TEMPLATES_DIR}/Mine.md`], '## A\ntext\n');
 });
 
-test('restore default writes v2, and a v1 file is still unmodified (restorable) while a changed one is not', async () => {
-  const v1 = M.CANONICAL_VERSIONS[0].textbook.en;
-  assert.ok(!v1.includes('summary callout'));
-  const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': v1.replace('3–5', '9') });
+test('D8 (the map pickers\' data source): a template block is picked at any level as file:<name>, the tone chain still applies, a missing block is "missing"', async () => {
+  const { store } = makeStore({ noteStylesFolder: 'WS/Note styles' }, { [`${TEMPLATES_DIR}/Mine.md`]: '## A\ntext\n' });
   await store.refresh();
-  assert.equal(await store.restoreDefault('WS/S/Textbook.md'), true);
-  assert.equal(v.files['WS/S/Textbook.md'], M.CANONICAL_VERSIONS[1].textbook.en);
-  assert.ok(v.files['WS/S/Textbook.md'].includes('summary callout: summary'));
-  const old = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Textbook.md': v1 });
-  await old.store.refresh();
-  assert.equal(M.matchCanonical(v1).version, 1);
-  assert.equal(old.store.builtinIdOfFile('Textbook.md').id, 'textbook');
-  assert.equal(old.v.writes.length, 0);
+  const run = store.resolve([{ template: 'file:Mine' }]);
+  assert.ok(run.block);
+  assert.equal(run.template.id, 'file:Mine');
+  eq(run.missing, []);
+  assert.equal(store.toneTextFor(run.template, ['plain'], 'en'), M.resolveToneText(PRESETS, ['plain'], 'en'), 'the layer\'s tone is not dropped');
+  assert.equal(store.resolve([{}, { template: 'file:Mine' }]).block.fileName, 'Mine.md');
+  const gone = store.resolve([{ template: 'file:Gone' }, { template: 'textbook' }]);
+  eq(gone.missing, ['file:Gone']);
+  assert.equal(gone.template.id, 'textbook');
+});
+
+test('D8 (tones): the tone choices are the built-in tones and the tone blocks; an upgraded custom preset keeps its name through its alias; a tone block is picked as file:<name>', async () => {
+  const { store, v } = makeStore({ noteStylesFolder: 'WS/Note styles' }, { [`${BLOCKS}/Tones/Calm.md`]: 'Speak calmly.\n' });
+  await store.upgradeLegacy();
+  await store.refresh();
+  const choices = store.toneChoices();
+  assert.ok(['academic', 'summary', 'plain'].every(id => choices.some(choice => choice.id === id)), 'the built-in tones come by tone id');
+  assert.ok(choices.some(choice => choice.id === 'file:Calm' && choice.name === 'Calm'));
+  assert.ok(choices.some(choice => choice.id === 'file:Pirate' && choice.name === 'Pirate'), 'the custom preset is a tone block now');
+  assert.ok(!choices.some(choice => choice.id === 'custom-tone-1'));
+  assert.equal(store.toneName('custom-tone-1'), 'Pirate');
+  assert.equal(store.toneName('file:Calm'), 'Calm');
+  assert.equal(store.toneName('summary'), choices.find(choice => choice.id === 'summary').name);
+  assert.equal(store.toneName('nothing'), undefined);
+  assert.equal(store.toneTextFor(undefined, ['file:Calm'], 'en'), 'Speak calmly.');
+  assert.equal(store.toneTextFor(undefined, ['custom-tone-1'], 'en'), 'Talk like a pirate.');
+  assert.equal(store.toneTextFor(undefined, ['file:Gone', 'plain'], 'en'), M.resolveToneText(PRESETS, ['plain'], 'en'), 'a tone block that is gone names nothing');
+  assert.ok(Object.keys(v.files).some(path => path.includes('/Tones/Pirate')));
 });
 
 test('folder rename follows the folder only; default folder name follows the language', async () => {

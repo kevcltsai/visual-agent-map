@@ -47,10 +47,10 @@ const TEMPLATES = () => [item('builtin:standard', 'Standard'), item('builtin:tex
 const TONES = () => ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'].map(id => item(`builtin:${id}`, id));
 
 // One Template or Tone row against a fake plugin and store; `calls` records what the buttons asked of the plugin.
-function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), list = [], old = [], hold = {} } = {}) {
+function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {} } = {}) {
   const calls = [];
   const view = { options: [], value: undefined, disabled: false, attrs: {}, focused: 0, buttons: [], desc: '', descAttrs: {}, name: '', classes: [], descWrites: 0 };
-  const settingsObject = { language: 'en', ...settings };
+  const settingsObject = { language: 'en', detailTemplates: [], ...settings };
   const setting = {
     descEl: { setAttr: (k, v) => { view.descAttrs[k] = v; } },
     settingEl: { addClass: name => { view.classes.push(name); } },
@@ -76,7 +76,7 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
     openBlock: async (...args) => { calls.push(['open', ...args]); await (hold.open ?? Promise.resolve()); return true; },
     copyBlock: async (...args) => { calls.push(['copy', ...args]); settingsObject[args[0] === 'template' ? 'noteTemplateBlock' : 'noteToneBlock'] = 'file:Copy'; (args[0] === 'template' ? templates : tones).push(item('file:Copy', 'Copy')); return 'file:Copy'; },
     restoreBlock: async (...args) => { calls.push(['restore', ...args]); const target = (args[0] === 'template' ? templates : tones).find(entry => entry.ref === args[1]); delete target.fileName; target.modified = false; return true; },
-    noteStyles: { list: () => list, unexportedTemplates: () => old, refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones) }
+    noteStyles: { refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones) }
   };
   let refreshed = 0;
   renderNoteBlockSetting(setting, plugin, category, () => { refreshed++; });
@@ -184,7 +184,7 @@ test('Open, Copy and Restore ask the plugin, lock the buttons meanwhile and keep
 });
 
 test('an old style file as the default shows its own item, turns the tone off and says why; choosing it again clears the new keys', async () => {
-  const legacy = { settings: { defaultNoteStyleId: 'style:Mine' }, list: [{ kind: 'file', id: 'style:Mine', name: 'Mine', issues: [] }] };
+  const legacy = { settings: { defaultNoteStyleId: 'style:Mine' } };
   const template = blockRow('template', legacy);
   assert.deepEqual(template.view.options[0], ['legacy:', 'Mine (old style file)']);
   assert.equal(template.view.value, 'legacy:');
@@ -202,7 +202,7 @@ test('an old style file as the default shows its own item, turns the tone off an
   assert.equal(template.refreshed(), 1, 'the other row is rebuilt');
   const again = blockRow('template', { ...legacy, settings: { ...legacy.settings, noteTemplateBlock: 'builtin:standard', noteToneBlock: 'builtin:plain' } });
   assert.equal(again.view.options.some(option => option[0] === 'legacy:'), false, 'once a block is chosen the default is not old any more');
-  const oldTemplate = blockRow('template', { settings: { defaultNoteStyleId: 'u1' }, old: [{ id: 'u1', name: 'Old one' }] });
+  const oldTemplate = blockRow('template', { settings: { defaultNoteStyleId: 'u1', detailTemplates: [{ id: 'u1', name: 'Old one' }] } });
   assert.equal(oldTemplate.view.options[0][1], 'Old one (old style file)');
 });
 

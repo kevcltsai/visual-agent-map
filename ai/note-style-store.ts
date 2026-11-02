@@ -29,15 +29,12 @@ import {
   type DetailTemplate
 } from "./detail-templates";
 import {
-  builtinStyleFileName,
-  canonicalContent,
   CANONICAL_LANGUAGES,
   matchCanonical,
   normalizeStyleContent,
   NOTE_STYLE_BUILTIN_IDS,
   parseNoteStyleFile,
   serializeLegacyV1,
-  type NoteStyle,
   type NoteStyleBuiltinId,
   type NoteStyleIssue
 } from "./note-style-file";
@@ -46,7 +43,6 @@ import {
   BUILTIN_PAIRS,
   builtinPairOf,
   builtinStyleFileBase,
-  isBuiltinStyleFileText,
   NOTE_STYLE_UPGRADE_VERSION,
   pairAliasKey,
   planNoteStyleUpgrade,
@@ -107,8 +103,6 @@ export interface StyleResolution {
   /** Template ids that were asked for but could not be used (as `resolveTemplate` reports them). */
   missing: string[];
   toneText?: string;
-  /** Set when a style file decided the template; absent for built-in and old paths. */
-  noteStyle?: NoteStyle;
   /** The file used (with ".md"), for the progress label. */
   fileName?: string;
   /** A style file that was chosen but does not parse: the run must not start. */
@@ -117,7 +111,7 @@ export interface StyleResolution {
   block?: BlockChoice;
   /** Set with `block` when its text cannot be read: the built-in template stands in, and these say why. */
   blockIssues?: BlockIssue[];
-  /** Set when the answer decided the tone as well (an alias of an old style file): `toneText` is the run's tone, nothing else is asked. */
+  /** Set when the answer decided the tone as well (an old style file, or an alias of one): `toneText` is the run's tone, nothing else is asked. */
   toneDecided?: true;
 }
 
@@ -151,17 +145,11 @@ export type RestoreBlockResult =
   | { ok: true; backup: string }
   | { ok: false; reason: "not-builtin" | "no-override" | "read-failed" | "backup-failed" | "trash-failed" };
 
-export type StyleListItem =
-  | { kind: "builtin"; id: NoteStyleBuiltinId; fileName: string; issues: NoteStyleIssue[] }
-  | { kind: "file"; id: string; name: string; fileName: string; issues: NoteStyleIssue[] }
-  | { kind: "legacy"; id: string; name: string; fileName: string; issues: NoteStyleIssue[] };
-
 const stripMd = (name: string) => name.replace(/\.md$/i, "");
 const lower = (value: string) => value.toLocaleLowerCase();
-const SAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
 
 /**
- * The writing tone of a run: a note style file decides its own (the answer made with the template, `resolution`), else the
+ * The writing tone of a run: an old style file or an alias of one decides its own (the answer made with the template, `resolution`), else the
  * first of `ids` that names a tone preset. Academic (and nothing chosen) is undefined so prompts stay unchanged.
  */
 export function runToneText(
@@ -170,7 +158,7 @@ export function runToneText(
   ids: readonly (string | undefined)[],
   language: ContentLanguage
 ): string | undefined {
-  if (resolution?.noteStyle) return resolution.toneText;
+  if (resolution?.toneDecided) return resolution.toneText;
   return resolveToneText(presets, ids, language);
 }
 
@@ -348,33 +336,9 @@ export class NoteStyleStore {
 
   // ---- identification of files ----
 
-  /** True when `text` is a built-in's file (canonical, or edited but still carrying its usage comment). */
-  private isBuiltinFile(id: NoteStyleBuiltinId, text: string): boolean {
-    return isBuiltinStyleFileText(id, text);
-  }
-
   /** The base name of the file that holds a built-in style now, if one is in the folder. */
   private builtinFile(id: NoteStyleBuiltinId): string | undefined {
     return builtinStyleFileBase(this.files, id, this.settings.language);
-  }
-
-  /**
-   * The built-in a file base name stands for ("restore default" applies to it). The name alone is not enough: a user's own
-   * file that happens to be called "Standard" is a `style:` file. When the snapshot holds the file its content must be a
-   * built-in's file; `restoreDefault` checks the live content again.
-   */
-  builtinIdOfFile(baseName: string): { id: NoteStyleBuiltinId; language: UiLanguage } | undefined {
-    const base = stripMd(baseName);
-    const key = lower(base);
-    for (const id of NOTE_STYLE_BUILTIN_IDS)
-      for (const language of CANONICAL_LANGUAGES) {
-        const name = lower(builtinStyleFileName(id, language));
-        if (key !== name && !new RegExp(`^${escapeRegExp(name)} \\(\\d+\\)$`).test(key)) continue;
-        const held = [...this.files.keys()].find(item => lower(item) === key);
-        if (held !== undefined && !this.isBuiltinFile(id, this.files.get(held)!)) continue;
-        return { id, language };
-      }
-    return undefined;
   }
 
   private legacyUnchanged(template: DetailTemplate | undefined, text: string): boolean {
@@ -461,8 +425,7 @@ export class NoteStyleStore {
     language: ContentLanguage
   ): string | undefined {
     const resolution = this.resolutionOf(template);
-    if (resolution?.noteStyle) return runToneText(resolution, this.settings.promptPresets, ids, language);
-    // An old style file's alias decided the tone together with the template.
+    // An old style file, or the alias of one, decided the tone together with the template.
     if (resolution?.toneDecided) return resolution.toneText;
     return this.plainTone(ids, language).text;
   }
@@ -492,6 +455,12 @@ export class NoteStyleStore {
     const presets = this.settings.promptPresets;
     for (const id of ids) {
       if (!id) continue;
+      if (parseBlockRef(id)?.kind === "file") {
+        // A tone block the map, topic or run picked; the file being gone means the id names nothing any more.
+        const target = this.toneByRef(id);
+        if (target) return { named: true, text: this.toneTargetText(target, language) };
+        continue;
+      }
       const alias = this.aliasOf(id);
       if (alias?.tone && !alias.template) {
         // A tone block the id was moved to; the file being gone means the id names nothing any more.
@@ -579,7 +548,7 @@ export class NoteStyleStore {
   }
 
   private remember(resolution: StyleResolution): StyleResolution {
-    if (resolution.noteStyle || resolution.block) this.resolutions.set(resolution.template, resolution);
+    if (resolution.toneDecided || resolution.block) this.resolutions.set(resolution.template, resolution);
     return resolution;
   }
 
@@ -659,6 +628,8 @@ export class NoteStyleStore {
     noteLanguage: ReturnType<typeof noteLanguageOf>
   ): StyleResolution | undefined {
     const settings = this.settings;
+    // A template block the user wrote, picked at the map, topic or run level (the map file stores `file:<name>`).
+    if (parseBlockRef(id)?.kind === "file") return this.tryBlock(id, toneChain, noteLanguage);
     if (id.startsWith("style:")) {
       const aliased = this.tryAlias(id, "user", level, toneChain, noteLanguage);
       if (aliased) return aliased;
@@ -761,7 +732,7 @@ export class NoteStyleStore {
       if (known !== undefined) toneText = resolveToneText(settings.promptPresets, chain, settings.language);
       else if (style.tone) toneText = this.toneFromFile(style.tone);
     } else if (style.tone) toneText = this.toneFromFile(style.tone);
-    return { template: style.template, missing: [], ...(toneText ? { toneText } : {}), noteStyle: style, fileName };
+    return { template: style.template, missing: [], ...(toneText ? { toneText } : {}), toneDecided: true, fileName };
   }
 
   /** `語氣` is the name or id of an existing tone (its full text is used), else free text. */
@@ -778,116 +749,26 @@ export class NoteStyleStore {
     return raw.trim() || undefined;
   }
 
-  // ---- lists for the entries ----
+  // ---- the tone choices of the map pickers ----
 
-  /** Every style in the folder with its parse result, for the pickers (call `refresh()` first). */
-  list(): StyleListItem[] {
-    const settings = this.settings;
-    const exportedBy = new Map<string, string>(
-      Object.entries(settings.noteStyleFiles ?? {}).map(([uuid, name]) => [lower(stripMd(name)), uuid])
-    );
-    const items: StyleListItem[] = [];
-    for (const [base, text] of [...this.files].sort(([a], [b]) => a.localeCompare(b))) {
-      const builtin = NOTE_STYLE_BUILTIN_IDS.find(id => this.builtinFile(id) === base);
-      const uuid = exportedBy.get(lower(base));
-      const id = builtin ? builtin : (uuid ?? `style:${base}`);
-      const parsed = parseNoteStyleFile(text, { id: typeof id === "string" ? id : base, name: base });
-      const issues = parsed.ok ? [] : parsed.issues;
-      if (builtin) items.push({ kind: "builtin", id: builtin, fileName: `${base}.md`, issues });
-      else if (uuid) items.push({ kind: "legacy", id: uuid, name: base, fileName: `${base}.md`, issues });
-      else items.push({ kind: "file", id: `style:${base}`, name: base, fileName: `${base}.md`, issues });
-    }
-    return items;
+  /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
+  toneChoices(): { id: string; name: string }[] {
+    return this.listBlocks("tone").map(item => {
+      const parsed = parseBlockRef(item.ref);
+      return { id: parsed?.kind === "builtin" ? parsed.id : item.ref, name: item.name };
+    });
   }
 
-  /** Old custom templates that have no style file yet (still pickable as before). */
-  unexportedTemplates(): DetailTemplate[] {
-    const map = this.settings.noteStyleFiles ?? {};
-    return this.settings.detailTemplates.filter(template => !map[template.id]);
-  }
-
-  // ---- writing files (only on a user action) ----
-
-  private uniqueName(base: string, taken: Set<string>): string {
-    let name = base;
-    for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
-    return name;
-  }
-
-  /**
-   * Creates the folder and the files that do not exist yet: the five built-ins, and an export of every old custom template.
-   * Safe to run again. Never overwrites: a name taken by another file gets a unique name instead.
-   */
-  async ensureStyleFolder(): Promise<string> {
-    const settings = this.settings;
-    const { port } = this.deps;
-    const folder = this.folder();
-    let dirty = false;
-    if (!settings.noteStylesFolder) {
-      settings.noteStylesFolder = folder;
-      dirty = true;
-    }
-    await port.createFolder(folder);
-    await this.refresh();
-    const taken = new Set([...this.files.keys()].map(lower));
-    const write = async (base: string, content: string) => {
-      await port.create(`${folder}/${base}.md`, content);
-      this.files.set(base, content);
-      taken.add(lower(base));
-    };
-    for (const id of NOTE_STYLE_BUILTIN_IDS) {
-      if (this.builtinFile(id) !== undefined) continue;
-      await write(
-        this.uniqueName(builtinStyleFileName(id, settings.language), taken),
-        canonicalContent(id, settings.language)
-      );
-    }
-    const map = { ...(settings.noteStyleFiles ?? {}) };
-    const claimed = new Set(Object.values(map).map(name => lower(stripMd(name))));
-    for (const template of settings.detailTemplates) {
-      if (map[template.id]) continue;
-      const wanted = template.name.replace(SAFE_NAME, " ").replace(/\s+/g, " ").trim() || "Style";
-      const existing = [...this.files.keys()].find(base => lower(base) === lower(wanted));
-      if (
-        existing !== undefined &&
-        !claimed.has(lower(existing)) &&
-        this.legacyUnchanged(template, this.files.get(existing)!)
-      ) {
-        map[template.id] = `${existing}.md`;
-        claimed.add(lower(existing));
-        dirty = true;
-        continue;
-      }
-      const base = this.uniqueName(wanted, taken);
-      await write(base, serializeLegacyV1(template, settings.language));
-      map[template.id] = `${base}.md`;
-      claimed.add(lower(base));
-      dirty = true;
-    }
-    if (Object.keys(map).length && JSON.stringify(map) !== JSON.stringify(settings.noteStyleFiles ?? {})) {
-      settings.noteStyleFiles = map;
-      dirty = true;
-    }
-    if (dirty) await this.deps.save();
-    return folder;
-  }
-
-  /** Moves the built-in's file to the trash, then writes its standard content again. */
-  async restoreDefault(path: string): Promise<boolean> {
-    const name = path.split("/").pop() ?? path;
-    const builtin = this.builtinIdOfFile(name);
-    if (!builtin) return false;
-    let live: string;
-    try {
-      live = await this.deps.port.read(path);
-    } catch {
-      return false;
-    }
-    if (!this.isBuiltinFile(builtin.id, live)) return false;
-    await this.deps.port.trash(path);
-    await this.deps.port.create(path, canonicalContent(builtin.id, builtin.language));
-    this.files.set(stripMd(name), canonicalContent(builtin.id, builtin.language));
-    return true;
+  /** The name of a stored tone id: a built-in tone, a tone block, a custom preset moved to a block (its alias), or an old preset not moved. */
+  toneName(id: string | undefined): string | undefined {
+    if (!id) return undefined;
+    const alias = this.aliasOf(id);
+    let ref: string | undefined;
+    if (alias?.tone && !alias.template) ref = alias.tone;
+    else if (parseBlockRef(id)?.kind === "file") ref = id;
+    else if (this.isBuiltinBlockId("tone", id)) ref = builtinRef(id);
+    const named = ref ? this.listBlocks("tone").find(item => item.ref === ref)?.name : undefined;
+    return named ?? findPreset(this.settings.promptPresets, "tone", id, this.settings.language)?.name;
   }
 
   // ---- writing block files (only on a user action; a file is never overwritten) ----
@@ -900,6 +781,24 @@ export class NoteStyleStore {
 
   private takenNames(category: BlockCategory): Set<string> {
     return new Set([...this.blocks[category].keys()].map(lower));
+  }
+
+  /**
+   * Creates the block folders (Templates and Tones) when they are missing, and remembers the style folder in the settings
+   * so a later change of interface language does not move it. Writes no block file. Returns the block folder.
+   */
+  ensureBlockFolder(): Promise<string> {
+    return this.serial(async () => {
+      const { port } = this.deps;
+      const folder = this.folder();
+      if (!this.settings.noteStylesFolder) {
+        this.settings.noteStylesFolder = folder;
+        await this.deps.save();
+      }
+      const dirs = this.blockDirectories();
+      for (const path of [dirs.root, dirs.template, dirs.tone]) await port.createFolder(path);
+      return dirs.root;
+    });
   }
 
   /**
@@ -1159,10 +1058,6 @@ export class NoteStyleStore {
   folderExists(): boolean {
     return this.deps.port.folderExists(this.folder());
   }
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** An exported file's sections take the role and old names of the same-named section of the original template. */

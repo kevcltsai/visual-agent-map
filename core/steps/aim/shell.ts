@@ -153,7 +153,11 @@ export function buildAimPrompt(
     withProviderOutput(inLanguage(JSON_CONTRACT, language), provider, language),
     context.toneText ? toneBlock(context.toneText, language) : "",
     phaseGuidance(phase, language, context.responseContract, !!context.aimContract),
-    readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language) : "",
+    phase === "delivery-writing" && context.aimNoteFormat !== undefined
+      ? context.aimNoteFormat
+      : readerFacingAimPhase(phase)
+        ? inLanguage(OBSIDIAN_FORMAT, language)
+        : "",
     context.researchMode === "local"
       ? inLanguage(WEB_SEARCH_OFF, language)
       : context.researchMode === "research"

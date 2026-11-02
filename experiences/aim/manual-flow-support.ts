@@ -188,6 +188,8 @@ export type PlannerQualityContext = {
   outputLanguage: ContentLanguage;
   /** Writing tone for the final delivery only; review and classification calls are structured and ignore it. */
   toneText?: string;
+  /** The user's AIM note style for the final conclusion; absent for the AIM report. */
+  noteStyle?: import("./aim-note-style").AimNoteStyle;
   conditions: Record<string, string>;
   currentQuestion: string;
   currentAnswer: string;

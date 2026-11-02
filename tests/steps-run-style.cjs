@@ -288,3 +288,31 @@ test('slice 12: the run\'s own tone takes no part in finding the template; it on
   assert.equal(got.toneText, 'Talk like a pirate.');
   assert.equal(got.label.toneName, 'Pirate');
 });
+
+// decisions 2026-11-02-deepen-modules#7: a proposal run (new subtopics, selection synthesis) asks for its tone only. Before this
+// change the view's `toneField` never looked at a style file, so the workspace default being an old style file or the alias of
+// one gave no tone of its own to a proposal: the tone came from the run, topic and map, else the workspace tone setting.
+// Expected values are what `toneField` gave at fba004b (no template level, so only the tone chain and the workspace tone).
+test('toneOnly: a proposal run takes no tone from the workspace default style file or pair alias, only from the tone chain and the workspace tone', async () => {
+  const oldFile = await world({ defaultNoteStyleId: 'style:Own' }, { ...TONE_FILES, [`${STYLES}/Own.md`]: OWN_OLD });
+  const proposal = (w, request = {}) => w.store.runStyle({ outputLanguage: 'en', toneOnly: true, ...request });
+  assert.equal(proposal(oldFile).toneText, undefined, 'the style file\'s tone does not reach a proposal');
+  assert.equal(proposal(oldFile).label.toneName, 'Academic rigor');
+  assert.equal(proposal(oldFile, { map: { tone: 'file:Poet' } }).toneText, 'Write as a poet.');
+  assert.equal(proposal(oldFile, { topic: { tone: 'file:Pirate' }, map: { tone: 'file:Poet' } }).toneText, 'Talk like a pirate.');
+  assert.equal(proposal(oldFile, { choice: { tone: 'academic' }, map: { tone: 'file:Poet' } }).toneText, undefined);
+  const withWorkspaceTone = await world({ defaultNoteStyleId: 'style:Own', noteToneBlock: 'file:Clerk' }, { ...TONE_FILES, [`${STYLES}/Own.md`]: OWN_OLD });
+  assert.equal(proposal(withWorkspaceTone).toneText, 'Write as a dry clerk.', 'the workspace tone fills the gap, as before');
+  const pair = await world({ ...UPGRADED, defaultNoteStyleId: 'style:S' }, UPGRADED_FILES);
+  assert.equal(proposal(pair).toneText, undefined, 'the alias\'s tone does not reach a proposal');
+  assert.equal(proposal(pair, { map: { tone: 'file:Clerk' } }).toneText, 'Write as a dry clerk.');
+  // the template still resolves, so the answer is a full RunStyle either way
+  assert.equal(proposal(pair).template.id, 'file:S');
+  // a built-in workspace style brings its tone through the workspace tone, with or without the option
+  const builtin = await world({ defaultNoteStyleId: 'summary' });
+  assert.equal(proposal(builtin).toneText, M.lookupBuiltinBlock('tone', 'summary', 'en'));
+  assert.equal(builtin.store.runStyle({ outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'summary', 'en'));
+  // without the option nothing changes: the style file decides its own tone
+  assert.equal(oldFile.store.runStyle({ outputLanguage: 'en' }).toneText, '簡明');
+  assert.equal(pair.store.runStyle({ outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
+});

@@ -112,6 +112,8 @@ export interface RunStyleRequest {
   map?: StyleLevel;
   /** The language the note is written in (the interface language is read from the settings). */
   outputLanguage: ContentLanguage;
+  /** Proposal runs: the tone comes from the tone levels and the workspace tone only, never from the template (a style file or alias that carries its own tone). */
+  toneOnly?: boolean;
 }
 
 /** The note style one run uses; a value, nothing in it changes after it is returned. */
@@ -430,8 +432,8 @@ export class NoteStyleStore {
     const templateName = (id: string): string =>
       isFileId(id) ? id.replace(/^(?:style|file):/, "") : (uiTemplates.find(item => item.id === id)?.name ?? id);
     const chain = [request.choice?.tone, request.topic?.tone, request.map?.tone];
-    // An old style file, or the alias of one, decided the tone together with the template; else the chain, then the workspace.
-    const tone: { text?: string; source?: string; free?: string } = found.toneDecided
+    // An old style file, or the alias of one, decided the tone together with the template (unless the run asks for the tone only); else the chain, then the workspace.
+    const tone: { text?: string; source?: string; free?: string } = found.toneDecided && !request.toneOnly
       ? { text: found.toneText, source: found.toneSource, free: found.toneFree }
       : this.plainTone(chain, language);
     // Free text names no tone; it stands for itself, so the style is a custom pair.

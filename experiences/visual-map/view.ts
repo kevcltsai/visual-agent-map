@@ -2131,7 +2131,8 @@ export class VisualAgentMapView extends ItemView {
       choice: { tone: options?.toneId },
       topic: { tone: note?.toneId },
       map: { tone: this.map?.toneId },
-      outputLanguage: options?.outputLanguage ?? this.plugin.settings.language
+      outputLanguage: options?.outputLanguage ?? this.plugin.settings.language,
+      toneOnly: true
     });
     return toneText ? { toneText } : {};
   }

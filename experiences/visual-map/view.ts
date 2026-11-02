@@ -323,7 +323,6 @@ import {
   isChatNarrow
 } from "../../core/map-chat-layout";
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
-import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
 import {
   addOutlineToMap,
@@ -1838,7 +1837,7 @@ export class VisualAgentMapView extends ItemView {
   private rerunStandard(node: MapNode): void {
     void (async () => {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-      if (this.plugin.running.has(node.path)) {
+      if (this.plugin.topicRuns.isBusy(node.path)) {
         new Notice(t("ui.ai_running_ai"));
         return;
       }
@@ -5056,7 +5055,7 @@ export class VisualAgentMapView extends ItemView {
     const fill = progress.createDiv("vam-research-progress-track").createDiv("vam-research-progress-fill");
     fill.style.width = `${nodes.length ? (done / nodes.length) * 100 : 0}%`;
     const running = nodes.filter(
-      node => this.plugin.running?.has(node.path) || this.plugin.quickExpandPending?.has(node.path)
+      node => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending?.has(node.path)
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
   }
@@ -5193,9 +5192,9 @@ export class VisualAgentMapView extends ItemView {
       task = this.integrationTask;
     return !!(
       this.plugin.relevanceGrades?.get(this.path)?.status === "running" ||
-      this.plugin.running?.has(node.path) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
-      this.plugin.activeTasks?.has(node.path) ||
+      this.plugin.topicRuns.hasTask(node.path) ||
       (batch?.status === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path))) ||
       (task?.state === "running" && task.mapPath === this.path && task.sources.some(source => source.id === node.id)) ||
       this.isMerging(node.id, except)
@@ -8100,7 +8099,7 @@ export class VisualAgentMapView extends ItemView {
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some(node => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
     return found;
   }
   /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
@@ -8385,9 +8384,9 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.repo.updateNote(node.path, patch);
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
-      this.plugin.pendingSuggestions.delete(node.path);
+      this.plugin.topicRuns.dropPending(node.path);
       this.plugin.pendingResearchOptions.delete(node.path);
-      if (this.plugin.pendingSuggestions instanceof PendingSuggestions) await this.plugin.pendingSuggestions.flush();
+      await this.plugin.topicRuns.flushPending();
     }
     if (
       [
@@ -8403,7 +8402,7 @@ export class VisualAgentMapView extends ItemView {
         "referencePaths"
       ].some(key => key in patch)
     )
-      this.plugin.activeTasks?.get(node.path)?.abort();
+      this.plugin.topicRuns.stopTask(node.path);
     this.history.push({
       undo: async () => {
         let restore = before;
@@ -8469,7 +8468,7 @@ export class VisualAgentMapView extends ItemView {
       countIssues: job.formatIssues,
       model: job.model,
       apply: async charted => {
-        if (this.plugin.running.has(path)) return false;
+        if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
         if (this.chartSnapshot(latest) !== snapshot) return false;
         await this.plugin.repo.updateNote(
@@ -9715,7 +9714,7 @@ export class VisualAgentMapView extends ItemView {
     const merging = this.isMerging(node.id);
     card.dataset.status =
       merging ||
-      this.plugin.running?.has(node.path) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path)
         ? "running"
@@ -9750,7 +9749,7 @@ export class VisualAgentMapView extends ItemView {
     else this.researchSigs.delete(node.path);
     const active =
       merging ||
-      this.plugin.running?.has(node.path) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path);
     const doc = this.map,
@@ -9897,21 +9896,21 @@ export class VisualAgentMapView extends ItemView {
     const stoppable =
       this.startingTasks.has(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
-      (this.plugin.running?.has(node.path) && this.plugin.activeTasks.has(node.path) && !batchChild);
+      (this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild);
     if (
       stoppable &&
       batch?.status !== "running" &&
       !(ownSynthesis?.state === "running" && ownSynthesis.mapPath === this.path)
     ) {
       this.button(header, t("ui.stop_research"), () =>
-        (this.startingTasks.get(node.path) ?? this.plugin.activeTasks.get(node.path))?.abort()
+        (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
       );
     }
     if (research?.slow && research.resend)
       this.button(header, t("ui.research_resend"), () => this.plugin.researchProgress.get(node.path)?.resend?.());
     if (research?.stage === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
+    const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.map?.aim)
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
@@ -10580,7 +10579,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** A topic waiting in a batch (multi-topic or shallow research) for a free slot; it is not running yet. */
   private isResearchQueued(node: MapNode): boolean {
-    return !this.plugin.running?.has(node.path) && !!this.plugin.expansionCoordinator?.isQueued(node.path);
+    return !this.plugin.topicRuns.isBusy(node.path) && !!this.plugin.expansionCoordinator?.isQueued(node.path);
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   private relationsEnabled(): boolean {
@@ -10986,7 +10985,7 @@ export class VisualAgentMapView extends ItemView {
         });
     } else if (
       !this.isMerging(node.id) &&
-      !this.plugin.running?.has(node.path) &&
+      !this.plugin.topicRuns.isBusy(node.path) &&
       !this.plugin.quickExpandPending?.has(node.path) &&
       !this.isResearchQueued(node)
     ) {
@@ -11112,7 +11111,7 @@ export class VisualAgentMapView extends ItemView {
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
-          const count = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
+          const count = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
             label: t("ui.view_0_expansion_suggestions", count),
             open: () => this.openNodePanel(node, "proposals")
@@ -11139,7 +11138,7 @@ export class VisualAgentMapView extends ItemView {
         this.app,
         note.title,
         this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
-        this.plugin.pendingSuggestions.get(node.path)?.length ?? 0,
+        this.plugin.topicRuns.pending(node.path)?.length ?? 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
@@ -11189,12 +11188,12 @@ export class VisualAgentMapView extends ItemView {
           path: node.path,
           save: patch => this.plugin.mutate(() => this.noteChange(node, patch)),
           running:
-            this.plugin.running.has(node.path) ||
+            this.plugin.topicRuns.isBusy(node.path) ||
             this.plugin.quickExpandPending.has(node.path) ||
             this.startingTasks.has(node.path),
           stop:
-            this.startingTasks.has(node.path) || this.plugin.activeTasks.has(node.path)
-              ? () => (this.startingTasks.get(node.path) ?? this.plugin.activeTasks.get(node.path))?.abort()
+            this.startingTasks.has(node.path) || this.plugin.topicRuns.hasTask(node.path)
+              ? () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
               : undefined,
           background: this.backgroundHooks(node.path, node),
           quickOutline: this.quickOutline(node),
@@ -11377,7 +11376,7 @@ export class VisualAgentMapView extends ItemView {
     close?: () => void,
     host?: HTMLElement
   ): void {
-    const suggestions = this.plugin.pendingSuggestions.get(node.path);
+    const suggestions = this.plugin.topicRuns.pending(node.path);
     if (!suggestions?.length) return;
     const section = panel.createDiv("vam-inspector-proposals");
     section.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
@@ -11428,7 +11427,7 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.mutate(async () => {
             const current = this.map?.nodes.find(item => item.id === node.id && item.path === node.path);
             if (!current) throw new Error(t("ui.the_topic_changed_select_it_again"));
-            if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+            if (this.plugin.topicRuns.pending(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
             await this.assertSuggestionOrigin(current, suggestions);
             try {
@@ -11437,9 +11436,9 @@ export class VisualAgentMapView extends ItemView {
               if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(node.path, error);
               throw error;
             }
-            this.plugin.pendingSuggestions.delete(node.path);
+            this.plugin.topicRuns.dropPending(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+            await this.plugin.topicRuns.flushPending();
           });
           if (researchOptions && createdNodes.length)
             await this.startShallowResearch(node, createdNodes, researchOptions);
@@ -11458,11 +11457,11 @@ export class VisualAgentMapView extends ItemView {
         void (async () => {
           try {
             await this.plugin.mutate(async () => {
-              if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+              if (this.plugin.topicRuns.pending(node.path) !== suggestions)
                 throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-              this.plugin.pendingSuggestions.delete(node.path);
+              this.plugin.topicRuns.dropPending(node.path);
               this.plugin.pendingResearchOptions.delete(node.path);
-              await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+              await this.plugin.topicRuns.flushPending();
             });
             close?.();
             this.render();
@@ -12672,12 +12671,12 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const previousBatch = this.plugin.expansionBatches.get(parent.path);
-    const pending = this.plugin.pendingSuggestions.get(parent.path);
+    const pending = this.plugin.topicRuns.pending(parent.path);
     const present = (items: Suggestion[]): void => {
-      const version = this.plugin.pendingSuggestions.get(parent.path);
+      const version = this.plugin.topicRuns.pending(parent.path);
       const names = items.filter(item => !item.parentTitle).map(item => item.title);
       if (new Set(names).size !== names.length) {
-        this.plugin.pendingSuggestions.delete(parent.path);
+        this.plugin.topicRuns.dropPending(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
@@ -12696,7 +12695,7 @@ export class VisualAgentMapView extends ItemView {
           ? { ...savedOptions, signal: options?.signal, onProgress: options?.onProgress }
           : undefined;
         await this.plugin.mutate(async () => {
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           try {
@@ -12711,9 +12710,9 @@ export class VisualAgentMapView extends ItemView {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
@@ -12728,7 +12727,7 @@ export class VisualAgentMapView extends ItemView {
       present(options ? pending.filter(item => !item.parentTitle) : pending);
       return;
     }
-    if (this.plugin.running.has(parent.path)) {
+    if (this.plugin.topicRuns.isBusy(parent.path)) {
       failed?.(t("ui.ai_running_ai"));
       return;
     }
@@ -12805,16 +12804,16 @@ export class VisualAgentMapView extends ItemView {
       )
     )
       return;
-    this.plugin.pendingSuggestions.delete(parent.path);
+    this.plugin.topicRuns.dropPending(parent.path);
     this.plugin.pendingResearchOptions.delete(parent.path);
-    await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+    await this.plugin.topicRuns.flushPending();
     throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
   }
   private openChildSuggestions(parent: MapNode, suggestions: Suggestion[]): void {
-    const version = this.plugin.pendingSuggestions.get(parent.path);
+    const version = this.plugin.topicRuns.pending(parent.path);
     const roots = suggestions.filter(item => !item.parentTitle).map(item => item.title);
     if (new Set(roots).size !== roots.length) {
-      this.plugin.pendingSuggestions.delete(parent.path);
+      this.plugin.topicRuns.dropPending(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
       new Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
@@ -12825,7 +12824,7 @@ export class VisualAgentMapView extends ItemView {
         let researchOptions: TaskOptions | undefined,
           createdNodes: MapNode[] = [];
         await this.plugin.mutate(async () => {
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
@@ -12835,9 +12834,9 @@ export class VisualAgentMapView extends ItemView {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
@@ -13158,9 +13157,9 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         const busy = (node: MapNode): boolean =>
-          this.plugin.running.has(node.path) ||
+          this.plugin.topicRuns.isBusy(node.path) ||
           this.plugin.quickExpandPending.has(node.path) ||
-          this.plugin.activeTasks.has(node.path);
+          this.plugin.topicRuns.hasTask(node.path);
         const nodes = selected.filter(node => !busy(node));
         if (!nodes.length) {
           new Notice(t("ui.multi_research_all_skipped"));
@@ -13448,10 +13447,10 @@ export class VisualAgentMapView extends ItemView {
     return { ...choices, signal: undefined, onProgress: undefined, referenceGroups: options.referenceGroups ?? [] };
   }
   private async clearPendingSuggestions(path: string): Promise<void> {
-    this.plugin.pendingSuggestions.delete(path);
+    this.plugin.topicRuns.dropPending(path);
     this.plugin.pendingResearchOptions.delete(path);
     try {
-      await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+      await this.plugin.topicRuns.flushPending();
     } catch (error) {
       throw new Error(this.plugin.recordFailure(t("ui.expansion_suggestions_changed_open_them_again"), error));
     }
@@ -13577,7 +13576,7 @@ export class VisualAgentMapView extends ItemView {
     failed?: (message: string) => void,
     accepted?: () => void
   ): Promise<void> {
-    if (!this.map || this.plugin.running.has(node.path)) {
+    if (!this.map || this.plugin.topicRuns.isBusy(node.path)) {
       failed?.(t("ui.ai_running_ai"));
       return;
     }
@@ -13735,7 +13734,7 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(path) || this.plugin.activeTasks.has(path) || existing?.state === "running") {
+    if (this.plugin.topicRuns.isBusy(path) || this.plugin.topicRuns.hasTask(path) || existing?.state === "running") {
       failed(t("ui.ai_running_ai"));
       return;
     }
@@ -13779,7 +13778,7 @@ export class VisualAgentMapView extends ItemView {
     task.progress = "";
     task.direction = direction ?? "";
     this.synthesisTasks.set(path, task);
-    this.plugin.activeTasks.set(path, controller);
+    this.plugin.topicRuns.registerTask(path, controller);
     const runOptions: TaskOptions = {
       ...(step === "draft"
         ? { ...task.options, requirements: options.requirements || task.options.requirements }
@@ -13864,7 +13863,7 @@ export class VisualAgentMapView extends ItemView {
       fail(error instanceof Error ? error.message : String(error));
     } finally {
       modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(path) === controller) this.plugin.activeTasks.delete(path);
+      this.plugin.topicRuns.releaseTask(path, controller);
       this.render();
     }
   }
@@ -16438,7 +16437,7 @@ export class VisualAgentMapView extends ItemView {
       const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
       if (!node) return { reason: "ui.map_chat_images_stale_gone" };
       if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
-      if (this.plugin.running?.has(node.path) || this.plugin.activeTasks?.has(node.path))
+      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
         return { reason: "ui.map_chat_images_stale_running" };
       return { node };
     };
@@ -16653,8 +16652,8 @@ export class VisualAgentMapView extends ItemView {
       if (!map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
       const task = this.synthesisTasks.get(node.path);
       if (
-        this.plugin.running.has(node.path) ||
-        this.plugin.activeTasks.has(node.path) ||
+        this.plugin.topicRuns.isBusy(node.path) ||
+        this.plugin.topicRuns.hasTask(node.path) ||
         task?.state === "running" ||
         task?.state === "directions"
       )

@@ -298,6 +298,7 @@ async function viewScenario() {
   await repo.rebuildDerivedData();
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: () => repo.rebuildDerivedData(), mutate: work => work(), running: new Set(), abortChartJobs() {}, addChartsAfterWrite() {}, quickExpandPending: new Set(), activeTasks: new Map(), expansionBatches: new Map(), currentModelChoice() { return { model: this.settings.cliModel, reasoning: 'auto' }; } };
   const { VisualAgentMapView } = load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
+  support.attachTopicRuns(plugin);
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = mapPath; view.map = doc; view.render = () => {}; view.focusNode = () => {}; view.drawEdges = () => {}; view.updateHistoryButtons = () => {};
   await view.hydrate();

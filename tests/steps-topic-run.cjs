@@ -437,7 +437,7 @@ test('the undo data the module reports becomes one undo step of the starting vie
 
 test('a plugin that has no TopicRuns fails the view research entry loudly instead of running unregistered', async () => {
   const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: class {} } });
-  const view = new VisualAgentMapView({ app: {} }, { settings: { ...S.DEFAULT_SETTINGS } });
+  const view = new VisualAgentMapView({ app: {} }, { settings: { ...S.DEFAULT_SETTINGS }, topicRuns: undefined });
   await assert.rejects(async () => view.runAgent({ id: 'n1', path: 'A.md' }), /reading 'start'/);
 });
 
@@ -830,4 +830,32 @@ test('synthesizeSelection draft: a thrown draftFailed or a failing write reaches
   const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   const body = src.slice(src.indexOf('private async startSelectionSynthesis('), src.indexOf('private discardSelectionSynthesis('));
   assert.match(body, /topicRuns\.start\(mapPath, "synthesizeSelection"/); assert.doesNotMatch(body, /plugin\.askModel|running\.(add|delete)/);
+});
+
+test('04c: isBusy, hasTask, stopTask, registerTask and releaseTask go through the ports', () => {
+  const running = new Set(), activeTasks = new Map();
+  const runs = fresh({ running: () => running, activeTasks: () => activeTasks });
+  running.add('A.md'); assert.equal(runs.isBusy('A.md'), true); assert.equal(runs.isBusy('B.md'), false);
+  const a = new AbortController(), b = new AbortController();
+  runs.registerTask('A.md', a); assert.equal(runs.hasTask('A.md'), true); assert.equal(runs.taskController('A.md'), a);
+  runs.releaseTask('A.md', b); assert.equal(runs.hasTask('A.md'), true, 'a foreign controller does not release');
+  runs.stopTask('A.md'); assert.equal(a.signal.aborted, true); runs.stopTask('Z.md');
+  runs.releaseTask('A.md', a); assert.equal(runs.hasTask('A.md'), false);
+});
+
+test('04c: pending, dropPending and flushPending follow the store the port holds now', async () => {
+  let store = new Map([['A.md', [{ title: 'x' }]]]);
+  const runs = fresh({ pendingSuggestions: () => store });
+  assert.equal(runs.pending('A.md').length, 1); runs.dropPending('A.md'); assert.equal(runs.pending('A.md'), undefined);
+  await runs.flushPending();
+  let flushed = 0; store = Object.assign(new Map([['B.md', []]]), { flush: async () => { flushed++; } });
+  runs.dropPending('B.md'); await runs.flushPending(); assert.equal(flushed, 1); assert.equal(runs.pending('B.md'), undefined);
+});
+
+test('04c: the view never touches the running set, the pending store or topic-run stop registration directly', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const rest = src.slice(0, src.indexOf('private async chatExpand(')) + src.slice(src.indexOf('private async chatSynthesize('));
+  assert.doesNotMatch(rest, /plugin\.(running|pendingSuggestions)\b/);
+  assert.doesNotMatch(rest, /plugin\.activeTasks\??\.(set|delete|get|has)\((?!key|this\.chatTaskKey)/);
+  assert.doesNotMatch(src, /import \{ PendingSuggestions \}/);
 });

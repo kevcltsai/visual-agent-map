@@ -1017,6 +1017,49 @@ export class TopicRuns {
     return this.controllers.has(path);
   }
 
+  /** Whether the topic has a run in flight, or another path (chat expansion, a reload leftover) holds it in the running set. */
+  isBusy(path: string): boolean {
+    return this.running.has(path);
+  }
+
+  /** Whether any stoppable AI task (shared registry: AiCalls, shallow expansion, selection synthesis) is registered for the path. */
+  hasTask(path: string): boolean {
+    return this.ports.activeTasks().has(path);
+  }
+
+  taskController(path: string): AbortController | undefined {
+    return this.ports.activeTasks().get(path);
+  }
+
+  /** Aborts the registered task of the path, if any. */
+  stopTask(path: string): void {
+    this.ports.activeTasks().get(path)?.abort();
+  }
+
+  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
+  registerTask(path: string, controller: AbortController): void {
+    this.ports.activeTasks().set(path, controller);
+  }
+
+  /** Releases the stop handle, only when it is still the one registered. */
+  releaseTask(path: string, controller: AbortController): void {
+    const tasks = this.ports.activeTasks();
+    if (tasks.get(path) === controller) tasks.delete(path);
+  }
+
+  pending(path: string): Suggestion[] | undefined {
+    return this.pendingSuggestions.get(path);
+  }
+
+  dropPending(path: string): void {
+    this.pendingSuggestions.delete(path);
+  }
+
+  /** Persists the pending store when it is the persisted one (a plain Map has nothing to flush). */
+  async flushPending(): Promise<void> {
+    await (this.pendingSuggestions as { flush?: () => Promise<void> }).flush?.();
+  }
+
   stop(path: string): void {
     this.controllers.get(path)?.abort();
   }

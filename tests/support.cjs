@@ -25,6 +25,11 @@ function load(entry, overrides = {}, windowValues = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, TextEncoder, Blob, URL, crypto: require('node:crypto').webcrypto, process, AbortController, navigator: windowValues.navigator, CSS: windowValues.CSS, document: windowValues.document, createSvg: windowValues.createSvg, createEl: windowValues.createEl, Option: class { constructor(text, value) { this.tag = 'option'; this.text = text; this.value = value; this.cls = ''; this.children = []; this.attrs = {}; } }, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
+  // The view reaches the running set, stop registry and pending suggestions only through plugin.topicRuns (04c): a plugin double gets a TopicRuns over its own fields.
+  if (entry === 'main.ts' && module.exports.VisualAgentMapView) {
+    const View = module.exports.VisualAgentMapView;
+    return { ...module.exports, VisualAgentMapView: class extends View { constructor(leaf, plugin) { super(leaf, plugin && !('topicRuns' in plugin) ? attachTopicRuns(plugin) : plugin); } } };
+  }
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -88,7 +93,7 @@ function attachTopicRuns(plugin) {
   TopicRunsClass ??= load('experiences/visual-map/topic-run.ts', { obsidian: module.exports.obsidian ?? {} }).TopicRuns;
   plugin.topicRuns = new TopicRunsClass({
     aiTasks: () => plugin.aiTasks ?? { chartEligible: () => false }, mutate: () => work => plugin.mutate(work), progress: () => plugin.researchProgress,
-    repository: () => plugin.repo, running: () => plugin.running, pendingSuggestions: () => plugin.pendingSuggestions, activeTasks: () => plugin.activeTasks,
+    repository: () => plugin.repo, running: () => plugin.running ??= new Set(), pendingSuggestions: () => plugin.pendingSuggestions ??= new Map(), activeTasks: () => plugin.activeTasks ??= new Map(),
     askModel: (...args) => plugin.askModel(...args), settings: () => plugin.settings, exchanges: () => plugin.exchanges, recordFailure: (...args) => plugin.recordFailure(...args),
     runStyle: ({ note, outputLanguage }) => (plugin.noteStyles ??= new NoteStyleStoreClass({ settings: () => plugin.settings, port: {}, save: async () => {} })).runStyle({ topic: { template: note.detailTemplateId, tone: note.toneId }, outputLanguage }), resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
     clearOtherHistory: origin => { for (const view of plugin.views?.() ?? []) if (view !== origin) view.clearUndoHistory?.(); },

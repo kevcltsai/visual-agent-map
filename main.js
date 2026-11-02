@@ -33906,97 +33906,6 @@ function relevanceModeAfterWrite(planned, setupChanged) {
   return planned === "recalibrate" && !setupChanged ? "recalibrate" : "full";
 }
 
-// store-adapter.ts
-async function readStoreText(adapter, path) {
-  if (await adapter.exists(path)) return adapter.read(path);
-  const temporary = `${path}.tmp`;
-  if (!await adapter.exists(temporary)) return null;
-  const text11 = await adapter.read(temporary);
-  await adapter.rename(temporary, path);
-  return text11;
-}
-async function writeStoreAtomically(adapter, path, text11) {
-  const temporary = `${path}.tmp`;
-  await adapter.write(temporary, text11);
-  if (await adapter.exists(path)) await adapter.remove(path);
-  await adapter.rename(temporary, path);
-}
-
-// pending-suggestions.ts
-var PendingSuggestions = class extends Map {
-  constructor(adapter, path, onError) {
-    super();
-    this.adapter = adapter;
-    this.path = path;
-    this.onError = onError;
-    __publicField(this, "writes", Promise.resolve());
-    __publicField(this, "writeError", null);
-    __publicField(this, "loadError", null);
-  }
-  async load() {
-    try {
-      const text11 = await readStoreText(this.adapter, this.path);
-      if (text11 === null) return;
-      const parsed = JSON.parse(text11);
-      if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
-      const entries = [];
-      for (const item of parsed) {
-        if (!Array.isArray(item) || item.length !== 2 || typeof item[0] !== "string" || !Array.isArray(item[1]))
-          throw new Error(t("error.pending_suggestions_fields_invalid"));
-        const suggestions = item[1].filter((value) => {
-          if (!value || typeof value !== "object") return false;
-          const suggestion = value;
-          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === void 0 || typeof suggestion.parentTitle === "string") && (suggestion.thinkingOriginBaseline === void 0 || typeof suggestion.thinkingOriginBaseline === "string");
-        });
-        if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
-        entries.push([item[0], suggestions]);
-      }
-      for (const [key2, suggestions] of entries) if (suggestions.length) super.set(key2, suggestions);
-      this.loadError = null;
-    } catch (error) {
-      this.loadError = error;
-      this.onError(error);
-    }
-  }
-  set(key2, value) {
-    super.set(key2, value);
-    this.save();
-    return this;
-  }
-  delete(key2) {
-    const removed = super.delete(key2);
-    if (removed) this.save();
-    return removed;
-  }
-  clear() {
-    if (!this.size) return;
-    super.clear();
-    this.save();
-  }
-  async flush() {
-    await this.writes;
-    if (this.writeError)
-      throw this.writeError instanceof Error ? this.writeError : new Error(t("error.pending_suggestions_save_failed"));
-  }
-  save() {
-    if (this.loadError) {
-      this.writeError = this.loadError;
-      this.onError(this.loadError);
-      return;
-    }
-    const snapshot = JSON.stringify([...this.entries()]);
-    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
-      () => {
-        this.writeError = null;
-      },
-      (error) => {
-        this.writeError = error;
-        this.onError(error);
-      }
-    );
-  }
-};
-
 // experiences/aim/create-map.ts
 var import_node_crypto9 = require("node:crypto");
 
@@ -36572,6 +36481,22 @@ var ReferencePicker = class {
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian22 = require("obsidian");
+
+// store-adapter.ts
+async function readStoreText(adapter, path) {
+  if (await adapter.exists(path)) return adapter.read(path);
+  const temporary = `${path}.tmp`;
+  if (!await adapter.exists(temporary)) return null;
+  const text11 = await adapter.read(temporary);
+  await adapter.rename(temporary, path);
+  return text11;
+}
+async function writeStoreAtomically(adapter, path, text11) {
+  const temporary = `${path}.tmp`;
+  await adapter.write(temporary, text11);
+  if (await adapter.exists(path)) await adapter.remove(path);
+  await adapter.rename(temporary, path);
+}
 
 // ai-exchange-log.ts
 function isRecord3(value) {
@@ -47609,7 +47534,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     void (async () => {
       var _a2;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-      if (this.plugin.running.has(node.path)) {
+      if (this.plugin.topicRuns.isBusy(node.path)) {
         new import_obsidian31.Notice(t("ui.ai_running_ai"));
         return;
       }
@@ -50629,8 +50554,8 @@ ${request.requirements}` : preset.text,
     fill2.style.width = `${nodes.length ? done / nodes.length * 100 : 0}%`;
     const running = nodes.filter(
       (node) => {
-        var _a3, _b3;
-        return ((_a3 = this.plugin.running) == null ? void 0 : _a3.has(node.path)) || ((_b3 = this.plugin.quickExpandPending) == null ? void 0 : _b3.has(node.path));
+        var _a3;
+        return this.plugin.topicRuns.isBusy(node.path) || ((_a3 = this.plugin.quickExpandPending) == null ? void 0 : _a3.has(node.path));
       }
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
@@ -50745,9 +50670,9 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
   }
   mergeBusy(node, except) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d;
     const batch = (_a2 = this.plugin.expansionBatches) == null ? void 0 : _a2.get(this.multiResearchKey()), task = this.integrationTask;
-    return !!(((_c = (_b2 = this.plugin.relevanceGrades) == null ? void 0 : _b2.get(this.path)) == null ? void 0 : _c.status) === "running" || ((_d = this.plugin.running) == null ? void 0 : _d.has(node.path)) || ((_e = this.plugin.quickExpandPending) == null ? void 0 : _e.has(node.path)) || ((_f = this.plugin.activeTasks) == null ? void 0 : _f.has(node.path)) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
+    return !!(((_c = (_b2 = this.plugin.relevanceGrades) == null ? void 0 : _b2.get(this.path)) == null ? void 0 : _c.status) === "running" || this.plugin.topicRuns.isBusy(node.path) || ((_d = this.plugin.quickExpandPending) == null ? void 0 : _d.has(node.path)) || this.plugin.topicRuns.hasTask(node.path) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
   }
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
   isMerging(nodeId, except) {
@@ -53432,7 +53357,7 @@ ${request.requirements}` : preset.text,
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some((node) => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    if (found.branch.some((node) => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
     return found;
   }
   /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
@@ -53669,7 +53594,7 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
   }
   async noteChange(node, patch) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c;
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key2 of Object.keys(patch)) before[key2] = current[key2];
     const followsSummary = patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0;
@@ -53682,9 +53607,9 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, patch);
     const written2 = followsSummary ? await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0) : null;
     if (patch.referencePaths !== void 0) {
-      this.plugin.pendingSuggestions.delete(node.path);
+      this.plugin.topicRuns.dropPending(node.path);
       this.plugin.pendingResearchOptions.delete(node.path);
-      if (this.plugin.pendingSuggestions instanceof PendingSuggestions) await this.plugin.pendingSuggestions.flush();
+      await this.plugin.topicRuns.flushPending();
     }
     if ([
       "title",
@@ -53698,7 +53623,7 @@ ${request.requirements}` : preset.text,
       "sourcePaths",
       "referencePaths"
     ].some((key2) => key2 in patch))
-      (_d = (_c = this.plugin.activeTasks) == null ? void 0 : _c.get(node.path)) == null ? void 0 : _d.abort();
+      this.plugin.topicRuns.stopTask(node.path);
     this.history.push({
       undo: async () => {
         var _a3;
@@ -53716,7 +53641,7 @@ ${request.requirements}` : preset.text,
       },
       redo: () => this.plugin.repo.updateNote(node.path, patch)
     });
-    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, (_e = this.map) != null ? _e : void 0));
+    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, (_c = this.map) != null ? _c : void 0));
     this.render();
   }
   /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */
@@ -53756,7 +53681,7 @@ ${request.requirements}` : preset.text,
       countIssues: job.formatIssues,
       model: job.model,
       apply: async (charted) => {
-        if (this.plugin.running.has(path)) return false;
+        if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
         if (this.chartSnapshot(latest) !== snapshot) return false;
         await this.plugin.repo.updateNote(
@@ -54890,7 +54815,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -54924,7 +54849,7 @@ ${request.requirements}` : preset.text,
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
-    card.dataset.status = merging || ((_c = this.plugin.running) == null ? void 0 : _c.has(node.path)) || ((_d = this.plugin.quickExpandPending) == null ? void 0 : _d.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : (_e = note == null ? void 0 : note.status) != null ? _e : "error";
+    card.dataset.status = merging || this.plugin.topicRuns.isBusy(node.path) || ((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : (_d = note == null ? void 0 : note.status) != null ? _d : "error";
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
@@ -54934,11 +54859,11 @@ ${request.requirements}` : preset.text,
     card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
-    this.labelCard(card, (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
+    this.labelCard(card, (_e = note == null ? void 0 : note.title) != null ? _e : t("ui.note_missing"));
     if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
-      select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
+      select.setAttr("aria-label", (_f = note == null ? void 0 : note.title) != null ? _f : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
@@ -54947,10 +54872,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const research = (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
+    const research = (_g = this.plugin.researchProgress) == null ? void 0 : _g.get(node.path);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
-    const active = merging || ((_i = this.plugin.running) == null ? void 0 : _i.has(node.path)) || ((_j = this.plugin.quickExpandPending) == null ? void 0 : _j.has(node.path)) || this.startingTasks.has(node.path);
+    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_h = this.plugin.quickExpandPending) == null ? void 0 : _h.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -54983,14 +54908,14 @@ ${request.requirements}` : preset.text,
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== "completed" || active || queued) {
         const chip = header.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_k = note == null ? void 0 : note.status) != null ? _k : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_i = note == null ? void 0 : note.status) != null ? _i : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
       }
       if (note) this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
     }
-    const relevance = !node.aimKind && !((_l = this.map) == null ? void 0 : _l.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_j = this.map) == null ? void 0 : _j.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -55000,14 +54925,14 @@ ${request.requirements}` : preset.text,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_m = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _m.status) === "running"
+        ((_k = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _k.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian31.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
+      const named = (_l = cardLabels.get(card)) == null ? void 0 : _l.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (kind !== "topic") {
@@ -55016,7 +54941,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength) renderHypothesisTag(header, strength, kindText);
       else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
+      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header, node.id);
@@ -55025,15 +54950,15 @@ ${request.requirements}` : preset.text,
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
     const errorDetails = [];
-    if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
+    if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
       const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
     if ((note == null ? void 0 : note.status) === "error" && note.lastError) errorDetails.push(note.lastError);
     if (batch) {
-      const currentNode = batch.currentPath ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_r = this.notes.get(currentNode.id)) == null ? void 0 : _r.title : void 0;
+      const currentNode = batch.currentPath ? (_o = this.map) == null ? void 0 : _o.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_p = this.notes.get(currentNode.id)) == null ? void 0 : _p.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -55056,16 +54981,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || ((_v = this.plugin.running) == null ? void 0 : _v.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_r = this.plugin.expansionCoordinator) == null ? void 0 : _r.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_s = this.plugin.quickExpandPending) == null ? void 0 : _s.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
         t("ui.stop_research"),
         () => {
           var _a3, _b3;
-          return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b3.abort();
+          return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
         }
       );
     }
@@ -55076,14 +55001,14 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_x = (_w = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
-    if (pendingCount && !this.selection.state.multiSelectMode && !((_y = this.map) == null ? void 0 : _y.aim))
+    const pendingCount = (_u = (_t = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _t.length) != null ? _u : 0;
+    if (pendingCount && !this.selection.state.multiSelectMode && !((_v = this.map) == null ? void 0 : _v.aim))
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
-    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !((_z = this.map) == null ? void 0 : _z.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
+    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !((_w = this.map) == null ? void 0 : _w.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
       this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
@@ -55091,14 +55016,14 @@ ${request.requirements}` : preset.text,
     if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !node.aimKind && !active && !queued && !research && !merging)
       this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !((_A = this.map) == null ? void 0 : _A.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !((_x = this.map) == null ? void 0 : _x.aim))
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !((_B = this.map) == null ? void 0 : _B.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !((_y = this.map) == null ? void 0 : _y.aim)) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -55134,7 +55059,7 @@ ${request.requirements}` : preset.text,
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.selection.state.multiSelectMode) {
-      if (!((_C = this.map) == null ? void 0 : _C.aim)) {
+      if (!((_z = this.map) == null ? void 0 : _z.aim)) {
         const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure2.addClass("vam-node-tool", "vam-structure-tool");
         structure2.setAttr("aria-label", t("ui.structure_and_links"));
@@ -55165,7 +55090,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_D = this.map) == null ? void 0 : _D.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -55177,7 +55102,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (((_E = this.map) == null ? void 0 : _E.aim) && assumptions.length) {
+      if (((_B = this.map) == null ? void 0 : _B.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -55189,7 +55114,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (((_F = this.map) == null ? void 0 : _F.aim) && node.aimKind === "conclusion") {
+      if (((_C = this.map) == null ? void 0 : _C.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -55203,18 +55128,18 @@ ${request.requirements}` : preset.text,
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.selection.state.multiSelectMode && !((_G = this.map) == null ? void 0 : _G.aim))
+    if (!this.selection.state.multiSelectMode && !((_D = this.map) == null ? void 0 : _D.aim))
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim)) {
+    if (!this.selection.state.multiSelectMode && !((_E = this.map) == null ? void 0 : _E.aim)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: (_I = note == null ? void 0 : note.title) != null ? _I : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_J = note == null ? void 0 : note.title) != null ? _J : node.path);
+    const title = card.createEl("h3", { text: (_F = note == null ? void 0 : note.title) != null ? _F : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_G = note == null ? void 0 : note.title) != null ? _G : node.path);
     title.setAttr("dir", "auto");
-    if (note && !this.selection.state.multiSelectMode && !((_K = this.map) == null ? void 0 : _K.aim))
+    if (note && !this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim))
       card.addEventListener("dblclick", (event) => {
         var _a3;
         const target = event.target;
@@ -55225,19 +55150,19 @@ ${request.requirements}` : preset.text,
         event.preventDefault();
         this.renameNode(node, note.title);
       });
-    if ((_L = research == null ? void 0 : research.preview) == null ? void 0 : _L.summary)
+    if ((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_M = note == null ? void 0 : note.summary) != null ? _M : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_N = note == null ? void 0 : note.summary) != null ? _N : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_J = note == null ? void 0 : note.summary) != null ? _J : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_K = note == null ? void 0 : note.summary) != null ? _K : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_O = this.map) == null ? void 0 : _O.aim)) {
+    if (node.aimKind === "conclusion" && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -55250,7 +55175,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_P = this.map) == null ? void 0 : _P.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -55286,11 +55211,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
+    if (node.aimKind === "question" && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_S = (_R = node.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -55333,11 +55258,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_T = this.map) == null ? void 0 : _T.aim)) {
+    if (node.aimKind === "answer" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_V = (_U = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _U.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _V : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -55346,7 +55271,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -55673,8 +55598,8 @@ ${request.requirements}` : preset.text,
   }
   /** A topic waiting in a batch (multi-topic or shallow research) for a free slot; it is not running yet. */
   isResearchQueued(node) {
-    var _a2, _b2;
-    return !((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) && !!((_b2 = this.plugin.expansionCoordinator) == null ? void 0 : _b2.isQueued(node.path));
+    var _a2;
+    return !this.plugin.topicRuns.isBusy(node.path) && !!((_a2 = this.plugin.expansionCoordinator) == null ? void 0 : _a2.isQueued(node.path));
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   relationsEnabled() {
@@ -56052,7 +55977,7 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${Math.max(12, Math.min(rect2.top - host.top, maxTop))}px`;
   }
   refreshCard(node, redrawEdges = true) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
@@ -56082,7 +56007,7 @@ ${request.requirements}` : preset.text,
           cls: `vam-status vam-status-${note.status}`,
           text: topicStatusLabel(note.status, this.plugin.settings.language)
         });
-    } else if (!this.isMerging(node.id) && !((_b2 = this.plugin.running) == null ? void 0 : _b2.has(node.path)) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
+    } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_b2 = this.plugin.quickExpandPending) == null ? void 0 : _b2.has(node.path)) && !this.isResearchQueued(node)) {
       const label = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
@@ -56095,7 +56020,7 @@ ${request.requirements}` : preset.text,
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
@@ -56194,7 +56119,7 @@ ${request.requirements}` : preset.text,
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
-          const count = (_d = (_c = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _c.length) != null ? _d : 0;
+          const count = (_d = (_c = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _c.length) != null ? _d : 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
             label: t("ui.view_0_expansion_suggestions", count),
             open: () => this.openNodePanel(node, "proposals")
@@ -56222,7 +56147,7 @@ ${request.requirements}` : preset.text,
         this.app,
         note.title,
         (_f = (_e = this.map) == null ? void 0 : _e.nodes.filter((item) => item.parentId === node.id).length) != null ? _f : 0,
-        (_h = (_g = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
+        (_h = (_g = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
           var _a3, _b3, _c2;
@@ -56269,10 +56194,10 @@ ${request.requirements}` : preset.text,
           rules: note.rules,
           path: node.path,
           save: (patch) => this.plugin.mutate(() => this.noteChange(node, patch)),
-          running: this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path) || this.startingTasks.has(node.path),
-          stop: this.startingTasks.has(node.path) || this.plugin.activeTasks.has(node.path) ? () => {
+          running: this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.startingTasks.has(node.path),
+          stop: this.startingTasks.has(node.path) || this.plugin.topicRuns.hasTask(node.path) ? () => {
             var _a3, _b3;
-            return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b3.abort();
+            return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
           } : void 0,
           background: this.backgroundHooks(node.path, node),
           quickOutline: this.quickOutline(node),
@@ -56444,7 +56369,7 @@ ${request.requirements}` : preset.text,
   }
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
-    const suggestions = this.plugin.pendingSuggestions.get(node.path);
+    const suggestions = this.plugin.topicRuns.pending(node.path);
     if (!(suggestions == null ? void 0 : suggestions.length)) return;
     const section3 = panel.createDiv("vam-inspector-proposals");
     section3.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
@@ -56492,10 +56417,10 @@ ${request.requirements}` : preset.text,
             shallowResearch: true
           } : void 0;
           await this.plugin.mutate(async () => {
-            var _a4, _b2, _c;
+            var _a4;
             const current = (_a4 = this.map) == null ? void 0 : _a4.nodes.find((item) => item.id === node.id && item.path === node.path);
             if (!current) throw new Error(t("ui.the_topic_changed_select_it_again"));
-            if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+            if (this.plugin.topicRuns.pending(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
             await this.assertSuggestionOrigin(current, suggestions);
             try {
@@ -56504,9 +56429,9 @@ ${request.requirements}` : preset.text,
               if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(node.path, error);
               throw error;
             }
-            this.plugin.pendingSuggestions.delete(node.path);
+            this.plugin.topicRuns.dropPending(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await ((_c = (_b2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c.call(_b2));
+            await this.plugin.topicRuns.flushPending();
           });
           if (researchOptions && createdNodes.length)
             await this.startShallowResearch(node, createdNodes, researchOptions);
@@ -56524,12 +56449,11 @@ ${request.requirements}` : preset.text,
       () => void (async () => {
         try {
           await this.plugin.mutate(async () => {
-            var _a3, _b2;
-            if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+            if (this.plugin.topicRuns.pending(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-            this.plugin.pendingSuggestions.delete(node.path);
+            this.plugin.topicRuns.dropPending(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await ((_b2 = (_a3 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a3));
+            await this.plugin.topicRuns.flushPending();
           });
           close == null ? void 0 : close();
           this.render();
@@ -57666,12 +57590,12 @@ ${request.requirements}` : preset.text,
       return;
     }
     const previousBatch = this.plugin.expansionBatches.get(parent.path);
-    const pending2 = this.plugin.pendingSuggestions.get(parent.path);
+    const pending2 = this.plugin.topicRuns.pending(parent.path);
     const present = (items) => {
-      const version = this.plugin.pendingSuggestions.get(parent.path);
+      const version = this.plugin.topicRuns.pending(parent.path);
       const names3 = items.filter((item) => !item.parentTitle).map((item) => item.title);
       if (new Set(names3).size !== names3.length) {
-        this.plugin.pendingSuggestions.delete(parent.path);
+        this.plugin.topicRuns.dropPending(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
@@ -57688,8 +57612,8 @@ ${request.requirements}` : preset.text,
         const savedOptions = this.plugin.pendingResearchOptions.get(parent.path);
         const researchOptions = savedOptions ? { ...savedOptions, signal: options == null ? void 0 : options.signal, onProgress: options == null ? void 0 : options.onProgress } : void 0;
         await this.plugin.mutate(async () => {
-          var _a3, _b2, _c;
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          var _a3;
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           try {
@@ -57704,9 +57628,9 @@ ${request.requirements}` : preset.text,
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_c = (_b2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c.call(_b2));
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -57721,7 +57645,7 @@ ${request.requirements}` : preset.text,
       present(options ? pending2.filter((item) => !item.parentTitle) : pending2);
       return;
     }
-    if (this.plugin.running.has(parent.path)) {
+    if (this.plugin.topicRuns.isBusy(parent.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
@@ -57787,22 +57711,22 @@ ${request.requirements}` : preset.text,
     }
   }
   async assertSuggestionOrigin(parent, suggestions) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2;
     const origin = (_b2 = (await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).thinkingOrigin) != null ? _b2 : "";
     if (suggestions.every(
       (item) => item.thinkingOriginBaseline === originBaseline(origin) || item.thinkingOriginBaseline === void 0 && !origin
     ))
       return;
-    this.plugin.pendingSuggestions.delete(parent.path);
+    this.plugin.topicRuns.dropPending(parent.path);
     this.plugin.pendingResearchOptions.delete(parent.path);
-    await ((_d = (_c = this.plugin.pendingSuggestions).flush) == null ? void 0 : _d.call(_c));
+    await this.plugin.topicRuns.flushPending();
     throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
   }
   openChildSuggestions(parent, suggestions) {
-    const version = this.plugin.pendingSuggestions.get(parent.path);
+    const version = this.plugin.topicRuns.pending(parent.path);
     const roots = suggestions.filter((item) => !item.parentTitle).map((item) => item.title);
     if (new Set(roots).size !== roots.length) {
-      this.plugin.pendingSuggestions.delete(parent.path);
+      this.plugin.topicRuns.dropPending(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
       new import_obsidian31.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
@@ -57812,8 +57736,7 @@ ${request.requirements}` : preset.text,
         if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
         let researchOptions, createdNodes = [];
         await this.plugin.mutate(async () => {
-          var _a2, _b2;
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
@@ -57823,9 +57746,9 @@ ${request.requirements}` : preset.text,
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -58108,7 +58031,7 @@ ${request.requirements}` : preset.text,
           new import_obsidian31.Notice(t("ui.multi_research_already_running"));
           return;
         }
-        const busy = (node) => this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.activeTasks.has(node.path);
+        const busy = (node) => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.topicRuns.hasTask(node.path);
         const nodes = selected.filter((node) => !busy(node));
         if (!nodes.length) {
           new import_obsidian31.Notice(t("ui.multi_research_all_skipped"));
@@ -58383,11 +58306,10 @@ ${request.requirements}` : preset.text,
     return { ...choices, signal: void 0, onProgress: void 0, referenceGroups: (_a2 = options.referenceGroups) != null ? _a2 : [] };
   }
   async clearPendingSuggestions(path) {
-    var _a2, _b2;
-    this.plugin.pendingSuggestions.delete(path);
+    this.plugin.topicRuns.dropPending(path);
     this.plugin.pendingResearchOptions.delete(path);
     try {
-      await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+      await this.plugin.topicRuns.flushPending();
     } catch (error) {
       throw new Error(this.plugin.recordFailure(t("ui.expansion_suggestions_changed_open_them_again"), error));
     }
@@ -58505,7 +58427,7 @@ ${request.requirements}` : preset.text,
   }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
     var _a2;
-    if (!this.map || this.plugin.running.has(node.path)) {
+    if (!this.map || this.plugin.topicRuns.isBusy(node.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
@@ -58650,7 +58572,7 @@ ${request.requirements}` : preset.text,
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(path) || this.plugin.activeTasks.has(path) || (existing == null ? void 0 : existing.state) === "running") {
+    if (this.plugin.topicRuns.isBusy(path) || this.plugin.topicRuns.hasTask(path) || (existing == null ? void 0 : existing.state) === "running") {
       failed(t("ui.ai_running_ai"));
       return;
     }
@@ -58687,7 +58609,7 @@ ${request.requirements}` : preset.text,
     task.progress = "";
     task.direction = direction != null ? direction : "";
     this.synthesisTasks.set(path, task);
-    this.plugin.activeTasks.set(path, controller);
+    this.plugin.topicRuns.registerTask(path, controller);
     const runOptions = {
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
       // The model of this step is the dialog's choice now, not the one the first step was started with.
@@ -58768,7 +58690,7 @@ ${request.requirements}` : preset.text,
       fail2(error instanceof Error ? error.message : String(error));
     } finally {
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(path) === controller) this.plugin.activeTasks.delete(path);
+      this.plugin.topicRuns.releaseTask(path, controller);
       this.render();
     }
   }
@@ -61111,14 +61033,13 @@ ${note.detail.trim()}` : "",
    */
   async chatInsertImage(block, item) {
     const fence = () => {
-      var _a2, _b2;
       if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
         return { reason: "ui.map_chat_images_stale_map" };
       if (this.map.aim) return { reason: "ui.map_chat_images_stale_locked" };
       const node = this.map.nodes.find((candidate) => candidate.id === block.nodeId);
       if (!node) return { reason: "ui.map_chat_images_stale_gone" };
       if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
-      if (((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) || ((_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.has(node.path)))
+      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
         return { reason: "ui.map_chat_images_stale_running" };
       return { node };
     };
@@ -61332,7 +61253,7 @@ ${addition}` : addition });
       const node = nodes[0];
       if (!map.nodes.some((item) => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
       const task = this.synthesisTasks.get(node.path);
-      if (this.plugin.running.has(node.path) || this.plugin.activeTasks.has(node.path) || (task == null ? void 0 : task.state) === "running" || (task == null ? void 0 : task.state) === "directions")
+      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path) || (task == null ? void 0 : task.state) === "running" || (task == null ? void 0 : task.state) === "directions")
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options2 = chatSynthesisOptions({
@@ -63480,6 +63401,81 @@ async function fitImageForInput(dataUrl, limits, signal) {
   }
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
+
+// pending-suggestions.ts
+var PendingSuggestions = class extends Map {
+  constructor(adapter, path, onError) {
+    super();
+    this.adapter = adapter;
+    this.path = path;
+    this.onError = onError;
+    __publicField(this, "writes", Promise.resolve());
+    __publicField(this, "writeError", null);
+    __publicField(this, "loadError", null);
+  }
+  async load() {
+    try {
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
+      if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
+      const entries = [];
+      for (const item of parsed) {
+        if (!Array.isArray(item) || item.length !== 2 || typeof item[0] !== "string" || !Array.isArray(item[1]))
+          throw new Error(t("error.pending_suggestions_fields_invalid"));
+        const suggestions = item[1].filter((value) => {
+          if (!value || typeof value !== "object") return false;
+          const suggestion = value;
+          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === void 0 || typeof suggestion.parentTitle === "string") && (suggestion.thinkingOriginBaseline === void 0 || typeof suggestion.thinkingOriginBaseline === "string");
+        });
+        if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
+        entries.push([item[0], suggestions]);
+      }
+      for (const [key2, suggestions] of entries) if (suggestions.length) super.set(key2, suggestions);
+      this.loadError = null;
+    } catch (error) {
+      this.loadError = error;
+      this.onError(error);
+    }
+  }
+  set(key2, value) {
+    super.set(key2, value);
+    this.save();
+    return this;
+  }
+  delete(key2) {
+    const removed = super.delete(key2);
+    if (removed) this.save();
+    return removed;
+  }
+  clear() {
+    if (!this.size) return;
+    super.clear();
+    this.save();
+  }
+  async flush() {
+    await this.writes;
+    if (this.writeError)
+      throw this.writeError instanceof Error ? this.writeError : new Error(t("error.pending_suggestions_save_failed"));
+  }
+  save() {
+    if (this.loadError) {
+      this.writeError = this.loadError;
+      this.onError(this.loadError);
+      return;
+    }
+    const snapshot = JSON.stringify([...this.entries()]);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
+      () => {
+        this.writeError = null;
+      },
+      (error) => {
+        this.writeError = error;
+        this.onError(error);
+      }
+    );
+  }
+};
 
 // ui/outline-view.ts
 var import_obsidian34 = require("obsidian");
@@ -68689,6 +68685,42 @@ var TopicRuns = class {
   }
   isRunning(path) {
     return this.controllers.has(path);
+  }
+  /** Whether the topic has a run in flight, or another path (chat expansion, a reload leftover) holds it in the running set. */
+  isBusy(path) {
+    return this.running.has(path);
+  }
+  /** Whether any stoppable AI task (shared registry: AiCalls, shallow expansion, selection synthesis) is registered for the path. */
+  hasTask(path) {
+    return this.ports.activeTasks().has(path);
+  }
+  taskController(path) {
+    return this.ports.activeTasks().get(path);
+  }
+  /** Aborts the registered task of the path, if any. */
+  stopTask(path) {
+    var _a2;
+    (_a2 = this.ports.activeTasks().get(path)) == null ? void 0 : _a2.abort();
+  }
+  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
+  registerTask(path, controller) {
+    this.ports.activeTasks().set(path, controller);
+  }
+  /** Releases the stop handle, only when it is still the one registered. */
+  releaseTask(path, controller) {
+    const tasks = this.ports.activeTasks();
+    if (tasks.get(path) === controller) tasks.delete(path);
+  }
+  pending(path) {
+    return this.pendingSuggestions.get(path);
+  }
+  dropPending(path) {
+    this.pendingSuggestions.delete(path);
+  }
+  /** Persists the pending store when it is the persisted one (a plain Map has nothing to flush). */
+  async flushPending() {
+    var _a2, _b2;
+    await ((_b2 = (_a2 = this.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
   }
   stop(path) {
     var _a2;

@@ -416,6 +416,68 @@ test('counter 13 (security): names with "../", "\\", "/" or spaces at the ends g
   for (const ref of [...Object.values(settings.noteStyleRecipe.legacy.templates), ...Object.values(settings.noteStyleRecipe.legacy.tones)]) assert.equal(ref.includes('..'), false, ref);
 });
 
+test('counter 14 (was upgrade "export conflicts" and "unreadable file", decisions #32): a user file whose name differs only by case keeps its bytes and the new file takes " (2)"; files at the style folder root and in the old block folder are not touched, nothing is trashed', async () => {
+  const mine = "the user's own file\n";
+  const files = {
+    [`${DIRS.template}/weekly REVIEW.md`]: mine,
+    [`${FOLDER}/Old style.md`]: '---\n語氣: x\n---\n## A\nold style file\n', [`${FOLDER}/Broken.md`]: '---\nnot closed\n## A\n',
+    [`${FOLDER}/積木/Keep.md`]: 'a file of the unpublished block folder\n'
+  };
+  const { store, v, settings } = world({}, files);
+  const before = { ...files };
+  assert.equal((await store.migrateLegacy({ mapsWithStyle: [] })).status, 'done');
+  assert.equal(v.files[`${DIRS.template}/weekly REVIEW.md`], mine, 'the user file keeps its bytes');
+  assert.ok(`${DIRS.template}/Weekly review (2).md` in v.files, 'the case-insensitive name is taken');
+  assert.ok(!(`${DIRS.template}/Weekly review.md` in v.files));
+  assert.equal(settings.noteStyleRecipe.legacy.templates[T_WEEKLY], 'file:Weekly review (2)');
+  for (const [file, text] of Object.entries(before)) assert.equal(v.files[file], text, `${file} is untouched`);
+  assert.equal(count(v, 'trash'), 0, 'nothing is moved to the trash');
+  assert.equal(settings.noteStyleAliases, undefined);
+  assert.equal(settings.noteStyleUpgrade, undefined);
+});
+
+test('counter 15 (was upgrade "T1 remembers the folder", decisions #32): the conversion pins the default folder it wrote to, so a later change of interface language still finds the files; nothing to convert pins nothing; a failed save leaves the path as it was', async () => {
+  const probe = world({ language: 'zh-TW', noteStylesFolder: undefined });
+  const folder = probe.store.folder();
+  const other = world({ language: 'zh-CN', noteStylesFolder: undefined }).store.folder();
+  assert.notEqual(folder, other, 'the default name depends on the language');
+  const w = world({ language: 'zh-TW', noteStylesFolder: undefined });
+  assert.equal((await w.store.migrateLegacy({ mapsWithStyle: [] })).status, 'done');
+  assert.equal(w.settings.noteStylesFolder, folder);
+  assert.equal(w.saves.length, 1);
+  const made = Object.keys(w.v.files).sort();
+  w.settings.language = 'zh-CN';
+  await w.store.refresh();
+  assert.equal(w.store.folder(), folder);
+  assert.ok(w.store.listBlocks('template').some(item => item.kind === 'file' && item.name === 'Conclusion'), 'the converted structure is still found');
+  await w.store.ensureBlockFolder();
+  assert.equal(w.settings.noteStylesFolder, folder);
+  assert.deepEqual([...w.v.folders].filter(path => path.startsWith(other)), []);
+  assert.deepEqual(Object.keys(w.v.files).sort(), made);
+  const empty = world({ language: 'zh-TW', noteStylesFolder: undefined, detailTemplates: [], promptPresets: [] });
+  await empty.store.migrateLegacy({ mapsWithStyle: [] });
+  assert.equal(empty.settings.noteStylesFolder, undefined, 'no file written: the path is not pinned');
+  const failing = world({ language: 'zh-TW', noteStylesFolder: undefined });
+  failing.v.failSave = true;
+  assert.equal((await failing.store.migrateLegacy({ mapsWithStyle: [] })).status, 'failed');
+  assert.equal(failing.settings.noteStylesFolder, undefined);
+});
+
+test('counter 16 (was upgrade "T1 a user action pins the folder", decisions #32): copyBlock, ensureBlockFile and ensureBlockFolder pin the default folder, and a saved path is never replaced', async () => {
+  const marked = { noteStyleRecipe: { migrated: 1, mapsNotified: true } };
+  const w = world({ language: 'en', noteStylesFolder: undefined, ...marked });
+  await w.store.refresh();
+  await w.store.copyBlock('template', 'builtin:standard');
+  assert.equal(w.settings.noteStylesFolder, w.store.folder());
+  const saved = w.settings.noteStylesFolder;
+  w.settings.language = 'zh-CN';
+  await w.store.ensureBlockFile('tone', 'builtin:plain');
+  assert.equal(w.settings.noteStylesFolder, saved);
+  const own = world({ language: 'en', noteStylesFolder: 'Mine/S', ...marked });
+  await own.store.ensureBlockFolder();
+  assert.equal(own.settings.noteStylesFolder, 'Mine/S');
+});
+
 test('pure plan: a plan with nothing to do says so; the planner reads existing files only to reuse or rename and returns the files in write order (structures, voices, styles)', () => {
   const empty = { language: 'en', detailTemplates: [], promptPresets: [], existing: { recipe: new Map(), template: new Map(), tone: new Map() } };
   eq(M.planRecipeMigration(empty), { files: [], legacy: { templates: {}, tones: {} }, skipped: [], nothing: true });

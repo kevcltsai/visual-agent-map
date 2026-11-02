@@ -35,14 +35,8 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import {
-  NoteStyleStore,
-  normalizeNoteTemplateByKind,
-  type NoteStyleUpgradeEvent,
-  type StyleFilePort
-} from "./ai/note-style-store";
+import { NoteStyleStore, normalizeNoteTemplateByKind, type StyleFilePort } from "./ai/note-style-store";
 import { parseRecipeRef, STYLE_KINDS } from "./ai/note-style-recipe";
-import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
@@ -222,12 +216,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
           )
         }
       : {}),
-    ...(normalizeNoteStyleAliases(saved?.noteStyleAliases)
-      ? { noteStyleAliases: normalizeNoteStyleAliases(saved?.noteStyleAliases) }
-      : {}),
-    ...(normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade)
-      ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade) }
-      : {}),
     coffeeStyles: Array.isArray(saved?.coffeeStyles)
       ? saved.coffeeStyles.filter(
           (item: unknown): item is { id: string; name: string; prompt: string } =>
@@ -280,8 +268,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
     port: this.noteStylePort(),
-    save: () => this.saveSettings(),
-    report: event => this.reportNoteStyleUpgrade(event)
+    save: () => this.saveSettings()
   });
   ready: Promise<void> = Promise.resolve();
   /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
@@ -1367,12 +1354,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;
     this.aiRuntime.dispose();
-  }
-  /** Says once what the note style upgrade could not do (it never stops the plugin). */
-  private reportNoteStyleUpgrade(event: NoteStyleUpgradeEvent): void {
-    if (event.kind === "failed") new Notice(t("ui.note_style_upgrade_failed"));
-    else if (event.kind === "skipped") new Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
-    else new Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   private noteStylePort(): StyleFilePort {

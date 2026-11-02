@@ -1675,13 +1675,6 @@ export const en = {
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
-  "ui.note_style_upgrade_tone_name_0": "{0} tone",
-  "ui.note_style_upgrade_failed":
-    "Your note styles could not be upgraded this time. They keep working as before, and VAM tries again the next time it loads.",
-  "ui.note_style_upgrade_skipped_0":
-    "These style files could not be read, so they were not upgraded and stay where they are: {0}",
-  "ui.note_style_upgrade_trash_failed_0":
-    "Your note styles were upgraded, but these old files could not be moved to the trash and are no longer used: {0}",
   "ui.note_style_edit": "Edit this style",
   "ui.note_style_edit_button": "Open file",
   "ui.note_style_edit_current_desc": "Open the file of the style in force, to change how AI writes.",

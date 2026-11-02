@@ -181,10 +181,8 @@ test('B3b: Simplified, Traditional and English roles of real guests count toward
   } finally { i18n.setUiLanguage('en'); }
 });
 
+// The dialogs read the name from runStyle's label; steps-run-style.cjs slice 9 checks it in the interface language.
 test('B6: the built-in template name used for "keep current" is the interface-language name', () => {
-  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /builtinTemplates\(noteLanguageOf\(language\), language\)\.find/);
-  assert.match(source, /currentTemplate: templateInLanguage\(/);
   assert.equal(templates.builtinTemplates('zh-TW', 'zh-CN')[0].name, '标准');
 });
 

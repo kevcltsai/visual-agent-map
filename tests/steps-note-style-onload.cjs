@@ -5,7 +5,7 @@ const S = require('./support.cjs');
 
 const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
 
-test('onload and layout-ready write nothing to the vault: no create, modify, createFolder, rename, trash or adapter write', async () => {
+async function onloadWrites(saved) {
   const writes = [];
   const record = name => (...args) => { writes.push([name, args[0]]); return Promise.resolve(); };
   const listeners = [];
@@ -21,16 +21,28 @@ test('onload and layout-ready write nothing to the vault: no create, modify, cre
   plugin.manifest = { id: 'visual-agent-map', version: '0.0.0-test', dir: '' };
   plugin.app = { vault, fileManager: { trashFile: record('trashFile'), renameFile: record('renameFile') }, metadataCache: { on: () => ({}), getFileCache: () => null },
     workspace: { onLayoutReady: callback => callback(), on: () => ({}), getLeavesOfType: () => [], getActiveFile: () => null, getActiveViewOfType: () => null, layoutReady: true }, loadLocalStorage: () => null, saveLocalStorage() {} };
-  plugin.loadData = async () => ({ migrated: true, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles' });
+  plugin.loadData = async () => saved;
   plugin.saveData = async () => {};
   plugin.addCommand = command => command;
   let error;
   try { await plugin.onload(); await plugin.ready; await new Promise(resolve => setImmediate(resolve)); } catch (caught) { error = caught; }
   assert.equal(error, undefined, String(error?.stack));
+  return { plugin, writes, listeners };
+}
+
+test('onload and layout-ready write nothing to the vault: no create, modify, createFolder, rename, trash or adapter write', async () => {
+  const { plugin, writes, listeners } = await onloadWrites({ migrated: true, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles' });
   assert.deepEqual(writes, []);
   assert.ok(listeners.includes('rename'), 'the folder-rename listener is registered at load');
   // Control: the recorder sees a user action (opening the block folder), so the empty list above is not a blind spot.
   await plugin.noteStyles.ensureBlockFolder().catch(() => undefined);
   assert.ok(writes.some(([name]) => name === 'createFolder'), 'ensureBlockFolder writes through the same recorder');
   assert.ok(!writes.some(([name]) => name === 'create'), 'and writes no file: the five built-in style files are not written any more');
+});
+
+test('onload with the old keys saved and no noteStyleUpgrade marker still writes nothing: the one-time upgrade no longer starts at layout-ready', async () => {
+  const saved = { migrated: true, structureVersion: 2, workspaceInitialized: true, noteStylesFolder: 'WS/Styles', noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'builtin:plain', noteTemplateByKind: { hypothesis: 'builtin:action' }, defaultDetailTemplateId: 'u1', detailTemplates: [{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }] };
+  assert.equal('noteStyleUpgrade' in saved, false);
+  const { writes } = await onloadWrites(saved);
+  assert.deepEqual(writes, []);
 });

@@ -569,3 +569,59 @@ test('counter 11 (store part): a structure file with an old format rules zone is
   assert.equal(promptOf(got, 'en').includes('FORMAT-ZONE-LINE'), false);
   assert.ok(promptOf(got, 'en').includes('Describe alpha.'));
 });
+
+// ---- P2b: the settings keys, the topic's note-style frontmatter, loading ----
+const S = require('./support.cjs');
+const Main = S.load('main.ts', { obsidian: S.obsidian });
+
+test('P2b settings: the old keys round-trip byte for byte through settingsFromSaved (unchanged for T3)', () => {
+  const saved = {
+    noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'file:Mine', noteTemplateByKind: { hypothesis: 'builtin:action', evidence: 'file:Mine' },
+    noteStyleAliases: { standard: { template: 'builtin:textbook', tone: 'builtin:plain' } }, defaultNoteStyleId: 'textbook', defaultDetailTemplateId: 'u1',
+    detailTemplates: [{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }],
+    promptPresets: [{ id: 'p1', kind: 'tone', name: 'P', text: 'x' }]
+  };
+  const once = Main.settingsFromSaved(saved);
+  for (const key of ['noteTemplateBlock', 'noteToneBlock', 'noteTemplateByKind', 'noteStyleAliases', 'defaultNoteStyleId', 'defaultDetailTemplateId'])
+    assert.deepEqual(plain(once[key]), plain(saved[key]), key);
+  assert.deepEqual(plain(once.detailTemplates.map(({ id, name }) => ({ id, name }))), [{ id: 'u1', name: 'U' }]);
+  assert.deepEqual(plain(once.promptPresets.map(({ id, name }) => ({ id, name }))), [{ id: 'p1', name: 'P' }]);
+  // Saving what was loaded and loading it again changes nothing, and T2 writes neither new key.
+  assert.deepEqual(plain(Main.settingsFromSaved(JSON.parse(JSON.stringify(once)))), plain(once));
+  assert.equal('noteStyleByKind' in once, false);
+  assert.equal('noteStyleRecipe' in once, false);
+});
+
+test('P2b settings: noteStyleByKind keeps only the seven known kinds with a readable ref; bad names are dropped; nothing left = no key', () => {
+  const kept = Main.settingsFromSaved({ noteStyleByKind: { topic: 'builtin:textbook', atomic: 'file:Mine', hypothesis: 'file:a/b', evidence: 'file:一般研究', conclusion: 5, action: 'x', aim: 'builtin:aim', other: 'builtin:general' } });
+  assert.deepEqual(plain(kept.noteStyleByKind), { topic: 'builtin:textbook', atomic: 'file:Mine', aim: 'builtin:aim' });
+  for (const value of [{ topic: 'file:a/b' }, { topic: 'file:..' }, { topic: '' }, { nope: 'builtin:general' }, [], 'builtin:general', null, 5])
+    assert.equal('noteStyleByKind' in Main.settingsFromSaved({ noteStyleByKind: value }), false, JSON.stringify(value));
+});
+
+test('P2b settings: noteStyleRecipe is kept only when its shape is valid', () => {
+  const good = { migrated: 1, mapsNotified: true, legacy: { templates: { u1: 'file:A' }, tones: { t1: 'builtin:plain' } } };
+  assert.deepEqual(plain(Main.settingsFromSaved({ noteStyleRecipe: good }).noteStyleRecipe), good);
+  assert.deepEqual(plain(Main.settingsFromSaved({ noteStyleRecipe: { migrated: 1 } }).noteStyleRecipe), { migrated: 1 });
+  for (const bad of [{ migrated: 2 }, { migrated: 1, legacy: { templates: {} } }, { migrated: 1, legacy: { templates: { a: 1 }, tones: {} } }, [], 'x', null])
+    assert.equal('noteStyleRecipe' in Main.settingsFromSaved({ noteStyleRecipe: bad }), false, JSON.stringify(bad));
+});
+
+test('P2b frontmatter: note-style is read when it is a non-empty string, written only when the patch carries it, and "" removes it; detail-template and tone are untouched', async () => {
+  const { repo, contents } = S.fixture('en');
+  const note = await S.topicNote(repo);
+  assert.equal(note.noteStyle, undefined);
+  await repo.updateNote(note.path, { detailTemplateId: 'u1', toneId: 'plain' });
+  assert.equal(contents.get(note.path).includes('note-style'), false, 'no patch field, no key');
+  assert.equal((await repo.readNote(note.path)).noteStyle, undefined);
+  await repo.updateNote(note.path, { noteStyle: 'file:Mine' });
+  const set = await repo.readNote(note.path);
+  assert.equal(set.noteStyle, 'file:Mine');
+  assert.equal(set.detailTemplateId, 'u1');
+  assert.equal(set.toneId, 'plain');
+  await repo.updateNote(note.path, { title: 'Other' });
+  assert.equal((await repo.readNote(note.path)).noteStyle, 'file:Mine', 'a patch without the field keeps it');
+  await repo.updateNote(note.path, { noteStyle: '' });
+  assert.equal(contents.get(note.path).includes('note-style'), false);
+  assert.equal((await repo.readNote(note.path)).detailTemplateId, 'u1');
+});

@@ -29,6 +29,7 @@ import type { ReasoningLevel, ResearchMode, VisualMode } from "./ai/types";
 import { normalizeReasoningLevel } from "./ai/task-policy";
 import { FALLBACK_MODEL, resolveTaskModel } from "./ai/model-resolution";
 import type { PromptPreset } from "./ai/prompt-presets";
+import type { StyleKind } from "./ai/note-style-recipe";
 import { sourcesHeadingKeys, standardTemplate, type DetailTemplate } from "./ai/detail-templates";
 import { fencedLines } from "./ai/markdown-blocks";
 import { clampMapChatWidth, MAP_CHAT_WIDTH_DEFAULT } from "./core/map-chat-layout";
@@ -99,6 +100,8 @@ export interface Note {
   detailTemplateId?: string;
   /** Per-topic tone preset id (frontmatter `tone`); absent = use the map default. */
   toneId?: string;
+  /** From `note-style` frontmatter (a style ref, `builtin:<id>` or `file:<name>`); absent = none or empty. */
+  noteStyle?: string;
   detailFormatIssues: string[];
   /** Why the last AI task on this note failed (frontmatter `last-error`); empty when none. */
   lastError: string;
@@ -135,6 +138,14 @@ export interface Settings {
   noteToneBlock?: string;
   /** The template block each topic type uses (`builtin:<id>` or `file:<name>`); a type with no entry follows the map and the workspace. */
   noteTemplateByKind?: Partial<Record<TopicKind, string>>;
+  /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. Read only until the settings page writes it. */
+  noteStyleByKind?: Partial<Record<StyleKind, string>>;
+  /** The marker of the conversion to the recipe model, and the old id -> new ref table that implicit styles read. */
+  noteStyleRecipe?: {
+    migrated: 1;
+    mapsNotified?: true;
+    legacy?: { templates: Record<string, string>; tones: Record<string, string> };
+  };
   /** The note style folder; written when the user first creates it. Absent = `<workspace>/<localized name>`. */
   noteStylesFolder?: string;
   /** Old custom template id -> the style file it was exported to (with ".md"). */
@@ -1295,6 +1306,7 @@ export class Repository {
         ? { detailTemplateId: fm["detail-template"] }
         : {}),
       ...(typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {}),
+      ...(typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {}),
       ...(noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {}),
       ...(readRelevance(fm) ? { relevance: readRelevance(fm) } : {}),
       ...(readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) as Exclude<TopicKind, "topic"> } : {}),
@@ -1368,6 +1380,7 @@ export class Repository {
     if (patch.detailTemplateId !== undefined)
       patch.detailTemplateId ? (fm["detail-template"] = patch.detailTemplateId) : delete fm["detail-template"];
     if (patch.toneId !== undefined) patch.toneId ? (fm.tone = patch.toneId) : delete fm.tone;
+    if (patch.noteStyle !== undefined) patch.noteStyle ? (fm["note-style"] = patch.noteStyle) : delete fm["note-style"];
     if (patch.detailFormatIssues !== undefined)
       patch.detailFormatIssues.length
         ? (fm["detail-format-issues"] = patch.detailFormatIssues)

@@ -35,6 +35,8 @@ __export(main_exports, {
   firstMarkdownTable: () => firstMarkdownTable,
   hasLegacyChatModel: () => hasLegacyChatModel,
   markdownImages: () => markdownImages,
+  normalizeNoteStyleByKind: () => normalizeNoteStyleByKind,
+  normalizeNoteStyleRecipeMarker: () => normalizeNoteStyleRecipeMarker,
   settingsFromSaved: () => settingsFromSaved,
   visualReferencesMarkdown: () => visualReferencesMarkdown
 });
@@ -22446,6 +22448,7 @@ var Repository = class {
       visualMode: fm["visual-mode"] === "on" || fm["visual-mode"] === "off" ? fm["visual-mode"] : "auto",
       ...typeof fm["detail-template"] === "string" && fm["detail-template"] ? { detailTemplateId: fm["detail-template"] } : {},
       ...typeof fm.tone === "string" && fm.tone ? { toneId: fm.tone } : {},
+      ...typeof fm["note-style"] === "string" && fm["note-style"] ? { noteStyle: fm["note-style"] } : {},
       ...noteContentLanguage(fm) ? { contentLanguage: noteContentLanguage(fm) } : {},
       ...readRelevance(fm) ? { relevance: readRelevance(fm) } : {},
       ...readTopicKind(fm) !== "topic" ? { topicKind: readTopicKind(fm) } : {},
@@ -22501,6 +22504,7 @@ var Repository = class {
     if (patch.detailTemplateId !== void 0)
       patch.detailTemplateId ? fm["detail-template"] = patch.detailTemplateId : delete fm["detail-template"];
     if (patch.toneId !== void 0) patch.toneId ? fm.tone = patch.toneId : delete fm.tone;
+    if (patch.noteStyle !== void 0) patch.noteStyle ? fm["note-style"] = patch.noteStyle : delete fm["note-style"];
     if (patch.detailFormatIssues !== void 0)
       patch.detailFormatIssues.length ? fm["detail-format-issues"] = patch.detailFormatIssues : delete fm["detail-format-issues"];
     if (patch.lastError !== void 0) patch.lastError ? fm["last-error"] = patch.lastError : delete fm["last-error"];
@@ -71534,6 +71538,37 @@ function migratedChatModel(saved) {
 function hasLegacyChatModel(saved) {
   return !!saved && typeof saved === "object" && "mapChatModel" in saved;
 }
+function normalizeNoteStyleByKind(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const saved = value;
+  const kept = {};
+  for (const kind of STYLE_KINDS) {
+    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : void 0;
+    if (typeof ref === "string" && parseRecipeRef(ref)) kept[kind] = ref;
+  }
+  return Object.keys(kept).length ? kept : void 0;
+}
+function isStringMap(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "string");
+}
+function normalizeNoteStyleRecipeMarker(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const saved = value;
+  if (saved.migrated !== 1) return void 0;
+  const legacy = saved.legacy;
+  const legacyOk = legacy === void 0 || !!legacy && isStringMap(legacy.templates) && isStringMap(legacy.tones);
+  if (!legacyOk) return void 0;
+  return {
+    migrated: 1,
+    ...saved.mapsNotified === true ? { mapsNotified: true } : {},
+    ...legacy ? {
+      legacy: {
+        templates: legacy.templates,
+        tones: legacy.tones
+      }
+    } : {}
+  };
+}
 function settingsFromSaved(saved) {
   var _a2;
   const legacy = saved;
@@ -71547,6 +71582,8 @@ function settingsFromSaved(saved) {
     ...typeof (saved == null ? void 0 : saved.noteTemplateBlock) === "string" && saved.noteTemplateBlock ? { noteTemplateBlock: saved.noteTemplateBlock } : {},
     ...typeof (saved == null ? void 0 : saved.noteToneBlock) === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {},
     ...normalizeNoteTemplateByKind(saved == null ? void 0 : saved.noteTemplateByKind) ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved == null ? void 0 : saved.noteTemplateByKind) } : {},
+    ...normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) ? { noteStyleByKind: normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) } : {},
+    ...normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
     ...(saved == null ? void 0 : saved.noteStyleFiles) && typeof saved.noteStyleFiles === "object" && !Array.isArray(saved.noteStyleFiles) ? {
       noteStyleFiles: Object.fromEntries(
@@ -71628,10 +71665,14 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       settings: () => this.settings,
       exchanges: () => this.exchanges,
       recordFailure: (context, error) => this.recordFailure(context, error),
-      runStyle: ({ note, outputLanguage: outputLanguage2 }) => this.noteStyles.runStyle({
-        topic: { template: note.detailTemplateId, tone: note.toneId },
-        outputLanguage: outputLanguage2
-      }),
+      runStyle: ({ note, outputLanguage: outputLanguage2 }) => {
+        var _a2;
+        return this.noteStyles.runStyle({
+          topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
+          kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
+          outputLanguage: outputLanguage2
+        });
+      },
       resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
       clearOtherHistory: (origin) => {
         for (const view of this.views()) if (view !== origin) view.clearUndoHistory();
@@ -72149,7 +72190,6 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       })
     );
     this.app.workspace.onLayoutReady(() => {
-      void this.noteStyles.startUpgrade(this.ready);
       void this.finishStartup();
     });
     this.registerVaultEvents();

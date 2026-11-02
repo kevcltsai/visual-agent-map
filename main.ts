@@ -41,6 +41,7 @@ import {
   type NoteStyleUpgradeEvent,
   type StyleFilePort
 } from "./ai/note-style-store";
+import { parseRecipeRef, STYLE_KINDS } from "./ai/note-style-recipe";
 import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
@@ -145,6 +146,46 @@ function migratedChatModel(saved: Partial<Settings> | null): string {
 export function hasLegacyChatModel(saved: unknown): boolean {
   return !!saved && typeof saved === "object" && "mapChatModel" in saved;
 }
+/** The kind -> style table: only the seven known kinds, each a ref `parseRecipeRef` reads; nothing left = no key. */
+export function normalizeNoteStyleByKind(value: unknown): Settings["noteStyleByKind"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const saved = value as Record<string, unknown>;
+  const kept: Record<string, string> = {};
+  for (const kind of STYLE_KINDS) {
+    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : undefined;
+    if (typeof ref === "string" && parseRecipeRef(ref)) kept[kind] = ref;
+  }
+  return Object.keys(kept).length ? kept : undefined;
+}
+function isStringMap(value: unknown): value is Record<string, string> {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.values(value).every(item => typeof item === "string")
+  );
+}
+/** The conversion marker is kept only when its shape is valid. */
+export function normalizeNoteStyleRecipeMarker(value: unknown): Settings["noteStyleRecipe"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const saved = value as { migrated?: unknown; mapsNotified?: unknown; legacy?: unknown };
+  if (saved.migrated !== 1) return undefined;
+  const legacy = saved.legacy as { templates?: unknown; tones?: unknown } | undefined;
+  const legacyOk = legacy === undefined || (!!legacy && isStringMap(legacy.templates) && isStringMap(legacy.tones));
+  if (!legacyOk) return undefined;
+  return {
+    migrated: 1,
+    ...(saved.mapsNotified === true ? { mapsNotified: true as const } : {}),
+    ...(legacy
+      ? {
+          legacy: {
+            templates: legacy.templates as Record<string, string>,
+            tones: legacy.tones as Record<string, string>
+          }
+        }
+      : {})
+  };
+}
 /** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
 export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
@@ -164,6 +205,12 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
     ...(typeof saved?.noteToneBlock === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {}),
     ...(normalizeNoteTemplateByKind(saved?.noteTemplateByKind)
       ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved?.noteTemplateByKind) }
+      : {}),
+    ...(normalizeNoteStyleByKind(saved?.noteStyleByKind)
+      ? { noteStyleByKind: normalizeNoteStyleByKind(saved?.noteStyleByKind) }
+      : {}),
+    ...(normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe)
+      ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved?.noteStyleRecipe) }
       : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
@@ -269,7 +316,8 @@ export default class VisualAgentMapPlugin extends Plugin {
     recordFailure: (context, error) => this.recordFailure(context, error),
     runStyle: ({ note, outputLanguage }) =>
       this.noteStyles.runStyle({
-        topic: { template: note.detailTemplateId, tone: note.toneId },
+        topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
+        kind: note.topicKind ?? "topic",
         outputLanguage
       }),
     resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
@@ -791,8 +839,6 @@ export default class VisualAgentMapPlugin extends Plugin {
       })
     );
     this.app.workspace.onLayoutReady(() => {
-      // The one-time upgrade of the old note style data starts here, after the settings are loaded and the workspace is ready.
-      void this.noteStyles.startUpgrade(this.ready);
       void this.finishStartup();
     });
     this.registerVaultEvents();

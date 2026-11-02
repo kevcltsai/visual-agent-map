@@ -88,6 +88,19 @@ test('collect snapshots: note style files (parsed file sections, intro layout, e
   }
 });
 
+test('collect snapshots: the built-in style of each topic kind (note-style-recipe T2: atomic, hypothesis, evidence, conclusion, action)', async () => {
+  const { NoteStyleStore } = loadModule('ai/note-style-store.ts');
+  for (const [language, tag] of LANGUAGES) {
+    const store = new NoteStyleStore({ settings: () => ({ detailTemplates: [], workspaceFolder: 'WS', language: 'en' }), port: {}, save: async () => {} });
+    for (const kind of ['atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) {
+      const style = store.runStyle({ kind, outputLanguage: language });
+      assert.equal(style.recipe.ref, `builtin:${kind}`);
+      const context = { ...base, outputLanguage: language, detailTemplate: style.template, ...(style.toneText ? { toneText: style.toneText } : {}), ...style.contextFields };
+      await recordContext(`service.task-kind-${kind}.${tag}`, `AiTaskService instructions: mode task with the built-in ${kind} style resolved by runStyle (its structure, academic voice, standard format)`, language, context);
+    }
+  }
+});
+
 test('collect snapshots: style combinations per step (safety net before the prompt assembler)', async () => {
   const { parseNoteStyleFile } = loadModule('ai/note-style-file.ts');
   const parsed = text => { const result = parseNoteStyleFile(text, { id: 'style:S', name: 'S' }); assert.equal(result.ok, true); return { style: result.style, text }; };

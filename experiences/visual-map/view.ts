@@ -835,6 +835,7 @@ export class VisualAgentMapView extends ItemView {
     deleted: boolean;
     deleteAction?: Action;
   } | null = null;
+  private synthesisErrorSink: ((error: unknown) => void) | null = null;
   private integrationTask: {
     title: string;
     goal: string;
@@ -13954,6 +13955,54 @@ export class VisualAgentMapView extends ItemView {
       }
     ).open();
   }
+  /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
+  async createIntegratedNode(
+    title: string,
+    sources: MapNode[],
+    goal: string,
+    _rules: string,
+    options?: TaskOptions,
+    flow?: {
+      observer?: SynthesisObserver;
+      accepted?: () => void;
+      controller?: AbortController;
+      directions?: Suggestion[];
+      model?: ModelChoice;
+    }
+  ): Promise<void> {
+    if (!this.map || sources.length < 2) return;
+    let failure: unknown;
+    let failed = false;
+    this.synthesisErrorSink = error => {
+      failure = error;
+      failed = true;
+    };
+    try {
+      await this.startSelectionSynthesis(
+        sources,
+        {
+          researchMode: "local",
+          researchDepth: "normal",
+          visualMode: "off",
+          ...options,
+          synthesisTitle: title,
+          signal: flow?.controller?.signal ?? options?.signal
+        },
+        goal,
+        message => {
+          if (!failed) {
+            failure = new Error(message);
+            failed = true;
+          }
+        },
+        () => flow?.accepted?.(),
+        flow?.observer
+      );
+    } finally {
+      this.synthesisErrorSink = null;
+    }
+    if (failed) throw failure;
+  }
   /**
    * One step of multi-select synthesis: the AI's suggested directions (`direction === null`), then the draft. Both
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
@@ -14031,6 +14080,12 @@ export class VisualAgentMapView extends ItemView {
             ? error.message
             : String(error);
         this.render();
+      }
+      if (this.synthesisErrorSink && !aborted) {
+        // The thin entry rethrows the original error to its caller instead of logging a user message.
+        this.synthesisErrorSink(error);
+        failed(error instanceof Error ? error.message : String(error));
+        return;
       }
       failed(
         aborted

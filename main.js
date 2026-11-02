@@ -46605,6 +46605,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     /** The note the user last had open beside the map; dropped text is assumed to come from it. */
     __publicField(this, "lastMarkdownPath", null);
     __publicField(this, "deletedMap", null);
+    __publicField(this, "synthesisErrorSink", null);
     __publicField(this, "integrationTask", null);
     /** A multi-select synthesis step is starting (before its task exists), so a second request is refused. */
     __publicField(this, "selectionStarting", false);
@@ -58783,6 +58784,45 @@ ${request.requirements}` : preset.text,
       }
     ).open();
   }
+  /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
+  async createIntegratedNode(title, sources, goal, _rules, options, flow) {
+    var _a2, _b2;
+    if (!this.map || sources.length < 2) return;
+    let failure;
+    let failed = false;
+    this.synthesisErrorSink = (error) => {
+      failure = error;
+      failed = true;
+    };
+    try {
+      await this.startSelectionSynthesis(
+        sources,
+        {
+          researchMode: "local",
+          researchDepth: "normal",
+          visualMode: "off",
+          ...options,
+          synthesisTitle: title,
+          signal: (_b2 = (_a2 = flow == null ? void 0 : flow.controller) == null ? void 0 : _a2.signal) != null ? _b2 : options == null ? void 0 : options.signal
+        },
+        goal,
+        (message) => {
+          if (!failed) {
+            failure = new Error(message);
+            failed = true;
+          }
+        },
+        () => {
+          var _a3;
+          return (_a3 = flow == null ? void 0 : flow.accepted) == null ? void 0 : _a3.call(flow);
+        },
+        flow == null ? void 0 : flow.observer
+      );
+    } finally {
+      this.synthesisErrorSink = null;
+    }
+    if (failed) throw failure;
+  }
   /**
    * One step of multi-select synthesis: the AI's suggested directions (`direction === null`), then the draft. Both
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
@@ -58846,6 +58886,11 @@ ${request.requirements}` : preset.text,
         task2.state = aborted ? "cancelled" : "failed";
         task2.progress = aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
         this.render();
+      }
+      if (this.synthesisErrorSink && !aborted) {
+        this.synthesisErrorSink(error);
+        failed(error instanceof Error ? error.message : String(error));
+        return;
       }
       failed(
         aborted ? t("ui.research_stopped_existing_content_was_preserved") : this.plugin.recordFailure(

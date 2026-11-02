@@ -15129,12 +15129,12 @@ ${timestamp.toLocaleString()}${item.model ? ` \xB7 ${item.model}` : ""}`
     }, 3e3) : null;
     if (this.previewVisible && this.selectedPath) void showPreview(this.selectedPath);
   }
-  async changeCoffeeStyles(change) {
+  async changeCoffeeStyles(change2) {
     if (this.savingCoffeeStyles) throw new Error(this.t("coffee.settings_are_being_saved_try_again_shortly"));
     const previousStyles = this.plugin.settings.coffeeStyles, previousId = this.plugin.settings.defaultCoffeeStyleId;
     this.savingCoffeeStyles = true;
     try {
-      change();
+      change2();
       await this.plugin.saveSettings();
     } catch (error) {
       this.plugin.settings.coffeeStyles = previousStyles;
@@ -19362,6 +19362,295 @@ function begin(deps) {
   return transaction;
 }
 
+// experiences/visual-map/topic-selection.ts
+var NO_CHANGE = Object.freeze({
+  touched: Object.freeze([]),
+  multiSelectModeChanged: false,
+  relationChanged: false
+});
+function change(ids, multiSelectModeChanged = false, relationChanged = false) {
+  const touched = [];
+  for (const id of ids) if (id !== null && !touched.includes(id)) touched.push(id);
+  return Object.freeze({ touched: Object.freeze(touched), multiSelectModeChanged, relationChanged });
+}
+function defaultTabStop(selected, shown) {
+  var _a2, _b2, _c, _d, _e;
+  return (_e = (_d = (_b2 = selected && shown.some((topic) => topic.id === selected) ? selected : null) != null ? _b2 : (_a2 = shown.find((topic) => !topic.parentId)) == null ? void 0 : _a2.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
+}
+var TopicSelection = class {
+  constructor() {
+    __publicField(this, "selected", null);
+    __publicField(this, "multi", /* @__PURE__ */ new Set());
+    __publicField(this, "mode", false);
+    __publicField(this, "relation", null);
+    __publicField(this, "tabStop", null);
+  }
+  /** A frozen copy: editing it, or its Set, never reaches the module. */
+  get state() {
+    return Object.freeze({
+      selected: this.selected,
+      multiSelected: new Set(this.multi),
+      multiSelectMode: this.mode,
+      selectedRelation: this.relation,
+      tabStopId: this.tabStop
+    });
+  }
+  // ---- single select (three copies) ----
+  /** Select one topic, no guard: enableDrag plain click (view.ts 17606-17609) and revealPath (10899-10902). */
+  click(id, ctx = {}) {
+    const before = this.selected, multi = [...this.multi];
+    this.selected = id;
+    this.multi.clear();
+    return this.commit([before, id, ...multi], ctx);
+  }
+  /** Select one topic unless that is already the whole selection: selectMapNode (10908-10915). */
+  selectIfChanged(id, ctx = {}) {
+    if (this.selected === id && this.multi.size === 0) return NO_CHANGE;
+    return this.click(id, ctx);
+  }
+  /** Write only the selected id, then the caller renders: 2065, 3937, 4162, 4354, 4364, 4413, 4464, 4554, 6447, 7934, 7966, 8019, 8334, 9412, 11301, 12651. */
+  setSelected(id) {
+    const before = this.selected;
+    this.selected = id;
+    return change([before, id]);
+  }
+  // ---- Cmd/Ctrl click ----
+  /** enableDrag Cmd/Ctrl branch (17592-17604). */
+  cmdClick(id, ctx) {
+    const before = this.selected, multi = [...this.multi];
+    if (ctx.canMultiSelect && !this.multi.size && before && before !== id) this.multi.add(before);
+    if (this.multi.has(id)) this.multi.delete(id);
+    else this.multi.add(id);
+    this.selected = id;
+    if (ctx.canMultiSelect && this.multi.size >= 2) {
+      this.mode = true;
+      return change([before, ...multi, id], true);
+    }
+    return this.commit([before, ...multi, id], ctx);
+  }
+  // ---- toggling inside multi-select (four copies; the fourth is cmdClick) ----
+  /** Checkbox: set by its checked state (9764-9766). */
+  setChecked(id, checked) {
+    if (checked) this.multi.add(id);
+    else this.multi.delete(id);
+    return this.commit([id], {});
+  }
+  /** Card click in multi-select (10268-10271). */
+  toggleByClick(id) {
+    return this.flip(id);
+  }
+  /** Enter on a card in multi-select (10316-10319). */
+  toggleByEnter(id) {
+    return this.flip(id);
+  }
+  flip(id) {
+    if (this.multi.has(id)) this.multi.delete(id);
+    else this.multi.add(id);
+    return this.commit([id], {});
+  }
+  // ---- marquee ----
+  /** Rubber-band selection (14818-14832). An AIM map never gets here in the view (14939); the module also refuses. */
+  marquee(ids, mode, ctx) {
+    if (!ctx.canMultiSelect) return NO_CHANGE;
+    const hits = new Set(ids);
+    if (!hits.size) return NO_CHANGE;
+    if (mode === "subtract") {
+      const removed = [...hits].filter((id) => this.multi.has(id));
+      if (!removed.length) return NO_CHANGE;
+      for (const id of removed) this.multi.delete(id);
+      return this.commit(removed, ctx);
+    }
+    for (const id of hits) this.multi.add(id);
+    if (mode === "enter") {
+      this.mode = true;
+      return change(hits, true);
+    }
+    return this.commit(hits, ctx);
+  }
+  // ---- clear ----
+  /** Selection bar Clear (13439-13441): multi emptied, selected and mode kept. */
+  clearMulti(ctx = {}) {
+    const multi = [...this.multi];
+    this.multi.clear();
+    return this.commit(multi, ctx);
+  }
+  /** Click on the empty canvas (14965-14975): ends a relation selection; outside multi-select also clears the selection. */
+  clickEmpty(ctx = {}) {
+    const hadRelation = this.relation !== null;
+    this.relation = null;
+    if (this.mode) return hadRelation ? change([], false, true) : NO_CHANGE;
+    const before = this.selected, multi = [...this.multi];
+    this.selected = null;
+    this.multi.clear();
+    return this.commit([before, ...multi], ctx, hadRelation);
+  }
+  /** Escape (1262-1270): everything cleared, mode off, relation off. */
+  escape(ctx = {}) {
+    const before = this.selected, multi = [...this.multi], wasMode = this.mode, hadRelation = this.relation !== null;
+    this.selected = null;
+    this.multi.clear();
+    this.relation = null;
+    this.mode = false;
+    const stops = this.resetStop(ctx);
+    return change([before, ...multi, ...stops], wasMode, hadRelation);
+  }
+  // ---- entering and leaving multi-select ----
+  /** The "select topics" button (9548-9550): flips the mode and clears selected and multi. */
+  toggleMultiSelect() {
+    const before = this.selected, multi = [...this.multi];
+    this.mode = !this.mode;
+    this.multi.clear();
+    this.selected = null;
+    return change([before, ...multi], true);
+  }
+  /** Leave multi-select. openMap (2006-2008) also drops selected; emptyMap (9532-9533) and backgroundRun (13231-13232) keep it. */
+  exitMultiSelect(variant) {
+    const before = this.selected, multi = [...this.multi], wasMode = this.mode;
+    this.mode = false;
+    this.multi.clear();
+    if (variant === "openMap") this.selected = null;
+    return change([...variant === "openMap" ? [before] : [], ...multi], wasMode);
+  }
+  /** Map chat picked topics (16508-16510). */
+  chatSelect(ids) {
+    return this.enterWith(ids);
+  }
+  /** A card's direct subtopics (17015-17017). */
+  selectSubtopics(ids) {
+    return this.enterWith(ids);
+  }
+  enterWith(ids) {
+    const before = this.selected, multi = [...this.multi], next = [...ids];
+    this.multi = new Set(next);
+    this.selected = null;
+    this.mode = true;
+    return change([before, ...multi, ...next], true);
+  }
+  /** Failed topics picked for another model (13384-13385): selected is kept. */
+  retryFailed(ids) {
+    const multi = [...this.multi], next = [...ids];
+    this.multi = new Set(next);
+    this.mode = true;
+    return change([...multi, ...next], true);
+  }
+  /** Retry with another provider (13375): the set only; the mode is not touched. */
+  replaceMulti(ids) {
+    const multi = [...this.multi], next = [...ids];
+    this.multi = new Set(next);
+    return change([...multi, ...next]);
+  }
+  // ---- reassignment after a structural operation ----
+  /** Deleted or moved to Unassigned (5207-5208, 7444-7445): selected and multi cleared; the mode stays. */
+  afterRemove() {
+    const before = this.selected, multi = [...this.multi];
+    this.selected = null;
+    this.multi.clear();
+    return change([before, ...multi]);
+  }
+  /** New branches written (7734): multi cleared; selected is set separately by setSelected. */
+  afterPaste() {
+    const multi = [...this.multi];
+    this.multi.clear();
+    return change(multi);
+  }
+  /** Branches moved (7492): multi cleared only when the caller asks. */
+  afterMove(clearSelection) {
+    return clearSelection ? this.afterPaste() : NO_CHANGE;
+  }
+  /** Merge (5705-5707, 5791-5793). */
+  afterMerge(id) {
+    return this.landOn(id);
+  }
+  /** Synthesis saved (14638-14640, 14672-14674). Same result as afterMerge today. */
+  afterSynthesis(id) {
+    return this.landOn(id);
+  }
+  landOn(id) {
+    const before = this.selected, multi = [...this.multi], wasMode = this.mode;
+    this.mode = false;
+    this.selected = id;
+    this.multi.clear();
+    return change([before, id, ...multi], wasMode);
+  }
+  // ---- pruning ----
+  /** Drop selected and multi ids that no longer exist (9615-9616). The mode is left as it is. */
+  prune(existing) {
+    const touched = [];
+    if (this.selected !== null && !existing.has(this.selected)) {
+      touched.push(this.selected);
+      this.selected = null;
+    }
+    for (const id of [...this.multi])
+      if (!existing.has(id)) {
+        touched.push(id);
+        this.multi.delete(id);
+      }
+    return touched.length ? change(touched) : NO_CHANGE;
+  }
+  /** Merge undo/redo (5838): only the selected id is pruned. */
+  pruneSelectedOnly(existing) {
+    if (this.selected === null || existing.has(this.selected)) return NO_CHANGE;
+    const gone = this.selected;
+    this.selected = null;
+    return change([gone]);
+  }
+  /** A relation line that is gone cannot stay selected (18061). */
+  pruneRelation(existingKeys) {
+    if (this.relation === null || existingKeys.has(this.relation)) return NO_CHANGE;
+    this.relation = null;
+    return change([], false, true);
+  }
+  // ---- relation line ----
+  /** Pointer down, click or focus on a line or its row (18032, 18038, 18181, 11724). */
+  selectRelation(key2) {
+    if (this.relation === key2) return NO_CHANGE;
+    this.relation = key2;
+    return change([], false, true);
+  }
+  /** Blur of a row, or the edited relation was removed (18185, 11716): only the same key is cleared. */
+  deselectRelation(key2) {
+    if (this.relation !== key2) return NO_CHANGE;
+    this.relation = null;
+    return change([], false, true);
+  }
+  // ---- tab stop ----
+  /** Back to the default stop (9618, 10562). */
+  resetTabStop(shown) {
+    return change(this.resetStop({ shown }));
+  }
+  /** Keyboard focus moved in multi-select (10504-10507). */
+  moveTabStop(id) {
+    const before = this.tabStop;
+    this.tabStop = id;
+    return change([before, id]);
+  }
+  // ---- presentation mode ----
+  /** Copy of selected and multi for the presentation session (1565-1566). */
+  stash() {
+    return Object.freeze({ selected: this.selected, multiSelected: Object.freeze([...this.multi]) });
+  }
+  /** Put the stash back, dropping ids that no longer exist (1701-1703). It commits like a click; the mode is not touched. */
+  restore(snapshot, existing, ctx = {}) {
+    const before = this.selected, multi = [...this.multi];
+    this.selected = snapshot.selected !== null && existing.has(snapshot.selected) ? snapshot.selected : null;
+    this.multi = new Set(snapshot.multiSelected.filter((id) => existing.has(id)));
+    return this.commit([before, this.selected, ...multi, ...this.multi], ctx);
+  }
+  /** The commit path of the view (commitSelection -> applySelectionState): ends a relation selection, resets the tab stop. */
+  commit(ids, ctx, relationAlready = false) {
+    const hadRelation = this.relation !== null;
+    this.relation = null;
+    const stops = this.resetStop(ctx);
+    return change([...ids, ...stops], false, hadRelation || relationAlready);
+  }
+  resetStop(ctx) {
+    if (!ctx.shown) return [];
+    const before = this.tabStop;
+    this.tabStop = defaultTabStop(this.selected, ctx.shown);
+    return [before, this.tabStop].filter((id) => id !== null);
+  }
+};
+
 // ui/modals/aim-clarification-modal.ts
 var import_obsidian10 = require("obsidian");
 var AimClarificationModal = class extends import_obsidian10.Modal {
@@ -22243,15 +22532,15 @@ ${body}`);
    * same `vault.process` call. An invalid, duplicate or over-limit address writes nothing and returns the reason; values
    * this version does not understand are kept, an emptied list removes the key, and `updated` is not bumped.
    */
-  async writeTopicLinks(path, change) {
+  async writeTopicLinks(path, change2) {
     let result = { ok: true, next: [] };
     await this.app.vault.process(this.file(path), (content) => {
       const raw = frontmatter(content)["topic-links"];
-      if ("add" in change) {
-        result = addTopicLink(raw, change.add);
+      if ("add" in change2) {
+        result = addTopicLink(raw, change2.add);
         return result.ok ? setFrontmatterKeys(content, { "topic-links": result.next }) : content;
       }
-      const next = removeTopicLink(raw, change.remove.href);
+      const next = removeTopicLink(raw, change2.remove.href);
       result = { ok: true, next: next != null ? next : [] };
       return setFrontmatterKeys(content, { "topic-links": next });
     });
@@ -22270,10 +22559,10 @@ ${body}`);
    * token left removes only those (the key goes when nothing is left), and `updated` is not bumped. A note whose style
    * would not change is returned as it is, byte for byte.
    */
-  async writeTopicStyle(path, change) {
+  async writeTopicStyle(path, change2) {
     await this.app.vault.process(this.file(path), (content) => {
       const raw = frontmatter(content)["topic-style"];
-      const next = "toggle" in change ? toggleTopicStyle(raw, change.toggle) : setTopicStyle(raw, change.set);
+      const next = "toggle" in change2 ? toggleTopicStyle(raw, change2.toggle) : setTopicStyle(raw, change2.set);
       const same = JSON.stringify(next) === JSON.stringify(raw === void 0 ? null : raw);
       return same ? content : setFrontmatterKeys(content, { "topic-style": next });
     });
@@ -22409,13 +22698,13 @@ ${body}`);
    * Read-modify-write on the current file content in one vault.process call, so a caller holding an older copy of
    * the map cannot overwrite fields it did not change (for example, research state saved meanwhile).
    */
-  async updateMap(path, change) {
+  async updateMap(path, change2) {
     let updated;
     let print = "";
     await this.app.vault.process(this.file(path), (content) => {
       const map = parseMap(content);
       const before = coordinatePrint(map);
-      change(map);
+      change2(map);
       this.stampAimContentLanguage(map);
       updated = map;
       const text11 = writeMapContent(content, map);
@@ -39499,11 +39788,11 @@ function parseRelevanceRecalibrate(raw, request) {
   body.changes.forEach((entry, index) => {
     const where = `#${index + 1}`;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw invalid3(locale, where);
-    const change = entry;
-    const keys = Object.keys(change);
+    const change2 = entry;
+    const keys = Object.keys(change2);
     if (keys.length !== 3 || !["id", "tier", "anchor"].every((key2) => keys.includes(key2)))
       throw invalid3(locale, `${where} keys`);
-    const { id: label, tier, anchor } = change;
+    const { id: label, tier, anchor } = change2;
     if (typeof label !== "string" || !label) throw invalid3(locale, `${where} id`);
     if (typeof tier !== "string" || !RELEVANCE_TIERS2.includes(tier))
       throw invalid3(locale, `${where} tier`);
@@ -46417,6 +46706,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "relevanceGoal");
     __publicField(this, "relevanceLevel");
     __publicField(this, "relevanceContext");
+    /** Selection rules (P2a: the old fields below stay in step until P3f removes them). */
+    __publicField(this, "selection", new TopicSelection());
     __publicField(this, "selected", null);
     __publicField(this, "multiSelected", /* @__PURE__ */ new Set());
     /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
@@ -48683,16 +48974,16 @@ ${request.requirements}` : preset.text,
   async restoreRelevance(changes, direction) {
     let skipped2 = 0;
     const same = (a, b) => a === b || !!a && !!b && a.tier === b.tier && !!a.manual === !!b.manual;
-    for (const change of changes) {
-      const expected = direction === "undo" ? change.after : change.before;
-      const replacement = direction === "undo" ? change.before : change.after;
+    for (const change2 of changes) {
+      const expected = direction === "undo" ? change2.after : change2.before;
+      const replacement = direction === "undo" ? change2.before : change2.after;
       try {
-        const latest = (await this.plugin.repo.readNote(change.path)).relevance;
+        const latest = (await this.plugin.repo.readNote(change2.path)).relevance;
         if (!same(latest, expected)) {
           skipped2++;
           continue;
         }
-        await this.plugin.repo.writeRelevance(change.path, replacement != null ? replacement : null);
+        await this.plugin.repo.writeRelevance(change2.path, replacement != null ? replacement : null);
       } catch (e) {
         skipped2++;
       }
@@ -48860,12 +49151,12 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c;
     const outcome = run.outcome;
     new RelevanceSummaryModal(this.app, {
-      rows: ((_a2 = outcome == null ? void 0 : outcome.changes) != null ? _a2 : []).map((change) => ({
-        id: change.id,
-        title: change.title,
-        before: change.before,
-        after: change.after,
-        ...change.anchor ? { anchor: change.anchor } : {}
+      rows: ((_a2 = outcome == null ? void 0 : outcome.changes) != null ? _a2 : []).map((change2) => ({
+        id: change2.id,
+        title: change2.title,
+        before: change2.before,
+        after: change2.after,
+        ...change2.anchor ? { anchor: change2.anchor } : {}
       })),
       pins: (_b2 = outcome == null ? void 0 : outcome.pins) != null ? _b2 : [],
       conflicts: (_c = outcome == null ? void 0 : outcome.conflicts) != null ? _c : [],
@@ -50429,8 +50720,8 @@ ${request.requirements}` : preset.text,
     return button;
   }
   /** Returns the snapshots its history entry restores (taken after any conflict was resolved), or null when nothing ran. */
-  async mapChange(change, rebuildDerivedData = true) {
-    await this.mapChangeSnapshots(change, rebuildDerivedData);
+  async mapChange(change2, rebuildDerivedData = true) {
+    await this.mapChangeSnapshots(change2, rebuildDerivedData);
   }
   /** Compares Map.md on disk with the map in memory; when they differ the conflict window decides and history is cleared. */
   async resolveMapConflict() {
@@ -50449,7 +50740,7 @@ ${request.requirements}` : preset.text,
     return true;
   }
   /** Runs `change` on Map.md through MapTransaction; `created` are notes that already exist and are parked by Undo. */
-  async mapChangeSnapshots(change, rebuildDerivedData = true, created = [], attachment) {
+  async mapChangeSnapshots(change2, rebuildDerivedData = true, created = [], attachment) {
     if (!this.map) return null;
     const tx = this.beginMapTransaction();
     for (const path of created) tx.create(path, this.plugin.repo.topicFolder(this.path, "Unassigned"), this.map.id);
@@ -50461,7 +50752,7 @@ ${request.requirements}` : preset.text,
       const entry = await tx.editMap(this.path, (map, _resolve, attachmentPath) => {
         map.viewport = clone(viewport);
         before = clone(map);
-        change(map, attachmentPath);
+        change2(map, attachmentPath);
         this.pruneSummariesIn(map);
         after = clone(map);
       }).commit({ deferRebuild: true });
@@ -52283,14 +52574,14 @@ ${request.requirements}` : preset.text,
     handle.addEventListener("pointerdown", (event) => begin2(event, true));
   }
   /** Writes a canvas-item change as one undo step; an empty list leaves no `canvasItems` field in Map.md. */
-  async changeCanvasItems(id, change) {
+  async changeCanvasItems(id, change2) {
     var _a2;
     if (!this.map || !this.canEditCanvasItems()) return;
     if (!((_a2 = this.map.canvasItems) == null ? void 0 : _a2.some((item) => item.id === id))) return;
     await this.mapChange((map) => {
       var _a3, _b2;
       const alive = new Set(map.nodes.map((node) => node.id));
-      const changed = change((_a3 = map.canvasItems) != null ? _a3 : []);
+      const changed = change2((_a3 = map.canvasItems) != null ? _a3 : []);
       const dangling = /* @__PURE__ */ new Set();
       for (const item of changed)
         if (item.kind === "text") {
@@ -54538,10 +54829,7 @@ ${request.requirements}` : preset.text,
         tools,
         this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
         () => {
-          this.integrationMode = !this.integrationMode;
-          this.multiSelected.clear();
-          this.selected = null;
-          this.render();
+          this.runSelection((selection) => selection.toggleMultiSelect());
         }
       );
       integrate.setAttr("aria-pressed", String(this.integrationMode));
@@ -54731,9 +55019,7 @@ ${request.requirements}` : preset.text,
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (select.checked) this.multiSelected.add(node.id);
-        else this.multiSelected.delete(node.id);
-        this.commitSelection(this.selected, this.selected, [node.id]);
+        this.runSelection((selection) => selection.setChecked(node.id, select.checked));
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
@@ -55146,9 +55432,7 @@ ${request.requirements}` : preset.text,
       if (event.target.closest("button")) return;
       if ((event.metaKey || event.ctrlKey) && !this.integrationMode) return;
       if (this.integrationMode) {
-        if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-        else this.multiSelected.add(node.id);
-        this.commitSelection(this.selected, this.selected, [node.id]);
+        this.runSelection((selection) => selection.toggleByClick(node.id));
         return;
       }
       this.selectMapNode(node);
@@ -55193,9 +55477,7 @@ ${request.requirements}` : preset.text,
       }
       if (event.key === "Enter") {
         if (this.integrationMode) {
-          if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-          else this.multiSelected.add(node.id);
-          this.commitSelection(this.selected, this.selected, [node.id]);
+          this.runSelection((selection) => selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
           if (node.aimKind === "question") this.openAimAnswer(node);
@@ -55449,6 +55731,35 @@ ${request.requirements}` : preset.text,
       return;
     }
     this.applySelectionState(prevId, nextId, touched);
+  }
+  /** Bring the module up to the old fields (P2a bridge: other paths still write them), run one operation, copy back. */
+  runSelection(operation) {
+    const sel = this.selection;
+    if (sel.state.multiSelectMode !== this.integrationMode) sel.toggleMultiSelect();
+    sel.replaceMulti(this.multiSelected);
+    sel.setSelected(this.selected);
+    const relation = sel.state.selectedRelation;
+    if (relation !== this.selectedRelation) {
+      if (this.selectedRelation) sel.selectRelation(this.selectedRelation);
+      else if (relation) sel.deselectRelation(relation);
+    }
+    sel.moveTabStop(this.tabStopId);
+    const change2 = operation(sel);
+    const state = sel.state;
+    this.selected = state.selected;
+    this.multiSelected = new Set(state.multiSelected);
+    this.integrationMode = state.multiSelectMode;
+    this.selectedRelation = state.selectedRelation;
+    this.tabStopId = state.tabStopId;
+    this.applySelectionChange(change2);
+  }
+  /** Mode changed: render the whole map. Only the selection changed: repaint the touched cards, bar and outline. */
+  applySelectionChange(change2) {
+    if (change2.multiSelectModeChanged) {
+      if (!this.closed) this.render();
+      return;
+    }
+    this.commitSelection(null, this.selected, change2.touched);
   }
   clearHoverTimer() {
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
@@ -55778,11 +56089,7 @@ ${request.requirements}` : preset.text,
     return true;
   }
   selectMapNode(node) {
-    if (this.selected === node.id && this.multiSelected.size === 0) return;
-    const previous = this.selected, touched = [...this.multiSelected];
-    this.selected = node.id;
-    this.multiSelected.clear();
-    this.commitSelection(previous, node.id, touched);
+    this.runSelection((selection) => selection.selectIfChanged(node.id));
   }
   hideHoverCardSoon() {
     this.clearHoverTimer();
@@ -56497,13 +56804,13 @@ ${request.requirements}` : preset.text,
     const apply = (next, repaint = true) => new Promise(
       (done) => this.enqueue(async () => {
         try {
-          await change(next, repaint);
+          await change2(next, repaint);
         } finally {
           done();
         }
       })
     );
-    const change = async (next, repaint) => {
+    const change2 = async (next, repaint) => {
       const outcome = {};
       if (!this.map) return;
       await this.mapChange((map) => {
@@ -57034,12 +57341,12 @@ ${request.requirements}` : preset.text,
     paint();
   }
   /** Adds or removes one link: the note's `topic-links` and Map.md (viewport only) in one undoable step. Null when not editable. */
-  async changeTopicLinks(node, change) {
+  async changeTopicLinks(node, change2) {
     if (!this.map || !this.markersEditable(node)) return null;
     const viewport = clone(this.map.viewport);
     let result = { ok: true, next: [] };
     const entry = await this.beginMapTransaction().rewriteNote(node.path, async (path) => {
-      result = await this.plugin.repo.writeTopicLinks(path, change);
+      result = await this.plugin.repo.writeTopicLinks(path, change2);
     }).editMap(this.path, (map) => {
       map.viewport = clone(viewport);
     }).commit({ deferRebuild: true, label: t("ui.topic_links") });
@@ -58145,9 +58452,7 @@ ${request.requirements}` : preset.text,
       selection,
       t("ui.clear"),
       () => {
-        const touched = [...this.multiSelected];
-        this.multiSelected.clear();
-        this.commitSelection(this.selected, this.selected, touched);
+        this.runSelection((selection2) => selection2.clearMulti());
       },
       !this.multiSelected.size
     );
@@ -61522,18 +61827,18 @@ ${addition}` : addition });
    * Sets (or, with undefined, clears) one card's custom width and/or height as one undo step. Only the keys present change,
    * so a horizontal-only corner drag never writes a height.
    */
-  async resizeCard(id, change) {
+  async resizeCard(id, change2) {
     var _a2;
     if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.id === id))) return;
     await this.mapChange((map) => {
       const node = map.nodes.find((item) => item.id === id);
       if (!node) return;
-      if ("width" in change) {
-        if (change.width === void 0 || change.width === CARD_WIDTH) delete node.width;
-        else node.width = clampCardWidth(change.width);
+      if ("width" in change2) {
+        if (change2.width === void 0 || change2.width === CARD_WIDTH) delete node.width;
+        else node.width = clampCardWidth(change2.width);
       }
-      if ("height" in change) {
-        const height = change.height === void 0 ? void 0 : clampCardHeight(change.height);
+      if ("height" in change2) {
+        const height = change2.height === void 0 ? void 0 : clampCardHeight(change2.height);
         if (height === void 0) delete node.height;
         else node.height = height;
       }
@@ -61713,13 +62018,13 @@ ${addition}` : addition });
       const up = () => {
         if (done) return;
         settle();
-        const change = {};
-        if (width !== fromWidth) change.width = width === CARD_WIDTH ? void 0 : width;
-        if (height !== fromHeight) change.height = height;
-        if (!("width" in change) && !("height" in change)) return restore();
+        const change2 = {};
+        if (width !== fromWidth) change2.width = width === CARD_WIDTH ? void 0 : width;
+        if (height !== fromHeight) change2.height = height;
+        if (!("width" in change2) && !("height" in change2)) return restore();
         this.suppressClickUntil = Date.now() + 250;
         this.focusResizeNodeId = null;
-        this.enqueue(() => this.resizeCard(node.id, change));
+        this.enqueue(() => this.resizeCard(node.id, change2));
       };
       const cancel = () => {
         if (done) return;
@@ -61737,12 +62042,12 @@ ${addition}` : addition });
       event.stopPropagation();
       event.preventDefault();
       const current = nodeNow();
-      const change = {};
-      if ((current == null ? void 0 : current.width) !== void 0) change.width = void 0;
-      if ((current == null ? void 0 : current.height) !== void 0) change.height = void 0;
-      if (!("width" in change) && !("height" in change)) return;
+      const change2 = {};
+      if ((current == null ? void 0 : current.width) !== void 0) change2.width = void 0;
+      if ((current == null ? void 0 : current.height) !== void 0) change2.height = void 0;
+      if (!("width" in change2) && !("height" in change2)) return;
       this.focusResizeNodeId = null;
-      this.enqueue(() => this.resizeCard(node.id, change));
+      this.enqueue(() => this.resizeCard(node.id, change2));
     });
   }
   enableDrag(card, node) {
@@ -61965,23 +62270,9 @@ ${addition}` : addition });
             })
           );
         } else if (e.metaKey || e.ctrlKey) {
-          const previous = this.selected, touched = [...this.multiSelected, node.id];
-          if (this.canSelectTopics() && !this.multiSelected.size && previous && previous !== node.id)
-            this.multiSelected.add(previous);
-          if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-          else this.multiSelected.add(node.id);
-          this.selected = node.id;
-          if (this.canSelectTopics() && this.multiSelected.size >= 2) {
-            this.integrationMode = true;
-            if (!this.closed) this.render();
-            return;
-          }
-          this.commitSelection(previous, node.id, touched);
+          this.runSelection((selection) => selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
-          const previous = this.selected, touched = [...this.multiSelected];
-          this.multiSelected.clear();
-          this.selected = node.id;
-          this.commitSelection(previous, node.id, touched);
+          this.runSelection((selection) => selection.click(node.id));
           if (node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
         }
@@ -65093,15 +65384,15 @@ function applySvgPatch(svg, patch) {
   const nodes = flatNodes(svg);
   for (const op of patch) {
     if (!Array.isArray(op) || op.length !== 2) return false;
-    const [index, change] = op;
+    const [index, change2] = op;
     if (typeof index !== "number" || !Number.isInteger(index) || index < 0 || index >= nodes.length) return false;
     const node = nodes[index];
-    if (typeof change === "string") {
+    if (typeof change2 === "string") {
       if (node.nodeType !== TEXT_NODE2) return false;
-      node.nodeValue = change;
-    } else if (change && typeof change === "object" && !Array.isArray(change)) {
+      node.nodeValue = change2;
+    } else if (change2 && typeof change2 === "object" && !Array.isArray(change2)) {
       if (node.nodeType !== ELEMENT_NODE2) return false;
-      for (const [name, value] of Object.entries(change)) {
+      for (const [name, value] of Object.entries(change2)) {
         if (value === null) node.removeAttribute(name);
         else if (typeof value === "string") node.setAttribute(name, value);
         else return false;

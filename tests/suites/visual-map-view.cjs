@@ -35,10 +35,10 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   assert.equal(view.selected, null);
   events.get('div:click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
   assert.equal(view.selected, topic.id); assert.equal(renders, 0, 'a click repaints the card in place instead of rendering'); assert.deepEqual(details, [], 'a click selects without opening the sidebar note');
-  view.selected = null; renders = 0; details.length = 0;
+  view.runSelection(sel => sel.setSelected(null)); renders = 0; details.length = 0;
   events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0] });
   assert.equal(view.selected, topic.id); assert.equal(renders, 0); assert.deepEqual(details, [topic.id]);
-  view.selected = null; renders = 0; details.length = 0;
+  view.runSelection(sel => sel.setSelected(null)); renders = 0; details.length = 0;
   view.mapChange = async () => {}; view.drawEdges = () => {};
   events.get('div:pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 2, clientX: 10, clientY: 10 });
   events.get('div:pointermove')({ clientX: 14, clientY: 10 });
@@ -1196,7 +1196,7 @@ integrationTest('select mode: the selection bar keeps action labels fixed and an
   const fixture = selectionView(load); const { view } = fixture;
   view.integrationMode = true; fixture.build();
   const labels = ids => {
-    view.multiSelected = new Set(ids);
+    view.runSelection(sel => sel.replaceMulti(ids));
     const bar = view.renderSelectionBar(selectionDom()('div'));
     return bar.children.filter(child => child.tag === 'button').map(button => [button.text, button.disabled, button.attrs['aria-label']]);
   };
@@ -1788,7 +1788,7 @@ integrationTest('Select subtopics: shown only for an unfolded, non-AIM card that
   // Root has direct children a and b but not grandchild c; the button replaces any earlier selection.
   const { fixture, buttons } = toolTexts(undefined, 'root');
   const { view } = fixture;
-  view.multiSelected = new Set(['c']); view.selected = 'b';
+  view.runSelection(sel => sel.replaceMulti(['c'])); view.runSelection(sel => sel.setSelected('b'));
   buttons.find(button => button.text === 'Select subtopics').handlers.get('click')({ stopPropagation() {} });
   assert.deepEqual([...view.multiSelected].sort(), ['a', 'b']); assert.equal(view.selected, null);
   assert.equal(view.integrationMode, true); assert.equal(fixture.renders(), 1);
@@ -1818,6 +1818,20 @@ integrationTest('Cmd/Ctrl+click: the first click on a second card enters selecti
   cards.b.handlers.get('pointerdown')({ target: { closest: () => null }, button: 0, clientX: 0, clientY: 0, pointerId: 1 });
   cards.b.handlers.get('pointerup')({ type: 'pointerup', metaKey: true });
   assert.equal(lone.view.integrationMode, false); assert.deepEqual([...lone.view.multiSelected], ['b']); assert.equal(lone.renders(), 0);
+});
+integrationTest('applySelectionChange: a mode change renders the whole map, a selection-only change repaints the touched cards and the outline', () => {
+  const fixture = selectionView(load); const { view, outline } = fixture;
+  fixture.build(); const cards = fixture.cards();
+  view.runSelection(sel => sel.setSelected('a'));
+  assert.equal(fixture.renders(), 0); assert.ok(cards.a.classes.has('is-selected')); assert.equal(outline.at(-1), 'a.md');
+  view.runSelection(sel => sel.click('b'));
+  assert.equal(fixture.renders(), 0); assert.equal(cards.a.classes.has('is-selected'), false); assert.ok(cards.b.classes.has('is-selected')); assert.equal(outline.at(-1), 'b.md');
+  view.runSelection(sel => sel.toggleMultiSelect());
+  assert.equal(fixture.renders(), 1, 'turning the mode on renders the whole map'); assert.equal(view.integrationMode, true); assert.equal(view.selected, null);
+  view.runSelection(sel => sel.toggleByClick('c'));
+  assert.equal(fixture.renders(), 1, 'ticking a card inside the mode only repaints'); assert.deepEqual([...view.multiSelected], ['c']);
+  view.runSelection(sel => sel.toggleMultiSelect());
+  assert.equal(fixture.renders(), 2); assert.equal(view.integrationMode, false); assert.equal(view.multiSelected.size, 0);
 });
 integrationTest('box selection: Shift+drag enters selection mode, an empty box changes nothing, Option+drag removes picks, Space and the middle button pan', () => {
   const fixture = selectionView(load); const { view } = fixture;

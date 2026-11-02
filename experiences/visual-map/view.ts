@@ -83,6 +83,7 @@ import {
   type Transaction,
   type TransactionEntry
 } from "./map-transaction";
+import { TopicSelection, type SelectionChange } from "./topic-selection";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
@@ -804,6 +805,8 @@ export class VisualAgentMapView extends ItemView {
   private relevanceGoal: string | undefined;
   private relevanceLevel: RelevanceLevel | undefined;
   private relevanceContext: string | undefined;
+  /** Selection rules (P2a: the old fields below stay in step until P3f removes them). */
+  private selection = new TopicSelection();
   private selected: string | null = null;
   private multiSelected = new Set<string>();
   /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
@@ -9545,10 +9548,7 @@ export class VisualAgentMapView extends ItemView {
         tools,
         this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
         () => {
-          this.integrationMode = !this.integrationMode;
-          this.multiSelected.clear();
-          this.selected = null;
-          this.render();
+          this.runSelection(selection => selection.toggleMultiSelect());
         }
       );
       integrate.setAttr("aria-pressed", String(this.integrationMode));
@@ -9761,9 +9761,7 @@ export class VisualAgentMapView extends ItemView {
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", event => {
         event.stopPropagation();
-        if (select.checked) this.multiSelected.add(node.id);
-        else this.multiSelected.delete(node.id);
-        this.commitSelection(this.selected, this.selected, [node.id]);
+        this.runSelection(selection => selection.setChecked(node.id, select.checked));
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
@@ -10265,9 +10263,7 @@ export class VisualAgentMapView extends ItemView {
       // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
       if ((event.metaKey || event.ctrlKey) && !this.integrationMode) return;
       if (this.integrationMode) {
-        if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-        else this.multiSelected.add(node.id);
-        this.commitSelection(this.selected, this.selected, [node.id]);
+        this.runSelection(selection => selection.toggleByClick(node.id));
         return;
       }
       // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
@@ -10313,9 +10309,7 @@ export class VisualAgentMapView extends ItemView {
       }
       if (event.key === "Enter") {
         if (this.integrationMode) {
-          if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-          else this.multiSelected.add(node.id);
-          this.commitSelection(this.selected, this.selected, [node.id]);
+          this.runSelection(selection => selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
           if (node.aimKind === "question") this.openAimAnswer(node);
@@ -10584,6 +10578,35 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.applySelectionState(prevId, nextId, touched);
+  }
+  /** Bring the module up to the old fields (P2a bridge: other paths still write them), run one operation, copy back. */
+  private runSelection(operation: (selection: TopicSelection) => SelectionChange): void {
+    const sel = this.selection;
+    if (sel.state.multiSelectMode !== this.integrationMode) sel.toggleMultiSelect();
+    sel.replaceMulti(this.multiSelected);
+    sel.setSelected(this.selected);
+    const relation = sel.state.selectedRelation;
+    if (relation !== this.selectedRelation) {
+      if (this.selectedRelation) sel.selectRelation(this.selectedRelation);
+      else if (relation) sel.deselectRelation(relation);
+    }
+    sel.moveTabStop(this.tabStopId);
+    const change = operation(sel);
+    const state = sel.state;
+    this.selected = state.selected;
+    this.multiSelected = new Set(state.multiSelected);
+    this.integrationMode = state.multiSelectMode;
+    this.selectedRelation = state.selectedRelation;
+    this.tabStopId = state.tabStopId;
+    this.applySelectionChange(change);
+  }
+  /** Mode changed: render the whole map. Only the selection changed: repaint the touched cards, bar and outline. */
+  applySelectionChange(change: SelectionChange): void {
+    if (change.multiSelectModeChanged) {
+      if (!this.closed) this.render();
+      return;
+    }
+    this.commitSelection(null, this.selected, change.touched);
   }
   private clearHoverTimer(): void {
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
@@ -10907,12 +10930,7 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   private selectMapNode(node: MapNode): void {
-    if (this.selected === node.id && this.multiSelected.size === 0) return;
-    const previous = this.selected,
-      touched = [...this.multiSelected];
-    this.selected = node.id;
-    this.multiSelected.clear();
-    this.commitSelection(previous, node.id, touched);
+    this.runSelection(selection => selection.selectIfChanged(node.id));
   }
   private hideHoverCardSoon(): void {
     this.clearHoverTimer();
@@ -13436,9 +13454,7 @@ export class VisualAgentMapView extends ItemView {
       selection,
       t("ui.clear"),
       () => {
-        const touched = [...this.multiSelected];
-        this.multiSelected.clear();
-        this.commitSelection(this.selected, this.selected, touched);
+        this.runSelection(selection => selection.clearMulti());
       },
       !this.multiSelected.size
     );
@@ -17587,27 +17603,10 @@ export class VisualAgentMapView extends ItemView {
             })
           );
         } else if (e.metaKey || e.ctrlKey) {
-          const previous = this.selected,
-            touched = [...this.multiSelected, node.id];
-          // "Click A, then Cmd+click B" selects both: the single selected card seeds the multi-selection.
-          if (this.canSelectTopics() && !this.multiSelected.size && previous && previous !== node.id)
-            this.multiSelected.add(previous);
-          if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-          else this.multiSelected.add(node.id);
-          this.selected = node.id;
-          // Two or more picked cards is topic selection: show its bar instead of leaving an invisible multi-selection.
-          if (this.canSelectTopics() && this.multiSelected.size >= 2) {
-            this.integrationMode = true;
-            if (!this.closed) this.render();
-            return;
-          }
-          this.commitSelection(previous, node.id, touched);
+          // "Click A, then Cmd+click B" selects both; two or more picked cards is topic selection (the module decides).
+          this.runSelection(selection => selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
-          const previous = this.selected,
-            touched = [...this.multiSelected];
-          this.multiSelected.clear();
-          this.selected = node.id;
-          this.commitSelection(previous, node.id, touched);
+          this.runSelection(selection => selection.click(node.id));
           if (node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
         }

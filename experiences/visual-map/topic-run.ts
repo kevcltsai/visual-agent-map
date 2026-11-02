@@ -8,6 +8,8 @@ import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai
 import type { DetailTemplate } from "../../ai/detail-templates";
 import type { ResearchObserver, ResearchPreviewFields, ResearchStageName } from "../../ai/research-observer";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
+import { checkCounts } from "../../ai/detail-templates";
+import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import { failureReason, type Note, type NotePatch } from "../../repository";
 import type { RunStyle } from "../../ai/note-style-store";
 import type { MapDocument } from "../../map-model";
@@ -177,6 +179,69 @@ export interface ProposeStart {
   onStored?: () => void;
 }
 
+/** What an integration-directions run needs from the entry that starts it (the view). */
+export interface IntegrateDirectionStart {
+  /** Read on every use: the view replaces its map object when it reloads. */
+  map: () => MapDocument | undefined;
+  runOnce?: RunOnceModel;
+  /** The dialog's Stop signal: it is the only way to stop this run. */
+  signal?: AbortSignal;
+  /** Returns a message when the run must not start (no sources); checked after the running guard. */
+  precheck?: () => string | undefined;
+  /** Runs right after the topic was registered (the view redraws). */
+  onStarted?: () => void;
+  /** Builds the request, or returns a message when the sources hold nothing to synthesize. */
+  buildContext: (note: Note) => Promise<TaskContext | string>;
+  /** Called once the AI accepted the request. */
+  accepted?: () => void;
+  found: (items: Suggestion[]) => void;
+  failed: (message: string) => void;
+  /** Runs after the topic was freed, before the run settles (the view reloads and redraws). */
+  onSettled?: () => Promise<void>;
+}
+
+/** The view-side checks an integrate-children run makes again before it writes. */
+export interface IntegratePrepared {
+  detailTemplate: DetailTemplate;
+  /** True when the map, its open view or the topic's children are no longer what the run started with. */
+  viewChanged: () => boolean;
+  /** True when the child sources read now differ from the ones the run started with. */
+  sourcesChanged: () => Promise<boolean>;
+}
+
+/** Writes the result (or lets a review step hold it): `save` re-checks everything and throws without writing when the topic changed. */
+export type IntegrateWrite = (
+  result: AiResult,
+  save: (summary: string, detail: string) => Promise<void>,
+  summary: string,
+  detail: string,
+  note: Note
+) => void | Promise<void>;
+
+/** What an integrate-children run needs from the entry that starts it (the view). */
+export interface IntegrateChildrenStart {
+  map: () => MapDocument | undefined;
+  runOnce?: RunOnceModel;
+  signal?: AbortSignal;
+  outputLanguage?: ContentLanguage;
+  /** Checks sources and reads the note style before anything is registered; a string is the message to show instead. */
+  prepare: (note: Note) => Promise<IntegratePrepared | string>;
+  /** Runs after the status was set to running (the view reloads and redraws). */
+  onStarted?: () => Promise<void>;
+  buildContext: (note: Note) => Promise<TaskContext>;
+  /** True only when the whole of the parent's Working Findings was in the prompt. */
+  findingsSent: () => boolean;
+  accepted?: () => void;
+  drafted: IntegrateWrite;
+  /** The note before and after the write: the view records undo, reloads and redraws. */
+  onWritten: (change: { before: Note; after: Note }) => Promise<void>;
+  queueCharts?: ResearchStart["queueCharts"];
+  failed?: (message: string) => void;
+  notify?: (message: string) => void;
+  /** Runs after the topic was freed, before the run settles (the view reloads and redraws). */
+  onSettled?: () => Promise<void>;
+}
+
 export interface TopicRunHandle {
   readonly path: string;
   readonly kind: TopicRunKind;
@@ -237,12 +302,18 @@ export class TopicRuns {
    * them. Resolves when the run is over. Creating the topics from a suggestion stays with the entry.
    */
   start(path: string, kind: "proposeChildren", options: ProposeStart): Promise<void>;
+  /** Asks for synthesis directions over the child topics and the chosen sources. Resolves when the run is over. */
+  start(path: string, kind: "integrateDirection", options: IntegrateDirectionStart): Promise<void>;
+  /** Rewrites a topic from its children and the chosen sources, unless it changed meanwhile. Resolves when the run is over. */
+  start(path: string, kind: "integrateChildren", options: IntegrateChildrenStart): Promise<void>;
   async start(
     path: string,
-    kind: "research" | "proposeChildren",
-    options: ResearchStart | ProposeStart
+    kind: "research" | "proposeChildren" | "integrateDirection" | "integrateChildren",
+    options: ResearchStart | ProposeStart | IntegrateDirectionStart | IntegrateChildrenStart
   ): Promise<AgentTaskHandle | null | void> {
     if (kind === "proposeChildren") return this.runProposal(path, options as ProposeStart);
+    if (kind === "integrateDirection") return this.runDirections(path, options as IntegrateDirectionStart);
+    if (kind === "integrateChildren") return this.runIntegration(path, options as IntegrateChildrenStart);
     return this.startResearch(path, kind, options as ResearchStart);
   }
 
@@ -328,6 +399,238 @@ export class TopicRuns {
       if (activeTasks.get(path) === controller) activeTasks.delete(path);
       handle.release();
       options.onReleased?.();
+    }
+  }
+
+  /** Frees the topic when a run ends, also a run that a later click replaced (as the view did before the module; ticket 05 ends this). */
+  private freeReplaceable(path: string, controller: AbortController, handle: TopicRunHandle): void {
+    if (this.controllers.get(path) !== controller) {
+      this.controllers.delete(path);
+      this.running.delete(path);
+    }
+    handle.release();
+  }
+
+  /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
+  private startProgress(path: string, model: string): { observer?: ResearchObserver; end: () => void } {
+    const progress = this.ports.progress() as (RunProgress & { get?(path: string): unknown }) | undefined;
+    if (!progress || progress.get?.(path)) return { end: () => {} };
+    let attempt = "starting";
+    progress.begin(path, attempt, Date.now(), model);
+    return {
+      observer: {
+        onAttempt: id => {
+          attempt = id;
+          progress.newAttempt(path, id, Date.now());
+        },
+        onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(path, id, fields ?? {})
+      },
+      end: () => progress.end(path, attempt)
+    };
+  }
+
+  private async modelOf(
+    path: string,
+    note: Note,
+    map: MapDocument | undefined,
+    runOnce?: RunOnceModel
+  ): Promise<{ model: string; reasoning?: ReasoningLevel }> {
+    return runOnce?.model.trim()
+      ? await this.ports.resolveModel(path, map, runOnce)
+      : { model: note.model, reasoning: note.reasoning };
+  }
+
+  private async runDirections(path: string, options: IntegrateDirectionStart): Promise<void> {
+    if (this.running.has(path)) {
+      options.failed(t("ui.ai_running_ai"));
+      return;
+    }
+    const blocked = options.precheck?.();
+    if (blocked) {
+      options.failed(blocked);
+      return;
+    }
+    const repo = this.ports.repository()!;
+    const note = await repo.readNote(path, options.map());
+    const used = await this.modelOf(path, note, options.map(), options.runOnce);
+    // A double click may pass the guard twice before the first run registers; the older run still frees the topic when it ends.
+    const handle = this.begin(path, "integrateDirection", { replace: true });
+    if (!handle) return;
+    const controller = this.controllers.get(path)!;
+    options.onStarted?.();
+    const progress = this.startProgress(path, used.model);
+    try {
+      const context = await options.buildContext(note);
+      if (typeof context === "string") {
+        options.failed(context);
+        return;
+      }
+      const result = await this.ports.askModel(
+        context,
+        used.model,
+        used.reasoning,
+        options.signal,
+        undefined,
+        options.accepted,
+        undefined,
+        progress.observer
+      );
+      progress.end();
+      options.accepted?.();
+      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const angles = result.suggestions.slice(0, 2);
+      if (!angles.length) {
+        options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+        return;
+      }
+      options.found(angles);
+    } catch (error) {
+      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+        options.failed(t("ui.research_stopped_existing_content_was_preserved"));
+        return;
+      }
+      console.error("Visual Agent Map integration directions", error);
+      options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
+    } finally {
+      progress.end();
+      this.freeReplaceable(path, controller, handle);
+      await options.onSettled?.();
+    }
+  }
+
+  private async runIntegration(path: string, options: IntegrateChildrenStart): Promise<void> {
+    const fail = (message: string): void => {
+      if (options.failed) options.failed(message);
+      else options.notify?.(message);
+    };
+    if (this.running.has(path)) {
+      options.failed?.(t("ui.ai_running_ai"));
+      return;
+    }
+    const repo = this.ports.repository()!;
+    const note = await repo.readNote(path, options.map());
+    const used = await this.modelOf(path, note, options.map(), options.runOnce);
+    const noteSnapshot = (item: Note): string =>
+      JSON.stringify([
+        item.title,
+        item.summary,
+        item.detail,
+        item.prompt,
+        item.rules,
+        item.model,
+        item.reasoning,
+        item.sourcePaths,
+        item.referencePaths,
+        item.thinkingOrigin,
+        item.newFindings
+      ]);
+    const snapshot = noteSnapshot(note);
+    const prepared = await options.prepare(note);
+    if (typeof prepared === "string") {
+      fail(prepared);
+      return;
+    }
+    const language = this.ports.settings().language;
+    const outputLanguage = options.outputLanguage ?? language;
+    const detailTemplate = prepared.detailTemplate;
+    this.abortCharts(path);
+    const handle = this.begin(path, "integrateChildren", { replace: true });
+    if (!handle) return;
+    const controller = this.controllers.get(path)!;
+    await repo.updateNote(path, { status: "running" });
+    await options.onStarted?.();
+    const progress = this.startProgress(path, used.model);
+    const changed = (): Error => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    try {
+      const context = await options.buildContext(note);
+      const result = await this.ports.askModel(
+        context,
+        used.model,
+        used.reasoning,
+        options.signal,
+        undefined,
+        options.accepted,
+        undefined,
+        progress.observer
+      );
+      // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
+      progress.end();
+      options.accepted?.();
+      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      await repo.updateNote(path, { status: note.status });
+      const save = async (summary: string, detail: string): Promise<void> =>
+        this.ports.mutate()(async () => {
+          if (options.signal?.aborted || prepared.viewChanged()) throw changed();
+          if (await prepared.sourcesChanged()) throw changed();
+          const latest = await repo.readNote(path, options.map());
+          if (noteSnapshot(latest) !== snapshot) throw changed();
+          const canonicalOnly = canonicalDetail(detail, noteLanguageOf(outputLanguage), detailTemplate);
+          // An edited draft is checked again so the topic's format mark matches what is saved.
+          const issues =
+            result.formatIssues && detail !== result.detail
+              ? checkCounts(canonicalOnly, detailTemplate)
+              : result.formatIssues;
+          // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
+          const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
+          const canonical = carryForwardSources(
+            canonicalOnly,
+            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+            [summary, canonicalOnly, references],
+            outputLanguage,
+            detailTemplate
+          );
+          await repo.updateNote(
+            path,
+            {
+              summary,
+              detail: canonical,
+              visualReferences: references,
+              // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+              ...(options.findingsSent() ? { newFindings: "" } : {}),
+              status: "completed",
+              ...formatIssuesPatch(issues, language)
+            },
+            { detailTemplate }
+          );
+          const saved = await repo.readNote(path, options.map());
+          await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
+          options.queueCharts?.({
+            path,
+            saved,
+            context,
+            detail: saved.detail,
+            formatIssues: issues,
+            model: used.model,
+            language: outputLanguage,
+            template: detailTemplate
+          });
+        });
+      // The result is written directly (no draft review); a write that fails or finds the topic changed writes
+      // nothing and is reported, without marking the parent topic as failed.
+      try {
+        await options.drafted(result, save, result.summary, result.detail, note);
+      } catch (error) {
+        if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+          fail(t("ui.research_stopped_existing_content_was_preserved"));
+        } else {
+          console.error("VAM synthesis write", error);
+          fail(this.ports.recordFailure(t("log.child_integration_failed"), error));
+        }
+      }
+    } catch (error) {
+      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+        await repo.updateNote(path, { status: note.status });
+        fail(t("ui.research_stopped_existing_content_was_preserved"));
+      } else {
+        console.error("Visual Agent Map child integration", error);
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail(this.ports.recordFailure(t("log.child_integration_failed"), error));
+      }
+    } finally {
+      progress.end();
+      this.freeReplaceable(path, controller, handle);
+      await options.onSettled?.();
     }
   }
 

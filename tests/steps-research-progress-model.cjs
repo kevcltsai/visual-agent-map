@@ -70,8 +70,12 @@ test('counterexample: the chart step shows "Adding diagrams" with the model of t
 test('startTaskProgress takes the task model and every call site passes the model that runs the task', () => {
   const source = read('experiences/visual-map/view.ts');
   const sites = [...source.matchAll(/this\.startTaskProgress\(([^;]*)\);/g)].map(m => m[1]);
-  assert.equal(sites.length, 5);
+  assert.equal(sites.length, 3);
   for (const site of sites) assert.match(site, /, (task\.model|note\.model|chosen\.model|used\.model)$/, site);
+  // The two synthesis runs moved into the run module, which starts their progress with the model that runs the task.
+  const moduleSites = [...read('experiences/visual-map/topic-run.ts').matchAll(/this\.startProgress\(([^;]*)\);/g)].map(m => m[1]);
+  assert.equal(moduleSites.length, 2);
+  for (const site of moduleSites) assert.match(site, /, used\.model$/, site);
   const progress = view();
   const store = new ResearchProgressStore(clock);
   progress.plugin.researchProgress = store;

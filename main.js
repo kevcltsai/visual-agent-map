@@ -24653,87 +24653,6 @@ function findingList(items, none, limit = 30) {
   return lines.join("\n");
 }
 
-// core/steps/task/carry-sources.ts
-var HEADING_KEY = "note.earlier_research_sources";
-var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
-var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
-function outsideCode(text11) {
-  const lines = text11.replace(/\r\n/g, "\n").split("\n");
-  const code = fencedLines(lines);
-  return lines.filter((_, index) => !code[index]);
-}
-function keysOf(text11) {
-  return [...linksOf([text11]).keys()];
-}
-function plainLine(line) {
-  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
-  return `- ${stripped}`;
-}
-function linkTokens(line, wanted) {
-  const out = [];
-  for (const match of line.matchAll(TOKEN)) {
-    const token = match[0];
-    if (!wanted(keysOf(token))) continue;
-    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
-    else out.push(token.replace(/^!/, ""));
-  }
-  return out;
-}
-function carriedSourceLines(previousTexts, nextTexts) {
-  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
-  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
-  if (!missing.size) return [];
-  const covered = /* @__PURE__ */ new Set();
-  const lines = [];
-  const add = (line) => {
-    if (line.trim() && !lines.includes(line)) lines.push(line);
-  };
-  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
-  for (const line of previousTexts.flatMap(outsideCode)) {
-    const keys = keysOf(line);
-    if (!open(keys)) continue;
-    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
-    if (definition) add(`- ${definition[1].trim()}`);
-    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
-    else add(plainLine(line));
-    for (const key2 of keys) covered.add(key2);
-  }
-  return lines;
-}
-function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
-  const carried = carriedSourceLines(previousTexts, nextTexts);
-  if (!carried.length) return detail;
-  const heading = translateNote(language2, HEADING_KEY);
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
-  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
-  const keys = sourcesHeadingKeys(template2);
-  const start = lines.findIndex((line, index) => {
-    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    return !!match && keys.has(match[1].toLocaleLowerCase());
-  });
-  if (start < 0) return `${detail.trimEnd()}
-
-### ${heading}
-
-${carried.join("\n")}
-`;
-  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
-}
-function insertAfterBlock(lines, code, start, add, stop, separate = false) {
-  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
-  if (end < 0) end = lines.length;
-  while (end > start + 1 && !lines[end - 1].trim()) end--;
-  return [
-    ...lines.slice(0, end),
-    ...separate ? [""] : [],
-    ...add,
-    ...end < lines.length && lines[end].trim() ? [""] : [],
-    ...lines.slice(end)
-  ].join("\n");
-}
-
 // ai/visual-guidance.ts
 function visualGuidance(context, language2) {
   const synthesis = context.mode === "synthesize";
@@ -58522,39 +58441,35 @@ ${request.requirements}` : preset.text,
     return [...new Set(paths)];
   }
   async proposeIntegrationDirections(node, options, found, failed, accepted) {
-    var _a2, _b2, _c, _d, _e, _f;
     if (!this.map) {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(node.path)) {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
     const children = this.map.nodes.filter((item) => item.parentId === node.id);
-    if (!children.length && !((_a2 = options.referenceGroups) == null ? void 0 : _a2.some((group) => group.documents.length))) {
-      failed(t("ui.choose_another_note_source_first"));
-      return;
-    }
-    const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
-    const used = await this.modelFor(note, node.path, options.runOnce);
-    this.plugin.running.add(node.path);
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
-    try {
-      const childSources = await this.topicReferenceGroup(
-        children,
-        (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
-      );
-      const selectedSources = (_c = options.referenceGroups) != null ? _c : [];
-      if (!children.length && !selectedSources.some((group) => group.documents.length)) {
-        failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"));
-        return;
-      }
-      const promptLanguage = (_d = options.outputLanguage) != null ? _d : this.plugin.settings.language;
-      const task = synthesisDirectionsTask(promptLanguage);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
+    await this.plugin.topicRuns.start(node.path, "integrateDirection", {
+      map: () => {
+        var _a2;
+        return (_a2 = this.map) != null ? _a2 : void 0;
+      },
+      runOnce: options.runOnce,
+      signal: options.signal,
+      precheck: () => {
+        var _a2;
+        return !children.length && !((_a2 = options.referenceGroups) == null ? void 0 : _a2.some((group) => group.documents.length)) ? t("ui.choose_another_note_source_first") : void 0;
+      },
+      onStarted: () => this.render(),
+      buildContext: async (note) => {
+        var _a2, _b2;
+        const childSources = await this.topicReferenceGroup(
+          children,
+          (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
+        );
+        const selectedSources = (_a2 = options.referenceGroups) != null ? _a2 : [];
+        if (!children.length && !selectedSources.some((group) => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        const promptLanguage = (_b2 = options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
+        const task = synthesisDirectionsTask(promptLanguage);
+        return withThinkingOrigin(
           {
             title: note.title,
             summary: summaryForPrompt(note.summary, promptLanguage),
@@ -58577,205 +58492,130 @@ ${request.requirements}` : preset.text,
             visualMode: "off"
           },
           note
-        ),
-        used.model,
-        used.reasoning,
-        options.signal,
-        void 0,
-        accepted,
-        void 0,
-        progress.observer
-      );
-      progress.end();
-      accepted == null ? void 0 : accepted();
-      if ((_e = options.signal) == null ? void 0 : _e.aborted) throw new DOMException("Aborted", "AbortError");
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
-        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
+        );
+      },
+      accepted,
+      found,
+      failed,
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-      found(angles);
-    } catch (error) {
-      if (((_f = options.signal) == null ? void 0 : _f.aborted) || error instanceof Error && error.name === "AbortError") {
-        failed(t("ui.research_stopped_existing_content_was_preserved"));
-        return;
-      }
-      console.error("Visual Agent Map integration directions", error);
-      failed(this.plugin.recordFailure(t("log.integration_directions_failed"), error));
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a2;
     if (!this.map || this.plugin.running.has(node.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
-    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-    const used = await this.modelFor(note, node.path, options == null ? void 0 : options.runOnce);
-    const children = this.map.nodes.filter((item) => item.parentId === node.id);
-    if (!children.length && !((_b2 = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length))) {
-      const message = t("ui.choose_another_note_source_first");
-      if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
-      return;
-    }
-    const childSources = await this.topicReferenceGroup(
-      children,
-      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
-      { language: options == null ? void 0 : options.outputLanguage }
-    );
-    const sourceSnapshot = JSON.stringify(childSources.documents);
-    const childIds2 = children.map((child) => child.id).sort().join("|");
-    const mapPath = this.path, mapId = this.map.id;
-    const noteSnapshot = JSON.stringify([
-      note.title,
-      note.summary,
-      note.detail,
-      note.prompt,
-      note.rules,
-      note.model,
-      note.reasoning,
-      note.sourcePaths,
-      note.referencePaths,
-      note.thinkingOrigin,
-      note.newFindings
-    ]);
-    const selectedSources = (_c = options == null ? void 0 : options.referenceGroups) != null ? _c : [];
-    if (!children.length && !selectedSources.some((group) => group.documents.length)) {
-      const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
-      if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
-      return;
-    }
-    const language2 = this.plugin.settings.language;
-    const task = direction || synthesisGoalTask(language2);
-    const synthesisRun = await this.detailTemplateFor(
-      node,
-      options == null ? void 0 : options.detailTemplateId,
-      options == null ? void 0 : options.toneId,
-      void 0,
-      (_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2
-    );
-    const detailTemplate = synthesisRun.template;
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    await this.plugin.repo.updateNote(node.path, { status: "running" });
-    await this.hydrate();
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
+    const map = this.map;
+    const mapPath = this.path, mapId = map.id;
+    const children = map.nodes.filter((item) => item.parentId === node.id);
+    const childIds2 = () => {
+      var _a3, _b2;
+      return ((_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b2 : []).filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|");
+    };
+    const startIds = children.map((child) => child.id).sort().join("|");
+    const readSources = () => this.topicReferenceGroup(children, (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong", {
+      language: options == null ? void 0 : options.outputLanguage
+    });
+    const selectedSources = (_a2 = options == null ? void 0 : options.referenceGroups) != null ? _a2 : [];
     let findingsSent = false;
-    try {
-      const synthesisStyle = {
-        tone: synthesisRun.toneText ? { toneText: synthesisRun.toneText } : {},
-        style: synthesisRun.contextFields
-      };
-      const synthesisContext = withThinkingOrigin(
-        {
-          title: note.title,
-          summary: summaryForPrompt(note.summary, (_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2),
-          rules: "",
-          detail: note.detail,
-          task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-          ancestors: await this.ancestorContext(node, (_f = options == null ? void 0 : options.outputLanguage) != null ? _f : language2),
-          userTexts: this.userTextContext(node.id),
-          ...this.summaryDirections(node.id),
-          workingFindings: note.newFindings,
-          onWorkingFindingsSent: (sent) => {
-            findingsSent = sent === note.newFindings;
-          },
-          referenceGroups: [...selectedSources, childSources],
-          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-          referenceDelivery: "direct",
-          onProgress: options == null ? void 0 : options.onProgress,
-          outputLanguage: options == null ? void 0 : options.outputLanguage,
-          ...synthesisStyle.tone,
-          mode: "synthesize",
-          researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
-          researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
-          visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : note.visualMode,
+    let synthesisRun;
+    let task = "";
+    let childSources;
+    await this.plugin.topicRuns.start(node.path, "integrateChildren", {
+      map: () => {
+        var _a3;
+        return (_a3 = this.map) != null ? _a3 : void 0;
+      },
+      runOnce: options == null ? void 0 : options.runOnce,
+      signal: options == null ? void 0 : options.signal,
+      outputLanguage: options == null ? void 0 : options.outputLanguage,
+      prepare: async (note) => {
+        var _a3;
+        if (!children.length && !selectedSources.some((group) => group.documents.length))
+          return t("ui.choose_another_note_source_first");
+        childSources = await readSources();
+        const sourceSnapshot = JSON.stringify(childSources.documents);
+        if (!children.length && !selectedSources.some((group) => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        const language2 = this.plugin.settings.language;
+        task = direction || synthesisGoalTask(language2);
+        const run = await this.detailTemplateFor(
+          node,
+          options == null ? void 0 : options.detailTemplateId,
+          options == null ? void 0 : options.toneId,
+          void 0,
+          (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2
+        );
+        const detailTemplate = run.template;
+        synthesisRun = run;
+        return {
           detailTemplate,
-          ...synthesisStyle.style,
-          addCharts: true
-        },
-        note
-      );
-      const result = await this.plugin.askModel(
-        synthesisContext,
-        used.model,
-        used.reasoning,
-        options == null ? void 0 : options.signal,
-        void 0,
-        accepted,
-        void 0,
-        progress.observer
-      );
-      progress.end();
-      accepted == null ? void 0 : accepted();
-      if ((_j = options == null ? void 0 : options.signal) == null ? void 0 : _j.aborted) throw new DOMException("Aborted", "AbortError");
-      await this.plugin.repo.updateNote(node.path, { status: note.status });
-      const save = async (summary, detail) => this.plugin.mutate(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2;
-        if (((_a3 = options == null ? void 0 : options.signal) == null ? void 0 : _a3.aborted) || this.closed || this.path !== mapPath || ((_b3 = this.map) == null ? void 0 : _b3.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds2)
-          throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const currentSources = await this.topicReferenceGroup(
-          children,
-          (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
-          { language: options == null ? void 0 : options.outputLanguage }
-        );
-        if (JSON.stringify(currentSources.documents) !== sourceSnapshot)
-          throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const latest = await this.plugin.repo.readNote(node.path, (_c2 = this.map) != null ? _c2 : void 0);
-        if (JSON.stringify([
-          latest.title,
-          latest.summary,
-          latest.detail,
-          latest.prompt,
-          latest.rules,
-          latest.model,
-          latest.reasoning,
-          latest.sourcePaths,
-          latest.referencePaths,
-          latest.thinkingOrigin,
-          latest.newFindings
-        ]) !== noteSnapshot)
-          throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const canonicalOnly = canonicalDetail(
-          detail,
-          noteLanguageOf((_d2 = options == null ? void 0 : options.outputLanguage) != null ? _d2 : this.plugin.settings.language),
-          detailTemplate
-        );
-        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
-        const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
-        const canonical = carryForwardSources(
-          canonicalOnly,
-          [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-          [summary, canonicalOnly, references2],
-          (_e2 = options == null ? void 0 : options.outputLanguage) != null ? _e2 : this.plugin.settings.language,
-          detailTemplate
-        );
-        await this.plugin.repo.updateNote(
-          node.path,
-          {
-            summary,
-            detail: canonical,
-            visualReferences: references2,
-            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
-            ...findingsSent ? { newFindings: "" } : {},
-            status: "completed",
-            ...formatIssuesPatch(issues, language2)
+          viewChanged: () => {
+            var _a4, _b2;
+            return ((_a4 = options == null ? void 0 : options.signal) == null ? void 0 : _a4.aborted) === true || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || childIds2() !== startIds;
           },
-          { detailTemplate }
+          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+        };
+      },
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
+      },
+      buildContext: async (note) => {
+        var _a3, _b2, _c, _d, _e;
+        const language2 = this.plugin.settings.language;
+        const run = synthesisRun;
+        const synthesisStyle = {
+          tone: run.toneText ? { toneText: run.toneText } : {},
+          style: run.contextFields
+        };
+        return withThinkingOrigin(
+          {
+            title: note.title,
+            summary: summaryForPrompt(note.summary, (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2),
+            rules: "",
+            detail: note.detail,
+            task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
+            ancestors: await this.ancestorContext(node, (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : language2),
+            userTexts: this.userTextContext(node.id),
+            ...this.summaryDirections(node.id),
+            workingFindings: note.newFindings,
+            onWorkingFindingsSent: (sent) => {
+              findingsSent = sent === note.newFindings;
+            },
+            referenceGroups: [...selectedSources, childSources],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
+            onProgress: options == null ? void 0 : options.onProgress,
+            outputLanguage: options == null ? void 0 : options.outputLanguage,
+            ...synthesisStyle.tone,
+            mode: "synthesize",
+            researchMode: (_c = options == null ? void 0 : options.researchMode) != null ? _c : "local",
+            researchDepth: (_d = options == null ? void 0 : options.researchDepth) != null ? _d : "normal",
+            visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
+            detailTemplate: run.template,
+            ...synthesisStyle.style,
+            addCharts: true
+          },
+          note
         );
-        const saved = await this.plugin.repo.readNote(node.path, (_f2 = this.map) != null ? _f2 : void 0);
+      },
+      findingsSent: () => findingsSent,
+      accepted,
+      drafted: drafted != null ? drafted : async (_result, write, summary, detail, note) => {
+        const previous = this.history.undoEntry;
+        await write(summary, detail);
+        this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
+      },
+      onWritten: async ({ before, after }) => {
         this.recordNoteWrite(
           node.path,
-          { ...latest, status: note.status },
-          saved,
+          before,
+          after,
           [
             "summary",
             "detail",
@@ -58792,52 +58632,15 @@ ${request.requirements}` : preset.text,
         );
         await this.hydrate();
         this.render();
-        this.queueCharts({
-          path: node.path,
-          saved,
-          context: synthesisContext,
-          detail: saved.detail,
-          formatIssues: issues,
-          model: used.model,
-          language: (_g2 = options == null ? void 0 : options.outputLanguage) != null ? _g2 : this.plugin.settings.language,
-          template: detailTemplate
-        });
-      });
-      try {
-        await (drafted != null ? drafted : async (_result, write, summary, detail) => {
-          const previous = this.history.undoEntry;
-          await write(summary, detail);
-          this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
-        })(result, save, result.summary, result.detail);
-      } catch (error) {
-        if (((_k = options == null ? void 0 : options.signal) == null ? void 0 : _k.aborted) || error instanceof Error && error.name === "AbortError") {
-          if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-        } else {
-          console.error("VAM synthesis write", error);
-          const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-          if (failed) failed(message);
-          else new import_obsidian31.Notice(message);
-        }
+      },
+      queueCharts: (job) => this.queueCharts(job),
+      failed,
+      notify: (message) => new import_obsidian31.Notice(message),
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-    } catch (error) {
-      if (((_l = options == null ? void 0 : options.signal) == null ? void 0 : _l.aborted) || error instanceof Error && error.name === "AbortError") {
-        await this.plugin.repo.updateNote(node.path, { status: note.status });
-        if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      } else {
-        console.error("Visual Agent Map child integration", error);
-        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-        const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-        if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
-      }
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   async startSynthesis(node, options, direction, failed, accepted, observer) {
     const path = node.path;
@@ -64738,7 +64541,7 @@ var ELEMENT_NODE = 1;
 var TEXT_NODE = 3;
 var PLACEHOLDER_OPEN = "\u27E6";
 var PLACEHOLDER_CLOSE = "\u27E7";
-var TOKEN2 = /⟦(\/?)(\d+)(\/?)⟧/g;
+var TOKEN = /⟦(\/?)(\d+)(\/?)⟧/g;
 var BLOCK_TAGS2 = /* @__PURE__ */ new Set([
   "address",
   "article",
@@ -64873,7 +64676,7 @@ function buildText(nodes, parts) {
   return out;
 }
 function hasTranslatableText(text11) {
-  return HAS_LETTER.test(text11.replace(TOKEN2, ""));
+  return HAS_LETTER.test(text11.replace(TOKEN, ""));
 }
 function extractSegments(root) {
   const units = [];
@@ -64906,7 +64709,7 @@ function extractSegments(root) {
     const raw = buildText(run, parts);
     const text11 = raw.trim();
     if (!text11 || !hasTranslatableText(text11) || raw.includes("\u27E6\u27E6")) return;
-    const stripped = raw.replace(TOKEN2, "");
+    const stripped = raw.replace(TOKEN, "");
     if (stripped.includes(PLACEHOLDER_OPEN) || stripped.includes(PLACEHOLDER_CLOSE)) return;
     const lead = raw.slice(0, raw.length - raw.trimStart().length);
     const trail = raw.slice(raw.trimEnd().length);
@@ -64939,13 +64742,13 @@ function extractSegments(root) {
   walk(root);
   return { units };
 }
-var tokensOf = (text11) => [...text11.matchAll(TOKEN2)].map((match) => match[0]);
+var tokensOf = (text11) => [...text11.matchAll(TOKEN)].map((match) => match[0]);
 function placeholdersMatch(source, translated) {
   if (!translated.trim()) return false;
   const a = tokensOf(source);
   const b = tokensOf(translated);
   if (a.length !== b.length || a.some((token, i) => token !== b[i])) return false;
-  const rest = translated.replace(TOKEN2, "");
+  const rest = translated.replace(TOKEN, "");
   return !rest.includes(PLACEHOLDER_OPEN) && !rest.includes(PLACEHOLDER_CLOSE);
 }
 function rebuild(unit, translated, doc) {
@@ -64962,7 +64765,7 @@ function rebuild(unit, translated, doc) {
   };
   addText(unit.lead);
   let last = 0;
-  for (const match of translated.matchAll(TOKEN2)) {
+  for (const match of translated.matchAll(TOKEN)) {
     addText(translated.slice(last, match.index));
     last = ((_a2 = match.index) != null ? _a2 : 0) + match[0].length;
     const part = unit.parts[Number(match[2]) - 1];
@@ -68227,6 +68030,87 @@ var ResearchProgressStore = class {
   }
 };
 
+// core/steps/task/carry-sources.ts
+var HEADING_KEY = "note.earlier_research_sources";
+var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
+var TOKEN2 = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
+function outsideCode(text11) {
+  const lines = text11.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  return lines.filter((_, index) => !code[index]);
+}
+function keysOf(text11) {
+  return [...linksOf([text11]).keys()];
+}
+function plainLine(line) {
+  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  return `- ${stripped}`;
+}
+function linkTokens(line, wanted) {
+  const out = [];
+  for (const match of line.matchAll(TOKEN2)) {
+    const token = match[0];
+    if (!wanted(keysOf(token))) continue;
+    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
+    else out.push(token.replace(/^!/, ""));
+  }
+  return out;
+}
+function carriedSourceLines(previousTexts, nextTexts) {
+  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
+  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
+  if (!missing.size) return [];
+  const covered = /* @__PURE__ */ new Set();
+  const lines = [];
+  const add = (line) => {
+    if (line.trim() && !lines.includes(line)) lines.push(line);
+  };
+  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
+  for (const line of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line);
+    if (!open(keys)) continue;
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    if (definition) add(`- ${definition[1].trim()}`);
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
+    else add(plainLine(line));
+    for (const key2 of keys) covered.add(key2);
+  }
+  return lines;
+}
+function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
+  const carried = carriedSourceLines(previousTexts, nextTexts);
+  if (!carried.length) return detail;
+  const heading = translateNote(language2, HEADING_KEY);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
+  const keys = sourcesHeadingKeys(template2);
+  const start = lines.findIndex((line, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && keys.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${detail.trimEnd()}
+
+### ${heading}
+
+${carried.join("\n")}
+`;
+  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
+}
+function insertAfterBlock(lines, code, start, add, stop, separate = false) {
+  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  if (end < 0) end = lines.length;
+  while (end > start + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    ...separate ? [""] : [],
+    ...add,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
+}
+
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
 var TopicRuns = class {
@@ -68270,6 +68154,8 @@ var TopicRuns = class {
   }
   async start(path, kind, options) {
     if (kind === "proposeChildren") return this.runProposal(path, options);
+    if (kind === "integrateDirection") return this.runDirections(path, options);
+    if (kind === "integrateChildren") return this.runIntegration(path, options);
     return this.startResearch(path, kind, options);
   }
   async runProposal(path, options) {
@@ -68356,6 +68242,221 @@ var TopicRuns = class {
       if (activeTasks.get(path) === controller) activeTasks.delete(path);
       handle.release();
       (_g = options.onReleased) == null ? void 0 : _g.call(options);
+    }
+  }
+  /** Frees the topic when a run ends, also a run that a later click replaced (as the view did before the module; ticket 05 ends this). */
+  freeReplaceable(path, controller, handle) {
+    if (this.controllers.get(path) !== controller) {
+      this.controllers.delete(path);
+      this.running.delete(path);
+    }
+    handle.release();
+  }
+  /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
+  startProgress(path, model) {
+    var _a2;
+    const progress = this.ports.progress();
+    if (!progress || ((_a2 = progress.get) == null ? void 0 : _a2.call(progress, path))) return { end: () => {
+    } };
+    let attempt = "starting";
+    progress.begin(path, attempt, Date.now(), model);
+    return {
+      observer: {
+        onAttempt: (id) => {
+          attempt = id;
+          progress.newAttempt(path, id, Date.now());
+        },
+        onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(path, id, fields != null ? fields : {})
+      },
+      end: () => progress.end(path, attempt)
+    };
+  }
+  async modelOf(path, note, map, runOnce) {
+    return (runOnce == null ? void 0 : runOnce.model.trim()) ? await this.ports.resolveModel(path, map, runOnce) : { model: note.model, reasoning: note.reasoning };
+  }
+  async runDirections(path, options) {
+    var _a2, _b2, _c, _d, _e, _f;
+    if (this.running.has(path)) {
+      options.failed(t("ui.ai_running_ai"));
+      return;
+    }
+    const blocked = (_a2 = options.precheck) == null ? void 0 : _a2.call(options);
+    if (blocked) {
+      options.failed(blocked);
+      return;
+    }
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map());
+    const used = await this.modelOf(path, note, options.map(), options.runOnce);
+    const handle = this.begin(path, "integrateDirection", { replace: true });
+    if (!handle) return;
+    const controller = this.controllers.get(path);
+    (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
+    const progress = this.startProgress(path, used.model);
+    try {
+      const context = await options.buildContext(note);
+      if (typeof context === "string") {
+        options.failed(context);
+        return;
+      }
+      const result = await this.ports.askModel(
+        context,
+        used.model,
+        used.reasoning,
+        options.signal,
+        void 0,
+        options.accepted,
+        void 0,
+        progress.observer
+      );
+      progress.end();
+      (_c = options.accepted) == null ? void 0 : _c.call(options);
+      if ((_d = options.signal) == null ? void 0 : _d.aborted) throw new DOMException("Aborted", "AbortError");
+      const angles = result.suggestions.slice(0, 2);
+      if (!angles.length) {
+        options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+        return;
+      }
+      options.found(angles);
+    } catch (error) {
+      if (((_e = options.signal) == null ? void 0 : _e.aborted) || error instanceof Error && error.name === "AbortError") {
+        options.failed(t("ui.research_stopped_existing_content_was_preserved"));
+        return;
+      }
+      console.error("Visual Agent Map integration directions", error);
+      options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
+    } finally {
+      progress.end();
+      this.freeReplaceable(path, controller, handle);
+      await ((_f = options.onSettled) == null ? void 0 : _f.call(options));
+    }
+  }
+  async runIntegration(path, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const fail2 = (message) => {
+      var _a3;
+      if (options.failed) options.failed(message);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    if (this.running.has(path)) {
+      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
+      return;
+    }
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map());
+    const used = await this.modelOf(path, note, options.map(), options.runOnce);
+    const noteSnapshot = (item) => JSON.stringify([
+      item.title,
+      item.summary,
+      item.detail,
+      item.prompt,
+      item.rules,
+      item.model,
+      item.reasoning,
+      item.sourcePaths,
+      item.referencePaths,
+      item.thinkingOrigin,
+      item.newFindings
+    ]);
+    const snapshot = noteSnapshot(note);
+    const prepared = await options.prepare(note);
+    if (typeof prepared === "string") {
+      fail2(prepared);
+      return;
+    }
+    const language2 = this.ports.settings().language;
+    const outputLanguage2 = (_b2 = options.outputLanguage) != null ? _b2 : language2;
+    const detailTemplate = prepared.detailTemplate;
+    this.abortCharts(path);
+    const handle = this.begin(path, "integrateChildren", { replace: true });
+    if (!handle) return;
+    const controller = this.controllers.get(path);
+    await repo.updateNote(path, { status: "running" });
+    await ((_c = options.onStarted) == null ? void 0 : _c.call(options));
+    const progress = this.startProgress(path, used.model);
+    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    try {
+      const context = await options.buildContext(note);
+      const result = await this.ports.askModel(
+        context,
+        used.model,
+        used.reasoning,
+        options.signal,
+        void 0,
+        options.accepted,
+        void 0,
+        progress.observer
+      );
+      progress.end();
+      (_d = options.accepted) == null ? void 0 : _d.call(options);
+      if ((_e = options.signal) == null ? void 0 : _e.aborted) throw new DOMException("Aborted", "AbortError");
+      await repo.updateNote(path, { status: note.status });
+      const save = async (summary, detail) => this.ports.mutate()(async () => {
+        var _a3, _b3;
+        if (((_a3 = options.signal) == null ? void 0 : _a3.aborted) || prepared.viewChanged()) throw changed();
+        if (await prepared.sourcesChanged()) throw changed();
+        const latest = await repo.readNote(path, options.map());
+        if (noteSnapshot(latest) !== snapshot) throw changed();
+        const canonicalOnly = canonicalDetail(detail, noteLanguageOf(outputLanguage2), detailTemplate);
+        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
+        const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
+        const canonical = carryForwardSources(
+          canonicalOnly,
+          [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+          [summary, canonicalOnly, references2],
+          outputLanguage2,
+          detailTemplate
+        );
+        await repo.updateNote(
+          path,
+          {
+            summary,
+            detail: canonical,
+            visualReferences: references2,
+            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+            ...options.findingsSent() ? { newFindings: "" } : {},
+            status: "completed",
+            ...formatIssuesPatch(issues, language2)
+          },
+          { detailTemplate }
+        );
+        const saved = await repo.readNote(path, options.map());
+        await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
+        (_b3 = options.queueCharts) == null ? void 0 : _b3.call(options, {
+          path,
+          saved,
+          context,
+          detail: saved.detail,
+          formatIssues: issues,
+          model: used.model,
+          language: outputLanguage2,
+          template: detailTemplate
+        });
+      });
+      try {
+        await options.drafted(result, save, result.summary, result.detail, note);
+      } catch (error) {
+        if (((_f = options.signal) == null ? void 0 : _f.aborted) || error instanceof Error && error.name === "AbortError") {
+          fail2(t("ui.research_stopped_existing_content_was_preserved"));
+        } else {
+          console.error("VAM synthesis write", error);
+          fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
+        }
+      }
+    } catch (error) {
+      if (((_g = options.signal) == null ? void 0 : _g.aborted) || error instanceof Error && error.name === "AbortError") {
+        await repo.updateNote(path, { status: note.status });
+        fail2(t("ui.research_stopped_existing_content_was_preserved"));
+      } else {
+        console.error("Visual Agent Map child integration", error);
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
+      }
+    } finally {
+      progress.end();
+      this.freeReplaceable(path, controller, handle);
+      await ((_h = options.onSettled) == null ? void 0 : _h.call(options));
     }
   }
   async startResearch(path, kind, options) {

@@ -595,3 +595,156 @@ test('the view proposal entry no longer touches the running set; it goes through
   const body = src.slice(src.indexOf('private async proposeChildren('), src.indexOf('private async assertSuggestionOrigin'));
   assert.doesNotMatch(body, /running\.(add|delete)/); assert.match(body, /topicRuns\.start\(parent\.path, "proposeChildren"/);
 });
+
+// ---- integration runs (ticket 04a): integrateDirection and integrateChildren ----
+const directionRuns = ({ reply, ask, notes } = {}) => {
+  const h = researchRuns({ notes, extra: { askModel: ask ?? (async (context, model, _r, signal, _e, accepted, _w, observer) => { h.log.asks.push({ context, model, signal, observer }); accepted(); return { summary: '', detail: '', visualReferences: [], suggestions: [sugg('A1'), sugg('A2'), sugg('A3')], ...reply }; }) } });
+  h.found = []; h.fails = []; h.events = [];
+  h.opts = (over = {}) => ({
+    map: () => undefined, buildContext: async note => ({ title: note.title, mode: 'synthesize' }),
+    onStarted: () => h.events.push(['started', h.running.has('A.md')]), accepted: () => h.events.push(['accepted']),
+    found: items => h.found.push(items), failed: m => h.fails.push(m), onSettled: async () => h.events.push(['settled', h.running.has('A.md')]), ...over
+  });
+  return h;
+};
+
+test('integrateDirection: a normal run registers, asks, offers at most 2 directions and frees the topic before it settles', async () => {
+  const h = directionRuns();
+  await h.runs.start('A.md', 'integrateDirection', h.opts());
+  assert.equal(h.log.asks[0].context.mode, 'synthesize'); assert.equal(h.log.asks[0].model, 'm1');
+  assert.equal(h.found.length, 1); assert.equal(h.found[0].length, 2); assert.deepEqual(h.fails, []);
+  assert.deepEqual(h.events, [['started', true], ['accepted'], ['accepted'], ['settled', false]], 'accepted twice, as in 307bcd7 (inside the ask, then after the answer)');
+  assert.deepEqual(h.log.progress.map(entry => entry[0]), ['begin', 'end', 'end']);
+  assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false, 'no stop controller is registered (only the dialog signal stops this run)');
+});
+
+test('integrateDirection: a second click while running is refused; precheck and an empty context report their message and free the topic', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  const h = directionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { suggestions: [sugg('X')] }; } });
+  const first = h.runs.start('A.md', 'integrateDirection', h.opts());
+  await settle(); assert.equal(h.running.has('A.md'), true);
+  await h.runs.start('A.md', 'integrateDirection', h.opts());
+  assert.equal(h.fails.length, 1); assert.equal(h.running.has('A.md'), true);
+  release(); await first; assert.equal(h.running.has('A.md'), false); assert.equal(h.found.length, 1);
+  const blocked = directionRuns();
+  await blocked.runs.start('A.md', 'integrateDirection', blocked.opts({ precheck: () => 'no sources' }));
+  assert.deepEqual(blocked.fails, ['no sources']); assert.equal(blocked.log.asks.length, 0); assert.equal(blocked.running.has('A.md'), false);
+  const empty = directionRuns();
+  await empty.runs.start('A.md', 'integrateDirection', empty.opts({ buildContext: async () => 'empty sources' }));
+  assert.deepEqual(empty.fails, ['empty sources']); assert.equal(empty.log.asks.length, 0); assert.equal(empty.running.has('A.md'), false);
+});
+
+test('integrateDirection: Stop (the dialog signal) reports the stopped message, offers nothing and frees the topic; stop() does not reach it', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  const h = directionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { suggestions: [sugg('X')] }; } });
+  const dialog = new AbortController();
+  const run = h.runs.start('A.md', 'integrateDirection', h.opts({ signal: dialog.signal }));
+  await settle(); h.runs.stop('A.md'); dialog.abort(); release(); await run;
+  assert.equal(h.fails.length, 1); assert.deepEqual(h.found, []); assert.equal(h.running.has('A.md'), false);
+});
+
+test('integrateDirection: no suggestion and an AI failure are reported; a double click runs twice and the older run still frees the topic', async () => {
+  const none = directionRuns({ reply: { suggestions: [] } });
+  await none.runs.start('A.md', 'integrateDirection', none.opts());
+  assert.equal(none.fails.length, 1); assert.deepEqual(none.found, []); assert.equal(none.running.has('A.md'), false);
+  const broken = directionRuns({ ask: async () => { throw new Error('boom'); } });
+  await broken.runs.start('A.md', 'integrateDirection', broken.opts());
+  assert.deepEqual(broken.fails, ['boom']); assert.equal(broken.running.has('A.md'), false);
+  const gates = []; let asked = 0;
+  const twice = directionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { asked++; accepted(); await new Promise(r => gates.push(r)); return { suggestions: [sugg('X')] }; } });
+  const runs = [twice.runs.start('A.md', 'integrateDirection', twice.opts()), twice.runs.start('A.md', 'integrateDirection', twice.opts())];
+  await settle(); assert.equal(asked, 2, '307bcd7: the guard is checked before registration, so both clicks run');
+  gates[0](); await runs[0]; assert.equal(twice.running.has('A.md'), false, 'the older run ending frees the topic');
+  gates[1](); await runs[1]; assert.equal(twice.running.has('A.md'), false);
+});
+
+const integrateRuns = ({ reply, ask, notes = { 'A.md': fakeNote() } } = {}) => {
+  for (const key of Object.keys(notes)) notes[key] = { visualReferences: '', ...notes[key] };
+  const h = researchRuns({ notes, extra: { askModel: ask ?? (async (context, model, _r, signal, _e, accepted) => { h.log.asks.push({ context, model, signal }); h.events.push(['ask', h.running.has('A.md'), h.store.get('A.md').status]); accepted(); return { summary: 'NS', detail: 'ND', visualReferences: [], suggestions: [], ...reply }; }) } });
+  h.events = []; h.fails = []; h.state = { viewChanged: false, sourcesChanged: false, sent: false };
+  h.opts = (over = {}) => ({
+    map: () => undefined,
+    prepare: async () => ({ detailTemplate: { id: 'std', sections: [] }, viewChanged: () => h.state.viewChanged, sourcesChanged: async () => h.state.sourcesChanged }),
+    onStarted: async () => h.events.push(['started', h.running.has('A.md'), h.store.get('A.md').status]),
+    buildContext: async note => ({ title: note.title, mode: 'synthesize', outputLanguage: 'en' }), findingsSent: () => h.state.sent, accepted: () => h.events.push(['accepted']),
+    drafted: async (_result, save, summary, detail) => { await save(summary, detail); h.events.push(['written']); },
+    onWritten: async change => { h.log.written.push(change); h.events.push(['onWritten']); },
+    queueCharts: job => h.log.charts.push(job), failed: m => h.fails.push(m), onSettled: async () => h.events.push(['settled', h.running.has('A.md')]), ...over
+  });
+  return h;
+};
+
+test('integrateChildren: a normal run sets running, asks, restores then writes the answer, queues charts and frees the topic', async () => {
+  const h = integrateRuns({ notes: { 'A.md': fakeNote({ detail: 'old', status: 'completed', newFindings: 'nf' }) } });
+  h.state.sent = true;
+  await h.runs.start('A.md', 'integrateChildren', h.opts());
+  assert.deepEqual(h.events.map(e => e[0]), ['started', 'ask', 'accepted', 'accepted', 'onWritten', 'written', 'settled']);
+  assert.deepEqual(h.events[0], ['started', true, 'running']); assert.deepEqual(h.events.at(-1), ['settled', false]);
+  assert.deepEqual(h.log.writes.map(([, patch]) => patch.status), ['running', 'completed', 'completed']);
+  const final = h.store.get('A.md'); assert.equal(final.summary, 'NS'); assert.ok('detail' in h.log.writes[2][1]); assert.equal(final.status, 'completed'); assert.equal(final.newFindings, '');
+  assert.equal(h.log.written[0].before.status, 'completed'); assert.equal(h.log.written[0].after.summary, 'NS');
+  assert.equal(h.log.charts.length, 1); assert.equal(h.log.charts[0].model, 'm1');
+  assert.deepEqual(h.fails, []); assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false);
+});
+
+test('integrateChildren: unsent findings stay; an edited draft and the save callback receive the note', async () => {
+  const h = integrateRuns({ notes: { 'A.md': fakeNote({ newFindings: 'nf' }) } });
+  let seen;
+  await h.runs.start('A.md', 'integrateChildren', h.opts({ drafted: async (result, save, summary, detail, note) => { seen = [result.summary, note.title]; await save(`${summary}!`, detail); } }));
+  assert.deepEqual(seen, ['NS', 'T']); assert.equal(h.store.get('A.md').summary, 'NS!'); assert.equal(h.store.get('A.md').newFindings, 'nf');
+});
+
+test('integrateChildren: Stop restores the status, reports the stopped message, writes nothing and frees the topic', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  const h = integrateRuns({ notes: { 'A.md': fakeNote({ status: 'completed' }) }, ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { summary: 'NS', detail: 'ND', suggestions: [] }; } });
+  const dialog = new AbortController();
+  const run = h.runs.start('A.md', 'integrateChildren', h.opts({ signal: dialog.signal }));
+  await settle(); assert.equal(h.running.has('A.md'), true); dialog.abort(); release(); await run;
+  assert.equal(h.fails.length, 1); assert.equal(h.store.get('A.md').status, 'completed'); assert.equal(h.store.get('A.md').summary, '');
+  assert.equal(h.log.charts.length, 0); assert.equal(h.running.has('A.md'), false);
+});
+
+test('integrateChildren: a changed note field, children (view) or sources discards the answer, writes nothing and does not mark the topic failed', async () => {
+  const changes = [
+    h => { h.store.get('A.md').detail = 'edited'; },
+    h => { h.store.get('A.md').newFindings = 'later'; },
+    h => { h.store.get('A.md').thinkingOrigin = 'o2'; },
+    h => { h.state.viewChanged = true; },
+    h => { h.state.sourcesChanged = true; }
+  ];
+  for (const change of changes) {
+    const h = integrateRuns({ notes: { 'A.md': fakeNote({ status: 'completed' }) }, ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); change(h); return { summary: 'NS', detail: 'ND', suggestions: [] }; } });
+    await h.runs.start('A.md', 'integrateChildren', h.opts());
+    assert.equal(h.fails.length, 1, 'one report'); assert.equal(h.store.get('A.md').summary, ''); assert.equal(h.store.get('A.md').status, 'completed');
+    assert.equal(h.log.charts.length, 0); assert.equal(h.log.written.length, 0); assert.equal(h.running.has('A.md'), false);
+  }
+});
+
+test('integrateChildren: the 11 note fields count, 12-field research fields (researchMode, visualMode) do not', async () => {
+  for (const [field, value, stale] of [['researchMode', 'research', false], ['visualMode', 'on', false], ['model', 'm2', true], ['sourcePaths', ['x.md'], true], ['referencePaths', [{ path: 'r' }], true], ['title', 'U', true], ['summary', 'S2', true], ['prompt', 'p2', true], ['rules', 'r2', true]]) {
+    const h = integrateRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); h.store.get('A.md')[field] = value; return { summary: 'NS', detail: 'ND', suggestions: [] }; } });
+    await h.runs.start('A.md', 'integrateChildren', h.opts());
+    assert.equal(h.fails.length, stale ? 1 : 0, field); assert.equal(h.store.get('A.md').summary === 'NS', !stale, field);
+  }
+});
+
+test('integrateChildren: a failure marks the topic as error and reports; prepare messages go to failed, else notify; a second click is refused', async () => {
+  const h = integrateRuns({ ask: async () => { throw new Error('boom'); } });
+  await h.runs.start('A.md', 'integrateChildren', h.opts());
+  assert.deepEqual(h.fails, ['boom']); assert.equal(h.store.get('A.md').status, 'error'); assert.equal(h.running.has('A.md'), false);
+  const notified = integrateRuns();
+  await notified.runs.start('A.md', 'integrateChildren', notified.opts({ failed: undefined, notify: m => notified.log.notices.push(m), prepare: async () => 'no sources' }));
+  assert.deepEqual(notified.log.notices, ['no sources']); assert.equal(notified.log.asks.length, 0); assert.equal(notified.running.has('A.md'), false); assert.deepEqual(notified.log.writes, []);
+  let release; const gate = new Promise(r => { release = r; });
+  const busy = integrateRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { summary: 'S', detail: 'D', suggestions: [] }; } });
+  const first = busy.runs.start('A.md', 'integrateChildren', busy.opts());
+  await settle(); await busy.runs.start('A.md', 'integrateChildren', busy.opts({ failed: undefined, notify: m => busy.log.notices.push(m) }));
+  assert.deepEqual(busy.log.notices, [], 'the refusal goes to failed only (not notify)');
+  release(); await first; assert.equal(busy.running.has('A.md'), false);
+});
+
+test('the view integration entries no longer touch the running set; they go through the run module', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const body = src.slice(src.indexOf('private async proposeIntegrationDirections('), src.indexOf('private async startSynthesis('));
+  assert.doesNotMatch(body, /running\.(add|delete)/); assert.match(body, /topicRuns\.start\(node\.path, "integrateDirection"/); assert.match(body, /topicRuns\.start\(node\.path, "integrateChildren"/);
+});

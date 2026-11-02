@@ -181,10 +181,10 @@ test('the message is not a provider error in any language and exists in all thre
 });
 
 test('both writers register the path in plugin.running before they write status running', () => {
-  // The research run moved into the run module, which registers through TopicRuns.begin (it adds to the same running set).
+  // The research and integrate-children runs moved into the run module, which registers through TopicRuns.begin (it adds to the same running set).
   const writers = [
     ['experiences/visual-map/view.ts', /this\.plugin\.running\.add\(/],
-    ['experiences/visual-map/topic-run.ts', /this\.begin\(path, kind/]
+    ['experiences/visual-map/topic-run.ts', /this\.begin\(path, (kind|"integrateChildren")/]
   ].flatMap(([file, registration]) => {
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     return [...source.matchAll(/updateNote\(\s*[^)]*\{\s*status:\s*"running"/g)].map(match => ({ file, registered: registration.test(source.slice(Math.max(0, match.index - 6000), match.index)) }));

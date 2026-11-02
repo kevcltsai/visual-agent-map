@@ -201,7 +201,6 @@ import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchD
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
-import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -222,14 +221,13 @@ import {
   normalizeMapChatStyle,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
-  failureReason,
   type Note,
   type NotePatch,
   type TopicInfo,
   isPlaceholder
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import { checkCounts, builtinTemplates, STANDARD_TEMPLATE_ID, type DetailTemplate } from "../../ai/detail-templates";
+import { builtinTemplates, STANDARD_TEMPLATE_ID, type DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { parseBlockRef } from "../../core/blocks/block-files";
@@ -13516,35 +13514,28 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(node.path)) {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
     const children = this.map.nodes.filter(item => item.parentId === node.id);
-    if (!children.length && !options.referenceGroups?.some(group => group.documents.length)) {
-      failed(t("ui.choose_another_note_source_first"));
-      return;
-    }
-    const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    const used = await this.modelFor(note, node.path, options.runOnce);
-    this.plugin.running.add(node.path);
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
-    try {
-      const childSources = await this.topicReferenceGroup(
-        children,
-        options?.synthesisContent === "summary" ? "summary" : "strong"
-      );
-      const selectedSources = options.referenceGroups ?? [];
-      if (!children.length && !selectedSources.some(group => group.documents.length)) {
-        failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"));
-        return;
-      }
-      // Task text, placeholders and ancestor labels follow the output note language, as in the other task paths.
-      const promptLanguage = options.outputLanguage ?? this.plugin.settings.language;
-      const task = synthesisDirectionsTask(promptLanguage);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
+    await this.plugin.topicRuns.start(node.path, "integrateDirection", {
+      map: () => this.map ?? undefined,
+      runOnce: options.runOnce,
+      signal: options.signal,
+      precheck: () =>
+        !children.length && !options.referenceGroups?.some(group => group.documents.length)
+          ? t("ui.choose_another_note_source_first")
+          : undefined,
+      onStarted: () => this.render(),
+      buildContext: async note => {
+        const childSources = await this.topicReferenceGroup(
+          children,
+          options?.synthesisContent === "summary" ? "summary" : "strong"
+        );
+        const selectedSources = options.referenceGroups ?? [];
+        if (!children.length && !selectedSources.some(group => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        // Task text, placeholders and ancestor labels follow the output note language, as in the other task paths.
+        const promptLanguage = options.outputLanguage ?? this.plugin.settings.language;
+        const task = synthesisDirectionsTask(promptLanguage);
+        return withThinkingOrigin(
           {
             title: note.title,
             summary: summaryForPrompt(note.summary, promptLanguage),
@@ -13567,37 +13558,16 @@ export class VisualAgentMapView extends ItemView {
             visualMode: "off"
           },
           note
-        ),
-        used.model,
-        used.reasoning,
-        options.signal,
-        undefined,
-        accepted,
-        undefined,
-        progress.observer
-      );
-      progress.end();
-      accepted?.();
-      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
-        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
+        );
+      },
+      accepted,
+      found,
+      failed,
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-      found(angles);
-    } catch (error) {
-      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        failed(t("ui.research_stopped_existing_content_was_preserved"));
-        return;
-      }
-      console.error("Visual Agent Map integration directions", error);
-      failed(this.plugin.recordFailure(t("log.integration_directions_failed"), error));
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   private async integrateChildren(
     node: MapNode,
@@ -13611,257 +13581,144 @@ export class VisualAgentMapView extends ItemView {
       failed?.(t("ui.ai_running_ai"));
       return;
     }
-    const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    const used = await this.modelFor(note, node.path, options?.runOnce);
-    const children = this.map.nodes.filter(item => item.parentId === node.id);
-    if (!children.length && !options?.referenceGroups?.some(group => group.documents.length)) {
-      const message = t("ui.choose_another_note_source_first");
-      if (failed) failed(message);
-      else new Notice(message);
-      return;
-    }
-    const childSources = await this.topicReferenceGroup(
-      children,
-      options?.synthesisContent === "summary" ? "summary" : "strong",
-      { language: options?.outputLanguage }
-    );
-    const sourceSnapshot = JSON.stringify(childSources.documents);
-    const childIds = children
+    const map = this.map;
+    const mapPath = this.path,
+      mapId = map.id;
+    const children = map.nodes.filter(item => item.parentId === node.id);
+    const childIds = (): string =>
+      (this.map?.nodes ?? [])
+        .filter(item => item.parentId === node.id)
+        .map(item => item.id)
+        .sort()
+        .join("|");
+    const startIds = children
       .map(child => child.id)
       .sort()
       .join("|");
-    const mapPath = this.path,
-      mapId = this.map.id;
-    const noteSnapshot = JSON.stringify([
-      note.title,
-      note.summary,
-      note.detail,
-      note.prompt,
-      note.rules,
-      note.model,
-      note.reasoning,
-      note.sourcePaths,
-      note.referencePaths,
-      note.thinkingOrigin,
-      note.newFindings
-    ]);
+    const readSources = (): Promise<ReferenceGroup> =>
+      this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong", {
+        language: options?.outputLanguage
+      });
     const selectedSources = options?.referenceGroups ?? [];
-    if (!children.length && !selectedSources.some(group => group.documents.length)) {
-      const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
-      if (failed) failed(message);
-      else new Notice(message);
-      return;
-    }
-    const language = this.plugin.settings.language;
-    const task = direction || synthesisGoalTask(language);
-    const synthesisRun = await this.detailTemplateFor(
-      node,
-      options?.detailTemplateId,
-      options?.toneId,
-      undefined,
-      options?.outputLanguage ?? language
-    );
-    const detailTemplate = synthesisRun.template;
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    await this.plugin.repo.updateNote(node.path, { status: "running" });
-    await this.hydrate();
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
-    // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
-    try {
-      const synthesisStyle = {
-        tone: synthesisRun.toneText ? { toneText: synthesisRun.toneText } : {},
-        style: synthesisRun.contextFields
-      };
-      const synthesisContext: TaskContext = withThinkingOrigin(
-        {
-          title: note.title,
-          summary: summaryForPrompt(note.summary, options?.outputLanguage ?? language),
-          rules: "",
-          detail: note.detail,
-          task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-          ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
-          userTexts: this.userTextContext(node.id),
-          ...this.summaryDirections(node.id),
-          workingFindings: note.newFindings,
-          onWorkingFindingsSent: sent => {
-            findingsSent = sent === note.newFindings;
-          },
-          referenceGroups: [...selectedSources, childSources],
-          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-          referenceDelivery: "direct",
-          onProgress: options?.onProgress,
-          outputLanguage: options?.outputLanguage,
-          ...synthesisStyle.tone,
-          mode: "synthesize",
-          researchMode: options?.researchMode ?? "local",
-          researchDepth: options?.researchDepth ?? "normal",
-          visualMode: options?.visualMode ?? note.visualMode,
+    let synthesisRun: Awaited<ReturnType<VisualAgentMapView["detailTemplateFor"]>> | undefined;
+    let task = "";
+    let childSources: ReferenceGroup | undefined;
+    await this.plugin.topicRuns.start(node.path, "integrateChildren", {
+      map: () => this.map ?? undefined,
+      runOnce: options?.runOnce,
+      signal: options?.signal,
+      outputLanguage: options?.outputLanguage,
+      prepare: async note => {
+        if (!children.length && !selectedSources.some(group => group.documents.length))
+          return t("ui.choose_another_note_source_first");
+        childSources = await readSources();
+        const sourceSnapshot = JSON.stringify(childSources.documents);
+        if (!children.length && !selectedSources.some(group => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        const language = this.plugin.settings.language;
+        task = direction || synthesisGoalTask(language);
+        const run = await this.detailTemplateFor(
+          node,
+          options?.detailTemplateId,
+          options?.toneId,
+          undefined,
+          options?.outputLanguage ?? language
+        );
+        const detailTemplate = run.template;
+        synthesisRun = run;
+        return {
           detailTemplate,
-          ...synthesisStyle.style,
-          addCharts: true
-        },
-        note
-      );
-      const result = await this.plugin.askModel(
-        synthesisContext,
-        used.model,
-        used.reasoning,
-        options?.signal,
-        undefined,
-        accepted,
-        undefined,
-        progress.observer
-      );
-      // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-      progress.end();
-      accepted?.();
-      if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      await this.plugin.repo.updateNote(node.path, { status: note.status });
-      const save = async (summary: string, detail: string): Promise<void> =>
-        this.plugin.mutate(async () => {
-          if (
-            options?.signal?.aborted ||
+          viewChanged: () =>
+            options?.signal?.aborted === true ||
             this.closed ||
             this.path !== mapPath ||
             this.map?.id !== mapId ||
-            this.map.nodes
-              .filter(item => item.parentId === node.id)
-              .map(item => item.id)
-              .sort()
-              .join("|") !== childIds
-          )
-            throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const currentSources = await this.topicReferenceGroup(
-            children,
-            options?.synthesisContent === "summary" ? "summary" : "strong",
-            { language: options?.outputLanguage }
-          );
-          if (JSON.stringify(currentSources.documents) !== sourceSnapshot)
-            throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          if (
-            JSON.stringify([
-              latest.title,
-              latest.summary,
-              latest.detail,
-              latest.prompt,
-              latest.rules,
-              latest.model,
-              latest.reasoning,
-              latest.sourcePaths,
-              latest.referencePaths,
-              latest.thinkingOrigin,
-              latest.newFindings
-            ]) !== noteSnapshot
-          )
-            throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const canonicalOnly = canonicalDetail(
-            detail,
-            noteLanguageOf(options?.outputLanguage ?? this.plugin.settings.language),
-            detailTemplate
-          );
-          // An edited draft is checked again so the topic's format mark matches what is saved.
-          const issues =
-            result.formatIssues && detail !== result.detail
-              ? checkCounts(canonicalOnly, detailTemplate)
-              : result.formatIssues;
-          // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
-          const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
-          const canonical = carryForwardSources(
-            canonicalOnly,
-            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-            [summary, canonicalOnly, references],
-            options?.outputLanguage ?? this.plugin.settings.language,
-            detailTemplate
-          );
-          await this.plugin.repo.updateNote(
-            node.path,
-            {
-              summary,
-              detail: canonical,
-              visualReferences: references,
-              // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
-              ...(findingsSent ? { newFindings: "" } : {}),
-              status: "completed",
-              ...formatIssuesPatch(issues, language)
+            childIds() !== startIds,
+          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+        };
+      },
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
+      },
+      buildContext: async note => {
+        const language = this.plugin.settings.language;
+        const run = synthesisRun!;
+        const synthesisStyle = {
+          tone: run.toneText ? { toneText: run.toneText } : {},
+          style: run.contextFields
+        };
+        return withThinkingOrigin(
+          {
+            title: note.title,
+            summary: summaryForPrompt(note.summary, options?.outputLanguage ?? language),
+            rules: "",
+            detail: note.detail,
+            task: [task, options?.requirements].filter(Boolean).join("\n\n"),
+            ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
+            userTexts: this.userTextContext(node.id),
+            ...this.summaryDirections(node.id),
+            workingFindings: note.newFindings,
+            onWorkingFindingsSent: sent => {
+              findingsSent = sent === note.newFindings;
             },
-            { detailTemplate }
-          );
-          const saved = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          this.recordNoteWrite(
-            node.path,
-            { ...latest, status: note.status },
-            saved,
-            [
-              "summary",
-              "detail",
-              "visualReferences",
-              "newFindings",
-              "previewSection",
-              "previewInitialized",
-              "previewAutoHash",
-              "status",
-              "lastError",
-              "detailFormatIssues"
-            ],
-            t("ui.synthesize_subtopics")
-          );
-          await this.hydrate();
-          this.render();
-          this.queueCharts({
-            path: node.path,
-            saved,
-            context: synthesisContext,
-            detail: saved.detail,
-            formatIssues: issues,
-            model: used.model,
-            language: options?.outputLanguage ?? this.plugin.settings.language,
-            template: detailTemplate
-          });
-        });
-      // The result is written directly (no draft review); a write that fails or finds the topic changed writes
-      // nothing and is reported, without marking the parent topic as failed.
-      try {
-        await (
-          drafted ??
-          (async (_result, write, summary, detail) => {
-            const previous = this.history.undoEntry;
-            await write(summary, detail);
-            this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
-          })
-        )(result, save, result.summary, result.detail);
-      } catch (error) {
-        if (options?.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-          if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-        } else {
-          console.error("VAM synthesis write", error);
-          const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-          if (failed) failed(message);
-          else new Notice(message);
-        }
+            referenceGroups: [...selectedSources, childSources!],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
+            onProgress: options?.onProgress,
+            outputLanguage: options?.outputLanguage,
+            ...synthesisStyle.tone,
+            mode: "synthesize",
+            researchMode: options?.researchMode ?? "local",
+            researchDepth: options?.researchDepth ?? "normal",
+            visualMode: options?.visualMode ?? note.visualMode,
+            detailTemplate: run.template,
+            ...synthesisStyle.style,
+            addCharts: true
+          },
+          note
+        );
+      },
+      findingsSent: () => findingsSent,
+      accepted,
+      drafted:
+        drafted ??
+        (async (_result, write, summary, detail, note) => {
+          const previous = this.history.undoEntry;
+          await write(summary, detail);
+          this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
+        }),
+      onWritten: async ({ before, after }) => {
+        this.recordNoteWrite(
+          node.path,
+          before,
+          after,
+          [
+            "summary",
+            "detail",
+            "visualReferences",
+            "newFindings",
+            "previewSection",
+            "previewInitialized",
+            "previewAutoHash",
+            "status",
+            "lastError",
+            "detailFormatIssues"
+          ],
+          t("ui.synthesize_subtopics")
+        );
+        await this.hydrate();
+        this.render();
+      },
+      queueCharts: job => this.queueCharts(job),
+      failed,
+      notify: message => new Notice(message),
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-    } catch (error) {
-      if (options?.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        await this.plugin.repo.updateNote(node.path, { status: note.status });
-        if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      } else {
-        console.error("Visual Agent Map child integration", error);
-        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-        const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-        if (failed) failed(message);
-        else new Notice(message);
-      }
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   private async startSynthesis(
     node: MapNode,

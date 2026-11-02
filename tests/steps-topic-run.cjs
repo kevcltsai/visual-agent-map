@@ -355,11 +355,11 @@ test('research: a topic that is already running is refused with null and a messa
   assert.equal(h.runs.isRunning('A.md'), true); release(); await first.finished;
 });
 
-test('research: two starts racing past the guard both run (current behavior, flipped by ticket 05)', async () => {
+test('research: two starts racing before the note is read run once; the second is refused with the running message (05)', async () => {
   const h = researchRuns();
   const [a, b] = await Promise.all([h.runs.start('A.md', 'research', h.options()), h.runs.start('A.md', 'research', h.options())]);
   await Promise.all([a?.finished, b?.finished]);
-  assert.equal(h.log.asks.length, 2);
+  assert.equal(h.log.asks.length, 1); assert.ok(a); assert.equal(b, null); assert.equal(h.log.failed.length, 1);
 });
 
 test('research: after dispose a start returns null and asks nothing', async () => {
@@ -451,21 +451,17 @@ test('the plugin clears the undo history of every other view and redraws all vie
   assert.deepEqual(calls, ['clear-other', 'reload-origin', 'reload-other']);
 });
 
-test('research: a double click starts two runs; the first run to end frees the topic even though the second still runs (307bcd7)', async () => {
-  const gates = []; const ends = [];
+test('research: a double click is registered before the note is read, so only the first click runs and frees the topic (05)', async () => {
+  const gates = [];
   const h = researchRuns({ ask: async (_c, _m, _r, _signal, onExchange, accepted) => { onExchange('ex'); accepted(); await new Promise(r => gates.push(r)); return { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] }; } });
   const opts = () => h.options({ runOnce: { model: 'm1' } });
   const p1 = h.runs.start('A.md', 'research', opts()); const p2 = h.runs.start('A.md', 'research', opts());
+  assert.equal(h.runs.isRunning('A.md'), true, 'registered before the first await');
   const [first, second] = await Promise.all([p1, p2]);
-  assert.ok(first && second, 'both clicks start a run'); assert.equal(gates.length, 2);
-  assert.equal(h.running.has('A.md'), true);
-  first.finished.then(() => ends.push('first')); second.finished.then(() => ends.push('second'));
+  assert.ok(first); assert.equal(second, null); assert.equal(gates.length, 1);
+  assert.equal(h.running.has('A.md'), true); assert.ok(h.activeTasks.get('A.md'), 'the one run keeps its stop controller');
   gates[0](); await first.finished; await settle();
-  assert.equal(h.runs.isRunning('A.md'), false, 'the older run ending frees the topic'); assert.equal(h.running.has('A.md'), false);
-  assert.ok(h.activeTasks.get('A.md'), 'the newer run keeps its stop controller');
-  gates[1](); await second.finished; await settle();
   assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.running.has('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false);
-  assert.deepEqual(ends, ['first', 'second']);
 });
 
 // ---- child-topic proposal run (ticket 03) ----
@@ -615,7 +611,7 @@ test('integrateDirection: a normal run registers, asks, offers at most 2 directi
   assert.equal(h.found.length, 1); assert.equal(h.found[0].length, 2); assert.deepEqual(h.fails, []);
   assert.deepEqual(h.events, [['started', true], ['accepted'], ['accepted'], ['settled', false]], 'accepted twice, as in 307bcd7 (inside the ask, then after the answer)');
   assert.deepEqual(h.log.progress.map(entry => entry[0]), ['begin', 'end', 'end']);
-  assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false, 'no stop controller is registered (only the dialog signal stops this run)');
+  assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false, 'no activeTasks entry (the registry controller stops this run)');
 });
 
 test('integrateDirection: a second click while running is refused; precheck and an empty context report their message and free the topic', async () => {
@@ -634,7 +630,7 @@ test('integrateDirection: a second click while running is refused; precheck and 
   assert.deepEqual(empty.fails, ['empty sources']); assert.equal(empty.log.asks.length, 0); assert.equal(empty.running.has('A.md'), false);
 });
 
-test('integrateDirection: Stop (the dialog signal) reports the stopped message, offers nothing and frees the topic; stop() does not reach it', async () => {
+test('integrateDirection: Stop (the dialog signal or stop()) reports the stopped message, offers nothing and frees the topic', async () => {
   let release; const gate = new Promise(r => { release = r; });
   const h = directionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { suggestions: [sugg('X')] }; } });
   const dialog = new AbortController();
@@ -643,7 +639,7 @@ test('integrateDirection: Stop (the dialog signal) reports the stopped message, 
   assert.equal(h.fails.length, 1); assert.deepEqual(h.found, []); assert.equal(h.running.has('A.md'), false);
 });
 
-test('integrateDirection: no suggestion and an AI failure are reported; a double click runs twice and the older run still frees the topic', async () => {
+test('integrateDirection: no suggestion and an AI failure are reported; a double click runs once (05)', async () => {
   const none = directionRuns({ reply: { suggestions: [] } });
   await none.runs.start('A.md', 'integrateDirection', none.opts());
   assert.equal(none.fails.length, 1); assert.deepEqual(none.found, []); assert.equal(none.running.has('A.md'), false);
@@ -653,9 +649,8 @@ test('integrateDirection: no suggestion and an AI failure are reported; a double
   const gates = []; let asked = 0;
   const twice = directionRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { asked++; accepted(); await new Promise(r => gates.push(r)); return { suggestions: [sugg('X')] }; } });
   const runs = [twice.runs.start('A.md', 'integrateDirection', twice.opts()), twice.runs.start('A.md', 'integrateDirection', twice.opts())];
-  await settle(); assert.equal(asked, 2, '307bcd7: the guard is checked before registration, so both clicks run');
-  gates[0](); await runs[0]; assert.equal(twice.running.has('A.md'), false, 'the older run ending frees the topic');
-  gates[1](); await runs[1]; assert.equal(twice.running.has('A.md'), false);
+  await settle(); assert.equal(asked, 1, 'the run is registered before the note is read, so the second click is refused'); assert.equal(twice.fails.length, 1);
+  gates[0](); await runs[0]; await runs[1]; assert.equal(twice.running.has('A.md'), false);
 });
 
 const integrateRuns = ({ reply, ask, notes = { 'A.md': fakeNote() } } = {}) => {
@@ -771,7 +766,7 @@ const selectionRuns = ({ ask, mutate } = {}) => {
   return h;
 };
 
-test('synthesizeSelection directions: asks, offers at most 2 directions, registers nothing in the running set', async () => {
+test('synthesizeSelection directions: asks, offers at most 2 directions, registers under the map path and frees it when done', async () => {
   const h = selectionRuns();
   await h.runs.start('M.md', 'synthesizeSelection', h.opts('directions'));
   assert.equal(h.asks[0].model, 'mx'); assert.equal(h.found.length, 1); assert.equal(h.found[0].length, 2); assert.deepEqual(h.fails, []);
@@ -922,4 +917,29 @@ test('05: dispose stops every run in flight and refuses a new start, for every k
     await run.start();
     assert.equal(run.asked.length, 1, kind + ': nothing starts after dispose');
   }
+});
+
+test('05 (L33): a thrown startup of an integrate-children run restores the status, frees the topic and rethrows', async () => {
+  const h = integrateRuns({ notes: { 'A.md': fakeNote({ status: 'completed' }) } });
+  await assert.rejects(h.runs.start('A.md', 'integrateChildren', h.opts({ onStarted: async () => { throw new Error('redraw failed'); } })), /redraw failed/);
+  assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.running.has('A.md'), false);
+  assert.equal(h.store.get('A.md').status, 'completed'); assert.equal(h.log.asks.length, 0);
+  const note = integrateRuns({ notes: { 'A.md': fakeNote({ status: 'completed' }) } });
+  await assert.rejects(note.runs.start('A.md', 'integrateChildren', note.opts({ prepare: async () => { throw new Error('prepare failed'); } })), /prepare failed/);
+  assert.equal(note.running.has('A.md'), false, 'an error before the status change also frees the topic');
+});
+
+test('05 (L34): the selection error sink is a closure of each call, not a view field', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.doesNotMatch(src, /synthesisErrorSink/); assert.match(src, /errorSink/);
+});
+
+test('05: a refused selection synthesis calls refused and none of the run callbacks; the first run keeps going', async () => {
+  const run = lifecycleKind('synthesizeSelection');
+  const first = run.start(); await settle();
+  const refused = []; const events = run.h.events;
+  await run.h.runs.start('M.md', 'synthesizeSelection', run.h.opts('directions', { refused: () => refused.push(1), settled: () => events.push('second-settled') }));
+  assert.equal(refused.length, 1); assert.ok(!events.includes('second-settled'));
+  assert.equal(run.h.runs.isRunning('M.md'), true);
+  run.release(); await first;
 });

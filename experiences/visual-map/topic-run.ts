@@ -245,14 +245,18 @@ export interface IntegrateChildrenStart {
 
 /**
  * What a selection-synthesis run needs from the entry that starts it (the view). The run belongs to a map, not to one
- * topic: it registers nothing in the running set and no stop controller (the view's waiting task holds `signal`'s
- * controller, which only the view can stop; ticket 05 changes that). The view keeps the task state it shows.
+ * topic: it is registered under the map's path like any other run, so Stop, stopAll and dispose reach it through
+ * `stop`. The view keeps the task state it shows.
  */
 export interface SynthesizeSelectionStart {
   /** "directions" asks for suggested directions; "draft" writes the new topic. */
   step: "directions" | "draft";
   /** The stop signal of the view's waiting task. */
   signal: AbortSignal;
+  /** Aborts the view's waiting task (its controller); called when the registered run is stopped. */
+  stop: () => void;
+  /** Called when the map already has a run, instead of starting; none of the other callbacks run. */
+  refused: () => void;
   /** The model for the selected topics. */
   model: () => Promise<{ model: string; reasoning?: ReasoningLevel }>;
   /** The selected topics' notes as one reference group; read again before anything is saved to compare. */
@@ -288,6 +292,13 @@ export interface SynthesizeSelectionStart {
   settled: () => void;
 }
 
+interface ResearchPrelude {
+  note: Note;
+  used: { model: string; reasoning?: ReasoningLevel };
+  context: TaskContext;
+  styleLabel: string | undefined;
+}
+
 export interface TopicRunHandle {
   readonly path: string;
   readonly kind: TopicRunKind;
@@ -315,12 +326,11 @@ export class TopicRuns {
   constructor(readonly ports: TopicRunPorts) {}
 
   /**
-   * Registers a run for the topic. Returns null when the topic already has one or the module is disposed.
-   * `replace` (the research run only, until ticket 05) takes the topic over from a run that is still registered: the
-   * older run is not stopped; `start` frees the topic when the older run ends.
+   * Registers a run for the topic. Returns null when the topic already has one or the module is disposed. Every run
+   * calls this synchronously, before its first await, so a second click on the same topic is refused.
    */
-  begin(path: string, kind: TopicRunKind, options: { replace?: boolean } = {}): TopicRunHandle | null {
-    if (this.disposed || (!options.replace && this.controllers.has(path))) return null;
+  begin(path: string, kind: TopicRunKind): TopicRunHandle | null {
+    if (this.disposed || this.controllers.has(path)) return null;
     const controller = new AbortController();
     this.controllers.set(path, controller);
     this.running.add(path);
@@ -359,7 +369,7 @@ export class TopicRuns {
     kind: TopicRunKind,
     options: ResearchStart | ProposeStart | IntegrateDirectionStart | IntegrateChildrenStart | SynthesizeSelectionStart
   ): Promise<AgentTaskHandle | null | void> {
-    if (kind === "synthesizeSelection") return this.runSelection(options as SynthesizeSelectionStart);
+    if (kind === "synthesizeSelection") return this.runSelection(path, options as SynthesizeSelectionStart);
     if (kind === "proposeChildren") return this.runProposal(path, options as ProposeStart);
     if (kind === "integrateDirection") return this.runDirections(path, options as IntegrateDirectionStart);
     if (kind === "integrateChildren") return this.runIntegration(path, options as IntegrateChildrenStart);
@@ -451,13 +461,20 @@ export class TopicRuns {
     }
   }
 
-  /** Frees the topic when a run ends, also a run that a later click replaced (as the view did before the module; ticket 05 ends this). */
-  private freeReplaceable(path: string, controller: AbortController, handle: TopicRunHandle): void {
-    if (this.controllers.get(path) !== controller) {
-      this.controllers.delete(path);
-      this.running.delete(path);
-    }
-    handle.release();
+  /** One signal that aborts when the registered run is stopped (Stop, stopAll, dispose) or the entry's own signal aborts. */
+  private linked(handle: TopicRunHandle, external?: AbortSignal): { signal: AbortSignal; dispose: () => void } {
+    const controller = new AbortController();
+    const abort = (): void => controller.abort();
+    if (handle.signal.aborted || external?.aborted) controller.abort();
+    handle.signal.addEventListener("abort", abort, { once: true });
+    external?.addEventListener("abort", abort, { once: true });
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        handle.signal.removeEventListener("abort", abort);
+        external?.removeEventListener("abort", abort);
+      }
+    };
   }
 
   /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
@@ -495,68 +512,95 @@ export class TopicRuns {
       options.failed(t("ui.ai_running_ai"));
       return;
     }
-    const blocked = options.precheck?.();
-    if (blocked) {
-      options.failed(blocked);
-      return;
-    }
-    const repo = this.ports.repository()!;
-    const note = await repo.readNote(path, options.map());
-    const used = await this.modelOf(path, note, options.map(), options.runOnce);
-    // A double click may pass the guard twice before the first run registers; the older run still frees the topic when it ends.
-    const handle = this.begin(path, "integrateDirection", { replace: true });
+    const handle = this.begin(path, "integrateDirection");
     if (!handle) return;
-    const controller = this.controllers.get(path)!;
-    options.onStarted?.();
-    const progress = this.startProgress(path, used.model);
+    const link = this.linked(handle, options.signal);
+    const free = (): void => {
+      link.dispose();
+      handle.release();
+    };
     try {
-      const context = await options.buildContext(note);
-      if (typeof context === "string") {
-        options.failed(context);
+      const blocked = options.precheck?.();
+      if (blocked) {
+        options.failed(blocked);
         return;
       }
-      const result = await this.ports.askModel(
-        context,
-        used.model,
-        used.reasoning,
-        options.signal,
-        undefined,
-        options.accepted,
-        undefined,
-        progress.observer
-      );
-      progress.end();
-      options.accepted?.();
-      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
-        options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
+      const repo = this.ports.repository()!;
+      const note = await repo.readNote(path, options.map());
+      const used = await this.modelOf(path, note, options.map(), options.runOnce);
+      options.onStarted?.();
+      const progress = this.startProgress(path, used.model);
+      try {
+        const context = await options.buildContext(note);
+        if (typeof context === "string") {
+          options.failed(context);
+          return;
+        }
+        const result = await this.ports.askModel(
+          context,
+          used.model,
+          used.reasoning,
+          link.signal,
+          undefined,
+          options.accepted,
+          undefined,
+          progress.observer
+        );
+        progress.end();
+        options.accepted?.();
+        if (link.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        const angles = result.suggestions.slice(0, 2);
+        if (!angles.length) {
+          options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+          return;
+        }
+        options.found(angles);
+      } catch (error) {
+        if (link.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+          options.failed(t("ui.research_stopped_existing_content_was_preserved"));
+          return;
+        }
+        console.error("Visual Agent Map integration directions", error);
+        options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
+      } finally {
+        progress.end();
+        free();
+        await options.onSettled?.();
       }
-      options.found(angles);
-    } catch (error) {
-      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        options.failed(t("ui.research_stopped_existing_content_was_preserved"));
-        return;
-      }
-      console.error("Visual Agent Map integration directions", error);
-      options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
     } finally {
-      progress.end();
-      this.freeReplaceable(path, controller, handle);
-      await options.onSettled?.();
+      free();
     }
   }
 
   private async runIntegration(path: string, options: IntegrateChildrenStart): Promise<void> {
-    const fail = (message: string): void => {
-      if (options.failed) options.failed(message);
-      else options.notify?.(message);
-    };
     if (this.running.has(path)) {
       options.failed?.(t("ui.ai_running_ai"));
       return;
     }
+    const handle = this.begin(path, "integrateChildren");
+    if (!handle) return;
+    const link = this.linked(handle, options.signal);
+    const free = (): void => {
+      link.dispose();
+      handle.release();
+    };
+    try {
+      await this.integrate(path, options, link.signal, free);
+    } finally {
+      free();
+    }
+  }
+
+  private async integrate(
+    path: string,
+    options: IntegrateChildrenStart,
+    signal: AbortSignal,
+    free: () => void
+  ): Promise<void> {
+    const fail = (message: string): void => {
+      if (options.failed) options.failed(message);
+      else options.notify?.(message);
+    };
     const repo = this.ports.repository()!;
     const note = await repo.readNote(path, options.map());
     const used = await this.modelOf(path, note, options.map(), options.runOnce);
@@ -584,11 +628,17 @@ export class TopicRuns {
     const outputLanguage = options.outputLanguage ?? language;
     const detailTemplate = prepared.detailTemplate;
     this.abortCharts(path);
-    const handle = this.begin(path, "integrateChildren", { replace: true });
-    if (!handle) return;
-    const controller = this.controllers.get(path)!;
-    await repo.updateNote(path, { status: "running" });
-    await options.onStarted?.();
+    try {
+      await repo.updateNote(path, { status: "running" });
+      await options.onStarted?.();
+    } catch (error) {
+      try {
+        await repo.updateNote(path, { status: note.status });
+      } catch {
+        /* Keep the startup error; the registered run still must be released. */
+      }
+      throw error;
+    }
     const progress = this.startProgress(path, used.model);
     const changed = (): Error => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     try {
@@ -597,7 +647,7 @@ export class TopicRuns {
         context,
         used.model,
         used.reasoning,
-        options.signal,
+        signal,
         undefined,
         options.accepted,
         undefined,
@@ -606,11 +656,11 @@ export class TopicRuns {
       // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
       progress.end();
       options.accepted?.();
-      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       await repo.updateNote(path, { status: note.status });
       const save = async (summary: string, detail: string): Promise<void> =>
         this.ports.mutate()(async () => {
-          if (options.signal?.aborted || prepared.viewChanged()) throw changed();
+          if (signal.aborted || prepared.viewChanged()) throw changed();
           if (await prepared.sourcesChanged()) throw changed();
           const latest = await repo.readNote(path, options.map());
           if (noteSnapshot(latest) !== snapshot) throw changed();
@@ -660,7 +710,7 @@ export class TopicRuns {
       try {
         await options.drafted(result, save, result.summary, result.detail, note);
       } catch (error) {
-        if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+        if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
           fail(t("ui.research_stopped_existing_content_was_preserved"));
         } else {
           console.error("VAM synthesis write", error);
@@ -668,7 +718,7 @@ export class TopicRuns {
         }
       }
     } catch (error) {
-      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+      if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
         await repo.updateNote(path, { status: note.status });
         fail(t("ui.research_stopped_existing_content_was_preserved"));
       } else {
@@ -678,12 +728,31 @@ export class TopicRuns {
       }
     } finally {
       progress.end();
-      this.freeReplaceable(path, controller, handle);
+      free();
       await options.onSettled?.();
     }
   }
 
-  private async runSelection(options: SynthesizeSelectionStart): Promise<void> {
+  private async runSelection(path: string, options: SynthesizeSelectionStart): Promise<void> {
+    const handle = this.begin(path, "synthesizeSelection");
+    if (!handle) {
+      options.refused();
+      return;
+    }
+    const onStop = (): void => options.stop();
+    handle.signal.addEventListener("abort", onStop, { once: true });
+    const free = (): void => {
+      handle.signal.removeEventListener("abort", onStop);
+      handle.release();
+    };
+    try {
+      await this.synthesizeSelection(options, free);
+    } finally {
+      free();
+    }
+  }
+
+  private async synthesizeSelection(options: SynthesizeSelectionStart, free: () => void): Promise<void> {
     const aborted = (): DOMException => new DOMException("Aborted", "AbortError");
     const changed = (): Error => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
     let progress: { end: () => void } | undefined;
@@ -747,14 +816,18 @@ export class TopicRuns {
       options.fail(error);
     } finally {
       progress?.end();
+      free();
       options.settled();
     }
   }
 
-  private async startResearch(path: string, kind: "research", options: ResearchStart): Promise<AgentTaskHandle | null> {
-    if (this.disposed) return null;
-    const { runStyle: givenStyle, ...overrides } = options.request ?? {};
-    const settings = (): ReturnType<TopicRunPorts["settings"]> => this.ports.settings();
+  /** Reads the note, resolves the model and style and builds the request; null (after telling the entry) when the topic has no task. */
+  private async researchPrelude(
+    path: string,
+    options: ResearchStart,
+    givenStyle: RunStyle | undefined,
+    overrides: Partial<TaskContext>
+  ): Promise<ResearchPrelude | null> {
     const repo = this.ports.repository()!;
     const note = await repo.readNote(path, options.map);
     const used = options.runOnce?.model.trim()
@@ -766,11 +839,7 @@ export class TopicRuns {
       else options.notify?.(message);
       return null;
     }
-    if (this.running.has(path)) {
-      options.failed?.(t("ui.ai_running_ai"));
-      return null;
-    }
-    const outputLanguage = overrides.outputLanguage ?? settings().language;
+    const outputLanguage = overrides.outputLanguage ?? this.ports.settings().language;
     const runStyle =
       givenStyle ??
       (options.resolveStyle
@@ -800,13 +869,38 @@ export class TopicRuns {
       },
       note
     );
+    return { note, used, context, styleLabel: runStyle.label.fileName };
+  }
+
+  private async startResearch(path: string, kind: "research", options: ResearchStart): Promise<AgentTaskHandle | null> {
+    if (this.disposed) return null;
+    const { runStyle: givenStyle, ...overrides } = options.request ?? {};
+    const settings = (): ReturnType<TopicRunPorts["settings"]> => this.ports.settings();
+    if (this.running.has(path)) {
+      options.failed?.(t("ui.ai_running_ai"));
+      return null;
+    }
+    // Registered before the first await: a second click on the topic is refused while the note is still being read.
+    const handle = this.begin(path, kind);
+    if (!handle) return null;
+    const controller = this.controllers.get(path)!;
+    let prelude: ResearchPrelude | null;
+    const repo = this.ports.repository()!;
+    try {
+      prelude = await this.researchPrelude(path, options, givenStyle, overrides);
+    } catch (error) {
+      handle.release();
+      throw error;
+    }
+    if (!prelude) {
+      handle.release();
+      return null;
+    }
+    const { note, used, context, styleLabel } = prelude;
     const language = settings().language;
     this.pendingSuggestions.delete(path);
     // A diagram job still running for the previous result of this note must not land on the new run.
     this.abortCharts(path);
-    const handle = this.begin(path, kind, { replace: true });
-    if (!handle) return null;
-    const controller = this.controllers.get(path)!;
     const activeTasks = this.ports.activeTasks();
     const abortFromTaskModal = (): void => controller.abort();
     if (overrides.signal?.aborted) controller.abort();
@@ -816,7 +910,7 @@ export class TopicRuns {
     // A plugin double without a progress store runs without progress lines.
     const progress = this.ports.progress() as RunProgress | undefined;
     let progressAttempt = "starting";
-    progress?.begin(path, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
+    progress?.begin(path, progressAttempt, Date.now(), used.model, styleLabel);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;
@@ -829,11 +923,6 @@ export class TopicRuns {
     const releaseRun = (): void => {
       overrides.signal?.removeEventListener("abort", abortFromTaskModal);
       if (activeTasks.get(path) === controller) activeTasks.delete(path);
-      // A run that was replaced still frees the topic when it ends, as the view did before the module (ticket 05 ends this).
-      if (this.controllers.get(path) !== controller) {
-        this.controllers.delete(path);
-        this.running.delete(path);
-      }
       handle.release();
     };
     const fail = (message: string): void => {

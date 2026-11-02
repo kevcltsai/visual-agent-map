@@ -835,7 +835,6 @@ export class VisualAgentMapView extends ItemView {
     deleted: boolean;
     deleteAction?: Action;
   } | null = null;
-  private synthesisErrorSink: ((error: unknown) => void) | null = null;
   private integrationTask: {
     title: string;
     goal: string;
@@ -13973,34 +13972,32 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map || sources.length < 2) return;
     let failure: unknown;
     let failed = false;
-    this.synthesisErrorSink = error => {
+    // This call's own sink (not a view field), so a second call that is refused cannot clear it.
+    const errorSink = (error: unknown): void => {
       failure = error;
       failed = true;
     };
-    try {
-      await this.startSelectionSynthesis(
-        sources,
-        {
-          researchMode: "local",
-          researchDepth: "normal",
-          visualMode: "off",
-          ...options,
-          synthesisTitle: title,
-          signal: flow?.controller?.signal ?? options?.signal
-        },
-        goal,
-        message => {
-          if (!failed) {
-            failure = new Error(message);
-            failed = true;
-          }
-        },
-        () => flow?.accepted?.(),
-        flow?.observer
-      );
-    } finally {
-      this.synthesisErrorSink = null;
-    }
+    await this.startSelectionSynthesis(
+      sources,
+      {
+        researchMode: "local",
+        researchDepth: "normal",
+        visualMode: "off",
+        ...options,
+        synthesisTitle: title,
+        signal: flow?.controller?.signal ?? options?.signal
+      },
+      goal,
+      message => {
+        if (!failed) {
+          failure = new Error(message);
+          failed = true;
+        }
+      },
+      () => flow?.accepted?.(),
+      flow?.observer,
+      errorSink
+    );
     if (failed) throw failure;
   }
   /**
@@ -14013,7 +14010,8 @@ export class VisualAgentMapView extends ItemView {
     direction: string | null,
     failed: (message: string) => void,
     accepted: () => void,
-    observer?: SynthesisObserver
+    observer?: SynthesisObserver,
+    errorSink?: (error: unknown) => void
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
@@ -14081,9 +14079,9 @@ export class VisualAgentMapView extends ItemView {
             : String(error);
         this.render();
       }
-      if (this.synthesisErrorSink && !aborted) {
+      if (errorSink && !aborted) {
         // The thin entry rethrows the original error to its caller instead of logging a user message.
-        this.synthesisErrorSink(error);
+        errorSink(error);
         failed(error instanceof Error ? error.message : String(error));
         return;
       }
@@ -14107,6 +14105,8 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.topicRuns.start(mapPath, "synthesizeSelection", {
       step,
       signal: controller.signal,
+      stop: () => controller.abort(),
+      refused: () => failed(t("ui.ai_running_ai")),
       model: async () => (modelChoice = await this.selectionModel(sources)),
       readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
       begin: group => {

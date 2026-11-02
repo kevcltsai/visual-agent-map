@@ -81,7 +81,7 @@ integrationTest('map default tone picker: lists built-in tones and tone blocks, 
   // 06 P3: the custom tone presets are tone blocks now (the upgrade moved them); the picker's data source is the block folder.
   const { NoteStyleStore } = load('ai/note-style-store.ts');
   const settings = { language: 'en', workspaceFolder: 'WS', noteStylesFolder: 'WS/S', detailTemplates: [], promptPresets: [] };
-  const port = { list: async folder => (folder === 'WS/S/Blocks/Tones' ? ['Mine.md'] : []), read: async () => 'x', folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
+  const port = { list: async folder => (folder === 'WS/S/Voices' ? ['Mine.md'] : []), read: async () => 'x', folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
   const plugin = { settings, noteStyles: new NoteStyleStore({ settings: () => settings, port, save: async () => {} }) };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.map = map([node('a')]); view.enqueue = work => work();
@@ -1006,7 +1006,7 @@ integrationTest('multi-select synthesis: the chosen content template reaches the
   // 06 P3: the user's own template is a template block (file:Brief), read from the Templates block folder.
   const { NoteStyleStore } = load('ai/note-style-store.ts');
   Object.assign(h.plugin.settings, { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' });
-  const dir = 'WS/S/Blocks/Templates';
+  const dir = 'WS/S/Structures';
   const port = { list: async folder => (folder === dir ? ['Brief.md'] : []), read: async () => '## Key points\nThe main idea.\n\n## Further\nMore detail.\n', folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
   h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
   await h.plugin.noteStyles.refresh();

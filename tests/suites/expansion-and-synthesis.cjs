@@ -1328,20 +1328,24 @@ async function templateHarness({ language = 'zh-TW', settings = {}, mapTemplate,
   const run = async (target = topic) => { const handle = await view.runAgent(target); await handle?.finished; await until(() => !plugin.running.size); };
   return { repo, app, contents, view, plugin, doc, mapPath, topic, notices, contexts, run, chartJobs, chartAborts };
 }
-integrationTest('runAgent: context carries the resolved template (topic > map > workspace > Standard)', async () => {
-  const h = await templateHarness({ settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' } });
-  await h.run(); assert.equal(h.contexts.at(-1).detailTemplate.id, 'C');
-  h.doc.detailTemplateId = 'B'; await h.run(); assert.equal(h.contexts.at(-1).detailTemplate.id, 'B');
+integrationTest('runAgent: context carries the resolved template (run > topic > topic type; the map and workspace keys are not read) (was: topic > map > workspace > Standard; grilling Q5/Q10/Q15)', async () => {
+  const h = await templateHarness({ settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C', noteTemplateBlock: 'builtin:textbook', noteTemplateByKind: { topic: 'builtin:textbook' } } });
+  await h.run(); assert.equal(h.contexts.at(-1).detailTemplate.id, 'standard', 'workspace keys do not choose the template');
+  h.doc.detailTemplateId = 'B'; await h.run(); assert.equal(h.contexts.at(-1).detailTemplate.id, 'standard', 'the map template does not choose it either');
   await h.repo.updateNote(h.topic.path, { detailTemplateId: 'A' }); await h.run(); assert.equal(h.contexts.at(-1).detailTemplate.id, 'A');
   assert.deepEqual(h.notices, []);
   assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, 'A');
+  const typed = await templateHarness({ language: 'en', settings: { noteStyleByKind: { topic: 'builtin:textbook' }, defaultDetailTemplateId: 'C', detailTemplates: sampleTemplates() } });
+  typed.doc.detailTemplateId = 'B';
+  await typed.run();
+  assert.equal(typed.contexts.at(-1).detailTemplate.id, 'textbook', 'the topic type decides when the topic has no style');
   const bare = await templateHarness({ language: 'en' });
   await bare.run();
   assert.equal(bare.contexts[0].detailTemplate.id, 'standard');
   assert.equal(bare.contexts[0].detailTemplate.sections[0].name, 'Core conclusions');
   assert.equal((await bare.repo.readNote(bare.topic.path)).detailTemplateId, undefined, 'resolution never writes the topic');
 });
-integrationTest('runAgent: a topic whose style file is missing keeps its note unchanged, says which file is missing and offers another style; an old template id is still cleared', async () => {
+integrationTest('runAgent: a topic whose style file is missing keeps its note unchanged, says which file is missing and offers another style; an old template id that is gone is told but kept (was: cleared; grilling Q18, counterexample 14)', async () => {
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
   await h.repo.updateNote(h.topic.path, { detailTemplateId: 'style:Gone', toneId: 'plain' });
   await h.run();
@@ -1352,36 +1356,34 @@ integrationTest('runAgent: a topic whose style file is missing keeps its note un
   const note = await h.repo.readNote(h.topic.path);
   assert.equal(note.detailTemplateId, 'style:Gone', 'the note is not rewritten: the file may come back');
   await h.repo.updateNote(h.topic.path, { detailTemplateId: 'old-gone' });
+  h.notices.length = 0;
   await h.run();
-  assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, undefined, 'an old template id that is gone is cleared as before');
+  assert.equal(h.notices.length, 1); assert.match(String(h.notices[0]), /"old-gone" no longer exists/);
+  assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, 'old-gone', 'an old template id that is gone is told but the note keeps it');
 });
-integrationTest('runAgent: a template block with two format headings still runs on the built-in template, with one Notice naming file and line, and the context carries the block text (04 counter 4)', async () => {
-  const broken = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
-  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'file:Bad' } });
-  const files = { 'WS/S/Blocks/Templates/Bad.md': broken };
-  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
-  const { NoteStyleStore } = load('ai/note-style-store.ts');
-  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
-  await h.plugin.noteStyles.refresh();
-  await h.run();
-  assert.equal(h.contexts.length, 1, 'the run is not stopped');
-  assert.equal(h.contexts[0].detailTemplate.id, 'standard', 'the built-in template stands in');
-  assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
-  assert.equal(h.notices.length, 1, 'exactly one Notice');
-  assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 5/);
-  assert.match(String(h.notices[0]), /The built-in structure is used instead\./);
-});
-// Ticket 04 FB1: the Notice for an unreadable template block belongs to the entry of a run, once per execution.
-const BAD_BLOCK = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
-async function installBadBlock(plugin, file = 'Bad') {
-  const files = { [`WS/S/Blocks/Templates/${file}.md`]: BAD_BLOCK };
+// The topic type's style file points at a structure file that does not parse; the files are served by an in-memory port that refuses writes.
+async function installStyleFiles(plugin, files) {
   const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
   const { NoteStyleStore } = load('ai/note-style-store.ts');
   plugin.noteStyles = new NoteStyleStore({ settings: () => plugin.settings, port, save: async () => {} });
   await plugin.noteStyles.refresh();
 }
-const badBlockSettings = { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'file:Bad' };
+// Ticket 04 FB1: the Notice for an unreadable structure belongs to the entry of a run, once per execution.
+const BAD_BLOCK = '## A\nbody\n%% never closed\nmore\n';
+const installBadBlock = (plugin, file = 'Bad') => installStyleFiles(plugin, { [`WS/S/Styles/${file}.md`]: `---\nstructure: ${file}\n---\n`, [`WS/S/Structures/${file}.md`]: BAD_BLOCK });
+const badBlockSettings = { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Bad' } };
 const blockNotices = notices => notices.filter(message => /Bad\.md/.test(String(message)));
+integrationTest('runAgent: a structure file with a comment that never closes, set as the topic type style, still runs on the built-in template, with one Notice naming file and line, and the context carries the file text (04 counter 4; was: set as the workspace template block, grilling Q10)', async () => {
+  const h = await templateHarness({ language: 'en', settings: badBlockSettings });
+  await installBadBlock(h.plugin);
+  await h.run();
+  assert.equal(h.contexts.length, 1, 'the run is not stopped');
+  assert.equal(h.contexts[0].detailTemplate.id, 'standard', 'the built-in template stands in');
+  assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
+  assert.equal(h.notices.length, 1, 'exactly one Notice');
+  assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 3/);
+  assert.match(String(h.notices[0]), /The built-in structure is used instead\./);
+});
 integrationTest('FB1 F1: opening the research or the synthesis dialog raises no Notice for an unreadable template block', async () => {
   const opened = [], notices = [];
   const h = await templateHarness({ language: 'en', settings: badBlockSettings });
@@ -1403,7 +1405,7 @@ integrationTest('FB1 F1: one runAgent, one synthesis and one integration each ra
   const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
   await h.run();
   assert.equal(blockNotices(h.notices).length, 1, 'runAgent');
-  assert.match(String(h.notices[0]), /line 5/);
+  assert.match(String(h.notices[0]), /line 3/);
   h.notices.length = 0;
   await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
   assert.equal(blockNotices(h.notices).length, 1, 'one integration (start and write-back together)');
@@ -1456,35 +1458,48 @@ integrationTest('FB1 F2: an unreadable block with the output language different 
   const note = await h.repo.readNote(h.topic.path);
   assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')).slice(0, 2), ['### Core conclusions', '### Key knowledge']);
   assert.equal(blockNotices(h.notices).length, 1);
-  assert.match(String(blockNotices(h.notices)[0]), /line 5/);
+  assert.match(String(blockNotices(h.notices)[0]), /line 3/);
 });
-integrationTest('runAgent: a changed built-in block keeps its text in the run context (the template is not swapped for a fresh built-in) and raises no Notice (04)', async () => {
+integrationTest('runAgent: an edited copy of a built-in structure file does not replace the built-in, and raises no Notice (04; was: a changed built-in block keeps its text in the run context; decisions #22, grilling Q10)', async () => {
   const changed = '## Alpha\nDescribe alpha.\n\n## Beta\nDescribe beta.\n\n# Format rules\n\nFORMAT-LINE-MINE\n';
-  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteTemplateBlock: 'builtin:standard' } });
-  const files = { 'WS/S/Blocks/Templates/Standard.md': changed };
-  const port = { list: async folder => Object.keys(files).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => files[f], folderExists: folder => Object.keys(files).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
-  const { NoteStyleStore } = load('ai/note-style-store.ts');
-  h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
-  await h.plugin.noteStyles.refresh();
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'builtin:general' } } });
+  await installStyleFiles(h.plugin, { 'WS/S/Structures/Standard six.md': changed });
   await h.run();
-  assert.equal(h.contexts[0].styleSelection.template.body, changed);
+  assert.equal(h.contexts[0].detailTemplate.id, 'standard');
+  assert.equal(h.contexts[0].detailTemplate.sections[0].name, 'Core conclusions', 'the built-in structure stands');
+  assert.equal(h.contexts[0].styleSelection, undefined, 'no file text travels with the run');
   assert.deepEqual(h.notices, []);
 });
-integrationTest('runAgent: choosing a style file for a run writes it as the topic template and deletes the topic tone; an old template keeps the tone', async () => {
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() } });
+integrationTest('runAgent: a structure file that still has a format rules heading runs on its sections and raises no Notice (04 counter 4; was: two format headings were an unreadable block, grilling Q1)', async () => {
+  const files = { 'WS/S/Styles/Bad.md': '---\nstructure: Bad\n---\n', 'WS/S/Structures/Bad.md': '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n' };
+  const h = await templateHarness({ language: 'en', settings: badBlockSettings });
+  await installStyleFiles(h.plugin, files);
+  await h.run();
+  assert.equal(h.contexts.length, 1);
+  assert.deepEqual(plain(h.contexts[0].detailTemplate.sections.map(section => section.name)), ['A']);
+  assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
+  assert.deepEqual(h.notices, [], 'the format rules zone is only noted, not an error');
+});
+integrationTest('runAgent: choosing a template or a style file for a run is used by that run only, the topic template and tone stay (was: written to the topic, the style file deleted the tone; grilling Q18)', async () => {
+  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), workspaceFolder: 'WS', noteStylesFolder: 'WS/S' } });
+  await installStyleFiles(h.plugin, { 'WS/S/Structures/Mine.md': '## Mine\nx\n' });
   await h.repo.updateNote(h.topic.path, { toneId: 'plain' });
-  await h.view.detailTemplateFor({ path: h.topic.path }, 'A');
-  assert.deepEqual([(await h.repo.readNote(h.topic.path)).detailTemplateId, (await h.repo.readNote(h.topic.path)).toneId], ['A', 'plain']);
-  await h.view.detailTemplateFor({ path: h.topic.path }, 'style:Mine');
+  const chosen = await h.view.detailTemplateFor({ path: h.topic.path }, 'A');
+  assert.equal(chosen.template.id, 'A');
+  assert.deepEqual([(await h.repo.readNote(h.topic.path)).detailTemplateId, (await h.repo.readNote(h.topic.path)).toneId], [undefined, 'plain']);
+  const file = await h.view.detailTemplateFor({ path: h.topic.path }, 'file:Mine');
+  assert.equal(file.template.id, 'file:Mine');
+  assert.equal(typeof file.toneText, 'string', 'the topic tone still applies to a run that only picks a structure');
   const note = await h.repo.readNote(h.topic.path);
-  assert.equal(note.detailTemplateId, 'style:Mine'); assert.equal(note.toneId, undefined, 'the style file decides the tone');
+  assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, 'plain', 'nothing is written to the topic');
 });
 integrationTest('runAgent saves detail with the template order and stores formatIssues text; clears it when met', async () => {
   const template = { id: 'T', name: 'Counted', sections: [templateSection('t0', '結論'), templateSection('t1', '範例', { count: { mode: 'exact', n: 3 } }), templateSection('t2', '來源', { role: 'sources' })] };
   const picture = { title: 'Pic', imageUrl: 'https://example.com/a.png', sourceUrl: 'https://example.com/page', description: '', palette: [], formula: '' };
-  const h = await templateHarness({ settings: { detailTemplates: [template], defaultDetailTemplateId: 'T' }, reply: (_context, call) => call === 1
+  const h = await templateHarness({ settings: { detailTemplates: [template] }, reply: (_context, call) => call === 1
     ? { summary: 'S1', detail: '### 範例\n\n- one\n\n### 結論\n\nConclusion text', suggestions: [], visualReferences: [picture], formatIssues: [{ section: '範例', mode: 'exact', n: 3, actual: 1 }] }
     : { summary: 'S2', detail: '### 結論\n\nDone\n\n### 範例\n\n- a\n- b\n- c', suggestions: [], visualReferences: [], formatIssues: [] } });
+  await h.repo.updateNote(h.topic.path, { detailTemplateId: 'T' });
   await h.run();
   let note = await h.repo.readNote(h.topic.path);
   assert.equal(note.status, 'completed');
@@ -1506,50 +1521,50 @@ integrationTest('runAgent clears stored format issues when the result has no cou
   assert.equal(note.summary, 'Saved summary');
   assert.deepEqual(plain(note.detailFormatIssues), []);
 });
-integrationTest('a deleted topic template notifies once, clears the field and falls back', async () => {
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() }, mapTemplate: 'B' });
+integrationTest('a deleted topic template notifies on each run, keeps the field and falls back to the topic type style (was: notified once, cleared the field, fell back to the map template; grilling Q5/Q18, counterexample 14)', async () => {
+  const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), noteStyleByKind: { topic: 'builtin:textbook' } }, mapTemplate: 'B' });
   await h.repo.updateNote(h.topic.path, { detailTemplateId: 'gone' });
   await h.run();
-  assert.equal(h.contexts[0].detailTemplate.id, 'B');
+  assert.equal(h.contexts[0].detailTemplate.id, 'standard', 'the structure of an unreadable old template is Standard; the map template is not read');
   assert.equal(h.notices.length, 1, h.notices.join('|'));
   assert.match(h.notices[0], /"gone" no longer exists/);
-  let note = await h.repo.readNote(h.topic.path);
-  assert.equal(note.detailTemplateId, undefined);
-  assert.equal(note.summary, 'Saved summary', 'clearing the field does not make the result stale');
+  const note = await h.repo.readNote(h.topic.path);
+  assert.equal(note.detailTemplateId, 'gone', 'the note keeps its old value');
+  assert.equal(note.summary, 'Saved summary');
   await h.run();
-  assert.equal(h.contexts[1].detailTemplate.id, 'B');
-  assert.equal(h.notices.length, 1, h.notices.join('|'));
+  assert.equal(h.contexts[1].detailTemplate.id, 'standard');
+  assert.equal(h.notices.length, 2, 'it is told again, nothing was cleared');
 });
-integrationTest('an explicit choice is recorded on the topic and its reply still saves', async () => {
+integrationTest('an explicit choice is used by that run only and its reply still saves (was: also recorded on the topic; grilling Q18)', async () => {
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' }, reply: () => ({ summary: 'Chosen summary', detail: '### Alpha\n\nBody', visualReferences: [], suggestions: [] }) });
   await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], detailTemplateId: 'A' });
   await until(() => !h.plugin.running.size);
   assert.equal(h.contexts[0].detailTemplate.id, 'A');
   const note = await h.repo.readNote(h.topic.path);
-  assert.equal(note.detailTemplateId, 'A');
+  assert.equal(note.detailTemplateId, undefined, 'the topic is not changed');
   assert.equal(note.summary, 'Chosen summary');
   assert.ok(!h.notices.some(message => /outdated/.test(message)), h.notices.join('|'));
   assert.match(note.detail, /^### Alpha/);
 });
-integrationTest('synthesis and integrated topics save with the template', async () => {
-  const custom = { id: 'X', name: 'Custom', sections: [templateSection('x0', 'First part'), templateSection('x1', 'Second part'), templateSection('x2', 'Refs', { role: 'sources' })] };
+integrationTest('synthesis, integrated topics and contributions save with the template of the topic type style (was: the map template; grilling Q5/Q15)', async () => {
   const reply = (_context, call) => call === 1
     ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Angle', task: 'Compare them', contribution: '', parentTitle: '' }] }
     : { summary: 'Synth', detail: '### Second part\n\nTwo\n\n### First part\n\nOne', visualReferences: [], suggestions: [] };
-  const h = await templateHarness({ language: 'en', settings: { detailTemplates: [custom] }, mapTemplate: 'X', reply });
+  const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Custom' } }, mapTemplate: 'Y', reply });
+  await installStyleFiles(h.plugin, { 'WS/S/Styles/Custom.md': '---\nstructure: Custom\n---\n', 'WS/S/Structures/Custom.md': '## First part\nA\n\n## Second part\nB\n\n## Refs\nC\n' });
   const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace'); child.parentId = h.topic.id; h.doc.nodes.push(child); await h.repo.saveMap(h.mapPath, h.doc);
   await h.repo.updateNote(h.topic.path, { status: 'completed' });
   const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
   await h.view.startSynthesis(h.topic, options(), null, message => assert.fail(message), () => {});
   await h.view.startSynthesis(h.topic, options(), 'Compare them', message => assert.fail(message), () => {});
-  assert.equal(h.contexts.at(-1).detailTemplate.id, 'X');
+  assert.equal(h.contexts.at(-1).detailTemplate.id, 'file:Custom');
   assert.equal(h.view.synthesisTasks.has(h.topic.path), false, 'written directly');
   const parent = await h.repo.readNote(h.topic.path);
   assert.ok(parent.detail.indexOf('### First part') < parent.detail.indexOf('### Second part'), parent.detail);
   assert.ok(!/### Core conclusions/.test(parent.detail), parent.detail);
   const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
   await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
-  assert.equal(h.contexts.at(-1).detailTemplate.id, 'X');
+  assert.equal(h.contexts.at(-1).detailTemplate.id, 'file:Custom');
   const saved = await h.repo.readMap(h.mapPath);
   const integrated = await h.repo.readNote(saved.nodes.at(-1).path);
   assert.equal(integrated.title, 'Combined');
@@ -1561,40 +1576,48 @@ integrationTest('synthesis and integrated topics save with the template', async 
 // Writing tone (B1): every TaskContext builder resolves chosen > topic override > map default > academic.
 const toneTexts = language => Object.fromEntries(load('ai/prompt-presets.ts').builtinPresets(language, 'tone').map(item => [item.id, item.text]));
 const { taskPrompt: renderTaskPrompt } = load('core/steps/task/render.ts');
-integrationTest('tone: runAgent resolves topic override > map default > academic and the prompt carries the tone block', async () => {
+// The topic type's style file carries a voice (every built-in style is academic), so a default tone comes from the topic type, not the map.
+const voicedSettings = { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Voiced' } };
+const installVoiced = (plugin, voice) => installStyleFiles(plugin, { 'WS/S/Styles/Voiced.md': `---\nvoice: ${voice}\n---\n` });
+integrationTest('tone: runAgent resolves run > topic override > topic type voice > academic, and the map tone is not read, and the prompt carries the tone block (was: topic override > map default > academic; grilling Q5/Q15)', async () => {
   const tones = toneTexts('en');
-  const h = await templateHarness({ language: 'en', settings: { promptPresets: [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Write like a friendly neighbour.' }] } });
+  const presets = [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Write like a friendly neighbour.' }];
+  const bare = await templateHarness({ language: 'en', settings: { promptPresets: presets } });
+  bare.doc.toneId = 'plain';
+  await bare.run();
+  assert.equal('toneText' in bare.contexts.at(-1), false, 'no tone: prompts unchanged, and the map tone does not count');
+  const h = await templateHarness({ language: 'en', settings: { ...voicedSettings, promptPresets: presets } });
+  await installVoiced(h.plugin, 'plain');
   await h.run();
-  assert.equal('toneText' in h.contexts.at(-1), false, 'no tone: prompts unchanged');
-  h.doc.toneId = 'plain'; await h.run();
   assert.equal(h.contexts.at(-1).toneText, tones.plain);
   assert.ok(renderTaskPrompt(h.contexts.at(-1), 'en').includes(tones.plain), 'the rendered prompt contains the tone text');
   await h.repo.updateNote(h.topic.path, { toneId: 'mine' }); await h.run();
   assert.equal(h.contexts.at(-1).toneText, 'Write like a friendly neighbour.');
   await h.repo.updateNote(h.topic.path, { toneId: 'academic' }); await h.run();
-  assert.equal('toneText' in h.contexts.at(-1), false, 'an explicit academic topic override beats the map default');
+  assert.equal('toneText' in h.contexts.at(-1), false, 'an explicit academic topic override beats the topic type voice');
   assert.ok(!renderTaskPrompt(h.contexts.at(-1), 'en').includes(tones.plain) && !renderTaskPrompt(h.contexts.at(-1), 'en').includes(tones.academic), 'academic adds no tone block');
   await h.repo.updateNote(h.topic.path, { toneId: 'gone' }); await h.run();
-  assert.equal(h.contexts.at(-1).toneText, tones.plain, 'a deleted topic tone falls through to the map default');
+  assert.equal('toneText' in h.contexts.at(-1), false, 'a deleted topic tone is academic rigor in the topic\'s own implicit style (was: fell through to the map default)');
 });
-integrationTest('tone: a dialog choice is recorded on the topic and used by that run (single and batch research)', async () => {
+integrationTest('tone: a dialog choice is used by that run only and not recorded on the topic (single and batch research) (was: recorded on the topic; grilling Q18)', async () => {
   const tones = toneTexts('en');
   const h = await templateHarness({ language: 'en' });
   await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], toneId: 'magazine' });
   await until(() => !h.plugin.running.size);
   assert.equal(h.contexts.at(-1).toneText, tones.magazine);
-  assert.equal((await h.repo.readNote(h.topic.path)).toneId, 'magazine');
+  assert.equal((await h.repo.readNote(h.topic.path)).toneId, undefined, 'the topic keeps no tone');
   await h.view.researchChild(h.topic, new AbortController().signal, () => {}, { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [] });
   await until(() => !h.plugin.running.size);
-  assert.equal(h.contexts.at(-1).toneText, tones.magazine, 'no choice keeps the topic tone');
+  assert.equal('toneText' in h.contexts.at(-1), false, 'no choice: the next run is back on the topic type voice');
 });
-integrationTest('tone: expansion, synthesis directions, draft and integrated topics all pass toneText', async () => {
+integrationTest('tone: expansion, synthesis directions, draft and integrated topics all pass toneText of the topic type voice (was: the map tone; grilling Q5/Q15)', async () => {
   const tones = toneTexts('en');
   const reply = (_context, call) => call === 1
     ? { summary: '', detail: '', visualReferences: [], suggestions: [{ title: 'Angle', task: 'Compare them', contribution: '', parentTitle: '' }] }
     : { summary: 'Synth', detail: '### Core conclusions\n\nTwo', visualReferences: [], suggestions: [] };
-  const h = await templateHarness({ language: 'en', reply });
-  h.doc.toneId = 'summary';
+  const h = await templateHarness({ language: 'en', reply, settings: voicedSettings });
+  await installVoiced(h.plugin, 'summary');
+  h.doc.toneId = 'plain';
   const child = await h.repo.createNote('Child', 'model-a', h.doc, h.mapPath, 'workspace'); child.parentId = h.topic.id; h.doc.nodes.push(child); await h.repo.saveMap(h.mapPath, h.doc);
   await h.repo.updateNote(h.topic.path, { status: 'completed' });
   const options = () => ({ researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [] });
@@ -1608,8 +1631,8 @@ integrationTest('tone: expansion, synthesis directions, draft and integrated top
   assert.equal(h.contexts.at(-1).toneText, tones.summary, 'expand');
   const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
   await h.view.createIntegratedNode('Combined', [h.topic, other], 'Compare', '');
-  assert.equal(h.contexts.at(-1).toneText, tones.summary, 'multi-select integration uses the map tone');
-  delete h.doc.toneId; await h.repo.saveMap(h.mapPath, h.doc);
+  assert.equal(h.contexts.at(-1).toneText, tones.summary, 'multi-select integration uses the topic type voice, not the map tone');
+  delete h.plugin.settings.noteStyleByKind.topic;
   await h.view.createIntegratedNode('Plain', [h.topic, other], 'Compare', '');
   assert.equal('toneText' in h.contexts.at(-1), false);
 });
@@ -1683,7 +1706,7 @@ integrationTest('expand without shallow research: the chosen template shapes con
   assert.match(child.detail, /^### First part\n\nA\n\n### Second part\n\nB$/);
   assert.equal(h.contexts.length, 1, 'no research ran');
 });
-integrationTest('opening the AI dialog for a topic with a deleted template neither notifies nor rewrites the note', async () => {
+integrationTest('opening the AI dialog for a topic with a deleted template neither notifies nor rewrites the note (the label is the topic type\'s structure, not the map template; grilling Q5/Q15)', async () => {
   const opened = [], notices = [];
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates() }, mapTemplate: 'B' });
   await h.repo.updateNote(h.topic.path, { detailTemplateId: 'gone' });
@@ -1692,7 +1715,7 @@ integrationTest('opening the AI dialog for a topic with a deleted template neith
   const view = new VisualAgentMapView({ app: h.app }, attachTopicRuns(h.plugin)); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
   view.openNextStep(h.topic);
   await until(() => opened.length === 1);
-  assert.equal(opened[0].modelSettings.currentTemplate, 'Template B', 'label shows the fallback template');
+  assert.equal(opened[0].modelSettings.currentTemplate, 'Standard six', 'label shows the fallback template: the topic type\'s built-in structure, the map template B is not read');
   opened[0].close();
   assert.deepEqual(notices, []);
   assert.equal(await h.app.vault.read(h.app.vault.getAbstractFileByPath(h.topic.path)), before, 'note file unchanged');
@@ -1709,7 +1732,7 @@ integrationTest('no templates, zh-TW interface, English output: Standard follows
   assert.deepEqual(note.detail.split('\n').filter(line => line.startsWith('### ')), ['### Core conclusions', '### Key knowledge', '### Evidence and sources', '### Tradeoffs and limitations', '### Open questions', '### Update log']);
   assert.match(note.detail, /### Core conclusions\n\nC\n\n### Key knowledge\n\nK/);
 });
-integrationTest('multi research with a chosen template records it on each started topic and the AI request uses it (skipped topics untouched)', async () => {
+integrationTest('multi research with a chosen template uses it for each started topic and records it on none (skipped topics untouched; was: recorded on each started topic; grilling Q18)', async () => {
   const h = await templateHarness({ language: 'en', settings: { detailTemplates: sampleTemplates(), defaultDetailTemplateId: 'C' } });
   const second = await h.repo.createNote('Second', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(second); await h.repo.saveMap(h.mapPath, h.doc);
   const third = await h.repo.createNote('Third', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(third); await h.repo.saveMap(h.mapPath, h.doc);
@@ -1720,14 +1743,14 @@ integrationTest('multi research with a chosen template records it on each starte
   await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'fast', requirements: '', detailTemplateId: 'A' });
   await until(() => h.contexts.length === 2 && !h.plugin.running.has(h.topic.path) && !h.plugin.running.has(second.path));
   assert.deepEqual(h.contexts.map(context => context.detailTemplate.id), ['A', 'A']);
-  assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, 'A');
-  assert.equal((await h.repo.readNote(second.path)).detailTemplateId, 'A');
+  assert.equal((await h.repo.readNote(h.topic.path)).detailTemplateId, undefined);
+  assert.equal((await h.repo.readNote(second.path)).detailTemplateId, undefined);
   assert.equal((await h.repo.readNote(third.path)).detailTemplateId, undefined);
 });
-// 06 P3: the map style list reads the template blocks of the user (file:<name>) in place of the old style files and old templates.
+// 06 P3: the map style list reads the structure files of the user (file:<name>, the Structures folder since the folders were renamed) in place of the old style files and old templates.
 async function installTemplateBlocks(plugin, files) {
   Object.assign(plugin.settings, { workspaceFolder: 'WS', noteStylesFolder: 'WS/S' });
-  const dir = 'WS/S/Blocks/Templates';
+  const dir = 'WS/S/Structures';
   const held = Object.fromEntries(Object.entries(files).map(([name, text]) => [`${dir}/${name}.md`, text]));
   const port = { list: async folder => Object.keys(held).filter(f => f.startsWith(`${folder}/`)).map(f => f.slice(folder.length + 1)), read: async f => held[f], folderExists: () => false, createFolder: async () => {}, create: async () => {}, trash: async () => {} };
   const { NoteStyleStore } = load('ai/note-style-store.ts');
@@ -1805,22 +1828,20 @@ integrationTest('map action: one default note style sets or clears the template 
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, undefined); assert.equal(saved.toneId, undefined);
 });
-integrationTest('run-style P3: "Keep as is (…)" in the research and synthesis dialogs names the style and tone the run really uses (workspace tone, topic override, style file tone)', async () => {
-  const FILES = { 'WS/S/Blocks/Tones/Pirate.md': 'Talk like a pirate.', 'WS/S/Own.md': '---\n語氣: 簡明\n---\n## 重點\n說明\n' };
-  const port = { list: async folder => Object.keys(FILES).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes('/')).map(f => f.slice(folder.length + 1)), read: async f => FILES[f], folderExists: folder => Object.keys(FILES).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
+integrationTest('run-style P3: "Keep as is (…)" in the research and synthesis dialogs names the style and tone the run really uses (topic type voice, topic override, topic style file; the map tone and the workspace tone block are not read; was: workspace tone block, map override; grilling Q5/Q10/Q15)', async () => {
+  const FILES = { 'WS/S/Voices/Pirate.md': 'Talk like a pirate.', 'WS/S/Styles/Pirated.md': '---\nvoice: Pirate\n---\n', 'WS/S/Styles/Own.md': '---\nvoice: plain\n---\n' };
   const { NoteStyleStore } = load('ai/note-style-store.ts');
   const cases = [
-    { name: 'workspace tone only', tone: 'Pirate', style: 'Custom: Standard · Pirate', note: {}, map: {} },
-    { name: 'topic override', tone: 'Plain explanation', style: 'Plain language', note: { toneId: 'plain' }, map: {} },
-    { name: 'map override', tone: 'Plain explanation', style: 'Plain language', note: {}, map: { toneId: 'plain' } },
-    { name: 'style file with its own tone', tone: '簡明', style: 'Own', note: { detailTemplateId: 'style:Own' }, map: {}, mapOnly: { detailTemplateId: 'style:Own' } }
+    { name: 'topic type voice', tone: 'Pirate', style: 'Pirated', note: {}, map: {} },
+    { name: 'topic override', tone: 'Plain explanation', style: 'Old setting (Standard six · Plain explanation)', note: { toneId: 'plain' }, map: {} },
+    { name: 'map tone is not read', tone: 'Pirate', style: 'Pirated', note: {}, map: { toneId: 'plain' } },
+    { name: 'topic style file with its own voice', tone: 'Plain explanation', style: 'Own', note: { noteStyle: 'file:Own' }, map: {} }
   ];
   for (const row of cases) {
     const opened = [];
-    const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteToneBlock: 'file:Pirate' } });
-    h.plugin.noteStyles = new NoteStyleStore({ settings: () => h.plugin.settings, port, save: async () => {} });
-    await h.plugin.noteStyles.refresh();
-    Object.assign(h.doc, row.mapOnly ?? row.map);
+    const h = await templateHarness({ language: 'en', settings: { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Pirated' }, noteToneBlock: 'builtin:plain' } });
+    await installStyleFiles(h.plugin, FILES);
+    Object.assign(h.doc, row.map);
     await h.repo.updateNote(h.topic.path, row.note);
     const other = await h.repo.createNote('Other', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(other); await h.repo.saveMap(h.mapPath, h.doc);
     const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal: class { constructor() {} open() { opened.push(this); } close() {} }, Notice: class {} } });
@@ -1832,9 +1853,8 @@ integrationTest('run-style P3: "Keep as is (…)" in the research and synthesis 
     view.selection.replaceMulti([h.topic.id, other.id]);
     view.openSelectionSynthesis(null);
     assert.equal(opened.length, 2);
-    const mapRow = row.note.detailTemplateId ? row : { ...row, tone: row.name === 'topic override' ? 'Pirate' : row.tone, style: row.name === 'topic override' ? 'Custom: Standard · Pirate' : row.style };
-    assert.equal(opened[1].selectionFlow.fields.currentTone, mapRow.tone, `${row.name}: synthesis dialog tone (map only)`);
-    assert.equal(opened[1].selectionFlow.fields.currentStyle, mapRow.style, `${row.name}: synthesis dialog style (map only)`);
+    assert.equal(opened[1].selectionFlow.fields.currentTone, 'Pirate', `${row.name}: synthesis dialog tone (no topic: the topic type voice)`);
+    assert.equal(opened[1].selectionFlow.fields.currentStyle, 'Pirated', `${row.name}: synthesis dialog style (no topic: the topic type style)`);
   }
 });
 

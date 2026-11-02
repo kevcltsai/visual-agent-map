@@ -65,6 +65,8 @@ export interface TaskContext {
   styleSelection?: StyleSelection;
   /** Resolved writing-tone text (trusted). Absent for the default academic tone, so prompts stay unchanged. */
   toneText?: string;
+  /** AIM final document only: the format rules of the user's note style, in place of the standard Obsidian format (trusted; never serialized). */
+  aimNoteFormat?: string;
   /** Trusted flag: after the note is written, run the chart step once. Never serialized into a prompt. */
   addCharts?: boolean;
   /** internal: this request is the single count repair. */

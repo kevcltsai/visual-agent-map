@@ -1621,6 +1621,7 @@ var en = {
   "ui.detail_template_missing_0": 'The note structure "{0}" no longer exists; this topic now uses the next default.',
   "ui.note_styles_folder_name": "Note styles",
   "ui.note_style_file_missing_0": 'The note style file "{0}" is missing; this topic now uses the next default.',
+  "ui.note_style_kind_aim": "AIM conclusion note",
   "ui.note_style_kind_missing_0_1": 'The structure set for {0} topics, "{1}", was not found; this topic uses the next one in line.',
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
@@ -3977,6 +3978,7 @@ var zhCN = {
   "ui.detail_template_missing_0": "\u7B14\u8BB0\u7ED3\u6784\u201C{0}\u201D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u7ED3\u6784\u3002",
   "ui.note_styles_folder_name": "\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u3002",
+  "ui.note_style_kind_aim": "AIM \u7ED3\u8BBA\u7B14\u8BB0",
   "ui.note_style_kind_missing_0_1": "\u4E3A\u201C{0}\u201D\u8BAE\u9898\u7C7B\u578B\u6307\u5B9A\u7684\u7B14\u8BB0\u7ED3\u6784\u201C{1}\u201D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u7ED3\u6784\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
@@ -6333,6 +6335,7 @@ var zhTW = {
   "ui.detail_template_missing_0": "\u7B46\u8A18\u7D50\u69CB\u300C{0}\u300D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u7D50\u69CB\u3002",
   "ui.note_styles_folder_name": "\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u3002",
+  "ui.note_style_kind_aim": "AIM \u7D50\u8AD6\u7B46\u8A18",
   "ui.note_style_kind_missing_0_1": "\u70BA\u300C{0}\u300D\u8B70\u984C\u985E\u578B\u6307\u5B9A\u7684\u7B46\u8A18\u7D50\u69CB\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u7D50\u69CB\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
@@ -25360,14 +25363,6 @@ function resolvePreset(custom, kind, id, language2) {
   const fallbackId = kind === "tone" ? DEFAULT_TONE_ID : DEFAULT_OUTLINE_PRESET_ID;
   return { preset: found != null ? found : findPreset(custom, kind, fallbackId, language2), missing: !!id && !found };
 }
-function resolveToneText(custom, ids, language2) {
-  for (const id of ids) {
-    const found = findPreset(custom, "tone", id, language2);
-    if (!found) continue;
-    return found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0;
-  }
-  return void 0;
-}
 function uniqueId(existing, kind) {
   for (let n = 1; ; n++) {
     const id = `custom-${kind}-${n}`;
@@ -25806,7 +25801,7 @@ ${value}` : "";
     withProviderOutput(inLanguage(JSON_CONTRACT2, language2), provider, language2),
     context.toneText ? toneBlock(context.toneText, language2) : "",
     phaseGuidance(phase, language2, context.responseContract, !!context.aimContract),
-    readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
+    phase === "delivery-writing" && context.aimNoteFormat !== void 0 ? context.aimNoteFormat : readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
     context.researchMode === "local" ? inLanguage(WEB_SEARCH_OFF, language2) : context.researchMode === "research" ? inLanguage(WEB_SEARCH_ON, language2) : "",
     field(inLanguage(LABEL_TOPIC, language2), context.title),
     field(inLanguage(LABEL_SUMMARY, language2), context.summary),
@@ -40650,11 +40645,50 @@ function deduplicateAimRequest(context) {
 // experiences/aim/final-delivery.ts
 var import_node_crypto12 = require("node:crypto");
 
+// experiences/aim/aim-note-style.ts
+var AIM_MAX_SECTIONS = 12;
+var CHART_BLOCK2 = "```mermaid";
+function aimNoteStyleOf(style) {
+  var _a2, _b2;
+  if (!style || style.recipe.aimDelivery) return void 0;
+  const sections = style.template.sections;
+  if (!sections.length || sections.length > AIM_MAX_SECTIONS) return void 0;
+  const mapped = sections.map((section3) => ({
+    name: section3.name,
+    description: section3.description.trim(),
+    ...section3.count ? { count: section3.count } : {}
+  }));
+  const lean = ((_b2 = (_a2 = style.contextFields.styleSelection) == null ? void 0 : _a2.format) == null ? void 0 : _b2.id) === "lean";
+  return {
+    ref: style.recipe.ref,
+    sections: mapped,
+    ...style.toneText === void 0 ? {} : { toneText: style.toneText },
+    formatText: style.formatText,
+    charts: !lean && (style.formatText.includes(CHART_BLOCK2) || mapped.some((s) => s.description.includes(CHART_BLOCK2)))
+  };
+}
+function renderAimStructure(sections) {
+  return sections.map(
+    (section3) => [
+      `### ${section3.name}`,
+      section3.description,
+      section3.count ? `${section3.count.mode === "exact" ? "Exactly" : "At least"} ${section3.count.n} items.` : ""
+    ].filter(Boolean).join("\n")
+  ).join("\n\n");
+}
+
 // experiences/aim/steps/delivery-outline/task.md
 var task_default = "You are the final-delivery Synthesizer. Design the actual document needed to answer the original user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return the outline in aim.sections: each section has heading, purpose (what the reader can do or understand after it), searchTask (specific web search needed, or empty if already supported), evidenceIds and dependencies (supplied source IDs). Choose a suitable structure, not a fixed template. Open with a section that gives the direct answer or recommendation. Give every section a distinct purpose so no two sections cover the same advice or caveats; gather the items the user must still confirm in at most one section; use no more sections than the answer needs (usually 3 to 5). Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Earlier rounds are part of this answer: the user's earlier answers and their saved results (earlier documents and research) carry into this document, integrated with the current research. Update what the current research changes, and drop an earlier finding only when a later answer replaces it. Do not ask the user or deliver the document yet.\nSupplied evidence IDs and reports:\n{{sourceCatalog}}\n";
 
+// experiences/aim/steps/delivery-outline/note-structure.md
+var note_structure_default = "The user chose a note style for this document. Use exactly these sections, in this order, with these headings verbatim as the aim.sections headings; take each section's purpose from its description. This replaces the instruction above to choose a suitable structure and the usual 3 to 5 sections, and it replaces the earlier instruction not to impose a fixed heading template. Put the direct answer in the section whose description asks for the conclusion or judgment, else in the first section. Still map evidenceIds, dependencies and searchTask as above.\nSections:\n{{structure}}\n";
+
 // experiences/aim/steps/delivery-outline/step.ts
-var renderOutlineTask = (sourceCatalog) => renderTemplate(task_default, { sourceCatalog });
+var renderOutlineTask = (sourceCatalog, structure2) => {
+  const task = renderTemplate(task_default, { sourceCatalog });
+  return structure2 === void 0 ? task : `${task}
+${renderTemplate(note_structure_default, { structure: structure2 })}`;
+};
 
 // experiences/aim/steps/delivery-research/task.md
 var task_default2 = "You are the Researcher for the final document. Search the web to fill and verify the sections of this agreed outline: {{outline}}. Prioritize the explicit searchTasks and the concrete resources, examples, steps, or current facts required to deliver this user's requested result. Reuse supported prior findings; do not search irrelevant topics. Return a section-by-section evidence report. Use a Markdown H2 heading exactly matching each agreed section heading with a nonempty searchTask; place only that section's findings under it. Include explicit source IDs (delivery-research:<section-heading>:<number>) and direct source URLs, what each source supports, usable concrete details and unresolved gaps. Actually use available search tools; never claim a search occurred if it did not. Set aim.status to searched only when search actually ran. If tools fail or are unavailable, set aim.status to unavailable rather than replacing research with memory. Do not write the final document or ask questions.\n";
@@ -40675,13 +40709,20 @@ var additional_research_default = "Additional final-document research:\n{{resear
 // experiences/aim/steps/delivery-writing/no-mapped-source.md
 var no_mapped_source_default = "No external source is mapped to this document. Do not make source-backed claims.\n";
 
+// experiences/aim/steps/delivery-writing/note-structure.md
+var note_structure_default2 = "Section headings come from the user's note style: keep them verbatim and in order, and follow each section's description and item count. This user-chosen section structure replaces the earlier instruction not to impose a fixed heading template.\nSections:\n{{structure}}\n";
+
 // experiences/aim/steps/delivery-writing/step.ts
-var renderWritingTask = (variables5) => renderTemplate(task_default3, {
-  outline: variables5.outline,
-  knownConditions: variables5.knownConditions,
-  evidence: variables5.evidence,
-  additionalResearch: variables5.research === void 0 ? "" : renderTemplate(additional_research_default, { research: variables5.research })
-});
+var renderWritingTask = (variables5) => {
+  const task = renderTemplate(task_default3, {
+    outline: variables5.outline,
+    knownConditions: variables5.knownConditions,
+    evidence: variables5.evidence,
+    additionalResearch: variables5.research === void 0 ? "" : renderTemplate(additional_research_default, { research: variables5.research })
+  });
+  return variables5.structure === void 0 ? task : `${task}
+${renderTemplate(note_structure_default2, { structure: variables5.structure })}`;
+};
 var NO_MAPPED_SOURCE = renderTemplate(no_mapped_source_default, {});
 
 // experiences/aim/steps/delivery-acceptance/task.md
@@ -40758,8 +40799,10 @@ async function buildFinalDelivery(base, ask, options = {}) {
     title: base.title,
     rules: base.rules,
     conditions: (_a2 = options.knownConditions) != null ? _a2 : base.detail,
-    language: base.outputLanguage
+    language: base.outputLanguage,
+    ...options.noteStyle ? { noteStyle: options.noteStyle.ref } : {}
   });
+  const structure2 = options.noteStyle ? renderAimStructure(options.noteStyle.sections) : void 0;
   const savedBaseValid = ((_b2 = options.checkpoint) == null ? void 0 : _b2.baseFingerprint) === baseFingerprint || !((_c = options.checkpoint) == null ? void 0 : _c.baseFingerprint) && options.evidence === void 0;
   const savedCheckpoint = savedBaseValid ? options.checkpoint : void 0;
   const checkpoint = {
@@ -40807,6 +40850,7 @@ async function buildFinalDelivery(base, ask, options = {}) {
       ...base,
       ...writingScope,
       ...phase === "delivery-acceptance" ? { responseContract: "aim-delivery-acceptance" } : {},
+      ...phase === "delivery-writing" && options.noteStyle ? { aimNoteFormat: options.noteStyle.formatText } : {},
       ...contract ? { aimContract: contract } : {},
       ...options.timeoutMs === void 0 ? {} : { timeoutMs: options.timeoutMs },
       task: `<!-- aim-phase: ${phase} -->
@@ -40824,7 +40868,7 @@ ${task}`,
 ${source.detail}`).join("\n\n");
   const outlineResult = await stage(
     "outline",
-    () => run("delivery-outline", renderOutlineTask(sourceCatalog)),
+    () => run("delivery-outline", renderOutlineTask(sourceCatalog, structure2)),
     (result2) => {
       parseDeliveryOutline(result2.detail);
     }
@@ -40927,6 +40971,7 @@ ${research.detail}`;
           outline,
           knownConditions: (_k = options.knownConditions) != null ? _k : base.detail,
           evidence: documentEvidence,
+          ...structure2 === void 0 ? {} : { structure: structure2 },
           ...documentResearch === void 0 ? {} : { research: documentResearch }
         })
       );
@@ -42053,6 +42098,8 @@ var _AimManualFlow = class _AimManualFlow {
     __publicField(this, "onProgress");
     /** The chart step for a finished conclusion; set by the view (it checks the "Add diagrams" setting). Absent in tests. */
     __publicField(this, "addDiagrams");
+    /** The user's AIM note style for the final conclusion; set by the view, absent in tests: the AIM report. */
+    __publicField(this, "noteStyle");
   }
   emitProgress(event) {
     var _a2;
@@ -42133,8 +42180,8 @@ var _AimManualFlow = class _AimManualFlow {
   /** A conclusion note keeps its open items in a hidden marker, so the user can correct them later. */
   async concludedDetail(review, charts) {
     var _a2;
-    const { mapPath, branchId, ...request } = charts;
-    const body = this.addDiagrams ? await this.addDiagrams({
+    const { mapPath, branchId, noteStyle, ...request } = charts;
+    const body = this.addDiagrams && (noteStyle == null ? void 0 : noteStyle.charts) !== false ? await this.addDiagrams({
       ...request,
       detail: review.detail,
       // Called only when the step really runs (the setting is on), so the UI never shows a stage that is skipped.
@@ -42166,11 +42213,12 @@ ${written2.detail}` : written2.detail,
     );
   }
   /**
-   * Tone text for prose-producing AIM calls (research and final delivery). Structured Planner/review calls carry an
-   * aimContract and never get it (askAimModel drops it), so tone cannot disturb their schemas.
+   * The note style of the final conclusion (the user's AIM row), or undefined for the AIM report. Read once per
+   * workflow entry. Research calls never carry a tone; the map tone is not read here.
    */
-  toneOf(map, language2) {
-    return resolveToneText(this.repository.settings.promptPresets, [map.toneId], language2);
+  async styleOf(language2) {
+    var _a2;
+    return aimNoteStyleOf(await ((_a2 = this.noteStyle) == null ? void 0 : _a2.call(this, language2)));
   }
   /** Content language of the map as read now; never cached on the flow, so a UI language switch cannot change it. */
   languageOf(map) {
@@ -42706,6 +42754,7 @@ ${renderOpenItemsContext(openItems)}` : ""}`
         (step) => this.askAimModel({ ...step, outputLanguage: deliveryContext.outputLanguage }, model, reasoning, signal),
         {
           checkpoint,
+          ...context.noteStyle ? { noteStyle: context.noteStyle } : {},
           timeoutMs: context.timeoutMs,
           webSearch: this.limits.webSearch,
           evidence: context.deliveryEvidence,
@@ -42863,6 +42912,7 @@ ${delivery.evidence}` },
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
+    const aimStyle = await this.styleOf(language2);
     const priorAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !priorAttempt || priorAttempt.status !== "failed")
       throw new Error("A saved failed AIM attempt is required to review a diagnostic report.");
@@ -43025,7 +43075,8 @@ Branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             goalDetail: topic.detail,
             unattended: this.isUnattended(map),
             outputLanguage: language2,
-            toneText: this.toneOf(map, language2),
+            toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+            ...aimStyle ? { noteStyle: aimStyle } : {},
             conditions: branch.inputSnapshot.conditions,
             currentQuestion: parent.summary,
             currentAnswer: answerDescription,
@@ -43093,7 +43144,6 @@ ${topic.detail}
 
 Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             outputLanguage: language2,
-            ...this.toneOf(map, language2) ? { toneText: this.toneOf(map, language2) } : {},
             mode: "task",
             researchMode: this.researchMode(),
             researchDepth: "normal",
@@ -43121,7 +43171,8 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
         model,
         signal,
         mapPath,
-        branchId: branch.id
+        branchId: branch.id,
+        noteStyle: aimStyle
       }) : this.interimDetail([
         this.interimNotice(finalReview, language2),
         this.readerDetail(finalReview),
@@ -43225,6 +43276,7 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
+    const aimStyle = await this.styleOf(language2);
     const currentAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !currentAttempt || ["running", "saving"].includes(currentAttempt.status) || !["partial", "failed", "cancelled"].includes(currentAttempt.status))
       throw new Error("Only a saved partial branch without active work can be continued.");
@@ -43307,7 +43359,8 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
           goalDetail: topicNote.detail,
           unattended: this.isUnattended(map),
           outputLanguage: language2,
-          toneText: this.toneOf(map, language2),
+          toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+          ...aimStyle ? { noteStyle: aimStyle } : {},
           conditions: branch.inputSnapshot.conditions,
           currentQuestion: parent.summary,
           currentAnswer: JSON.stringify(branch.answerSnapshot),
@@ -43401,7 +43454,6 @@ ${lineage.context}
 
 Persisted answer branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
               outputLanguage: language2,
-              ...this.toneOf(map, language2) ? { toneText: this.toneOf(map, language2) } : {},
               mode: "task",
               researchMode: this.researchMode(),
               researchDepth: "normal",
@@ -43512,7 +43564,8 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             goalDetail: topicNote.detail,
             unattended: this.isUnattended(map),
             outputLanguage: language2,
-            toneText: this.toneOf(map, language2),
+            toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+            ...aimStyle ? { noteStyle: aimStyle } : {},
             conditions: branch.inputSnapshot.conditions,
             currentQuestion: parent.summary,
             currentAnswer: JSON.stringify(branch.answerSnapshot),
@@ -43568,7 +43621,8 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
         model: modelToUse,
         signal,
         mapPath,
-        branchId: branch.id
+        branchId: branch.id,
+        noteStyle: aimStyle
       }) : this.interimDetail([
         this.interimNotice(finalReview, language2),
         finalReview.decision === "research_more" ? translateNote(language2, "note.aim_research_status_partial") : translateNote(language2, "note.aim_interim_result"),
@@ -44438,6 +44492,7 @@ ${note.detail}`
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     let map = await this.repository.readMap(mapPath);
     const language2 = this.languageOf(map);
+    const aimStyle = await this.styleOf(language2);
     let branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch) throw new Error("AIM answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;
@@ -44458,7 +44513,6 @@ ${topicNote.detail}
 Branch lineage:
 ${lineageContext || "None."}`,
       outputLanguage: language2,
-      ...this.toneOf(map, language2) ? { toneText: this.toneOf(map, language2) } : {},
       mode: "task",
       researchMode: "local",
       researchDepth: "fast",
@@ -44987,7 +45041,8 @@ ${currentReports.detail}`,
           goalDetail: topicNote.detail,
           unattended: this.isUnattended(map),
           outputLanguage: language2,
-          toneText: this.toneOf(map, language2),
+          toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+          ...aimStyle ? { noteStyle: aimStyle } : {},
           conditions: branch.inputSnapshot.conditions,
           currentQuestion: parent.summary,
           currentAnswer: answerDescription,
@@ -45219,7 +45274,8 @@ ${beforeSearch.detail}`,
         model,
         signal,
         mapPath,
-        branchId
+        branchId,
+        noteStyle: aimStyle
       });
       const presentation = isPartial ? {
         title: translateNote(language2, "note.aim_needs_followup"),
@@ -46874,6 +46930,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
+    __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
     __publicField(this, "noStyleFiles");
     this.installUndoScope();
     this.aimRuns = new AimRunStore(plugin.repo);
@@ -46892,12 +46949,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     );
     this.aimManual.onProgress = (event) => this.onAimProgress(event);
     this.aimManual.addDiagrams = (request) => plugin.addAimDiagrams(request);
+    this.aimManual.noteStyle = (language2) => this.aimNoteStyle(language2);
     this.aimRecovery = new AimManualFlow(
       plugin.repo,
       this.aimRuns,
       (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, void 0, void 0, onWebSearchEvent)
     );
     this.aimRecovery.addDiagrams = (request) => plugin.addAimDiagrams(request);
+    this.aimRecovery.noteStyle = (language2) => this.aimNoteStyle(language2);
   }
   /** How many same-pair relations the latest merge dropped (0 when none). */
   droppedSamePairOfLastMerge() {
@@ -62615,6 +62674,30 @@ ${addition}` : addition });
     if (!ref || ref === topicTemplateId || !issues.missing.includes(ref) || (gate == null ? void 0 : gate.shown)) return;
     if (gate) gate.shown = true;
     new import_obsidian31.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
+  }
+  /**
+   * The note style of the AIM conclusion note (the "aim" row). A row that cannot be read, or whose structure the AIM
+   * outline cannot hold (0 or more than 12 sections), falls back to the AIM report; the user is told once per map in
+   * this view. Nothing is written.
+   */
+  async aimNoteStyle(language2) {
+    var _a2;
+    if (!this.plugin.settings) return void 0;
+    try {
+      await this.noteStyles.refresh();
+    } catch (e) {
+    }
+    const style = this.noteStyles.runStyle({ kind: "aim", outputLanguage: language2 });
+    const ref = (_a2 = this.plugin.settings.noteStyleByKind) == null ? void 0 : _a2.aim;
+    const sections = style.template.sections.length;
+    const unusable = !style.recipe.aimDelivery && (sections === 0 || sections > AIM_MAX_SECTIONS);
+    if (ref && (style.issues.missing.includes(ref) || unusable) && !this.aimStyleNoticed.has(this.path)) {
+      this.aimStyleNoticed.add(this.path);
+      new import_obsidian31.Notice(
+        t("ui.note_style_kind_missing_0_1", t("ui.note_style_kind_aim"), ref.replace(/^(?:builtin|file):/, ""))
+      );
+    }
+    return style;
   }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {

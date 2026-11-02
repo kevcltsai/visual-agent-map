@@ -119,7 +119,7 @@
   "AIM flow limits: the smoke bundle is built outside the repository and the production bundle carries no smoke marker",
   "AIM flow limits: with production limits a rejected final delivery at the budget publishes the written document with the gap stated and open",
   "AIM flow limits: with smoke limits a rejected final delivery at the budget is published as a labelled conclusion that keeps the rejection reason",
-  "AIM tone: research calls carry the map tone, structured Planner calls never do, and no tone leaves every context untouched",
+  "AIM tone: the map tone is no longer read, only the final written document carries the AIM note style tone, and no style leaves every context untouched",
   "AIM map survives a note rename, and deleting another topic folder logs no AIM reference failure",
   "AIM references follow a note moved outside Obsidian and found again by node-id reconciliation",
   "AIM topic folder renamed in the file explorer stays readable",

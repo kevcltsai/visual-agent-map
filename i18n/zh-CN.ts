@@ -1586,7 +1586,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.detail_template_missing_0": "笔记结构“{0}”已不存在，这个议题改用下一顺位的默认结构。",
   "ui.note_styles_folder_name": "笔记风格",
   "ui.note_style_file_missing_0": "找不到笔记风格文件“{0}”，这个议题改用下一顺位的默认。",
-  "ui.note_style_kind_missing_0_1": "为「{0}」议题类型指定的笔记结构「{1}」找不到，这个议题改用下一顺位的结构。",
+  "ui.note_style_kind_missing_0_1": "为“{0}”议题类型指定的笔记结构“{1}”找不到，这个议题改用下一顺位的结构。",
   "ui.note_style_file_invalid_0_1_2": "笔记风格文件“{0}”有问题（第 {1} 行）：{2}",
   "ui.note_style_open_folder_command": "打开笔记风格文件夹",
   "ui.note_style_folder_opened_0": "笔记风格文件夹：{0}",

@@ -336,7 +336,7 @@ test('kind level: the i18n Notice text exists in three languages and names the t
   const text = language => M.translate(language, 'ui.note_style_kind_missing_0_1', kindName[language], 'Nope');
   assert.equal(text('zh-TW'), '為「假設」議題類型指定的筆記結構「Nope」找不到，這個議題改用下一順位的結構。');
   assert.equal(text('en'), 'The structure set for Hypothesis topics, "Nope", was not found; this topic uses the next one in line.');
-  assert.equal(text('zh-CN'), '为「假设」议题类型指定的笔记结构「Nope」找不到，这个议题改用下一顺位的结构。');
+  assert.equal(text('zh-CN'), '为“假设”议题类型指定的笔记结构“Nope”找不到，这个议题改用下一顺位的结构。');
 });
 
 // ---- the view call sites (the real prototype methods over a small stand-in view) ----

@@ -412,9 +412,10 @@ export class NoteStyleStore {
       isFileId(id) ? id.replace(/^(?:style|file):/, "") : (uiTemplates.find(item => item.id === id)?.name ?? id);
     const chain = [request.choice?.tone, request.topic?.tone, request.map?.tone];
     // An old style file, or the alias of one, decided the tone together with the template (unless the run asks for the tone only); else the chain, then the workspace.
-    const tone: { text?: string; source?: string; free?: string } = found.toneDecided && !request.toneOnly
-      ? { text: found.toneText, source: found.toneSource, free: found.toneFree }
-      : this.plainTone(chain, language);
+    const tone: { text?: string; source?: string; free?: string } =
+      found.toneDecided && !request.toneOnly
+        ? { text: found.toneText, source: found.toneSource, free: found.toneFree }
+        : this.plainTone(chain, language);
     // Free text names no tone; it stands for itself, so the style is a custom pair.
     const toneId = tone.free ?? tone.source ?? DEFAULT_TONE_ID;
     const toneName = (id: string): string => this.toneName(id) ?? id;

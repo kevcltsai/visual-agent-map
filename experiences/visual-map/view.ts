@@ -3849,7 +3849,11 @@ export class VisualAgentMapView extends ItemView {
         model = (request.shallowResearch && request.model) || baseModel;
         // A template chosen here is recorded on each new topic: an import never changes this map's default.
         await this.noteStyles.refresh();
-        const template = this.mapStyle(settings.language, { template: request.detailTemplateId, notify: true, gate: noticeGate }).template;
+        const template = this.mapStyle(settings.language, {
+          template: request.detailTemplateId,
+          notify: true,
+          gate: noticeGate
+        }).template;
         const result = await addOutlineToMap(
           repo,
           map,
@@ -11258,8 +11262,7 @@ export class VisualAgentMapView extends ItemView {
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
           // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: templateInLanguage(this.topicStyle(note).template, this.plugin.settings.language)
-            .name,
+          currentTemplate: templateInLanguage(this.topicStyle(note).template, this.plugin.settings.language).name,
           topicStatus: note.status,
           childrenCompleted:
             this.map?.nodes.filter(item => item.parentId === node.id && this.notes.get(item.id)?.status === "completed")
@@ -13127,7 +13130,13 @@ export class VisualAgentMapView extends ItemView {
     const note = await this.plugin.repo.readNote(child.path, this.map ?? undefined);
     const outputLanguage =
       choices.outputLanguage ?? outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-    const runStyle = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId, gate, outputLanguage);
+    const runStyle = await this.detailTemplateFor(
+      child,
+      choices.detailTemplateId,
+      choices.toneId,
+      gate,
+      outputLanguage
+    );
     let started = false;
     let failure: string | undefined;
     const handle = await this.runAgent(
@@ -18412,13 +18421,7 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(
-      taskPath,
-      progressAttempt,
-      Date.now(),
-      used.model,
-      runStyle.label.fileName
-    );
+    progress?.begin(taskPath, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;

@@ -49245,7 +49245,11 @@ ${request.requirements}` : preset.text,
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
-        const template2 = this.mapStyle(settings.language, { template: request.detailTemplateId, notify: true, gate: noticeGate }).template;
+        const template2 = this.mapStyle(settings.language, {
+          template: request.detailTemplateId,
+          notify: true,
+          gate: noticeGate
+        }).template;
         const result = await addOutlineToMap(
           repo,
           map,
@@ -57850,7 +57854,13 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c;
     const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
     const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-    const runStyle = await this.detailTemplateFor(child, choices.detailTemplateId, choices.toneId, gate, outputLanguage2);
+    const runStyle = await this.detailTemplateFor(
+      child,
+      choices.detailTemplateId,
+      choices.toneId,
+      gate,
+      outputLanguage2
+    );
     let started = false;
     let failure;
     const handle = await this.runAgent(
@@ -62691,13 +62701,7 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(
-      taskPath,
-      progressAttempt,
-      Date.now(),
-      used.model,
-      runStyle.label.fileName
-    );
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;

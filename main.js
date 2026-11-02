@@ -57741,7 +57741,7 @@ ${request.requirements}` : preset.text,
     if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
@@ -57769,7 +57769,7 @@ ${request.requirements}` : preset.text,
         const savedOptions = this.plugin.pendingResearchOptions.get(parent.path);
         const researchOptions = savedOptions ? { ...savedOptions, signal: options == null ? void 0 : options.signal, onProgress: options == null ? void 0 : options.onProgress } : void 0;
         await this.plugin.mutate(async () => {
-          var _a3, _b3, _c2;
+          var _a3, _b2, _c;
           if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
@@ -57787,7 +57787,7 @@ ${request.requirements}` : preset.text,
           }
           this.plugin.pendingSuggestions.delete(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_c2 = (_b3 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c2.call(_b3));
+          await ((_c = (_b2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c.call(_b2));
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -57806,103 +57806,63 @@ ${request.requirements}` : preset.text,
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
-    const controller = new AbortController();
-    const modalSignal = options == null ? void 0 : options.signal;
-    const abortBeforeAcceptance = () => controller.abort();
-    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
-    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let accepted = false;
-    const acceptDispatch = () => {
-      if (accepted || controller.signal.aborted) return;
-      accepted = true;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      acceptedCallback == null ? void 0 : acceptedCallback();
-    };
-    const releaseTask = () => {
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
-      this.plugin.running.delete(parent.path);
-      if (!this.plugin.expansionCoordinator.isRunning(parent.path)) this.plugin.quickExpandPending.delete(parent.path);
-    };
-    this.plugin.running.add(parent.path);
-    this.plugin.quickExpandPending.add(parent.path);
-    this.plugin.activeTasks.set(parent.path, controller);
-    this.render();
     try {
-      const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
-      const used = await this.modelFor(note, parent.path, options == null ? void 0 : options.runOnce);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const outputLanguage2 = (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
-      const existing = ((_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === parent.id).map((item) => {
-        const child = this.notes.get(item.id);
-        return `- ${(child == null ? void 0 : child.title) || item.path}: ${summaryForPrompt((child == null ? void 0 : child.summary) || noSummaryYet(outputLanguage2), outputLanguage2)}`;
-      }).join("\n")) || inLanguage(NONE, outputLanguage2);
-      const task = expansionTask(outputLanguage2, existing, direction);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
-          {
-            title: note.title,
-            summary: summaryForPrompt(note.summary, outputLanguage2),
-            rules: "",
-            detail: note.detail,
-            task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(parent, outputLanguage2),
-            referenceGroups: options == null ? void 0 : options.referenceGroups,
-            outputLanguage: options == null ? void 0 : options.outputLanguage,
-            ...this.proposalTone(note, options),
-            mode: "decompose",
-            researchMode: (_d = options == null ? void 0 : options.researchMode) != null ? _d : "research",
-            researchDepth: (_e = options == null ? void 0 : options.researchDepth) != null ? _e : "normal",
-            visualMode: "off"
-          },
-          note
-        ),
-        used.model,
-        used.reasoning,
-        controller.signal,
-        void 0,
-        acceptDispatch
-      );
-      if (!accepted) acceptDispatch();
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const suggestions = result.suggestions.filter((item) => !item.parentTitle).slice(0, 7);
-      if (suggestions.length === 0) {
-        const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
-        if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
-        return;
-      }
-      const latest = await this.plugin.repo.readNote(parent.path, (_f = this.map) != null ? _f : void 0);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (latest.thinkingOrigin !== note.thinkingOrigin)
-        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-      const pendingItems = suggestions.map((item) => ({
-        ...item,
-        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
-      }));
-      this.plugin.pendingSuggestions.set(parent.path, pendingItems);
-      await ((_h = (_g = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h.call(_g));
-      if (controller.signal.aborted) {
-        this.plugin.pendingSuggestions.delete(parent.path);
-        await ((_j = (_i = this.plugin.pendingSuggestions).flush) == null ? void 0 : _j.call(_i));
-        throw new DOMException("Aborted", "AbortError");
-      }
-      if (options == null ? void 0 : options.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
-      else (_k = this.plugin.pendingResearchOptions) == null ? void 0 : _k.delete(parent.path);
-      present(pendingItems);
-    } catch (error) {
-      const partial = error instanceof PartialChildBatchError;
-      const currentBatch = this.plugin.expansionBatches.get(parent.path);
-      const stoppedBatch = currentBatch !== previousBatch && (currentBatch == null ? void 0 : currentBatch.status) === "stopped";
-      const cancelled2 = !partial && (controller.signal.aborted || stoppedBatch);
-      if (!cancelled2) {
-        console.error("Visual Agent Map AI split", error);
-        const message = this.plugin.recordFailure(t("log.ai_split_failed"), error);
-        if (failed) failed(message, !partial);
-        else new import_obsidian31.Notice(message);
-      }
+      await this.plugin.topicRuns.start(parent.path, "proposeChildren", {
+        map: (_a2 = this.map) != null ? _a2 : void 0,
+        runOnce: options == null ? void 0 : options.runOnce,
+        signal: options == null ? void 0 : options.signal,
+        outputLanguage: options == null ? void 0 : options.outputLanguage,
+        accepted: acceptedCallback,
+        failed,
+        notify: (message) => new import_obsidian31.Notice(message),
+        onStarted: () => {
+          this.plugin.quickExpandPending.add(parent.path);
+          this.render();
+        },
+        onReleased: () => {
+          if (!this.plugin.expansionCoordinator.isRunning(parent.path))
+            this.plugin.quickExpandPending.delete(parent.path);
+        },
+        buildContext: async (note, language2) => {
+          var _a3, _b2, _c;
+          const existing = ((_a3 = this.map) == null ? void 0 : _a3.nodes.filter((item) => item.parentId === parent.id).map((item) => {
+            const child = this.notes.get(item.id);
+            return `- ${(child == null ? void 0 : child.title) || item.path}: ${summaryForPrompt((child == null ? void 0 : child.summary) || noSummaryYet(language2), language2)}`;
+          }).join("\n")) || inLanguage(NONE, language2);
+          const task = expansionTask(language2, existing, direction);
+          return withThinkingOrigin(
+            {
+              title: note.title,
+              summary: summaryForPrompt(note.summary, language2),
+              rules: "",
+              detail: note.detail,
+              task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
+              ancestors: await this.ancestorContext(parent, language2),
+              referenceGroups: options == null ? void 0 : options.referenceGroups,
+              outputLanguage: options == null ? void 0 : options.outputLanguage,
+              ...this.proposalTone(note, options),
+              mode: "decompose",
+              researchMode: (_b2 = options == null ? void 0 : options.researchMode) != null ? _b2 : "research",
+              researchDepth: (_c = options == null ? void 0 : options.researchDepth) != null ? _c : "normal",
+              visualMode: "off"
+            },
+            note
+          );
+        },
+        classifyError: (error) => {
+          if (error instanceof PartialChildBatchError) return "partial";
+          const currentBatch = this.plugin.expansionBatches.get(parent.path);
+          return currentBatch !== previousBatch && (currentBatch == null ? void 0 : currentBatch.status) === "stopped" ? "stopped" : void 0;
+        },
+        onStored: () => {
+          var _a3;
+          if (options == null ? void 0 : options.shallowResearch)
+            this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
+          else (_a3 = this.plugin.pendingResearchOptions) == null ? void 0 : _a3.delete(parent.path);
+        },
+        offer: (items) => present(items)
+      });
     } finally {
-      releaseTask();
       await this.hydrate();
       this.render();
     }
@@ -68308,13 +68268,97 @@ var TopicRuns = class {
       }
     };
   }
-  /**
-   * Runs a research on one topic: reads the note, resolves model and style, registers (the topic is `running`), asks
-   * the model, then checks the note against what the run started from and writes the answer in one mutate. Resolves
-   * with null when the run did not start, otherwise with a handle whose `finished` settles when the run is over.
-   * The caller says what the run should look like; this decides when each step happens.
-   */
   async start(path, kind, options) {
+    if (kind === "proposeChildren") return this.runProposal(path, options);
+    return this.startResearch(path, kind, options);
+  }
+  async runProposal(path, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const fail2 = (message, retryable) => {
+      var _a3;
+      if (options.failed) options.failed(message, retryable);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    if (this.running.has(path)) {
+      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "proposeChildren");
+    if (!handle) return;
+    const controller = this.controllers.get(path);
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = () => controller.abort();
+    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
+    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    let accepted = false;
+    const acceptDispatch = () => {
+      var _a3;
+      if (accepted || controller.signal.aborted) return;
+      accepted = true;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
+    };
+    const activeTasks = this.ports.activeTasks();
+    activeTasks.set(path, controller);
+    (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
+    const aborted = () => new DOMException("Aborted", "AbortError");
+    try {
+      const repo = this.ports.repository();
+      const note = await repo.readNote(path, options.map);
+      const used = ((_c = options.runOnce) == null ? void 0 : _c.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
+      if (controller.signal.aborted) throw aborted();
+      const outputLanguage2 = (_d = options.outputLanguage) != null ? _d : this.ports.settings().language;
+      const result = await this.ports.askModel(
+        await options.buildContext(note, outputLanguage2),
+        used.model,
+        used.reasoning,
+        controller.signal,
+        void 0,
+        acceptDispatch
+      );
+      if (!accepted) acceptDispatch();
+      if (controller.signal.aborted) throw aborted();
+      const suggestions = result.suggestions.filter((item) => !item.parentTitle).slice(0, 7);
+      if (suggestions.length === 0) {
+        fail2(result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        return;
+      }
+      const latest = await repo.readNote(path, options.map);
+      if (controller.signal.aborted) throw aborted();
+      if (latest.thinkingOrigin !== note.thinkingOrigin)
+        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+      const pendingItems = suggestions.map((item) => ({
+        ...item,
+        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
+      }));
+      const flush = async () => {
+        var _a3, _b3;
+        await ((_b3 = (_a3 = this.pendingSuggestions).flush) == null ? void 0 : _b3.call(_a3));
+      };
+      this.pendingSuggestions.set(path, pendingItems);
+      await flush();
+      if (controller.signal.aborted) {
+        this.pendingSuggestions.delete(path);
+        await flush();
+        throw aborted();
+      }
+      (_e = options.onStored) == null ? void 0 : _e.call(options);
+      options.offer(pendingItems);
+    } catch (error) {
+      const kind = (_f = options.classifyError) == null ? void 0 : _f.call(options, error);
+      const cancelled2 = kind !== "partial" && (controller.signal.aborted || kind === "stopped");
+      if (!cancelled2) {
+        console.error("Visual Agent Map AI split", error);
+        fail2(this.ports.recordFailure(t("log.ai_split_failed"), error), kind !== "partial");
+      }
+    } finally {
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+      (_g = options.onReleased) == null ? void 0 : _g.call(options);
+    }
+  }
+  async startResearch(path, kind, options) {
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (this.disposed) return null;
     const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};

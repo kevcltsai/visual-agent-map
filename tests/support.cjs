@@ -99,7 +99,7 @@ function attachTopicRuns(plugin) {
 }
 /** Replaces the research run at the module seam (TopicRuns.start); the stub gets what view.runAgent used to get: node, done, failed, request, accepted, runOnce. */
 function researchSeam(view) {
-  return { set run(stub) { view.plugin.topicRuns.start = (path, _kind, options) => stub(view.map?.nodes.find(node => node.path === path) ?? { path }, options.done, options.failed, options.request, options.accepted, options.runOnce); } };
+  return { set run(stub) { const runs = view.plugin.topicRuns, original = runs.start.bind(runs); runs.start = (path, kind, options) => kind !== 'research' ? original(path, kind, options) : stub(view.map?.nodes.find(node => node.path === path) ?? { path }, options.done, options.failed, options.request, options.accepted, options.runOnce); } };
 }
 function withExpansionCoordinator(plugin) {
   const { ShallowExpansionCoordinator } = load('experiences/visual-map/expansion-batch.ts');

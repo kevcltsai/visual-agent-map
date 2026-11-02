@@ -12734,107 +12734,65 @@ export class VisualAgentMapView extends ItemView {
       failed?.(t("ui.ai_running_ai"));
       return;
     }
-    const controller = new AbortController();
-    const modalSignal = options?.signal;
-    const abortBeforeAcceptance = (): void => controller.abort();
-    if (modalSignal?.aborted) controller.abort();
-    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let accepted = false;
-    const acceptDispatch = (): void => {
-      if (accepted || controller.signal.aborted) return;
-      accepted = true;
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      acceptedCallback?.();
-    };
-    const releaseTask = (): void => {
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
-      this.plugin.running.delete(parent.path);
-      if (!this.plugin.expansionCoordinator.isRunning(parent.path)) this.plugin.quickExpandPending.delete(parent.path);
-    };
-    this.plugin.running.add(parent.path);
-    this.plugin.quickExpandPending.add(parent.path);
-    this.plugin.activeTasks.set(parent.path, controller);
-    this.render();
     try {
-      const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      const used = await this.modelFor(note, parent.path, options?.runOnce);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const outputLanguage = options?.outputLanguage ?? this.plugin.settings.language;
-      const existing =
-        this.map?.nodes
-          .filter(item => item.parentId === parent.id)
-          .map(item => {
-            const child = this.notes.get(item.id);
-            return `- ${child?.title || item.path}: ${summaryForPrompt(child?.summary || noSummaryYet(outputLanguage), outputLanguage)}`;
-          })
-          .join("\n") || inLanguage(NONE, outputLanguage);
-      const task = expansionTask(outputLanguage, existing, direction);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
-          {
-            title: note.title,
-            summary: summaryForPrompt(note.summary, outputLanguage),
-            rules: "",
-            detail: note.detail,
-            task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(parent, outputLanguage),
-            referenceGroups: options?.referenceGroups,
-            outputLanguage: options?.outputLanguage,
-            ...this.proposalTone(note, options),
-            mode: "decompose",
-            researchMode: options?.researchMode ?? "research",
-            researchDepth: options?.researchDepth ?? "normal",
-            visualMode: "off"
-          },
-          note
-        ),
-        used.model,
-        used.reasoning,
-        controller.signal,
-        undefined,
-        acceptDispatch
-      );
-      if (!accepted) acceptDispatch();
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const suggestions = result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
-      if (suggestions.length === 0) {
-        const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
-        if (failed) failed(message);
-        else new Notice(message);
-        return;
-      }
-      const latest = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (latest.thinkingOrigin !== note.thinkingOrigin)
-        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-      const pendingItems = suggestions.map(item => ({
-        ...item,
-        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
-      }));
-      this.plugin.pendingSuggestions.set(parent.path, pendingItems);
-      await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-      if (controller.signal.aborted) {
-        this.plugin.pendingSuggestions.delete(parent.path);
-        await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-        throw new DOMException("Aborted", "AbortError");
-      }
-      if (options?.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
-      else this.plugin.pendingResearchOptions?.delete(parent.path);
-      present(pendingItems);
-    } catch (error) {
-      const partial = error instanceof PartialChildBatchError;
-      const currentBatch = this.plugin.expansionBatches.get(parent.path);
-      const stoppedBatch = currentBatch !== previousBatch && currentBatch?.status === "stopped";
-      const cancelled = !partial && (controller.signal.aborted || stoppedBatch);
-      if (!cancelled) {
-        console.error("Visual Agent Map AI split", error);
-        const message = this.plugin.recordFailure(t("log.ai_split_failed"), error);
-        if (failed) failed(message, !partial);
-        else new Notice(message);
-      }
+      await this.plugin.topicRuns.start(parent.path, "proposeChildren", {
+        map: this.map ?? undefined,
+        runOnce: options?.runOnce,
+        signal: options?.signal,
+        outputLanguage: options?.outputLanguage,
+        accepted: acceptedCallback,
+        failed,
+        notify: message => new Notice(message),
+        onStarted: () => {
+          this.plugin.quickExpandPending.add(parent.path);
+          this.render();
+        },
+        onReleased: () => {
+          if (!this.plugin.expansionCoordinator.isRunning(parent.path))
+            this.plugin.quickExpandPending.delete(parent.path);
+        },
+        buildContext: async (note, language) => {
+          const existing =
+            this.map?.nodes
+              .filter(item => item.parentId === parent.id)
+              .map(item => {
+                const child = this.notes.get(item.id);
+                return `- ${child?.title || item.path}: ${summaryForPrompt(child?.summary || noSummaryYet(language), language)}`;
+              })
+              .join("\n") || inLanguage(NONE, language);
+          const task = expansionTask(language, existing, direction);
+          return withThinkingOrigin(
+            {
+              title: note.title,
+              summary: summaryForPrompt(note.summary, language),
+              rules: "",
+              detail: note.detail,
+              task: [task, options?.requirements].filter(Boolean).join("\n\n"),
+              ancestors: await this.ancestorContext(parent, language),
+              referenceGroups: options?.referenceGroups,
+              outputLanguage: options?.outputLanguage,
+              ...this.proposalTone(note, options),
+              mode: "decompose",
+              researchMode: options?.researchMode ?? "research",
+              researchDepth: options?.researchDepth ?? "normal",
+              visualMode: "off"
+            },
+            note
+          );
+        },
+        classifyError: error => {
+          if (error instanceof PartialChildBatchError) return "partial";
+          const currentBatch = this.plugin.expansionBatches.get(parent.path);
+          return currentBatch !== previousBatch && currentBatch?.status === "stopped" ? "stopped" : undefined;
+        },
+        onStored: () => {
+          if (options?.shallowResearch)
+            this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
+          else this.plugin.pendingResearchOptions?.delete(parent.path);
+        },
+        offer: items => present(items)
+      });
     } finally {
-      releaseTask();
       await this.hydrate();
       this.render();
     }

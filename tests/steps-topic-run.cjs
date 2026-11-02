@@ -467,3 +467,131 @@ test('research: a double click starts two runs; the first run to end frees the t
   assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.running.has('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false);
   assert.deepEqual(ends, ['first', 'second']);
 });
+
+// ---- child-topic proposal run (ticket 03) ----
+const sugg = (title, over = {}) => ({ title, task: '', contribution: '', ...over });
+function proposalRuns({ reply, ask, notes, extra } = {}) {
+  const h = researchRuns({ notes, extra: { askModel: ask ?? (async (context, model, _r, _s, _e, accepted) => { h.log.asks.push({ context, model }); accepted(); return { summary: '', detail: '', visualReferences: [], suggestions: [sugg('X'), sugg('Y')], ...reply }; }), ...extra } });
+  h.events = []; h.offered = []; h.flushOrder = [];
+  h.pending.flush = async () => { h.log.flushed++; h.events.push(['flush', h.pending.has('A.md')]); };
+  h.opts = (over = {}) => ({
+    buildContext: async (note, language) => ({ title: note.title, mode: 'decompose', outputLanguage: language }),
+    onStarted: () => h.events.push(['started', h.running.has('A.md'), h.activeTasks.has('A.md')]),
+    onReleased: () => h.events.push(['released', h.running.has('A.md'), h.activeTasks.has('A.md')]),
+    offer: items => { h.events.push(['offer', h.running.has('A.md')]); h.offered.push(items); },
+    failed: (m, retryable) => h.log.failed.push([m, retryable]), ...over
+  });
+  return h;
+}
+
+test('proposal: a normal run stores pending suggestions with the origin baseline, offers them, then frees the topic', async () => {
+  const h = proposalRuns({ notes: { 'A.md': fakeNote({ thinkingOrigin: 'o1' }) } });
+  await h.runs.start('A.md', 'proposeChildren', h.opts());
+  assert.equal(h.log.asks[0].context.mode, 'decompose'); assert.equal(h.log.asks[0].model, 'm1');
+  const stored = h.pending.get('A.md'); assert.equal(stored.length, 2); assert.ok(stored.every(item => item.thinkingOriginBaseline !== undefined));
+  assert.deepEqual(h.offered, [stored]); assert.deepEqual(h.log.failed, []);
+  assert.equal(h.running.has('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false); assert.equal(h.runs.isRunning('A.md'), false);
+});
+
+test('proposal: running clears after the offer and before the entry settles (307bcd7 order: register, ask, store, offer, release)', async () => {
+  const h = proposalRuns();
+  await h.runs.start('A.md', 'proposeChildren', h.opts());
+  assert.deepEqual(h.events, [['started', true, true], ['flush', true], ['offer', true], ['released', false, false]]);
+});
+
+test('proposal: running is set while the model works and a second click is refused with the running message', async () => {
+  let release; const gate = new Promise(r => { release = r; });
+  const h = proposalRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { suggestions: [sugg('X')] }; } });
+  const first = h.runs.start('A.md', 'proposeChildren', h.opts());
+  await settle(); assert.equal(h.running.has('A.md'), true);
+  await h.runs.start('A.md', 'proposeChildren', h.opts());
+  assert.equal(h.log.failed.length, 1); assert.deepEqual(h.offered, []);
+  assert.equal(h.running.has('A.md'), true, 'the refused click does not free the first run');
+  release(); await first; assert.equal(h.running.has('A.md'), false); assert.equal(h.offered.length, 1);
+});
+
+test('proposal: Stop (activeTasks controller, stop(), the dialog signal) discards the answer, stays silent and frees the topic', async () => {
+  const stoppers = [(h) => h.activeTasks.get('A.md').abort(), (h) => h.runs.stop('A.md')];
+  for (const stopper of stoppers) {
+    let release; const gate = new Promise(r => { release = r; });
+    const h = proposalRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { suggestions: [sugg('X')] }; } });
+    const dialog = new AbortController(); let accepted = 0;
+    const run = h.runs.start('A.md', 'proposeChildren', h.opts({ signal: dialog.signal, accepted: () => { accepted++; } }));
+    await settle(); stopper(h, dialog); release(); await run;
+    assert.deepEqual(h.log.failed, []); assert.deepEqual(h.offered, []); assert.equal(h.pending.has('A.md'), false);
+    assert.equal(h.running.has('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false); assert.equal(accepted, 1);
+  }
+});
+
+test('proposal: the dialog signal stops the run only until the AI accepted it (as in 307bcd7)', async () => {
+  for (const [acceptFirst, stopped] of [[false, true], [true, false]]) {
+    let release; const gate = new Promise(r => { release = r; });
+    const h = proposalRuns({ ask: async (_c, _m, _r, signal, _e, accepted) => { if (acceptFirst) accepted(); await gate; if (signal.aborted) throw new DOMException('Aborted', 'AbortError'); return { suggestions: [sugg('X')] }; } });
+    const dialog = new AbortController();
+    const run = h.runs.start('A.md', 'proposeChildren', h.opts({ signal: dialog.signal }));
+    await settle(); dialog.abort(); release(); await run;
+    assert.equal(h.offered.length, stopped ? 0 : 1); assert.deepEqual(h.log.failed, []); assert.equal(h.running.has('A.md'), false);
+  }
+});
+
+test('proposal: a dialog signal aborted before the start never asks the model and is not accepted', async () => {
+  const h = proposalRuns(); const dialog = new AbortController(); dialog.abort(); let accepted = 0;
+  await h.runs.start('A.md', 'proposeChildren', h.opts({ signal: dialog.signal, accepted: () => { accepted++; } }));
+  assert.equal(h.log.asks.length, 0); assert.equal(accepted, 0); assert.deepEqual(h.log.failed, []); assert.equal(h.running.has('A.md'), false);
+});
+
+test('proposal: a changed thinking origin discards the answer with the outdated message; other fields do not count', async () => {
+  for (const [change, stale] of [[{ thinkingOrigin: 'changed' }, true], [{ title: 'changed', detail: 'changed' }, false]]) {
+    let release; const gate = new Promise(r => { release = r; });
+    const h = proposalRuns({ ask: async (_c, _m, _r, _s, _e, accepted) => { accepted(); await gate; return { suggestions: [sugg('X')] }; } });
+    const run = h.runs.start('A.md', 'proposeChildren', h.opts());
+    await settle(); Object.assign(h.store.get('A.md'), change); release(); await run;
+    assert.equal(h.log.failed.length, stale ? 1 : 0); assert.equal(h.offered.length, stale ? 0 : 1); assert.equal(h.pending.has('A.md'), !stale);
+    assert.equal(h.running.has('A.md'), false);
+  }
+});
+
+test('proposal: an answer with no first-level suggestion is reported (its detail first) and nothing is stored', async () => {
+  const h = proposalRuns({ reply: { detail: 'not worth splitting', suggestions: [sugg('Z', { parentTitle: 'X' })] } });
+  await h.runs.start('A.md', 'proposeChildren', h.opts());
+  assert.deepEqual(h.log.failed, [['not worth splitting', undefined]]); assert.equal(h.pending.has('A.md'), false); assert.deepEqual(h.offered, []);
+  assert.equal(h.running.has('A.md'), false);
+});
+
+test('proposal: at most 7 first-level suggestions are kept', async () => {
+  const h = proposalRuns({ reply: { suggestions: Array.from({ length: 10 }, (_, i) => sugg(`T${i}`)) } });
+  await h.runs.start('A.md', 'proposeChildren', h.opts());
+  assert.equal(h.pending.get('A.md').length, 7);
+});
+
+test('proposal: an AI failure is reported as retryable, a partial batch as not retryable, a stopped batch stays silent', async () => {
+  for (const [kind, expectFailed, retryable] of [[undefined, true, true], ['partial', true, false], ['stopped', false]]) {
+    const h = proposalRuns({ ask: async () => { throw new Error('boom'); } });
+    await h.runs.start('A.md', 'proposeChildren', h.opts({ classifyError: () => kind }));
+    assert.equal(h.log.failed.length, expectFailed ? 1 : 0);
+    if (expectFailed) { assert.match(h.log.failed[0][0], /boom/); assert.equal(h.log.failed[0][1], retryable); }
+    assert.equal(h.running.has('A.md'), false);
+  }
+});
+
+test('proposal: a failing store (flush) reports once and frees the topic; with no failed callback notify gets the message', async () => {
+  const h = proposalRuns(); const notices = [];
+  h.pending.flush = async () => { throw new Error('disk'); };
+  await h.runs.start('A.md', 'proposeChildren', h.opts({ failed: undefined, notify: m => notices.push(m) }));
+  assert.equal(notices.length, 1); assert.match(notices[0], /disk/); assert.equal(h.running.has('A.md'), false);
+});
+
+test('proposal: a run once model is resolved through the repository; a started research of the same topic blocks the proposal', async () => {
+  const h = proposalRuns();
+  await h.runs.start('A.md', 'proposeChildren', h.opts({ runOnce: { model: 'run-once', reasoning: 'high' } }));
+  assert.equal(h.log.asks[0].model, 'run-once');
+  h.running.add('A.md');
+  await h.runs.start('A.md', 'proposeChildren', h.opts());
+  assert.equal(h.log.asks.length, 1); assert.equal(h.log.failed.length, 1);
+});
+
+test('the view proposal entry no longer touches the running set; it goes through the run module', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  const body = src.slice(src.indexOf('private async proposeChildren('), src.indexOf('private async assertSuggestionOrigin'));
+  assert.doesNotMatch(body, /running\.(add|delete)/); assert.match(body, /topicRuns\.start\(parent\.path, "proposeChildren"/);
+});

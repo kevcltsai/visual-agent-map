@@ -151,6 +151,32 @@ export interface ResearchStart {
   }) => void;
 }
 
+/** What a child-topic proposal run needs from the entry that starts it (the view). */
+export interface ProposeStart {
+  map?: MapDocument;
+  runOnce?: RunOnceModel;
+  /** The dialog's Stop signal: aborting it stops the run. */
+  signal?: AbortSignal;
+  outputLanguage?: ContentLanguage;
+  /** Builds the request from the note and the output language (the view knows the map, ancestors and tone). */
+  buildContext: (note: Note, outputLanguage: ContentLanguage) => Promise<TaskContext>;
+  /** Called once the AI accepted the request (not after Stop). */
+  accepted?: () => void;
+  /** Runs right after the topic was registered (the view marks it pending and redraws). */
+  onStarted?: () => void;
+  /** Runs once the topic was freed, before the run settles. */
+  onReleased?: () => void;
+  /** Called with the pending suggestions once they are stored; the entry shows them. */
+  offer: (items: Suggestion[]) => void;
+  failed?: (message: string, retryable?: boolean) => void;
+  /** Shows a message when `failed` is not given. */
+  notify?: (message: string) => void;
+  /** Tells a failure the entry knows: "partial" (some children were created) or "stopped" (the batch was stopped). */
+  classifyError?: (error: unknown) => "partial" | "stopped" | undefined;
+  /** Runs when the suggestions are stored, before they are offered (the view saves the research choices). */
+  onStored?: () => void;
+}
+
 export interface TopicRunHandle {
   readonly path: string;
   readonly kind: TopicRunKind;
@@ -205,7 +231,107 @@ export class TopicRuns {
    * with null when the run did not start, otherwise with a handle whose `finished` settles when the run is over.
    * The caller says what the run should look like; this decides when each step happens.
    */
-  async start(path: string, kind: "research", options: ResearchStart): Promise<AgentTaskHandle | null> {
+  start(path: string, kind: "research", options: ResearchStart): Promise<AgentTaskHandle | null>;
+  /**
+   * Proposes child topics: registers the run, asks the model, stores the suggestions that await a decision and offers
+   * them. Resolves when the run is over. Creating the topics from a suggestion stays with the entry.
+   */
+  start(path: string, kind: "proposeChildren", options: ProposeStart): Promise<void>;
+  async start(
+    path: string,
+    kind: "research" | "proposeChildren",
+    options: ResearchStart | ProposeStart
+  ): Promise<AgentTaskHandle | null | void> {
+    if (kind === "proposeChildren") return this.runProposal(path, options as ProposeStart);
+    return this.startResearch(path, kind, options as ResearchStart);
+  }
+
+  private async runProposal(path: string, options: ProposeStart): Promise<void> {
+    const fail = (message: string, retryable?: boolean): void => {
+      if (options.failed) options.failed(message, retryable);
+      else options.notify?.(message);
+    };
+    if (this.running.has(path)) {
+      options.failed?.(t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "proposeChildren");
+    if (!handle) return;
+    const controller = this.controllers.get(path)!;
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = (): void => controller.abort();
+    if (modalSignal?.aborted) controller.abort();
+    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    let accepted = false;
+    const acceptDispatch = (): void => {
+      if (accepted || controller.signal.aborted) return;
+      accepted = true;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      options.accepted?.();
+    };
+    const activeTasks = this.ports.activeTasks();
+    activeTasks.set(path, controller);
+    options.onStarted?.();
+    const aborted = (): DOMException => new DOMException("Aborted", "AbortError");
+    try {
+      const repo = this.ports.repository()!;
+      const note = await repo.readNote(path, options.map);
+      const used = options.runOnce?.model.trim()
+        ? await this.ports.resolveModel(path, options.map, options.runOnce)
+        : { model: note.model, reasoning: note.reasoning };
+      if (controller.signal.aborted) throw aborted();
+      const outputLanguage = options.outputLanguage ?? this.ports.settings().language;
+      const result = await this.ports.askModel(
+        await options.buildContext(note, outputLanguage),
+        used.model,
+        used.reasoning,
+        controller.signal,
+        undefined,
+        acceptDispatch
+      );
+      if (!accepted) acceptDispatch();
+      if (controller.signal.aborted) throw aborted();
+      const suggestions = result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
+      if (suggestions.length === 0) {
+        fail(result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        return;
+      }
+      const latest = await repo.readNote(path, options.map);
+      if (controller.signal.aborted) throw aborted();
+      if (latest.thinkingOrigin !== note.thinkingOrigin)
+        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+      const pendingItems = suggestions.map(item => ({
+        ...item,
+        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
+      }));
+      const flush = async (): Promise<void> => {
+        await (this.pendingSuggestions as { flush?: () => Promise<void> }).flush?.();
+      };
+      this.pendingSuggestions.set(path, pendingItems);
+      await flush();
+      if (controller.signal.aborted) {
+        this.pendingSuggestions.delete(path);
+        await flush();
+        throw aborted();
+      }
+      options.onStored?.();
+      options.offer(pendingItems);
+    } catch (error) {
+      const kind = options.classifyError?.(error);
+      const cancelled = kind !== "partial" && (controller.signal.aborted || kind === "stopped");
+      if (!cancelled) {
+        console.error("Visual Agent Map AI split", error);
+        fail(this.ports.recordFailure(t("log.ai_split_failed"), error), kind !== "partial");
+      }
+    } finally {
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+      options.onReleased?.();
+    }
+  }
+
+  private async startResearch(path: string, kind: "research", options: ResearchStart): Promise<AgentTaskHandle | null> {
     if (this.disposed) return null;
     const { runStyle: givenStyle, ...overrides } = options.request ?? {};
     const settings = (): ReturnType<TopicRunPorts["settings"]> => this.ports.settings();

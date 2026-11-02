@@ -41,10 +41,11 @@ HEADINGS.hypothesis['zh-CN'] = HEADINGS.hypothesis['zh-TW'];
 HEADINGS.evidence['zh-CN'] = HEADINGS.evidence['zh-TW'];
 HEADINGS.action['zh-CN'] = HEADINGS.action['zh-TW'];
 HEADINGS.atomic['zh-CN'] = HEADINGS.atomic['zh-TW'];
+// The names are the design's part names (decisions: a part is named for what it holds, not "... structure").
 const NAMES = {
-  'zh-TW': { hypothesis: '假設結構', evidence: '證據結構', action: '行動結構', atomic: '原子知識結構' },
-  'zh-CN': { hypothesis: '假设结构', evidence: '证据结构', action: '行动结构', atomic: '原子知识结构' },
-  en: { hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure', atomic: 'Atomic note structure' }
+  'zh-TW': { hypothesis: '主張到判斷', evidence: '內容與可信度', action: '目標到完成', atomic: '定義解釋例子' },
+  'zh-CN': { hypothesis: '主张到判断', evidence: '内容与可信度', action: '目标到完成', atomic: '定义解释例子' },
+  en: { hypothesis: 'Claim to verdict', evidence: 'Content & credibility', action: 'Goal to done', atomic: 'Definition & example' }
 };
 const IDS = Object.keys(HEADINGS);
 const FOLDER = { 'zh-TW': ['積木', '結構'], en: ['Blocks', 'Templates'] };
@@ -82,7 +83,7 @@ function promptOf(style, language) {
 
 test('kinds: the four kind templates are registered after Textbook, with names in three languages', () => {
   const templates = M.BUILTIN_BLOCKS.filter(block => block.category === 'template');
-  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic');
+  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion');
   for (const id of IDS) for (const language of LANGUAGES) {
     const block = templates.find(item => item.id === id);
     assert.equal(M.translate(language, block.nameKey), NAMES[language][id], `${id} ${language}`);
@@ -118,11 +119,13 @@ test('kinds: the source and log sentences are the Standard ones word for word; z
   for (const id of IDS) assert.equal(M.builtinTemplateText(id, 'zh-CN').split('\n# ')[0], M.builtinTemplateText(id, 'zh-TW').split('\n# ')[0], id);
 });
 
-test('kinds: builtinTemplateText has the sections, then the format rules heading, then the Obsidian format rules', () => {
+test('kinds: builtinTemplateText is the sections only; the format rules are a part of their own (Q1)', () => {
   for (const id of IDS) for (const language of LANGUAGES) {
-    const zones = M.splitTemplateZones(M.builtinTemplateText(id, language));
-    assert.equal(zones.separatorLines.length, 1, `${id} ${language}`);
-    assert.equal(zones.format, M.inLanguage(M.OBSIDIAN_FORMAT, language).trim(), `${id} ${language}`);
+    const text = M.builtinTemplateText(id, language);
+    const zones = M.splitTemplateZones(text);
+    assert.equal(zones.separatorLines.length, 0, `${id} ${language}`);
+    assert.equal(zones.format, undefined, `${id} ${language}`);
+    assert.equal(text.includes(M.inLanguage(M.OBSIDIAN_FORMAT, language).trim()), false, `${id} ${language}`);
   }
 });
 
@@ -167,21 +170,22 @@ test('kinds: the hypothesis prompt goes through the custom detail structure with
 });
 
 test('kinds: an override file equal to the built-in text is the built-in; a changed one that parses is used as written', async () => {
-  const same = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action structure.md`]: M.builtinTemplateText('action', 'en') });
+  const same = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Goal to done.md`]: M.builtinTemplateText('action', 'en') });
   const got = same.store.runStyle({ outputLanguage: 'en' });
   assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS.action.en);
   assert.equal(got.contextFields.styleSelection, undefined);
-  assert.equal(got.label.templateName, 'Action structure');
-  const changed = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action structure.md`]: '## Only\nOne section.\n' });
+  assert.equal(got.label.templateName, 'Goal to done');
+  const changed = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Goal to done.md`]: '## Only\nOne section.\n' });
   const used = changed.store.runStyle({ outputLanguage: 'en' });
   assert.deepEqual(JSON.parse(JSON.stringify(names(used.template))), ['Only']);
-  assert.equal(used.contextFields.styleSelection.template.fileName, 'Action structure.md');
+  assert.equal(used.contextFields.styleSelection.template.fileName, 'Goal to done.md');
 });
 
 test('kinds: a broken override of a kind template is stood in for by the same built-in, with the issues; nothing throws', async () => {
-  const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+  // A count line that is not a number: still a problem the sections parser reports (a second format heading is not one any more, Q1).
+  const BROKEN = '## A\nCount: x\nbody\n';
   for (const id of IDS) {
-    const file = { hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure', atomic: 'Atomic note structure' }[id];
+    const file = NAMES.en[id];
     const { store, v } = await world({ noteTemplateBlock: `builtin:${id}` }, { [`${TPL}/${file}.md`]: BROKEN });
     let got;
     assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en' }); }, id);
@@ -204,7 +208,7 @@ test('kinds: the built-in names are not mistaken for the legacy ids, and Standar
   }
   const { store } = await world({});
   assert.equal(store.runStyle({ outputLanguage: 'en' }).template.id, 'standard');
-  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic']);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion']);
 });
 
 test('kinds: a user file named Evidence / Action / Hypothesis / Atomic note stays a file ("mine"), is not claimed by a built-in, and file:<name> resolves to it', async () => {
@@ -321,7 +325,8 @@ test('kind level: a missing file is reported in missing and the next level is us
 });
 
 test('kind level: a broken file gets the built-in stand-in and block issues, and does not fall to the next level', async () => {
-  const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+  // A count line that is not a number: still a problem the sections parser reports (a second format heading is not one any more, Q1).
+  const BROKEN = '## A\nCount: x\nbody\n';
   const { store } = await world({ noteTemplateByKind: { evidence: 'file:Mine' }, noteTemplateBlock: 'builtin:textbook' }, { [`${TPL}/Mine.md`]: BROKEN });
   const got = store.runStyle({ outputLanguage: 'en', topicKind: 'evidence', map: { template: 'standard' } });
   assert.equal(got.label.templateSource, 'kind');
@@ -335,7 +340,7 @@ test('kind level: interface zh-TW, output language en, kind structure builtin:hy
   const { store } = await world({ language: 'zh-TW', noteTemplateByKind: { hypothesis: 'builtin:hypothesis' } });
   const got = store.runStyle({ outputLanguage: 'en', topicKind: 'hypothesis' });
   assert.deepEqual(plainOf(names(got.template)), HEADINGS.hypothesis.en);
-  assert.equal(got.label.templateName, '假設結構');
+  assert.equal(got.label.templateName, NAMES['zh-TW'].hypothesis);
   assert.equal(got.label.templateSource, 'kind');
   const { text } = promptOf(got, 'en');
   assert.ok(text.includes(HEADINGS.hypothesis.en.map(heading => `### ${heading}`).join(', ')));

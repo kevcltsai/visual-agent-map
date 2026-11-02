@@ -17,7 +17,7 @@ export * from "./ai/note-style-file";
 export { planNoteStyleUpgrade, normalizeNoteStyleAliases, readLegacyFormatPreferences, legacyObsidianFormat } from "./ai/note-style-upgrade";
 export { normalizeTemplates } from "./ai/detail-templates";
 export { previewPrompt, sampleTaskContext, PREVIEW_STEPS } from "./core/blocks/prompt-preview";
-export { parseTemplateBlock } from "./core/blocks/template-block";
+export { parseTemplateBlock, splitTemplateZones } from "./core/blocks/template-block";
 export { inLanguage, OBSIDIAN_FORMAT } from "./core/steps/_shared/fragments";
 export { customDetailRule } from "./core/steps/task/fragments";
 export { AiTaskService } from "./core/ai-task-service";
@@ -72,10 +72,20 @@ const dirs = language => {
 const inDir = (v, folder) => Object.fromEntries(Object.entries(v.files).filter(([file]) => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/')).map(([file, text]) => [file.slice(folder.length + 1), text]));
 
 /** The style fields a run gets, as the map view builds them from runStyle (the three levels are the run's choice, the topic and the map). */
+/**
+ * Q1: the format rules are a part of their own. The store (until P2a) still hands the block as one text; the test splits it
+ * into the sections (template body) and the format rules zone (format choice), as the snapshot test's upgradedSelection does.
+ */
+function splitSelection(selection) {
+  if (!selection || selection.template.body === undefined) return selection;
+  const zones = M.splitTemplateZones(selection.template.body);
+  return { ...selection, template: { ...selection.template, body: zones.sections }, format: { id: `file:${selection.template.id}`, body: zones.format ?? '' } };
+}
 function fieldsFor(store, levels, ids, language) {
   const resolved = store.runStyle({ choice: levels[0], topic: levels[1], map: levels[2], outputLanguage: language });
   assert.equal(resolved.issues.invalid, undefined);
-  return { resolved, fields: { detailTemplate: resolved.template, ...(resolved.toneText ? { toneText: resolved.toneText } : {}), ...resolved.contextFields } };
+  const contextFields = resolved.contextFields.styleSelection ? { ...resolved.contextFields, styleSelection: splitSelection(resolved.contextFields.styleSelection) } : resolved.contextFields;
+  return { resolved, fields: { detailTemplate: resolved.template, ...(resolved.toneText ? { toneText: resolved.toneText } : {}), ...contextFields } };
 }
 const service = new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false });
 /** The five step prompts and the chart answer for one scenario. */
@@ -566,7 +576,8 @@ test('built-in style files: unchanged canonical files (v1 and v2, any language) 
     const after = world({ language }, files); await after.store.upgradeLegacy(); await after.store.refresh();
     const templates = Object.keys(inDir(after.v, dirs(language).template));
     assert.ok(templates.includes(`${summaryName}.md`), templates.join());
-    assert.ok(templates.includes(`${standardName} (2).md`), 'a built-in\'s name is not reused');
+    // The built-in structure names are now the design's names (標準六段 / Standard six), so the old file base "標準" / "Standard" is free.
+    assert.ok(templates.includes(`${standardName}.md`) && !templates.includes(`${standardName} (2).md`), 'the old file base is not a built-in name any more');
     assert.ok(after.store.listBlocks('template').filter(item => item.kind === 'builtin').every(item => !item.modified));
     assert.ok(after.settings.noteStyleAliases['pair:summary'] && after.settings.noteStyleAliases['pair:standard']);
     for (const scenario of [

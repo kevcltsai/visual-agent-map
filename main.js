@@ -1648,6 +1648,30 @@ var en = {
   "ui.note_style_issue_count_invalid": "The count is not a number.",
   "ui.note_style_issue_comment_unclosed": "A %% comment is never closed.",
   "ui.note_style_issue_format_heading_repeated": "The format rules heading appears a second time.",
+  "ui.update_mode_merge": "Merge and rewrite",
+  "ui.update_mode_top": "New on top",
+  "ui.update_mode_fresh": "Save new content only",
+  "ui.recipe_name_general": "General research",
+  "ui.recipe_name_atomic": "Atomic note",
+  "ui.recipe_name_hypothesis": "Hypothesis test",
+  "ui.recipe_name_evidence": "Evidence record",
+  "ui.recipe_name_conclusion": "Conclusion",
+  "ui.recipe_name_action": "Action plan",
+  "ui.recipe_name_aim": "AIM report",
+  "ui.recipe_name_textbook": "Textbook",
+  "ui.structure_name_standard": "Standard six",
+  "ui.structure_name_textbook": "Intro + six",
+  "ui.structure_name_atomic": "Definition & example",
+  "ui.structure_name_hypothesis": "Claim to verdict",
+  "ui.structure_name_evidence": "Content & credibility",
+  "ui.structure_name_action": "Goal to done",
+  "ui.structure_name_conclusion": "Conclusion & basis",
+  "ui.format_name_standard": "Standard format",
+  "ui.format_name_lean": "Lean format",
+  "ui.format_name_rich": "Rich format",
+  "ui.note_style_issue_format_zone_moved": "Put the format rules in a format rules file instead.",
+  "ui.note_style_issue_update_invalid": "The update mode is not merge, top or fresh; merge is used.",
+  "ui.note_style_issue_part_name_invalid": "The part name cannot be used as a file name.",
   "ui.note_style_folder_missing": "File location not found",
   "ui.note_style_folder_missing_desc_0": '"{0}" does not exist. Choose the folder again or show it in the file explorer to create it.',
   "ui.note_style_folder_choose": "Choose folder",
@@ -3974,6 +3998,30 @@ var zhCN = {
   "ui.note_style_issue_count_invalid": "\u6570\u91CF\u4E0D\u662F\u6570\u5B57\u3002",
   "ui.note_style_issue_comment_unclosed": "\u6709\u4E00\u6BB5 %% \u6CE8\u91CA\u6CA1\u6709\u7ED3\u5C3E\u3002",
   "ui.note_style_issue_format_heading_repeated": "\u201C\u683C\u5F0F\u89C4\u5219\u201D\u6807\u9898\u51FA\u73B0\u4E86\u7B2C\u4E8C\u6B21\u3002",
+  "ui.update_mode_merge": "\u6574\u5408\u6539\u5199",
+  "ui.update_mode_top": "\u65B0\u7684\u653E\u4E0A\u9762",
+  "ui.update_mode_fresh": "\u53EA\u5B58\u65B0\u5185\u5BB9",
+  "ui.recipe_name_general": "\u4E00\u822C\u7814\u7A76",
+  "ui.recipe_name_atomic": "\u539F\u5B50\u77E5\u8BC6",
+  "ui.recipe_name_hypothesis": "\u5047\u8BBE\u68C0\u9A8C",
+  "ui.recipe_name_evidence": "\u8BC1\u636E\u8BB0\u5F55",
+  "ui.recipe_name_conclusion": "\u7ED3\u8BBA",
+  "ui.recipe_name_action": "\u884C\u52A8\u8BA1\u5212",
+  "ui.recipe_name_aim": "AIM \u62A5\u544A",
+  "ui.recipe_name_textbook": "\u6559\u79D1\u4E66",
+  "ui.structure_name_standard": "\u6807\u51C6\u516D\u6BB5",
+  "ui.structure_name_textbook": "\u5BFC\u8BFB\u52A0\u516D\u6BB5",
+  "ui.structure_name_atomic": "\u5B9A\u4E49\u89E3\u91CA\u4F8B\u5B50",
+  "ui.structure_name_hypothesis": "\u4E3B\u5F20\u5230\u5224\u65AD",
+  "ui.structure_name_evidence": "\u5185\u5BB9\u4E0E\u53EF\u4FE1\u5EA6",
+  "ui.structure_name_action": "\u76EE\u6807\u5230\u5B8C\u6210",
+  "ui.structure_name_conclusion": "\u7ED3\u8BBA\u4E0E\u4F9D\u636E",
+  "ui.format_name_standard": "\u6807\u51C6\u683C\u5F0F",
+  "ui.format_name_lean": "\u7CBE\u7B80\u683C\u5F0F",
+  "ui.format_name_rich": "\u4E30\u5BCC\u683C\u5F0F",
+  "ui.note_style_issue_format_zone_moved": "\u683C\u5F0F\u89C4\u5219\u8BF7\u6539\u653E\u5230\u683C\u5F0F\u89C4\u5219\u6587\u4EF6",
+  "ui.note_style_issue_update_invalid": "\u66F4\u65B0\u65B9\u5F0F\u4E0D\u662F merge\u3001top \u6216 fresh\uFF0C\u5DF2\u6539\u7528\u6574\u5408\u6539\u5199\u3002",
+  "ui.note_style_issue_part_name_invalid": "\u8FD9\u4E2A\u90E8\u5206\u540D\u79F0\u4E0D\u80FD\u7528\u4F5C\u6587\u4EF6\u540D\u3002",
   "ui.note_style_folder_missing": "\u627E\u4E0D\u5230\u6587\u4EF6\u4F4D\u7F6E",
   "ui.note_style_folder_missing_desc_0": "\u201C{0}\u201D\u4E0D\u5B58\u5728\u3002\u8BF7\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939\uFF0C\u6216\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u663E\u793A\u5B83\u8BA9\u5B83\u91CD\u65B0\u521B\u5EFA\u3002",
   "ui.note_style_folder_choose": "\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939",
@@ -6300,6 +6348,30 @@ var zhTW = {
   "ui.note_style_issue_count_invalid": "\u6578\u91CF\u4E0D\u662F\u6578\u5B57\u3002",
   "ui.note_style_issue_comment_unclosed": "\u6709\u4E00\u6BB5 %% \u8A3B\u89E3\u6C92\u6709\u7D50\u5C3E\u3002",
   "ui.note_style_issue_format_heading_repeated": "\u300C\u683C\u5F0F\u898F\u5247\u300D\u6A19\u984C\u51FA\u73FE\u4E86\u7B2C\u4E8C\u6B21\u3002",
+  "ui.update_mode_merge": "\u6574\u5408\u6539\u5BEB",
+  "ui.update_mode_top": "\u65B0\u7684\u653E\u4E0A\u9762",
+  "ui.update_mode_fresh": "\u53EA\u5B58\u65B0\u5167\u5BB9",
+  "ui.recipe_name_general": "\u4E00\u822C\u7814\u7A76",
+  "ui.recipe_name_atomic": "\u539F\u5B50\u77E5\u8B58",
+  "ui.recipe_name_hypothesis": "\u5047\u8A2D\u6AA2\u9A57",
+  "ui.recipe_name_evidence": "\u8B49\u64DA\u7D00\u9304",
+  "ui.recipe_name_conclusion": "\u7D50\u8AD6",
+  "ui.recipe_name_action": "\u884C\u52D5\u8A08\u756B",
+  "ui.recipe_name_aim": "AIM \u5831\u544A",
+  "ui.recipe_name_textbook": "\u6559\u79D1\u66F8",
+  "ui.structure_name_standard": "\u6A19\u6E96\u516D\u6BB5",
+  "ui.structure_name_textbook": "\u5C0E\u8B80\u52A0\u516D\u6BB5",
+  "ui.structure_name_atomic": "\u5B9A\u7FA9\u89E3\u91CB\u4F8B\u5B50",
+  "ui.structure_name_hypothesis": "\u4E3B\u5F35\u5230\u5224\u65B7",
+  "ui.structure_name_evidence": "\u5167\u5BB9\u8207\u53EF\u4FE1\u5EA6",
+  "ui.structure_name_action": "\u76EE\u6A19\u5230\u5B8C\u6210",
+  "ui.structure_name_conclusion": "\u7D50\u8AD6\u8207\u4F9D\u64DA",
+  "ui.format_name_standard": "\u6A19\u6E96\u683C\u5F0F",
+  "ui.format_name_lean": "\u7CBE\u7C21\u683C\u5F0F",
+  "ui.format_name_rich": "\u8C50\u5BCC\u683C\u5F0F",
+  "ui.note_style_issue_format_zone_moved": "\u683C\u5F0F\u898F\u5247\u8ACB\u6539\u653E\u5230\u683C\u5F0F\u898F\u5247\u6A94",
+  "ui.note_style_issue_update_invalid": "\u66F4\u65B0\u65B9\u5F0F\u4E0D\u662F merge\u3001top \u6216 fresh\uFF0C\u5DF2\u6539\u7528\u6574\u5408\u6539\u5BEB\u3002",
+  "ui.note_style_issue_part_name_invalid": "\u9019\u500B\u90E8\u5206\u540D\u7A31\u4E0D\u80FD\u7576\u4F5C\u6A94\u540D\u3002",
   "ui.note_style_folder_missing": "\u627E\u4E0D\u5230\u6A94\u6848\u4F4D\u7F6E",
   "ui.note_style_folder_missing_desc_0": "\u300C{0}\u300D\u4E0D\u5B58\u5728\u3002\u8ACB\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E\uFF0C\u6216\u5728\u6A94\u6848\u7E3D\u7BA1\u986F\u793A\u5B83\u8B93\u5B83\u91CD\u65B0\u5EFA\u7ACB\u3002",
   "ui.note_style_folder_choose": "\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E",
@@ -25290,65 +25362,6 @@ function parseNoteStyleFile(text11, options) {
   };
 }
 
-// core/blocks/template-block.ts
-var FORMAT_HEADING_KEY = "ui.block_template_format_heading";
-function templateFormatHeading(language2) {
-  return translate(language2, FORMAT_HEADING_KEY);
-}
-var unify = (text11) => text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
-var trimBlankLines = (lines) => {
-  let start = 0;
-  let end = lines.length;
-  while (start < end && !lines[start].trim()) start++;
-  while (end > start && !lines[end - 1].trim()) end--;
-  return lines.slice(start, end).join("\n");
-};
-function splitTemplateZones(text11) {
-  const lines = unify(text11).split("\n");
-  const code = fencedLines(lines);
-  const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
-  const separatorLines = [];
-  lines.forEach((line, index) => {
-    if (code[index]) return;
-    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line);
-    if (heading && names3.has(heading[1])) separatorLines.push(index + 1);
-  });
-  if (!separatorLines.length) return { sections: lines.join("\n"), format: void 0, separatorLines };
-  const first = separatorLines[0] - 1;
-  return {
-    sections: lines.slice(0, first).join("\n"),
-    format: trimBlankLines(lines.slice(first + 1)),
-    separatorLines
-  };
-}
-function parseTemplateBlock(text11, options) {
-  var _a2;
-  const zones = splitTemplateZones(text11);
-  if (zones.separatorLines.length > 1) {
-    const line = zones.separatorLines[1];
-    return {
-      ok: false,
-      issues: [
-        {
-          line,
-          code: "format_heading_repeated",
-          values: [line],
-          message: `Line ${line}: the format rules heading appears a second time.`
-        }
-      ]
-    };
-  }
-  const parsed = parseNoteStyleFile(zones.sections, options);
-  if (!parsed.ok) return parsed;
-  const { template: template2, intro } = parsed.style;
-  return {
-    ok: true,
-    template: { ...template2, layout: "sections", intro: "" },
-    lead: intro,
-    format: (_a2 = zones.format) != null ? _a2 : ""
-  };
-}
-
 // ai/prompt-presets/plain.zh.md
 var plain_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u767D\u8A71\u8AAA\u660E\u3002\u7528\u65E5\u5E38\u7528\u8A9E\u5411\u975E\u5C08\u696D\u8B80\u8005\u89E3\u91CB\uFF0C\u53E5\u5B50\u77ED\u3001\u5C11\u7528\u8853\u8A9E\uFF1B\u5FC5\u8981\u7684\u8853\u8A9E\u7B2C\u4E00\u6B21\u51FA\u73FE\u6642\u7528\u4E00\u53E5\u8A71\u8AAA\u660E\u3002\u5148\u8B1B\u7D50\u8AD6\u8207\u91CD\u9EDE\uFF0C\u518D\u88DC\u80CC\u666F\uFF0C\u4E0D\u5806\u780C\u5C08\u6709\u540D\u8A5E\u3002\n";
 
@@ -25558,6 +25571,34 @@ var atomic_zh_CN_default = "## \u5B9A\u7FA9\n\u4E00\u53E5\u8A71\u5B9A\u7FA9\u901
 // core/blocks/template/atomic.en.md
 var atomic_en_default = "## Definition\nDefine the concept in one sentence of no more than 25 words.\n\n## Explanation\nAt most three sentences on why it holds and how it differs from nearby concepts.\n\n## Example\nOne concrete example.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
 
+// core/blocks/template/conclusion.zh-TW.md
+var conclusion_zh_TW_default = "## \u7D50\u8AD6\n\u7528\u4E00\u5230\u4E09\u53E5\u8A71\u76F4\u63A5\u5BEB\u51FA\u9019\u500B\u8B70\u984C\u4E0B\u7684\u7D50\u8AD6\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u4F9D\u64DA\n\u8B93\u9019\u500B\u7D50\u8AD6\u6210\u7ACB\u7684\u7406\u7531\u8207\u63A8\u8AD6\uFF0C\u8AAA\u660E\u6BCF\u500B\u7406\u7531\u4F9D\u8CF4\u54EA\u4E9B\u4E8B\u5BE6\u3002\n\n## \u4FE1\u5FC3\u7A0B\u5EA6\n\u9019\u500B\u7D50\u8AD6\u6709\u591A\u53EF\u9760\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\uFF0C\u4EE5\u53CA\u4FE1\u5FC3\u4F86\u81EA\u54EA\u88E1\u3001\u7F3A\u4E86\u4EC0\u9EBC\u3002\n\n## \u9069\u7528\u7BC4\u570D\u8207\u9650\u5236\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u5728\u54EA\u4E9B\u60C5\u6CC1\u4E0B\u4E0D\u9069\u7528\uFF0C\u4EE5\u53CA\u9019\u6B21\u5224\u65B7\u7684\u9650\u5236\u3002\n\n## \u5F8C\u7E8C\u884C\u52D5\n\u5982\u679C\u7D50\u8AD6\u6210\u7ACB\uFF0C\u63A5\u4E0B\u4F86\u8981\u505A\u4EC0\u9EBC\uFF1B\u5982\u679C\u8981\u63A8\u7FFB\u5B83\uFF0C\u9700\u8981\u770B\u5230\u4EC0\u9EBC\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/conclusion.zh-CN.md
+var conclusion_zh_CN_default = "## \u7D50\u8AD6\n\u7528\u4E00\u5230\u4E09\u53E5\u8A71\u76F4\u63A5\u5BEB\u51FA\u9019\u500B\u8B70\u984C\u4E0B\u7684\u7D50\u8AD6\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u4F9D\u64DA\n\u8B93\u9019\u500B\u7D50\u8AD6\u6210\u7ACB\u7684\u7406\u7531\u8207\u63A8\u8AD6\uFF0C\u8AAA\u660E\u6BCF\u500B\u7406\u7531\u4F9D\u8CF4\u54EA\u4E9B\u4E8B\u5BE6\u3002\n\n## \u4FE1\u5FC3\u7A0B\u5EA6\n\u9019\u500B\u7D50\u8AD6\u6709\u591A\u53EF\u9760\uFF08\u4F4E\uFF0F\u4E2D\uFF0F\u9AD8\uFF09\uFF0C\u4EE5\u53CA\u4FE1\u5FC3\u4F86\u81EA\u54EA\u88E1\u3001\u7F3A\u4E86\u4EC0\u9EBC\u3002\n\n## \u9069\u7528\u7BC4\u570D\u8207\u9650\u5236\n\u7D50\u8AD6\u5728\u54EA\u4E9B\u689D\u4EF6\u4E0B\u6210\u7ACB\u3001\u5728\u54EA\u4E9B\u60C5\u6CC1\u4E0B\u4E0D\u9069\u7528\uFF0C\u4EE5\u53CA\u9019\u6B21\u5224\u65B7\u7684\u9650\u5236\u3002\n\n## \u5F8C\u7E8C\u884C\u52D5\n\u5982\u679C\u7D50\u8AD6\u6210\u7ACB\uFF0C\u63A5\u4E0B\u4F86\u8981\u505A\u4EC0\u9EBC\uFF1B\u5982\u679C\u8981\u63A8\u7FFB\u5B83\uFF0C\u9700\u8981\u770B\u5230\u4EC0\u9EBC\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+
+// core/blocks/template/conclusion.en.md
+var conclusion_en_default = "## Conclusion\nState the conclusion under this topic in one to three sentences, the conclusion first and the reasons after.\n\n## Basis\nThe reasons and inferences that make the conclusion hold, and which facts each reason depends on.\n\n## Confidence\nHow reliable the conclusion is (low, medium or high), where the confidence comes from, and what is missing.\n\n## Scope and limits\nThe conditions under which the conclusion holds, the cases where it does not apply, and the limits of this judgement.\n\n## Next actions\nWhat to do next if the conclusion holds; what would have to be seen to overturn it.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+
+// core/blocks/format/lean.zh.md
+var lean_zh_default = "detail \u6703\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u672C\u683C\u5F0F\u53EA\u7528\u6A19\u984C\u3001\u689D\u5217\u8207\u8868\u683C\uFF0C\u4F9D\u5167\u5BB9\u7684\u5F62\u614B\u9078\u7528\uFF1A\n\n- \u5206\u6BB5\uFF1A\u7528\u6A19\u984C\u5206\u6BB5\uFF0C\u6BB5\u843D\u5BEB\u4E00\u822C\u6587\u5B57\u3002\n- \u4E26\u5217\u7684\u9805\u76EE\uFF1A\u7528\u689D\u5217\u3002\n- \u5169\u500B\u4EE5\u4E0A\u7684\u9078\u9805\uFF0C\u6216\u5169\u500B\u4EE5\u4E0A\u7684\u6BD4\u8F03\u7DAD\u5EA6\uFF1AMarkdown \u8868\u683C\u3002\n\n\u898F\u5247\uFF1A\n1. \u53EA\u4F7F\u7528\u6A19\u984C\u3001\u6BB5\u843D\u3001\u689D\u5217\u8207\u8868\u683C\uFF1B\u4E0D\u8981\u4F7F\u7528 callout\uFF08`> [!\u2026]`\uFF09\u3001\u4EFB\u4F55\u5716\u8868\u3001`==highlight==` \u87A2\u5149\u6A19\u8A18\u6216 `- [ ]` \u4EFB\u52D9\u6E05\u55AE\u3002\u5F62\u614B\u6C92\u6709\u5C0D\u61C9\u7684\u8A9E\u6CD5\u6642\uFF0C\u5C31\u5BEB\u4E00\u822C\u6BB5\u843D\u3002\n2. \u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF0C\u4E0D\u52A0 callout\u3002\n3. \u6709\u6307\u5B9A\u9805\u76EE\u6578\u91CF\u7684\u6BB5\u843D\uFF0C\u9805\u76EE\u8981\u5BEB\u6210\u9802\u5C64\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF0C\u4E0D\u8981\u653E\u9032 callout \u6216\u8868\u683C\u3002\n4. detail \u662F\u7D66\u8B80\u8005\u770B\u7684\u5167\u5BB9\uFF1A\u4E0D\u8981\u5BEB\u5167\u90E8 ID\uFF08\u7BC0\u9EDE\u3001\u8B49\u64DA\u3001\u4F86\u6E90\u6216\u5831\u544A\u7684 ID\uFF09\u3001\u5BE9\u67E5\u610F\u898B\uFF0C\u6216\u5C0D\u8349\u7A3F\u8207\u7814\u7A76\u904E\u7A0B\u672C\u8EAB\u7684\u8A55\u8AD6\u3002\n5. detail \u5167\u7684\u6A19\u984C\u4E00\u5F8B\u5F9E\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\u958B\u59CB\uFF0C\u5F80\u4E0B\u4F9D\u5E8F\u7528 ####\uFF0C\u4E0D\u8DF3\u7D1A\uFF1B\u4E0D\u8981\u7528 # \u6216 ##\u3002\n6. \u6578\u5B78\u5F0F\u53EA\u7528\u5728\u771F\u6B63\u7684\u516C\u5F0F\uFF1A\u884C\u5167\u7528 `$\u2026$`\uFF08\u9322\u5B57\u865F\u5167\u5074\u4E0D\u7559\u7A7A\u767D\uFF09\uFF0C\u7368\u7ACB\u4E00\u884C\u7684\u516C\u5F0F\u7528\u55AE\u7368\u6210\u884C\u7684 `$$`\uFF1B\u4E0D\u8981\u4F7F\u7528 `\\(`\u3001`\\)`\u3001`\\[`\u3001`\\]`\u3002\n7. \u4E0D\u8981\u7528 <iframe>\u3001<form>\u3001<object>\u3001<embed>\u3001<script>\u3001<style> \u8207 on\u2026 \u4E8B\u4EF6\u5C6C\u6027\uFF0C\u4E5F\u4E0D\u8981\u8F38\u51FA Obsidian \u4E0D\u652F\u63F4\u7684\u8A9E\u6CD5\uFF08\u4F8B\u5982 :::\uFF09\u3002\n";
+
+// core/blocks/format/lean.en.md
+var lean_en_default = 'The detail is rendered in Obsidian. This format uses only headings, bullet lists and tables; choose among them by the shape of the content:\n\n- Dividing the page: headings for sections, plain text for paragraphs.\n- Parallel items: a bullet list.\n- Two or more options, or two or more comparison dimensions: a Markdown table.\n\nRules:\n1. Use only headings, paragraphs, bullet lists and tables; never use callouts (`> [!\u2026]`), any diagram or chart, `==highlight==` marks or `- [ ]` task lists. When no syntax fits the content\'s shape, write a plain paragraph.\n2. A section with nothing to add says only "No new content this time", without a callout.\n3. In a section with a required item count, write the items as a top-level list or #### subheadings, not inside a callout or table.\n4. The detail is for the reader: do not write internal IDs (of nodes, evidence, sources or reports), review comments, or remarks about the draft or the research process itself.\n5. Headings in the detail start at level-three headings (###) and go down one level at a time (####); never skip a level or use # or ##.\n6. Use math only for real formulas: inline math as `$\u2026$` with no spaces just inside the dollars, display math with `$$` on its own lines; never use `\\(`, `\\)`, `\\[` or `\\]`.\n7. In all output, never use <iframe>, <form>, <object>, <embed>, <script>, <style> or on\u2026 event attributes, and do not output syntax Obsidian does not support (for example :::).\n';
+
+// core/blocks/format/rich.zh.md
+var rich_zh_default = "\u8C50\u5BCC\u683C\u5F0F\u7684\u9644\u52A0\u8981\u6C42\uFF08\u63A5\u5728\u4E0A\u9762\u7684\u6A19\u6E96\u683C\u5F0F\u4E4B\u5F8C\uFF09\uFF1A\n\n- \u6BCF\u500B ### \u6BB5\u843D\u81F3\u5C11\u4F7F\u7528\u4E00\u7A2E callout\u3001\u8868\u683C\u6216\u5716\uFF1B\u512A\u5148\u4F7F\u7528 callout\uFF0C\u4F9D\u4E0A\u9762\u7684 callout \u985E\u578B\u9078\u6700\u8CBC\u5408\u5167\u5BB9\u7684\u4E00\u7A2E\u3002\n- \u672C\u689D\u512A\u5148\u65BC\u4E0A\u9762\u898F\u5247 1 \u4E2D\u300C\u5F62\u614B\u6C92\u6709\u5C0D\u61C9\u7684\u8A9E\u6CD5\u6642\uFF0C\u5C31\u5BEB\u4E00\u822C\u6BB5\u843D\u300D\uFF1A\u5728\u8C50\u5BCC\u683C\u5F0F\u4E2D\uFF0C\u6BCF\u500B\u6709\u5167\u5BB9\u7684 ### \u6BB5\u843D\u90FD\u8981\u6709\u81F3\u5C11\u4E00\u7A2E\u4E0A\u8FF0\u8996\u89BA\u5143\u7D20\u3002\n- \u6C92\u6709\u5167\u5BB9\u3001\u53EA\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\u7684\u6BB5\u843D\uFF08\u898F\u5247 4\uFF09\u4E0D\u52A0\u4EFB\u4F55\u5143\u7D20\u3002\n- \u898F\u5247 2 \u7684\u4E0A\u9650\u7167\u820A\uFF1A\u6BCF\u500B\u6BB5\u843D\u6700\u591A\u4F7F\u7528\u5169\u7A2E\u7279\u6B8A\u8A9E\u6CD5\u3002\n- \u898F\u5247 3\u30015\u300110 \u7167\u820A\uFF0C\u5716\u8207 HTML \u7684\u5B89\u5168\u898F\u5247\u4E00\u9AD4\u9069\u7528\uFF1A\u5716\u53EA\u5728\u5167\u5BB9\u6709\u5C0D\u61C9\u5F62\u72C0\uFF0C\u4E14\u5E36\u6578\u503C\u7684\u5716\u6709\u4F86\u6E90\u6578\u5B57\u6642\u624D\u756B\u3002\n";
+
+// core/blocks/format/rich.en.md
+var rich_en_default = `Additional requirements of the rich format (they follow the standard format above):
+
+- Every ### section uses at least one callout, table or diagram; prefer a callout, and choose the callout type above that fits the content best.
+- This line takes precedence over rule 1 above, "when no syntax fits the content's shape, write a plain paragraph": in the rich format, every ### section that has content carries at least one of these visual elements.
+- A section with nothing to add that says only "No new content this time" (rule 4) gets no element.
+- The cap in rule 2 stays: at most two kinds of special syntax per section.
+- Rules 3, 5 and 10 stay as they are, so the diagram and HTML safety rules apply as one: draw a diagram only when the content has a matching shape, and a chart with numbers only when the sources hold the numbers.
+`;
+
 // core/blocks/builtin.ts
 var strip2 = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
 var tone = (id, nameKey) => ({
@@ -25582,26 +25623,21 @@ var template = (id, nameKey, files) => {
     id,
     nameKey,
     body: (language2) => strip2(fileFor(table, language2)),
-    sections: (language2) => strip2(fileFor(table, language2)),
-    format: (language2) => inLanguage(OBSIDIAN_FORMAT, language2)
+    sections: (language2) => strip2(fileFor(table, language2))
   };
 };
 function builtinTemplateText(id, language2) {
-  var _a2, _b2;
-  const block = findBuiltinBlock("template", id);
-  return `${(_a2 = block.sections) == null ? void 0 : _a2.call(block, language2)}
-
-# ${templateFormatHeading(noteLanguageOf(language2))}
-
-${(_b2 = block.format) == null ? void 0 : _b2.call(block, language2)}`;
+  var _a2, _b2, _c;
+  return (_c = (_b2 = (_a2 = findBuiltinBlock("template", id)).sections) == null ? void 0 : _b2.call(_a2, language2)) != null ? _c : "";
 }
 var BUILTIN_BLOCKS = [
-  template("standard", "ui.note_style_standard_short", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
-  template("textbook", "ui.note_style_textbook_short", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
-  template("hypothesis", "ui.note_style_hypothesis_short", [hypothesis_zh_TW_default, hypothesis_zh_CN_default, hypothesis_en_default]),
-  template("evidence", "ui.note_style_evidence_short", [evidence_zh_TW_default, evidence_zh_CN_default, evidence_en_default]),
-  template("action", "ui.note_style_action_short", [action_zh_TW_default, action_zh_CN_default, action_en_default]),
-  template("atomic", "ui.note_style_atomic_short", [atomic_zh_TW_default, atomic_zh_CN_default, atomic_en_default]),
+  template("standard", "ui.structure_name_standard", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
+  template("textbook", "ui.structure_name_textbook", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
+  template("hypothesis", "ui.structure_name_hypothesis", [hypothesis_zh_TW_default, hypothesis_zh_CN_default, hypothesis_en_default]),
+  template("evidence", "ui.structure_name_evidence", [evidence_zh_TW_default, evidence_zh_CN_default, evidence_en_default]),
+  template("action", "ui.structure_name_action", [action_zh_TW_default, action_zh_CN_default, action_en_default]),
+  template("atomic", "ui.structure_name_atomic", [atomic_zh_TW_default, atomic_zh_CN_default, atomic_en_default]),
+  template("conclusion", "ui.structure_name_conclusion", [conclusion_zh_TW_default, conclusion_zh_CN_default, conclusion_en_default]),
   tone("academic", "ui.preset_name_academic"),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine"),
@@ -25609,6 +25645,23 @@ var BUILTIN_BLOCKS = [
   tone("guide", "ui.preset_name_guide"),
   tone("auto", "ui.preset_name_auto")
 ];
+var byInstruction = (zh, en2) => (language2) => instructionLanguageOf(language2) === "zh" ? zh : en2;
+var BUILTIN_FORMATS = [
+  { id: "standard", nameKey: "ui.format_name_standard", text: (language2) => inLanguage(OBSIDIAN_FORMAT, language2) },
+  { id: "lean", nameKey: "ui.format_name_lean", text: byInstruction(lean_zh_default, lean_en_default) },
+  {
+    id: "rich",
+    nameKey: "ui.format_name_rich",
+    text: (language2) => `${inLanguage(OBSIDIAN_FORMAT, language2)}
+
+${byInstruction(rich_zh_default, rich_en_default)(language2)}`
+  }
+];
+function lookupBuiltinFormat(id, language2) {
+  const format = BUILTIN_FORMATS.find((item) => item.id === id);
+  if (!format) throw new Error(`Unknown built-in format: ${id}`);
+  return format.text(language2);
+}
 function findBuiltinBlock(category, id) {
   const block = BUILTIN_BLOCKS.find((item) => item.category === category && item.id === id);
   if (!block) throw new Error(`Unknown built-in block: ${category}/${id}`);
@@ -25623,6 +25676,55 @@ function academicToneNote(language2) {
 }
 function stripToneComments(text11) {
   return /<!--[\s\S]*?-->/.test(text11) ? text11.replace(/<!--[\s\S]*?-->/g, "").trim() : text11;
+}
+
+// core/blocks/template-block.ts
+var FORMAT_HEADING_KEY = "ui.block_template_format_heading";
+function templateFormatHeading(language2) {
+  return translate(language2, FORMAT_HEADING_KEY);
+}
+var unify = (text11) => text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+var trimBlankLines = (lines) => {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && !lines[start].trim()) start++;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return lines.slice(start, end).join("\n");
+};
+function trimFormatBody(text11) {
+  return trimBlankLines(unify(text11).split("\n"));
+}
+function splitTemplateZones(text11) {
+  const lines = unify(text11).split("\n");
+  const code = fencedLines(lines);
+  const names3 = new Set(CANONICAL_LANGUAGES.map(templateFormatHeading));
+  const separatorLines = [];
+  lines.forEach((line, index) => {
+    if (code[index]) return;
+    const heading = /^#[ \t]+(.*?)[ \t]*$/.exec(line);
+    if (heading && names3.has(heading[1])) separatorLines.push(index + 1);
+  });
+  if (!separatorLines.length) return { sections: lines.join("\n"), format: void 0, separatorLines };
+  const first = separatorLines[0] - 1;
+  return {
+    sections: lines.slice(0, first).join("\n"),
+    format: trimBlankLines(lines.slice(first + 1)),
+    separatorLines
+  };
+}
+function parseTemplateBlock(text11, options) {
+  var _a2;
+  const zones = splitTemplateZones(text11);
+  const parsed = parseNoteStyleFile(zones.sections, options);
+  if (!parsed.ok) return parsed;
+  const { template: template2, intro } = parsed.style;
+  return {
+    ok: true,
+    template: { ...template2, layout: "sections", intro: "" },
+    lead: intro,
+    notices: zones.separatorLines.length ? [{ line: zones.separatorLines[0], code: "format_zone_moved" }] : [],
+    format: (_a2 = zones.format) != null ? _a2 : ""
+  };
 }
 
 // core/steps/aim/language.zh.md
@@ -25963,7 +26065,7 @@ function templateParts(selection, context, language2, topicAnchor, options) {
         })
       });
     }
-    return { sections: structure2(today), owned, format: inLanguage(OBSIDIAN_FORMAT, language2), issues: [] };
+    return { sections: structure2(today), owned, issues: [], notices: [] };
   }
   const parsed = parseTemplateBlock(body, { id, name: id });
   if (!parsed.ok) {
@@ -25983,31 +26085,40 @@ function templateParts(selection, context, language2, topicAnchor, options) {
       topicAnchor,
       {}
     );
-    return { ...fallback, issues };
+    return { ...fallback, issues, notices: [] };
   }
   const introTemplate = legacy && ((_h = context.detailTemplate) == null ? void 0 : _h.layout) === "intro" ? context.detailTemplate : void 0;
   if (parsed.lead && !introTemplate)
     return {
       ...leadStructure(parsed.template, parsed.lead, language2, topicAnchor),
-      format: parsed.format,
-      issues: []
+      issues: [],
+      notices: parsed.notices
     };
   const template2 = introTemplate != null ? introTemplate : parsed.template.id === STANDARD_TEMPLATE_ID ? parsed.template : { ...parsed.template, id: `block-${id}` };
   return {
     sections: structure2(template2),
     owned: describedSections(template2, language2),
-    format: parsed.format,
-    issues: []
+    issues: [],
+    notices: parsed.notices
   };
+}
+function formatTextOf(selection, language2, options) {
+  var _a2, _b2, _c;
+  const choice2 = selection.format;
+  if (!choice2) return inLanguage(OBSIDIAN_FORMAT, language2);
+  const body = (_c = choice2.body) != null ? _c : (_b2 = (_a2 = options.blocks) == null ? void 0 : _a2[`format/${choice2.id}`]) == null ? void 0 : _b2.call(_a2, language2);
+  return body !== void 0 ? trimFormatBody(body) : lookupBuiltinFormat(choice2.id, language2);
 }
 var CHART_BLOCK = "```mermaid";
 function chartsWanted(selection, context, language2, options = {}) {
   const parts = templateParts(selection, context, language2, { kind: "topic", text: context.title }, options);
-  return partsAskForCharts(parts, selection);
+  return partsAskForCharts(parts, selection, formatTextOf(selection, language2, options));
 }
-function partsAskForCharts(parts, selection) {
+function partsAskForCharts(parts, selection, format) {
+  var _a2;
+  if (((_a2 = selection.format) == null ? void 0 : _a2.id) === "lean" && selection.format.body === void 0) return false;
   const sections = selection.template.adaptive ? "" : parts.sections;
-  return sections.includes(CHART_BLOCK) || parts.format.includes(CHART_BLOCK);
+  return sections.includes(CHART_BLOCK) || format.includes(CHART_BLOCK);
 }
 var fixed = (text11, id) => [text11, { kind: "fixed", id }];
 var input = (text11, id) => [text11, { kind: "input", id }];
@@ -26023,6 +26134,7 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   const none = inLanguage(NONE, language2);
   const topicAnchor = { kind: "topic", text: context.title };
   const parts = templateParts(selection, context, language2, topicAnchor, options);
+  const format = formatTextOf(selection, language2, options);
   const elements = [];
   const add = (...pieces) => elements.push(pieces);
   add(fixed(outputLanguage(language2, topicAnchor), "output-language"));
@@ -26052,7 +26164,7 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
       pieces.push([fixed(inLanguage(ADAPTIVE_DETAIL_STRUCTURE, language2), "adaptive-detail-structure")]);
     else pieces.push(sectionPieces(parts, selection.template.id));
     if (readerFacingDetail(context) && step !== "merge") {
-      const text11 = parts.format;
+      const text11 = format;
       if (text11)
         pieces.push([[text11, { kind: "block", category: "template", id: selection.template.id, part: "format" }]]);
     }
@@ -26096,9 +26208,10 @@ ${context.task}`, "task"));
   return {
     text: segments.map((segment) => segment.text).join(""),
     segments,
-    charts: partsAskForCharts(parts, selection),
+    charts: partsAskForCharts(parts, selection, format),
     // The decompose step carries no template, so a template that could not be read changes nothing there.
-    issues: step === "decompose" ? [] : parts.issues
+    issues: step === "decompose" ? [] : parts.issues,
+    notices: step === "decompose" ? [] : parts.notices
   };
 }
 function sectionPieces(parts, id) {

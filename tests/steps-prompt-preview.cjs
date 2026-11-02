@@ -18,7 +18,8 @@ export { AiTaskService } from "./core/ai-task-service";
 `);
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
 const PROVIDERS = ['codex', 'claude'];
-const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+// A count line that is not a number: the sections parser reports it (line 2). A second format rules heading is no problem any more (Q1).
+const BROKEN = '## A\nCount: x\nbody\n';
 const plain = value => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
 
 const styleCases = language => ({
@@ -88,7 +89,7 @@ test('counter 1 (preview): a broken body shows the built-in text and the reporte
     const good = M.previewPrompt('research', language, 'codex', {});
     assert.equal(bad.text, good.text);
     assert.equal(bad.issues.length, 1);
-    assert.equal(bad.issues[0].line, 5);
+    assert.equal(bad.issues[0].line, 2);
     assert.equal(bad.issues[0].fileName, 'Mine.md');
     assert.equal(good.issues.length, 0);
   }

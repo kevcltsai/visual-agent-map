@@ -12,6 +12,7 @@ export { resolveToneText } from "./ai/prompt-presets";
 export { canonicalDetail } from "./ai/result-utils";
 export { AiTaskService } from "./core/ai-task-service";
 export { builtinBlockText } from "./core/blocks/block-files";
+export { splitTemplateZones } from "./core/blocks/template-block";
 `);
 const plain = value => JSON.parse(JSON.stringify(value));
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
@@ -274,7 +275,7 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   const moved = store.runStyle(request([{ template: 'uuid-1' }]));
   assert.ok(moved.contextFields.styleSelection, 'the old template runs as its block');
   eq(moved.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
-  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard'], ['builtin', 'Textbook'], ['builtin', 'Hypothesis structure'], ['builtin', 'Evidence structure'], ['builtin', 'Action structure'], ['builtin', 'Atomic note structure'], ['file', 'My notes']]);
+  eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard six'], ['builtin', 'Intro + six'], ['builtin', 'Claim to verdict'], ['builtin', 'Content & credibility'], ['builtin', 'Goal to done'], ['builtin', 'Definition & example'], ['builtin', 'Conclusion & basis'], ['file', 'My notes']]);
 });
 
 test('D12 (was export conflicts): a user file with the name (also another case) keeps its bytes; the old template takes a unique name and its id points at it', async () => {
@@ -309,7 +310,7 @@ test('D12 (was lost mapping): a block file with the upgrade\'s own text is reuse
 
 test('D12 (was restore default): the old restoreDefault and builtinIdOfFile are gone; restoreBlock backs a changed built-in up, then trashes it, and refuses an own block', async () => {
   const { store, v } = makeStore({ noteStylesFolder: 'WS/Note styles' }, {
-    [`${TEMPLATES_DIR}/Textbook.md`]: M.builtinBlockText('template', 'textbook', 'en') + '\nA line of mine.\n',
+    [`${TEMPLATES_DIR}/Intro + six.md`]: M.builtinBlockText('template', 'textbook', 'en') + '\nA line of mine.\n',
     [`${TEMPLATES_DIR}/Mine.md`]: '## A\ntext\n'
   });
   assert.equal(store.restoreDefault, undefined);
@@ -325,7 +326,7 @@ test('D12 (was restore default): the old restoreDefault and builtinIdOfFile are 
   assert.equal(done.ok, true);
   eq(order, ['create', 'trash']);
   assert.match(v.files[done.backup], /A line of mine/);
-  eq(v.trashed.map(item => item.path), [`${TEMPLATES_DIR}/Textbook.md`]);
+  eq(v.trashed.map(item => item.path), [`${TEMPLATES_DIR}/Intro + six.md`]);
   assert.equal(v.files[`${TEMPLATES_DIR}/Mine.md`], '## A\ntext\n');
 });
 
@@ -386,10 +387,12 @@ test('diagrams off (P2: through the upgrade): the old flag is not in the context
     const off = store.runStyle(request([{ template: 'style:Own' }]));
     const fields = off.contextFields;
     eq(Object.keys(fields), ['styleSelection']);
+    // Q1: the store (until P2a) hands the block as one text; the format rules zone goes in as the selection's format part.
+    const split = selection => { const zones = M.splitTemplateZones(selection.template.body); return { ...selection, template: { ...selection.template, body: zones.sections }, format: { id: `file:${selection.template.id}`, body: zones.format ?? '' } }; };
     assert.ok(!fields.styleSelection.template.body.includes('```mermaid'));
-    assert.equal(service.chartEligible({ ...base, mode, ...fields }), false);
+    assert.equal(service.chartEligible({ ...base, mode, ...fields, styleSelection: split(fields.styleSelection) }), false);
     const on = store.runStyle(request([{ template: 'style:Free' }]));
-    assert.equal(service.chartEligible({ ...base, mode, ...on.contextFields }), true);
+    assert.equal(service.chartEligible({ ...base, mode, ...on.contextFields, styleSelection: split(on.contextFields.styleSelection) }), true);
   }
   eq(store.runStyle(request([{ template: 'standard' }])).contextFields, {});
 });

@@ -32,7 +32,8 @@ async function recordContext(name, builder, language, context, model) {
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 
 // Ticket 06 P2: the old note style switches no longer reach the prompt. A style file is turned into the block the upgrade
-// writes for it (the switches are applied to the format rules zone there) and goes in as the request's styleSelection;
+// writes for it (the switches are applied to the format rules zone there) and goes in as the request's styleSelection (the
+// sections as the template, the format rules zone as the format);
 // the snapshot files stay what they were (the old file and its switches produced exactly this prompt).
 function upgradedSelection(text, language) {
   const { planNoteStyleUpgrade } = loadModule('ai/note-style-upgrade.ts');
@@ -40,7 +41,11 @@ function upgradedSelection(text, language) {
   const plan = planNoteStyleUpgrade({ language, files: new Map([['S', text]]), detailTemplates: [], promptPresets: undefined, noteStyleFiles: undefined, blocks: { template: none, tone: none } });
   const blocks = plan.blocks.filter(block => block.category === 'template');
   assert.equal(blocks.length, 1, 'the style file upgrades into one template block');
-  return { template: { id: 'style:S', body: blocks[0].text }, tone: { id: 'academic' } };
+  // The format rules are a part of their own (Q1): the block's format rules zone goes in as the format choice, the sections
+  // zone as the template body. An input mapping only; the snapshot files and the compare mode stay as they were (decision 24).
+  const { splitTemplateZones } = loadModule('core/blocks/template-block.ts');
+  const zones = splitTemplateZones(blocks[0].text);
+  return { template: { id: 'style:S', body: zones.sections }, format: { id: 'file:S', body: zones.format ?? '' }, tone: { id: 'academic' } };
 }
 
 test('collect snapshots: AiTaskService general task prompt', async () => {

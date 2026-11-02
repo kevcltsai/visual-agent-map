@@ -125,7 +125,8 @@ test('slice 5b: before the upgrade, an old style file with "語氣: 簡明" give
   assert.equal(got.issues.invalid, undefined);
 });
 
-const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+// A count line that is not a number: the sections parser reports it. A second format rules heading is no problem any more (Q1).
+const BROKEN = '## A\nCount: x\nbody\n';
 const MINE = '## Alpha\nDescribe alpha.\n\n## Beta\nDescribe beta.\n';
 
 test('slice 6: a template block that cannot be read gives the built-in template in the output language, the block and the reasons; nothing throws or is written', async () => {
@@ -148,7 +149,7 @@ test('slice 6: a template block that cannot be read gives the built-in template 
 });
 
 test('slice 6b: a changed built-in block that cannot be read is stood in for by the same built-in id; a readable own block is used as written', async () => {
-  const changed = await world({ noteTemplateBlock: 'builtin:textbook' }, { [`${TPL}/Textbook.md`]: BROKEN });
+  const changed = await world({ noteTemplateBlock: 'builtin:textbook' }, { [`${TPL}/Intro + six.md`]: BROKEN });
   const got = changed.store.runStyle({ outputLanguage: 'en' });
   assert.equal(got.template.id, 'textbook');
   assert.equal(got.contextFields.styleSelection.template.id, 'textbook');

@@ -10,7 +10,14 @@ const { default: Plugin } = S.load('main.ts', { obsidian: S.obsidian });
 const M = loadSource(`
 export { NoteStyleStore } from "./ai/note-style-store";
 export { AiTaskService } from "./core/ai-task-service";
+export { splitTemplateZones } from "./core/blocks/template-block";
 `);
+/** Q1: the format rules are a part of their own. Until P2a the store hands a block as one text; split it into sections and format. */
+function splitSelection(selection) {
+  if (!selection || selection.template.body === undefined) return selection;
+  const zones = M.splitTemplateZones(selection.template.body);
+  return { ...selection, template: { ...selection.template, body: zones.sections }, format: { id: `file:${selection.template.id}`, body: zones.format ?? '' } };
+}
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const P1 = 'The larva stage lasts 3 days at 25°C and reaches 160–180 mm.';
 const NOTE = `${P1}\n\nThe pupa stage lasts 5 days.`;
@@ -57,7 +64,8 @@ async function run(styleId, mode) {
   await h.store.refresh();
   assert.equal((await h.store.upgradeLegacy()).status, 'done');
   await h.store.refresh();
-  const fields = h.store.runStyle({ ...(styleId ? { topic: { template: styleId } } : {}), outputLanguage: 'en' }).contextFields;
+  const resolvedFields = h.store.runStyle({ ...(styleId ? { topic: { template: styleId } } : {}), outputLanguage: 'en' }).contextFields;
+  const fields = resolvedFields.styleSelection ? { ...resolvedFields, styleSelection: splitSelection(resolvedFields.styleSelection) } : resolvedFields;
   const context = { title: 'Topic', summary: 'Sum', rules: '', detail: '', task: 'Do it', ancestors: '', sourceContext: '', mode, researchMode: 'local', researchDepth: 'fast', visualMode: 'auto', outputLanguage: 'en', addCharts: true, ...fields };
   const result = await h.service.askModel(context, 'gpt-6-luna', 'low');
   const applied = [];

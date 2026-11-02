@@ -124,8 +124,10 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
 
 test('intro: the Note style sub-page opens with a plain row (not a heading) holding the help line and a muted Preview AI instructions button that gets the focus back', () => {
   const { setting, view, log, plugin } = row();
+  view.name = t('ui.settings_note_style_intro'); // Obsidian applies the definition name before render
   renderNoteStyleIntro(setting, plugin);
   assert.notEqual(view.heading, true, 'an ordinary row, not a heading');
+  assert.equal(view.name, '', 'the sentence is in the description only, not also in the name Obsidian pre-filled');
   assert.equal(view.desc, t('ui.settings_note_style_intro'));
   assert.equal(view.desc, 'Default structure and voice for AI notes. A map or topic that sets its own wins.');
   assert.equal(view.buttons.length, 1);

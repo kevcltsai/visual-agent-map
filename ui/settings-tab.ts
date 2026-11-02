@@ -21,10 +21,19 @@ import { styleIssueText } from "../experiences/visual-map/note-style-picker";
 import type { TopicKind } from "../note-values";
 
 /**
+ * A sub-page's opening sentence as a grey description-only row. Obsidian puts the definition `name` into the row
+ * before calling render, so the name is cleared here and the sentence shows once, in the description style.
+ */
+export function renderSettingsIntro(setting: Setting, text: string): void {
+  setting.setName("");
+  setting.setDesc(text);
+}
+
+/**
  * The first row of the "Note style" page: the one-line help and the "Preview AI instructions" button on its right.
  */
 export function renderNoteStyleIntro(setting: Setting, plugin: VisualAgentMapPlugin): void {
-  setting.setDesc(t("ui.settings_note_style_intro"));
+  renderSettingsIntro(setting, t("ui.settings_note_style_intro"));
   setting.addButton(button => {
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
     button.buttonEl.addClass("mod-muted");
@@ -795,7 +804,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       displayValue: () => this.aiConnectionValue(),
       status: () => this.aiConnectionStatus(),
       items: [
-        { name: t("ui.settings_ai_connection_intro") },
+        {
+          name: t("ui.settings_ai_connection_intro"),
+          searchable: false,
+          render: setting => renderSettingsIntro(setting, t("ui.settings_ai_connection_intro"))
+        },
         this.cliGroup(
           "Codex",
           "codex",
@@ -817,7 +830,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       displayValue: () => this.noteKindValue(),
       status: () => this.noteKindStatus(),
       items: [
-        { name: t("ui.settings_by_kind_intro") },
+        {
+          name: t("ui.settings_by_kind_intro"),
+          searchable: false,
+          render: setting => renderSettingsIntro(setting, t("ui.settings_by_kind_intro"))
+        },
         ...KIND_ROWS.map(kind => ({
           name: t(`ui.topic_kind_${kind}`),
           render: (setting: Setting) => renderNoteKindSetting(setting, this.plugin, kind)
@@ -833,6 +850,7 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       items: [
         {
           name: t("ui.settings_note_style_intro"),
+          searchable: false,
           render: setting => renderNoteStyleIntro(setting, this.plugin)
         },
         {

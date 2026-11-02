@@ -458,6 +458,29 @@ test('settings page: every control and saved key is still reachable after the re
   for (const name of ['Interface language', 'Hover preview size', 'Mind Maps folder', 'AIM folder', 'Record AI exchanges', 'Add diagrams after research', 'Reconnect existing Workspace', 'Structure', 'Voice', 'File location', 'Topic']) assert.ok(names.includes(name), `${name} is on the page`);
 });
 
+test('settings page: the three sub-page intro rows render with an empty name and the sentence as the description, and stay out of search', () => {
+  const { tab, plugin } = groupedTab();
+  const intros = [["AI connection"], ["By topic type"], ["Note style"]];
+  for (const [pageName] of intros) {
+    const item = pageNamed(tab, pageName).items[0];
+    assert.equal(item.searchable, false, `${pageName} intro is not a search entry`);
+    assert.equal(typeof item.render, 'function', `${pageName} intro has a render`);
+    assert.ok(item.name, 'the definition keeps a name, as Obsidian requires');
+    const view = { name: item.name, desc: '', buttons: [] };
+    const setting = { setName(n) { view.name = n; return this; }, setDesc(d) { view.desc = d; return this; }, addButton(cb) { const b = { text: '', onClick(h) { view.click = h; return this; }, setButtonText(x) { b.text = x; return this; }, buttonEl: { addClass() {} } }; cb(b); view.buttons.push(b); return this; } };
+    item.render(setting);
+    assert.equal(view.name, '', `${pageName} intro: no name left after render`);
+    assert.equal(view.desc, item.name, `${pageName} intro: desc is the intro text`);
+  }
+  const noteItem = pageNamed(tab, 'Note style').items[0];
+  let opened = 0; plugin.openPromptPreview = () => { opened++; };
+  const v = { buttons: [] };
+  noteItem.render({ setName() { return this; }, setDesc() { return this; }, addButton(cb) { const b = { setButtonText() { return this; }, onClick(h) { v.click = h; return this; }, buttonEl: { addClass() {} } }; cb(b); v.buttons.push(b); return this; } });
+  assert.equal(v.buttons.length, 1);
+  v.click();
+  assert.equal(opened, 1, 'the Note style intro button opens the prompt preview');
+});
+
 test('AI connection entry: shows how many CLIs are connected and warns only when none is', () => {
   for (const [codex, claude, text, status] of [[true, true, '2 connected', null], [true, false, '1 connected', null], [false, true, '1 connected', null], [false, false, 'Not connected', 'warning']]) {
     const page = pageNamed(groupedTab({ codex, claude }).tab, 'AI connection');
@@ -494,5 +517,5 @@ test('By topic type entry: "Not set" with nothing saved, "N set" otherwise, warn
   const lost = pageNamed(groupedTab({ settings: { noteTemplateByKind: { action: 'file:deleted' } } }).tab, 'By topic type');
   assert.equal(valueOf(lost), '1 set');
   assert.equal(statusOf(lost), 'warning');
-  assert.equal(pageNamed(groupedTab().tab, 'By topic type').items.filter(i => i.render).length, 6, 'six topic types, in KIND_ROWS order');
+  assert.equal(pageNamed(groupedTab().tab, 'By topic type').items.filter(i => i.render && i.searchable !== false).length, 6, 'six topic types, in KIND_ROWS order');
 });

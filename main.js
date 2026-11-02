@@ -63228,8 +63228,12 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
 
 // ui/settings-tab.ts
 var import_obsidian33 = require("obsidian");
+function renderSettingsIntro(setting, text11) {
+  setting.setName("");
+  setting.setDesc(text11);
+}
 function renderNoteStyleIntro(setting, plugin) {
-  setting.setDesc(t("ui.settings_note_style_intro"));
+  renderSettingsIntro(setting, t("ui.settings_note_style_intro"));
   setting.addButton((button) => {
     button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
     button.buttonEl.addClass("mod-muted");
@@ -63828,7 +63832,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
       displayValue: () => this.aiConnectionValue(),
       status: () => this.aiConnectionStatus(),
       items: [
-        { name: t("ui.settings_ai_connection_intro") },
+        {
+          name: t("ui.settings_ai_connection_intro"),
+          searchable: false,
+          render: (setting) => renderSettingsIntro(setting, t("ui.settings_ai_connection_intro"))
+        },
         this.cliGroup(
           "Codex",
           "codex",
@@ -63850,7 +63858,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
       displayValue: () => this.noteKindValue(),
       status: () => this.noteKindStatus(),
       items: [
-        { name: t("ui.settings_by_kind_intro") },
+        {
+          name: t("ui.settings_by_kind_intro"),
+          searchable: false,
+          render: (setting) => renderSettingsIntro(setting, t("ui.settings_by_kind_intro"))
+        },
         ...KIND_ROWS.map((kind) => ({
           name: t(`ui.topic_kind_${kind}`),
           render: (setting) => renderNoteKindSetting(setting, this.plugin, kind)
@@ -63866,6 +63878,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
       items: [
         {
           name: t("ui.settings_note_style_intro"),
+          searchable: false,
           render: (setting) => renderNoteStyleIntro(setting, this.plugin)
         },
         {

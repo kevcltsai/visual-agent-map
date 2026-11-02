@@ -140,6 +140,12 @@ export interface WritebackHooks {
   readRaw?: (path: string) => Promise<string>;
 }
 
+/** The note file's text before a run changed anything, and after it marked the topic running. */
+interface RawSnapshot {
+  original: string;
+  started: string;
+}
+
 /** The job the view's chart step gets after a write-back. */
 export interface QueuedCharts {
   path: string;
@@ -656,7 +662,9 @@ export class TopicRuns {
     const outputLanguage = options.outputLanguage ?? language;
     const detailTemplate = prepared.detailTemplate;
     this.abortCharts(path);
+    let original: string | null = null;
     try {
+      original = await this.readOriginal(prepared.updateMode ?? "merge", path, options);
       await repo.updateNote(path, { status: "running" });
       await options.onStarted?.();
     } catch (error) {
@@ -686,6 +694,8 @@ export class TopicRuns {
       options.accepted?.();
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       await repo.updateNote(path, { status: note.status });
+      // The status is back; this is the file the write-time check compares with (the backup is `original`).
+      const raw = await this.snapshotRaw(original, path, options);
       const save = async (summary: string, detail: string): Promise<void> =>
         this.ports.mutate()(async () => {
           if (signal.aborted || prepared.viewChanged()) throw changed();
@@ -710,7 +720,8 @@ export class TopicRuns {
               template: detailTemplate,
               language: noteLanguage,
               signal,
-              hooks: options
+              hooks: options,
+              raw
             });
             if (!composed.ok) throw new Error(composed.message);
             written = composed.detail;
@@ -743,7 +754,8 @@ export class TopicRuns {
               template: detailTemplate,
               language: noteLanguage,
               signal,
-              hooks: options
+              hooks: options,
+              raw
             });
             if (!composed.ok) throw new Error(composed.message);
             written = composed.detail;
@@ -897,6 +909,26 @@ export class TopicRuns {
     return { updateMode: mode, preserve: charted => chartPreserves(record, charted) };
   }
 
+  /** "fresh" only: reads the whole note file before the run changes any field; null when it cannot be read. */
+  private async readOriginal(mode: WritebackMode, path: string, hooks: WritebackHooks): Promise<string | null> {
+    if (mode !== "fresh" || !hooks.readRaw) return null;
+    try {
+      return await hooks.readRaw(path);
+    } catch {
+      return null;
+    }
+  }
+
+  /** The file once the run has marked the topic running (the baseline the write-time check compares with). */
+  private async snapshotRaw(original: string | null, path: string, hooks: WritebackHooks): Promise<RawSnapshot | null> {
+    if (original === null || !hooks.readRaw) return null;
+    try {
+      return { original, started: await hooks.readRaw(path) };
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Builds the text to save for one of the three write-back ways. Runs inside the mutation queue after the stale fence.
    * `top`: pure insert, blocked when the old text would not come back. `fresh`: the whole note file is backed up first and
@@ -912,8 +944,10 @@ export class TopicRuns {
     language: NoteLanguage;
     signal: AbortSignal;
     hooks: WritebackHooks;
+    /** "fresh" only: the note file as the run found it, and as it was once the run had marked it running. */
+    raw?: RawSnapshot | null;
   }): Promise<{ ok: true; detail: string; record: WritebackRecord } | { ok: false; message: string }> {
-    const { mode, path, signal, hooks } = input;
+    const { mode, path, signal, hooks, raw } = input;
     const base = {
       mode,
       oldDetail: input.oldDetail,
@@ -929,15 +963,16 @@ export class TopicRuns {
     }
     const stopped = { ok: false as const, message: t("ui.research_stopped_existing_content_was_preserved") };
     const failed = { ok: false as const, message: t("ui.writeback_backup_failed") };
-    if (!hooks.backupNote || !hooks.readRaw) return failed;
+    if (!hooks.backupNote || !hooks.readRaw || !raw) return failed;
     if (signal.aborted) return stopped;
     try {
-      const before = await hooks.readRaw(path);
-      const backup = await hooks.backupNote(path, before);
+      // The backup is the file from before the run touched anything (status, stamp), byte for byte.
+      const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
       const composed = compose({ ...base, now: new Date(), backupPath: backup.path });
       if (!composed.ok) return failed;
-      if ((await hooks.readRaw(path)) !== before) return failed;
+      // The stale fence has shown the topic's content is unchanged; the file itself must also be as the run left it.
+      if ((await hooks.readRaw(path)) !== raw.started) return failed;
       if (signal.aborted) return stopped;
       return composed;
     } catch {
@@ -1063,10 +1098,13 @@ export class TopicRuns {
       releaseRun();
     };
     let startupStatusAttempted = false;
+    let raw: RawSnapshot | null = null;
     try {
       startupStatusAttempted = true;
+      const original = await this.readOriginal(context.updateMode ?? "merge", path, options);
       await repo.updateNote(path, { status: "running" });
       await options.onStarted?.();
+      raw = await this.snapshotRaw(original, path, options);
       if (controller.signal.aborted) {
         try {
           await repo.updateNote(path, { status: note.status });
@@ -1155,7 +1193,8 @@ export class TopicRuns {
             template: context.detailTemplate ?? standardTemplate(writeLanguage),
             language: writeLanguage,
             signal: controller.signal,
-            hooks: options
+            hooks: options,
+            raw
           });
           if (!composed.ok) {
             await repo.updateNote(path, { status: note.status });

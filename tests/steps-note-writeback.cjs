@@ -579,10 +579,13 @@ test('merge through the real run: undo restores the old Detail and the log gains
 });
 
 test('fresh through the real run: the whole note file is backed up byte for byte first, the old log lines stay, one line names the backup, undo restores (counterexamples 8, 11)', async () => {
-  // The run marks the note as running before it asks, so the file at write time (not the file before the run) is what is backed up.
+  // The backup is the file as it was before the run (status and stamp included), not the file at write time (status running).
   const w = await wiring({ kind: 'topic', reply: () => { w.atAnswer = w.raw(); return reply(`### ${names.core}\n\n全新結論 F1\n\n### ${names.log}\n\n2099-01-01　AI 的紀錄`); } });
+  const rawBefore = w.raw();
   await w.run({ runStyle: await fresh(w) });
-  const rawBefore = w.atAnswer;
+  assert.match(w.atAnswer, /^status: running$/m, 'the file at answer time is marked running');
+  assert.notEqual(w.atAnswer, rawBefore);
+  assert.match(rawBefore, /^status: completed$/m);
   const saved = await w.saved();
   const backups = backupKeys(w.files);
   assert.equal(backups.length, 1, [...w.files.keys()].join('\n'));
@@ -729,13 +732,12 @@ test('integrate children: top keeps the old text, fresh backs up and does not ca
   await top.view.history.undo().undo();
   assert.equal((await top.saved()).detail, top.before.detail, 'undo covers the integration write');
 
-  let rawBefore = '';
-  const freshRun = await wiring({ kind: 'topic', reply: () => { rawBefore = freshRun.raw(); return reply(`### ${names.core}\n\n全新整合 F2`); } });
+  const freshRun = await wiring({ kind: 'topic', reply: () => reply(`### ${names.core}\n\n全新整合 F2`) });
+  const rawBefore = freshRun.raw();
   await integrate(freshRun, 'fresh');
   assert.equal(backupKeys(freshRun.files).length, 1);
-  // An integration puts the status back before it writes, so the backup differs from the file at answer time in the status and stamp only.
-  const loose = text => stable(text).replace(/^status: .*$/m, 'status: <s>');
-  assert.equal(loose(freshRun.contents.get(backupKeys(freshRun.files)[0])), loose(rawBefore));
+  // The backup is the file from before the integration started: same status and same stamp, byte for byte.
+  assert.equal(freshRun.contents.get(backupKeys(freshRun.files)[0]), rawBefore);
   const freshSaved = await freshRun.saved();
   assert.ok(freshSaved.detail.includes('全新整合 F2') && !freshSaved.detail.includes('舊來源'), 'old links are not carried');
   assert.equal(logBody(freshSaved.detail).length, logBody(freshRun.before.detail).length + 1);

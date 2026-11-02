@@ -69863,7 +69863,7 @@ var TopicRuns = class {
     }
   }
   async integrate(path, options, signal, free) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c, _d, _e;
     const fail2 = (message) => {
       var _a3;
       if (options.failed) options.failed(message);
@@ -69895,9 +69895,11 @@ var TopicRuns = class {
     const outputLanguage2 = (_a2 = options.outputLanguage) != null ? _a2 : language2;
     const detailTemplate = prepared.detailTemplate;
     this.abortCharts(path);
+    let original = null;
     try {
+      original = await this.readOriginal((_b2 = prepared.updateMode) != null ? _b2 : "merge", path, options);
       await repo.updateNote(path, { status: "running" });
-      await ((_b2 = options.onStarted) == null ? void 0 : _b2.call(options));
+      await ((_c = options.onStarted) == null ? void 0 : _c.call(options));
     } catch (error) {
       try {
         await repo.updateNote(path, { status: note.status });
@@ -69920,9 +69922,10 @@ var TopicRuns = class {
         progress.observer
       );
       progress.end();
-      (_c = options.accepted) == null ? void 0 : _c.call(options);
+      (_d = options.accepted) == null ? void 0 : _d.call(options);
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       await repo.updateNote(path, { status: note.status });
+      const raw = await this.snapshotRaw(original, path, options);
       const save = async (summary, detail) => this.ports.mutate()(async () => {
         var _a3, _b3;
         if (signal.aborted || prepared.viewChanged()) throw changed();
@@ -69946,7 +69949,8 @@ var TopicRuns = class {
             template: detailTemplate,
             language: noteLanguage,
             signal,
-            hooks: options
+            hooks: options,
+            raw
           });
           if (!composed.ok) throw new Error(composed.message);
           written2 = composed.detail;
@@ -69970,7 +69974,8 @@ var TopicRuns = class {
             template: detailTemplate,
             language: noteLanguage,
             signal,
-            hooks: options
+            hooks: options,
+            raw
           });
           if (!composed.ok) throw new Error(composed.message);
           written2 = composed.detail;
@@ -70025,7 +70030,7 @@ var TopicRuns = class {
     } finally {
       progress.end();
       free();
-      await ((_d = options.onSettled) == null ? void 0 : _d.call(options));
+      await ((_e = options.onSettled) == null ? void 0 : _e.call(options));
     }
   }
   async runSelection(path, options) {
@@ -70115,6 +70120,24 @@ var TopicRuns = class {
   chartGuard(mode, record) {
     return { updateMode: mode, preserve: (charted) => chartPreserves(record, charted) };
   }
+  /** "fresh" only: reads the whole note file before the run changes any field; null when it cannot be read. */
+  async readOriginal(mode, path, hooks) {
+    if (mode !== "fresh" || !hooks.readRaw) return null;
+    try {
+      return await hooks.readRaw(path);
+    } catch (e) {
+      return null;
+    }
+  }
+  /** The file once the run has marked the topic running (the baseline the write-time check compares with). */
+  async snapshotRaw(original, path, hooks) {
+    if (original === null || !hooks.readRaw) return null;
+    try {
+      return { original, started: await hooks.readRaw(path) };
+    } catch (e) {
+      return null;
+    }
+  }
   /**
    * Builds the text to save for one of the three write-back ways. Runs inside the mutation queue after the stale fence.
    * `top`: pure insert, blocked when the old text would not come back. `fresh`: the whole note file is backed up first and
@@ -70122,7 +70145,7 @@ var TopicRuns = class {
    */
   async composeWrite(input2) {
     var _a2;
-    const { mode, path, signal, hooks } = input2;
+    const { mode, path, signal, hooks, raw } = input2;
     const base = {
       mode,
       oldDetail: input2.oldDetail,
@@ -70138,15 +70161,14 @@ var TopicRuns = class {
     }
     const stopped = { ok: false, message: t("ui.research_stopped_existing_content_was_preserved") };
     const failed = { ok: false, message: t("ui.writeback_backup_failed") };
-    if (!hooks.backupNote || !hooks.readRaw) return failed;
+    if (!hooks.backupNote || !hooks.readRaw || !raw) return failed;
     if (signal.aborted) return stopped;
     try {
-      const before = await hooks.readRaw(path);
-      const backup = await hooks.backupNote(path, before);
+      const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
       const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
       if (!composed.ok) return failed;
-      if (await hooks.readRaw(path) !== before) return failed;
+      if (await hooks.readRaw(path) !== raw.started) return failed;
       if (signal.aborted) return stopped;
       return composed;
     } catch (e) {
@@ -70196,7 +70218,7 @@ var TopicRuns = class {
     return { note, used, context, styleLabel: styleLabel2 };
   }
   async startResearch(path, kind, options) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     if (this.disposed) return null;
     const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
     const settings = () => this.ports.settings();
@@ -70256,10 +70278,13 @@ var TopicRuns = class {
       releaseRun();
     };
     let startupStatusAttempted = false;
+    let raw = null;
     try {
       startupStatusAttempted = true;
+      const original = await this.readOriginal((_e = context.updateMode) != null ? _e : "merge", path, options);
       await repo.updateNote(path, { status: "running" });
-      await ((_e = options.onStarted) == null ? void 0 : _e.call(options));
+      await ((_f = options.onStarted) == null ? void 0 : _f.call(options));
+      raw = await this.snapshotRaw(original, path, options);
       if (controller.signal.aborted) {
         try {
           await repo.updateNote(path, { status: note.status });
@@ -70304,7 +70329,7 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f, _g, _h, _i, _j, _k, _l, _m;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g, _h, _i, _j, _k, _l, _m;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -70330,7 +70355,8 @@ var TopicRuns = class {
           template: (_d2 = context.detailTemplate) != null ? _d2 : standardTemplate(writeLanguage),
           language: writeLanguage,
           signal: controller.signal,
-          hooks: options
+          hooks: options,
+          raw
         });
         if (!composed.ok) {
           await repo.updateNote(path, { status: note.status });
@@ -70353,7 +70379,7 @@ var TopicRuns = class {
           { detailTemplate: context.detailTemplate }
         );
         const saved = await repo.readNote(path, options.map);
-        (_f = options.onWritten) == null ? void 0 : _f.call(options, { before: { ...latest, status: note.status }, after: saved });
+        (_f2 = options.onWritten) == null ? void 0 : _f2.call(options, { before: { ...latest, status: note.status }, after: saved });
         if (exchangeId) (_g = exchanges()) == null ? void 0 : _g.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
         (_i = options.queueCharts) == null ? void 0 : _i.call(options, {

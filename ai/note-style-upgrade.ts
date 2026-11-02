@@ -11,10 +11,7 @@ import { BUILTIN_BLOCKS, type BlockCategory } from "../core/blocks/builtin";
 import { parseTemplateBlock, templateFormatHeading } from "../core/blocks/template-block";
 import { inLanguage, OBSIDIAN_FORMAT, type FragmentPair } from "../core/steps/_shared/fragments";
 import { renderTemplate } from "../core/step-runner";
-import FormatPreferencesZH from "../core/steps/_shared/format-preferences.zh.md";
-import FormatPreferencesEN from "../core/steps/_shared/format-preferences.en.md";
-import FormatPreferencesPlacedZH from "../core/steps/_shared/format-preferences-placed.zh.md";
-import FormatPreferencesPlacedEN from "../core/steps/_shared/format-preferences-placed.en.md";
+import { LEGACY_FORMAT_PREFERENCES } from "../core/steps/_shared/legacy-format-preferences";
 import {
   STANDARD_TEMPLATE_ID,
   TEXTBOOK_TEMPLATE_ID,
@@ -285,10 +282,10 @@ export interface FormatPreferences {
   /** Replacement callout type (or "off" to drop the line) for the summary / warning / question / tip lines; absent = default. */
   calloutMap?: Partial<Record<"summary" | "warning" | "question" | "tip", string>>;
 }
-const FORMAT_PREFERENCES: FragmentPair = { zh: FormatPreferencesZH, en: FormatPreferencesEN };
+const FORMAT_PREFERENCES: FragmentPair = { zh: LEGACY_FORMAT_PREFERENCES.zh, en: LEGACY_FORMAT_PREFERENCES.en };
 const FORMAT_PREFERENCES_PLACED: FragmentPair = {
-  zh: renderTemplate(FormatPreferencesPlacedZH, {}),
-  en: renderTemplate(FormatPreferencesPlacedEN, {})
+  zh: renderTemplate(LEGACY_FORMAT_PREFERENCES.placedZh, {}),
+  en: renderTemplate(LEGACY_FORMAT_PREFERENCES.placedEn, {})
 };
 const FORMAT_ITEM_NAMES = {
   zh: ["callout", "圖表（mermaid）", "表格", "待辦清單（- [ ]）", "螢光標記（==highlight==）"],

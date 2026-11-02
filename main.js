@@ -25681,6 +25681,14 @@ var format_preferences_placed_zh_default = "callout \u53EA\u7528\u5728\u98A8\u68
 // core/steps/_shared/format-preferences-placed.en.md
 var format_preferences_placed_en_default = "Use callouts only where the style places them; the foldable callout in rule 5 becomes a plain list or a #### subheading.\n";
 
+// core/steps/_shared/legacy-format-preferences.ts
+var LEGACY_FORMAT_PREFERENCES = {
+  zh: format_preferences_zh_default,
+  en: format_preferences_en_default,
+  placedZh: format_preferences_placed_zh_default,
+  placedEn: format_preferences_placed_en_default
+};
+
 // ai/note-style-upgrade.ts
 var NOTE_STYLE_UPGRADE_VERSION = 1;
 var styleAliasKey = (base) => `style:${base}`;
@@ -25815,10 +25823,10 @@ var OBSIDIAN_CALLOUT_TYPES = /* @__PURE__ */ new Set([
   "quote",
   "cite"
 ]);
-var FORMAT_PREFERENCES = { zh: format_preferences_zh_default, en: format_preferences_en_default };
+var FORMAT_PREFERENCES = { zh: LEGACY_FORMAT_PREFERENCES.zh, en: LEGACY_FORMAT_PREFERENCES.en };
 var FORMAT_PREFERENCES_PLACED = {
-  zh: renderTemplate(format_preferences_placed_zh_default, {}),
-  en: renderTemplate(format_preferences_placed_en_default, {})
+  zh: renderTemplate(LEGACY_FORMAT_PREFERENCES.placedZh, {}),
+  en: renderTemplate(LEGACY_FORMAT_PREFERENCES.placedEn, {})
 };
 var FORMAT_ITEM_NAMES = {
   zh: ["callout", "\u5716\u8868\uFF08mermaid\uFF09", "\u8868\u683C", "\u5F85\u8FA6\u6E05\u55AE\uFF08- [ ]\uFF09", "\u87A2\u5149\u6A19\u8A18\uFF08==highlight==\uFF09"],

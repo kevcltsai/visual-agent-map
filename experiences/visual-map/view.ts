@@ -5752,9 +5752,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
     this.history.push(this.mergeEntry(entry));
-    this.integrationMode = false;
-    this.selected = created.id;
-    this.multiSelected.clear();
+    this.selection.afterMerge(created.id);
     await this.finishMerge(created.id);
   }
   /**
@@ -5838,9 +5836,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
     this.history.push(this.mergeEntry(entry));
-    this.integrationMode = false;
-    this.selected = target.id;
-    this.multiSelected.clear();
+    this.selection.afterMerge(target.id);
     await this.finishMerge(target.id);
   }
   /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
@@ -5885,7 +5881,7 @@ export class VisualAgentMapView extends ItemView {
       } catch (error) {
         throw this.mergeError(error);
       }
-      if (this.selected && !this.map?.nodes.some(item => item.id === this.selected)) this.selected = null;
+      this.selection.pruneSelectedOnly(new Set((this.map?.nodes ?? []).map(item => item.id)));
     };
     return { ...entry, undo: travel(entry.undo), redo: travel(entry.redo) };
   }
@@ -13309,8 +13305,7 @@ export class VisualAgentMapView extends ItemView {
         }
         if (nodes.length < selected.length) new Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
         // The batch runs in the background: leave selection mode so the selection bar gets out of the way.
-        this.integrationMode = false;
-        this.multiSelected.clear();
+        this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared = {
           referenceGroups: [],
@@ -13453,7 +13448,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Retries `nodes` with `model` for this run only (through the batch's run-once model): no setting or frontmatter is written. */
   private async retryWithOtherProvider(nodes: MapNode[], model: string, retryBatchKey?: string): Promise<void> {
-    this.multiSelected = new Set(nodes.map(node => node.id));
+    this.selection.replaceMulti(nodes.map(node => node.id));
     await this.startMultiResearch({ requirements: "", model }, retryBatchKey);
   }
   /** Selects the failed topics and opens the multi-research dialog so the owner can pick another model. */
@@ -13462,8 +13457,7 @@ export class VisualAgentMapView extends ItemView {
     if (!batch) return;
     const failed = this.retryableFailures(batch);
     if (!failed.length) return;
-    this.multiSelected = new Set(failed.map(node => node.id));
-    this.integrationMode = true;
+    this.selection.retryFailed(failed.map(node => node.id));
     if (!this.closed) this.render();
     this.openMultiResearch(batchKey);
   }
@@ -14714,9 +14708,7 @@ export class VisualAgentMapView extends ItemView {
         if (pushed && pushed !== previousEntry) pushed.label = t("ui.confirm_new_synthesis_topic");
       }
       this.integrationTask = null;
-      this.selected = integrated.id;
-      this.multiSelected.clear();
-      this.integrationMode = false;
+      this.selection.afterSynthesis(integrated.id);
       await this.hydrate();
       this.render();
       this.focusNode(integrated);
@@ -14748,9 +14740,7 @@ export class VisualAgentMapView extends ItemView {
       } else {
         this.integrationTask = null;
         this.map = disk;
-        this.selected = integrated.id;
-        this.multiSelected.clear();
-        this.integrationMode = false;
+        this.selection.afterSynthesis(integrated.id);
         try {
           await this.plugin.rebuildDerivedData();
           await this.hydrate();
@@ -16572,9 +16562,7 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private chatSelect(ids: string[]): void {
-    this.multiSelected = new Set(ids);
-    this.selected = null;
-    this.integrationMode = true;
+    this.selection.chatSelect(ids);
     if (!this.closed) this.render();
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
@@ -17079,9 +17067,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const ids = this.map.nodes.filter(item => item.parentId === node.id).map(item => item.id);
     if (!ids.length) return;
-    this.multiSelected = new Set(ids);
-    this.selected = null;
-    this.integrationMode = true;
+    this.selection.selectSubtopics(ids);
     if (!this.closed) this.render();
   }
   /** True while a card drag is running on a map that is no longer the one shown here. */

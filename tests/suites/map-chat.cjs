@@ -713,7 +713,7 @@ integrationTest('map chat: a failing write is reported and the next action still
 integrationTest('map chat: select_topics(all) then research_standard starts the research once on every topic (Quick when nothing names a mode), outside any mutate', async () => {
   const h = await harness(); await h.view.hydrate();
   const started = [];
-  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.multiSelected], mutating: h.control.depth }); };
+  h.view.startMultiResearch = async request => { started.push({ request, selected: [...h.view.selection.state.multiSelected], mutating: h.control.depth }); };
   h.control.mutates = 0;
   const lines = await apply(h, [
     { kind: 'select_topics', nodeIds: Object.values(h.ids), all: true },
@@ -722,7 +722,7 @@ integrationTest('map chat: select_topics(all) then research_standard starts the 
   eq(lines.map(l => l.status), ['done', 'done']); await tick();
   assert.equal(started.length, 1); eq(started[0].request, quickRequest, 'no mode named and the map remembers none: Quick (D-2026-10-228)');
   eq(started[0].selected.sort(), Object.values(h.ids).sort()); assert.equal(started[0].mutating, 0, 'not inside a mutate');
-  assert.equal(h.view.integrationMode, true); assert.equal(h.control.mutates, 0, 'selecting and starting research write nothing through the queue');
+  assert.equal(h.view.selection.state.multiSelectMode, true); assert.equal(h.control.mutates, 0, 'selecting and starting research write nothing through the queue');
 });
 
 integrationTest('map chat: the result rows name the mode the research really runs in, and the expand row says the subtopics are created directly', async () => {
@@ -742,7 +742,7 @@ integrationTest('map chat: the result rows name the mode the research really run
 
 integrationTest('map chat: research on named topics selects exactly those first', async () => {
   const h = await harness(); await h.view.hydrate(); const seen = [];
-  h.view.startMultiResearch = async () => { seen.push([...h.view.multiSelected]); };
+  h.view.startMultiResearch = async () => { seen.push([...h.view.selection.state.multiSelected]); };
   await apply(h, [{ kind: 'run_map_action', action: 'research_standard', nodeIds: [h.ids.a, h.ids.b], title: '', goal: '', direction: '' }]); await tick();
   eq(seen, [[h.ids.a, h.ids.b]]);
 });
@@ -837,7 +837,7 @@ integrationTest('map chat: sending asks for usage consent first, builds the cont
   h.setActive('Notes/Other.md', h.contents.get('Notes/Other.md'));
   const chat = h.open();
   chat.addTopicReference(h.ids.c); chat.addSnippet('darkness', 'Notes/Research.md', false); chat.addFile('Notes/Research.md');
-  h.view.selected = h.ids.a;
+  h.view.selection.setSelected(h.ids.a);
   const seen = [];
   h.control.reply = async (request, _signal, onReply) => {
     onReply('Thinking'); seen.push(chat.transcript().at(-1).text); onReply('Thinking harder'); seen.push(chat.transcript().at(-1).text);
@@ -1009,10 +1009,10 @@ integrationTest('map chat: a different map starts a new conversation', async () 
 
 integrationTest('map chat: the selection (one card, or the selected set) shows as references', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  h.view.selected = h.ids.a; h.view.paintCards([h.ids.a]);
+  h.view.selection.setSelected(h.ids.a); h.view.paintCards([h.ids.a]);
   const labels = () => findAll(chat.chipsEl, i => hasClass(i, 'vam-map-chat-chip-label')).map(i => i.text);
   eq(labels(), ['Selected: Body']);
-  h.view.multiSelected = new Set([h.ids.b, h.ids.c]); h.view.integrationMode = true; h.view.paintCards([h.ids.b]);
+  h.view.selection.retryFailed([h.ids.b, h.ids.c]); /* set + mode on, selected kept */ h.view.paintCards([h.ids.b]);
   eq(labels(), ['Selected: Mind', 'Selected: REM'], 'in selection mode the selected set becomes the references');
 });
 
@@ -1059,7 +1059,7 @@ integrationTest('map chat: moving over the panel and back out before releasing m
 integrationTest('map chat: a click on a card (no drag) is still a click and adds no chip', async () => {
   const d = await dragHarness();
   d.down(); d.up();
-  assert.equal(d.chat.attachments().length, 0); assert.equal(d.changes.length, 0); assert.equal(d.view.selected, d.ids.a, 'the card was selected as usual');
+  assert.equal(d.chat.attachments().length, 0); assert.equal(d.changes.length, 0); assert.equal(d.view.selection.state.selected, d.ids.a, 'the card was selected as usual');
 });
 
 integrationTest('map chat: while the map is sorted by relevance a card dropped on the panel is still a reference', async () => {
@@ -1360,10 +1360,10 @@ integrationTest('map chat C1: the chat model list is the settings list (no follo
 
 integrationTest('map chat C1: "Say it in more detail" re-sends the same message and references as detailed, with the earlier turn as history, and adds a new answer', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  chat.addTopicReference(h.ids.c); h.view.selected = h.ids.a;
+  chat.addTopicReference(h.ids.c); h.view.selection.setSelected(h.ids.a);
   h.control.reply = async request => ({ reply: request.style === 'detailed' ? 'Long answer.' : 'Short.', actions: [], rejected: [] });
   h.type('what is REM'); await h.view.sendMapChat();
-  chat.removeChip(chat.attachments()[0]); h.view.selected = h.ids.b; h.type('half-typed draft');
+  chat.removeChip(chat.attachments()[0]); h.view.selection.setSelected(h.ids.b); h.type('half-typed draft');
   assert.equal(moreButtons({ panel: chat }).length, 1);
   moreButtons({ panel: chat })[0].click(); await until(() => h.control.requests.length === 2 && !chat.isBusy);
   const [first, second] = h.control.requests;
@@ -1653,27 +1653,27 @@ test('map chat D1: the view refreshes the note chip when the active leaf changes
 
 integrationTest('map chat: in selection mode a card dragged onto the panel adds a topic chip, writes nothing and keeps the selection', async () => {
   const d = await dragHarness();
-  d.view.integrationMode = true; d.view.multiSelected = new Set([d.ids.b, d.ids.c]);
+  d.view.selection.chatSelect([d.ids.b, d.ids.c]);
   d.down(); d.move(100, 400);
   assert.ok(hasClass(d.chat.el, 'is-drop'), 'the panel lights up in selection mode too');
   d.up();
   eq(d.chat.attachments().filter(a => a.kind === 'topic'), [{ kind: 'topic', id: d.ids.a }]);
-  assert.equal(d.changes.length, 0, 'no mapChange'); eq([...d.view.multiSelected], [d.ids.b, d.ids.c]); assert.equal(d.view.integrationMode, true);
+  assert.equal(d.changes.length, 0, 'no mapChange'); eq([...d.view.selection.state.multiSelected], [d.ids.b, d.ids.c]); assert.equal(d.view.selection.state.multiSelectMode, true);
   assert.ok(d.view.suppressClickUntil > Date.now(), 'the release is not read as a click that toggles the card');
   assert.equal(d.view.dragging, false);
 });
 
 integrationTest('map chat: in selection mode a drag onto the canvas moves nothing and does not toggle; a plain click is left to the click handler', async () => {
   const d = await dragHarness();
-  d.view.integrationMode = true; d.view.multiSelected = new Set([d.ids.b]); d.view.selected = d.ids.b;
+  d.view.selection.chatSelect([d.ids.b]); d.view.selection.setSelected(d.ids.b);
   d.down(); d.move(520, 150); d.move(560, 160); d.up();
   await new Promise(r => setTimeout(r, 0));
   assert.equal(d.changes.length, 0, 'mapChange not called'); eq([d.card.style.left, d.card.style.top], [`${d.node('a').x}px`, `${d.node('a').y}px`]);
-  eq([...d.view.multiSelected], [d.ids.b]); assert.equal(d.view.selected, d.ids.b); assert.equal(d.chat.attachments().filter(a => a.kind === 'topic').length, 0);
+  eq([...d.view.selection.state.multiSelected], [d.ids.b]); assert.equal(d.view.selection.state.selected, d.ids.b); assert.equal(d.chat.attachments().filter(a => a.kind === 'topic').length, 0);
   assert.ok(d.view.suppressClickUntil > Date.now(), 'the click after a drag is suppressed');
   d.view.suppressClickUntil = 0;
   d.down(); d.up();
-  eq([...d.view.multiSelected], [d.ids.b]); assert.equal(d.view.selected, d.ids.b, 'pointer handling leaves a plain click to the click handler');
+  eq([...d.view.selection.state.multiSelected], [d.ids.b]); assert.equal(d.view.selection.state.selected, d.ids.b, 'pointer handling leaves a plain click to the click handler');
   assert.equal(d.view.suppressClickUntil, 0, 'a plain click is not suppressed, so it still toggles');
 });
 
@@ -2808,9 +2808,9 @@ integrationTest('B1 ui: a suggestion only fills the message field (nothing is se
   assert.equal(chat.inputEl.value, 'What is missing from this map?'); assert.equal(h.page.doc.activeElement, chat.inputEl);
   await tick(); assert.equal(h.control.requests.length, requests, 'nothing sent'); assert.equal(h.control.mutates, mutates, 'nothing written'); assert.equal(chat.hasMessages, false);
   chat.inputEl.value = 'first line'; findAll(chat.suggestEl, i => i.tag === 'button')[1].click(); assert.equal(chat.inputEl.value, 'first line\nArrange the whole map', 'an existing draft is kept');
-  h.view.selected = h.ids.a; chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /subtopics under the selected topic/);
-  h.view.multiSelected = new Set([h.ids.a, h.ids.b]); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /Compare the selected topics/);
-  h.view.selected = null; h.view.multiSelected = new Set(); h.setActive('Notes/Research.md', ''); chat.refreshNote(); assert.ok(suggestionTexts(chat).includes('Add what the open note says to the map'));
+  h.view.selection.setSelected(h.ids.a); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /subtopics under the selected topic/);
+  h.view.selection.replaceMulti([h.ids.a, h.ids.b]); chat.refreshSelection(); assert.match(suggestionTexts(chat)[0], /Compare the selected topics/);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]); h.setActive('Notes/Research.md', ''); chat.refreshNote(); assert.ok(suggestionTexts(chat).includes('Add what the open note says to the map'));
   assert.ok(suggestionTexts(chat).length <= 4);
 });
 
@@ -3406,7 +3406,7 @@ integrationTest('B2-0 L4: a reply with one automatic layout at the end is laid o
 
 // ---- B2-feat: research options, shallow research, headless integration, two merges ---------------------------------------
 const researchAct = (fields = {}) => ({ kind: 'run_map_action', action: 'research_standard', nodeIds: [], title: '', goal: '', direction: '', mode: '', images: false, ...fields });
-const startedResearch = h => { const started = []; h.view.startMultiResearch = async (request, key, onSettled) => { started.push({ request, key, onSettled, selected: [...h.view.multiSelected], depth: h.control.depth }); }; return started; };
+const startedResearch = h => { const started = []; h.view.startMultiResearch = async (request, key, onSettled) => { started.push({ request, key, onSettled, selected: [...h.view.selection.state.multiSelected], depth: h.control.depth }); }; return started; };
 const newCard = ref => ({ kind: 'add_child', parentId: '', title: `Card ${ref}`, summary: '', ref });
 
 const quickRequest = { mapAiMode: 'quick', researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false };
@@ -3631,12 +3631,12 @@ integrationTest('B3 find_images: a declined usage notice starts nothing', async 
 });
 integrationTest('B3 find_images: one card is the target; an empty list takes the selection only when it is exactly one card', async () => {
   const { h } = await imageHarness();
-  h.view.selected = null; h.view.multiSelected = new Set();
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
   let lines = await apply(h, [findAct(h, null)]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /name exactly one card first/);
-  h.view.multiSelected = new Set([h.ids.a, h.ids.b]);
+  h.view.selection.replaceMulti([h.ids.a, h.ids.b]);
   lines = await apply(h, [findAct(h, null)]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /name exactly one card first/);
   assert.equal(h.control.searches.length, 0);
-  h.view.multiSelected = new Set(); h.view.selected = h.ids.b;
+  h.view.selection.replaceMulti([]); h.view.selection.setSelected(h.ids.b);
   lines = await apply(h, [findAct(h, null, { direction: '' })]); assert.equal(lines[0].status, 'done'); assert.match(lines[0].text, /for “Mind”/);
   assert.equal(h.control.searches[0].query, 'Mind', 'no search words: the card\'s title');
   lines = await apply(h, [findAct(h, null, { nodeIds: ['gone'] })]); assert.equal(lines[0].status, 'skipped'); assert.match(lines[0].text, /no longer on the map/);

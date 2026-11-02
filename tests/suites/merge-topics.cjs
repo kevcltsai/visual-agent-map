@@ -276,7 +276,7 @@ async function heHarness() {
   const saved = async () => repo.readMap(path);
   const relations = async () => plain((await saved()).topicRelations ?? null);
   const mergeKeys = async keys => {
-    view.multiSelected = new Set(keys.map(k => ids[k]));
+    view.selection.replaceMulti(keys.map(k => ids[k]));
     const check = view.mergeCheck(); assert.equal(check.ok, true, JSON.stringify(check));
     await view.mergeSelected('Merged', { path, mapId: mapDoc.id, targetId: check.targetId, sources: check.sources.map(n => ({ id: n.id, path: n.path })) });
     return check;
@@ -395,7 +395,7 @@ integrationTest('hypothesis-evidence: removing the selection (removeSelected) dr
   const h = await heHarness();
   await h.relate([heRel('supports', h.ids.f1, h.ids.hyp), heRel('prerequisite', h.ids.hyp2, h.ids.x), heRel('supports', h.ids.f2, h.ids.hyp2)]);
   const original = await h.relations();
-  h.view.multiSelected = new Set([h.ids.hyp, h.ids.x]);
+  h.view.selection.replaceMulti([h.ids.hyp, h.ids.x]);
   await h.view.removeSelected();
   assert.deepEqual(await h.relations(), [heRel('supports', h.ids.f2, h.ids.hyp2)]);
   await h.view.travel(false);

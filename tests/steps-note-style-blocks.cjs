@@ -12,7 +12,7 @@ const M = loadSource(`
 export { NoteStyleStore } from "./ai/note-style-store";
 export { NOTE_STYLE_BUILTIN_IDS } from "./ai/note-style-file";
 export { previewPrompt, PREVIEW_STEPS } from "./core/blocks/prompt-preview";
-export { lookupBuiltinBlock, builtinTemplateText } from "./core/blocks/builtin";
+export { lookupBuiltinBlock, builtinTemplateText, academicToneNote, stripToneComments } from "./core/blocks/builtin";
 export { parseTemplateBlock } from "./core/blocks/template-block";
 export { textbookTemplate } from "./ai/detail-templates";
 export { listPresets, findPreset } from "./ai/prompt-presets";
@@ -283,7 +283,7 @@ test('counter 8: a style file that decides the tone keeps it; the workspace tone
 });
 
 // ---- counter 9: copy ----
-test('counter 9: copy gives a unique name ("x copy", "x copy (2)"), never overwrites, never takes a built-in name, is cleaned, stays in the block folder, and the setting points at it', async () => {
+test('counter 9: copy gives a unique name ("x (my version)", "x (my version) (2)"), never overwrites, never takes a built-in name, is cleaned, stays in the block folder, and the setting points at it', async () => {
   for (const language of LANGUAGES) {
     const { store, v, settings, saves } = makeStore({ language });
     await store.refresh();
@@ -301,29 +301,29 @@ test('counter 9: copy gives a unique name ("x copy", "x copy (2)"), never overwr
     const items = store.listBlocks('template');
     assert.ok(items.some(item => item.ref === first && item.kind === 'file'));
     assert.ok(items.some(item => item.ref === second && item.kind === 'file'));
-    assert.deepEqual(plain(items.filter(item => item.kind === 'builtin').map(item => item.ref)), ['builtin:standard', 'builtin:textbook']);
+    assert.deepEqual(plain(items.filter(item => item.kind === 'builtin').map(item => item.ref)), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic']);
   }
   // a user's file of that name, created after the last refresh, is not touched
   const { store, v } = makeStore({});
   await store.refresh();
-  v.files[`${TPL}/Standard copy.md`] = 'MINE, do not touch';
+  v.files[`${TPL}/Standard (my version).md`] = 'MINE, do not touch';
   v.folders.add(`${STYLES}/Blocks`); v.folders.add(TPL);
   const ref = await store.copyBlock('template', 'builtin:standard');
-  assert.equal(ref, 'file:Standard copy (2)');
-  assert.equal(v.files[`${TPL}/Standard copy.md`], 'MINE, do not touch');
+  assert.equal(ref, 'file:Standard (my version) (2)');
+  assert.equal(v.files[`${TPL}/Standard (my version).md`], 'MINE, do not touch');
   // the name is cleaned, and the path stays inside the folder
   const odd = makeStore({}, { [`${TPL}/We*ird [a].md`]: MINE });
   await odd.store.refresh();
   const oddRef = await odd.store.copyBlock('template', 'file:We*ird [a]');
-  assert.equal(oddRef, 'file:We ird a copy');
+  assert.equal(oddRef, 'file:We ird a (my version)');
   const made = odd.v.created[odd.v.created.length - 1];
   assert.ok(made.startsWith(`${TPL}/`) && !made.slice(TPL.length + 1).includes('/') && !/[\\/:*?"<>|#^[\]]/.test(made.slice(TPL.length + 1)), made);
-  // a tone is copied the same way, into the tone folder; academic copies as an empty file
+  // a tone is copied the same way, into the tone folder; academic with no file copies as the design note (design 3.8), not an empty file
   const tone = makeStore({});
   await tone.store.refresh();
   const toneRef = await tone.store.copyBlock('tone', 'builtin:academic');
-  assert.equal(toneRef, 'file:Academic rigor copy');
-  assert.equal(tone.v.files[`${TONE}/Academic rigor copy.md`], '');
+  assert.equal(toneRef, 'file:Academic rigor (my version)');
+  assert.equal(tone.v.files[`${TONE}/Academic rigor (my version).md`], M.academicToneNote('en'));
   assert.equal(tone.settings.noteToneBlock, toneRef);
   // the copy can be edited and the prompt follows
   const edit = makeStore({});
@@ -457,10 +457,10 @@ test('counter 13: two copies started together make two different files and lose 
   await store.refresh();
   const [a, b, c] = await Promise.all([store.copyBlock('template', 'builtin:standard'), store.copyBlock('template', 'builtin:standard'), store.copyBlock('tone', 'builtin:guide')]);
   assert.notEqual(a, b);
-  assert.deepEqual([a, b], ['file:Standard copy', 'file:Standard copy (2)']);
-  assert.equal(c, 'file:Practical guide copy');
-  for (const name of ['Standard copy', 'Standard copy (2)']) assert.equal(v.files[`${TPL}/${name}.md`], M.builtinTemplateText('standard', 'en'));
-  assert.equal(v.files[`${TONE}/Practical guide copy.md`], M.lookupBuiltinBlock('tone', 'guide', 'en'));
+  assert.deepEqual([a, b], ['file:Standard (my version)', 'file:Standard (my version) (2)']);
+  assert.equal(c, 'file:Practical guide (my version)');
+  for (const name of ['Standard (my version)', 'Standard (my version) (2)']) assert.equal(v.files[`${TPL}/${name}.md`], M.builtinTemplateText('standard', 'en'));
+  assert.equal(v.files[`${TONE}/Practical guide (my version).md`], M.lookupBuiltinBlock('tone', 'guide', 'en'));
 });
 
 // ---- opening a block: the file exists, in the first spelling that exists ----
@@ -497,7 +497,7 @@ test('block-files: folder names are found by any spelling (existing first), buil
   assert.equal(b.builtinBlockIdOfName('template', '教科書'), 'textbook');
   assert.equal(b.builtinBlockIdOfName('tone', 'Key-point summary'), 'summary');
   assert.equal(b.builtinBlockIdOfName('template', 'Standard (2)'), undefined);
-  assert.equal(b.builtinBlockIdOfName('template', 'Standard copy'), undefined);
+  assert.equal(b.builtinBlockIdOfName('template', 'Standard (my version)'), undefined);
   assert.equal(b.builtinBlockIdOfName('tone', 'Standard'), undefined);
   for (const language of LANGUAGES) {
     assert.equal(b.isUnmodifiedBlock('template', 'standard', M.builtinTemplateText('standard', language)), true);
@@ -592,4 +592,126 @@ test('FB1 B1: opening the preview reads the block files again, so a block edited
   assert.match(texts(), /FORMAT-LINE-EDITED-LATER/);
   assert.doesNotMatch(texts(), /FORMAT-LINE-MINE\b/);
   modal.close();
+});
+
+// ---- note style flow redesign, P2: tone files are read without HTML comments; academic rigor "Edit" writes only a note ----
+const toneTextOf = (store, ref) => store.runStyle({ choice: { tone: ref }, outputLanguage: 'en' }).toneText;
+
+test('P2 comments: a tone file with a comment and text sends only the text; a lone "<" or an unclosed "<!--" is kept as written (counter: not a comment)', async () => {
+  assert.equal(M.stripToneComments('<!-- note -->\nSpeak calmly.'), 'Speak calmly.');
+  assert.equal(M.stripToneComments('Before <!-- a\nb --> after'), 'Before  after');
+  assert.equal(M.stripToneComments('<!-- one --><!-- two -->'), '');
+  assert.equal(M.stripToneComments('Use a < b and <b>bold</b> words.'), 'Use a < b and <b>bold</b> words.');
+  assert.equal(M.stripToneComments('Text <!-- never closed'), 'Text <!-- never closed');
+  const files = {
+    [`${TONE}/Calm.md`]: '<!-- my note -->\nSpeak calmly.\n',
+    [`${TONE}/Plain text.md`]: 'Speak calmly.\n',
+    [`${TONE}/Angle.md`]: 'Prefer a < b over <b>bold</b>.\n'
+  };
+  const { store } = makeStore({}, files);
+  await store.refresh();
+  assert.equal(toneTextOf(store, 'file:Calm'), 'Speak calmly.');
+  assert.equal(toneTextOf(store, 'file:Calm'), toneTextOf(store, 'file:Plain text'));
+  assert.equal(toneTextOf(store, 'file:Angle').trim(), 'Prefer a < b over <b>bold</b>.');
+  const calm = M.previewPrompt('research', 'en', 'codex', { toneText: toneTextOf(store, 'file:Calm') }).text;
+  const plainText = M.previewPrompt('research', 'en', 'codex', { toneText: toneTextOf(store, 'file:Plain text') }).text;
+  assert.equal(calm, plainText, 'the prompt only loses the comment');
+  assert.ok(!calm.includes('my note'));
+});
+
+test('P2 comments: a comment-only file is no change (academic: unmodified, prompt equal to the default; a built-in tone with its text plus a comment likewise)', async () => {
+  const academicFile = M.academicToneNote('en');
+  const plainWithNote = `<!-- hello -->\n${M.lookupBuiltinBlock('tone', 'plain', 'en')}\n`;
+  const { store } = makeStore({ noteToneBlock: 'builtin:academic' }, { [`${TONE}/Academic rigor.md`]: academicFile, [`${TONE}/Plain explanation.md`]: plainWithNote });
+  const fields = await fieldsOf(store);
+  const academic = store.listBlocks('tone').find(item => item.ref === 'builtin:academic');
+  assert.equal(academic.fileName, 'Academic rigor.md');
+  assert.equal(academic.modified, false, 'not shown as modified');
+  assert.equal(fields.toneText, undefined);
+  assert.equal(fields.styleSelection, undefined);
+  for (const step of M.PREVIEW_STEPS)
+    assert.equal(M.previewPrompt(step.id, 'en', 'codex', fields).text, M.previewPrompt(step.id, 'en', 'codex', {}).text, step.id);
+  const plainItem = store.listBlocks('tone').find(item => item.ref === 'builtin:plain');
+  assert.equal(plainItem.modified, false);
+  const plainRun = makeStore({ noteToneBlock: 'builtin:plain' }, { [`${TONE}/Plain explanation.md`]: plainWithNote });
+  await plainRun.store.refresh();
+  assert.equal(plainRun.store.runStyle({ outputLanguage: 'en' }).toneText, M.lookupBuiltinBlock('tone', 'plain', 'en'));
+  // text under the note IS a change
+  const edited = makeStore({ noteToneBlock: 'builtin:academic' }, { [`${TONE}/Academic rigor.md`]: `${academicFile}\nUse short sentences.\n` });
+  await edited.store.refresh();
+  assert.equal(edited.store.listBlocks('tone').find(item => item.ref === 'builtin:academic').modified, true);
+  assert.equal(toneTextOf(edited.store, 'builtin:academic'), 'Use short sentences.');
+});
+
+test('P2 academic Edit: ensureBlockFile writes only the design note (three languages), the file then reads as unmodified; other tones still get their own text', async () => {
+  for (const language of LANGUAGES) {
+    const { store, v } = makeStore({ language });
+    await store.refresh();
+    const made = await store.ensureBlockFile('tone', 'builtin:academic');
+    const text = v.files[made.path];
+    assert.equal(text, M.academicToneNote(language), language);
+    assert.ok(text.startsWith('<!--') && text.trimEnd().endsWith('-->'), language);
+    assert.equal(M.stripToneComments(text), '', language);
+    assert.equal(store.listBlocks('tone').find(item => item.ref === 'builtin:academic').modified, false, language);
+    const guide = await store.ensureBlockFile('tone', 'builtin:guide');
+    assert.equal(v.files[guide.path], M.lookupBuiltinBlock('tone', 'guide', language), language);
+  }
+});
+
+test('P2 save as: a chosen name is used (cleaned) and selected; a taken name, a built-in name in any language, or an empty name throws and changes nothing', async () => {
+  const { store, v, settings } = makeStore({ noteToneBlock: 'builtin:plain' }, { [`${TONE}/Mine.md`]: 'x' });
+  await store.refresh();
+  const ref = await store.copyBlock('tone', 'builtin:plain', 'Weekly: calm');
+  assert.equal(ref, 'file:Weekly calm');
+  assert.equal(settings.noteToneBlock, ref);
+  assert.equal(v.files[`${TONE}/Weekly calm.md`], M.lookupBuiltinBlock('tone', 'plain', 'en'));
+  const before = { files: { ...v.files }, key: settings.noteToneBlock, created: v.created.length };
+  for (const bad of ['mine', 'MINE', 'Weekly calm', 'Plain explanation', '白話說明', '   ', '...'])
+    await assert.rejects(() => store.copyBlock('tone', 'builtin:plain', bad), undefined, bad);
+  assert.deepEqual(v.files, before.files);
+  assert.equal(v.files[`${TONE}/Mine.md`], 'x', 'the existing file is not overwritten');
+  assert.equal(settings.noteToneBlock, before.key, 'the setting does not move');
+  assert.equal(v.created.length, before.created);
+});
+
+test('P2 preview: with the default voice the modal shows the voice heading and "(Default voice; no extra instruction)"; with a voice it shows the voice text instead', async () => {
+  const none = makeStore({});
+  await none.store.refresh();
+  const { modal, dom } = openPreviewModal(none.store);
+  const titles = () => dom.findAll(modal.contentEl, item => item.tag === 'h2').map(item => item.text);
+  const empty = () => dom.findAll(modal.contentEl, item => (item.attrs.class ?? item.cls ?? '').toString().includes('vam-prompt-preview-empty'));
+  assert.ok(titles().includes('Voice'), titles().join('|'));
+  assert.equal(empty().length, 1);
+  assert.equal(empty()[0].text, '(Default voice; no extra instruction)');
+  assert.ok(titles().indexOf('Voice') > titles().indexOf('Structure'), 'after the structure part');
+  modal.close();
+  const guide = makeStore({ noteToneBlock: 'builtin:guide' });
+  await guide.store.refresh();
+  const second = openPreviewModal(guide.store);
+  assert.equal(second.dom.findAll(second.modal.contentEl, item => (item.attrs.class ?? item.cls ?? '').toString().includes('vam-prompt-preview-empty')).length, 0);
+  assert.ok(second.dom.findAll(second.modal.contentEl, item => item.tag === 'h2').some(item => item.text === 'Voice'));
+  second.modal.close();
+});
+
+test('Low 1: Save as my own from academic rigor with no file starts the new file from the design note (three languages); with an edited file it copies that file', async () => {
+  for (const language of LANGUAGES) {
+    const { store, v } = makeStore({ language });
+    await store.refresh();
+    const ref = await store.copyBlock('tone', 'builtin:academic', 'My rigor');
+    const path = Object.keys(v.files).find(key => key.endsWith('/My rigor.md'));
+    assert.equal(v.files[path], M.academicToneNote(language), language);
+    assert.equal(ref, 'file:My rigor', language);
+  }
+  const edited = makeStore({}, { [`${TONE}/Academic rigor.md`]: `${M.academicToneNote('en')}\nUse short sentences.\n` });
+  await edited.store.refresh();
+  await edited.store.copyBlock('tone', 'builtin:academic', 'Mine two');
+  assert.equal(edited.v.files[`${TONE}/Mine two.md`], `${M.academicToneNote('en')}\nUse short sentences.\n`);
+});
+
+test('ensureBlockFile reports created: true for a file it just wrote, false for an existing file or an override', async () => {
+  const { store } = makeStore({}, { [`${TONE}/Mine.md`]: 'x' });
+  await store.refresh();
+  assert.equal((await store.ensureBlockFile('template', 'builtin:standard')).created, true);
+  assert.equal((await store.ensureBlockFile('template', 'builtin:standard')).created, false);
+  assert.equal((await store.ensureBlockFile('tone', 'file:Mine')).created, false);
 });

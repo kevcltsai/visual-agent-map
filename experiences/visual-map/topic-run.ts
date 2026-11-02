@@ -3,7 +3,7 @@
  * It imports neither obsidian nor the view; everything it needs from the plugin comes through lazy ports, because the
  * plugin replaces some of those objects after construction.
  */
-import { noteLanguageOf, t, type ContentLanguage } from "../../i18n";
+import { noteLanguageOf, t, type ContentLanguage, type UiLanguage } from "../../i18n";
 import type { AiResult, ReasoningLevel, Suggestion, TaskContext } from "../../ai/types";
 import type { DetailTemplate } from "../../ai/detail-templates";
 import type { ReferenceGroup } from "../../ai/reference-materials";
@@ -13,6 +13,7 @@ import { checkCounts } from "../../ai/detail-templates";
 import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import { failureReason, type Note, type NotePatch } from "../../repository";
 import type { RunStyle } from "../../ai/note-style-store";
+import { runStyleLabelText } from "../../ai/note-style-label";
 import type { MapDocument } from "../../map-model";
 import type { AgentTaskHandle, RunOnceModel } from "./modals";
 import { withThinkingOrigin } from "./thinking-origin";
@@ -100,7 +101,7 @@ export interface TopicRunPorts {
     onWebSearchEvent?: undefined,
     observer?: ResearchObserver
   ): Promise<AiResult>;
-  settings(): { language: ContentLanguage; aiExchangeLoggingEnabled?: boolean };
+  settings(): { language: UiLanguage; aiExchangeLoggingEnabled?: boolean };
   exchanges(): RunExchanges | null | undefined;
   recordFailure(context: string, error: unknown): string;
   /** The note style of a topic when the caller gave none (the entry that has the map and notices passes its own). */
@@ -869,7 +870,11 @@ export class TopicRuns {
       },
       note
     );
-    return { note, used, context, styleLabel: runStyle.label.fileName };
+    const styleLabel =
+      runStyle.label.fileName || runStyle.label.templateSource === "kind"
+        ? runStyleLabelText(runStyle.label, this.ports.settings().language)
+        : undefined;
+    return { note, used, context, styleLabel };
   }
 
   private async startResearch(path: string, kind: "research", options: ResearchStart): Promise<AgentTaskHandle | null> {

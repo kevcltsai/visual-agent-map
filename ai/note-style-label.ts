@@ -3,6 +3,7 @@ import { STANDARD_TEMPLATE_ID, TEXTBOOK_TEMPLATE_ID } from "./detail-templates";
 import { DEFAULT_TONE_ID } from "./prompt-presets";
 import { builtinPairOf, type NoteStyleAliases } from "./note-style-upgrade";
 import { parseBlockRef } from "../core/blocks/block-files";
+import type { RunStyle } from "./note-style-store";
 
 /**
  * The note-style menu is two stored values filled in together: a preset is one content template plus one writing tone.
@@ -115,4 +116,25 @@ export function styleRefOf(
     templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : undefined;
   if (moved?.template && parseBlockRef(moved.template)?.kind === "file") return { kind: "file", id: moved.template };
   return undefined;
+}
+
+/**
+ * The research progress line: "Note style: <structure> · <voice> (<where the structure came from>)". Only the structure's
+ * level names a source; a structure or voice set on the run or the topic adds no bracket.
+ */
+export function runStyleLabelText(
+  label: Pick<RunStyle["label"], "templateName" | "toneName" | "templateSource">,
+  language: UiLanguage
+): string {
+  const source =
+    label.templateSource === "kind"
+      ? "ui.note_style_source_kind"
+      : label.templateSource === "map"
+        ? "ui.note_style_source_map"
+        : label.templateSource === "workspace" || label.templateSource === "standard"
+          ? "ui.note_style_source_default"
+          : undefined;
+  return source
+    ? translate(language, "ui.note_style_label_0_1_2", label.templateName, label.toneName, translate(language, source))
+    : translate(language, "ui.note_style_label_0_1", label.templateName, label.toneName);
 }

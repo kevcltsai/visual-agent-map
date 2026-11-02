@@ -12,7 +12,7 @@
 
 ## Three ways to explore
 
-- **Visual maps.** Break a question into topics and research any branch with AI. Draft a multi-level outline, review suggestions before adding them, pick a note style such as Textbook (or write your own template and tone blocks in Markdown), merge related topics, and research several topics in the background. Manual mapping needs no AI.
+- **Visual maps.** Break a question into topics and research any branch with AI. Draft a multi-level outline, review suggestions before adding them, pick a note style such as Textbook (or write your own note structure and voice in Markdown), merge related topics, and research several topics in the background. Manual mapping needs no AI.
   - **Talk to your map.** Open the AI chat beside the map and say what you want in plain language: build a whole map from one sentence, add, move or rename topics, research or expand a branch, find pictures, or edit the notes you point it to. Large changes are shown as a plan first, and every action gets a result line.
   - **Quick or Standard.** Quick answers from the model's own knowledge without the web; Standard searches the web and may add images. Choose per research or expansion.
 - **AIM — Adaptive Inquiry Map.** Give it your question and background, answer the opening questions once, and let it run. Watch each subtopic on the map and finish with a document backed by sources.

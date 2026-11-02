@@ -1369,7 +1369,7 @@ integrationTest('runAgent: a template block with two format headings still runs 
   assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
   assert.equal(h.notices.length, 1, 'exactly one Notice');
   assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 5/);
-  assert.match(String(h.notices[0]), /built-in template is used/);
+  assert.match(String(h.notices[0]), /The built-in structure is used instead\./);
 });
 // Ticket 04 FB1: the Notice for an unreadable template block belongs to the entry of a run, once per execution.
 const BAD_BLOCK = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
@@ -1744,7 +1744,7 @@ integrationTest('map action: a template block is chosen in the map style list; i
   view.chooseMapStyle(); await new Promise(resolve => setTimeout(resolve, 0));
   const choices = opened.at(-1).choices;
   assert.equal(choices.at(-1).label, 'Edit this style', 'a picker with a block folder offers the edit row last');
-  assert.deepEqual(plain(choices.slice(0, -1).map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
+  assert.deepEqual(plain(choices.slice(0, -1).map(choice => choice.label)), ['Follow default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
   assert.deepEqual(plain(choices.slice(0, 9).map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', '']);
   await choices[7].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'file:Template B');
@@ -1764,8 +1764,8 @@ integrationTest('map action: one default note style sets or clears the template 
   const settle = () => new Promise(resolve => setTimeout(resolve, 0));
   view.chooseMapStyle(); await settle();
   let modal = opened.at(-1);
-  assert.equal(modal.titleText, 'Default note style for this map'); assert.equal(modal.description, 'New topics, and topics without their own style, use it.');
-  assert.deepEqual(plain(modal.choices.slice(0, 9).map(choice => choice.label)), ['Use the default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
+  assert.equal(modal.titleText, 'Note style for this map'); assert.equal(modal.description, 'New topics, and topics without their own style, use it.');
+  assert.deepEqual(plain(modal.choices.slice(0, 9).map(choice => choice.label)), ['Follow default (Standard)', 'Standard (academic)', 'Textbook (intro, then sections)', 'Key points', 'Plain language', 'Practical guide', 'Template A', 'Template B', 'Template C']);
   assert.deepEqual(plain(modal.choices.slice(0, 9).map(choice => choice.description ?? '')), ['Current setting', '', '', '', '', '', '', '', ''], 'no value stored: the default is current');
   await modal.choices[2].action();
   await until(async () => (await h.repo.readMap(h.mapPath)).detailTemplateId === 'textbook');
@@ -1805,7 +1805,7 @@ integrationTest('map action: one default note style sets or clears the template 
   saved = await h.repo.readMap(h.mapPath);
   assert.equal(saved.detailTemplateId, undefined); assert.equal(saved.toneId, undefined);
 });
-integrationTest('run-style P3: "Keep current (…)" in the research and synthesis dialogs names the style and tone the run really uses (workspace tone, topic override, style file tone)', async () => {
+integrationTest('run-style P3: "Keep as is (…)" in the research and synthesis dialogs names the style and tone the run really uses (workspace tone, topic override, style file tone)', async () => {
   const FILES = { 'WS/S/Blocks/Tones/Pirate.md': 'Talk like a pirate.', 'WS/S/Own.md': '---\n語氣: 簡明\n---\n## 重點\n說明\n' };
   const port = { list: async folder => Object.keys(FILES).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes('/')).map(f => f.slice(folder.length + 1)), read: async f => FILES[f], folderExists: folder => Object.keys(FILES).some(f => f.startsWith(`${folder}/`)), createFolder: async () => {}, create: async () => { throw new Error('read only'); }, trash: async () => {} };
   const { NoteStyleStore } = load('ai/note-style-store.ts');

@@ -35,12 +35,19 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { NoteStyleStore, type NoteStyleUpgradeEvent, type StyleFilePort } from "./ai/note-style-store";
+import {
+  NoteStyleStore,
+  normalizeNoteTemplateByKind,
+  type NoteStyleUpgradeEvent,
+  type StyleFilePort
+} from "./ai/note-style-store";
 import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
 import { DebugLogModal } from "./ui/modals/debug-log-modal";
+import { backgroundResultNotice } from "./ui/background-run";
+import { parseBlockRef } from "./core/blocks/block-files";
 import {
   AiUsageModal,
   ClaudeSetupModal,
@@ -155,6 +162,9 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
       ? { noteTemplateBlock: saved.noteTemplateBlock }
       : {}),
     ...(typeof saved?.noteToneBlock === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {}),
+    ...(normalizeNoteTemplateByKind(saved?.noteTemplateByKind)
+      ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved?.noteTemplateByKind) }
+      : {}),
     ...(typeof saved?.noteStylesFolder === "string" && saved.noteStylesFolder
       ? { noteStylesFolder: saved.noteStylesFolder }
       : {}),
@@ -1339,23 +1349,26 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
   async openBlock(category: BlockCategory, ref: string): Promise<boolean> {
     try {
-      const { path } = await this.noteStyles.ensureBlockFile(category, ref);
+      const { path, base, created } = await this.noteStyles.ensureBlockFile(category, ref);
       const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
       if (!(file instanceof TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
-      new Notice(t("ui.block_notice_opened_0", path));
+      new Notice(created ? t("ui.block_notice_created_0_1", base, path) : t("ui.block_notice_opened_0", path));
       return true;
     } catch {
       new Notice(t("ui.block_notice_open_failed"));
       return false;
     }
   }
-  /** Copies a block into a new file, which becomes the workspace's choice; it is not opened. Returns the new ref. */
-  async copyBlock(category: BlockCategory, ref: string): Promise<string | null> {
+  /**
+   * "Save as my own": copies a block into a new file (named `name`, else "<name> (my version)"), which becomes the
+   * workspace's choice; it is not opened here. Returns the new ref, or null (nothing written) when it cannot be saved.
+   */
+  async copyBlock(category: BlockCategory, ref: string, name?: string): Promise<string | null> {
     try {
-      const created = await this.noteStyles.copyBlock(category, ref);
-      const { path } = await this.noteStyles.ensureBlockFile(category, created);
-      new Notice(t("ui.block_notice_copied_0", path));
+      const created = await this.noteStyles.copyBlock(category, ref, name);
+      const parsed = parseBlockRef(created);
+      new Notice(t("ui.block_notice_saved_as_0", parsed?.kind === "file" ? parsed.base : created));
       return created;
     } catch {
       new Notice(t("ui.block_notice_copy_failed"));
@@ -1367,7 +1380,15 @@ export default class VisualAgentMapPlugin extends Plugin {
     try {
       const result = await this.noteStyles.restoreBlock(category, ref);
       if (result.ok) {
-        new Notice(t("ui.block_notice_restored_0", result.backup));
+        const backup = result.backup;
+        backgroundResultNotice(t("ui.block_notice_restored_0", backup), {
+          label: t("ui.block_notice_open_backup"),
+          open: () => {
+            const file = this.app.vault.getAbstractFileByPath(normalizePath(backup));
+            if (file instanceof TFile) void this.app.workspace.getLeaf("tab").openFile(file);
+            else new Notice(t("ui.block_notice_open_failed"));
+          }
+        });
         return true;
       }
       const reason = result.reason;

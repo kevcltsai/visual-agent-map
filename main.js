@@ -1503,7 +1503,7 @@ var en = {
   "ui.block_folder_template": "Templates",
   "ui.block_folder_tone": "Tones",
   "ui.block_folder_backup": "Backups",
-  "ui.block_copy_name_0": "{0} copy",
+  "ui.block_copy_name_0": "{0} (my version)",
   "ui.block_picker_template": "Structure",
   "ui.block_picker_tone": "Voice",
   "ui.block_picker_template_aria": "Note style structure",
@@ -1512,19 +1512,35 @@ var en = {
   "ui.block_copy": "Save as my own\u2026",
   "ui.block_restore": "Restore built-in",
   "ui.block_modified_0": "{0} (modified)",
-  "ui.block_status_modified": "You changed this built-in version; AI writes with your version.",
-  "ui.block_status_builtin_file": "Built-in version.",
-  "ui.block_status_builtin_none": "Built-in version.",
-  "ui.block_status_own": "A structure or voice you created yourself.",
-  "ui.block_status_issue_0_1_2": '\u26A0 "{0}" has a problem (line {1}): {2} Until it is fixed, AI uses the built-in version.',
   "ui.block_notice_opened_0": "Opened {0}",
-  "ui.block_notice_copied_0": "Saved as {0}",
   "ui.block_notice_restored_0": "Restored the built-in version. Your version is backed up at {0}.",
   "ui.block_notice_open_failed": "Cannot open this file. It may have been renamed or deleted.",
   "ui.block_notice_copy_failed": "Cannot save this file as your own. Nothing was overwritten.",
   "ui.block_notice_restore_not_available": "There is no built-in version to restore here.",
   "ui.block_notice_restore_backup_failed": "Cannot save a backup, so the file was left as it is.",
   "ui.block_notice_restore_failed": "Cannot restore the built-in version. Check the Backups folder before trying again.",
+  "ui.block_group_builtin": "Built-in",
+  "ui.block_status_modified_template": "You edited this built-in structure; AI writes with your version.",
+  "ui.block_status_modified_tone": "You edited this built-in voice; AI writes with your version.",
+  "ui.block_status_own_template": "A structure you created yourself.",
+  "ui.block_status_own_tone": "A voice you created yourself.",
+  "ui.block_status_issue_template_0_1": '\u26A0 Line {0}: {1} Until it is fixed, AI uses the built-in "Standard".',
+  "ui.block_status_issue_tone_0_1": '\u26A0 Line {0}: {1} Until it is fixed, AI uses the built-in "Academic rigor".',
+  "ui.block_status_missing_template_0": '\u26A0 "{0}" was not found; AI is using the built-in "Standard". Pick another from the menu.',
+  "ui.block_status_missing_tone_0": '\u26A0 "{0}" was not found; AI is using the built-in "Academic rigor". Pick another from the menu.',
+  "ui.block_missing_option_0": "Not found: {0}",
+  "ui.block_edit_aria_template": "Edit note structure",
+  "ui.block_edit_aria_tone": "Edit writing voice",
+  "ui.block_more_template": "More actions: structure",
+  "ui.block_more_tone": "More actions: voice",
+  "ui.block_save_as_title": "Save as my own",
+  "ui.block_name_taken": "A file or built-in item already has this name. Pick another.",
+  "ui.block_notice_saved_as_0": 'Saved as "{0}" and switched to it.',
+  "ui.block_notice_open_backup": "Open backup",
+  "ui.note_style_location_desc": "Structures and voices you edited or created are stored here as plain Markdown files.",
+  "ui.note_style_location_empty": "No files yet. The first edit or save creates them.",
+  "ui.preview_tone_empty": "(Default voice; no extra instruction)",
+  "ui.block_academic_note": "<!-- Academic rigor is the default voice: the AI follows the plugin's fixed neutral, evidence-first rules and gets no extra voice instruction.\n     To change the voice, write it below this comment, for example 'use more metaphors and shorter sentences'. -->",
   "ui.preview_step_research": "Research a topic",
   "ui.preview_step_quick": "Quick research",
   "ui.preview_step_decompose": "Break into subtopics",
@@ -3747,7 +3763,7 @@ var zhCN = {
   "ui.block_folder_template": "\u6A21\u677F",
   "ui.block_folder_tone": "\u8BED\u6C14",
   "ui.block_folder_backup": "\u5907\u4EFD",
-  "ui.block_copy_name_0": "{0} \u526F\u672C",
+  "ui.block_copy_name_0": "{0} \u6211\u7684\u7248\u672C",
   "ui.block_picker_template": "\u7B14\u8BB0\u7ED3\u6784",
   "ui.block_picker_tone": "\u5199\u4F5C\u53E3\u543B",
   "ui.block_picker_template_aria": "\u7B14\u8BB0\u98CE\u683C\u7684\u7ED3\u6784",
@@ -3756,19 +3772,35 @@ var zhCN = {
   "ui.block_copy": "\u53E6\u5B58\u4E3A\u6211\u7684\u7248\u672C\u2026",
   "ui.block_restore": "\u6062\u590D\u5185\u7F6E\u7248\u672C",
   "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
-  "ui.block_status_modified": "\u4F60\u6539\u8FC7\u8FD9\u4EFD\u5185\u7F6E\u7248\u672C\uFF0CAI \u4F1A\u7167\u4F60\u7684\u7248\u672C\u5199\u3002",
-  "ui.block_status_builtin_file": "\u5185\u7F6E\u7248\u672C\u3002",
-  "ui.block_status_builtin_none": "\u5185\u7F6E\u7248\u672C\u3002",
-  "ui.block_status_own": "\u4F60\u81EA\u5DF1\u521B\u5EFA\u7684\u7ED3\u6784\u6216\u53E3\u543B\u3002",
-  "ui.block_status_issue_0_1_2": "\u26A0 \u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u4F1A\u5148\u7528\u5185\u7F6E\u7248\u672C\u3002",
   "ui.block_notice_opened_0": "\u5DF2\u6253\u5F00 {0}",
-  "ui.block_notice_copied_0": "\u5DF2\u53E6\u5B58\u4E3A {0}",
   "ui.block_notice_restored_0": "\u5DF2\u6062\u590D\u5185\u7F6E\u7248\u672C\uFF0C\u4F60\u7684\u7248\u672C\u5DF2\u5907\u4EFD\u5728 {0}\u3002",
   "ui.block_notice_open_failed": "\u65E0\u6CD5\u6253\u5F00\u8FD9\u4EFD\u6587\u4EF6\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u5220\u9664\u3002",
   "ui.block_notice_copy_failed": "\u65E0\u6CD5\u53E6\u5B58\u8FD9\u4EFD\u6587\u4EF6\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u6587\u4EF6\u3002",
   "ui.block_notice_restore_not_available": "\u8FD9\u91CC\u6CA1\u6709\u53EF\u6062\u590D\u7684\u5185\u7F6E\u7248\u672C\u3002",
   "ui.block_notice_restore_backup_failed": "\u65E0\u6CD5\u5199\u5165\u5907\u4EFD\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u8FD9\u4E2A\u6587\u4EF6\u3002",
   "ui.block_notice_restore_failed": "\u65E0\u6CD5\u6062\u590D\u5185\u7F6E\u7248\u672C\u3002\u518D\u8BD5\u4E00\u6B21\u4E4B\u524D\uFF0C\u8BF7\u5148\u770B\u5907\u4EFD\u6587\u4EF6\u5939\u3002",
+  "ui.block_group_builtin": "\u5185\u7F6E",
+  "ui.block_status_modified_template": "\u4F60\u6539\u8FC7\u8FD9\u4EFD\u5185\u7F6E\u7ED3\u6784\uFF0CAI \u4F1A\u7167\u4F60\u7684\u7248\u672C\u5199\u3002",
+  "ui.block_status_modified_tone": "\u4F60\u6539\u8FC7\u8FD9\u4EFD\u5185\u7F6E\u53E3\u543B\uFF0CAI \u4F1A\u7167\u4F60\u7684\u7248\u672C\u5199\u3002",
+  "ui.block_status_own_template": "\u4F60\u81EA\u5DF1\u521B\u5EFA\u7684\u7ED3\u6784\u3002",
+  "ui.block_status_own_tone": "\u4F60\u81EA\u5DF1\u521B\u5EFA\u7684\u53E3\u543B\u3002",
+  "ui.block_status_issue_template_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u4F1A\u5148\u7528\u5185\u7F6E\u201C\u6807\u51C6\u201D\u3002",
+  "ui.block_status_issue_tone_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u4F1A\u5148\u7528\u5185\u7F6E\u201C\u5B66\u672F\u4E25\u8C28\u201D\u3002",
+  "ui.block_status_missing_template_0": "\u26A0 \u627E\u4E0D\u5230\u201C{0}\u201D\uFF0CAI \u76EE\u524D\u7528\u5185\u7F6E\u201C\u6807\u51C6\u201D\u3002\u8BF7\u4ECE\u83DC\u5355\u91CD\u65B0\u9009\u4E00\u4E2A\u3002",
+  "ui.block_status_missing_tone_0": "\u26A0 \u627E\u4E0D\u5230\u201C{0}\u201D\uFF0CAI \u76EE\u524D\u7528\u5185\u7F6E\u201C\u5B66\u672F\u4E25\u8C28\u201D\u3002\u8BF7\u4ECE\u83DC\u5355\u91CD\u65B0\u9009\u4E00\u4E2A\u3002",
+  "ui.block_missing_option_0": "\u627E\u4E0D\u5230\uFF1A{0}",
+  "ui.block_edit_aria_template": "\u7F16\u8F91\u7B14\u8BB0\u7ED3\u6784",
+  "ui.block_edit_aria_tone": "\u7F16\u8F91\u5199\u4F5C\u53E3\u543B",
+  "ui.block_more_template": "\u66F4\u591A\u64CD\u4F5C\uFF1A\u7B14\u8BB0\u7ED3\u6784",
+  "ui.block_more_tone": "\u66F4\u591A\u64CD\u4F5C\uFF1A\u5199\u4F5C\u53E3\u543B",
+  "ui.block_save_as_title": "\u53E6\u5B58\u4E3A\u6211\u7684\u7248\u672C",
+  "ui.block_name_taken": "\u5DF2\u6709\u540C\u540D\u7684\u6587\u4EF6\u6216\u5185\u7F6E\u9879\u76EE\uFF0C\u8BF7\u6362\u4E00\u4E2A\u540D\u79F0\u3002",
+  "ui.block_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u4E3A\u201C{0}\u201D\u5E76\u6539\u7528\u5B83\u3002",
+  "ui.block_notice_open_backup": "\u6253\u5F00\u5907\u4EFD",
+  "ui.note_style_location_desc": "\u4F60\u6539\u8FC7\u6216\u81EA\u5DF1\u521B\u5EFA\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u5B58\u5728\u8FD9\u91CC\uFF0C\u662F\u666E\u901A Markdown \u6587\u4EF6\u3002",
+  "ui.note_style_location_empty": "\u8FD8\u6CA1\u6709\u6587\u4EF6\u3002\u7B2C\u4E00\u6B21\u7F16\u8F91\u6216\u53E6\u5B58\u65F6\u4F1A\u521B\u5EFA\u3002",
+  "ui.preview_tone_empty": "\uFF08\u9ED8\u8BA4\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
+  "ui.block_academic_note": "<!-- \u5B66\u672F\u4E25\u8C28\u662F\u9ED8\u8BA4\u53E3\u543B\uFF1AAI \u53EA\u7167\u63D2\u4EF6\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8BC1\u636E\u89C4\u5219\u5199\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u6362\u4E00\u79CD\u5199\u6CD5\uFF0C\u5C31\u5728\u8FD9\u6BB5\u6CE8\u91CA\u4E0B\u9762\u76F4\u63A5\u5199\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u201C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u70B9\u201D\u3002 -->",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u9898",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u9898",
@@ -5991,7 +6023,7 @@ var zhTW = {
   "ui.block_folder_template": "\u6A21\u677F",
   "ui.block_folder_tone": "\u8A9E\u6C23",
   "ui.block_folder_backup": "\u5099\u4EFD",
-  "ui.block_copy_name_0": "{0} \u526F\u672C",
+  "ui.block_copy_name_0": "{0} \u6211\u7684\u7248\u672C",
   "ui.block_picker_template": "\u7B46\u8A18\u7D50\u69CB",
   "ui.block_picker_tone": "\u5BEB\u4F5C\u53E3\u543B",
   "ui.block_picker_template_aria": "\u7B46\u8A18\u98A8\u683C\u7684\u7D50\u69CB",
@@ -6000,19 +6032,35 @@ var zhTW = {
   "ui.block_copy": "\u53E6\u5B58\u70BA\u6211\u7684\u7248\u672C\u2026",
   "ui.block_restore": "\u6062\u5FA9\u5167\u5EFA\u7248\u672C",
   "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
-  "ui.block_status_modified": "\u4F60\u6539\u904E\u9019\u4EFD\u5167\u5EFA\u7248\u672C\uFF0CAI \u6703\u7167\u4F60\u7684\u7248\u672C\u5BEB\u3002",
-  "ui.block_status_builtin_file": "\u5167\u5EFA\u7248\u672C\u3002",
-  "ui.block_status_builtin_none": "\u5167\u5EFA\u7248\u672C\u3002",
-  "ui.block_status_own": "\u4F60\u81EA\u5DF1\u5EFA\u7ACB\u7684\u7D50\u69CB\u6216\u53E3\u543B\u3002",
-  "ui.block_status_issue_0_1_2": "\u26A0 \u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u6703\u5148\u7528\u5167\u5EFA\u7248\u672C\u3002",
   "ui.block_notice_opened_0": "\u5DF2\u958B\u555F {0}",
-  "ui.block_notice_copied_0": "\u5DF2\u53E6\u5B58\u70BA {0}",
   "ui.block_notice_restored_0": "\u5DF2\u6062\u5FA9\u5167\u5EFA\u7248\u672C\uFF0C\u4F60\u7684\u7248\u672C\u5099\u4EFD\u5728 {0}\u3002",
   "ui.block_notice_open_failed": "\u7121\u6CD5\u958B\u555F\u9019\u4EFD\u6A94\u6848\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u522A\u9664\u3002",
   "ui.block_notice_copy_failed": "\u7121\u6CD5\u53E6\u5B58\u9019\u4EFD\u6A94\u6848\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u6A94\u6848\u3002",
   "ui.block_notice_restore_not_available": "\u9019\u88E1\u6C92\u6709\u53EF\u6062\u5FA9\u7684\u5167\u5EFA\u7248\u672C\u3002",
   "ui.block_notice_restore_backup_failed": "\u7121\u6CD5\u5BEB\u5165\u5099\u4EFD\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u9019\u500B\u6A94\u6848\u3002",
   "ui.block_notice_restore_failed": "\u7121\u6CD5\u6062\u5FA9\u5167\u5EFA\u7248\u672C\u3002\u518D\u8A66\u4E00\u6B21\u4E4B\u524D\uFF0C\u8ACB\u5148\u770B\u5099\u4EFD\u8CC7\u6599\u593E\u3002",
+  "ui.block_group_builtin": "\u5167\u5EFA",
+  "ui.block_status_modified_template": "\u4F60\u6539\u904E\u9019\u4EFD\u5167\u5EFA\u7D50\u69CB\uFF0CAI \u6703\u7167\u4F60\u7684\u7248\u672C\u5BEB\u3002",
+  "ui.block_status_modified_tone": "\u4F60\u6539\u904E\u9019\u4EFD\u5167\u5EFA\u53E3\u543B\uFF0CAI \u6703\u7167\u4F60\u7684\u7248\u672C\u5BEB\u3002",
+  "ui.block_status_own_template": "\u4F60\u81EA\u5DF1\u5EFA\u7ACB\u7684\u7D50\u69CB\u3002",
+  "ui.block_status_own_tone": "\u4F60\u81EA\u5DF1\u5EFA\u7ACB\u7684\u53E3\u543B\u3002",
+  "ui.block_status_issue_template_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u6703\u5148\u7528\u5167\u5EFA\u300C\u6A19\u6E96\u300D\u3002",
+  "ui.block_status_issue_tone_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u6703\u5148\u7528\u5167\u5EFA\u300C\u5B78\u8853\u56B4\u8B39\u300D\u3002",
+  "ui.block_status_missing_template_0": "\u26A0 \u627E\u4E0D\u5230\u300C{0}\u300D\uFF0CAI \u76EE\u524D\u7528\u5167\u5EFA\u300C\u6A19\u6E96\u300D\u3002\u8ACB\u5F9E\u9078\u55AE\u91CD\u65B0\u9078\u4E00\u500B\u3002",
+  "ui.block_status_missing_tone_0": "\u26A0 \u627E\u4E0D\u5230\u300C{0}\u300D\uFF0CAI \u76EE\u524D\u7528\u5167\u5EFA\u300C\u5B78\u8853\u56B4\u8B39\u300D\u3002\u8ACB\u5F9E\u9078\u55AE\u91CD\u65B0\u9078\u4E00\u500B\u3002",
+  "ui.block_missing_option_0": "\u627E\u4E0D\u5230\uFF1A{0}",
+  "ui.block_edit_aria_template": "\u7DE8\u8F2F\u7B46\u8A18\u7D50\u69CB",
+  "ui.block_edit_aria_tone": "\u7DE8\u8F2F\u5BEB\u4F5C\u53E3\u543B",
+  "ui.block_more_template": "\u66F4\u591A\u52D5\u4F5C\uFF1A\u7B46\u8A18\u7D50\u69CB",
+  "ui.block_more_tone": "\u66F4\u591A\u52D5\u4F5C\uFF1A\u5BEB\u4F5C\u53E3\u543B",
+  "ui.block_save_as_title": "\u53E6\u5B58\u70BA\u6211\u7684\u7248\u672C",
+  "ui.block_name_taken": "\u5DF2\u6709\u540C\u540D\u7684\u6A94\u6848\u6216\u5167\u5EFA\u9805\u76EE\uFF0C\u8ACB\u63DB\u4E00\u500B\u540D\u7A31\u3002",
+  "ui.block_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u70BA\u300C{0}\u300D\u4E26\u6539\u7528\u5B83\u3002",
+  "ui.block_notice_open_backup": "\u958B\u555F\u5099\u4EFD",
+  "ui.note_style_location_desc": "\u4F60\u6539\u904E\u6216\u81EA\u5DF1\u5EFA\u7ACB\u7684\u7D50\u69CB\u8207\u53E3\u543B\u5B58\u5728\u9019\u88E1\uFF0C\u662F\u4E00\u822C Markdown \u6A94\u3002",
+  "ui.note_style_location_empty": "\u9084\u6C92\u6709\u6A94\u6848\u3002\u7B2C\u4E00\u6B21\u7DE8\u8F2F\u6216\u53E6\u5B58\u6642\u6703\u5EFA\u7ACB\u3002",
+  "ui.preview_tone_empty": "\uFF08\u9810\u8A2D\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
+  "ui.block_academic_note": "<!-- \u5B78\u8853\u56B4\u8B39\u662F\u9810\u8A2D\u53E3\u543B\uFF1AAI \u53EA\u7167\u5916\u639B\u56FA\u5B9A\u7684\u4E2D\u6027\u3001\u91CD\u8B49\u64DA\u898F\u5247\u5BEB\uFF0C\u4E0D\u53E6\u52A0\u53E3\u543B\u6307\u793A\u3002\n     \u60F3\u63DB\u4E00\u7A2E\u5BEB\u6CD5\uFF0C\u5C31\u5728\u9019\u6BB5\u8A3B\u89E3\u4E0B\u9762\u76F4\u63A5\u5BEB\u4F60\u8981\u7684\u53E3\u543B\uFF0C\u4F8B\u5982\u300C\u591A\u7528\u6BD4\u55BB\uFF0C\u53E5\u5B50\u77ED\u4E00\u9EDE\u300D\u3002 -->",
   "ui.preview_step_research": "\u7814\u7A76\u4E3B\u984C",
   "ui.preview_step_quick": "\u5FEB\u901F\u7814\u7A76",
   "ui.preview_step_decompose": "\u62C6\u6210\u5B50\u4E3B\u984C",
@@ -24155,14 +24203,17 @@ var NameModal = class extends import_obsidian12.Modal {
     actions.createEl("button", { text: t("ui.cancel") }).addEventListener("click", () => this.close());
     const saveButton = actions.createEl("button", { text: t("ui.save"), cls: "mod-cta" });
     const save = () => {
+      var _a2, _b2;
       const value = input2.value.trim();
       if (this.options.allowEmpty ? !!value && !!titleProblemText(value) : !value || !!titleProblemText(value)) return;
+      if (value && ((_b2 = (_a2 = this.options).problem) == null ? void 0 : _b2.call(_a2, value))) return;
       this.close();
       this.submit(value);
     };
     const check = () => {
+      var _a2, _b2, _c;
       const empty = !input2.value.trim();
-      const problem = empty ? "" : titleProblemText(input2.value);
+      const problem = empty ? "" : titleProblemText(input2.value) || ((_c = (_b2 = (_a2 = this.options).problem) == null ? void 0 : _b2.call(_a2, input2.value.trim())) != null ? _c : "");
       const blankOk = empty && !!this.options.allowEmpty;
       saveButton.disabled = empty && !blankOk || !!problem;
       status.setText(empty && !blankOk ? t("ui.name_required") : problem);
@@ -25396,6 +25447,13 @@ function findBuiltinBlock(category, id) {
 function lookupBuiltinBlock(category, id, language2) {
   return findBuiltinBlock(category, id).body(language2);
 }
+function academicToneNote(language2) {
+  return `${translate(language2, "ui.block_academic_note")}
+`;
+}
+function stripToneComments(text11) {
+  return /<!--[\s\S]*?-->/.test(text11) ? text11.replace(/<!--[\s\S]*?-->/g, "").trim() : text11;
+}
 
 // core/steps/aim/language.zh.md
 var language_zh_default = "\u8F38\u51FA\u8A9E\u8A00\uFF1A{{language}}\u3002\u6240\u6709\u7D66\u8B80\u8005\u770B\u7684\u6B04\u4F4D\u3001\u6A19\u984C\u3001\u554F\u984C\u8207\u9078\u9805\u90FD\u7528{{languagePlain}}\u64B0\u5BEB\uFF0C\u4E0D\u8AD6\u5176\u4ED6\u6307\u793A\u3001\u8A18\u61B6\u6216\u4F86\u6E90\u8CC7\u6599\u4F7F\u7528\u4F55\u7A2E\u8A9E\u8A00\u3002\u4FDD\u7559\u4F86\u6E90\u539F\u6587\u5F15\u8FF0\u8207\u5C08\u6709\u540D\u7A31\u3002\n";
@@ -26575,7 +26633,7 @@ var NoteStyleStore = class {
     for (const block of BUILTIN_BLOCKS.filter((item) => item.category === category)) {
       const base = this.overrideBase(category, block.id);
       const text11 = base === void 0 ? void 0 : map.get(base);
-      const modified = text11 !== void 0 && !isUnmodifiedBlock(category, block.id, text11);
+      const modified = text11 !== void 0 && !isUnmodifiedBlock(category, block.id, category === "tone" ? stripToneComments(text11) : text11);
       if (base !== void 0) used.add(base);
       items.push({
         ref: builtinRef(block.id),
@@ -26748,13 +26806,14 @@ var NoteStyleStore = class {
     if ((parsed == null ? void 0 : parsed.kind) === "builtin") {
       if (!this.isBuiltinBlockId("tone", parsed.id)) return void 0;
       const base = this.overrideBase("tone", parsed.id);
-      const text11 = base === void 0 ? void 0 : this.blocks.tone.get(base);
+      const raw = base === void 0 ? void 0 : this.blocks.tone.get(base);
+      const text11 = raw === void 0 ? void 0 : stripToneComments(raw);
       if (text11 !== void 0 && !isUnmodifiedBlock("tone", parsed.id, text11)) return { text: text11, source: parsed.id };
       return { id: parsed.id };
     }
     if ((parsed == null ? void 0 : parsed.kind) === "file") {
-      const text11 = this.blocks.tone.get(parsed.base);
-      return text11 === void 0 ? void 0 : { text: text11, source: ref };
+      const raw = this.blocks.tone.get(parsed.base);
+      return raw === void 0 ? void 0 : { text: stripToneComments(raw), source: ref };
     }
     return void 0;
   }
@@ -27054,7 +27113,7 @@ var NoteStyleStore = class {
         cleanBlockName(translate(language2, block.nameKey)) || parsed.id,
         this.takenNames(category)
       );
-      const text11 = builtinBlockText(category, parsed.id, language2);
+      const text11 = category === "tone" && parsed.id === "academic" ? academicToneNote(language2) : builtinBlockText(category, parsed.id, language2);
       await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text11);
@@ -27063,10 +27122,12 @@ var NoteStyleStore = class {
     });
   }
   /**
-   * Copies a block into a new file of the category, named "<name> copy" (unique, never a built-in's name), and makes it
-   * the workspace's choice. Returns the new ref. The text copied is the block's file when it has one, else its built-in text.
+   * Copies a block into a new file of the category, named "<name> (my version)" (unique, never a built-in's name), and
+   * makes it the workspace's choice. Returns the new ref. The text copied is the block's file when it has one, else its
+   * built-in text. With `chosenName` the file gets that name (cleaned); a name that is empty, taken or a built-in's
+   * throws and nothing is written or changed.
    */
-  copyBlock(category, ref) {
+  copyBlock(category, ref, chosenName) {
     return this.serial(async () => {
       await this.loadBlocks();
       const parsed = parseBlockRef(ref);
@@ -27084,7 +27145,16 @@ var NoteStyleStore = class {
         text11 = override === void 0 ? builtinBlockText(category, parsed.id, language2) : this.blocks[category].get(override);
       } else throw new Error(`Unknown block: ${ref}`);
       const dir = this.blockDirectories()[category];
-      const base = copyBlockName(category, name, language2, this.takenNames(category));
+      let base;
+      if (chosenName === void 0) base = copyBlockName(category, name, language2, this.takenNames(category));
+      else {
+        base = cleanBlockName(chosenName);
+        const reserved = new Set(this.takenNames(category));
+        for (const block of BUILTIN_BLOCKS)
+          if (block.category === category)
+            for (const builtinName of builtinBlockNames(category, block.id)) reserved.add(lower3(builtinName));
+        if (!base || reserved.has(lower3(base))) throw new Error(`Block name not available: ${chosenName}`);
+      }
       await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text11);
@@ -63325,7 +63395,18 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
         }
       )
     );
-    for (const section3 of preview.sections) {
+    const hasTone = preview.sections.some((section3) => section3.group === "tone");
+    const lastTemplate = preview.sections.map((section3) => section3.group).lastIndexOf("template");
+    const emptyToneAt = hasTone ? -1 : lastTemplate + 1;
+    const showEmptyTone = () => {
+      body.createEl("h2", { text: t(GROUP_KEYS.tone) });
+      body.createEl("p", {
+        text: t("ui.preview_tone_empty"),
+        cls: "vam-prompt-preview-empty setting-item-description"
+      });
+    };
+    for (const [index, section3] of preview.sections.entries()) {
+      if (index === emptyToneAt) showEmptyTone();
       const title = t(GROUP_KEYS[section3.group]);
       body.createEl("h2", { text: title });
       const pre = body.createEl("pre", { cls: "vam-prompt-preview-text" });
@@ -63334,18 +63415,33 @@ var PromptPreviewModal = class extends import_obsidian32.Modal {
       pre.setAttr("role", "region");
       pre.setAttr("aria-label", t("ui.preview_prompt_text_0", title));
     }
+    if (emptyToneAt === preview.sections.length) showEmptyTone();
   }
 };
 
 // ui/settings-tab.ts
 var import_obsidian33 = require("obsidian");
-function renderNoteStyleSetting(setting, plugin, refresh) {
+function renderNoteStyleSetting(setting, plugin) {
+  setting.setName(t("ui.note_style")).setDesc(t("ui.note_style_setting_desc")).setHeading();
+  setting.addButton((button) => {
+    button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl));
+    button.buttonEl.addClass("mod-muted");
+  });
+}
+function renderNoteLocationSetting(setting, plugin, refresh) {
   const store = plugin.noteStyles;
   const settings = plugin.settings;
-  const missing = !store.folderExists();
-  setting.setName(t("ui.note_style")).setDesc(missing ? t("ui.note_style_folder_missing_desc_0", store.folder()) : t("ui.note_style_setting_desc"));
+  const missing = !store.folderExists() && !!settings.noteStylesFolder;
+  let loaded = false;
+  const hasFiles = () => ["template", "tone"].some(
+    (category) => store.listBlocks(category).some((item) => item.fileName !== void 0)
+  );
+  const describe = () => {
+    if (missing) return;
+    setting.setDesc(t(loaded && !hasFiles() ? "ui.note_style_location_empty" : "ui.note_style_location_desc"));
+  };
   if (missing) {
-    setting.nameEl.setText(`${t("ui.note_style")} \xB7 ${t("ui.note_style_folder_missing")}`);
+    setting.setName(t("ui.note_style_folder_missing")).setDesc(t("ui.note_style_folder_missing_desc_0", store.folder()));
     let input2 = "";
     setting.addText((text11) => {
       input2 = store.folder();
@@ -63365,6 +63461,8 @@ function renderNoteStyleSetting(setting, plugin, refresh) {
       })
     );
   } else {
+    setting.setName(t("ui.note_style_folder_path"));
+    describe();
     setting.addText((text11) => {
       text11.setValue(store.folder()).setDisabled(true);
       text11.inputEl.setAttr("aria-label", t("ui.note_style_folder_path"));
@@ -63376,8 +63474,12 @@ function renderNoteStyleSetting(setting, plugin, refresh) {
       refresh();
     })
   );
-  setting.addButton(
-    (button) => button.setButtonText(t("ui.preview_prompt_open")).onClick(() => plugin.openPromptPreview(button.buttonEl))
+  void store.refresh().then(
+    () => {
+      loaded = true;
+      describe();
+    },
+    () => void 0
   );
 }
 function shownBlocks(plugin) {
@@ -63405,10 +63507,27 @@ function writeShown(plugin, changed) {
   const next = { template: shown.template, tone: shown.tone };
   for (const category of ["template", "tone"]) {
     if ((changed == null ? void 0 : changed.category) === category) next[category] = changed.value;
-    else if (!saved[category] && held[category]) next[category] = void 0;
+    else if (!saved[category] && held[category] || missingBlockRef(plugin, category)) next[category] = void 0;
   }
   if (next.template !== void 0) settings.noteTemplateBlock = next.template;
   if (next.tone !== void 0) settings.noteToneBlock = next.tone;
+}
+var BLOCK_HINTS = {
+  template: { standard: "ui.note_style_standard_hint", textbook: "ui.note_style_textbook_hint" },
+  tone: {
+    academic: "ui.tone_hint_academic",
+    plain: "ui.tone_hint_plain",
+    magazine: "ui.tone_hint_magazine",
+    summary: "ui.tone_hint_summary",
+    guide: "ui.tone_hint_guide",
+    auto: "ui.tone_hint_auto"
+  }
+};
+function missingBlockRef(plugin, category) {
+  const { noteStyles: store } = plugin;
+  const key2 = store.effectiveBlockKeys()[category];
+  if (!key2) return void 0;
+  return store.listBlocks(category).some((item) => item.ref === key2) ? void 0 : key2;
 }
 function renderNoteBlockSetting(setting, plugin, category) {
   const { noteStyles: store } = plugin;
@@ -63419,43 +63538,73 @@ function renderNoteBlockSetting(setting, plugin, category) {
   setting.settingEl.addClass("vam-block-row");
   let shownDesc;
   let busy = false;
+  let loaded = false;
   let picker;
-  let openButton;
-  let copyButton;
-  let restoreButton;
+  let editButton;
+  let moreButton;
+  let current;
+  let missing;
   const lock = (button, disabled) => {
     button == null ? void 0 : button.setDisabled(disabled);
     button == null ? void 0 : button.buttonEl.setAttr("aria-disabled", String(disabled));
   };
+  const writeDesc = (lines) => {
+    const key2 = lines.map((line) => `${line.error ? "!" : ""}${line.text}`).join("\n");
+    if (key2 === shownDesc) return;
+    shownDesc = key2;
+    setting.descEl.empty();
+    for (const line of lines)
+      setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : void 0 });
+  };
   const render = () => {
-    var _a2;
     if (!picker) return;
-    const shown = shownBlocks(plugin);
     const items = store.listBlocks(category);
     picker.selectEl.replaceChildren();
-    for (const item2 of items)
-      picker.addOption(item2.ref, item2.modified ? t("ui.block_modified_0", item2.name) : item2.name);
-    const value = shown[category];
+    missing = loaded ? missingBlockRef(plugin, category) : void 0;
+    const optionText = (item) => item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.modified ? t("ui.block_modified_0", item.name) : item.name;
+    const addGroup = (title, group) => {
+      if (!group.length) return;
+      const groupEl = picker.selectEl.createEl("optgroup", { attr: { label: title } });
+      for (const item of group) groupEl.createEl("option", { value: item.ref, text: optionText(item) });
+    };
+    const missingName = () => {
+      const parsed = parseBlockRef(missing);
+      return (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : (parsed == null ? void 0 : parsed.kind) === "builtin" ? parsed.id : missing != null ? missing : "";
+    };
+    if (missing) picker.addOption(missing, t("ui.block_missing_option_0", missingName()));
+    addGroup(
+      t("ui.block_group_builtin"),
+      items.filter((item) => item.kind === "builtin")
+    );
+    addGroup(
+      t("ui.note_style_group_folder"),
+      items.filter((item) => item.kind === "file")
+    );
+    const value = missing != null ? missing : shownBlocks(plugin)[category];
     picker.setValue(value);
-    const item = items.find((entry) => entry.ref === value);
-    const restorable = (item == null ? void 0 : item.kind) === "builtin" && item.fileName !== void 0;
+    current = missing ? void 0 : items.find((entry) => entry.ref === value);
     picker.setDisabled(busy);
-    lock(openButton, busy);
-    lock(copyButton, busy);
-    lock(restoreButton, busy || !restorable);
-    const parts = [];
-    if (item) {
-      const issue2 = item.issues[0];
+    lock(editButton, busy);
+    if (missing) editButton == null ? void 0 : editButton.buttonEl.hide();
+    else editButton == null ? void 0 : editButton.buttonEl.show();
+    moreButton == null ? void 0 : moreButton.setDisabled(busy);
+    const fallback = isTemplate ? "template" : "tone";
+    const lines = [];
+    if (missing) lines.push({ text: t(`ui.block_status_missing_${fallback}_0`, missingName()), error: true });
+    else if (current) {
+      const builtinId = parseBlockRef(current.ref);
+      if (current.kind === "file") lines.push({ text: t(`ui.block_status_own_${fallback}`) });
+      else if ((builtinId == null ? void 0 : builtinId.kind) === "builtin" && BLOCK_HINTS[category][builtinId.id])
+        lines.push({ text: t(BLOCK_HINTS[category][builtinId.id]) });
+      const issue2 = current.issues[0];
       if (issue2)
-        parts.push(t("ui.block_status_issue_0_1_2", (_a2 = item.fileName) != null ? _a2 : item.name, issue2.line, styleIssueText(issue2)));
-      if (item.kind === "file") parts.push(t("ui.block_status_own"));
-      else if (item.modified) parts.push(t("ui.block_status_modified"));
-      else parts.push(t(item.fileName === void 0 ? "ui.block_status_builtin_none" : "ui.block_status_builtin_file"));
+        lines.push({
+          text: t(`ui.block_status_issue_${fallback}_0_1`, issue2.line, styleIssueText(issue2)),
+          error: true
+        });
+      else if (current.modified) lines.push({ text: t(`ui.block_status_modified_${fallback}`) });
     }
-    const desc = parts.join(" ");
-    if (desc === shownDesc) return;
-    shownDesc = desc;
-    setting.setDesc(desc);
+    writeDesc(lines);
   };
   const act = async (action, target) => {
     var _a2;
@@ -63474,6 +63623,62 @@ function renderNoteBlockSetting(setting, plugin, category) {
       (_a2 = target()) == null ? void 0 : _a2.focus();
     }
   };
+  const saveAs = () => {
+    const item = current;
+    if (busy || !item) return;
+    const items = store.listBlocks(category);
+    const reserved = /* @__PURE__ */ new Set();
+    for (const entry of items) {
+      reserved.add(entry.name.toLocaleLowerCase());
+      const parsed = parseBlockRef(entry.ref);
+      if ((parsed == null ? void 0 : parsed.kind) === "builtin")
+        for (const name of builtinBlockNames(category, parsed.id)) reserved.add(name.toLocaleLowerCase());
+    }
+    const suggested = copyBlockName(category, item.name, plugin.settings.language, reserved);
+    new NameModal(
+      plugin.app,
+      t("ui.block_save_as_title"),
+      suggested,
+      (name) => void act(
+        async (ref) => {
+          const created = await plugin.copyBlock(category, ref, name);
+          if (created) await plugin.openBlock(category, created);
+        },
+        () => picker == null ? void 0 : picker.selectEl
+      ),
+      {
+        problem: (value) => {
+          const cleaned = cleanBlockName(value).toLocaleLowerCase();
+          return !cleaned || reserved.has(cleaned) ? t("ui.block_name_taken") : "";
+        }
+      }
+    ).open();
+  };
+  const showMenu = () => {
+    if (busy || !moreButton) return;
+    const menu = new import_obsidian33.Menu();
+    const item = current;
+    if (item)
+      menu.addItem(
+        (entry) => entry.setTitle(t("ui.block_copy")).setIcon("copy").onClick(() => saveAs())
+      );
+    if ((item == null ? void 0 : item.kind) === "builtin" && item.modified)
+      menu.addItem(
+        (entry) => entry.setTitle(t("ui.block_restore")).setIcon("rotate-ccw").onClick(
+          () => act(
+            (ref) => plugin.restoreBlock(category, ref).then(() => void 0),
+            () => moreButton == null ? void 0 : moreButton.extraSettingsEl
+          )
+        )
+      );
+    menu.addItem(
+      (entry) => entry.setTitle(t("ui.note_style_open_folder")).setIcon("folder-open").onClick(() => {
+        void plugin.openNoteStylesFolder().then(() => moreButton == null ? void 0 : moreButton.extraSettingsEl.focus());
+      })
+    );
+    const rect2 = moreButton.extraSettingsEl.getBoundingClientRect();
+    menu.showAtPosition({ x: rect2.left, y: rect2.bottom });
+  };
   setting.addDropdown((dropdown) => {
     picker = dropdown;
     dropdown.selectEl.setAttr(
@@ -63487,34 +63692,30 @@ function renderNoteBlockSetting(setting, plugin, category) {
     });
   });
   setting.addButton((button) => {
-    openButton = button;
-    button.setButtonText(t("ui.block_open")).onClick(
+    editButton = button;
+    button.setButtonText(t("ui.block_open"));
+    button.buttonEl.setAttr("aria-label", t(isTemplate ? "ui.block_edit_aria_template" : "ui.block_edit_aria_tone"));
+    button.onClick(
       () => act(
         (ref) => plugin.openBlock(category, ref).then(() => void 0),
-        () => openButton == null ? void 0 : openButton.buttonEl
+        () => editButton == null ? void 0 : editButton.buttonEl
       )
     );
   });
-  setting.addButton((button) => {
-    copyButton = button;
-    button.setButtonText(t("ui.block_copy")).onClick(
-      () => act(
-        (ref) => plugin.copyBlock(category, ref).then(() => void 0),
-        () => picker == null ? void 0 : picker.selectEl
-      )
-    );
-  });
-  setting.addButton((button) => {
-    restoreButton = button;
-    button.setButtonText(t("ui.block_restore")).onClick(
-      () => act(
-        (ref) => plugin.restoreBlock(category, ref).then(() => void 0),
-        () => (restoreButton == null ? void 0 : restoreButton.buttonEl.getAttribute("aria-disabled")) === "true" ? picker == null ? void 0 : picker.selectEl : restoreButton == null ? void 0 : restoreButton.buttonEl
-      )
-    );
+  setting.addExtraButton((button) => {
+    moreButton = button;
+    const moreLabel = t(isTemplate ? "ui.block_more_template" : "ui.block_more_tone");
+    button.setIcon("more-horizontal").setTooltip(moreLabel).onClick(showMenu);
+    button.extraSettingsEl.setAttr("aria-label", moreLabel);
   });
   render();
-  void store.refresh().then(render, () => void 0);
+  void store.refresh().then(
+    () => {
+      loaded = true;
+      render();
+    },
+    () => void 0
+  );
 }
 var CODEX_INSTALL_URL = "https://developers.openai.com/codex/cli/";
 var CLAUDE_INSTALL_URL = "https://code.claude.com/docs/en/setup";
@@ -63777,7 +63978,7 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
       },
       {
         name: t("ui.note_style"),
-        render: (setting) => renderNoteStyleSetting(setting, this.plugin, () => this.update())
+        render: (setting) => renderNoteStyleSetting(setting, this.plugin)
       },
       {
         name: t("ui.block_picker_template"),
@@ -63786,6 +63987,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
       {
         name: t("ui.block_picker_tone"),
         render: (setting) => renderNoteBlockSetting(setting, this.plugin, "tone")
+      },
+      {
+        name: t("ui.note_style_folder_path"),
+        render: (setting) => renderNoteLocationSetting(setting, this.plugin, () => this.update())
       },
       {
         name: t("ui.markdown_selection_ai_auto_open"),
@@ -71140,12 +71345,15 @@ ${t("ui.organize_link_wait_hint")}`;
       return false;
     }
   }
-  /** Copies a block into a new file, which becomes the workspace's choice; it is not opened. Returns the new ref. */
-  async copyBlock(category, ref) {
+  /**
+   * "Save as my own": copies a block into a new file (named `name`, else "<name> (my version)"), which becomes the
+   * workspace's choice; it is not opened here. Returns the new ref, or null (nothing written) when it cannot be saved.
+   */
+  async copyBlock(category, ref, name) {
     try {
-      const created = await this.noteStyles.copyBlock(category, ref);
-      const { path } = await this.noteStyles.ensureBlockFile(category, created);
-      new import_obsidian40.Notice(t("ui.block_notice_copied_0", path));
+      const created = await this.noteStyles.copyBlock(category, ref, name);
+      const parsed = parseBlockRef(created);
+      new import_obsidian40.Notice(t("ui.block_notice_saved_as_0", (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : created));
       return created;
     } catch (e) {
       new import_obsidian40.Notice(t("ui.block_notice_copy_failed"));
@@ -71157,7 +71365,15 @@ ${t("ui.organize_link_wait_hint")}`;
     try {
       const result = await this.noteStyles.restoreBlock(category, ref);
       if (result.ok) {
-        new import_obsidian40.Notice(t("ui.block_notice_restored_0", result.backup));
+        const backup = result.backup;
+        backgroundResultNotice(t("ui.block_notice_restored_0", backup), {
+          label: t("ui.block_notice_open_backup"),
+          open: () => {
+            const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(backup));
+            if (file instanceof import_obsidian40.TFile) void this.app.workspace.getLeaf("tab").openFile(file);
+            else new import_obsidian40.Notice(t("ui.block_notice_open_failed"));
+          }
+        });
         return true;
       }
       const reason = result.reason;

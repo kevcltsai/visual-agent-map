@@ -1,81 +1,116 @@
-// P4: the settings "Note style" row (04: now the folder row plus the Template and Tone rows), the style-file problem texts in every language, and the dead template UI is gone.
+// Settings "Note style" area (note style flow redesign P2): the heading with Preview AI instructions, the Structure and Voice
+// rows (a picker in two groups, one Edit button, one more-actions menu with only the actions that apply), the File location
+// row, the style-file problem texts in every language, and the dead template UI is gone.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const S = require('./support.cjs');
+const dom = require('./support-dom.cjs');
 const { loadSource } = require('./support-replay.cjs');
 
-const obsidian = { ...S.obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: class {} };
-const { renderNoteStyleSetting, renderNoteBlockSetting } = S.load('ui/settings-tab.ts', { obsidian });
+const modals = [];
+class FakeModal { constructor(app) { this.app = app; } open() { modals.push(this); } close() {} }
+const menus = [];
+class FakeMenu {
+  constructor() { this.items = []; menus.push(this); }
+  addItem(build) { const item = { title: '', icon: '' }; build({ setTitle(t) { item.title = t; return this; }, setIcon(i) { item.icon = i; return this; }, onClick(fn) { item.click = fn; return this; } }); this.items.push(item); return this; }
+  showAtPosition(position) { this.position = position; return this; }
+  get titles() { return this.items.map(item => item.title); }
+}
+const notices = [];
+const obsidian = { ...S.obsidian, PluginSettingTab: class { hide() {} }, Setting: class {}, Modal: FakeModal, Menu: FakeMenu, Notice: dom.makeNotice(notices) };
+const { renderNoteStyleSetting, renderNoteBlockSetting, renderNoteLocationSetting } = S.load('ui/settings-tab.ts', { obsidian });
 const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
+const { default: Plugin } = S.load('main.ts', { obsidian }, { createFragment: dom.createFragment });
 const { parseNoteStyleFile } = loadSource('export { parseNoteStyleFile } from "./ai/note-style-file";');
 const i18n = S.load('i18n.ts');
+const { t } = i18n;
 const root = path.resolve(__dirname, '..');
 
-function row({ exists, folder = 'WS/Styles', settings = {} } = {}) {
-  const log = { name: '', desc: '', texts: [], buttons: [], saved: 0, opened: 0, refreshed: 0 };
+const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+const buttonOf = (log, build) => { const el = dom.element('button'); el.hide = () => { el.hidden = true; }; el.show = () => { el.hidden = false; }; el.focus = () => { log.focused = el; }; return el; };
+
+/** A fake Setting made of real stand-in elements, recording what the row builds. */
+function fakeSetting() {
+  const view = { name: '', desc: '', heading: false, buttons: [], extras: [], dropdown: undefined, texts: [], descWrites: 0, classes: [], focused: undefined };
+  const descEl = dom.element('div');
+  const emptyDesc = descEl.empty.bind(descEl);
+  descEl.empty = () => { view.descWrites++; emptyDesc(); };
+  const settingEl = dom.element('div');
+  view.descEl = descEl;
   const setting = {
-    nameEl: { setText: text => { log.name = text; } },
-    setName(name) { log.name = name; return this; }, setDesc(desc) { log.desc = desc; return this; },
-    addText(build) {
-      const entry = { disabled: false, value: '', change: undefined, attrs: {} };
-      log.texts.push(entry);
-      build({ setPlaceholder() { return this; }, setValue(value) { entry.value = value; return this; }, setDisabled(value) { entry.disabled = value; return this; }, onChange(fn) { entry.change = fn; return this; }, getValue: () => entry.value, inputEl: { setAttr: (k, v) => { entry.attrs[k] = v; } } });
+    descEl, settingEl, nameEl: { setText: text => { view.name = text; } },
+    setName(name) { view.name = name; return this; }, setDesc(desc) { view.desc = desc; return this; }, setHeading() { view.heading = true; return this; },
+    addDropdown(build) {
+      const selectEl = dom.element('select'); selectEl.focus = () => { view.focused = selectEl; };
+      const entry = { selectEl, disabled: false };
+      view.dropdown = entry;
+      build({ selectEl, addOption(value, text) { selectEl.createEl('option', { value, text }); }, setValue(value) { selectEl.value = value; return this; }, setDisabled(value) { entry.disabled = value; return this; }, onChange(fn) { entry.change = fn; return this; } });
       return this;
     },
     addButton(build) {
-      const entry = {};
-      log.buttons.push(entry);
-      build({ setButtonText(text) { entry.text = text; return this; }, onClick(fn) { entry.click = fn; return this; }, buttonEl: {} });
+      const entry = { disabled: false, buttonEl: buttonOf(view) };
+      entry.buttonEl.focus = () => { view.focused = entry.buttonEl; };
+      view.buttons.push(entry);
+      build({ setButtonText(text) { entry.text = text; entry.buttonEl.text = text; return this; }, onClick(fn) { entry.click = fn; return this; }, setDisabled(value) { entry.disabled = value; return this; }, buttonEl: entry.buttonEl });
+      return this;
+    },
+    addExtraButton(build) {
+      const extraSettingsEl = dom.element('div'); extraSettingsEl.getBoundingClientRect = () => ({ left: 10, bottom: 20 }); extraSettingsEl.focus = () => { view.focused = extraSettingsEl; };
+      const entry = { disabled: false, extraSettingsEl };
+      view.extras.push(entry);
+      build({ extraSettingsEl, setIcon(icon) { entry.icon = icon; return this; }, setTooltip(text) { entry.tooltip = text; return this; }, onClick(fn) { entry.click = fn; return this; }, setDisabled(value) { entry.disabled = value; return this; } });
+      return this;
+    },
+    addText(build) {
+      const entry = { disabled: false, value: '', change: undefined, attrs: {} };
+      view.texts.push(entry);
+      build({ setPlaceholder() { return this; }, setValue(value) { entry.value = value; return this; }, setDisabled(value) { entry.disabled = value; return this; }, onChange(fn) { entry.change = fn; return this; }, getValue: () => entry.value, inputEl: { setAttr: (k, v) => { entry.attrs[k] = v; } } });
       return this;
     }
   };
+  return { setting, view };
+}
+const lines = view => view.descEl.children.map(child => child.text);
+const errorLines = view => view.descEl.children.filter(child => child.hasClass('vam-block-status-error')).map(child => child.text);
+const optionsOf = view => dom.findAll(view.dropdown.selectEl, node => node.tag === 'option').map(node => [node.optionValue, node.text]);
+const groupsOf = view => dom.findAll(view.dropdown.selectEl, node => node.tag === 'optgroup').map(node => ({ label: node.attrs.label, options: node.children.map(child => child.text) }));
+
+function row({ exists = true, folder = 'WS/Styles', settings = {}, items = [] } = {}) {
+  const { setting, view } = fakeSetting();
+  const log = { saved: 0, opened: 0, refreshed: 0, previewed: [] };
   const settingsObject = { language: 'en', ...settings };
   const plugin = {
     settings: settingsObject, saveSettings: async () => { log.saved++; }, openNoteStylesFolder: async () => { log.opened++; },
-    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder },
-    openPromptPreview: () => { log.previewed = (log.previewed ?? 0) + 1; }
+    openPromptPreview: trigger => { log.previewed.push(trigger); },
+    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items }
   };
-  renderNoteStyleSetting(setting, plugin, () => { log.refreshed++; });
-  return { log, settings: settingsObject };
+  return { setting, view, log, plugin, settings: settingsObject };
 }
 
-const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 const item = (ref, name, extra = {}) => ({ ref, kind: ref.startsWith('builtin:') ? 'builtin' : 'file', name, modified: false, issues: [], ...extra });
 const TEMPLATES = () => [item('builtin:standard', 'Standard'), item('builtin:textbook', 'Textbook')];
 const TONES = () => ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'].map(id => item(`builtin:${id}`, id));
 
-// One Template or Tone row against a fake plugin and store; `calls` records what the buttons asked of the plugin.
-function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {}, pending } = {}) {
+// One Structure or Voice row against a fake plugin and store; `calls` records what the controls asked of the plugin.
+function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {}, pending, copyResult } = {}) {
   const calls = [];
-  const view = { options: [], value: undefined, disabled: false, attrs: {}, focused: 0, buttons: [], desc: '', descAttrs: {}, name: '', classes: [], descWrites: 0 };
+  const { setting, view } = fakeSetting();
   const settingsObject = { language: 'en', detailTemplates: [], ...settings };
-  const setting = {
-    descEl: { setAttr: (k, v) => { view.descAttrs[k] = v; } },
-    settingEl: { addClass: name => { view.classes.push(name); } },
-    setName(name) { view.name = name; return this; }, setDesc(desc) { view.desc = desc; view.descWrites++; return this; },
-    addDropdown(build) {
-      build({
-        selectEl: { replaceChildren() { view.options = []; }, setAttr: (k, v) => { view.attrs[k] = v; }, focus() { view.focused++; view.focusedEl = 'select'; } },
-        addOption(id, name) { view.options.push([id, name]); }, setValue(value) { view.value = value; return this; },
-        setDisabled(value) { view.disabled = value; return this; }, onChange(fn) { view.change = fn; return this; }
-      });
-      return this;
-    },
-    addButton(build) {
-      const entry = { disabled: false, attrs: {} };
-      view.buttons.push(entry);
-      entry.buttonEl = { setAttr: (k, v) => { entry.attrs[k] = v; }, getAttribute: k => entry.attrs[k], focus() { view.focusedEl = entry.text; } };
-      build({ setButtonText(text) { entry.text = text; return this; }, onClick(fn) { entry.click = fn; return this; }, setDisabled(value) { entry.disabled = value; return this; }, buttonEl: entry.buttonEl });
-      return this;
-    }
-  };
   const plugin = {
-    settings: settingsObject, saveSettings: async () => { calls.push(['save', { ...settingsObject }]); },
+    app: {}, settings: settingsObject, saveSettings: async () => { calls.push(['save', { ...settingsObject }]); },
     openBlock: async (...args) => { calls.push(['open', ...args]); await (hold.open ?? Promise.resolve()); return true; },
-    copyBlock: async (...args) => { calls.push(['copy', ...args]); settingsObject[args[0] === 'template' ? 'noteTemplateBlock' : 'noteToneBlock'] = 'file:Copy'; (args[0] === 'template' ? templates : tones).push(item('file:Copy', 'Copy')); return 'file:Copy'; },
+    copyBlock: async (...args) => {
+      calls.push(['copy', ...args]);
+      if (copyResult === null) return null;
+      const name = args[2] ?? 'Copy';
+      settingsObject[args[0] === 'template' ? 'noteTemplateBlock' : 'noteToneBlock'] = `file:${name}`;
+      (args[0] === 'template' ? templates : tones).push(item(`file:${name}`, name, { fileName: `${name}.md` }));
+      return `file:${name}`;
+    },
     restoreBlock: async (...args) => { calls.push(['restore', ...args]); const target = (args[0] === 'template' ? templates : tones).find(entry => entry.ref === args[1]); delete target.fileName; target.modified = false; return true; },
+    openNoteStylesFolder: async () => { calls.push(['folder']); return 'WS/Styles'; },
     noteStyles: {
       refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones),
       // as the store: what is saved, else what an unfinished upgrade holds in memory
@@ -83,50 +118,184 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
     }
   };
   renderNoteBlockSetting(setting, plugin, category);
-  return { view, calls, settings: settingsObject, templates, tones };
+  const menu = () => { const before = menus.length; view.extras[0].click(); return menus.length > before ? menus.at(-1) : undefined; };
+  return { view, setting, calls, settings: settingsObject, templates, tones, plugin, menu, edit: () => view.buttons[0] };
 }
 
-test('settings row: read-only folder path, open-folder and preview buttons, no picker of its own', async () => {
-  const { log } = row({ exists: true });
-  assert.equal(log.texts[0].disabled, true);
-  assert.equal(log.texts[0].value, 'WS/Styles');
-  assert.equal(log.dropdown, undefined);
-  assert.equal(log.buttons[0].text, 'Show in file explorer');
-  await log.buttons[0].click();
-  assert.equal(log.opened, 1);
-  assert.equal(log.buttons[1].text, 'Preview AI instructions');
+test('heading: "Note style" is a heading with its help line and a muted Preview AI instructions button that gets the focus back', () => {
+  const { setting, view, log, plugin } = row();
+  renderNoteStyleSetting(setting, plugin);
+  assert.equal(view.heading, true);
+  assert.equal(view.name, 'Note style');
+  assert.equal(view.desc, t('ui.note_style_setting_desc'));
+  assert.equal(view.buttons.length, 1);
+  assert.equal(view.buttons[0].text, 'Preview AI instructions');
+  assert.equal(view.buttons[0].buttonEl.hasClass('mod-muted'), true);
+  view.buttons[0].click();
+  assert.deepEqual(log.previewed, [view.buttons[0].buttonEl]);
 });
 
-test('Template and Tone rows: pickers with a label, the built-ins first, a changed built-in marked', async () => {
-  const template = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook'), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
+test('File location row: the folder path (read-only), a Show in file explorer button, and "no files yet" until a file exists', async () => {
+  const none = row({ items: TEMPLATES() });
+  renderNoteLocationSetting(none.setting, none.plugin, () => { none.log.refreshed++; });
+  assert.equal(none.view.name, 'File location');
+  assert.equal(none.view.desc, t('ui.note_style_location_desc'), 'before the files are read nothing is claimed');
+  await flush();
+  assert.equal(none.view.desc, 'No files yet. The first edit or save creates them.');
+  assert.equal(none.view.texts[0].disabled, true);
+  assert.equal(none.view.texts[0].value, 'WS/Styles');
+  assert.equal(none.view.buttons.length, 1);
+  assert.equal(none.view.buttons[0].text, 'Show in file explorer');
+  await none.view.buttons[0].click();
+  assert.equal(none.log.opened, 1);
+  const some = row({ items: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
+  renderNoteLocationSetting(some.setting, some.plugin, () => {});
+  await flush();
+  assert.equal(some.view.desc, 'Structures and voices you edited or created are stored here as plain Markdown files.');
+  // a folder never made and never chosen is not "not found"
+  const fresh = row({ exists: false, items: TEMPLATES() });
+  renderNoteLocationSetting(fresh.setting, fresh.plugin, () => {});
+  await flush();
+  assert.equal(fresh.view.name, 'File location');
+  assert.equal(fresh.view.desc, 'No files yet. The first edit or save creates them.');
+});
+
+test('File location row: a chosen folder that is gone says so and can be chosen again (only the words changed)', async () => {
+  const { setting, view, log, plugin, settings } = row({ exists: false, settings: { noteStylesFolder: 'WS/Old' }, items: TEMPLATES() });
+  renderNoteLocationSetting(setting, plugin, () => { log.refreshed++; });
+  assert.match(view.name, /File location not found/);
+  assert.equal(view.texts[0].disabled, false);
+  view.texts[0].change(' WS/Moved ');
+  await view.buttons[0].click();
+  assert.equal(settings.noteStylesFolder, 'WS/Moved');
+  assert.equal(log.refreshed, 1);
+  assert.equal(view.buttons[1].text, 'Show in file explorer');
+});
+
+test('Structure and Voice rows: one Edit button and one more-actions button per row, no disabled button, aria names tell the rows apart', async () => {
+  const template = blockRow('template');
   await flush();
   assert.equal(template.view.name, 'Structure');
-  assert.equal(template.view.attrs['aria-label'], 'Note style structure');
-  assert.equal(template.view.descAttrs['aria-live'], 'polite');
-  assert.deepEqual(template.view.options, [['builtin:standard', 'Standard (modified)'], ['builtin:textbook', 'Textbook'], ['file:Mine', 'Mine']]);
-  assert.deepEqual(template.view.buttons.map(button => button.text), ['Edit', 'Save as my own…', 'Restore built-in']);
+  assert.equal(template.view.buttons.length, 1, 'one ordinary button');
+  assert.equal(template.view.extras.length, 1, 'one more-actions button');
+  assert.equal(template.edit().text, 'Edit');
+  assert.equal(template.edit().buttonEl.attrs['aria-label'], 'Edit note structure');
+  assert.equal(template.view.extras[0].icon, 'more-horizontal');
+  assert.equal(template.view.extras[0].tooltip, 'More actions: structure');
+  assert.equal(template.view.extras[0].extraSettingsEl.attrs['aria-label'], 'More actions: structure');
+  assert.equal(template.view.dropdown.selectEl.attrs['aria-label'], 'Note style structure');
+  assert.equal(template.view.descEl.attrs['aria-live'], 'polite');
   const tone = blockRow('tone');
   assert.equal(tone.view.name, 'Voice');
-  assert.equal(tone.view.attrs['aria-label'], 'Note style voice');
-  assert.equal(tone.view.options.length, 6);
+  assert.equal(tone.edit().buttonEl.attrs['aria-label'], 'Edit writing voice');
+  assert.equal(tone.view.extras[0].tooltip, 'More actions: voice');
+  assert.equal(tone.view.extras[0].extraSettingsEl.attrs['aria-label'], 'More actions: voice');
+  assert.equal(tone.view.dropdown.selectEl.attrs['aria-label'], 'Note style voice');
+  for (const view of [template.view, tone.view]) assert.ok([...view.buttons, ...view.extras].every(control => control.disabled === false), 'nothing is shown disabled while idle');
+});
+
+test('the picker has a Built-in group, and a Mine group only when own files exist; a changed built-in is marked, a block with a problem too', async () => {
+  const only = blockRow('template');
+  assert.deepEqual(groupsOf(only.view), [{ label: 'Built-in', options: ['Standard', 'Textbook'] }]);
+  const bad = item('file:Bad', 'Bad', { fileName: 'Bad.md', issues: [{ line: 7, code: 'format_heading_repeated', values: [], message: 'x' }] });
+  const both = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook'), item('file:Mine', 'Mine', { fileName: 'Mine.md' }), bad] });
+  assert.deepEqual(groupsOf(both.view), [{ label: 'Built-in', options: ['Standard (modified)', 'Textbook'] }, { label: 'Mine', options: ['Mine', 'Bad (has a problem)'] }]);
+  assert.equal(blockRow('tone').view.dropdown.selectEl.children[0].children.length, 6);
+});
+
+test('first line says what the block does (built-in hints for every structure and voice, "created yourself" for own files); no file-state sentences', async () => {
+  for (const id of ['standard', 'textbook'])
+    assert.deepEqual(lines(blockRow('template', { settings: { noteTemplateBlock: `builtin:${id}` } }).view), [t(`ui.note_style_${id}_hint`)]);
+  for (const id of ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'])
+    assert.deepEqual(lines(blockRow('tone', { settings: { noteToneBlock: `builtin:${id}` } }).view), [t(`ui.tone_hint_${id}`)], id);
+  assert.equal(lines(blockRow('tone').view)[0], 'Neutral, precise, evidence-first, no opinions. The default voice; adds no instruction.');
+  const own = blockRow('template', { settings: { noteTemplateBlock: 'file:Mine' }, templates: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
+  assert.deepEqual(lines(own.view), ['A structure you created yourself.']);
+  const ownTone = blockRow('tone', { settings: { noteToneBlock: 'file:Calm' }, tones: [...TONES(), item('file:Calm', 'Calm', { fileName: 'Calm.md' })] });
+  assert.deepEqual(lines(ownTone.view), ['A voice you created yourself.']);
+  for (const row of [own, ownTone, blockRow('template'), blockRow('tone')]) assert.ok(!/Built-in version|matches the built-in|disabled/i.test(lines(row.view).join(' ')));
+});
+
+test('state: empty (no files) — built-in group only, menu offers Save as my own… and Show in file explorer, no Restore', async () => {
+  const state = blockRow('template');
+  const menu = state.menu();
+  assert.deepEqual(menu.titles, ['Save as my own…', 'Show in file explorer']);
+  assert.deepEqual(JSON.parse(JSON.stringify(menu.position)), { x: 10, y: 20 });
+  assert.equal(blockRow('tone').menu().titles.includes('Restore built-in'), false);
+});
+
+test('state: modified — marked in the picker, second line says the AI uses your version, the menu gets Restore built-in', async () => {
+  const state = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook')] });
+  assert.deepEqual(lines(state.view), [t('ui.note_style_standard_hint'), 'You edited this built-in structure; AI writes with your version.']);
+  assert.deepEqual(errorLines(state.view), []);
+  assert.deepEqual(state.menu().titles, ['Save as my own…', 'Restore built-in', 'Show in file explorer']);
+  const tone = blockRow('tone', { tones: TONES().map(entry => (entry.ref === 'builtin:plain' ? { ...entry, modified: true, fileName: 'Plain.md' } : entry)), settings: { noteToneBlock: 'builtin:plain' } });
+  assert.equal(lines(tone.view)[1], 'You edited this built-in voice; AI writes with your version.');
+  assert.ok(tone.menu().titles.includes('Restore built-in'));
+});
+
+test('state: has a problem — error line with the line number and the built-in it falls back to, in the error style; Edit stays', async () => {
+  const bad = item('file:Bad', 'Bad', { fileName: 'Bad.md', issues: [{ line: 7, code: 'format_heading_repeated', values: [], message: 'x' }] });
+  const state = blockRow('template', { settings: { noteTemplateBlock: 'file:Bad' }, templates: [...TEMPLATES(), bad] });
+  const [error] = errorLines(state.view);
+  assert.match(error, /^⚠ Line 7: /);
+  assert.match(error, /Until it is fixed, AI uses the built-in "Standard"\.$/);
+  assert.equal(state.edit().buttonEl.hidden, false);
+  for (const language of ['zh-TW', 'zh-CN']) {
+    i18n.setUiLanguage(language);
+    const text = t('ui.block_status_issue_template_0_1', 12, '原因。');
+    assert.match(text, /第 12 行/);
+    assert.match(text, /(標準|标准)/);
+    assert.match(t('ui.block_status_issue_tone_0_1', 3, '原因。'), /(學術嚴謹|学术严谨)/);
+  }
+  i18n.setUiLanguage('en');
+});
+
+test('state: own file — in the Mine group, first line says you created it, the menu has no Restore built-in', async () => {
+  const state = blockRow('template', { settings: { noteTemplateBlock: 'file:Mine' }, templates: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
+  assert.equal(state.view.dropdown.selectEl.value, 'file:Mine');
+  assert.deepEqual(state.menu().titles, ['Save as my own…', 'Show in file explorer']);
+});
+
+test('state: not found — "Not found: X" is shown and selected, no Edit, an error line, the menu offers only Show in file explorer, and the saved value is never rewritten', async () => {
+  const state = blockRow('template', { settings: { noteTemplateBlock: 'file:Gone' } });
+  await flush();
+  assert.equal(state.view.dropdown.selectEl.value, 'file:Gone');
+  assert.deepEqual(optionsOf(state.view)[0], ['file:Gone', 'Not found: Gone']);
+  assert.equal(state.edit().buttonEl.hidden, true, 'no Edit button');
+  assert.deepEqual(lines(state.view), ['⚠ "Gone" was not found; AI is using the built-in "Standard". Pick another from the menu.']);
+  assert.deepEqual(errorLines(state.view), lines(state.view));
+  assert.deepEqual(state.menu().titles, ['Show in file explorer']);
+  assert.equal(state.settings.noteTemplateBlock, 'file:Gone');
+  assert.equal(state.calls.length, 0, 'nothing was saved');
+  // the other row acting does not write the standard template over the missing choice
+  const tone = blockRow('tone', { settings: { noteTemplateBlock: 'file:Gone' } });
+  await flush();
+  await tone.view.dropdown.change('builtin:guide');
+  assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
+  assert.equal(tone.settings.noteTemplateBlock, 'file:Gone', 'the missing structure stays as it was saved');
+  // choosing another block brings Edit back
+  await state.view.dropdown.change('builtin:textbook');
+  assert.equal(state.settings.noteTemplateBlock, 'builtin:textbook');
+  assert.equal(state.edit().buttonEl.hidden, false);
+  assert.equal(optionsOf(state.view).some(option => /Not found/.test(option[1])), false);
 });
 
 test('the rows show what the old default stands for, and nothing is written until the user acts', async () => {
   const summary = blockRow('tone', { settings: { defaultNoteStyleId: 'summary' } });
-  assert.equal(summary.view.value, 'builtin:summary');
-  assert.equal(blockRow('template', { settings: { defaultNoteStyleId: 'summary' } }).view.value, 'builtin:standard');
-  assert.equal(blockRow('template', { settings: { defaultNoteStyleId: 'textbook' } }).view.value, 'builtin:textbook');
-  assert.equal(blockRow('template', { settings: { defaultDetailTemplateId: 'textbook' } }).view.value, 'builtin:textbook');
-  assert.equal(blockRow('tone', { settings: {} }).view.value, 'builtin:academic');
+  assert.equal(summary.view.dropdown.selectEl.value, 'builtin:summary');
+  const valueOf = (category, settings) => blockRow(category, { settings }).view.dropdown.selectEl.value;
+  assert.equal(valueOf('template', { defaultNoteStyleId: 'summary' }), 'builtin:standard');
+  assert.equal(valueOf('template', { defaultNoteStyleId: 'textbook' }), 'builtin:textbook');
+  assert.equal(valueOf('template', { defaultDetailTemplateId: 'textbook' }), 'builtin:textbook');
+  assert.equal(valueOf('tone', {}), 'builtin:academic');
   assert.equal(summary.calls.length, 0);
   assert.equal(summary.settings.noteToneBlock, undefined);
-  const gone = blockRow('template', { settings: { noteTemplateBlock: 'file:Deleted' } });
-  assert.equal(gone.view.value, 'builtin:standard', 'a chosen block that is gone shows as the standard template, as the run falls back');
 });
 
 test('changing a picker writes both shown values into the settings', async () => {
   const tone = blockRow('tone', { settings: { defaultNoteStyleId: 'textbook' } });
-  await tone.view.change('builtin:guide');
+  await tone.view.dropdown.change('builtin:guide');
   assert.equal(tone.settings.noteTemplateBlock, 'builtin:textbook');
   assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
   assert.equal(tone.calls.at(-1)[0], 'save');
@@ -136,101 +305,118 @@ test('M1: the rows show the blocks the runs use, also while an upgrade has not b
   const pending = { template: 'file:Upgraded', tone: 'file:Calm' };
   const templates = [...TEMPLATES(), item('file:Upgraded', 'Upgraded')];
   const tones = [...TONES(), item('file:Calm', 'Calm')];
-  assert.equal(blockRow('template', { pending, templates, tones }).view.value, 'file:Upgraded');
-  assert.equal(blockRow('tone', { pending, templates, tones }).view.value, 'file:Calm');
+  assert.equal(blockRow('template', { pending, templates, tones }).view.dropdown.selectEl.value, 'file:Upgraded');
+  assert.equal(blockRow('tone', { pending, templates, tones }).view.dropdown.selectEl.value, 'file:Calm');
 });
 
 test('M1: after a failed upgrade, changing only the tone does not write the standard template over the pending one', async () => {
   const pending = { template: 'file:Upgraded' };
   const templates = [...TEMPLATES(), item('file:Upgraded', 'Upgraded')];
   const tone = blockRow('tone', { pending, templates });
-  await tone.view.change('builtin:guide');
+  await tone.view.dropdown.change('builtin:guide');
   assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
   assert.equal(tone.settings.noteTemplateBlock, undefined, 'the pending template stays unsaved, so a retry still writes it');
   const open = blockRow('template', { pending, templates });
-  await open.view.buttons[0].click();
+  await open.edit().click();
   assert.equal(open.settings.noteTemplateBlock, undefined);
   assert.equal(open.calls.find(call => call[0] === 'open')[2], 'file:Upgraded');
 });
 
-test('Restore default is off, aria-disabled and explained when it does not apply', async () => {
-  const none = blockRow('template');
-  const restore = none.view.buttons[2];
-  assert.equal(restore.disabled, true);
-  assert.equal(restore.attrs['aria-disabled'], 'true');
-  assert.match(none.view.desc, /Built-in version\./);
-  assert.equal(none.view.buttons[0].disabled, false);
-  const own = blockRow('template', { settings: { noteTemplateBlock: 'file:Mine' }, templates: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] });
-  assert.equal(own.view.buttons[2].disabled, true);
-  assert.match(own.view.desc, /created yourself/);
-  const changed = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook')] });
-  assert.equal(changed.view.buttons[2].disabled, false);
-  assert.equal(changed.view.buttons[2].attrs['aria-disabled'], 'false');
-  assert.match(changed.view.desc, /AI writes with your version/);
-});
-
-test('an unreadable template block says which line, in the row text', async () => {
-  const bad = item('file:Bad', 'Bad', { fileName: 'Bad.md', issues: [{ line: 7, code: 'format_heading_repeated', values: [], message: 'x' }] });
-  const view = blockRow('template', { settings: { noteTemplateBlock: 'file:Bad' }, templates: [...TEMPLATES(), bad] }).view;
-  assert.match(view.desc, /"Bad\.md" has a problem \(line 7\)/);
-});
-
-test('Open, Copy and Restore ask the plugin, lock the buttons meanwhile and keep focus where it belongs', async () => {
+test('Edit asks the plugin, locks every control meanwhile (a second press does nothing) and gets the focus back', async () => {
   let release;
   const hold = { open: new Promise(resolve => { release = resolve; }) };
   const open = blockRow('template', { hold });
-  const pending = open.view.buttons[0].click();
+  const pending = open.edit().click();
   await flush();
   assert.deepEqual(open.calls.map(call => call[0]), ['save', 'open']);
   assert.deepEqual(open.calls[1], ['open', 'template', 'builtin:standard']);
   assert.equal(open.settings.noteTemplateBlock, 'builtin:standard', 'the shown values were written first');
   assert.equal(open.settings.noteToneBlock, 'builtin:academic');
-  assert.ok(open.view.buttons.every(button => button.disabled) && open.view.disabled, 'everything is off while it runs');
-  await open.view.buttons[0].click();
-  assert.equal(open.calls.filter(call => call[0] === 'open').length, 1, 'a second press while busy does nothing');
+  assert.ok(open.edit().disabled && open.view.extras[0].disabled && open.view.dropdown.disabled, 'everything is off while it runs');
+  assert.equal(open.menu(), undefined, 'the menu does not open while an action runs');
+  await open.edit().click();
+  assert.equal(open.calls.filter(call => call[0] === 'open').length, 1);
   release();
   await pending;
-  assert.equal(open.view.disabled, false);
-  assert.equal(open.view.focusedEl, 'Edit');
-
-  const copy = blockRow('tone');
-  await copy.view.buttons[1].click();
-  assert.deepEqual(copy.calls.find(call => call[0] === 'copy'), ['copy', 'tone', 'builtin:academic']);
-  assert.equal(copy.view.value, 'file:Copy', 'the new block is selected');
-  assert.equal(copy.view.focusedEl, 'select');
-
-  const restore = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook')] });
-  await restore.view.buttons[2].click();
-  assert.deepEqual(restore.calls.find(call => call[0] === 'restore'), ['restore', 'template', 'builtin:standard']);
-  assert.equal(restore.view.buttons[2].disabled, true, 'nothing left to restore');
-  assert.equal(restore.view.focusedEl, 'select', 'focus moves to the picker when the button turns off');
+  assert.equal(open.view.dropdown.disabled, false);
+  assert.equal(open.view.focused, open.edit().buttonEl);
 });
 
-// 06 P4: the old "an old style file as the default" item is gone (the upgrade moves the file to a template block and writes the keys).
-test('after the upgrade the default is a block: no "(old style file)" item in either row, the block is selected and the tone row stays usable', async () => {
+test('Save as my own…: asks for a name (default "<name> (my version)", a taken name is refused as typed), then saves, selects the new file and opens it', async () => {
+  modals.length = 0;
+  const state = blockRow('template', { templates: [...TEMPLATES(), item('file:Taken', 'Taken', { fileName: 'Taken.md' })] });
+  state.menu().items[0].click();
+  assert.equal(modals.length, 1);
+  const modal = modals[0];
+  assert.equal(modal.titleText, 'Save as my own');
+  assert.equal(modal.value, 'Standard (my version)');
+  assert.equal(modal.options.problem('taken'), t('ui.block_name_taken'), 'case-insensitive, existing file');
+  assert.equal(modal.options.problem('Textbook'), t('ui.block_name_taken'), 'a built-in name');
+  assert.equal(modal.options.problem('Standard'), t('ui.block_name_taken'));
+  assert.equal(modal.options.problem('Weekly report'), '');
+  assert.equal(state.calls.length, 0, 'nothing is written before the name is confirmed');
+  modal.submit('Weekly report');
+  await flush();
+  assert.deepEqual(state.calls.filter(call => call[0] !== 'save'), [['copy', 'template', 'builtin:standard', 'Weekly report'], ['open', 'template', 'file:Weekly report']]);
+  assert.equal(state.settings.noteTemplateBlock, 'file:Weekly report');
+  assert.equal(state.view.dropdown.selectEl.value, 'file:Weekly report', 'the new file is selected');
+  assert.equal(state.view.focused, state.view.dropdown.selectEl);
+  assert.equal(state.templates.filter(entry => entry.kind === 'builtin').length, 2);
+});
+
+test('Save as my own…: when the plugin could not save (name taken meanwhile), the new file is not opened and the choice does not change', async () => {
+  modals.length = 0;
+  const state = blockRow('template', { copyResult: null });
+  state.menu().items[0].click();
+  modals[0].submit('Anything');
+  await flush();
+  assert.deepEqual(state.calls.filter(call => call[0] !== 'save').map(call => call[0]), ['copy']);
+  assert.equal(state.settings.noteTemplateBlock, 'builtin:standard', 'still the block that was shown');
+});
+
+test('Restore built-in: no confirmation, the plugin restores, and with nothing left to restore the menu loses the item', async () => {
+  modals.length = 0;
+  const state = blockRow('template', { templates: [item('builtin:standard', 'Standard', { modified: true, fileName: 'Standard.md' }), item('builtin:textbook', 'Textbook')] });
+  const restore = state.menu().items.find(entry => entry.title === 'Restore built-in');
+  await restore.click();
+  assert.equal(modals.length, 0, 'no confirmation dialog');
+  assert.deepEqual(state.calls.find(call => call[0] === 'restore'), ['restore', 'template', 'builtin:standard']);
+  assert.deepEqual(state.menu().titles, ['Save as my own…', 'Show in file explorer']);
+  assert.equal(state.view.focused, state.view.extras[0].extraSettingsEl, 'focus returns to the more-actions button');
+});
+
+test('Show in file explorer (menu) asks the plugin and keeps the focus on the more-actions button', async () => {
+  const state = blockRow('tone');
+  await state.menu().items.at(-1).click();
+  await flush();
+  assert.deepEqual(state.calls.map(call => call[0]), ['folder']);
+  assert.equal(state.view.focused, state.view.extras[0].extraSettingsEl);
+});
+
+// After the upgrade the default is a block: no "(old style file)" item.
+test('after the upgrade the default is a block: no "(old style file)" item in either row, the block is selected and the voice row stays usable', async () => {
   const upgraded = { settings: { defaultNoteStyleId: 'style:Mine', noteTemplateBlock: 'file:Mine', noteToneBlock: 'builtin:plain' }, templates: [...TEMPLATES(), item('file:Mine', 'Mine', { fileName: 'Mine.md' })] };
   const template = blockRow('template', upgraded);
-  assert.equal(template.view.value, 'file:Mine');
-  assert.equal(template.view.options.some(option => option[0] === 'legacy:' || /old style file/.test(option[1])), false);
-  assert.doesNotMatch(template.view.desc, /old style file/);
-  assert.equal(template.view.buttons[0].disabled, false);
+  assert.equal(template.view.dropdown.selectEl.value, 'file:Mine');
+  assert.equal(optionsOf(template.view).some(option => option[0] === 'legacy:' || /old style file/.test(option[1])), false);
+  assert.doesNotMatch(lines(template.view).join(' '), /old style file/);
+  assert.equal(template.edit().disabled, false);
   const tone = blockRow('tone', upgraded);
-  assert.equal(tone.view.value, 'builtin:plain');
-  assert.equal(tone.view.disabled, false, 'the tone row is not turned off by an old default any more');
-  assert.ok(tone.view.buttons.slice(0, 2).every(button => button.disabled === false));
-  assert.doesNotMatch(tone.view.desc, /old style file/);
-  await tone.view.buttons[1].click();
-  assert.deepEqual(tone.calls.find(call => call[0] === 'copy'), ['copy', 'tone', 'builtin:plain'], 'Copy acts on the shown tone');
-  await template.view.change('builtin:textbook');
+  assert.equal(tone.view.dropdown.selectEl.value, 'builtin:plain');
+  assert.equal(tone.view.dropdown.disabled, false, 'the voice row is not turned off by an old default any more');
+  assert.equal(tone.edit().disabled, false);
+  await tone.menu().items[0].click();
+  assert.equal(modals.at(-1).value, 'plain (my version)', 'Save as acts on the shown voice');
+  await template.view.dropdown.change('builtin:textbook');
   assert.equal(template.settings.noteTemplateBlock, 'builtin:textbook');
   assert.equal(template.settings.noteToneBlock, 'builtin:plain', 'the other shown value is kept');
 });
 
 test('a default that is not a built-in and has no block key yet shows the standard template (O2 is gone: there is no old-style-file item)', async () => {
   const oldTemplate = blockRow('template', { settings: { defaultNoteStyleId: 'u1', detailTemplates: [{ id: 'u1', name: 'Old one' }] } });
-  assert.equal(oldTemplate.view.value, 'builtin:standard');
-  assert.equal(oldTemplate.view.options.length, 2);
-  assert.equal(oldTemplate.view.options.some(option => /Old one|legacy/.test(option.join(' '))), false);
+  assert.equal(oldTemplate.view.dropdown.selectEl.value, 'builtin:standard');
+  assert.equal(optionsOf(oldTemplate.view).length, 2);
+  assert.equal(optionsOf(oldTemplate.view).some(option => /Old one|legacy/.test(option.join(' '))), false);
   assert.equal(oldTemplate.calls.length, 0, 'nothing is written until the user acts');
 });
 
@@ -239,16 +425,6 @@ test('the settings page has no tone presets row and the modal file no longer off
   assert.ok(!/tone_presets|renderTonePresetsSetting|LEGACY_PICK|legacyName/.test(tab));
   const modal = fs.readFileSync(path.join(root, 'ui/modals/prompt-presets-modal.ts'), 'utf8');
   assert.ok(!/renderTonePresetsSetting|ui\.tone_preset|"tone"/.test(modal), 'the library lists outline presets only');
-});
-
-test('settings row: a missing folder says so and can be chosen again', async () => {
-  const { log, settings } = row({ exists: false });
-  assert.match(log.name, /File location not found/);
-  assert.equal(log.texts[0].disabled, false);
-  log.texts[0].change(' WS/Moved ');
-  await log.buttons[0].click();
-  assert.equal(settings.noteStylesFolder, 'WS/Moved');
-  assert.equal(log.refreshed, 1);
 });
 
 test('every style-file problem has a translated message in en, zh-TW and zh-CN, with the limits filled in', () => {
@@ -280,15 +456,56 @@ test('the old template library is gone from the code and the dictionaries', () =
   for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(!fs.readFileSync(path.join(root, `i18n/${language}.ts`), 'utf8').includes('"ui.note_style_custom"'));
 });
 
+
 test('FB1 L2/B2: the row description is written only when its text changes, and the row carries the wrapping class', async () => {
-  const row = blockRow('template');
+  const state = blockRow('template');
   await flush();
-  assert.deepEqual(row.view.classes, ['vam-block-row']);
-  const writes = row.view.descWrites;
+  assert.deepEqual(state.setting.settingEl.classes, ['vam-block-row']);
+  const writes = state.view.descWrites;
   assert.ok(writes >= 1);
-  await row.view.buttons[0].click();
+  await state.edit().click();
   await flush();
-  assert.equal(row.view.descWrites, writes, 'an action that leaves the text alone does not write it twice (aria-live)');
-  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.equal(state.view.descWrites, writes, 'an action that leaves the text alone does not write it twice (aria-live)');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
   assert.match(css, /^\.vam-block-row > \.setting-item-control \{[^}]*flex-wrap: wrap/m);
+  assert.match(css, /^\.vam-block-row \.vam-block-status-error \{ color: var\(--text-error\); \}/m);
 });
+
+// ---- the plugin methods behind the menu: Save as my own and Restore built-in ----
+function pluginSelf(store) {
+  const opened = [];
+  const file = new obsidian.TFile('WS/Styles/Backups/Standard backup.md');
+  const self = { noteStyles: store, app: { vault: { getAbstractFileByPath: path => (path === file.path ? file : null) }, workspace: { getLeaf: () => ({ openFile: async target => { opened.push(target); } }) } } };
+  return { self, opened, file };
+}
+
+test('plugin copyBlock: passes the chosen name, says "Saved as … and switched to it", and returns the new ref; a refusal writes nothing, says so and returns null', async () => {
+  notices.length = 0;
+  const asked = [];
+  const ok = pluginSelf({ copyBlock: async (...args) => { asked.push(args); return 'file:Weekly report'; } });
+  assert.equal(await Plugin.prototype.copyBlock.call(ok.self, 'template', 'builtin:standard', 'Weekly report'), 'file:Weekly report');
+  assert.deepEqual(asked, [['template', 'builtin:standard', 'Weekly report']]);
+  assert.deepEqual(notices, ['Saved as "Weekly report" and switched to it.']);
+  notices.length = 0;
+  const refused = pluginSelf({ copyBlock: async () => { throw new Error('Block name not available'); } });
+  assert.equal(await Plugin.prototype.copyBlock.call(refused.self, 'template', 'builtin:standard', 'Standard'), null);
+  assert.deepEqual(notices, [t('ui.block_notice_copy_failed')]);
+});
+
+test('plugin restoreBlock: the Notice names the backup and carries an Open backup button that opens it; failures keep their own Notices', async () => {
+  notices.length = 0;
+  const done = pluginSelf({ restoreBlock: async () => ({ ok: true, backup: 'WS/Styles/Backups/Standard backup.md' }) });
+  assert.equal(await Plugin.prototype.restoreBlock.call(done.self, 'template', 'builtin:standard'), true);
+  const notice = obsidian.Notice.all.at(-1);
+  assert.equal(notices.at(-1), 'Restored the built-in version. Your version is backed up at WS/Styles/Backups/Standard backup.md.');
+  assert.equal(notice.actions.length, 1);
+  assert.equal(notice.actions[0].text, 'Open backup');
+  notice.actions[0].click();
+  await flush();
+  assert.deepEqual(done.opened, [done.file], 'the backup is opened in a tab');
+  notices.length = 0;
+  const failing = pluginSelf({ restoreBlock: async () => ({ ok: false, reason: 'backup-failed' }) });
+  assert.equal(await Plugin.prototype.restoreBlock.call(failing.self, 'template', 'builtin:standard'), false);
+  assert.deepEqual(notices, [t('ui.block_notice_restore_backup_failed')]);
+});
+

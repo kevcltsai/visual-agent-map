@@ -116,7 +116,19 @@ export class PromptPreviewModal extends Modal {
       )
     );
     // The modal title is not a heading element, so the section titles start at h2 and never skip a level.
-    for (const section of preview.sections) {
+    // The default voice (academic rigor) adds no text, so the prompt has no voice part: say so instead of leaving a gap.
+    const hasTone = preview.sections.some(section => section.group === "tone");
+    const lastTemplate = preview.sections.map(section => section.group).lastIndexOf("template");
+    const emptyToneAt = hasTone ? -1 : lastTemplate + 1;
+    const showEmptyTone = (): void => {
+      body.createEl("h2", { text: t(GROUP_KEYS.tone) });
+      body.createEl("p", {
+        text: t("ui.preview_tone_empty"),
+        cls: "vam-prompt-preview-empty setting-item-description"
+      });
+    };
+    for (const [index, section] of preview.sections.entries()) {
+      if (index === emptyToneAt) showEmptyTone();
       const title = t(GROUP_KEYS[section.group]);
       body.createEl("h2", { text: title });
       const pre = body.createEl("pre", { cls: "vam-prompt-preview-text" });
@@ -125,5 +137,6 @@ export class PromptPreviewModal extends Modal {
       pre.setAttr("role", "region");
       pre.setAttr("aria-label", t("ui.preview_prompt_text_0", title));
     }
+    if (emptyToneAt === preview.sections.length) showEmptyTone();
   }
 }

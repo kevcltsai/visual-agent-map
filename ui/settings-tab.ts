@@ -35,7 +35,11 @@ export function renderNoteStyleSetting(setting: Setting, plugin: VisualAgentMapP
  * (renamed while the plugin was off) shows "File location not found" and lets the user pick it again; a folder that was
  * never made says there are no files yet.
  */
-export function renderNoteLocationSetting(setting: Setting, plugin: VisualAgentMapPlugin, refresh: () => void): void {
+export function renderNoteLocationSetting(
+  setting: Setting,
+  plugin: VisualAgentMapPlugin,
+  refresh: () => void
+): () => void {
   const store = plugin.noteStyles;
   const settings = plugin.settings;
   const missing = !store.folderExists() && !!settings.noteStylesFolder;
@@ -84,13 +88,18 @@ export function renderNoteLocationSetting(setting: Setting, plugin: VisualAgentM
       refresh();
     })
   );
-  void store.refresh().then(
-    () => {
-      loaded = true;
-      describe();
-    },
-    () => undefined
-  );
+  /** Reads the files again and rewrites the description (after a row made or saved a file). */
+  const update = (): void => {
+    void store.refresh().then(
+      () => {
+        loaded = true;
+        describe();
+      },
+      () => undefined
+    );
+  };
+  update();
+  return update;
 }
 
 /** What the two pickers show: a block ref for each. */
@@ -183,7 +192,12 @@ export function missingBlockRef(plugin: VisualAgentMapPlugin, category: BlockCat
  * (edited, has a problem, not found). A saved choice whose block is gone shows "Not found: <name>" and offers no Edit;
  * the saved value is not rewritten.
  */
-export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapPlugin, category: BlockCategory): void {
+export function renderNoteBlockSetting(
+  setting: Setting,
+  plugin: VisualAgentMapPlugin,
+  category: BlockCategory,
+  onFilesChanged?: () => void
+): void {
   const { noteStyles: store } = plugin;
   const isTemplate = category === "template";
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
@@ -283,6 +297,7 @@ export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapP
       busy = false;
       render();
       target()?.focus();
+      onFilesChanged?.();
     }
   };
   /** Asks for a name (the default is "<name> (my version)"; a taken name is refused as it is typed), then saves, selects and opens. */
@@ -570,6 +585,8 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
   private readonly modelSelects = new Set<HTMLSelectElement>();
   private readonly modelStatusEls = new Set<HTMLElement>();
   private unsubscribeCurrentModel: (() => void) | null = null;
+  /** Rewrites the File location row's description (it follows the Structure and Voice rows making files). */
+  private noteLocationChanged: (() => void) | undefined;
   constructor(
     app: App,
     private plugin: VisualAgentMapPlugin
@@ -732,15 +749,17 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
       },
       {
         name: t("ui.block_picker_template"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "template")
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "template", () => this.noteLocationChanged?.())
       },
       {
         name: t("ui.block_picker_tone"),
-        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone")
+        render: setting => renderNoteBlockSetting(setting, this.plugin, "tone", () => this.noteLocationChanged?.())
       },
       {
         name: t("ui.note_style_folder_path"),
-        render: setting => renderNoteLocationSetting(setting, this.plugin, () => this.update())
+        render: setting => {
+          this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
+        }
       },
       {
         name: t("ui.markdown_selection_ai_auto_open"),

@@ -318,12 +318,12 @@ test('counter 9: copy gives a unique name ("x (my version)", "x (my version) (2)
   assert.equal(oddRef, 'file:We ird a (my version)');
   const made = odd.v.created[odd.v.created.length - 1];
   assert.ok(made.startsWith(`${TPL}/`) && !made.slice(TPL.length + 1).includes('/') && !/[\\/:*?"<>|#^[\]]/.test(made.slice(TPL.length + 1)), made);
-  // a tone is copied the same way, into the tone folder; academic copies as an empty file
+  // a tone is copied the same way, into the tone folder; academic with no file copies as the design note (design 3.8), not an empty file
   const tone = makeStore({});
   await tone.store.refresh();
   const toneRef = await tone.store.copyBlock('tone', 'builtin:academic');
   assert.equal(toneRef, 'file:Academic rigor (my version)');
-  assert.equal(tone.v.files[`${TONE}/Academic rigor (my version).md`], '');
+  assert.equal(tone.v.files[`${TONE}/Academic rigor (my version).md`], M.academicToneNote('en'));
   assert.equal(tone.settings.noteToneBlock, toneRef);
   // the copy can be edited and the prompt follows
   const edit = makeStore({});
@@ -691,4 +691,27 @@ test('P2 preview: with the default voice the modal shows the voice heading and "
   assert.equal(second.dom.findAll(second.modal.contentEl, item => (item.attrs.class ?? item.cls ?? '').toString().includes('vam-prompt-preview-empty')).length, 0);
   assert.ok(second.dom.findAll(second.modal.contentEl, item => item.tag === 'h2').some(item => item.text === 'Voice'));
   second.modal.close();
+});
+
+test('Low 1: Save as my own from academic rigor with no file starts the new file from the design note (three languages); with an edited file it copies that file', async () => {
+  for (const language of LANGUAGES) {
+    const { store, v } = makeStore({ language });
+    await store.refresh();
+    const ref = await store.copyBlock('tone', 'builtin:academic', 'My rigor');
+    const path = Object.keys(v.files).find(key => key.endsWith('/My rigor.md'));
+    assert.equal(v.files[path], M.academicToneNote(language), language);
+    assert.equal(ref, 'file:My rigor', language);
+  }
+  const edited = makeStore({}, { [`${TONE}/Academic rigor.md`]: `${M.academicToneNote('en')}\nUse short sentences.\n` });
+  await edited.store.refresh();
+  await edited.store.copyBlock('tone', 'builtin:academic', 'Mine two');
+  assert.equal(edited.v.files[`${TONE}/Mine two.md`], `${M.academicToneNote('en')}\nUse short sentences.\n`);
+});
+
+test('ensureBlockFile reports created: true for a file it just wrote, false for an existing file or an override', async () => {
+  const { store } = makeStore({}, { [`${TONE}/Mine.md`]: 'x' });
+  await store.refresh();
+  assert.equal((await store.ensureBlockFile('template', 'builtin:standard')).created, true);
+  assert.equal((await store.ensureBlockFile('template', 'builtin:standard')).created, false);
+  assert.equal((await store.ensureBlockFile('tone', 'file:Mine')).created, false);
 });

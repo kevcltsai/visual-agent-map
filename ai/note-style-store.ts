@@ -888,19 +888,19 @@ export class NoteStyleStore {
    * The path of the file behind a block, so it can be opened. A built-in with no file gets one, written with its text in
    * the interface language; a file that is there is left as it is. Throws for a file block that no longer exists.
    */
-  ensureBlockFile(category: BlockCategory, ref: string): Promise<{ path: string; base: string }> {
+  ensureBlockFile(category: BlockCategory, ref: string): Promise<{ path: string; base: string; created: boolean }> {
     return this.serial(async () => {
       await this.loadBlocks();
       const parsed = parseBlockRef(ref);
       const dir = this.blockDirectories()[category];
       if (parsed?.kind === "file") {
         if (!this.blocks[category].has(parsed.base)) throw new Error(`Block file not found: ${parsed.base}`);
-        return { path: `${dir}/${parsed.base}.md`, base: parsed.base };
+        return { path: `${dir}/${parsed.base}.md`, base: parsed.base, created: false };
       }
       if (parsed?.kind !== "builtin" || !this.isBuiltinBlockId(category, parsed.id))
         throw new Error(`Unknown block: ${ref}`);
       const override = this.overrideBase(category, parsed.id);
-      if (override !== undefined) return { path: `${dir}/${override}.md`, base: override };
+      if (override !== undefined) return { path: `${dir}/${override}.md`, base: override, created: false };
       const language = this.settings.language;
       const block = findBuiltinBlock(category, parsed.id);
       const base = uniqueBlockName(
@@ -916,7 +916,7 @@ export class NoteStyleStore {
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text);
       this.blocks[category].set(base, text);
-      return { path: `${dir}/${base}.md`, base };
+      return { path: `${dir}/${base}.md`, base, created: true };
     });
   }
 
@@ -941,10 +941,12 @@ export class NoteStyleStore {
       } else if (parsed?.kind === "builtin" && this.isBuiltinBlockId(category, parsed.id)) {
         const override = this.overrideBase(category, parsed.id);
         name = translate(language, findBuiltinBlock(category, parsed.id).nameKey);
-        text =
-          override === undefined
-            ? builtinBlockText(category, parsed.id, language)
-            : this.blocks[category].get(override)!;
+        // Academic rigor has no text of its own: without a file the copy starts from the design note, like Edit does.
+        const builtinText =
+          category === "tone" && parsed.id === "academic"
+            ? academicToneNote(language)
+            : builtinBlockText(category, parsed.id, language);
+        text = override === undefined ? builtinText : this.blocks[category].get(override)!;
       } else throw new Error(`Unknown block: ${ref}`);
       const dir = this.blockDirectories()[category];
       let base: string;

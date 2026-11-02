@@ -1366,7 +1366,7 @@ integrationTest('runAgent: a template block with two format headings still runs 
   assert.equal(h.contexts[0].styleSelection.template.fileName, 'Bad.md');
   assert.equal(h.notices.length, 1, 'exactly one Notice');
   assert.match(String(h.notices[0]), /Bad\.md/); assert.match(String(h.notices[0]), /line 5/);
-  assert.match(String(h.notices[0]), /built-in template is used/);
+  assert.match(String(h.notices[0]), /The built-in structure is used instead\./);
 });
 // Ticket 04 FB1: the Notice for an unreadable template block belongs to the entry of a run, once per execution.
 const BAD_BLOCK = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';

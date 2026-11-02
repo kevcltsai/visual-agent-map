@@ -1319,11 +1319,11 @@ export default class VisualAgentMapPlugin extends Plugin {
   /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
   async openBlock(category: BlockCategory, ref: string): Promise<boolean> {
     try {
-      const { path } = await this.noteStyles.ensureBlockFile(category, ref);
+      const { path, base, created } = await this.noteStyles.ensureBlockFile(category, ref);
       const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
       if (!(file instanceof TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
-      new Notice(t("ui.block_notice_opened_0", path));
+      new Notice(created ? t("ui.block_notice_created_0_1", base, path) : t("ui.block_notice_opened_0", path));
       return true;
     } catch {
       new Notice(t("ui.block_notice_open_failed"));

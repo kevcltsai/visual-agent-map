@@ -1513,6 +1513,7 @@ var en = {
   "ui.block_restore": "Restore built-in",
   "ui.block_modified_0": "{0} (modified)",
   "ui.block_notice_opened_0": "Opened {0}",
+  "ui.block_notice_created_0_1": 'Created "{0}" for you to edit: {1}. Save your changes and the next AI notes will use it.',
   "ui.block_notice_restored_0": "Restored the built-in version. Your version is backed up at {0}.",
   "ui.block_notice_open_failed": "Cannot open this file. It may have been renamed or deleted.",
   "ui.block_notice_copy_failed": "Cannot save this file as your own. Nothing was overwritten.",
@@ -1570,7 +1571,7 @@ var en = {
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",
-  "ui.note_style_standard_hint": "Six fixed sections in a neutral, evidence-first voice. Same as today's default.",
+  "ui.note_style_standard_hint": "Six fixed sections in a neutral, evidence-first voice.",
   "ui.note_style_textbook_hint": "Opens with 2\u20134 intro paragraphs, then the six sections; empty sections are left out.",
   "ui.note_style_summary_hint": "Six sections in short sentences and lists: conclusions, facts and numbers only.",
   "ui.note_style_plain_hint": "Six sections in everyday words; jargon is explained the first time it appears.",
@@ -3773,6 +3774,7 @@ var zhCN = {
   "ui.block_restore": "\u6062\u590D\u5185\u7F6E\u7248\u672C",
   "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
   "ui.block_notice_opened_0": "\u5DF2\u6253\u5F00 {0}",
+  "ui.block_notice_created_0_1": "\u5DF2\u521B\u5EFA\u53EF\u7F16\u8F91\u7684\u201C{0}\u201D\uFF1A{1}\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u5199\u7B14\u8BB0\u5C31\u4F1A\u7528\u3002",
   "ui.block_notice_restored_0": "\u5DF2\u6062\u590D\u5185\u7F6E\u7248\u672C\uFF0C\u4F60\u7684\u7248\u672C\u5DF2\u5907\u4EFD\u5728 {0}\u3002",
   "ui.block_notice_open_failed": "\u65E0\u6CD5\u6253\u5F00\u8FD9\u4EFD\u6587\u4EF6\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u5220\u9664\u3002",
   "ui.block_notice_copy_failed": "\u65E0\u6CD5\u53E6\u5B58\u8FD9\u4EFD\u6587\u4EF6\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u6587\u4EF6\u3002",
@@ -3830,7 +3832,7 @@ var zhCN = {
   "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
   "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
   "ui.note_style_guide": "\u5B9E\u7528\u6307\u5357",
-  "ui.note_style_standard_hint": "\u516D\u4E2A\u56FA\u5B9A\u5206\u7C7B\uFF0C\u4E2D\u6027\u3001\u4EE5\u8BC1\u636E\u4E3A\u672C\u3002\u548C\u73B0\u5728\u7684\u9ED8\u8BA4\u76F8\u540C\u3002",
+  "ui.note_style_standard_hint": "\u516D\u4E2A\u56FA\u5B9A\u5206\u7C7B\uFF0C\u4E2D\u6027\u3001\u4EE5\u8BC1\u636E\u4E3A\u672C\u3002",
   "ui.note_style_textbook_hint": "\u5148\u7528 2\u20134 \u6BB5\u5BFC\u8BFB\u5E26\u4F60\u8FDB\u5165\u4E3B\u9898\uFF0C\u518D\u63A5\u516D\u4E2A\u5206\u7C7B\uFF1B\u6CA1\u6709\u5185\u5BB9\u7684\u5206\u7C7B\u4F1A\u7701\u7565\u3002",
   "ui.note_style_summary_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7528\u77ED\u53E5\u548C\u6761\u5217\u53EA\u7559\u7ED3\u8BBA\u3001\u4E8B\u5B9E\u4E0E\u6570\u5B57\u3002",
   "ui.note_style_plain_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7528\u65E5\u5E38\u7528\u8BED\u89E3\u91CA\uFF0C\u672F\u8BED\u7B2C\u4E00\u6B21\u51FA\u73B0\u5C31\u8BF4\u660E\u3002",
@@ -3894,7 +3896,7 @@ var zhCN = {
   "ui.note_style_folder_missing_desc_0": "\u201C{0}\u201D\u4E0D\u5B58\u5728\u3002\u8BF7\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939\uFF0C\u6216\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u663E\u793A\u5B83\u8BA9\u5B83\u91CD\u65B0\u521B\u5EFA\u3002",
   "ui.note_style_folder_choose": "\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939",
   "ui.note_style_folder_choose_prompt": "\u7B14\u8BB0\u98CE\u683C\u7684\u6587\u4EF6\u5939\u8DEF\u5F84",
-  "ui.note_style_setting_desc": "AI \u5199\u7B14\u8BB0\u65F6\u7528\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u3002\u5730\u56FE\u3001\u8BAE\u9898\u6216\u5355\u6B21\u7814\u7A76\u6CA1\u6709\u6307\u5B9A\u65F6\u7528\u8FD9\u91CC\u3002",
+  "ui.note_style_setting_desc": "AI \u5199\u7B14\u8BB0\u65F6\u7528\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u3002\u5FC3\u667A\u56FE\u3001\u8BAE\u9898\u6216\u5355\u6B21\u7814\u7A76\u6CA1\u6709\u6307\u5B9A\u65F6\u7528\u8FD9\u91CC\u3002",
   "ui.note_style_open_folder": "\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u663E\u793A",
   "ui.note_style_folder_path": "\u6587\u4EF6\u4F4D\u7F6E",
   "ui.detail_format_unmet": "\u683C\u5F0F\u672A\u8FBE\u8981\u6C42",
@@ -6033,6 +6035,7 @@ var zhTW = {
   "ui.block_restore": "\u6062\u5FA9\u5167\u5EFA\u7248\u672C",
   "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
   "ui.block_notice_opened_0": "\u5DF2\u958B\u555F {0}",
+  "ui.block_notice_created_0_1": "\u5DF2\u5EFA\u7ACB\u53EF\u7DE8\u8F2F\u7684\u300C{0}\u300D\uFF1A{1}\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u5BEB\u7B46\u8A18\u5C31\u6703\u7528\u3002",
   "ui.block_notice_restored_0": "\u5DF2\u6062\u5FA9\u5167\u5EFA\u7248\u672C\uFF0C\u4F60\u7684\u7248\u672C\u5099\u4EFD\u5728 {0}\u3002",
   "ui.block_notice_open_failed": "\u7121\u6CD5\u958B\u555F\u9019\u4EFD\u6A94\u6848\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u522A\u9664\u3002",
   "ui.block_notice_copy_failed": "\u7121\u6CD5\u53E6\u5B58\u9019\u4EFD\u6A94\u6848\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u6A94\u6848\u3002",
@@ -6090,7 +6093,7 @@ var zhTW = {
   "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
   "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
   "ui.note_style_guide": "\u5BE6\u7528\u6307\u5357",
-  "ui.note_style_standard_hint": "\u516D\u500B\u56FA\u5B9A\u5206\u985E\uFF0C\u4E2D\u6027\u3001\u4EE5\u8B49\u64DA\u70BA\u672C\u3002\u548C\u73FE\u5728\u7684\u9810\u8A2D\u76F8\u540C\u3002",
+  "ui.note_style_standard_hint": "\u516D\u500B\u56FA\u5B9A\u5206\u985E\uFF0C\u4E2D\u6027\u3001\u4EE5\u8B49\u64DA\u70BA\u672C\u3002",
   "ui.note_style_textbook_hint": "\u5148\u7528 2\u20134 \u6BB5\u5C0E\u8B80\u5E36\u4F60\u9032\u5165\u4E3B\u984C\uFF0C\u518D\u63A5\u516D\u500B\u5206\u985E\uFF1B\u6C92\u6709\u5167\u5BB9\u7684\u5206\u985E\u6703\u7701\u7565\u3002",
   "ui.note_style_summary_hint": "\u516D\u500B\u5206\u985E\uFF0C\u7528\u77ED\u53E5\u548C\u689D\u5217\u53EA\u7559\u7D50\u8AD6\u3001\u4E8B\u5BE6\u8207\u6578\u5B57\u3002",
   "ui.note_style_plain_hint": "\u516D\u500B\u5206\u985E\uFF0C\u7528\u65E5\u5E38\u7528\u8A9E\u89E3\u91CB\uFF0C\u8853\u8A9E\u7B2C\u4E00\u6B21\u51FA\u73FE\u5C31\u8AAA\u660E\u3002",
@@ -6154,7 +6157,7 @@ var zhTW = {
   "ui.note_style_folder_missing_desc_0": "\u300C{0}\u300D\u4E0D\u5B58\u5728\u3002\u8ACB\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E\uFF0C\u6216\u5728\u6A94\u6848\u7E3D\u7BA1\u986F\u793A\u5B83\u8B93\u5B83\u91CD\u65B0\u5EFA\u7ACB\u3002",
   "ui.note_style_folder_choose": "\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E",
   "ui.note_style_folder_choose_prompt": "\u7B46\u8A18\u98A8\u683C\u7684\u8CC7\u6599\u593E\u8DEF\u5F91",
-  "ui.note_style_setting_desc": "AI \u5BEB\u7B46\u8A18\u6642\u7528\u7684\u7D50\u69CB\u8207\u53E3\u543B\u3002\u5730\u5716\u3001\u8B70\u984C\u6216\u55AE\u6B21\u7814\u7A76\u6C92\u6709\u6307\u5B9A\u6642\u7528\u9019\u88E1\u3002",
+  "ui.note_style_setting_desc": "AI \u5BEB\u7B46\u8A18\u6642\u7528\u7684\u7D50\u69CB\u8207\u53E3\u543B\u3002\u5FC3\u667A\u5716\u3001\u8B70\u984C\u6216\u55AE\u6B21\u7814\u7A76\u6C92\u6709\u6307\u5B9A\u6642\u7528\u9019\u88E1\u3002",
   "ui.note_style_open_folder": "\u5728\u6A94\u6848\u7E3D\u7BA1\u986F\u793A",
   "ui.note_style_folder_path": "\u6A94\u6848\u4F4D\u7F6E",
   "ui.detail_format_unmet": "\u683C\u5F0F\u672A\u9054\u8981\u6C42",
@@ -27101,12 +27104,12 @@ var NoteStyleStore = class {
       const dir = this.blockDirectories()[category];
       if ((parsed == null ? void 0 : parsed.kind) === "file") {
         if (!this.blocks[category].has(parsed.base)) throw new Error(`Block file not found: ${parsed.base}`);
-        return { path: `${dir}/${parsed.base}.md`, base: parsed.base };
+        return { path: `${dir}/${parsed.base}.md`, base: parsed.base, created: false };
       }
       if ((parsed == null ? void 0 : parsed.kind) !== "builtin" || !this.isBuiltinBlockId(category, parsed.id))
         throw new Error(`Unknown block: ${ref}`);
       const override = this.overrideBase(category, parsed.id);
-      if (override !== void 0) return { path: `${dir}/${override}.md`, base: override };
+      if (override !== void 0) return { path: `${dir}/${override}.md`, base: override, created: false };
       const language2 = this.settings.language;
       const block = findBuiltinBlock(category, parsed.id);
       const base = uniqueBlockName(
@@ -27118,7 +27121,7 @@ var NoteStyleStore = class {
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text11);
       this.blocks[category].set(base, text11);
-      return { path: `${dir}/${base}.md`, base };
+      return { path: `${dir}/${base}.md`, base, created: true };
     });
   }
   /**
@@ -27142,7 +27145,8 @@ var NoteStyleStore = class {
       } else if ((parsed == null ? void 0 : parsed.kind) === "builtin" && this.isBuiltinBlockId(category, parsed.id)) {
         const override = this.overrideBase(category, parsed.id);
         name = translate(language2, findBuiltinBlock(category, parsed.id).nameKey);
-        text11 = override === void 0 ? builtinBlockText(category, parsed.id, language2) : this.blocks[category].get(override);
+        const builtinText = category === "tone" && parsed.id === "academic" ? academicToneNote(language2) : builtinBlockText(category, parsed.id, language2);
+        text11 = override === void 0 ? builtinText : this.blocks[category].get(override);
       } else throw new Error(`Unknown block: ${ref}`);
       const dir = this.blockDirectories()[category];
       let base;
@@ -63474,13 +63478,17 @@ function renderNoteLocationSetting(setting, plugin, refresh) {
       refresh();
     })
   );
-  void store.refresh().then(
-    () => {
-      loaded = true;
-      describe();
-    },
-    () => void 0
-  );
+  const update = () => {
+    void store.refresh().then(
+      () => {
+        loaded = true;
+        describe();
+      },
+      () => void 0
+    );
+  };
+  update();
+  return update;
 }
 function shownBlocks(plugin) {
   var _a2, _b2;
@@ -63529,7 +63537,7 @@ function missingBlockRef(plugin, category) {
   if (!key2) return void 0;
   return store.listBlocks(category).some((item) => item.ref === key2) ? void 0 : key2;
 }
-function renderNoteBlockSetting(setting, plugin, category) {
+function renderNoteBlockSetting(setting, plugin, category, onFilesChanged) {
   const { noteStyles: store } = plugin;
   const isTemplate = category === "template";
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
@@ -63621,6 +63629,7 @@ function renderNoteBlockSetting(setting, plugin, category) {
       busy = false;
       render();
       (_a2 = target()) == null ? void 0 : _a2.focus();
+      onFilesChanged == null ? void 0 : onFilesChanged();
     }
   };
   const saveAs = () => {
@@ -63845,6 +63854,8 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
     __publicField(this, "modelSelects", /* @__PURE__ */ new Set());
     __publicField(this, "modelStatusEls", /* @__PURE__ */ new Set());
     __publicField(this, "unsubscribeCurrentModel", null);
+    /** Rewrites the File location row's description (it follows the Structure and Voice rows making files). */
+    __publicField(this, "noteLocationChanged");
     plugin.subscribeModelDiscovery(() => {
       for (const select of [...this.modelSelects]) {
         if (!select.isConnected) {
@@ -63982,15 +63993,23 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
       },
       {
         name: t("ui.block_picker_template"),
-        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "template")
+        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "template", () => {
+          var _a2;
+          return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
+        })
       },
       {
         name: t("ui.block_picker_tone"),
-        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "tone")
+        render: (setting) => renderNoteBlockSetting(setting, this.plugin, "tone", () => {
+          var _a2;
+          return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
+        })
       },
       {
         name: t("ui.note_style_folder_path"),
-        render: (setting) => renderNoteLocationSetting(setting, this.plugin, () => this.update())
+        render: (setting) => {
+          this.noteLocationChanged = renderNoteLocationSetting(setting, this.plugin, () => this.update());
+        }
       },
       {
         name: t("ui.markdown_selection_ai_auto_open"),
@@ -71334,11 +71353,11 @@ ${t("ui.organize_link_wait_hint")}`;
   /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
   async openBlock(category, ref) {
     try {
-      const { path } = await this.noteStyles.ensureBlockFile(category, ref);
+      const { path, base, created } = await this.noteStyles.ensureBlockFile(category, ref);
       const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
       if (!(file instanceof import_obsidian40.TFile)) throw new Error("not a file");
       await this.app.workspace.getLeaf("tab").openFile(file);
-      new import_obsidian40.Notice(t("ui.block_notice_opened_0", path));
+      new import_obsidian40.Notice(created ? t("ui.block_notice_created_0_1", base, path) : t("ui.block_notice_opened_0", path));
       return true;
     } catch (e) {
       new import_obsidian40.Notice(t("ui.block_notice_open_failed"));

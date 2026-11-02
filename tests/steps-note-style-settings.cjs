@@ -94,7 +94,7 @@ const TEMPLATES = () => [item('builtin:standard', 'Standard'), item('builtin:tex
 const TONES = () => ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'].map(id => item(`builtin:${id}`, id));
 
 // One Structure or Voice row against a fake plugin and store; `calls` records what the controls asked of the plugin.
-function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {}, pending, copyResult } = {}) {
+function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {}, pending, copyResult, onChanged } = {}) {
   const calls = [];
   const { setting, view } = fakeSetting();
   const settingsObject = { language: 'en', detailTemplates: [], ...settings };
@@ -117,7 +117,7 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
       effectiveBlockKeys: () => ({ template: settingsObject.noteTemplateBlock || pending?.template, tone: settingsObject.noteToneBlock || pending?.tone, pending: pending !== undefined })
     }
   };
-  renderNoteBlockSetting(setting, plugin, category);
+  renderNoteBlockSetting(setting, plugin, category, onChanged);
   const menu = () => { const before = menus.length; view.extras[0].click(); return menus.length > before ? menus.at(-1) : undefined; };
   return { view, setting, calls, settings: settingsObject, templates, tones, plugin, menu, edit: () => view.buttons[0] };
 }
@@ -509,3 +509,47 @@ test('plugin restoreBlock: the Notice names the backup and carries an Open backu
   assert.deepEqual(notices, [t('ui.block_notice_restore_backup_failed')]);
 });
 
+
+test('plugin openBlock: a file that Edit just made says "Created … edit, save, next AI notes use it" (path included); an existing file says "Opened"', async () => {
+  const file = new obsidian.TFile('WS/Styles/Blocks/Templates/Standard.md');
+  const make = created => {
+    const self = { noteStyles: { ensureBlockFile: async () => ({ path: file.path, base: 'Standard', created }) }, app: { vault: { getAbstractFileByPath: p => (p === file.path ? file : null) }, workspace: { getLeaf: () => ({ openFile: async () => {} }) } } };
+    return self;
+  };
+  notices.length = 0;
+  assert.equal(await Plugin.prototype.openBlock.call(make(true), 'template', 'builtin:standard'), true);
+  assert.deepEqual(notices, ['Created "Standard" for you to edit: WS/Styles/Blocks/Templates/Standard.md. Save your changes and the next AI notes will use it.']);
+  notices.length = 0;
+  await Plugin.prototype.openBlock.call(make(false), 'template', 'builtin:standard');
+  assert.deepEqual(notices, ['Opened WS/Styles/Blocks/Templates/Standard.md']);
+  assert.equal(t('ui.block_notice_created_0_1', 'Standard', 'P'), 'Created "Standard" for you to edit: P. Save your changes and the next AI notes will use it.');
+  for (const language of ['zh-TW', 'zh-CN']) {
+    const text = i18n.translate(language, 'ui.block_notice_created_0_1', '標準', 'WS/標準.md');
+    assert.ok(text.includes('標準') && text.includes('WS/標準.md'), language);
+  }
+  assert.equal(i18n.translate('zh-TW', 'ui.block_notice_created_0_1', 'A', 'B'), '已建立可編輯的「A」：B。改完存檔，下次 AI 寫筆記就會用。');
+});
+
+test('Low 2: the standard structure hint states the effect only, in three languages (no "same as today\'s default")', () => {
+  assert.equal(t('ui.note_style_standard_hint'), 'Six fixed sections in a neutral, evidence-first voice.');
+  assert.equal(i18n.translate('zh-TW', 'ui.note_style_standard_hint'), '六個固定分類，中性、以證據為本。');
+  assert.equal(i18n.translate('zh-CN', 'ui.note_style_standard_hint'), '六个固定分类，中性、以证据为本。');
+});
+
+test('Low 4: after Edit or Save as makes a file, the File location description is rewritten without reopening the page', async () => {
+  const items = TEMPLATES();
+  const loc = row({ items });
+  const update = renderNoteLocationSetting(loc.setting, loc.plugin, () => {});
+  await flush();
+  assert.equal(loc.view.desc, 'No files yet. The first edit or save creates them.');
+  const block = blockRow('template', { templates: items, onChanged: () => update() });
+  await block.edit().click();
+  assert.equal(loc.view.desc, 'No files yet. The first edit or save creates them.', 'Edit made no file here');
+  items.push(item('file:Mine', 'Mine', { fileName: 'Mine.md' }));
+  let changed = 0;
+  const saved = blockRow('template', { templates: items, onChanged: () => { changed++; update(); } });
+  await saved.edit().click();
+  await flush();
+  assert.equal(changed, 1);
+  assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here as plain Markdown files.');
+});

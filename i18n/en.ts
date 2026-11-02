@@ -1554,6 +1554,8 @@ export const en = {
   "ui.block_restore": "Restore built-in",
   "ui.block_modified_0": "{0} (modified)",
   "ui.block_notice_opened_0": "Opened {0}",
+  "ui.block_notice_created_0_1":
+    'Created "{0}" for you to edit: {1}. Save your changes and the next AI notes will use it.',
   "ui.block_notice_restored_0": "Restored the built-in version. Your version is backed up at {0}.",
   "ui.block_notice_open_failed": "Cannot open this file. It may have been renamed or deleted.",
   "ui.block_notice_copy_failed": "Cannot save this file as your own. Nothing was overwritten.",
@@ -1617,7 +1619,7 @@ export const en = {
   "ui.note_style_summary": "Key points",
   "ui.note_style_plain": "Plain language",
   "ui.note_style_guide": "Practical guide",
-  "ui.note_style_standard_hint": "Six fixed sections in a neutral, evidence-first voice. Same as today's default.",
+  "ui.note_style_standard_hint": "Six fixed sections in a neutral, evidence-first voice.",
   "ui.note_style_textbook_hint": "Opens with 2–4 intro paragraphs, then the six sections; empty sections are left out.",
   "ui.note_style_summary_hint": "Six sections in short sentences and lists: conclusions, facts and numbers only.",
   "ui.note_style_plain_hint": "Six sections in everyday words; jargon is explained the first time it appears.",

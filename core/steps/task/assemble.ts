@@ -295,6 +295,9 @@ function templateParts(
   }
   // The request's own old template object in the intro layout (its lead-in is a sentence of the intro structure text) keeps
   // that structure text, with the format rules the block holds (decision 18 of ticket 06: the snapshots pin it).
+  // This is a reference output of the old path: production never sends it (no code builds such a request; the upgrade
+  // turns a lead-in into a block with a lead), and only tests/prompt-snapshots.cjs reaches it. Whether to keep the hook
+  // and re-record those snapshots is the owner's decision at wrap-up.
   const introTemplate = legacy && context.detailTemplate?.layout === "intro" ? context.detailTemplate : undefined;
   if (parsed.lead && !introTemplate)
     return {

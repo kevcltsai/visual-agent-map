@@ -72,6 +72,9 @@ test('collect snapshots: note style files (parsed file sections, intro layout, e
   const calloutStyle = parsed('---\n方框: 自動\n結論方框: abstract\n風險方框: caution\n問題方框: 關\n技巧方框: example\n---\n## 核心結論\n講結論。\n');
   for (const [language, tag] of LANGUAGES) {
     const ctx = { ...base, outputLanguage: language };
+    // NOTE: the intro-layout snapshots below are reference output of the OLD path (a request carrying the old template object
+    // in the intro layout, see the intro hook in core/steps/task/assemble.ts). Production never sends this prompt; the
+    // upgrade turns such a file into a block with a lead. Kept as is until the owner decides at wrap-up.
     const withStyle = ({ style, text }) => ({ ...ctx, detailTemplate: style.template, styleSelection: upgradedSelection(text, language), toneText: undefined });
     await recordContext(`service.task-style-file-sections.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file (sections layout, count, callout instruction, sources and log roles)', language, withStyle(sectionsStyle));
     await recordContext(`service.task-style-file-intro.${tag}`, 'AiTaskService instructions: mode task with a parsed note style file in the intro layout (lead-in, empty sections omitted, diagrams off)', language, withStyle(introStyle));

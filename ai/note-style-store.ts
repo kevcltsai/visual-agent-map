@@ -535,6 +535,14 @@ export class NoteStyleStore {
     return this.settings.noteToneBlock || this.pending?.keys.noteToneBlock;
   }
 
+  /**
+   * The template and tone blocks the runs use: what is saved, else what an unfinished upgrade holds in memory. Read-only;
+   * the settings page shows these, so a failed or unfinished upgrade does not show the standard template over the result.
+   */
+  effectiveBlockKeys(): { template?: string; tone?: string; pending: boolean } {
+    return { template: this.templateKey(), tone: this.toneKey(), pending: this.pending !== undefined };
+  }
+
   private aliasOf(key: string): NoteStyleAlias | undefined {
     const saved = this.settings.noteStyleAliases;
     if (saved && Object.prototype.hasOwnProperty.call(saved, key)) return saved[key];
@@ -784,17 +792,23 @@ export class NoteStyleStore {
   }
 
   /**
+   * Remembers the style folder in the settings when it has no saved path, so a later change of interface language does
+   * not move it. A saved path is never replaced. Call it before anything is created in the folder.
+   */
+  private async pinFolder(): Promise<void> {
+    if (this.settings.noteStylesFolder) return;
+    this.settings.noteStylesFolder = this.folder();
+    await this.deps.save();
+  }
+
+  /**
    * Creates the block folders (Templates and Tones) when they are missing, and remembers the style folder in the settings
    * so a later change of interface language does not move it. Writes no block file. Returns the block folder.
    */
   ensureBlockFolder(): Promise<string> {
     return this.serial(async () => {
       const { port } = this.deps;
-      const folder = this.folder();
-      if (!this.settings.noteStylesFolder) {
-        this.settings.noteStylesFolder = folder;
-        await this.deps.save();
-      }
+      await this.pinFolder();
       const dirs = this.blockDirectories();
       for (const path of [dirs.root, dirs.template, dirs.tone]) await port.createFolder(path);
       return dirs.root;
@@ -825,6 +839,7 @@ export class NoteStyleStore {
         this.takenNames(category)
       );
       const text = builtinBlockText(category, parsed.id, language);
+      await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text);
       this.blocks[category].set(base, text);
@@ -858,6 +873,7 @@ export class NoteStyleStore {
       } else throw new Error(`Unknown block: ${ref}`);
       const dir = this.blockDirectories()[category];
       const base = copyBlockName(category, name, language, this.takenNames(category));
+      await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text);
       this.blocks[category].set(base, text);
@@ -899,6 +915,7 @@ export class NoteStyleStore {
         } catch {
           present = [];
         }
+        await this.pinFolder();
         await port.createFolder(dirs.backup);
         backup = `${dirs.backup}/${backupName(base, this.deps.now?.() ?? new Date(), new Set(present.map(lower)))}`;
         await port.create(backup, live);
@@ -983,6 +1000,8 @@ export class NoteStyleStore {
     const { port } = this.deps;
     const settings = this.settings;
     const dirs = this.blockDirectories();
+    // The folders are about to be made: the path they get is the one kept, whatever the interface language becomes.
+    const pinned = settings.noteStylesFolder ? undefined : this.folder();
     if (plan.oldFiles.length) {
       let present: string[] = [];
       try {
@@ -1007,11 +1026,13 @@ export class NoteStyleStore {
     }
     // data.json: the new keys only where they have no value, the aliases, then the marker; undone when the save fails.
     const before = {
+      noteStylesFolder: settings.noteStylesFolder,
       noteTemplateBlock: settings.noteTemplateBlock,
       noteToneBlock: settings.noteToneBlock,
       noteStyleAliases: settings.noteStyleAliases,
       noteStyleUpgrade: settings.noteStyleUpgrade
     };
+    if (pinned !== undefined && (plan.oldFiles.length || plan.blocks.length)) settings.noteStylesFolder = pinned;
     if (plan.keys.noteTemplateBlock && !settings.noteTemplateBlock)
       settings.noteTemplateBlock = plan.keys.noteTemplateBlock;
     if (plan.keys.noteToneBlock && !settings.noteToneBlock) settings.noteToneBlock = plan.keys.noteToneBlock;

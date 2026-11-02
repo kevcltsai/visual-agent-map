@@ -599,6 +599,90 @@ test('counter 12: a block file that is already there with the same text is reuse
   assert.equal(other.settings.noteStyleAliases['style:S'].template, 'file:S (2)');
 });
 
+test('decision #20 (locked, CHANGELOG upgrade point 5): the workspace default is an edited built-in pair file and a lower level picks another tone', async () => {
+  const language = 'en';
+  const name = M.builtinStyleFileName('summary', language);
+  const edited = M.canonicalContent('summary', language).replace(/\n## /, '\n## Look here first\nNew paragraph.\n\n## ');
+  const files = { [`${name}.md`]: edited };
+  const scenario = { levels: [{}, {}, { tone: 'plain' }], ids: [undefined, undefined, 'plain'] };
+  const before = world({ language, defaultNoteStyleId: 'summary' }, files); await before.store.refresh();
+  const after = world({ language, defaultNoteStyleId: 'summary' }, files); await after.store.upgradeLegacy(); await after.store.refresh();
+  const old = promptsOf(before.store, language, scenario), upgraded = promptsOf(after.store, language, scenario);
+  const names = got => got.resolved.template.sections.map(section => section.name);
+  // before: the picked tone selects that tone's own pair, so the edited summary file is not used at all
+  assert.ok(!names(old).includes('Look here first'));
+  assert.equal(old.resolved.block, undefined);
+  // after: the file's template stays (the static key), and only the tone changes
+  assert.equal(names(upgraded)[0], 'Look here first');
+  assert.deepEqual(names(upgraded).slice(1), names(old));
+  assert.ok(upgraded.resolved.block);
+  const toneOf = got => got.fields.toneText;
+  assert.ok(toneOf(old), 'the picked tone applies before');
+  assert.equal(toneOf(upgraded), toneOf(old), 'and after: the same tone text');
+  assert.notEqual(upgraded.prompts.join(), old.prompts.join(), 'the known difference: the template is the edited file');
+  // with no lower pick both agree, so the difference is only the lower-level pick
+  const plain = { levels: [{}, {}, {}], ids: [] };
+  assert.deepEqual(promptsOf(after.store, language, plain).prompts, promptsOf(before.store, language, plain).prompts);
+});
+
+test('T1: the upgrade remembers the folder it wrote to, so a later change of interface language still finds the blocks', async () => {
+  const text = fixture('table-off.md');
+  const probe = world({ language: 'zh-TW', noteStylesFolder: undefined });
+  const folder = probe.store.folder();
+  const other = world({ language: 'zh-CN', noteStylesFolder: undefined }).store.folder();
+  assert.notEqual(folder, other, 'the default name depends on the language');
+  const w = world({ language: 'zh-TW', noteStylesFolder: undefined }, { [`${folder}/S.md`]: text });
+  assert.equal((await w.store.upgradeLegacy()).status, 'done');
+  assert.equal(w.settings.noteStylesFolder, folder, 'written with the marker in the one save');
+  assert.equal(w.saves.length, 1);
+  const made = Object.keys(w.v.files).sort();
+  w.settings.language = 'zh-CN';
+  await w.store.refresh();
+  assert.equal(w.store.folder(), folder);
+  eq(w.store.listBlocks('template').filter(item => item.kind === 'file').map(item => item.ref), ['file:S'], 'the block is still found');
+  // opening the folder after the language changed makes nothing new and keeps the saved path
+  await w.store.ensureBlockFolder();
+  assert.equal(w.settings.noteStylesFolder, folder);
+  eq([...w.v.folders].filter(path => path.startsWith(other)), []);
+  eq(Object.keys(w.v.files).sort(), made);
+  // no old data: nothing is written, so the folder path is not pinned either
+  const empty = world({ language: 'zh-TW', noteStylesFolder: undefined });
+  await empty.store.upgradeLegacy();
+  assert.equal(empty.settings.noteStylesFolder, undefined);
+  // a save that fails leaves the path as it was
+  const failing = world({ language: 'zh-TW', noteStylesFolder: undefined }, { [`${folder}/S.md`]: text });
+  failing.v.failSave = true;
+  assert.equal((await failing.store.upgradeLegacy()).status, 'failed');
+  assert.equal(failing.settings.noteStylesFolder, undefined);
+});
+
+test('T1: a user action that makes a block file pins the folder too (open, copy), and a saved path is never replaced', async () => {
+  const w = world({ language: 'en', noteStylesFolder: undefined, noteStyleUpgrade: { version: 1 } });
+  await w.store.refresh();
+  await w.store.copyBlock('template', 'builtin:standard');
+  assert.equal(w.settings.noteStylesFolder, w.store.folder());
+  const saved = w.settings.noteStylesFolder;
+  w.settings.language = 'zh-CN';
+  await w.store.ensureBlockFile('tone', 'builtin:plain');
+  assert.equal(w.settings.noteStylesFolder, saved);
+  const own = world({ language: 'en', noteStylesFolder: 'Mine/S', noteStyleUpgrade: { version: 1 } });
+  await own.store.ensureBlockFolder();
+  assert.equal(own.settings.noteStylesFolder, 'Mine/S');
+});
+
+test('M1: after a failed upgrade the store reports the blocks the runs use (the pending ones), and nothing is saved', async () => {
+  const w = world({ language: 'en', defaultNoteStyleId: 'style:table-off' }, { 'table-off.md': fixture('table-off.md') });
+  w.v.failSave = true;
+  assert.equal((await w.store.startUpgrade()).status, 'failed');
+  assert.equal(w.settings.noteTemplateBlock, undefined);
+  const keys = w.store.effectiveBlockKeys();
+  assert.equal(keys.template, 'file:table-off');
+  assert.equal(keys.pending, true);
+  w.v.failSave = false;
+  assert.equal((await world({}, {}, { v: w.v, settings: w.settings }).store.startUpgrade()).status, 'done');
+  assert.equal(w.settings.noteTemplateBlock, 'file:table-off');
+});
+
 test('a style file that does not read stays where it is, is not backed up or trashed, and is told once', async () => {
   const w = world({ language: 'en' }, { 'Bad.md': '---\ntone: x\n---\nno sections here\n', 'S.md': fixture('table-off.md') });
   const result = await w.store.upgradeLegacy();

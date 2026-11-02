@@ -47,7 +47,7 @@ const TEMPLATES = () => [item('builtin:standard', 'Standard'), item('builtin:tex
 const TONES = () => ['academic', 'plain', 'magazine', 'summary', 'guide', 'auto'].map(id => item(`builtin:${id}`, id));
 
 // One Template or Tone row against a fake plugin and store; `calls` records what the buttons asked of the plugin.
-function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {} } = {}) {
+function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TONES(), hold = {}, pending } = {}) {
   const calls = [];
   const view = { options: [], value: undefined, disabled: false, attrs: {}, focused: 0, buttons: [], desc: '', descAttrs: {}, name: '', classes: [], descWrites: 0 };
   const settingsObject = { language: 'en', detailTemplates: [], ...settings };
@@ -76,7 +76,11 @@ function blockRow(category, { settings = {}, templates = TEMPLATES(), tones = TO
     openBlock: async (...args) => { calls.push(['open', ...args]); await (hold.open ?? Promise.resolve()); return true; },
     copyBlock: async (...args) => { calls.push(['copy', ...args]); settingsObject[args[0] === 'template' ? 'noteTemplateBlock' : 'noteToneBlock'] = 'file:Copy'; (args[0] === 'template' ? templates : tones).push(item('file:Copy', 'Copy')); return 'file:Copy'; },
     restoreBlock: async (...args) => { calls.push(['restore', ...args]); const target = (args[0] === 'template' ? templates : tones).find(entry => entry.ref === args[1]); delete target.fileName; target.modified = false; return true; },
-    noteStyles: { refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones) }
+    noteStyles: {
+      refresh: async () => {}, listBlocks: kind => (kind === 'template' ? templates : tones),
+      // as the store: what is saved, else what an unfinished upgrade holds in memory
+      effectiveBlockKeys: () => ({ template: settingsObject.noteTemplateBlock || pending?.template, tone: settingsObject.noteToneBlock || pending?.tone, pending: pending !== undefined })
+    }
   };
   renderNoteBlockSetting(setting, plugin, category);
   return { view, calls, settings: settingsObject, templates, tones };
@@ -87,7 +91,7 @@ test('settings row: read-only folder path, open-folder and preview buttons, no p
   assert.equal(log.texts[0].disabled, true);
   assert.equal(log.texts[0].value, 'WS/Styles');
   assert.equal(log.dropdown, undefined);
-  assert.equal(log.buttons[0].text, 'Open style folder');
+  assert.equal(log.buttons[0].text, 'Open block folder');
   await log.buttons[0].click();
   assert.equal(log.opened, 1);
   assert.equal(log.buttons[1].text, 'Preview full prompt');
@@ -126,6 +130,27 @@ test('changing a picker writes both shown values into the settings', async () =>
   assert.equal(tone.settings.noteTemplateBlock, 'builtin:textbook');
   assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
   assert.equal(tone.calls.at(-1)[0], 'save');
+});
+
+test('M1: the rows show the blocks the runs use, also while an upgrade has not been saved', async () => {
+  const pending = { template: 'file:Upgraded', tone: 'file:Calm' };
+  const templates = [...TEMPLATES(), item('file:Upgraded', 'Upgraded')];
+  const tones = [...TONES(), item('file:Calm', 'Calm')];
+  assert.equal(blockRow('template', { pending, templates, tones }).view.value, 'file:Upgraded');
+  assert.equal(blockRow('tone', { pending, templates, tones }).view.value, 'file:Calm');
+});
+
+test('M1: after a failed upgrade, changing only the tone does not write the standard template over the pending one', async () => {
+  const pending = { template: 'file:Upgraded' };
+  const templates = [...TEMPLATES(), item('file:Upgraded', 'Upgraded')];
+  const tone = blockRow('tone', { pending, templates });
+  await tone.view.change('builtin:guide');
+  assert.equal(tone.settings.noteToneBlock, 'builtin:guide');
+  assert.equal(tone.settings.noteTemplateBlock, undefined, 'the pending template stays unsaved, so a retry still writes it');
+  const open = blockRow('template', { pending, templates });
+  await open.view.buttons[0].click();
+  assert.equal(open.settings.noteTemplateBlock, undefined);
+  assert.equal(open.calls.find(call => call[0] === 'open')[2], 'file:Upgraded');
 });
 
 test('Restore default is off, aria-disabled and explained when it does not apply', async () => {

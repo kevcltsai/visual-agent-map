@@ -76,7 +76,8 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
   const standard = NOTE_STYLE_PRESETS[0];
   const has = (category: BlockCategory, ref: string | undefined): ref is string =>
     ref !== undefined && store.listBlocks(category).some(item => item.ref === ref);
-  const keyed = settings.noteTemplateBlock;
+  const effective = store.effectiveBlockKeys();
+  const keyed = effective.template;
   const template = keyed
     ? has("template", keyed)
       ? keyed
@@ -84,7 +85,7 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
     : preset
       ? builtinRef(preset.templateId)
       : builtinRef(standard.templateId);
-  const toneKey = settings.noteToneBlock;
+  const toneKey = effective.tone;
   const tone = toneKey
     ? has("tone", toneKey)
       ? toneKey
@@ -94,13 +95,35 @@ export function shownBlocks(plugin: VisualAgentMapPlugin): ShownBlocks {
 }
 
 /**
+ * Writes the shown blocks into the settings, so what the rows show is what runs use. `changed` is the one the user just
+ * picked. A key an unfinished upgrade holds in memory (not saved yet) is left alone, so a retry still brings in its
+ * result: the other row's shown value is not written over it.
+ */
+function writeShown(plugin: VisualAgentMapPlugin, changed?: { category: BlockCategory; value: string }): void {
+  const { settings, noteStyles: store } = plugin;
+  const shown = shownBlocks(plugin);
+  const held = store.effectiveBlockKeys();
+  const saved: Record<BlockCategory, string | undefined> = {
+    template: settings.noteTemplateBlock,
+    tone: settings.noteToneBlock
+  };
+  const next: Record<BlockCategory, string | undefined> = { template: shown.template, tone: shown.tone };
+  for (const category of ["template", "tone"] as const) {
+    if (changed?.category === category) next[category] = changed.value;
+    else if (!saved[category] && held[category]) next[category] = undefined;
+  }
+  if (next.template !== undefined) settings.noteTemplateBlock = next.template;
+  if (next.tone !== undefined) settings.noteToneBlock = next.tone;
+}
+
+/**
  * The "Template" or "Tone" row of the note style setting: a picker over the built-in and the user's own blocks, and the
  * buttons Open, Copy and Restore default. The first action writes both shown values into the settings, so what the rows
  * show is what runs use. Buttons are off while an action runs; focus stays on the button used, or on the picker when the
  * choice changed.
  */
 export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapPlugin, category: BlockCategory): void {
-  const { settings, noteStyles: store } = plugin;
+  const { noteStyles: store } = plugin;
   const isTemplate = category === "template";
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
   setting.setName(label);
@@ -153,8 +176,7 @@ export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapP
     render();
     try {
       const shown = shownBlocks(plugin);
-      settings.noteTemplateBlock = shown.template;
-      settings.noteToneBlock = shown.tone;
+      writeShown(plugin);
       await plugin.saveSettings();
       await action(shown[category]);
     } catch {
@@ -172,9 +194,7 @@ export function renderNoteBlockSetting(setting: Setting, plugin: VisualAgentMapP
       t(isTemplate ? "ui.block_picker_template_aria" : "ui.block_picker_tone_aria")
     );
     dropdown.onChange(async value => {
-      const shown = shownBlocks(plugin);
-      settings.noteTemplateBlock = isTemplate ? value : shown.template;
-      settings.noteToneBlock = isTemplate ? shown.tone : value;
+      writeShown(plugin, { category, value });
       await plugin.saveSettings();
       render();
     });

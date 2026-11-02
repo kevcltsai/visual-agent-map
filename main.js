@@ -1602,7 +1602,7 @@ var en = {
   "ui.note_style_edit_missing_0": 'Cannot find the style file "{0}".',
   "ui.note_style_open_file": "Open this file",
   "ui.note_style_switch": "Use another style",
-  "ui.note_style_group_folder": "Style folder",
+  "ui.note_style_group_folder": "Your own templates",
   "ui.note_style_unusable_0_1_2": '"{0}" cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (cannot be used)",
   "ui.note_style_issue_file_long": "The file is over {0} characters.",
@@ -1617,8 +1617,8 @@ var en = {
   "ui.note_style_folder_missing_desc_0": '"{0}" does not exist. Choose the folder again or open the style folder to create it.',
   "ui.note_style_folder_choose": "Choose folder",
   "ui.note_style_folder_choose_prompt": "Folder path for note styles",
-  "ui.note_style_setting_desc": "Each note style is a Markdown file in this folder. The default applies to topics and maps with no style of their own.",
-  "ui.note_style_open_folder": "Open style folder",
+  "ui.note_style_setting_desc": "A note style is a template block plus a tone block, each a Markdown file in the Templates and Tones folders under this folder. The default applies to topics and maps with no style of their own.",
+  "ui.note_style_open_folder": "Open block folder",
   "ui.note_style_folder_path": "Style folder",
   "ui.detail_format_unmet": "Format not met",
   "ui.detail_template_error_name_required": "Template name is required.",
@@ -3846,7 +3846,7 @@ var zhCN = {
   "ui.note_style_edit_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u3002",
   "ui.note_style_open_file": "\u6253\u5F00\u8FD9\u4E2A\u6587\u4EF6",
   "ui.note_style_switch": "\u6539\u7528\u5176\u4ED6\u98CE\u683C",
-  "ui.note_style_group_folder": "\u98CE\u683C\u6587\u4EF6\u5939",
+  "ui.note_style_group_folder": "\u4F60\u81EA\u5DF1\u7684\u6A21\u677F",
   "ui.note_style_unusable_0_1_2": "\u201C{0}\u201D\u65E0\u6CD5\u9009\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u65E0\u6CD5\u4F7F\u7528\uFF09",
   "ui.note_style_issue_file_long": "\u6587\u4EF6\u8D85\u8FC7 {0} \u5B57\u3002",
@@ -3861,8 +3861,8 @@ var zhCN = {
   "ui.note_style_folder_missing_desc_0": "\u201C{0}\u201D\u4E0D\u5B58\u5728\u3002\u8BF7\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939\uFF0C\u6216\u6253\u5F00\u98CE\u683C\u6587\u4EF6\u5939\u8BA9\u5B83\u91CD\u65B0\u521B\u5EFA\u3002",
   "ui.note_style_folder_choose": "\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939",
   "ui.note_style_folder_choose_prompt": "\u7B14\u8BB0\u98CE\u683C\u7684\u6587\u4EF6\u5939\u8DEF\u5F84",
-  "ui.note_style_setting_desc": "\u6BCF\u4E2A\u7B14\u8BB0\u98CE\u683C\u90FD\u662F\u8FD9\u4E2A\u6587\u4EF6\u5939\u91CC\u7684\u4E00\u4E2A Markdown \u6587\u4EF6\u3002\u9ED8\u8BA4\u98CE\u683C\u7528\u5728\u6CA1\u6709\u81EA\u5DF1\u98CE\u683C\u7684\u8BAE\u9898\u4E0E\u5730\u56FE\u3002",
-  "ui.note_style_open_folder": "\u6253\u5F00\u98CE\u683C\u6587\u4EF6\u5939",
+  "ui.note_style_setting_desc": "\u7B14\u8BB0\u98CE\u683C\u7531\u4E00\u4E2A\u6A21\u677F\u79EF\u6728\u52A0\u4E00\u4E2A\u8BED\u6C14\u79EF\u6728\u7EC4\u6210\uFF0C\u5404\u662F\u8FD9\u4E2A\u6587\u4EF6\u5939\u4E0B\u201C\u6A21\u677F\u201D\u4E0E\u201C\u8BED\u6C14\u201D\u6587\u4EF6\u5939\u91CC\u7684\u4E00\u4E2A Markdown \u6587\u4EF6\u3002\u9ED8\u8BA4\u98CE\u683C\u7528\u5728\u6CA1\u6709\u81EA\u5DF1\u98CE\u683C\u7684\u8BAE\u9898\u4E0E\u5730\u56FE\u3002",
+  "ui.note_style_open_folder": "\u6253\u5F00\u79EF\u6728\u6587\u4EF6\u5939",
   "ui.note_style_folder_path": "\u98CE\u683C\u6587\u4EF6\u5939",
   "ui.detail_format_unmet": "\u683C\u5F0F\u672A\u8FBE\u8981\u6C42",
   "ui.detail_template_error_name_required": "\u8BF7\u8F93\u5165\u6A21\u677F\u540D\u79F0\u3002",
@@ -6090,7 +6090,7 @@ var zhTW = {
   "ui.note_style_edit_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u3002",
   "ui.note_style_open_file": "\u958B\u555F\u9019\u500B\u6A94",
   "ui.note_style_switch": "\u6539\u7528\u5176\u4ED6\u98A8\u683C",
-  "ui.note_style_group_folder": "\u98A8\u683C\u8CC7\u6599\u593E",
+  "ui.note_style_group_folder": "\u4F60\u81EA\u5DF1\u7684\u6A21\u677F",
   "ui.note_style_unusable_0_1_2": "\u300C{0}\u300D\u7121\u6CD5\u9078\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u7121\u6CD5\u4F7F\u7528\uFF09",
   "ui.note_style_issue_file_long": "\u6A94\u6848\u8D85\u904E {0} \u5B57\u3002",
@@ -6105,8 +6105,8 @@ var zhTW = {
   "ui.note_style_folder_missing_desc_0": "\u300C{0}\u300D\u4E0D\u5B58\u5728\u3002\u8ACB\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E\uFF0C\u6216\u958B\u555F\u98A8\u683C\u8CC7\u6599\u593E\u8B93\u5B83\u91CD\u65B0\u5EFA\u7ACB\u3002",
   "ui.note_style_folder_choose": "\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E",
   "ui.note_style_folder_choose_prompt": "\u7B46\u8A18\u98A8\u683C\u7684\u8CC7\u6599\u593E\u8DEF\u5F91",
-  "ui.note_style_setting_desc": "\u6BCF\u500B\u7B46\u8A18\u98A8\u683C\u90FD\u662F\u9019\u500B\u8CC7\u6599\u593E\u88E1\u7684\u4E00\u500B Markdown \u6A94\u3002\u9810\u8A2D\u98A8\u683C\u7528\u5728\u6C92\u6709\u81EA\u5DF1\u98A8\u683C\u7684\u8B70\u984C\u8207\u5730\u5716\u3002",
-  "ui.note_style_open_folder": "\u958B\u555F\u98A8\u683C\u8CC7\u6599\u593E",
+  "ui.note_style_setting_desc": "\u7B46\u8A18\u98A8\u683C\u7531\u4E00\u500B\u6A21\u677F\u7A4D\u6728\u52A0\u4E00\u500B\u8A9E\u6C23\u7A4D\u6728\u7D44\u6210\uFF0C\u5404\u662F\u9019\u500B\u8CC7\u6599\u593E\u4E0B\u300C\u6A21\u677F\u300D\u8207\u300C\u8A9E\u6C23\u300D\u8CC7\u6599\u593E\u88E1\u7684\u4E00\u500B Markdown \u6A94\u3002\u9810\u8A2D\u98A8\u683C\u7528\u5728\u6C92\u6709\u81EA\u5DF1\u98A8\u683C\u7684\u8B70\u984C\u8207\u5730\u5716\u3002",
+  "ui.note_style_open_folder": "\u958B\u555F\u7A4D\u6728\u8CC7\u6599\u593E",
   "ui.note_style_folder_path": "\u98A8\u683C\u8CC7\u6599\u593E",
   "ui.detail_format_unmet": "\u683C\u5F0F\u672A\u9054\u8981\u6C42",
   "ui.detail_template_error_name_required": "\u8ACB\u8F38\u5165\u6A21\u677F\u540D\u7A31\u3002",
@@ -26403,6 +26403,13 @@ var NoteStyleStore = class {
     var _a2;
     return this.settings.noteToneBlock || ((_a2 = this.pending) == null ? void 0 : _a2.keys.noteToneBlock);
   }
+  /**
+   * The template and tone blocks the runs use: what is saved, else what an unfinished upgrade holds in memory. Read-only;
+   * the settings page shows these, so a failed or unfinished upgrade does not show the standard template over the result.
+   */
+  effectiveBlockKeys() {
+    return { template: this.templateKey(), tone: this.toneKey(), pending: this.pending !== void 0 };
+  }
   aliasOf(key2) {
     var _a2;
     const saved = this.settings.noteStyleAliases;
@@ -26611,17 +26618,22 @@ var NoteStyleStore = class {
     return new Set([...this.blocks[category].keys()].map(lower3));
   }
   /**
+   * Remembers the style folder in the settings when it has no saved path, so a later change of interface language does
+   * not move it. A saved path is never replaced. Call it before anything is created in the folder.
+   */
+  async pinFolder() {
+    if (this.settings.noteStylesFolder) return;
+    this.settings.noteStylesFolder = this.folder();
+    await this.deps.save();
+  }
+  /**
    * Creates the block folders (Templates and Tones) when they are missing, and remembers the style folder in the settings
    * so a later change of interface language does not move it. Writes no block file. Returns the block folder.
    */
   ensureBlockFolder() {
     return this.serial(async () => {
       const { port } = this.deps;
-      const folder = this.folder();
-      if (!this.settings.noteStylesFolder) {
-        this.settings.noteStylesFolder = folder;
-        await this.deps.save();
-      }
+      await this.pinFolder();
       const dirs = this.blockDirectories();
       for (const path of [dirs.root, dirs.template, dirs.tone]) await port.createFolder(path);
       return dirs.root;
@@ -26651,6 +26663,7 @@ var NoteStyleStore = class {
         this.takenNames(category)
       );
       const text11 = builtinBlockText(category, parsed.id, language2);
+      await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text11);
       this.blocks[category].set(base, text11);
@@ -26680,6 +26693,7 @@ var NoteStyleStore = class {
       } else throw new Error(`Unknown block: ${ref}`);
       const dir = this.blockDirectories()[category];
       const base = copyBlockName(category, name, language2, this.takenNames(category));
+      await this.pinFolder();
       await this.deps.port.createFolder(dir);
       await this.deps.port.create(`${dir}/${base}.md`, text11);
       this.blocks[category].set(base, text11);
@@ -26721,6 +26735,7 @@ var NoteStyleStore = class {
         } catch (e) {
           present = [];
         }
+        await this.pinFolder();
         await port.createFolder(dirs.backup);
         backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower3)))}`;
         await port.create(backup, live);
@@ -26802,6 +26817,7 @@ var NoteStyleStore = class {
     const { port } = this.deps;
     const settings = this.settings;
     const dirs = this.blockDirectories();
+    const pinned = settings.noteStylesFolder ? void 0 : this.folder();
     if (plan.oldFiles.length) {
       let present = [];
       try {
@@ -26825,11 +26841,13 @@ var NoteStyleStore = class {
       for (const item of items) await port.create(`${dirs[category]}/${item.base}.md`, item.text);
     }
     const before = {
+      noteStylesFolder: settings.noteStylesFolder,
       noteTemplateBlock: settings.noteTemplateBlock,
       noteToneBlock: settings.noteToneBlock,
       noteStyleAliases: settings.noteStyleAliases,
       noteStyleUpgrade: settings.noteStyleUpgrade
     };
+    if (pinned !== void 0 && (plan.oldFiles.length || plan.blocks.length)) settings.noteStylesFolder = pinned;
     if (plan.keys.noteTemplateBlock && !settings.noteTemplateBlock)
       settings.noteTemplateBlock = plan.keys.noteTemplateBlock;
     if (plan.keys.noteToneBlock && !settings.noteToneBlock) settings.noteToneBlock = plan.keys.noteToneBlock;
@@ -63072,14 +63090,31 @@ function shownBlocks(plugin) {
   const preset = NOTE_STYLE_PRESETS.find((item) => item.id === chosen);
   const standard = NOTE_STYLE_PRESETS[0];
   const has2 = (category, ref) => ref !== void 0 && store.listBlocks(category).some((item) => item.ref === ref);
-  const keyed = settings.noteTemplateBlock;
+  const effective = store.effectiveBlockKeys();
+  const keyed = effective.template;
   const template2 = keyed ? has2("template", keyed) ? keyed : builtinRef(standard.templateId) : preset ? builtinRef(preset.templateId) : builtinRef(standard.templateId);
-  const toneKey = settings.noteToneBlock;
+  const toneKey = effective.tone;
   const tone2 = toneKey ? has2("tone", toneKey) ? toneKey : builtinRef(standard.toneId) : builtinRef((preset != null ? preset : standard).toneId);
   return { template: template2, tone: tone2 };
 }
-function renderNoteBlockSetting(setting, plugin, category) {
+function writeShown(plugin, changed) {
   const { settings, noteStyles: store } = plugin;
+  const shown = shownBlocks(plugin);
+  const held = store.effectiveBlockKeys();
+  const saved = {
+    template: settings.noteTemplateBlock,
+    tone: settings.noteToneBlock
+  };
+  const next = { template: shown.template, tone: shown.tone };
+  for (const category of ["template", "tone"]) {
+    if ((changed == null ? void 0 : changed.category) === category) next[category] = changed.value;
+    else if (!saved[category] && held[category]) next[category] = void 0;
+  }
+  if (next.template !== void 0) settings.noteTemplateBlock = next.template;
+  if (next.tone !== void 0) settings.noteToneBlock = next.tone;
+}
+function renderNoteBlockSetting(setting, plugin, category) {
+  const { noteStyles: store } = plugin;
   const isTemplate = category === "template";
   const label = t(isTemplate ? "ui.block_picker_template" : "ui.block_picker_tone");
   setting.setName(label);
@@ -63132,8 +63167,7 @@ function renderNoteBlockSetting(setting, plugin, category) {
     render();
     try {
       const shown = shownBlocks(plugin);
-      settings.noteTemplateBlock = shown.template;
-      settings.noteToneBlock = shown.tone;
+      writeShown(plugin);
       await plugin.saveSettings();
       await action(shown[category]);
     } catch (e) {
@@ -63150,9 +63184,7 @@ function renderNoteBlockSetting(setting, plugin, category) {
       t(isTemplate ? "ui.block_picker_template_aria" : "ui.block_picker_tone_aria")
     );
     dropdown.onChange(async (value) => {
-      const shown = shownBlocks(plugin);
-      settings.noteTemplateBlock = isTemplate ? value : shown.template;
-      settings.noteToneBlock = isTemplate ? shown.tone : value;
+      writeShown(plugin, { category, value });
       await plugin.saveSettings();
       render();
     });

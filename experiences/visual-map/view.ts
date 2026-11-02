@@ -18029,7 +18029,7 @@ export class VisualAgentMapView extends ItemView {
   private async aimNoteStyle(language: ContentLanguage): Promise<RunStyle | undefined> {
     // A plugin test double without settings has no styles: the AIM report.
     if (!this.plugin.settings) return undefined;
-    // The store only knows the style folder as of its last refresh; read it now, as every other run entry does.
+    // The store only knows the style folder as of its last refresh; read it now, like the other note-style run entries (import, topic run) do.
     try {
       await this.noteStyles.refresh();
     } catch {

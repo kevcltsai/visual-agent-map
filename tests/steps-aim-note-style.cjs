@@ -181,6 +181,7 @@ async function concludeSeen({ toneId, port, afterRun, tasks } = {}) {
     doc.toneId = toneId;
     await repo.saveMap(created.mapPath, doc);
   }
+  const settingsBefore = JSON.stringify(repo.settings);
   const seen = [];
   const flow = new AimManualFlow(repo, new AimRunStore(repo), (context, ...rest) => {
     tasks?.push({ phase: M.aimPhase(context.task), task: String(context.task) });
@@ -193,7 +194,7 @@ async function concludeSeen({ toneId, port, afterRun, tasks } = {}) {
     const outcome = await flow.answerAndResearch(created.mapPath, question.id, { requestId: `a-${round}`, selections: [question.aimQuestion.options[0].id], freeText: `Specific condition ${round}` }, MODEL, 'low');
     if (round < 3) question = (await repo.readMap(created.mapPath)).nodes.find(node => node.id === outcome.questionNodeId);
   }
-  await afterRun?.(repo, created);
+  await afterRun?.(repo, created, settingsBefore);
   return seen;
 }
 
@@ -211,11 +212,10 @@ test('counter 5: a plain-voice style tones only the final document; research and
 });
 
 test('counter 10: an AIM run writes neither noteStyleByKind nor the map tone', async () => {
-  const settingsBefore = JSON.stringify(S.DEFAULT_SETTINGS.noteStyleByKind ?? null);
-  let toneAfter;
-  await concludeSeen({ toneId: 'magazine', port: () => PLAIN_STYLE, afterRun: async (repo, created) => { toneAfter = (await repo.readMap(created.mapPath)).toneId; } });
+  let toneAfter, settingsAfter, settingsBefore;
+  await concludeSeen({ toneId: 'magazine', port: () => PLAIN_STYLE, afterRun: async (repo, created, before) => { toneAfter = (await repo.readMap(created.mapPath)).toneId; settingsAfter = JSON.stringify(repo.settings); settingsBefore = before; } });
   assert.equal(toneAfter, 'magazine');
-  assert.equal(JSON.stringify(S.DEFAULT_SETTINGS.noteStyleByKind ?? null), settingsBefore);
+  assert.equal(settingsAfter, settingsBefore, 'the repository settings the flow used are unchanged by the run');
 });
 
 test('counter 6: an AIM row that cannot be read, or has 0 or 13 sections, falls back to the AIM report with one Notice per map', async () => {

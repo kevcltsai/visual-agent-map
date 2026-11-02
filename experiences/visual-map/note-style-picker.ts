@@ -1,19 +1,16 @@
 import { Notice, normalizePath, TFile, type App } from "obsidian";
 import type VisualAgentMapPlugin from "../../main";
-import { builtinPairOf, type NoteStyleAliases } from "../../ai/note-style-upgrade";
 import type { NoteStyleStore } from "../../ai/note-style-store";
-import { builtinRef, parseBlockRef } from "../../core/blocks/block-files";
+import { builtinRef } from "../../core/blocks/block-files";
 import { t, type TranslationKey } from "../../i18n";
 import type { NoteStyleIssue } from "../../ai/note-style-file";
 import { backgroundResultNotice } from "../../ui/background-run";
 import { ChoiceModal, type Choice } from "../../ui/modals/choice-modal";
 import { NOTE_STYLE_PRESETS } from "./note-style";
+import { styleRefOf, type StyleRef } from "../../ai/note-style-label";
 
-/** Which style a picker row stands for: a built-in style id, or `file:<name>` of a template block the user wrote. */
-export interface StyleRef {
-  kind: "builtin" | "file";
-  id: string;
-}
+export { styleRefOf };
+export type { StyleRef };
 
 /** One template block of the user in a picker, with the reasons it cannot be read (empty when it can). */
 export interface StyleListItem {
@@ -97,24 +94,6 @@ export async function openStyleFile(app: App, store: NoteStyleStore, ref: StyleR
   } catch {
     new Notice(t("ui.note_style_edit_missing_0", name));
   }
-}
-
-/**
- * The style a stored template and tone pair stands for, when it is a built-in or a template block of the user. An old id
- * the upgrade moved to a block (`aliases`) stands for that block.
- */
-export function styleRefOf(
-  templateId: string | undefined,
-  toneId: string | undefined,
-  aliases: NoteStyleAliases = {}
-): StyleRef | undefined {
-  const builtin = builtinPairOf(templateId, toneId);
-  if (builtin) return { kind: "builtin", id: builtin };
-  if (parseBlockRef(templateId)?.kind === "file" && templateId) return { kind: "file", id: templateId };
-  const moved =
-    templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : undefined;
-  if (moved?.template && parseBlockRef(moved.template)?.kind === "file") return { kind: "file", id: moved.template };
-  return undefined;
 }
 
 const ISSUE_KEYS = new Set([

@@ -26093,6 +26093,74 @@ function planNoteStyleUpgrade(input2) {
   };
 }
 
+// ai/note-style-label.ts
+var NOTE_STYLE_PRESETS = [
+  {
+    id: "standard",
+    templateId: STANDARD_TEMPLATE_ID,
+    toneId: DEFAULT_TONE_ID,
+    name: "ui.note_style_standard",
+    short: "ui.note_style_standard_short",
+    hint: "ui.note_style_standard_hint"
+  },
+  {
+    id: "textbook",
+    templateId: TEXTBOOK_TEMPLATE_ID,
+    toneId: DEFAULT_TONE_ID,
+    name: "ui.note_style_textbook",
+    short: "ui.note_style_textbook_short",
+    hint: "ui.note_style_textbook_hint"
+  },
+  {
+    id: "summary",
+    templateId: STANDARD_TEMPLATE_ID,
+    toneId: "summary",
+    name: "ui.note_style_summary",
+    short: "ui.note_style_summary",
+    hint: "ui.note_style_summary_hint"
+  },
+  {
+    id: "plain",
+    templateId: STANDARD_TEMPLATE_ID,
+    toneId: "plain",
+    name: "ui.note_style_plain",
+    short: "ui.note_style_plain",
+    hint: "ui.note_style_plain_hint"
+  },
+  {
+    id: "guide",
+    templateId: STANDARD_TEMPLATE_ID,
+    toneId: "guide",
+    name: "ui.note_style_guide",
+    short: "ui.note_style_guide",
+    hint: "ui.note_style_guide_hint"
+  }
+];
+function matchPreset(templateId, toneId) {
+  const template2 = templateId || STANDARD_TEMPLATE_ID;
+  const tone2 = toneId || DEFAULT_TONE_ID;
+  return NOTE_STYLE_PRESETS.find((preset) => preset.templateId === template2 && preset.toneId === tone2);
+}
+function styleLabel(templateId, toneId, names3, language2) {
+  const preset = matchPreset(templateId, toneId);
+  if (preset) return translate(language2, preset.short);
+  return translate(
+    language2,
+    "ui.note_style_custom_0_1",
+    names3.template(templateId || STANDARD_TEMPLATE_ID),
+    names3.tone(toneId || DEFAULT_TONE_ID)
+  );
+}
+function styleRefOf(templateId, toneId, aliases = {}) {
+  var _a2, _b2;
+  const builtin = builtinPairOf(templateId, toneId);
+  if (builtin) return { kind: "builtin", id: builtin };
+  if (((_a2 = parseBlockRef(templateId)) == null ? void 0 : _a2.kind) === "file" && templateId) return { kind: "file", id: templateId };
+  const moved = templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : void 0;
+  if ((moved == null ? void 0 : moved.template) && ((_b2 = parseBlockRef(moved.template)) == null ? void 0 : _b2.kind) === "file") return { kind: "file", id: moved.template };
+  return void 0;
+}
+
 // ai/note-style-store.ts
 var stripMd3 = (name) => name.replace(/\.md$/i, "");
 var lower3 = (value) => value.toLocaleLowerCase();
@@ -26253,6 +26321,62 @@ var NoteStyleStore = class {
   }
   // ---- resolution ----
   /**
+   * The note style of a run, as one value: the template, the writing tone text, the context fields, the names to show and
+   * the problems found. Reads only what the last `refresh()` loaded; writes nothing and shows nothing.
+   */
+  runStyle(request) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    const settings = this.settings;
+    const language2 = request.outputLanguage;
+    const levels = [{ template: (_a2 = request.choice) == null ? void 0 : _a2.template }];
+    if (request.topic) levels.push(request.topic);
+    if (request.map) levels.push(request.map);
+    const found = this.resolve(levels);
+    const template2 = isBuiltinTemplateId(found.template.id) && !(found.block && !found.blockIssues) ? builtinTemplates(noteLanguageOf(language2), language2).find((item) => item.id === found.template.id) : found.template;
+    const uiTemplates = [
+      ...builtinTemplates(noteLanguageOf(settings.language), settings.language),
+      ...settings.detailTemplates
+    ];
+    const isFileId = (id) => id.startsWith("style:") || id.startsWith("file:");
+    const templateName = (id) => {
+      var _a3, _b3;
+      return isFileId(id) ? id.replace(/^(?:style|file):/, "") : (_b3 = (_a3 = uiTemplates.find((item) => item.id === id)) == null ? void 0 : _a3.name) != null ? _b3 : id;
+    };
+    const chain = [(_b2 = request.choice) == null ? void 0 : _b2.tone, (_c = request.topic) == null ? void 0 : _c.tone, (_d = request.map) == null ? void 0 : _d.tone];
+    const tone2 = found.toneDecided ? { text: found.toneText, source: found.toneSource, free: found.toneFree } : this.plainTone(chain, language2);
+    const toneId = (_f = (_e = tone2.free) != null ? _e : tone2.source) != null ? _f : DEFAULT_TONE_ID;
+    const toneName = (id) => {
+      var _a3;
+      return (_a3 = this.toneName(id)) != null ? _a3 : id;
+    };
+    const styleRef = styleRefOf(template2.id, toneId, settings.noteStyleAliases);
+    const label = Object.freeze({
+      templateName: templateName(template2.id),
+      toneName: (_g = tone2.free) != null ? _g : toneName(toneId),
+      styleName: isFileId(template2.id) ? templateName(template2.id) : styleLabel(template2.id, toneId, { template: templateName, tone: toneName }, settings.language),
+      ...styleRef ? { styleRef } : {},
+      ...found.fileName ? { fileName: found.fileName } : {}
+    });
+    return Object.freeze({
+      template: template2,
+      ...tone2.text ? { toneText: tone2.text } : {},
+      contextFields: Object.freeze(
+        found.block ? {
+          styleSelection: Object.freeze({
+            template: Object.freeze({ ...found.block }),
+            tone: Object.freeze(toneChoiceFromText(tone2.text, language2))
+          })
+        } : {}
+      ),
+      label,
+      issues: Object.freeze({
+        missing: Object.freeze([...found.missing]),
+        blockIssues: Object.freeze([...(_h = found.blockIssues) != null ? _h : []]),
+        ...found.invalid ? { invalid: Object.freeze({ ...found.invalid }) } : {}
+      })
+    });
+  }
+  /**
    * `levels`: the run's choice, the topic and the map (most specific first, any may be absent). The workspace default is
    * added here. Records the answer for `resolutionOf(template)` so tone and context fields follow the same choice.
    */
@@ -26325,7 +26449,7 @@ var NoteStyleStore = class {
     const workspace = this.workspaceTone();
     if (!workspace) return own2;
     if ("id" in workspace) return this.namedTone([workspace.id], language2);
-    return { named: true, text: workspace.text.trim() || void 0 };
+    return { named: true, text: workspace.text.trim() || void 0, source: workspace.source };
   }
   /** The first of `ids` that names a tone decides: `named`, and its text (undefined for academic or an empty text). */
   namedTone(ids, language2) {
@@ -26335,18 +26459,22 @@ var NoteStyleStore = class {
       if (!id) continue;
       if (((_a2 = parseBlockRef(id)) == null ? void 0 : _a2.kind) === "file") {
         const target = this.toneByRef(id);
-        if (target) return { named: true, text: this.toneTargetText(target, language2) };
+        if (target) return { named: true, text: this.toneTargetText(target, language2), source: id };
         continue;
       }
       const alias = this.aliasOf(id);
       if ((alias == null ? void 0 : alias.tone) && !alias.template) {
         const target = this.toneByRef(alias.tone);
-        if (target) return { named: true, text: this.toneTargetText(target, language2) };
+        if (target) return { named: true, text: this.toneTargetText(target, language2), source: id };
         continue;
       }
       const found = findPreset(presets, "tone", id, language2);
       if (found)
-        return { named: true, text: found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0 };
+        return {
+          named: true,
+          text: found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0,
+          source: id
+        };
     }
     return { named: false };
   }
@@ -26385,12 +26513,12 @@ var NoteStyleStore = class {
       if (!this.isBuiltinBlockId("tone", parsed.id)) return void 0;
       const base = this.overrideBase("tone", parsed.id);
       const text11 = base === void 0 ? void 0 : this.blocks.tone.get(base);
-      if (text11 !== void 0 && !isUnmodifiedBlock("tone", parsed.id, text11)) return { text: text11 };
+      if (text11 !== void 0 && !isUnmodifiedBlock("tone", parsed.id, text11)) return { text: text11, source: parsed.id };
       return { id: parsed.id };
     }
     if ((parsed == null ? void 0 : parsed.kind) === "file") {
       const text11 = this.blocks.tone.get(parsed.base);
-      return text11 === void 0 ? void 0 : { text: text11 };
+      return text11 === void 0 ? void 0 : { text: text11, source: ref };
     }
     return void 0;
   }
@@ -26545,17 +26673,23 @@ var NoteStyleStore = class {
     const language2 = this.settings.language;
     const target = alias.tone ? this.toneByRef(alias.tone) : void 0;
     const own2 = target ? this.toneTargetText(target, language2) : void 0;
+    const ownSource = target && alias.tone ? alias.tone : void 0;
     let toneText;
-    if (kind === "pair") toneText = own2;
-    else if (kind === "user") {
+    let toneSource;
+    if (kind === "pair") {
+      toneText = own2;
+      toneSource = ownSource;
+    } else if (kind === "user") {
       const named = this.namedTone(toneChain.slice(0, level + 1), language2);
       toneText = named.named ? named.text : own2;
+      toneSource = named.named ? named.source : ownSource;
     } else {
       if (!alias.tone) return found;
       const named = this.plainTone(toneChain, language2);
       toneText = named.named ? named.text : own2;
+      toneSource = named.named ? named.source : ownSource;
     }
-    return { ...found, ...toneText ? { toneText } : {}, toneDecided: true };
+    return { ...found, ...toneText ? { toneText } : {}, ...toneSource ? { toneSource } : {}, toneDecided: true };
   }
   fromFile(parsed, fileName, level, toneChain, kind) {
     const settings = this.settings;
@@ -26567,15 +26701,36 @@ var NoteStyleStore = class {
       };
     const style = parsed.style;
     let toneText;
+    let toneSource;
+    let toneFree;
+    const fromStyle = (raw) => {
+      const file = this.toneFromFile(raw);
+      toneText = file.text;
+      toneSource = file.source;
+      toneFree = file.free;
+    };
     if (kind !== "builtin") {
       const chain = kind === "legacy" ? toneChain : toneChain.slice(0, level + 1);
       const known = chain.find((toneId) => findPreset(settings.promptPresets, "tone", toneId, settings.language));
-      if (known !== void 0) toneText = resolveToneText(settings.promptPresets, chain, settings.language);
-      else if (style.tone) toneText = this.toneFromFile(style.tone);
-    } else if (style.tone) toneText = this.toneFromFile(style.tone);
-    return { template: style.template, missing: [], ...toneText ? { toneText } : {}, toneDecided: true, fileName };
+      if (known !== void 0) {
+        toneText = resolveToneText(settings.promptPresets, chain, settings.language);
+        toneSource = known;
+      } else if (style.tone) fromStyle(style.tone);
+    } else if (style.tone) fromStyle(style.tone);
+    return {
+      template: style.template,
+      missing: [],
+      ...toneText ? { toneText } : {},
+      ...toneSource ? { toneSource } : {},
+      ...toneFree ? { toneFree } : {},
+      toneDecided: true,
+      fileName
+    };
   }
-  /** `語氣` is the name or id of an existing tone (its full text is used), else free text. */
+  /**
+   * `語氣` is the name or id of an existing tone (its full text is used), else free text. `source` is the tone's id when it
+   * names one; `free` is the written text when it names none (it is then also the name shown).
+   */
   toneFromFile(raw) {
     const settings = this.settings;
     const key2 = lower3(raw.trim());
@@ -26584,9 +26739,14 @@ var NoteStyleStore = class {
     );
     for (const pool of pools) {
       const found = pool.find((item) => lower3(item.id) === key2 || lower3(item.name) === key2);
-      if (found) return found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0;
+      if (found)
+        return {
+          text: found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0,
+          source: found.id
+        };
     }
-    return raw.trim() || void 0;
+    const free = raw.trim() || void 0;
+    return { text: free, ...free ? { free } : {} };
   }
   // ---- the tone choices of the map pickers ----
   /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
@@ -26922,65 +27082,6 @@ function emptyNoteStyleStore(settings) {
   });
 }
 
-// experiences/visual-map/note-style.ts
-var NOTE_STYLE_PRESETS = [
-  {
-    id: "standard",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: DEFAULT_TONE_ID,
-    name: "ui.note_style_standard",
-    short: "ui.note_style_standard_short",
-    hint: "ui.note_style_standard_hint"
-  },
-  {
-    id: "textbook",
-    templateId: TEXTBOOK_TEMPLATE_ID,
-    toneId: DEFAULT_TONE_ID,
-    name: "ui.note_style_textbook",
-    short: "ui.note_style_textbook_short",
-    hint: "ui.note_style_textbook_hint"
-  },
-  {
-    id: "summary",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "summary",
-    name: "ui.note_style_summary",
-    short: "ui.note_style_summary",
-    hint: "ui.note_style_summary_hint"
-  },
-  {
-    id: "plain",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "plain",
-    name: "ui.note_style_plain",
-    short: "ui.note_style_plain",
-    hint: "ui.note_style_plain_hint"
-  },
-  {
-    id: "guide",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "guide",
-    name: "ui.note_style_guide",
-    short: "ui.note_style_guide",
-    hint: "ui.note_style_guide_hint"
-  }
-];
-function matchPreset(templateId, toneId) {
-  const template2 = templateId || STANDARD_TEMPLATE_ID;
-  const tone2 = toneId || DEFAULT_TONE_ID;
-  return NOTE_STYLE_PRESETS.find((preset) => preset.templateId === template2 && preset.toneId === tone2);
-}
-function styleLabel(templateId, toneId, names3, language2) {
-  const preset = matchPreset(templateId, toneId);
-  if (preset) return translate(language2, preset.short);
-  return translate(
-    language2,
-    "ui.note_style_custom_0_1",
-    names3.template(templateId || STANDARD_TEMPLATE_ID),
-    names3.tone(toneId || DEFAULT_TONE_ID)
-  );
-}
-
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian14 = require("obsidian");
 var NoteStyleFileError = class extends Error {
@@ -27025,15 +27126,6 @@ async function openStyleFile(app, store, ref) {
   } catch (e) {
     new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", name));
   }
-}
-function styleRefOf(templateId, toneId, aliases = {}) {
-  var _a2, _b2;
-  const builtin = builtinPairOf(templateId, toneId);
-  if (builtin) return { kind: "builtin", id: builtin };
-  if (((_a2 = parseBlockRef(templateId)) == null ? void 0 : _a2.kind) === "file" && templateId) return { kind: "file", id: templateId };
-  const moved = templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : void 0;
-  if ((moved == null ? void 0 : moved.template) && ((_b2 = parseBlockRef(moved.template)) == null ? void 0 : _b2.kind) === "file") return { kind: "file", id: moved.template };
-  return void 0;
 }
 var ISSUE_KEYS = /* @__PURE__ */ new Set([
   "file_long",

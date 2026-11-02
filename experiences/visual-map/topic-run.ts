@@ -180,7 +180,7 @@ export class TopicRuns {
   /**
    * Registers a run for the topic. Returns null when the topic already has one or the module is disposed.
    * `replace` (the research run only, until ticket 05) takes the topic over from a run that is still registered: the
-   * older run is not stopped, and its release then no longer frees the topic.
+   * older run is not stopped; `start` frees the topic when the older run ends.
    */
   begin(path: string, kind: TopicRunKind, options: { replace?: boolean } = {}): TopicRunHandle | null {
     if (this.disposed || (!options.replace && this.controllers.has(path))) return null;
@@ -283,6 +283,11 @@ export class TopicRuns {
     const releaseRun = (): void => {
       overrides.signal?.removeEventListener("abort", abortFromTaskModal);
       if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      // A run that was replaced still frees the topic when it ends, as the view did before the module (ticket 05 ends this).
+      if (this.controllers.get(path) !== controller) {
+        this.controllers.delete(path);
+        this.running.delete(path);
+      }
       handle.release();
     };
     const fail = (message: string): void => {

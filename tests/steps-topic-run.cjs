@@ -450,3 +450,20 @@ test('the plugin clears the undo history of every other view and redraws all vie
   plugin.topicRuns.ports.clearOtherHistory(origin); plugin.topicRuns.ports.refreshViews();
   assert.deepEqual(calls, ['clear-other', 'reload-origin', 'reload-other']);
 });
+
+test('research: a double click starts two runs; the first run to end frees the topic even though the second still runs (307bcd7)', async () => {
+  const gates = []; const ends = [];
+  const h = researchRuns({ ask: async (_c, _m, _r, _signal, onExchange, accepted) => { onExchange('ex'); accepted(); await new Promise(r => gates.push(r)); return { summary: 'S', detail: 'D', visualReferences: [], suggestions: [] }; } });
+  const opts = () => h.options({ runOnce: { model: 'm1' } });
+  const p1 = h.runs.start('A.md', 'research', opts()); const p2 = h.runs.start('A.md', 'research', opts());
+  const [first, second] = await Promise.all([p1, p2]);
+  assert.ok(first && second, 'both clicks start a run'); assert.equal(gates.length, 2);
+  assert.equal(h.running.has('A.md'), true);
+  first.finished.then(() => ends.push('first')); second.finished.then(() => ends.push('second'));
+  gates[0](); await first.finished; await settle();
+  assert.equal(h.runs.isRunning('A.md'), false, 'the older run ending frees the topic'); assert.equal(h.running.has('A.md'), false);
+  assert.ok(h.activeTasks.get('A.md'), 'the newer run keeps its stop controller');
+  gates[1](); await second.finished; await settle();
+  assert.equal(h.runs.isRunning('A.md'), false); assert.equal(h.running.has('A.md'), false); assert.equal(h.activeTasks.has('A.md'), false);
+  assert.deepEqual(ends, ['first', 'second']);
+});

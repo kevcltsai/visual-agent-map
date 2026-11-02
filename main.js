@@ -68290,7 +68290,7 @@ var TopicRuns = class {
   /**
    * Registers a run for the topic. Returns null when the topic already has one or the module is disposed.
    * `replace` (the research run only, until ticket 05) takes the topic over from a run that is still registered: the
-   * older run is not stopped, and its release then no longer frees the topic.
+   * older run is not stopped; `start` frees the topic when the older run ends.
    */
   begin(path, kind, options = {}) {
     if (this.disposed || !options.replace && this.controllers.has(path)) return null;
@@ -68385,6 +68385,10 @@ var TopicRuns = class {
       var _a3;
       (_a3 = overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
       if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      if (this.controllers.get(path) !== controller) {
+        this.controllers.delete(path);
+        this.running.delete(path);
+      }
       handle.release();
     };
     const fail2 = (message) => {

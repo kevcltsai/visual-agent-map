@@ -574,16 +574,19 @@ test('counter 11 (store part): a structure file with an old format rules zone is
 const S = require('./support.cjs');
 const Main = S.load('main.ts', { obsidian: S.obsidian });
 
-test('P2b settings: the old keys round-trip byte for byte through settingsFromSaved (unchanged for T3)', () => {
+test('P2b settings (T3 P2b, decisions #32): the other unpublished and old keys round-trip byte for byte through settingsFromSaved; noteStyleAliases and noteStyleUpgrade are not read and are gone after a save', () => {
   const saved = {
     noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'file:Mine', noteTemplateByKind: { hypothesis: 'builtin:action', evidence: 'file:Mine' },
-    noteStyleAliases: { standard: { template: 'builtin:textbook', tone: 'builtin:plain' } }, defaultNoteStyleId: 'textbook', defaultDetailTemplateId: 'u1',
+    noteStyleAliases: { standard: { template: 'builtin:textbook', tone: 'builtin:plain' } }, noteStyleUpgrade: { version: 1 }, defaultNoteStyleId: 'textbook', defaultDetailTemplateId: 'u1',
     detailTemplates: [{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }],
     promptPresets: [{ id: 'p1', kind: 'tone', name: 'P', text: 'x' }]
   };
   const once = Main.settingsFromSaved(saved);
-  for (const key of ['noteTemplateBlock', 'noteToneBlock', 'noteTemplateByKind', 'noteStyleAliases', 'defaultNoteStyleId', 'defaultDetailTemplateId'])
+  for (const key of ['noteTemplateBlock', 'noteToneBlock', 'noteTemplateByKind', 'defaultNoteStyleId', 'defaultDetailTemplateId'])
     assert.deepEqual(plain(once[key]), plain(saved[key]), key);
+  assert.equal('noteStyleAliases' in once, false);
+  assert.equal('noteStyleUpgrade' in once, false);
+  assert.equal('noteStyleAliases' in Main.settingsFromSaved(JSON.parse(JSON.stringify(once))), false);
   assert.deepEqual(plain(once.detailTemplates.map(({ id, name }) => ({ id, name }))), [{ id: 'u1', name: 'U' }]);
   assert.deepEqual(plain(once.promptPresets.map(({ id, name }) => ({ id, name }))), [{ id: 'p1', name: 'P' }]);
   // Saving what was loaded and loading it again changes nothing, and T2 writes neither new key.

@@ -72,11 +72,11 @@ test('no folder, no new keys (was: topic x map x workspace matrix; grilling Q10/
   }
 });
 
-test('old style files (was: unchanged files take today\'s path; grilling Q12): canonical and exported style files in any written language are not read: the 0.28.0 template and tone come out, with no file name', async () => {
+test('old style files (was: unchanged files take today\'s path; grilling Q12): old style files in the folder, in any written language, are not read: the 0.28.0 template and tone come out, with no file name', async () => {
   for (const writeLanguage of ['zh-TW', 'zh-CN', 'en']) for (const readLanguage of ['en', 'zh-TW']) {
     const files = {};
-    for (const id of M.NOTE_STYLE_BUILTIN_IDS)
-      files[`WS/S/${M.builtinStyleFileName(id, writeLanguage)}.md`] = M.canonicalContent(id, writeLanguage).replace(/\n/g, ' \r\n');
+    for (const name of ['Standard', 'Key points', '精簡重點'])
+      files[`WS/S/${name}.md`] = `---\n語氣: 簡明\n---\n## 重點\n${writeLanguage}\n`.replace(/\n/g, ' \r\n');
     files['WS/S/My notes.md'] = M.serializeLegacyV1(LEGACY, writeLanguage).replace(/\n/g, '\r\n');
     const { store, settings } = makeStore({ language: readLanguage, noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' } }, files);
     await store.refresh();
@@ -95,7 +95,7 @@ test('old style files (was: unchanged files take today\'s path; grilling Q12): c
 });
 
 test('edited old files (was: an edited built-in file decides template and tone; grilling Q12/decision #22): an edited style file or an edited exported file changes nothing; the roles and aliases come from the saved template', async () => {
-  const edited = M.canonicalContent('summary', 'en').replace('3–5', '2–4');
+  const edited = '---\n語氣: 簡明\n---\n## 重點\n說明 2–4\n';
   const { store } = makeStore({ noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' } }, {
     'WS/S/Key points.md': edited,
     'WS/S/My notes.md': M.serializeLegacyV1(LEGACY, 'en').replace('What we found.', 'What we really found.')
@@ -117,8 +117,6 @@ test('edited old files (was: an edited built-in file decides template and tone; 
   assert.equal(M.checkCounts('### Findings\n#### a\n', legacy.template).length, 1);
 });
 
-const OWNER = '---\n語氣: Pirate\n圖表: 關\n---\n導讀。\n\n## 核心結論\n> [!summary]\n> 講結論。\n';
-const FREE = '---\ntone: Short sentences, friendly.\n---\n## A\ntext\n';
 
 test('voice names (was: the style file\'s tone is a name or free text; grilling Q12): a style file names its voice by a built-in name in any language or by an own file; a run tone replaces it', async () => {
   const RECIPES = 'WS/S/Styles';
@@ -232,9 +230,10 @@ const ROOT = 'WS/Note styles';
 const TEMPLATES_DIR = `${ROOT}/Structures`;
 const TONES_DIR = `${ROOT}/Voices`;
 
-test('D12 (was ensureStyleFolder): no style file is written any more; opening the block folder writes only folders; the old template becomes one block once; the old keys are kept', async () => {
+test('D12 (was ensureStyleFolder): no style file is written any more; opening the block folder writes only folders; the old keys are kept (decisions #32: no upgrade module any more; the conversion is in steps-note-style-migrate.cjs)', async () => {
   const templates = M.normalizeTemplates([LEGACY]);
-  const { store, v, settings } = makeStore({ detailTemplates: templates, promptPresets: [] });
+  const mine = LEGACY.sections.map(section => `## ${section.name}\n${section.description}\n`).join('\n');
+  const { store, v, settings } = makeStore({ detailTemplates: templates, promptPresets: [] }, { [`${TEMPLATES_DIR}/My notes.md`]: mine });
   const templatesBefore = plain(settings.detailTemplates), presetsBefore = plain(settings.promptPresets);
   await store.refresh();
   assert.deepEqual(v.writes, [], 'refresh writes nothing');
@@ -246,12 +245,8 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   assert.equal(settings.noteStylesFolder, 'WS/Note styles', 'the folder is remembered, as ensureStyleFolder did');
   assert.deepEqual(v.writes, [], 'only folders: not even the five built-in style files');
   assert.ok(v.folders.has(TEMPLATES_DIR) && v.folders.has(TONES_DIR));
-  assert.equal((await store.upgradeLegacy()).status, 'done');
-  eq(v.writes, [`${TEMPLATES_DIR}/My notes.md`]);
-  const after = JSON.stringify(v.files);
-  await store.upgradeLegacy();
-  assert.equal(JSON.stringify(v.files), after);
-  assert.equal(v.writes.length, 1);
+  assert.equal(store.upgradeLegacy, undefined);
+  assert.equal(store.startUpgrade, undefined);
   eq(settings.detailTemplates, templatesBefore);
   eq(settings.promptPresets, presetsBefore);
   assert.equal(settings.noteStyleFiles, undefined, 'nothing is exported to a style file any more');
@@ -265,36 +260,6 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   assert.ok(block.contextFields.styleSelection, 'the upgraded block runs as a structure file');
   eq(block.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
   eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard six'], ['builtin', 'Intro + six'], ['builtin', 'Claim to verdict'], ['builtin', 'Content & credibility'], ['builtin', 'Goal to done'], ['builtin', 'Definition & example'], ['builtin', 'Conclusion & basis'], ['file', 'My notes']]);
-});
-
-test('D12 (was export conflicts): a user file with the name (also another case) keeps its bytes; the old template takes a unique name and its id points at it', async () => {
-  const { store, v, settings } = makeStore({ noteStylesFolder: 'WS/Note styles', detailTemplates: M.normalizeTemplates([LEGACY]) }, {
-    [`${TEMPLATES_DIR}/my NOTES.md`]: 'the user\'s own file\n'
-  });
-  await store.upgradeLegacy();
-  assert.equal(v.files[`${TEMPLATES_DIR}/my NOTES.md`], 'the user\'s own file\n');
-  assert.ok(v.files[`${TEMPLATES_DIR}/My notes (2).md`]);
-  assert.equal(settings.noteStyleAliases['uuid-1'].template, 'file:My notes (2)');
-  await store.refresh();
-  eq(store.runStyle(request([], 'en', { template: 'file:My notes (2)' })).template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
-  assert.equal(Object.keys(v.files).filter(path => path.startsWith(TEMPLATES_DIR)).length, 2);
-});
-
-test('D12 (was lost mapping): a block file with the upgrade\'s own text is reused, a changed one is not and the old template takes a new name', async () => {
-  const first = makeStore({ noteStylesFolder: 'WS/Note styles', promptPresets: [], detailTemplates: M.normalizeTemplates([LEGACY]) });
-  await first.store.upgradeLegacy();
-  const written = first.v.files[`${TEMPLATES_DIR}/My notes.md`];
-  assert.ok(written);
-  const same = makeStore({ noteStylesFolder: 'WS/Note styles', promptPresets: [], detailTemplates: M.normalizeTemplates([LEGACY]) }, { [`${TEMPLATES_DIR}/My notes.md`]: written });
-  await same.store.upgradeLegacy();
-  assert.deepEqual(same.v.writes, [], 'nothing new was written');
-  assert.equal(same.settings.noteStyleAliases['uuid-1'].template, 'file:My notes');
-  const changed = written.replace('What we found.', 'Edited by hand.');
-  assert.notEqual(changed, written);
-  const other = makeStore({ noteStylesFolder: 'WS/Note styles', detailTemplates: M.normalizeTemplates([LEGACY]) }, { [`${TEMPLATES_DIR}/My notes.md`]: changed });
-  await other.store.upgradeLegacy();
-  assert.equal(other.v.files[`${TEMPLATES_DIR}/My notes.md`], changed);
-  assert.equal(other.settings.noteStyleAliases['uuid-1'].template, 'file:My notes (2)');
 });
 
 test('D12 (was restore default): the old restoreDefault and builtinIdOfFile are gone; restoreBlock backs a changed built-in up, then trashes it, and refuses an own block', async () => {
@@ -336,9 +301,10 @@ test('D8 (was: the map pickers\' data source, a block at any level; grilling Q10
   assert.equal(gone.template.id, 'textbook');
 });
 
-test('D8 (was: tones, an upgraded custom preset keeps its name through its alias; grilling Q10/Q12): the tone choices are the built-in tones and the tone blocks; a tone block is picked as file:<name>; the alias is not read', async () => {
-  const { store, v } = makeStore({ noteStylesFolder: 'WS/Note styles' }, { [`${TONES_DIR}/Calm.md`]: 'Speak calmly.\n' });
-  await store.upgradeLegacy();
+test('D8 (was: tones, an upgraded custom preset keeps its name through its alias; grilling Q10/Q12): the tone choices are the built-in tones and the tone blocks; a tone block is picked as file:<name>; the conversion makes the preset a block and no alias is read', async () => {
+  const { store, v, settings } = makeStore({ noteStylesFolder: 'WS/Note styles' }, { [`${TONES_DIR}/Calm.md`]: 'Speak calmly.\n' });
+  assert.equal((await store.migrateLegacy({ mapsWithStyle: [] })).status, 'done');
+  assert.equal(settings.noteStyleAliases, undefined);
   await store.refresh();
   const choices = store.toneChoices();
   assert.ok(['academic', 'summary', 'plain'].every(id => choices.some(choice => choice.id === id)), 'the built-in tones come by tone id');
@@ -360,31 +326,4 @@ test('folder rename follows the folder only; default folder name follows the lan
   assert.equal(makeStore({ language: 'zh-CN' }).store.folder(), 'WS/笔记风格');
   assert.equal(makeStore({ language: 'zh-TW' }).store.folder(), 'WS/筆記風格');
   assert.equal(store.folderExists(), false);
-});
-
-test('diagrams off (was: through the alias of the upgrade; grilling Q10/Q12): the old flag is not in the context; after the upgrade the block\'s format zone has no mermaid line and no chart step is eligible (research and synthesis)', async () => {
-  const { store, v, settings } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/Own.md': OWNER, 'WS/S/Free.md': FREE });
-  await store.refresh();
-  const service = new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => true });
-  const base = { title: 'T', summary: 's', rules: '', detail: '', task: 'x', ancestors: '', addCharts: true };
-  // an old style file is no style any more: the old flag and the style id reach nothing
-  eq(store.runStyle(request([{ template: 'style:Own' }])).contextFields, {});
-  assert.equal((await store.upgradeLegacy()).status, 'done');
-  await store.refresh();
-  // The upgrade wrote the old file as a block (sections, then the format rules zone). The alias is not read, so the test sends that block as the
-  // new model does: the sections as the structure body and the format zone as the format part (the snapshot test's upgradedSelection does the same).
-  const upgraded = oldId => {
-    const ref = settings.noteStyleAliases[oldId].template;
-    const text = v.files[`WS/S/Structures/${ref.slice('file:'.length)}.md`];
-    const zones = M.splitTemplateZones(text);
-    return { template: { id: ref, body: zones.sections, fileName: `${ref.slice('file:'.length)}.md` }, tone: { id: 'academic' }, format: { id: ref, body: zones.format ?? '' } };
-  };
-  for (const mode of ['task', 'synthesize']) {
-    const off = upgraded('style:Own');
-    assert.ok(!off.template.body.includes('```mermaid'));
-    assert.ok(!off.format.body.includes('```mermaid'));
-    assert.equal(service.chartEligible({ ...base, mode, styleSelection: off }), false);
-    assert.equal(service.chartEligible({ ...base, mode, styleSelection: upgraded('style:Free') }), true);
-  }
-  eq(store.runStyle(request([{ template: 'standard' }])).contextFields, {});
 });

@@ -1676,13 +1676,6 @@ export const en = {
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
-  "ui.note_style_upgrade_tone_name_0": "{0} tone",
-  "ui.note_style_upgrade_failed":
-    "Your note styles could not be upgraded this time. They keep working as before, and VAM tries again the next time it loads.",
-  "ui.note_style_upgrade_skipped_0":
-    "These style files could not be read, so they were not upgraded and stay where they are: {0}",
-  "ui.note_style_upgrade_trash_failed_0":
-    "Your note styles were upgraded, but these old files could not be moved to the trash and are no longer used: {0}",
   "ui.note_style_edit": "Edit this style",
   "ui.note_style_edit_button": "Open file",
   "ui.note_style_edit_current_desc": "Open the file of the style in force, to change how AI writes.",
@@ -1730,6 +1723,15 @@ export const en = {
   "ui.style_folder_tone": "Voices",
   "ui.style_folder_format": "Formats",
   "ui.style_folder_backup": "Backups",
+  "ui.recipe_key_structure": "structure",
+  "ui.recipe_key_voice": "voice",
+  "ui.recipe_key_format": "format",
+  "ui.recipe_key_update": "update",
+  "ui.note_style_maps_notice_0":
+    "Note styles now follow the topic type. The style set on these maps is no longer used: {0}. To keep one for a topic, right-click the topic and choose it.",
+  "ui.note_style_maps_notice_default_0": "Your old default template is now the note style of general topics: {0}.",
+  "ui.note_style_migrate_failed":
+    "The note style conversion did not finish. It will try again the next time VAM opens; your old settings are all still there.",
   "ui.note_style_legacy_0_1": "Old setting ({0} · {1})",
   "ui.note_style_folder_missing": "File location not found",
   "ui.note_style_folder_missing_desc_0":

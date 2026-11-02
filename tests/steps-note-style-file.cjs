@@ -1,30 +1,20 @@
-// Note style files (P1a): parsing, comment removal, fail-closed validation, frozen canonical contents, frozen legacy export.
+// Note style files (P1a): parsing, comment removal, fail-closed validation, frozen legacy export.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
-const fs = require('node:fs');
-const path = require('node:path');
 const { loadSource } = require('./support-replay.cjs');
 
 const S = loadSource(`
 export * from "./ai/note-style-file";
 export { sectionLookup, checkCounts, standardTemplate, textbookTemplate } from "./ai/detail-templates";
-export { readLegacyFormatPreferences } from "./ai/note-style-upgrade";
 `);
 const plain = value => structuredClone(value);
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
-const root = path.resolve(__dirname, '..');
-const v1 = path.join(root, 'core/note-styles/canonical/v1');
-const v2 = path.join(root, 'core/note-styles/canonical/v2');
 const parse = (text, name = 'A') => S.parseNoteStyleFile(text, { id: `style:${name}`, name });
 const ok = text => {
   const result = parse(text);
   assert.equal(result.ok, true, JSON.stringify(result.issues));
   return result.style;
 };
-// The old switches are no longer part of the parsed file: the frozen reader of the upgrade module reads them (P2).
-const prefs = text => S.readLegacyFormatPreferences(text);
-const ALL_ON = { callouts: 'placed', diagrams: true, tables: true, tasks: true, highlight: true };
 const fail = (text, code) => {
   const result = parse(text);
   assert.equal(result.ok, false);
@@ -49,145 +39,9 @@ const OWNER_EXAMPLE = `---
 > 用「初學者常以為…，其實…」的句型。
 `;
 
-const HASHES = {
-  'guide.en.md': 'c900bc573beb11805f51799a736862360fd48e7a3a9d8dc02e31f34aa660744c',
-  'guide.zh-CN.md': 'b5a94b6232ed446db0df40506a8089c4d3a3ea4cdb999b4769a82bb5e824d3e8',
-  'guide.zh-TW.md': 'ba83a266598a5c0d6f2a04257319f938f02beb6e8d634a81e1278aee8cac39f0',
-  'plain.en.md': '6ecf1c11c6929ecb4277c25fea2172dcb053c97167c98bea994efa1a8ac486ce',
-  'plain.zh-CN.md': 'c085bb3ce48359ce6c417a2754961c3e516de19744c12daa4072587e009f8a0f',
-  'plain.zh-TW.md': '3d0fd1e18855cedef32c5f9b506a50d8512846e996a50bd4444ddaec074de59e',
-  'standard.en.md': '454875071cc0565d7bd1fe57e47b8fe7233b6d52bb552e177d39eb92db7d3492',
-  'standard.zh-CN.md': 'c5d0f0ceedeb6c5a35ce97128806bdb5787ad3fe6ad2d8a2b72844fce79d5490',
-  'standard.zh-TW.md': '7c612f9be9d56b46aa50397aa01ea5d78162e93457c7546003b24273981e9441',
-  'summary.en.md': 'a0e5f3bf48fead95fe9c4dbaf84efd177a7ea3bcb301fecd1fde0f265e5414ef',
-  'summary.zh-CN.md': '949e52807247c554323d1ceb9aaebf93b8be0b522b71abc34df448c4abb5c7a1',
-  'summary.zh-TW.md': '9c878fef6d59af354b346d465bd716b2a78815a2860890119ba5d8c42ce43c44',
-  'textbook.en.md': '7365baaee6239fbad6c90cfdf6429618d7f9a4c24bb80b855864147e2bdd443d',
-  'textbook.zh-CN.md': '7647fcabe9509b24dd6e09b975b0f24c376087fbd4c89c0fb186ccf759adc628',
-  'textbook.zh-TW.md': 'd73191f69ce5841e5506d68bb9cecec878eb1c4593b62c639b3efa474925d54a'
-};
-
-test('frozen canonical v1: the file list and every sha256 are pinned', () => {
-  eq(fs.readdirSync(v1).sort(), Object.keys(HASHES).sort());
-  for (const [file, hash] of Object.entries(HASHES))
-    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(v1, file))).digest('hex'), hash, file);
-});
-
-const HASHES_V2 = {
-  'guide.en.md': '0f880ed794fa8f5881c60de0fc170ed7b1c3e98204116d2099ae87cdef2a647b',
-  'guide.zh-CN.md': 'd4c96a17e206deebbb9bf13d8fe19fee65afc714432452b582443dac9a82f16d',
-  'guide.zh-TW.md': '4a43014029571dadb29e2f9f668634e3144b7ffa024f8d2544ad3778531be36a',
-  'plain.en.md': '0011bdc39123812bbb8b44137382f6e630e7c1f464c8e82c7c1f5a101fc2fc19',
-  'plain.zh-CN.md': '2e1319abb5549a8fbd340c585569757fce0992b0885f5e9acc7651b0a982fc0e',
-  'plain.zh-TW.md': '783fbfe39f6b7bd96865b5542d1cbc07da8fbb7395930b5a5c2527640ccc5e37',
-  'standard.en.md': '436c6cb331b64d8c9c61e6923276be19f6e439ffe9b94344eadc265d5e80a245',
-  'standard.zh-CN.md': '25f0a6c412117a291d0ca809a2ec038cdcf017e28746ac9d29accb87950997bc',
-  'standard.zh-TW.md': '9f5259b7394c1900041a04b38d06c6cc8ef9b9906ca659e32340a40922543cc8',
-  'summary.en.md': 'b0a2bfc2d07670c43500a544ac46cf7ab27e4956b25a926dea232d859ad33c93',
-  'summary.zh-CN.md': '29f6cce4b1a6dfd42ebb8d0885a5e7430a396e0077d03e323714b26e21ae3eca',
-  'summary.zh-TW.md': '6a69601965be95ef08ca4302b5518d8066ee839e586deba7a4174f235a921fca',
-  'textbook.en.md': '4d41ad78d6a38887da5e6fab66ebc0ed24574b910b9f93b47a762cb2b9cc471a',
-  'textbook.zh-CN.md': 'c88b5810acfb31373f9309c2dd0d1509b75f1f36e1ccd423963d1d41172dc1cb',
-  'textbook.zh-TW.md': '94e2ed48eeccf9386f6fe7cdfdc3f47bced61678b18b9d35e48b8444ebba63bd'
-};
-
-test('frozen canonical v2: the file list and every sha256 are pinned; the module exposes them; v1 and v2 both count as unmodified', () => {
-  eq(fs.readdirSync(v2).sort(), Object.keys(HASHES_V2).sort());
-  for (const [file, hash] of Object.entries(HASHES_V2))
-    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(v2, file))).digest('hex'), hash, file);
-  for (const id of S.NOTE_STYLE_BUILTIN_IDS)
-    for (const language of S.CANONICAL_LANGUAGES) {
-      const content = fs.readFileSync(path.join(v2, `${id}.${language}.md`), 'utf8');
-      assert.equal(S.CANONICAL_VERSIONS[1][id][language], content);
-      assert.equal(S.canonicalContent(id, language), content);
-      eq({ ...S.matchCanonical(content) }, { id, language, version: 2 });
-      eq({ ...S.matchCanonical(S.CANONICAL_VERSIONS[0][id][language]) }, { id, language, version: 1 });
-      assert.equal(S.matchCanonical(content.replace('summary', 'abstract')), undefined);
-    }
-});
-
-test('canonical v2: shows the four keys at their defaults, explains that they only apply with auto callouts, and parses to no change', () => {
-  const keys = { 'zh-TW': ['結論方框', '風險方框', '問題方框', '技巧方框'], 'zh-CN': ['结论方框', '风险方框', '问题方框', '技巧方框'], en: ['summary callout', 'risk callout', 'question callout', 'tip callout'] };
-  const auto = { 'zh-TW': '方框: 自動', 'zh-CN': '方框: 自动', en: 'callouts: auto' };
-  for (const id of S.NOTE_STYLE_BUILTIN_IDS)
-    for (const language of S.CANONICAL_LANGUAGES) {
-      const content = S.canonicalContent(id, language);
-      const front = content.split('\n---\n')[0].split('\n');
-      eq(front.slice(front.indexOf(auto[language]) + 1), keys[language].map((key, i) => `${key}: ${['summary', 'warning', 'question', 'tip'][i]}`));
-      assert.ok(content.split('\n')[front.length + 1].includes(auto[language]), 'comment names the auto-only rule');
-      eq(prefs(content), { ...ALL_ON, callouts: 'auto' });
-      assert.equal(ok(content).calloutMap, undefined);
-    }
-});
-
-test('frozen canonical v1: the module exposes exactly the files, and each is recognised as unmodified', () => {
-  assert.equal(S.CANONICAL_VERSIONS.length, 2);
-  for (const id of S.NOTE_STYLE_BUILTIN_IDS)
-    for (const language of S.CANONICAL_LANGUAGES) {
-      const content = fs.readFileSync(path.join(v1, `${id}.${language}.md`), 'utf8');
-      assert.equal(S.CANONICAL_VERSIONS[0][id][language], content);
-      eq({ ...S.matchCanonical(content) }, { id, language, version: 1 });
-      // CRLF and trailing whitespace do not make it modified; one changed character does.
-      assert.ok(S.matchCanonical(content.replace(/\n/g, ' \r\n')));
-      assert.equal(S.matchCanonical(content.replace('AI', 'Ai')), undefined);
-      assert.equal(S.matchCanonical(`${content}\n\nextra`), undefined);
-    }
-});
-
-test('canonical files: first line after frontmatter is the usage comment in three languages and each parses', () => {
-  const marks = { 'zh-TW': '恢復預設內容', 'zh-CN': '恢复默认内容', en: 'Restore default content' };
-  for (const id of S.NOTE_STYLE_BUILTIN_IDS)
-    for (const language of S.CANONICAL_LANGUAGES) {
-      const content = S.canonicalContent(id, language);
-      const lines = content.split('\n');
-      assert.equal(lines[0], '---');
-      const after = lines[lines.indexOf('---', 1) + 1];
-      assert.ok(after.startsWith('%% ') && after.endsWith(' %%'), after);
-      assert.ok(after.includes(marks[language]), after);
-      assert.ok(after.includes(S.builtinStyleName ? '' : ''));
-      const style = ok(content);
-      assert.equal(prefs(content).callouts, 'auto');
-      assert.equal(style.sections.length, 6);
-      assert.equal(style.layout, id === 'textbook' ? 'intro' : 'sections');
-      eq(style.sections.map(section => section.role), ['none', 'none', 'sources', 'none', 'none', 'log']);
-    }
-});
-
-test('canonical files: textbook carries the teaching requirements; the other four are plain sections with auto callouts', () => {
-  const t = ok(S.canonicalContent('textbook', 'zh-TW'));
-  assert.ok(t.intro.includes('2–4 段'));
-  eq(t.sections[3].callouts.map(c => c.type), ['warning']);
-  assert.ok(t.sections[3].callouts[0].body.includes('初學者常以為'));
-  assert.ok(t.sections[4].description.includes('自我檢核'));
-  assert.ok(t.sections[0].description.includes('3–5'));
-  for (const id of ['standard', 'summary', 'plain', 'guide']) {
-    const s = ok(S.canonicalContent(id, 'en'));
-    assert.equal(s.intro, '');
-    assert.equal(prefs(S.canonicalContent(id, 'en')).callouts, 'auto');
-  }
-  assert.equal(ok(S.canonicalContent('summary', 'zh-TW')).tone, '重點摘要');
-});
-
-test('canonical standard sections map onto the standard template for old notes', () => {
-  const style = ok(S.canonicalContent('standard', 'en'));
-  const standard = S.standardTemplate('en');
-  eq(style.sections.map(section => section.name), standard.sections.map(section => section.name));
-  eq(style.sections.map(section => section.id), standard.sections.map(section => section.id));
-  eq(style.sections.map(section => section.aliases), standard.sections.map(section => section.aliases));
-  const lookup = S.sectionLookup(style.template);
-  assert.equal(lookup.get('核心結論'), 0);
-  assert.equal(lookup.get('update log'), 5);
-});
-
-test('builtin file names', () => {
-  eq(['zh-TW', 'zh-CN', 'en'].map(l => S.builtinStyleFileName('summary', l)), ['精簡重點', '精简重点', 'Key points']);
-  assert.equal(S.builtinStyleFileName('standard', 'zh-TW'), '標準');
-});
-
 test('owner example parses into the expected structure', () => {
   const style = ok(OWNER_EXAMPLE);
   assert.equal(style.tone, '親切白話，短句；專有名詞第一次出現先用一句話解釋');
-  eq(prefs(OWNER_EXAMPLE), { ...ALL_ON, diagrams: false });
   assert.equal(style.layout, 'intro');
   assert.equal(style.intro, '先用 2–4 段導讀帶讀者進入主題。');
   eq(style.sections.map(s => s.name), ['核心結論', '常見誤解']);
@@ -203,21 +57,17 @@ test('owner example parses into the expected structure', () => {
 test('frontmatter: keys in three languages, toggles, defaults, ignored keys and lists', () => {
   const s = ok('---\ntags:\n  - a\n- b\nfoo: bar\n语气: x\n方框: 指定\n图表: off\ntables: FALSE\n待辦清單: 關\nhighlight: 開\n---\n## A\nbody');
   const text = '---\ntags:\n  - a\n- b\nfoo: bar\n语气: x\n方框: 指定\n图表: off\ntables: FALSE\n待辦清單: 關\nhighlight: 開\n---\n## A\nbody';
-  eq(prefs(text), { callouts: 'placed', diagrams: false, tables: false, tasks: false, highlight: true });
   eq([s.tone, s.layout], ['x', 'sections']);
   const d = ok('## A\nx');
   eq([d.tone, d.layout], [undefined, 'sections']);
-  eq(prefs('## A\nx'), ALL_ON);
-  eq(prefs('---\ncallouts: auto\n---\n## A'), { ...ALL_ON, callouts: 'auto' });
   assert.equal(ok('---\n語氣: "quoted"\n---\n## A').tone, 'quoted');
 });
 
 test('fail closed with line numbers and no repair', () => {
   const sections = n => Array.from({ length: n }, (_, i) => `## S${i}\nx`).join('\n');
   assert.equal(fail('---\n語氣: x\n## A', 'frontmatter_unclosed')[0].line, 1);
-  // The old switches no longer fail the parser (P2: skipped); the frozen reader of the upgrade still refuses such files.
+  // The old switches no longer fail the parser (skipped).
   ok('---\n語氣: x\nnot a pair\n---\n## A');
-  assert.equal(prefs('---\n語氣: x\nnot a pair\n---\n## A'), undefined);
   assert.equal(fail('just text, no heading', 'no_sections').length, 1);
   assert.equal(fail('# only h1\ntext\n### h3', 'no_sections')[0].code, 'no_sections');
   fail(sections(13), 'ui.detail_template_error_section_count');
@@ -229,8 +79,6 @@ test('fail closed with line numbers and no repair', () => {
   fail(`---\n語氣: ${'x'.repeat(1001)}\n---\n## A`, 'tone_long');
   ok('---\n圖表: maybe\n---\n## A');
   ok('---\n方框: sometimes\n---\n## A');
-  assert.equal(prefs('---\n圖表: maybe\n---\n## A'), undefined);
-  assert.equal(prefs('---\n方框: sometimes\n---\n## A'), undefined);
   fail('## 證據與來源\nx\n## Evidence and sources\ny', 'ui.detail_template_error_role_taken');
   fail('## 更新紀錄\nx\n## 更新记录\ny', 'ui.detail_template_error_role_taken');
   fail('## A\n數量: 0', 'ui.detail_template_error_count_range');
@@ -265,9 +113,9 @@ test('comments: %% inside a code block is kept, and a heading inside a code bloc
 });
 
 test('comments: changing only the usage comment keeps the parsed structure the same', () => {
-  const original = S.canonicalContent('textbook', 'zh-TW');
+  const original = '---\n語氣: x\n---\n%% the usage comment %%\n\n## A\nbody\n';
   const edited = original.replace(/^%% .* %%$/m, '%% my own words %%');
-  assert.notEqual(S.matchCanonical(edited) !== undefined, true);
+  assert.notEqual(edited, original);
   const a = ok(original);
   const b = ok(edited);
   assert.deepEqual(plain(b), plain(a));
@@ -342,7 +190,6 @@ test('a legacy export parses back to the same sections, counts, roles and the us
   for (const language of ['zh-TW', 'zh-CN', 'en']) {
     const text = S.serializeLegacyV1(LEGACY, language);
     const style = ok(text);
-    assert.equal(prefs(text).callouts, 'auto');
     assert.equal(style.layout, 'sections');
     eq(style.sections.map(s => s.name), LEGACY.sections.map(s => s.name));
     eq(style.sections.map(s => s.count), LEGACY.sections.map(s => s.count));
@@ -358,24 +205,12 @@ test('normalizeStyleContent', () => {
   assert.equal(S.normalizeStyleContent('a\n'), S.normalizeStyleContent('a'));
 });
 
-test('callout rule keys (P1, now the frozen reader of the upgrade): three languages, aliases, off, lower-casing, default values omitted', () => {
-  const map = text => prefs(text).calloutMap ?? {};
-  eq(map('## A\nx'), {});
-  eq(map('---\n結論方框: abstract\n風險方框: Caution\n問題方框: 關\n技巧方框: example\n---\n## A\nx'), { summary: 'abstract', warning: 'caution', question: 'off', tip: 'example' });
-  eq(map('---\n结论方框: tldr\n风险方框: 关\n问题方框: faq\n技巧方框: hint\n---\n## A\nx'), { summary: 'tldr', warning: 'off', question: 'faq', tip: 'hint' });
-  eq(map('---\nsummary callout: abstract\nrisk callout: off\nquestion callout: help\ntip callout: example\n---\n## A\nx'), { summary: 'abstract', warning: 'off', question: 'help', tip: 'example' });
-  eq(map('---\n結論方框: summary\n風險方框: warning\n問題方框: question\n技巧方框: tip\n---\n## A\nx'), {});
-  eq(map('---\n結論方框: abstract\nrisk callout: danger\n问题方框: off\n---\n## A\nx'), { summary: 'abstract', warning: 'danger', question: 'off' });
-});
-
-test('callout rule keys (P1, now the frozen reader of the upgrade): bad values, empty values, duplicates, custom types are refused; the parser itself skips them (counter 18)', () => {
+test('callout rule keys (counter 18): bad values, empty values, duplicates and custom types in the frontmatter are skipped by the parser, which reads the sections', () => {
   for (const text of ['---\n結論方框: banana\n---\n## A', '---\n語氣: x\n問題方框:\n---\n## A', '---\n風險方框: my-custom\n---\n## A',
     '---\n結論方框: note\n語氣: x\n结论方框: info\n---\n## A', '---\ntip callout: note\n技巧方框: info\n---\n## A', '---\n技巧方框: summary callout\n---\n## A']) {
-    assert.equal(prefs(text), undefined, text);
     assert.equal(ok(text).sections.length, 1, 'the parser skips the line and reads the sections');
   }
   assert.equal(ok('---\n語氣: x\n問題方框:\n---\n## A').tone, 'x');
   // the only frontmatter error left is one that never closes
   assert.equal(fail('---\n結論方框: note\n## A', 'frontmatter_unclosed')[0].line, 1);
-  assert.equal(prefs('---\n結論方框: note\n## A'), undefined);
 });

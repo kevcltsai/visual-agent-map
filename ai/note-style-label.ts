@@ -1,7 +1,7 @@
 import { translate, type TranslationKey, type UiLanguage } from "../i18n";
 import { STANDARD_TEMPLATE_ID, TEXTBOOK_TEMPLATE_ID } from "./detail-templates";
 import { DEFAULT_TONE_ID } from "./prompt-presets";
-import { builtinPairOf, type NoteStyleAliases } from "./note-style-upgrade";
+import { NOTE_STYLE_BUILTIN_IDS, type NoteStyleBuiltinId } from "./note-style-file";
 import { parseBlockRef } from "../core/blocks/block-files";
 import type { RunStyle } from "./note-style-store";
 
@@ -94,6 +94,25 @@ export function styleLabel(
   );
 }
 
+/** Ids of the built-in styles as stored pairs (template id plus tone id); the same table the note-style menu uses. */
+export const BUILTIN_PAIRS: Record<NoteStyleBuiltinId, { template: string; tone: string }> = {
+  standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
+  textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
+  summary: { template: STANDARD_TEMPLATE_ID, tone: "summary" },
+  plain: { template: STANDARD_TEMPLATE_ID, tone: "plain" },
+  guide: { template: STANDARD_TEMPLATE_ID, tone: "guide" }
+};
+
+/** The built-in style a stored template and tone pair equals; an unset template counts as Standard, an unset tone as Academic. */
+export function builtinPairOf(
+  templateId: string | undefined,
+  toneId: string | undefined
+): NoteStyleBuiltinId | undefined {
+  const template = templateId || STANDARD_TEMPLATE_ID;
+  const tone = toneId || DEFAULT_TONE_ID;
+  return NOTE_STYLE_BUILTIN_IDS.find(id => BUILTIN_PAIRS[id].template === template && BUILTIN_PAIRS[id].tone === tone);
+}
+
 /** Which style a picker row stands for: a built-in style id, or `file:<name>` of a template block the user wrote. */
 export interface StyleRef {
   kind: "builtin" | "file";
@@ -101,20 +120,12 @@ export interface StyleRef {
 }
 
 /**
- * The style a stored template and tone pair stands for, when it is a built-in or a template block of the user. An old id
- * the upgrade moved to a block (`aliases`) stands for that block.
+ * The style a stored template and tone pair stands for, when it is a built-in or a template block of the user.
  */
-export function styleRefOf(
-  templateId: string | undefined,
-  toneId: string | undefined,
-  aliases: NoteStyleAliases = {}
-): StyleRef | undefined {
+export function styleRefOf(templateId: string | undefined, toneId: string | undefined): StyleRef | undefined {
   const builtin = builtinPairOf(templateId, toneId);
   if (builtin) return { kind: "builtin", id: builtin };
   if (parseBlockRef(templateId)?.kind === "file" && templateId) return { kind: "file", id: templateId };
-  const moved =
-    templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : undefined;
-  if (moved?.template && parseBlockRef(moved.template)?.kind === "file") return { kind: "file", id: moved.template };
   return undefined;
 }
 

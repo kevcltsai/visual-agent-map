@@ -2156,7 +2156,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The style behind a stored pair, for "Edit this style" on the first option of a picker. */
   private styleRefFor(templateId: string | undefined, toneId: string | undefined): StyleRef | undefined {
-    return styleRefOf(templateId, toneId, this.plugin.settings.noteStyleAliases);
+    return styleRefOf(templateId, toneId);
   }
   private defaultStyleRef(): StyleRef | undefined {
     const block = parseBlockRef(this.plugin.settings.noteTemplateBlock);

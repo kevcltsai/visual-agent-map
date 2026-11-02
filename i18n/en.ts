@@ -1729,6 +1729,15 @@ export const en = {
   "ui.style_folder_tone": "Voices",
   "ui.style_folder_format": "Formats",
   "ui.style_folder_backup": "Backups",
+  "ui.recipe_key_structure": "structure",
+  "ui.recipe_key_voice": "voice",
+  "ui.recipe_key_format": "format",
+  "ui.recipe_key_update": "update",
+  "ui.note_style_maps_notice_0":
+    "Note styles now follow the topic type. The style set on these maps is no longer used: {0}. To keep one for a topic, right-click the topic and choose it.",
+  "ui.note_style_maps_notice_default_0": "Your old default template is now the note style of general topics: {0}.",
+  "ui.note_style_migrate_failed":
+    "The note style conversion did not finish. It will try again the next time VAM opens; your old settings are all still there.",
   "ui.note_style_legacy_0_1": "Old setting ({0} · {1})",
   "ui.note_style_folder_missing": "File location not found",
   "ui.note_style_folder_missing_desc_0":

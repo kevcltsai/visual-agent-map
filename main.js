@@ -1676,6 +1676,13 @@ var en = {
   "ui.style_folder_tone": "Voices",
   "ui.style_folder_format": "Formats",
   "ui.style_folder_backup": "Backups",
+  "ui.recipe_key_structure": "structure",
+  "ui.recipe_key_voice": "voice",
+  "ui.recipe_key_format": "format",
+  "ui.recipe_key_update": "update",
+  "ui.note_style_maps_notice_0": "Note styles now follow the topic type. The style set on these maps is no longer used: {0}. To keep one for a topic, right-click the topic and choose it.",
+  "ui.note_style_maps_notice_default_0": "Your old default template is now the note style of general topics: {0}.",
+  "ui.note_style_migrate_failed": "The note style conversion did not finish. It will try again the next time VAM opens; your old settings are all still there.",
   "ui.note_style_legacy_0_1": "Old setting ({0} \xB7 {1})",
   "ui.note_style_folder_missing": "File location not found",
   "ui.note_style_folder_missing_desc_0": '"{0}" does not exist. Choose the folder again or show it in the file explorer to create it.',
@@ -4029,6 +4036,13 @@ var zhCN = {
   "ui.style_folder_tone": "\u5199\u4F5C\u53E3\u543B",
   "ui.style_folder_format": "\u683C\u5F0F\u89C4\u5219",
   "ui.style_folder_backup": "\u5907\u4EFD",
+  "ui.recipe_key_structure": "\u6BB5\u843D\u7ED3\u6784",
+  "ui.recipe_key_voice": "\u5199\u4F5C\u53E3\u543B",
+  "ui.recipe_key_format": "\u683C\u5F0F\u89C4\u5219",
+  "ui.recipe_key_update": "\u66F4\u65B0\u65B9\u5F0F",
+  "ui.note_style_maps_notice_0": "\u7B14\u8BB0\u98CE\u683C\u6539\u6210\u6309\u8BAE\u9898\u7C7B\u578B\u51B3\u5B9A\u3002\u8FD9\u4E9B\u5730\u56FE\u539F\u672C\u8BBE\u7684\u98CE\u683C\u4E0D\u518D\u4F7F\u7528\uFF1A{0}\u3002\u60F3\u8BA9\u67D0\u4E2A\u8BAE\u9898\u6CBF\u7528\uFF0C\u8BF7\u5728\u8BAE\u9898\u4E0A\u53F3\u952E\u9009\u62E9\u3002",
+  "ui.note_style_maps_notice_default_0": "\u539F\u672C\u7684\u9ED8\u8BA4\u6A21\u677F\u5DF2\u6539\u6210\u201C\u4E00\u822C\u8BAE\u9898\u201D\u7684\u7B14\u8BB0\u98CE\u683C\uFF1A{0}\u3002",
+  "ui.note_style_migrate_failed": "\u7B14\u8BB0\u98CE\u683C\u8F6C\u6362\u6CA1\u6709\u5B8C\u6210\uFF0C\u4E0B\u6B21\u6253\u5F00\u65F6\u4F1A\u518D\u8BD5\u4E00\u6B21\uFF1B\u539F\u672C\u7684\u8BBE\u7F6E\u90FD\u8FD8\u5728\u3002",
   "ui.note_style_legacy_0_1": "\u65E7\u8BBE\u7F6E\uFF08{0} \xB7 {1}\uFF09",
   "ui.note_style_folder_missing": "\u627E\u4E0D\u5230\u6587\u4EF6\u4F4D\u7F6E",
   "ui.note_style_folder_missing_desc_0": "\u201C{0}\u201D\u4E0D\u5B58\u5728\u3002\u8BF7\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939\uFF0C\u6216\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u663E\u793A\u5B83\u8BA9\u5B83\u91CD\u65B0\u521B\u5EFA\u3002",
@@ -6382,6 +6396,13 @@ var zhTW = {
   "ui.style_folder_tone": "\u5BEB\u4F5C\u53E3\u543B",
   "ui.style_folder_format": "\u683C\u5F0F\u898F\u5247",
   "ui.style_folder_backup": "\u5099\u4EFD",
+  "ui.recipe_key_structure": "\u6BB5\u843D\u7D50\u69CB",
+  "ui.recipe_key_voice": "\u5BEB\u4F5C\u53E3\u543B",
+  "ui.recipe_key_format": "\u683C\u5F0F\u898F\u5247",
+  "ui.recipe_key_update": "\u66F4\u65B0\u65B9\u5F0F",
+  "ui.note_style_maps_notice_0": "\u7B46\u8A18\u98A8\u683C\u6539\u6210\u4F9D\u8B70\u984C\u985E\u578B\u6C7A\u5B9A\u3002\u9019\u4E9B\u5730\u5716\u539F\u672C\u8A2D\u7684\u98A8\u683C\u4E0D\u518D\u4F7F\u7528\uFF1A{0}\u3002\u60F3\u8B93\u67D0\u500B\u8B70\u984C\u6CBF\u7528\uFF0C\u8ACB\u5728\u8B70\u984C\u4E0A\u6309\u53F3\u9375\u9078\u64C7\u3002",
+  "ui.note_style_maps_notice_default_0": "\u539F\u672C\u7684\u9810\u8A2D\u6A21\u677F\u5DF2\u6539\u6210\u300C\u4E00\u822C\u8B70\u984C\u300D\u7684\u7B46\u8A18\u98A8\u683C\uFF1A{0}\u3002",
+  "ui.note_style_migrate_failed": "\u7B46\u8A18\u98A8\u683C\u8F49\u63DB\u6C92\u6709\u5B8C\u6210\uFF0C\u4E0B\u6B21\u958B\u555F\u6642\u6703\u518D\u8A66\u4E00\u6B21\uFF1B\u539F\u672C\u7684\u8A2D\u5B9A\u90FD\u9084\u5728\u3002",
   "ui.note_style_legacy_0_1": "\u820A\u8A2D\u5B9A\uFF08{0} \xB7 {1}\uFF09",
   "ui.note_style_folder_missing": "\u627E\u4E0D\u5230\u6A94\u6848\u4F4D\u7F6E",
   "ui.note_style_folder_missing_desc_0": "\u300C{0}\u300D\u4E0D\u5B58\u5728\u3002\u8ACB\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E\uFF0C\u6216\u5728\u6A94\u6848\u7E3D\u7BA1\u986F\u793A\u5B83\u8B93\u5B83\u91CD\u65B0\u5EFA\u7ACB\u3002",
@@ -7514,11 +7535,11 @@ function cleanStyle(value) {
 function cleanAttributes(node) {
   var _a2;
   for (const { name, value } of Array.from(node.attributes)) {
-    const lower4 = name.toLowerCase();
-    if (lower4.startsWith("on")) node.removeAttribute(name);
-    else if ((lower4 === "href" || lower4 === "xlink:href" || lower4 === "src") && unsafeUrl(value))
+    const lower5 = name.toLowerCase();
+    if (lower5.startsWith("on")) node.removeAttribute(name);
+    else if ((lower5 === "href" || lower5 === "xlink:href" || lower5 === "src") && unsafeUrl(value))
       node.removeAttribute(name);
-    else if (lower4 === "style") {
+    else if (lower5 === "style") {
       if (HARD_TO_VET.test(value)) node.removeAttribute(name);
       else if (cleanStyle(value) !== value) (_a2 = node.setAttribute) == null ? void 0 : _a2.call(node, name, cleanStyle(value));
     } else if (EXTERNAL_URL.test(value) || HARD_TO_VET.test(value)) node.removeAttribute(name);
@@ -21324,8 +21345,8 @@ function guardMapChatWrite(check) {
   const path = normalizeVaultPath(check.path);
   if (path === null) return { ok: false, code: "outside_vault" };
   const configDir = normalizeVaultPath(check.configDir);
-  const lower4 = path.toLowerCase();
-  const inside2 = (dir) => !!dir && (lower4 === dir.toLowerCase() || lower4.startsWith(`${dir.toLowerCase()}/`));
+  const lower5 = path.toLowerCase();
+  const inside2 = (dir) => !!dir && (lower5 === dir.toLowerCase() || lower5.startsWith(`${dir.toLowerCase()}/`));
   if (configDir === null || inside2(configDir)) return { ok: false, code: "config_dir" };
   if (!path.toLowerCase().endsWith(".md")) return { ok: false, code: "not_markdown" };
   if (check.kind === "create") {
@@ -26934,6 +26955,117 @@ function planNoteStyleUpgrade(input2) {
   };
 }
 
+// ai/note-style-migrate.ts
+var lower3 = (value) => value.toLocaleLowerCase();
+var safeName2 = (name) => cleanBlockName(name.replace(/\.{2,}/g, " "));
+var Namer2 = class {
+  constructor(category, nameCategory, existing) {
+    this.category = category;
+    this.nameCategory = nameCategory;
+    __publicField(this, "held", /* @__PURE__ */ new Map());
+    __publicField(this, "planned", []);
+    for (const [base, text11] of existing) this.held.set(lower3(base), { base, text: text11 });
+  }
+  place(wanted, fallback, text11) {
+    const safe = safeName2(wanted) || safeName2(fallback) || "Style";
+    for (let n = 1; ; n++) {
+      const name = n === 1 ? safe : `${safe} (${n})`;
+      if (!validatePartName(name, this.nameCategory).ok) continue;
+      const key2 = lower3(name);
+      const held = this.held.get(key2);
+      if (!held) {
+        this.held.set(key2, { base: name, text: text11 });
+        this.planned.push({ category: this.category, base: name, text: text11 });
+        return name;
+      }
+      if (normalizeStyleContent(held.text) === normalizeStyleContent(text11)) return held.base;
+    }
+  }
+};
+var trimBlankLines3 = (text11) => {
+  const lines = text11.split("\n");
+  let start = 0;
+  let end = lines.length;
+  while (start < end && !lines[start].trim()) start++;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return lines.slice(start, end).join("\n");
+};
+function templateSectionsText2(template2, language2) {
+  const head = serializeLegacyV1({ ...template2, sections: [] }, language2);
+  const full = serializeLegacyV1(template2, language2);
+  return trimBlankLines3(full.startsWith(head) ? full.slice(head.length) : full);
+}
+var sectionShape2 = (section3) => {
+  var _a2, _b2;
+  return JSON.stringify([
+    section3.name,
+    section3.description.replace(/\r\n?/g, "\n").trim(),
+    (_a2 = section3.count) != null ? _a2 : null,
+    (_b2 = section3.callouts) != null ? _b2 : []
+  ]);
+};
+function recipeText(structureBase, language2) {
+  const voice = translate(language2, findBuiltinBlock("tone", "academic").nameKey);
+  const format = translate(language2, BUILTIN_FORMATS.find((item) => item.id === "standard").nameKey);
+  return [
+    "---",
+    `${translate(language2, "ui.recipe_key_structure")}: ${structureBase}`,
+    `${translate(language2, "ui.recipe_key_voice")}: ${voice}`,
+    `${translate(language2, "ui.recipe_key_format")}: ${format}`,
+    `${translate(language2, "ui.recipe_key_update")}: merge`,
+    "---",
+    ""
+  ].join("\n");
+}
+function planRecipeMigration(input2) {
+  var _a2, _b2;
+  const { language: language2 } = input2;
+  const structures = new Namer2("template", "structure", input2.existing.template);
+  const voices = new Namer2("tone", "voice", input2.existing.tone);
+  const recipes = new Namer2("recipe", "recipe", input2.existing.recipe);
+  const legacy = { templates: {}, tones: {} };
+  const skipped2 = [];
+  const recipeOf = /* @__PURE__ */ new Map();
+  for (const template2 of input2.detailTemplates) {
+    if (isBuiltinTemplateId(template2.id)) continue;
+    const text11 = `${templateSectionsText2(template2, language2)}
+`;
+    const check = parseTemplateBlock(text11, { id: fileRef(template2.name), name: template2.name });
+    if (!check.ok || check.lead || check.template.sections.length !== template2.sections.length || check.template.sections.some((section3, index) => sectionShape2(section3) !== sectionShape2(template2.sections[index]))) {
+      skipped2.push(template2.name);
+      continue;
+    }
+    const structure2 = structures.place(template2.name, "Style", text11);
+    legacy.templates[template2.id] = fileRef(structure2);
+    recipeOf.set(template2.id, recipes.place(structure2, "Style", recipeText(structure2, language2)));
+  }
+  for (const preset of (_a2 = input2.promptPresets) != null ? _a2 : []) {
+    if (preset.kind !== "tone" || isBuiltinPreset(preset.id)) continue;
+    legacy.tones[preset.id] = fileRef(voices.place(preset.name, preset.id, preset.text));
+  }
+  let topicStyle;
+  let defaultConverted;
+  const chosen = input2.defaultDetailTemplateId;
+  if (chosen && !((_b2 = input2.noteStyleByKind) == null ? void 0 : _b2.topic)) {
+    if (chosen === "textbook") {
+      topicStyle = "builtin:textbook";
+      defaultConverted = translate(language2, "ui.recipe_name_textbook");
+    } else if (recipeOf.has(chosen)) {
+      topicStyle = fileRef(recipeOf.get(chosen));
+      defaultConverted = recipeOf.get(chosen);
+    }
+  }
+  const files = [...structures.planned, ...voices.planned, ...recipes.planned];
+  return {
+    files,
+    legacy,
+    ...topicStyle ? { topicStyle } : {},
+    ...defaultConverted ? { defaultConverted } : {},
+    skipped: skipped2,
+    nothing: !files.length && !Object.keys(legacy.templates).length && !Object.keys(legacy.tones).length && topicStyle === void 0
+  };
+}
+
 // ai/note-style-store.ts
 function normalizeNoteTemplateByKind(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
@@ -26946,7 +27078,7 @@ function normalizeNoteTemplateByKind(value) {
   return Object.keys(kept).length ? kept : void 0;
 }
 var stripMd3 = (name) => name.replace(/\.md$/i, "");
-var lower3 = (value) => value.toLocaleLowerCase();
+var lower4 = (value) => value.toLocaleLowerCase();
 function defaultStylesFolderName(language2) {
   return translate(language2, "ui.note_styles_folder_name");
 }
@@ -26967,6 +27099,8 @@ var NoteStyleStore = class {
     __publicField(this, "upgradeRun");
     /** An upgrade that could not be written out: its blocks, aliases and keys answer in memory until the next load retries it. */
     __publicField(this, "pending");
+    /** The conversion of the 0.28.0 data that is under way (never rejects); `refresh()` waits for it. */
+    __publicField(this, "migration");
   }
   get settings() {
     return this.deps.settings();
@@ -26982,6 +27116,7 @@ var NoteStyleStore = class {
    */
   async refresh() {
     if (this.upgradeRun) await this.upgradeRun;
+    if (this.migration) await this.migration;
     await this.loadBlocks();
   }
   /** The old style files directly in the style folder (only the old upgrade reads them). */
@@ -27050,7 +27185,7 @@ var NoteStyleStore = class {
       tone: await this.readFolder(dirs.tone)
     };
     for (const block of (_b2 = (_a2 = this.pending) == null ? void 0 : _a2.blocks) != null ? _b2 : [])
-      if (![...next[block.category].keys()].some((base) => lower3(base) === lower3(block.base)))
+      if (![...next[block.category].keys()].some((base) => lower4(base) === lower4(block.base)))
         next[block.category].set(block.base, block.text);
     this.blocks = next;
     this.formats = await this.readFolder(dirs.format);
@@ -27061,7 +27196,7 @@ var NoteStyleStore = class {
     const block = findBuiltinBlock(category, id);
     const names3 = [translate(this.settings.language, block.nameKey), ...builtinBlockNames(category, id)];
     for (const name of names3) {
-      const base = [...this.blocks[category].keys()].find((key2) => lower3(key2) === lower3(name));
+      const base = [...this.blocks[category].keys()].find((key2) => lower4(key2) === lower4(name));
       if (base !== void 0) return base;
     }
     return void 0;
@@ -27463,7 +27598,7 @@ var NoteStyleStore = class {
     return run;
   }
   takenNames(category) {
-    return new Set([...this.blocks[category].keys()].map(lower3));
+    return new Set([...this.blocks[category].keys()].map(lower4));
   }
   /**
    * Remembers the style folder in the settings when it has no saved path, so a later change of interface language does
@@ -27550,8 +27685,8 @@ var NoteStyleStore = class {
         const reserved = new Set(this.takenNames(category));
         for (const block of BUILTIN_BLOCKS)
           if (block.category === category)
-            for (const builtinName of builtinBlockNames(category, block.id)) reserved.add(lower3(builtinName));
-        if (!base || reserved.has(lower3(base))) throw new Error(`Block name not available: ${chosenName}`);
+            for (const builtinName of builtinBlockNames(category, block.id)) reserved.add(lower4(builtinName));
+        if (!base || reserved.has(lower4(base))) throw new Error(`Block name not available: ${chosenName}`);
       }
       await this.pinFolder();
       await this.deps.port.createFolder(dir);
@@ -27597,7 +27732,7 @@ var NoteStyleStore = class {
         }
         await this.pinFolder();
         await port.createFolder(dirs.backup);
-        backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower3)))}`;
+        backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower4)))}`;
         await port.create(backup, live);
       } catch (e) {
         return { ok: false, reason: "backup-failed" };
@@ -27687,11 +27822,11 @@ var NoteStyleStore = class {
         present = [];
       }
       await port.createFolder(dirs.backup);
-      const taken = new Set(present.map(lower3));
+      const taken = new Set(present.map(lower4));
       const now = (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date();
       for (const old of plan.oldFiles) {
         const name = backupName(old.base, now, taken);
-        taken.add(lower3(name));
+        taken.add(lower4(name));
         await port.create(`${dirs.backup}/${name}`, old.text);
       }
     }
@@ -27740,6 +27875,94 @@ var NoteStyleStore = class {
       }
     }
     return failed;
+  }
+  // ---- the conversion of the 0.28.0 data (the only write that is not a user action) ----
+  /**
+   * Turns the custom detail templates and tone presets of 0.28.0 into structure, voice and style files, and records the old
+   * id -> new ref table, once: the marker `noteStyleRecipe.migrated` ends it. Only new files are created (a file that holds
+   * the same text is reused, other text gets " (n)"), no old key is changed, and the files, the folder, the general-topic
+   * style and the marker reach data.json in one save. A failure sets no marker and leaves the settings as they were; files
+   * already written stay and are reused by the next try. Never rejects. `mapsWithStyle` are the titles of maps that carry a
+   * style of their own: they are handed back once (`notify`) because that style is not read any more.
+   */
+  migrateLegacy(input2) {
+    const run = this.serial(() => this.runMigration(input2.mapsWithStyle));
+    const tracked = run.finally(() => {
+      if (this.migration === tracked) this.migration = void 0;
+    });
+    this.migration = tracked.catch(() => void 0);
+    return run;
+  }
+  async runMigration(mapsWithStyle) {
+    var _a2;
+    const settings = this.settings;
+    const maps = [...mapsWithStyle];
+    try {
+      const marker5 = settings.noteStyleRecipe;
+      if (marker5 == null ? void 0 : marker5.migrated) {
+        if (marker5.mapsNotified) return { status: "already" };
+        settings.noteStyleRecipe = { ...marker5, mapsNotified: true };
+        try {
+          await this.deps.save();
+        } catch (error) {
+          settings.noteStyleRecipe = marker5;
+          throw error;
+        }
+        return { status: "already", ...maps.length ? { notify: { maps } } : {} };
+      }
+      await this.loadBlocks();
+      const plan = planRecipeMigration({
+        language: settings.language,
+        detailTemplates: settings.detailTemplates,
+        promptPresets: settings.promptPresets,
+        defaultDetailTemplateId: settings.defaultDetailTemplateId,
+        noteStyleByKind: settings.noteStyleByKind,
+        existing: { recipe: this.recipes, template: this.blocks.template, tone: this.blocks.tone }
+      });
+      const { port } = this.deps;
+      const dirs = this.blockDirectories();
+      const pinned = settings.noteStylesFolder ? void 0 : this.folder();
+      for (const category of ["template", "tone", "recipe"]) {
+        const items = plan.files.filter((file) => file.category === category);
+        if (!items.length) continue;
+        const dir = dirs[category];
+        await port.createFolder(dir);
+        const present = await this.readFolder(dir);
+        for (const item of items) {
+          const held = [...present].find(([base]) => lower4(base) === lower4(item.base));
+          if (held) {
+            if (held[1] === item.text) continue;
+            throw new Error(`File appeared while converting: ${dir}/${item.base}.md`);
+          }
+          await port.create(`${dir}/${item.base}.md`, item.text);
+        }
+      }
+      const before = {
+        noteStylesFolder: settings.noteStylesFolder,
+        noteStyleByKind: settings.noteStyleByKind,
+        noteStyleRecipe: settings.noteStyleRecipe
+      };
+      if (pinned !== void 0 && plan.files.length) settings.noteStylesFolder = pinned;
+      if (plan.topicStyle && !((_a2 = settings.noteStyleByKind) == null ? void 0 : _a2.topic))
+        settings.noteStyleByKind = { ...settings.noteStyleByKind, topic: plan.topicStyle };
+      const hasLegacy = Object.keys(plan.legacy.templates).length > 0 || Object.keys(plan.legacy.tones).length > 0;
+      settings.noteStyleRecipe = { migrated: 1, ...hasLegacy ? { legacy: plan.legacy } : {}, mapsNotified: true };
+      try {
+        await this.deps.save();
+      } catch (error) {
+        for (const [key2, value] of Object.entries(before)) {
+          if (value === void 0) delete settings[key2];
+          else settings[key2] = value;
+        }
+        throw error;
+      }
+      return {
+        status: "done",
+        ...maps.length ? { notify: { maps, ...plan.defaultConverted ? { defaultName: plan.defaultConverted } : {} } } : {}
+      };
+    } catch (error) {
+      return { status: "failed", error: error instanceof Error ? error.message : String(error) };
+    }
   }
   /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */
   async followFolderRename(oldPath, newPath) {
@@ -65278,23 +65501,23 @@ function allowedUrl(tag, name, value) {
   return false;
 }
 function cssIsInert(css) {
-  const lower4 = css.toLowerCase();
-  if (lower4.includes("@import") || lower4.includes("expression(") || lower4.includes("javascript:")) return false;
-  if (lower4.includes("behavior:") || lower4.includes("-moz-binding")) return false;
-  for (const match of lower4.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
+  const lower5 = css.toLowerCase();
+  if (lower5.includes("@import") || lower5.includes("expression(") || lower5.includes("javascript:")) return false;
+  if (lower5.includes("behavior:") || lower5.includes("-moz-binding")) return false;
+  for (const match of lower5.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g))
     if (!match[2].trim().startsWith("#")) return false;
-  return !FORBIDDEN_SCHEMES.test(lower4);
+  return !FORBIDDEN_SCHEMES.test(lower5);
 }
 function scrubAttributes(element, tag, report) {
   var _a2;
   for (const name of element.getAttributeNames()) {
-    const lower4 = name.toLowerCase();
+    const lower5 = name.toLowerCase();
     const value = (_a2 = element.getAttribute(name)) != null ? _a2 : "";
     let drop = false;
-    if (lower4.startsWith("on") || lower4 === "srcdoc") drop = true;
-    else if (lower4.startsWith("data-") && !lower4.startsWith("data-callout")) drop = true;
-    else if (URL_ATTRIBUTES.has(lower4)) drop = !allowedUrl(tag, lower4, value);
-    else if (lower4 === "style") drop = !cssIsInert(value);
+    if (lower5.startsWith("on") || lower5 === "srcdoc") drop = true;
+    else if (lower5.startsWith("data-") && !lower5.startsWith("data-callout")) drop = true;
+    else if (URL_ATTRIBUTES.has(lower5)) drop = !allowedUrl(tag, lower5, value);
+    else if (lower5 === "style") drop = !cssIsInert(value);
     else if (FORBIDDEN_SCHEMES.test(value)) drop = true;
     if (drop) {
       element.removeAttribute(name);
@@ -72162,6 +72385,9 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     this.app.workspace.onLayoutReady(() => {
       void this.finishStartup();
     });
+    this.app.workspace.onLayoutReady(() => {
+      void this.migrateNoteStyles();
+    });
     this.registerVaultEvents();
   }
   /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
@@ -72204,6 +72430,44 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         t("log.initialization_incomplete_0", error instanceof Error ? error.message : String(error))
       );
       console.warn("Visual Agent Map initialization", error);
+    }
+  }
+  /**
+   * Converts the 0.28.0 custom templates and tones once (the one write VAM makes on load), then says once which maps
+   * carried a style that is no longer used. After the first load that has done both, nothing is scanned or written.
+   * Never throws.
+   */
+  async migrateNoteStyles() {
+    var _a2;
+    try {
+      await this.ready;
+      const marker5 = this.settings.noteStyleRecipe;
+      if ((marker5 == null ? void 0 : marker5.migrated) && marker5.mapsNotified) return;
+      const found = /* @__PURE__ */ new Map();
+      for (const { file, map } of await this.repo.readableMaps()) {
+        const styled = [map.detailTemplateId, map.toneId].some((id) => typeof id === "string" && id !== "");
+        if (styled) found.set(file.path, map.title.trim() || file.name.replace(/\.md$/i, ""));
+      }
+      const mapsWithStyle = [
+        ...new Set([...found].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, name]) => name))
+      ];
+      const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
+      if (result.status === "failed") {
+        this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
+        new import_obsidian40.Notice(t("ui.note_style_migrate_failed"));
+      } else if (result.notify) {
+        const maps = result.notify.maps.join(t("ui.list_separator"));
+        const text11 = [
+          t("ui.note_style_maps_notice_0", maps),
+          result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
+        ].filter(Boolean).join(" ");
+        new import_obsidian40.Notice(text11, 0);
+      }
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note style conversion did not run: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   registerVaultEvents() {

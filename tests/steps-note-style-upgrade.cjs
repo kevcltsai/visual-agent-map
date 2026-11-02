@@ -790,7 +790,9 @@ test('plugin wiring: layout-ready starts the upgrade once, a user without old da
   await plugin.onload(); await plugin.ready;
   await plugin.noteStyles.startUpgrade();
   assert.deepEqual(writes, []);
-  assert.equal(saved.length, 1);
-  eq(saved[0].noteStyleUpgrade, { version: 1 });
+  // note-style-recipe T3 P1: the load also saves the marker of the new conversion (one more save); the old upgrade's own save is still the one with its marker.
+  assert.equal(saved.length, 2);
+  eq(saved.filter(data => data.noteStyleUpgrade).map(data => data.noteStyleUpgrade), [{ version: 1 }]);
+  eq(saved.filter(data => data.noteStyleRecipe).map(data => data.noteStyleRecipe.migrated), [1, 1]);
   eq(plugin.settings.noteStyleUpgrade, { version: 1 });
 });

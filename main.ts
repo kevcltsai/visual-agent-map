@@ -841,6 +841,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       void this.finishStartup();
     });
+    // Its own callback, not part of finishStartup: the conversion writes files and must stay apart from the start-up
+    // checks that call finishStartup on a bare plugin.
+    this.app.workspace.onLayoutReady(() => {
+      void this.migrateNoteStyles();
+    });
     this.registerVaultEvents();
   }
   /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
@@ -883,6 +888,46 @@ export default class VisualAgentMapPlugin extends Plugin {
         t("log.initialization_incomplete_0", error instanceof Error ? error.message : String(error))
       );
       console.warn("Visual Agent Map initialization", error);
+    }
+  }
+  /**
+   * Converts the 0.28.0 custom templates and tones once (the one write VAM makes on load), then says once which maps
+   * carried a style that is no longer used. After the first load that has done both, nothing is scanned or written.
+   * Never throws.
+   */
+  async migrateNoteStyles(): Promise<void> {
+    try {
+      await this.ready;
+      const marker = this.settings.noteStyleRecipe;
+      if (marker?.migrated && marker.mapsNotified) return;
+      // Read only: maps with a style of their own, by title (the file name when the title is empty), in path order.
+      const found = new Map<string, string>();
+      for (const { file, map } of await this.repo.readableMaps()) {
+        const styled = [map.detailTemplateId, map.toneId].some(id => typeof id === "string" && id !== "");
+        if (styled) found.set(file.path, map.title.trim() || file.name.replace(/\.md$/i, ""));
+      }
+      const mapsWithStyle = [
+        ...new Set([...found].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, name]) => name))
+      ];
+      const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
+      if (result.status === "failed") {
+        this.logs.appendLog("warn", `Note style conversion failed: ${result.error ?? "unknown error"}`);
+        new Notice(t("ui.note_style_migrate_failed"));
+      } else if (result.notify) {
+        const maps = result.notify.maps.join(t("ui.list_separator"));
+        const text = [
+          t("ui.note_style_maps_notice_0", maps),
+          result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+        new Notice(text, 0);
+      }
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note style conversion did not run: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   registerVaultEvents(): void {

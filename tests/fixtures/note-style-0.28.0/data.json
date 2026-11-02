@@ -1,0 +1,162 @@
+{
+  "migrated": true,
+  "structureVersion": 2,
+  "workspaceInitialized": true,
+  "workspaceFolder": "Agent Workspace",
+  "language": "en",
+  "detailTemplates": [
+    {
+      "id": "3f6b2a1e-0c64-4a43-9d51-6a1c1d0f7a11",
+      "name": "Weekly review",
+      "sections": [
+        {
+          "id": "core",
+          "name": "Core conclusions",
+          "description": "Answer the research question directly, 3–5 points by default; give the conclusion first, then the reason.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "knowledge",
+          "name": "Key knowledge",
+          "description": "The concepts, data, mechanisms and background needed to understand the conclusions.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "sources",
+          "name": "Evidence and sources",
+          "description": "The facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.",
+          "role": "sources",
+          "aliases": []
+        },
+        {
+          "id": "tradeoffs",
+          "name": "Tradeoffs and limitations",
+          "description": "Pros and cons of the options, when each applies, the risks, and the limits of this research.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "questions",
+          "name": "Open questions",
+          "description": "Questions not yet verified or lacking data that are worth researching next.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "log",
+          "name": "Update log",
+          "description": "Add only one line saying what this update changed.",
+          "role": "log",
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "id": "8c2e91d4-5b7a-4f08-a3c6-2e94b7d1c5f2",
+      "name": "Field notes / draft",
+      "sections": [
+        {
+          "id": "findings",
+          "name": "Findings",
+          "description": "What we saw.",
+          "role": "none",
+          "aliases": [],
+          "count": {
+            "mode": "min",
+            "n": 3
+          }
+        },
+        {
+          "id": "refs",
+          "name": "Refs",
+          "description": "Where it came from.",
+          "role": "sources",
+          "aliases": [
+            "Sources"
+          ]
+        },
+        {
+          "id": "open",
+          "name": "Open items",
+          "description": "What is still unclear.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "history",
+          "name": "History",
+          "description": "One dated line.",
+          "role": "log",
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "id": "b41d7e60-92c8-4d3f-8e15-0f6a3c9b2d77",
+      "name": "Conclusion",
+      "sections": [
+        {
+          "id": "answer",
+          "name": "Answer",
+          "description": "State the answer first.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "why",
+          "name": "Why",
+          "description": "The reasons.",
+          "role": "none",
+          "aliases": []
+        }
+      ]
+    },
+    {
+      "id": "custom-textbook",
+      "name": "My textbook",
+      "sections": [
+        {
+          "id": "idea",
+          "name": "Big idea",
+          "description": "One paragraph.",
+          "role": "none",
+          "aliases": []
+        },
+        {
+          "id": "practice",
+          "name": "Practice",
+          "description": "Three exercises.",
+          "role": "none",
+          "aliases": [],
+          "count": {
+            "mode": "exact",
+            "n": 3
+          }
+        }
+      ]
+    }
+  ],
+  "promptPresets": [
+    {
+      "id": "custom-tone-1",
+      "kind": "tone",
+      "name": "Academic rigor",
+      "text": "Write like a careful reviewer: hedge claims, cite the source of every number."
+    },
+    {
+      "id": "custom-tone-2",
+      "kind": "tone",
+      "name": "Pirate",
+      "text": "Talk like a pirate.\nKeep the facts straight."
+    },
+    {
+      "id": "custom-outline-1",
+      "kind": "outline",
+      "name": "Two levels",
+      "text": "Outline in two levels only."
+    }
+  ],
+  "defaultDetailTemplateId": "3f6b2a1e-0c64-4a43-9d51-6a1c1d0f7a11"
+}

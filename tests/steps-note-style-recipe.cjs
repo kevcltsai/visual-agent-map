@@ -1,6 +1,7 @@
 // Note style recipe (note-style-recipe T2, P1): the pure model in ai/note-style-recipe.ts, the built-in format rules apart from
 // the structures, the conclusion structure, the format zone that is noted and not read, and the assembler's format position.
-// Unit level, no vault. Later packets of the same ticket add the store, the settings and the call sites to this file.
+// Unit level. P1 is the pure model; P2a (below the marker line) is the store's resolution over an in-memory vault; later packets add
+// the settings and the call sites to this file.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadSource } = require('./support-replay.cjs');
@@ -12,6 +13,10 @@ export { parseTemplateBlock, splitTemplateZones, templateFormatHeading } from ".
 export { assembleTaskPrompt, selectionFromContext, promptStepOf, chartsWanted } from "./core/steps/task/assemble";
 export { OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
 export { translate } from "./i18n";
+export { NoteStyleStore } from "./ai/note-style-store";
+export { normalizeTemplates, standardTemplate, textbookTemplate } from "./ai/detail-templates";
+export { resolveToneText } from "./ai/prompt-presets";
+export { readTopicKind, TOPIC_KINDS } from "./note-values";
 `);
 
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
@@ -294,4 +299,273 @@ test('recipe: the built-in structure texts hold no format rules zone, so editing
     assert.equal(text.includes('```mermaid'), false, `${block.id} ${language}`);
     assert.equal(text, block.body(language), `${block.id} ${language}`);
   }
+});
+
+// ======== P2a: the store resolves run -> topic -> kind over the four folders ========
+const STYLES = 'WS/S';
+const DIR = { recipe: `${STYLES}/Styles`, template: `${STYLES}/Structures`, tone: `${STYLES}/Voices`, format: `${STYLES}/Formats`, backup: `${STYLES}/Backups` };
+const KINDS7 = ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action', 'aim'];
+const PRESETS = [{ id: 'custom-tone-1', kind: 'tone', name: 'Pirate', text: 'Talk like a pirate.' }];
+
+function vault(files = {}) {
+  const state = { files: { ...files }, writes: [] };
+  const under = folder => Object.keys(state.files).filter(file => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/'));
+  state.port = {
+    list: async folder => under(folder).map(file => file.slice(folder.length + 1)).filter(name => name.endsWith('.md')),
+    read: async file => { if (!(file in state.files)) throw new Error(file); return state.files[file]; },
+    folderExists: folder => Object.keys(state.files).some(file => file.startsWith(`${folder}/`)),
+    createFolder: async folder => { state.writes.push(`createFolder ${folder}`); },
+    create: async file => { state.writes.push(`create ${file}`); },
+    trash: async file => { state.writes.push(`trash ${file}`); }
+  };
+  return state;
+}
+async function world(settingsPatch = {}, files = {}) {
+  const v = vault(files);
+  const settings = { detailTemplates: [], promptPresets: PRESETS, workspaceFolder: 'WS', noteStylesFolder: STYLES, language: 'en', ...settingsPatch };
+  const store = new M.NoteStyleStore({ settings: () => settings, port: v.port, save: async () => { v.writes.push('save'); } });
+  await store.refresh();
+  return { store, v, settings };
+}
+/** The task prompt a run builds from a runStyle result, as the production call sites put it together. */
+function promptOf(style, language, step = 'research') {
+  const context = { ...contextOf(language), detailTemplate: style.template, ...(style.toneText ? { toneText: style.toneText } : {}) };
+  const selection = style.contextFields.styleSelection ?? M.selectionFromContext(context, language);
+  return M.assembleTaskPrompt(selection, step, context, language).text;
+}
+const baseText = (language, detailTemplate) => {
+  const context = { ...contextOf(language), ...(detailTemplate ? { detailTemplate } : {}) };
+  return M.assembleTaskPrompt(M.selectionFromContext(context, language), 'research', context, language).text;
+};
+const summaryOf = style => plain({ ref: style.recipe.ref, source: style.recipe.source, template: style.template, toneText: style.toneText, formatText: style.formatText, updateMode: style.updateMode, contextFields: style.contextFields, issues: style.issues });
+
+test('P2a kinds: the six topic kinds and AIM each resolve to their built-in style (design 3.2): style, structure, voice academic, format standard, update mode', async () => {
+  const { store } = await world();
+  const structureOf = { topic: 'standard', atomic: 'atomic', hypothesis: 'hypothesis', evidence: 'evidence', conclusion: 'conclusion', action: 'action', aim: 'standard' };
+  for (const kind of KINDS7) {
+    const got = store.runStyle({ kind, outputLanguage: 'en' });
+    const label = kind;
+    assert.equal(got.recipe.ref, M.KIND_DEFAULT_RECIPE[kind], label);
+    assert.equal(got.recipe.source, 'kind', label);
+    assert.equal(got.template.id, structureOf[kind], label);
+    assert.equal(got.toneText, undefined, label);
+    assert.equal(got.formatText, standardFormat('en'), label);
+    assert.equal(got.updateMode, kind === 'hypothesis' ? 'top' : 'merge', label);
+    assert.deepEqual(plain(got.contextFields), {}, label);
+    assert.equal(got.recipe.aimDelivery, kind === 'aim' ? true : undefined, label);
+    assert.deepEqual(plain(got.issues), { missing: [], blockIssues: [], notices: [] }, label);
+  }
+  assert.equal(store.runStyle({ outputLanguage: 'en' }).recipe.ref, 'builtin:general', 'no kind counts as the general topic kind');
+});
+
+test('P2a kinds: general research and Textbook give prompts byte-equal to a run with no style fields, in all three languages (the kind=topic default path)', async () => {
+  for (const language of LANGUAGES) {
+    const { store } = await world({ language });
+    const general = store.runStyle({ kind: 'topic', outputLanguage: language });
+    assert.deepEqual(plain(general.contextFields), {});
+    for (const step of ['research', 'synthesize', 'decompose']) assert.equal(promptOf(general, language, step), M.assembleTaskPrompt(M.selectionFromContext(contextOf(language), language), step, contextOf(language), language).text, `${language} ${step}`);
+    const textbook = (await world({ language, noteStyleByKind: { topic: 'builtin:textbook' } })).store.runStyle({ kind: 'topic', outputLanguage: language });
+    assert.deepEqual(plain(textbook.contextFields), {});
+    assert.equal(promptOf(textbook, language), baseText(language, M.textbookTemplate(language === 'en' ? 'en' : 'zh-TW', language)), language);
+  }
+});
+
+test('counter 1: a map\'s template and tone never reach the result: the seven kinds equal the same runs with no map', async () => {
+  const { store } = await world({ detailTemplates: M.normalizeTemplates([{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }]) });
+  for (const kind of KINDS7) for (const language of LANGUAGES) {
+    const without = store.runStyle({ kind, outputLanguage: language });
+    for (const extra of [{ map: { template: 'textbook', tone: 'plain' } }, { map: { template: 'u1', tone: 'custom-tone-1' }, toneOnly: true }, { map: { template: 'file:X' } }]) {
+      const got = store.runStyle({ kind, outputLanguage: language, ...extra });
+      assert.deepEqual(summaryOf(got), summaryOf(without), `${kind} ${language} ${JSON.stringify(extra)}`);
+      assert.equal(promptOf(got, language), promptOf(without, language), `${kind} ${language}`);
+    }
+  }
+});
+
+test('counter 2: the workspace keys and the unpublished keys do not reach the result: the seven kinds equal the empty settings', async () => {
+  const empty = await world();
+  const set = await world({
+    noteTemplateBlock: 'builtin:textbook', noteToneBlock: 'builtin:plain', defaultNoteStyleId: 'textbook', defaultDetailTemplateId: 'textbook',
+    noteTemplateByKind: { hypothesis: 'builtin:action' }, noteStyleAliases: { standard: { template: 'builtin:textbook' } }, noteStyleUpgrade: { version: 1 },
+    noteStyleFiles: { standard: 'Standard.md' }
+  }, { [`${STYLES}/Standard.md`]: '---\ntone: x\n---\n## A\ntext\n', [`${DIR.template}/Mine.md`]: '## A\nx\n' });
+  for (const kind of KINDS7) for (const language of LANGUAGES) {
+    const a = set.store.runStyle({ kind, outputLanguage: language }), b = empty.store.runStyle({ kind, outputLanguage: language });
+    assert.deepEqual(summaryOf(a), summaryOf(b), `${kind} ${language}`);
+    assert.equal(promptOf(a, language), promptOf(b, language), `${kind} ${language}`);
+  }
+});
+
+test('counter 3 (store part): a kind setting that is a bad ref is skipped and reported, and the result is general research', async () => {
+  for (const ref of ['file:a/b', 'file:a\\b', 'file:..', 'file:../x', 'file: x', 'file:', 'file:標準六段', 'file:General research', 'x']) {
+    const { store } = await world({ noteStyleByKind: { topic: ref } }, { [`${DIR.recipe}/x.md`]: '', [`${DIR.recipe}/a.md`]: '' });
+    const got = store.runStyle({ kind: 'topic', outputLanguage: 'en' });
+    assert.equal(got.recipe.ref, 'builtin:general', ref);
+    assert.deepEqual(plain(got.issues.missing), [ref], ref);
+  }
+});
+
+test('counter 4: a file named like a built-in part is never the built-in; file:<built-in name> is unreadable', async () => {
+  const files = { [`${DIR.template}/標準六段.md`]: '## Changed\nOnly one.\n', [`${DIR.template}/Standard six.md`]: '## Changed\nOnly one.\n', [`${DIR.tone}/Plain explanation.md`]: 'file voice', [`${DIR.format}/Standard format.md`]: 'file format', [`${DIR.recipe}/General research.md`]: '---\nstructure: Changed\n---\n' };
+  for (const language of LANGUAGES) {
+    const { store } = await world({ language }, files);
+    const general = store.runStyle({ kind: 'topic', outputLanguage: language });
+    assert.equal(promptOf(general, language), baseText(language), language);
+    assert.equal(general.recipe.ref, 'builtin:general');
+    // a run that names the file as a structure, a voice, or a style cannot read it
+    for (const [request, ref] of [[{ choice: { template: 'file:標準六段' } }, 'file:標準六段'], [{ choice: { template: 'file:Standard six' } }, 'file:Standard six'], [{ choice: { style: 'file:General research' } }, 'file:General research']]) {
+      const got = store.runStyle({ kind: 'topic', outputLanguage: language, ...request });
+      assert.deepEqual(plain(got.issues.missing), [ref], ref);
+      assert.equal(got.template.id, 'standard');
+      assert.equal(got.recipe.ref, 'builtin:general');
+    }
+    assert.equal(store.runStyle({ kind: 'topic', outputLanguage: language, choice: { tone: 'file:Plain explanation' } }).toneText, undefined);
+  }
+  // the conversion table cannot reach a built-in name through a file either
+  const { store } = await world({ noteStyleRecipe: { migrated: 1, legacy: { templates: { old: 'file:標準六段' }, tones: {} } } }, files);
+  const got = store.runStyle({ kind: 'topic', topic: { template: 'old' }, outputLanguage: 'en' });
+  assert.equal(got.template.id, 'standard');
+  assert.deepEqual(plain(got.issues.missing), ['old']);
+});
+
+test('counter 5: every unreadable level falls back and nothing throws: a missing kind style, a style naming a gone structure, an update mode that is not one', async () => {
+  const { store } = await world({ noteStyleByKind: { hypothesis: 'file:不存在' } }, {
+    [`${DIR.recipe}/Gone part.md`]: '---\nstructure: 不存在的結構\nvoice: 不存在的口吻\nformat: 不存在的格式\n---\n',
+    [`${DIR.recipe}/Bad mode.md`]: '---\n更新方式: 隨便\n---\n'
+  });
+  const hypothesis = store.runStyle({ kind: 'hypothesis', outputLanguage: 'en' });
+  assert.equal(hypothesis.recipe.ref, 'builtin:hypothesis');
+  assert.deepEqual(plain(hypothesis.issues.missing), ['file:不存在']);
+  assert.equal(hypothesis.template.id, 'hypothesis');
+  const part = store.runStyle({ choice: { style: 'file:Gone part' }, outputLanguage: 'en' });
+  assert.equal(part.recipe.ref, 'file:Gone part');
+  assert.equal(part.template.id, 'standard');
+  assert.equal(part.toneText, undefined);
+  assert.equal(part.formatText, standardFormat('en'));
+  assert.deepEqual(plain(part.issues.blockIssues.map(issue => [issue.fileName, issue.line, issue.code])), [['Gone part.md', 2, 'ui.note_style_issue_part_missing'], ['Gone part.md', 3, 'ui.note_style_issue_part_missing'], ['Gone part.md', 4, 'ui.note_style_issue_part_missing']]);
+  const mode = store.runStyle({ choice: { style: 'file:Bad mode' }, outputLanguage: 'en' });
+  assert.equal(mode.updateMode, 'merge');
+  assert.deepEqual(plain(mode.issues.blockIssues.map(issue => [issue.fileName, issue.line, issue.code])), [['Bad mode.md', 2, 'ui.note_style_issue_update_invalid']]);
+  assert.equal(mode.recipe.ref, 'file:Bad mode', 'the style is still used');
+});
+
+test('counter 6: AIM is isolated: builtin:aim is unreadable outside kind aim, kind aim with no setting is the AIM report, a setting for aim picks another style', async () => {
+  for (const patch of [{ noteStyleByKind: { topic: 'builtin:aim' } }]) {
+    const got = (await world(patch)).store.runStyle({ kind: 'topic', outputLanguage: 'en' });
+    assert.equal(got.recipe.ref, 'builtin:general');
+    assert.deepEqual(plain(got.issues.missing), ['builtin:aim']);
+  }
+  const { store } = await world({ noteStyleByKind: { aim: 'builtin:general' } });
+  const viaTopic = store.runStyle({ kind: 'topic', topic: { style: 'builtin:aim' }, outputLanguage: 'en' });
+  assert.equal(viaTopic.recipe.ref, 'builtin:general');
+  assert.deepEqual(plain(viaTopic.issues.missing), ['builtin:aim']);
+  const viaRun = store.runStyle({ kind: 'hypothesis', choice: { style: 'builtin:aim' }, outputLanguage: 'en' });
+  assert.equal(viaRun.recipe.ref, 'builtin:hypothesis');
+  const aim = (await world()).store.runStyle({ kind: 'aim', outputLanguage: 'en' });
+  assert.equal(aim.recipe.ref, 'builtin:aim');
+  assert.equal(aim.recipe.aimDelivery, true);
+  assert.equal(aim.template.id, 'standard');
+  const other = store.runStyle({ kind: 'aim', outputLanguage: 'en' });
+  assert.equal(other.recipe.ref, 'builtin:general');
+  assert.equal(other.recipe.aimDelivery, undefined);
+});
+
+test('counter 7: a kind that is not one of the seven reads as the general topic kind, and a stored topic-kind that is not a kind reads as topic', async () => {
+  assert.equal(M.readTopicKind({ 'topic-kind': '亂寫' }), 'topic');
+  const { store } = await world();
+  const got = store.runStyle({ kind: M.readTopicKind({ 'topic-kind': '亂寫' }), outputLanguage: 'en' });
+  assert.equal(got.recipe.ref, 'builtin:general');
+  assert.equal(store.runStyle({ kind: '亂寫', outputLanguage: 'en' }).recipe.ref, 'builtin:general', 'the store itself does not throw on an unknown kind');
+});
+
+test('counter 8: priority: the topic\'s note-style beats its old keys; the run\'s style beats the topic; the run\'s tone changes only the voice and the source is run', async () => {
+  const { store } = await world({ detailTemplates: M.normalizeTemplates([{ id: 'u1', name: 'U', sections: [{ id: 's', name: 'S', description: 'd', role: 'none', aliases: [] }] }]) });
+  const ask = request => store.runStyle({ kind: 'topic', outputLanguage: 'en', ...request });
+  const both = ask({ topic: { style: 'builtin:atomic', template: 'u1', tone: 'plain' } });
+  assert.equal(both.recipe.ref, 'builtin:atomic');
+  assert.equal(both.template.id, 'atomic');
+  assert.equal(both.toneText, undefined, 'the old tone is not mixed into a style');
+  assert.equal(both.recipe.source, 'topic');
+  const run = ask({ choice: { style: 'builtin:evidence' }, topic: { style: 'builtin:atomic' } });
+  assert.deepEqual([run.recipe.ref, run.recipe.source, run.template.id], ['builtin:evidence', 'run', 'evidence']);
+  const tone = ask({ choice: { tone: 'plain' }, topic: { style: 'builtin:atomic' } });
+  assert.deepEqual([tone.recipe.ref, tone.recipe.source, tone.template.id], ['builtin:atomic', 'run', 'atomic']);
+  assert.ok(tone.toneText && tone.toneText.length > 0);
+  assert.equal(tone.label.toneName, 'Plain explanation');
+  const old = ask({ topic: { template: 'u1', tone: 'plain' } });
+  assert.deepEqual([old.recipe.source, old.recipe.implicit, old.template.id], ['topic', true, 'u1']);
+});
+
+test('counter 9: the implicit style of an old topic: a custom template is the 0.28.0 path; a custom tone preset sends its text; unknown or file ids are Standard; one key takes the kind default for the other part; the conversion table first', async () => {
+  const templates = M.normalizeTemplates([{ id: 'uuid-9', name: 'Mine', sections: [{ id: 's', name: 'Findings', description: 'What we found.', role: 'none', aliases: [] }] }]);
+  const { store } = await world({ detailTemplates: templates });
+  for (const language of LANGUAGES) {
+    const got = store.runStyle({ kind: 'topic', topic: { template: 'uuid-9' }, outputLanguage: language });
+    assert.deepEqual(plain(got.contextFields), {}, 'no styleSelection: the 0.28.0 path');
+    assert.deepEqual(plain(got.template), plain(templates[0]));
+    assert.equal(promptOf(got, language), baseText(language, templates[0]), language);
+  }
+  assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
+  for (const id of ['style:X', 'file:X', 'builtin:standard', 'nope']) {
+    const got = store.runStyle({ topic: { template: id }, outputLanguage: 'en' });
+    assert.equal(got.template.id, 'standard', id);
+    assert.deepEqual(plain(got.issues.missing), [id], id);
+  }
+  const hypothesis = store.runStyle({ kind: 'hypothesis', topic: { tone: 'plain' }, outputLanguage: 'en' });
+  assert.equal(hypothesis.template.id, 'hypothesis', 'only a tone: the structure of the kind');
+  assert.ok(hypothesis.toneText);
+  const kindStructure = store.runStyle({ kind: 'atomic', topic: { template: 'textbook' }, outputLanguage: 'en' });
+  assert.equal(kindStructure.template.id, 'textbook');
+  assert.equal(kindStructure.toneText, undefined, 'only a structure: the voice of the kind (academic)');
+  assert.equal(kindStructure.updateMode, 'merge');
+  // the conversion table is looked up before the saved templates
+  const table = await world({ detailTemplates: templates, noteStyleRecipe: { migrated: 1, legacy: { templates: { 'uuid-9': 'builtin:action' }, tones: { 'custom-tone-1': 'builtin:summary' } } } });
+  const mapped = table.store.runStyle({ topic: { template: 'uuid-9', tone: 'custom-tone-1' }, outputLanguage: 'en' });
+  assert.equal(mapped.template.id, 'action');
+  assert.ok(mapped.toneText && mapped.toneText !== 'Talk like a pirate.');
+  assert.equal(mapped.label.styleName, 'Old setting (Goal to done · Key-point summary)');
+});
+
+test('counter 12: reading and resolving write nothing: refresh and the seven kinds make no create, createFolder, trash or save', async () => {
+  const { store, v } = await world({}, { [`${DIR.recipe}/R.md`]: '---\nstructure: Mine\n---\n', [`${DIR.template}/Mine.md`]: '## A\nx\n' });
+  await store.refresh();
+  for (const kind of KINDS7) store.runStyle({ kind, outputLanguage: 'en' });
+  store.runStyle({ choice: { style: 'file:R' }, outputLanguage: 'en' });
+  assert.deepEqual(v.writes, []);
+});
+
+test('P2a folders: the four folders are read in the spelling that exists (zh-TW here); a style file, a structure, a voice and a format file make a style that reads all of them', async () => {
+  const files = {
+    [`${STYLES}/風格/我的.md`]: '---\n段落結構: 我的結構\n寫作口吻: 我的口吻\n格式規則: 我的格式\n更新方式: 只存新內容\n---\n這是一行說明。\n',
+    [`${STYLES}/段落結構/我的結構.md`]: '## 重點\n說明\n',
+    [`${STYLES}/寫作口吻/我的口吻.md`]: '<!-- note -->\n像朋友一樣說話。\n',
+    [`${STYLES}/格式規則/我的格式.md`]: '\n\n只用條列。\n\n'
+  };
+  const { store } = await world({ language: 'en' }, files);
+  const got = store.runStyle({ choice: { style: 'file:我的' }, outputLanguage: 'zh-TW' });
+  assert.deepEqual([got.recipe.ref, got.recipe.name, got.template.id, got.toneText, got.formatText, got.updateMode], ['file:我的', '我的', 'file:我的結構', '像朋友一樣說話。', '只用條列。', 'fresh']);
+  assert.deepEqual(plain(got.contextFields.styleSelection.format), { id: 'file:我的格式', body: '\n\n只用條列。\n\n', fileName: '我的格式.md' });
+  assert.equal(got.contextFields.styleSelection.template.body, '## 重點\n說明\n');
+  const text = promptOf(got, 'zh-TW');
+  assert.ok(text.includes('只用條列。') && text.includes('像朋友一樣說話。'));
+  assert.equal(text.includes(standardFormat('zh-TW')), false, 'the format file replaces the standard format');
+  // an empty format file adds no format text; a built-in format is named by its name in any language
+  const empty = await world({}, { [`${DIR.recipe}/E.md`]: '---\nformat: Blank\n---\n', [`${DIR.format}/Blank.md`]: '\n\n' });
+  const none = empty.store.runStyle({ choice: { style: 'file:E' }, outputLanguage: 'en' });
+  assert.equal(none.formatText, '');
+  assert.equal(promptOf(none, 'en').includes('Obsidian'), false);
+  const lean = (await world({}, { [`${DIR.recipe}/L.md`]: '---\nformat: 精簡格式\n---\n' })).store.runStyle({ choice: { style: 'file:L' }, outputLanguage: 'en' });
+  assert.deepEqual(plain(lean.contextFields.styleSelection.format), { id: 'lean' });
+  assert.equal(lean.formatText, M.lookupBuiltinFormat('lean', 'en'));
+});
+
+test('counter 11 (store part): a structure file with an old format rules zone is used for its sections; the zone is not in the prompt; the notice names the line; no fallback', async () => {
+  const text = `## Alpha\nDescribe alpha.\n\n# Format rules\n\nFORMAT-ZONE-LINE\n`;
+  const { store } = await world({ noteStyleByKind: { topic: 'file:Z' } }, { [`${DIR.recipe}/Z.md`]: '---\nstructure: Old zone\n---\n', [`${DIR.template}/Old zone.md`]: text });
+  const got = store.runStyle({ kind: 'topic', outputLanguage: 'en' });
+  assert.deepEqual(plain(got.template.sections.map(section => section.name)), ['Alpha']);
+  assert.deepEqual(plain(got.issues.blockIssues), []);
+  assert.deepEqual(plain(got.issues.notices), [{ line: 4, code: 'format_zone_moved', id: 'file:Old zone', fileName: 'Old zone.md' }]);
+  assert.equal(promptOf(got, 'en').includes('FORMAT-ZONE-LINE'), false);
+  assert.ok(promptOf(got, 'en').includes('Describe alpha.'));
 });

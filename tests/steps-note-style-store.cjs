@@ -15,6 +15,8 @@ export { builtinBlockText } from "./core/blocks/block-files";
 `);
 const plain = value => JSON.parse(JSON.stringify(value));
 const eq = (actual, expected) => assert.deepEqual(plain(actual), plain(expected));
+// A request from the old per-level lists: the first level is the topic, the second the map; outputLanguage is the interface language.
+const request = (levels, outputLanguage = 'en') => ({ topic: levels[0], map: levels[1], outputLanguage });
 
 const LEGACY = {
   id: 'uuid-1',
@@ -59,13 +61,13 @@ test('no folder, no new keys: resolution equals resolveTemplate + resolveToneTex
   const tones = [undefined, 'summary', 'plain', 'guide', 'custom-tone-1', 'academic', 'nope'];
   for (const topic of templates) for (const map of templates) for (const noteTone of tones) for (const mapTone of tones) for (const workspace of [undefined, 'textbook', 'uuid-1']) {
     settings.defaultDetailTemplateId = workspace;
-    const got = store.resolve([{ template: undefined }, { template: topic, tone: noteTone }, { template: map, tone: mapTone }]);
+    const got = store.runStyle(request([{ template: topic, tone: noteTone }, { template: map, tone: mapTone }]));
     const want = todayTemplate(settings, [undefined, topic, map, workspace]);
     eq(got.template, want.template);
-    eq(got.missing, want.missing);
+    eq(got.issues.missing, want.missing);
     assert.equal(got.toneText, M.resolveToneText(PRESETS, [undefined, noteTone, mapTone], 'en'));
-    assert.equal(got.toneDecided, undefined);
-    assert.equal(got.invalid, undefined);
+    assert.equal(got.label.fileName, undefined);
+    assert.equal(got.issues.invalid, undefined);
   }
 });
 
@@ -78,17 +80,17 @@ test('unchanged files take today\'s path: builtins in any written language, CRLF
     const { store, settings } = makeStore({ language: readLanguage, noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' } }, files);
     await store.refresh();
     for (const [templateId, toneId] of [['standard', undefined], ['textbook', undefined], ['standard', 'summary'], ['standard', 'plain'], ['standard', 'guide'], ['uuid-1', 'plain']]) {
-      const got = store.resolve([{ template: templateId, tone: toneId }]);
+      const got = store.runStyle(request([{ template: templateId, tone: toneId }], readLanguage));
       const want = todayTemplate(settings, [templateId], readLanguage);
       eq(got.template, want.template);
       assert.equal(got.toneText, M.resolveToneText(PRESETS, [toneId], readLanguage));
-      assert.equal(got.toneDecided, undefined, `${templateId}/${toneId} ${writeLanguage}->${readLanguage}`);
+      assert.equal(got.label.fileName, undefined, `${templateId}/${toneId} ${writeLanguage}->${readLanguage}`);
     }
   }
   // the three new keys missing (downgrade) with the exported file still in the folder
   const { store, settings } = makeStore({ noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]) }, { 'WS/S/My notes.md': 'whatever' });
   await store.refresh();
-  eq(store.resolve([{ template: 'uuid-1' }]).template, todayTemplate(settings, ['uuid-1']).template);
+  eq(store.runStyle(request([{ template: 'uuid-1' }])).template, todayTemplate(settings, ['uuid-1']).template);
 });
 
 test('an edited built-in file decides template and tone; an edited exported file keeps roles and aliases of its old sections', async () => {
@@ -98,11 +100,11 @@ test('an edited built-in file decides template and tone; an edited exported file
     'WS/S/My notes.md': M.serializeLegacyV1(LEGACY, 'en').replace('What we found.', 'What we really found.')
   });
   await store.refresh();
-  const summary = store.resolve([{ template: 'standard', tone: 'summary' }]);
-  assert.ok(summary.toneDecided);
-  assert.equal(summary.fileName, 'Key points.md');
-  const legacy = store.resolve([{ template: 'uuid-1', tone: 'plain' }]);
-  assert.equal(legacy.fileName, 'My notes.md');
+  const summary = store.runStyle(request([{ template: 'standard', tone: 'summary' }]));
+  assert.ok(summary.label.fileName);
+  assert.equal(summary.label.fileName, 'Key points.md');
+  const legacy = store.runStyle(request([{ template: 'uuid-1', tone: 'plain' }]));
+  assert.equal(legacy.label.fileName, 'My notes.md');
   const roles = Object.fromEntries(legacy.template.sections.map(section => [section.name, section.role]));
   eq(roles, { Findings: 'none', Refs: 'sources', History: 'log' });
   assert.ok(legacy.template.sections.find(section => section.name === 'Refs').aliases.includes('Sources'));
@@ -120,19 +122,19 @@ test('tone: the file\'s tone is a name or free text; a same or more specific lev
   const { store } = makeStore({ noteStylesFolder: 'WS/S', defaultNoteStyleId: 'style:Own' }, { 'WS/S/Own.md': OWNER, 'WS/S/Free.md': FREE });
   await store.refresh();
   // file named by tone name: full text of the preset
-  assert.equal(store.resolve([{ template: 'style:Own' }]).toneText, 'Talk like a pirate.');
-  assert.equal(store.resolve([{ template: 'style:Free' }]).toneText, 'Short sentences, friendly.');
+  assert.equal(store.runStyle(request([{ template: 'style:Own' }])).toneText, 'Talk like a pirate.');
+  assert.equal(store.runStyle(request([{ template: 'style:Free' }])).toneText, 'Short sentences, friendly.');
   // topic picks the style, map has a tone (less specific): the file's tone wins
-  assert.equal(store.resolve([{ template: 'style:Free' }, { tone: 'plain' }]).toneText, 'Short sentences, friendly.');
+  assert.equal(store.runStyle(request([{ template: 'style:Free' }, { tone: 'plain' }])).toneText, 'Short sentences, friendly.');
   // topic has a tone at the same level as the style: that tone wins
-  const same = store.resolve([{ template: 'style:Free', tone: 'plain' }]);
+  const same = store.runStyle(request([{ template: 'style:Free', tone: 'plain' }]));
   assert.equal(same.toneText, M.resolveToneText(PRESETS, ['plain'], 'en'));
   // the style is chosen at the workspace: every tone level is more specific
-  const ws = store.resolve([{ tone: 'plain' }]);
-  assert.equal(ws.fileName, 'Own.md');
+  const ws = store.runStyle(request([{ tone: 'plain' }]));
+  assert.equal(ws.label.fileName, 'Own.md');
   assert.equal(ws.toneText, M.resolveToneText(PRESETS, ['plain'], 'en'));
   // academic at a specific level means no tone text and beats the file
-  assert.equal(store.resolve([{ template: 'style:Free', tone: 'academic' }]).toneText, undefined);
+  assert.equal(store.runStyle(request([{ template: 'style:Free', tone: 'academic' }])).toneText, undefined);
 });
 
 // Scope 5 matrix: topic x map in {none, template only, tone only, template + tone}, x workspace in {none, textbook,
@@ -164,7 +166,7 @@ test('resolution matrix (topic x map x workspace x file tone): 4 x 4 x 4 x 2 = 1
       noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' }, ...ws.patch
     }, files);
     await store.refresh();
-    const got = store.resolve([topic, map]);
+    const got = store.runStyle(request([topic, map]));
     // oracle
     const levels = [topic, map, { template: ws.patch.defaultNoteStyleId ?? ws.patch.defaultDetailTemplateId }];
     const at = levels.findIndex(level => level.template);
@@ -173,21 +175,21 @@ test('resolution matrix (topic x map x workspace x file tone): 4 x 4 x 4 x 2 = 1
     const label = `${file} topic=${JSON.stringify(topic)} map=${JSON.stringify(map)} ws=${ws.name}`;
     if (chosen?.startsWith('style:')) {
       const base = chosen.slice(6);
-      assert.equal(got.fileName, `${base}.md`, label);
-      assert.ok(got.toneDecided, label);
+      assert.equal(got.label.fileName, `${base}.md`, label);
+      assert.ok(got.label.fileName, label);
       const own = tones.slice(0, at + 1).find(Boolean);
       assert.equal(got.toneText, own ? M.resolveToneText(PRESETS, [own], 'en') : fileTone[base], label);
     } else if (chosen === 'uuid-1') {
-      assert.equal(got.fileName, 'My notes.md', label);
-      assert.ok(got.toneDecided, label);
+      assert.equal(got.label.fileName, 'My notes.md', label);
+      assert.ok(got.label.fileName, label);
       assert.equal(got.toneText, M.resolveToneText(PRESETS, tones, 'en'), label);
     } else {
       // no style file decides: today's template and tone
-      assert.equal(got.toneDecided, undefined, label);
+      assert.equal(got.label.fileName, undefined, label);
       eq(got.template, todayTemplate(settings, [undefined, undefined, chosen]).template);
       assert.equal(got.toneText, M.resolveToneText(PRESETS, tones, 'en'), label);
     }
-    eq(got.missing, [], label);
+    eq(got.issues.missing, [], label);
     cells++;
   }
   assert.equal(cells, 128);
@@ -197,48 +199,48 @@ test('missing and invalid style files: next level is used, missing names the id,
   const { store, v } = makeStore({ noteStylesFolder: 'WS/S', defaultDetailTemplateId: 'textbook' }, { 'WS/S/Bad.md': '---\ntone: x\n---\nno sections here\n' });
   await store.refresh();
   const before = JSON.stringify(v.files);
-  const gone = store.resolve([{ template: 'style:Gone' }, { template: 'style:Gone' }]);
-  eq(gone.missing, ['style:Gone', 'style:Gone']);
+  const gone = store.runStyle(request([{ template: 'style:Gone' }, { template: 'style:Gone' }]));
+  eq(gone.issues.missing, ['style:Gone', 'style:Gone']);
   assert.equal(gone.template.id, 'textbook');
-  const bad = store.resolve([{ template: 'style:Bad' }]);
-  assert.equal(bad.invalid.fileName, 'Bad.md');
-  assert.ok(bad.invalid.issues[0].line >= 1);
+  const bad = store.runStyle(request([{ template: 'style:Bad' }]));
+  assert.equal(bad.issues.invalid.fileName, 'Bad.md');
+  assert.ok(bad.issues.invalid.issues[0].line >= 1);
   assert.equal(JSON.stringify(v.files), before);
   assert.deepEqual(v.writes, []);
   // case differs: the file name is the identity
-  eq(store.resolve([{ template: 'style:bad' }]).missing, ['style:bad']);
+  eq(store.runStyle(request([{ template: 'style:bad' }])).issues.missing, ['style:bad']);
 });
 
 test('lifecycle: rename, move out and back, delete, and a new file with the old name', async () => {
   const note = 'WS/S/A.md';
   const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { [note]: FREE });
   await store.refresh();
-  assert.ok(store.resolve([{ template: 'style:A' }]).toneDecided);
+  assert.ok(store.runStyle(request([{ template: 'style:A' }])).label.fileName);
   v.files['WS/S/B.md'] = v.files[note]; delete v.files[note]; // renamed
   await store.refresh();
-  eq(store.resolve([{ template: 'style:A' }]).missing, ['style:A']);
-  assert.ok(store.resolve([{ template: 'style:B' }]).toneDecided);
+  eq(store.runStyle(request([{ template: 'style:A' }])).issues.missing, ['style:A']);
+  assert.ok(store.runStyle(request([{ template: 'style:B' }])).label.fileName);
   v.files[note] = '---\ntone: New A.\n---\n## X\nnew\n'; // someone creates A again: that is style A (contract), label shows A.md
   await store.refresh();
-  const again = store.resolve([{ template: 'style:A' }]);
-  assert.equal(again.fileName, 'A.md');
+  const again = store.runStyle(request([{ template: 'style:A' }]));
+  assert.equal(again.label.fileName, 'A.md');
   assert.equal(again.toneText, 'New A.');
   v.files['WS/Other/A.md'] = v.files[note]; delete v.files[note]; // moved out
   await store.refresh();
-  eq(store.resolve([{ template: 'style:A' }]).missing, ['style:A']);
+  eq(store.runStyle(request([{ template: 'style:A' }])).issues.missing, ['style:A']);
   v.files[note] = v.files['WS/Other/A.md']; // moved back
   await store.refresh();
-  assert.ok(store.resolve([{ template: 'style:A' }]).toneDecided);
+  assert.ok(store.runStyle(request([{ template: 'style:A' }])).label.fileName);
 });
 
 test('snapshot: a file edited after refresh() changes nothing until the next refresh()', async () => {
   const { store, v } = makeStore({ noteStylesFolder: 'WS/S' }, { 'WS/S/A.md': FREE });
   await store.refresh();
-  const first = store.resolve([{ template: 'style:A' }]);
+  const first = store.runStyle(request([{ template: 'style:A' }]));
   v.files['WS/S/A.md'] = '---\ntone: Changed.\n---\n## X\nx\n';
-  assert.equal(store.resolve([{ template: 'style:A' }]).toneText, first.toneText);
+  assert.equal(store.runStyle(request([{ template: 'style:A' }])).toneText, first.toneText);
   await store.refresh();
-  assert.equal(store.resolve([{ template: 'style:A' }]).toneText, 'Changed.');
+  assert.equal(store.runStyle(request([{ template: 'style:A' }])).toneText, 'Changed.');
 });
 
 const BLOCKS = 'WS/Note styles/Blocks';
@@ -268,9 +270,9 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   eq(settings.promptPresets, presetsBefore);
   assert.equal(settings.noteStyleFiles, undefined, 'nothing is exported to a style file any more');
   await store.refresh();
-  assert.equal(store.resolve([{ template: 'standard', tone: 'summary' }]).toneDecided, undefined);
-  const moved = store.resolve([{ template: 'uuid-1' }]);
-  assert.ok(moved.block, 'the old template runs as its block');
+  assert.equal(store.runStyle(request([{ template: 'standard', tone: 'summary' }])).label.fileName, undefined);
+  const moved = store.runStyle(request([{ template: 'uuid-1' }]));
+  assert.ok(moved.contextFields.styleSelection, 'the old template runs as its block');
   eq(moved.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
   eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard'], ['builtin', 'Textbook'], ['file', 'My notes']]);
 });
@@ -284,7 +286,7 @@ test('D12 (was export conflicts): a user file with the name (also another case) 
   assert.ok(v.files[`${TEMPLATES_DIR}/My notes (2).md`]);
   assert.equal(settings.noteStyleAliases['uuid-1'].template, 'file:My notes (2)');
   await store.refresh();
-  eq(store.resolve([{ template: 'uuid-1' }]).template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
+  eq(store.runStyle(request([{ template: 'uuid-1' }])).template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
   assert.equal(Object.keys(v.files).filter(path => path.startsWith(TEMPLATES_DIR)).length, 2);
 });
 
@@ -330,14 +332,14 @@ test('D12 (was restore default): the old restoreDefault and builtinIdOfFile are 
 test('D8 (the map pickers\' data source): a template block is picked at any level as file:<name>, the tone chain still applies, a missing block is "missing"', async () => {
   const { store } = makeStore({ noteStylesFolder: 'WS/Note styles' }, { [`${TEMPLATES_DIR}/Mine.md`]: '## A\ntext\n' });
   await store.refresh();
-  const run = store.resolve([{ template: 'file:Mine' }]);
-  assert.ok(run.block);
+  const run = store.runStyle(request([{ template: 'file:Mine' }]));
+  assert.ok(run.contextFields.styleSelection);
   assert.equal(run.template.id, 'file:Mine');
-  eq(run.missing, []);
-  assert.equal(store.toneTextFor(run.template, ['plain'], 'en'), M.resolveToneText(PRESETS, ['plain'], 'en'), 'the layer\'s tone is not dropped');
-  assert.equal(store.resolve([{}, { template: 'file:Mine' }]).block.fileName, 'Mine.md');
-  const gone = store.resolve([{ template: 'file:Gone' }, { template: 'textbook' }]);
-  eq(gone.missing, ['file:Gone']);
+  eq(run.issues.missing, []);
+  assert.equal(store.runStyle(request([{ template: 'file:Mine', tone: 'plain' }])).toneText, M.resolveToneText(PRESETS, ['plain'], 'en'), 'the layer\'s tone is not dropped');
+  assert.equal(store.runStyle(request([{}, { template: 'file:Mine' }])).contextFields.styleSelection.template.fileName, 'Mine.md');
+  const gone = store.runStyle(request([{ template: 'file:Gone' }, { template: 'textbook' }]));
+  eq(gone.issues.missing, ['file:Gone']);
   assert.equal(gone.template.id, 'textbook');
 });
 
@@ -354,9 +356,9 @@ test('D8 (tones): the tone choices are the built-in tones and the tone blocks; a
   assert.equal(store.toneName('file:Calm'), 'Calm');
   assert.equal(store.toneName('summary'), choices.find(choice => choice.id === 'summary').name);
   assert.equal(store.toneName('nothing'), undefined);
-  assert.equal(store.toneTextFor(undefined, ['file:Calm'], 'en'), 'Speak calmly.');
-  assert.equal(store.toneTextFor(undefined, ['custom-tone-1'], 'en'), 'Talk like a pirate.');
-  assert.equal(store.toneTextFor(undefined, ['file:Gone', 'plain'], 'en'), M.resolveToneText(PRESETS, ['plain'], 'en'), 'a tone block that is gone names nothing');
+  assert.equal(store.runStyle({ topic: { tone: 'file:Calm' }, outputLanguage: 'en' }).toneText, 'Speak calmly.');
+  assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.');
+  assert.equal(store.runStyle({ choice: { tone: 'file:Gone' }, topic: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.resolveToneText(PRESETS, ['plain'], 'en'), 'a tone block that is gone names nothing');
   assert.ok(Object.keys(v.files).some(path => path.includes('/Tones/Pirate')));
 });
 
@@ -377,17 +379,17 @@ test('diagrams off (P2: through the upgrade): the old flag is not in the context
   const service = new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => true });
   const base = { title: 'T', summary: 's', rules: '', detail: '', task: 'x', ancestors: '', addCharts: true };
   // before the upgrade the old path carries no switch: neither styleDiagrams nor noteStyle is in the context any more
-  eq(store.contextFields(store.resolve([{ template: 'style:Own' }]).template), {});
+  eq(store.runStyle(request([{ template: 'style:Own' }])).contextFields, {});
   assert.equal((await store.upgradeLegacy()).status, 'done');
   await store.refresh();
   for (const mode of ['task', 'synthesize']) {
-    const off = store.resolve([{ template: 'style:Own' }]);
-    const fields = store.contextFields(off.template);
+    const off = store.runStyle(request([{ template: 'style:Own' }]));
+    const fields = off.contextFields;
     eq(Object.keys(fields), ['styleSelection']);
     assert.ok(!fields.styleSelection.template.body.includes('```mermaid'));
     assert.equal(service.chartEligible({ ...base, mode, ...fields }), false);
-    const on = store.resolve([{ template: 'style:Free' }]);
-    assert.equal(service.chartEligible({ ...base, mode, ...store.contextFields(on.template) }), true);
+    const on = store.runStyle(request([{ template: 'style:Free' }]));
+    assert.equal(service.chartEligible({ ...base, mode, ...on.contextFields }), true);
   }
-  eq(store.contextFields(store.resolve([{ template: 'standard' }]).template), {});
+  eq(store.runStyle(request([{ template: 'standard' }])).contextFields, {});
 });

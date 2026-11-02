@@ -181,8 +181,8 @@ test('chartEligible (was: styleDiagrams false blocks the chart step): the upgrad
   assert.equal(service.chartEligible(base), diagrams);
   // The old gate no longer exists: the flag changes nothing.
   assert.equal(service.chartEligible({ ...base, styleDiagrams: false }), diagrams);
-  // What the old switch did, as the upgrade writes it: a block whose format zone lacks the mermaid line.
-  const block = format => ({ template: { id: 'file:X', body: `## A\nx\n\n# ${M.translate('en', 'ui.block_template_format_heading')}\n\n${format}\n` }, tone: { id: 'academic' } });
+  // What the old switch did, as the upgrade writes it: format rules that lack the mermaid line (a part of their own, Q1).
+  const block = format => ({ template: { id: 'file:X', body: '## A\nx\n' }, format: { id: 'file:X', body: format }, tone: { id: 'academic' } });
   const off = block(M.obsidianFormat('en', { ...ON, diagrams: false }));
   const on = block(M.obsidianFormat('en', ON));
   for (const mode of ['task', 'synthesize']) {

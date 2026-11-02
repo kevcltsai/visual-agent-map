@@ -96,14 +96,7 @@ export class PromptPreviewModal extends Modal {
     if (!body) return;
     body.empty();
     // A run with no choice of its own: the workspace default style.
-    const style = this.store.runStyle({ outputLanguage: this.language });
-    const { invalid } = style.issues;
-    if (invalid) {
-      const first = invalid.issues[0];
-      const reason = first ? styleIssueText(first) : "";
-      this.showProblems([t("ui.preview_style_invalid_0_1_2", invalid.fileName, first?.line ?? 1, reason)]);
-      return;
-    }
+    const style = this.store.runStyle({ kind: "topic", outputLanguage: this.language });
     const fields: PreviewStyleFields = {
       detailTemplate: style.template,
       ...(style.toneText ? { toneText: style.toneText } : {}),

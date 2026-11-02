@@ -1,6 +1,7 @@
-// Q3: the template decides whether the background chart step runs. A template (sections or format rules) without a
-// ```mermaid block gets no chart call; the built-in templates still get one; the old `圖表: 關` line, now written into the
-// upgraded block's format rules (P2), still stops it, and a mermaid block the user wrote in a section still gets its chart step.
+// Q3: the style decides whether the background chart step runs. A template or format rules without a ```mermaid block get
+// no chart call; the built-in templates still get one; the old `圖表: 關` line, now written into a format rules text (P2),
+// still stops it, and a mermaid block the user wrote in a section still gets its chart step. The format rules are a part
+// of their own (Q1): the tests give them as the selection's format, not inside the template body.
 // Runs the real AiTaskService and the plugin's addChartsAfterWrite over a scripted runtime.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -59,14 +60,16 @@ async function run(mode, extra = {}) {
 const noMermaid = body => body.split('\n').filter(line => !line.includes('```mermaid')).join('\n');
 /** The built-in format rules with the old diagrams switch applied, the way the upgrade writes it into a block. */
 const diagramsOff = body => body.replace(M.inLanguage(M.OBSIDIAN_FORMAT, 'en'), () => M.legacyObsidianFormat('en', { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true }));
-const withTemplate = (body, id = 'standard') => ({ styleSelection: { ...M.selectionFromContext(base('task'), 'en'), template: { id, body } } });
+const withTemplate = (body, id = 'standard', format) => ({ styleSelection: { ...M.selectionFromContext(base('task'), 'en'), template: { id, body }, ...(format === undefined ? {} : { format: { id: 'file:F', body: format } }) } });
+const STANDARD_FORMAT = M.inLanguage(M.OBSIDIAN_FORMAT, 'en');
 
 for (const mode of ['task', 'synthesize']) {
   test(`${mode}: a template without a mermaid block makes no chart call and leaves no mermaid`, async () => {
-    const body = noMermaid(M.builtinTemplateText('standard', 'en'));
-    assert.ok(M.builtinTemplateText('standard', 'en').includes('```mermaid'), 'the built-in standard text has one');
-    assert.ok(!body.includes('```mermaid'));
-    const r = await run(mode, withTemplate(body));
+    const format = noMermaid(STANDARD_FORMAT);
+    assert.ok(STANDARD_FORMAT.includes('```mermaid'), 'the built-in standard format has one');
+    assert.ok(!M.builtinTemplateText('standard', 'en').includes('```mermaid'), 'the built-in standard sections have none');
+    assert.ok(!format.includes('```mermaid'));
+    const r = await run(mode, withTemplate(M.builtinTemplateText('standard', 'en'), 'standard', format));
     assert.equal(r.calls.length, 1, 'only the main call');
     assert.ok(!r.detail.includes('```mermaid'));
     assert.ok(!r.prompt.includes('```mermaid'), 'the prompt the model got has no mermaid block either');
@@ -83,7 +86,7 @@ for (const mode of ['task', 'synthesize']) {
     assert.equal(r.calls.length, 2);
   });
   test(`${mode}: the old 圖表 off switch, as the upgrade writes it into the format rules, still stops the chart step`, async () => {
-    const r = await run(mode, withTemplate(diagramsOff(M.builtinTemplateText('standard', 'en'))));
+    const r = await run(mode, withTemplate(M.builtinTemplateText('standard', 'en'), 'standard', diagramsOff(STANDARD_FORMAT)));
     assert.equal(r.calls.length, 1);
     assert.ok(!r.detail.includes('```mermaid'));
     assert.ok(!r.prompt.includes('```mermaid'));
@@ -94,18 +97,18 @@ for (const mode of ['task', 'synthesize']) {
   });
   test(`${mode}: charts off in the format rules but a mermaid block in the user's own section: the chart step still runs (locked behaviour, counter 3)`, async () => {
     const own = '## 流程\n畫一張流程圖：\n```mermaid\nflowchart TD\n  A --> B\n```\n';
-    const body = diagramsOff(`${own}\n# Format rules\n\n${M.inLanguage(M.OBSIDIAN_FORMAT, 'en')}\n`);
-    assert.ok(M.splitTemplateZones(body).format.length > 0 && !M.splitTemplateZones(body).format.includes('```mermaid'));
-    assert.equal(new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => true }).chartEligible({ ...base(mode), ...withTemplate(body) }), true);
-    const r = await run(mode, withTemplate(body));
+    const format = diagramsOff(STANDARD_FORMAT);
+    assert.ok(format.length > 0 && !format.includes('```mermaid'));
+    assert.equal(new M.AiTaskService({ pluginDirectory: () => '/plugin', language: () => 'en', defaultReasoning: () => 'low', exchangeLoggingEnabled: () => false, diagramsEnabled: () => true }).chartEligible({ ...base(mode), ...withTemplate(own, 'standard', format) }), true);
+    const r = await run(mode, withTemplate(own, 'standard', format));
     assert.equal(r.calls.length, 2, 'main call plus the chart call');
   });
 }
 
 test('chartEligible keeps its existing conditions first and does not throw on other contexts', () => {
   const { service } = rig();
-  const body = noMermaid(M.builtinTemplateText('standard', 'en'));
-  assert.equal(service.chartEligible({ ...base('task'), ...withTemplate(body) }), false);
+  const format = noMermaid(STANDARD_FORMAT);
+  assert.equal(service.chartEligible({ ...base('task'), ...withTemplate(M.builtinTemplateText('standard', 'en'), 'standard', format) }), false);
   assert.equal(service.chartEligible({ ...base('task') }), true);
   assert.equal(service.chartEligible({ ...base('decompose') }), false);
   assert.equal(service.chartEligible({ ...base(undefined), mode: undefined }), false);
@@ -120,16 +123,14 @@ test('generalTaskPrompt reads styleSelection when present and is unchanged witho
   const context = base('task');
   const plain = M.generalTaskPrompt(context, 'en');
   assert.equal(M.generalTaskPrompt({ ...context, styleSelection: M.selectionFromContext(context, 'en') }, 'en'), plain);
-  const body = noMermaid(M.builtinTemplateText('standard', 'en'));
-  const stripped = M.generalTaskPrompt({ ...context, ...withTemplate(body) }, 'en');
+  const stripped = M.generalTaskPrompt({ ...context, ...withTemplate(M.builtinTemplateText('standard', 'en'), 'standard', noMermaid(STANDARD_FORMAT)) }, 'en');
   assert.notEqual(stripped, plain);
   assert.ok(!stripped.includes('```mermaid'));
 });
 
 test('the assembler reports charts === false for a template without a mermaid block', () => {
   const context = base('task');
-  const body = noMermaid(M.builtinTemplateText('standard', 'en'));
-  const sel = { ...M.selectionFromContext(context, 'en'), template: { id: 'standard', body } };
+  const sel = { ...M.selectionFromContext(context, 'en'), template: { id: 'standard', body: M.builtinTemplateText('standard', 'en') }, format: { id: 'file:F', body: noMermaid(STANDARD_FORMAT) } };
   assert.equal(M.assembleTaskPrompt(sel, 'research', context, 'en').charts, false);
   assert.equal(M.assembleTaskPrompt(M.selectionFromContext(context, 'en'), 'research', context, 'en').charts, true);
 });

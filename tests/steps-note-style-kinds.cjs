@@ -7,7 +7,7 @@ const { loadSource } = require('./support-replay.cjs');
 
 const M = loadSource(`
 export { NoteStyleStore } from "./ai/note-style-store";
-export { BUILTIN_BLOCKS, builtinTemplateText } from "./core/blocks/builtin";
+export { BUILTIN_BLOCKS, builtinTemplateText, lookupBuiltinBlock } from "./core/blocks/builtin";
 export { builtinBlockIdOfName } from "./core/blocks/block-files";
 export { parseTemplateBlock, splitTemplateZones } from "./core/blocks/template-block";
 export { assembleTaskPrompt, selectionFromContext, promptStepOf } from "./core/steps/task/assemble";
@@ -41,16 +41,16 @@ HEADINGS.hypothesis['zh-CN'] = HEADINGS.hypothesis['zh-TW'];
 HEADINGS.evidence['zh-CN'] = HEADINGS.evidence['zh-TW'];
 HEADINGS.action['zh-CN'] = HEADINGS.action['zh-TW'];
 HEADINGS.atomic['zh-CN'] = HEADINGS.atomic['zh-TW'];
+// The names are the design's part names (decisions: a part is named for what it holds, not "... structure").
 const NAMES = {
-  'zh-TW': { hypothesis: '假設結構', evidence: '證據結構', action: '行動結構', atomic: '原子知識結構' },
-  'zh-CN': { hypothesis: '假设结构', evidence: '证据结构', action: '行动结构', atomic: '原子知识结构' },
-  en: { hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure', atomic: 'Atomic note structure' }
+  'zh-TW': { hypothesis: '主張到判斷', evidence: '內容與可信度', action: '目標到完成', atomic: '定義解釋例子' },
+  'zh-CN': { hypothesis: '主张到判断', evidence: '内容与可信度', action: '目标到完成', atomic: '定义解释例子' },
+  en: { hypothesis: 'Claim to verdict', evidence: 'Content & credibility', action: 'Goal to done', atomic: 'Definition & example' }
 };
 const IDS = Object.keys(HEADINGS);
-const FOLDER = { 'zh-TW': ['積木', '結構'], en: ['Blocks', 'Templates'] };
 
 const STYLES = 'WS/S';
-const TPL = `${STYLES}/Blocks/Templates`;
+const TPL = `${STYLES}/Structures`;
 function vault(files = {}) {
   const state = { files: { ...files }, writes: [] };
   const under = folder => Object.keys(state.files).filter(file => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/'));
@@ -72,6 +72,15 @@ async function world(settingsPatch = {}, files = {}) {
   return { store, v, settings };
 }
 const names = template => template.sections.map(section => section.name);
+
+// Since note-style-recipe T2 a run reads styles (recipes) and their parts. A style file "Mix" in `Styles/` names a structure and a
+// voice (a built-in by its English name, an own file by its base name); `mixWorld` makes it the style of `kind` (default topic).
+const RECIPES = `${STYLES}/Styles`;
+const partNameOf = (ref, part) => (ref.startsWith('file:') ? ref.slice(5) : M.translate('en', part === 'tone' ? `ui.preset_name_${ref.slice(8)}` : `ui.structure_name_${ref.slice(8)}`));
+function mixWorld({ structure, voice } = {}, settingsPatch = {}, files = {}, kind = 'topic') {
+  const lines = ['---', ...(structure ? [`structure: ${partNameOf(structure, 'template')}`] : []), ...(voice ? [`voice: ${partNameOf(voice, 'tone')}`] : []), '---', ''];
+  return world({ ...settingsPatch, noteStyleByKind: { ...settingsPatch.noteStyleByKind, [kind]: 'file:Mix' } }, { ...files, [`${RECIPES}/Mix.md`]: lines.join('\n') });
+}
 const base = { title: 'Topic T', summary: 'S', rules: 'R', detail: 'D', task: 'Do X', ancestors: 'A', workingFindings: 'F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 /** The prompt a run builds from a runStyle result, as the production call sites put it together. */
 function promptOf(style, language) {
@@ -82,7 +91,7 @@ function promptOf(style, language) {
 
 test('kinds: the four kind templates are registered after Textbook, with names in three languages', () => {
   const templates = M.BUILTIN_BLOCKS.filter(block => block.category === 'template');
-  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic');
+  assert.equal(templates.map(block => block.id).join(), 'standard,textbook,hypothesis,evidence,action,atomic,conclusion');
   for (const id of IDS) for (const language of LANGUAGES) {
     const block = templates.find(item => item.id === id);
     assert.equal(M.translate(language, block.nameKey), NAMES[language][id], `${id} ${language}`);
@@ -118,11 +127,13 @@ test('kinds: the source and log sentences are the Standard ones word for word; z
   for (const id of IDS) assert.equal(M.builtinTemplateText(id, 'zh-CN').split('\n# ')[0], M.builtinTemplateText(id, 'zh-TW').split('\n# ')[0], id);
 });
 
-test('kinds: builtinTemplateText has the sections, then the format rules heading, then the Obsidian format rules', () => {
+test('kinds: builtinTemplateText is the sections only; the format rules are a part of their own (Q1)', () => {
   for (const id of IDS) for (const language of LANGUAGES) {
-    const zones = M.splitTemplateZones(M.builtinTemplateText(id, language));
-    assert.equal(zones.separatorLines.length, 1, `${id} ${language}`);
-    assert.equal(zones.format, M.inLanguage(M.OBSIDIAN_FORMAT, language).trim(), `${id} ${language}`);
+    const text = M.builtinTemplateText(id, language);
+    const zones = M.splitTemplateZones(text);
+    assert.equal(zones.separatorLines.length, 0, `${id} ${language}`);
+    assert.equal(zones.format, undefined, `${id} ${language}`);
+    assert.equal(text.includes(M.inLanguage(M.OBSIDIAN_FORMAT, language).trim()), false, `${id} ${language}`);
   }
 });
 
@@ -132,14 +143,14 @@ test('kinds: the atomic note keeps itself short in its section descriptions, not
   assert.match(zh.sections[1].description, /三句/);
 });
 
-test('kinds: a store that picks a kind template gives that template, named, in the output language; the interface language stays out of the headings', async () => {
+test('kinds: a store whose kind style is a kind template gives that template, named, in the output language; the interface language stays out of the headings', async () => {
   for (const id of IDS) {
-    const { store, v } = await world({ language: 'zh-TW', noteTemplateBlock: `builtin:${id}` });
+    const { store, v } = await world({ language: 'zh-TW', noteStyleByKind: { topic: `builtin:${id}` } });
     const got = store.runStyle({ outputLanguage: 'en' });
     assert.equal(got.template.id, id);
     assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS[id].en, id);
     assert.equal(got.label.templateName, NAMES['zh-TW'][id], 'the name follows the interface language, not the bare id');
-    assert.deepEqual(JSON.parse(JSON.stringify(got.issues)), { missing: [], blockIssues: [] });
+    assert.deepEqual(JSON.parse(JSON.stringify(got.issues)), { missing: [], blockIssues: [], notices: [] });
     assert.deepEqual(v.writes, []);
     const zh = store.runStyle({ outputLanguage: 'zh-TW' });
     assert.deepEqual(JSON.parse(JSON.stringify(names(zh.template))), HEADINGS[id]['zh-TW'], id);
@@ -148,7 +159,7 @@ test('kinds: a store that picks a kind template gives that template, named, in t
 
 test('kinds: the hypothesis prompt goes through the custom detail structure with the eight headings in order, in each output language', async () => {
   for (const language of LANGUAGES) {
-    const { store } = await world({ language: 'en', noteTemplateBlock: 'builtin:hypothesis' });
+    const { store } = await world({ language: 'en', noteStyleByKind: { topic: 'builtin:hypothesis' } });
     const style = store.runStyle({ outputLanguage: language });
     const { text, segments } = promptOf(style, language);
     const headings = HEADINGS.hypothesis[language];
@@ -166,52 +177,58 @@ test('kinds: the hypothesis prompt goes through the custom detail structure with
   }
 });
 
-test('kinds: an override file equal to the built-in text is the built-in; a changed one that parses is used as written', async () => {
-  const same = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action structure.md`]: M.builtinTemplateText('action', 'en') });
-  const got = same.store.runStyle({ outputLanguage: 'en' });
-  assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS.action.en);
-  assert.equal(got.contextFields.styleSelection, undefined);
-  assert.equal(got.label.templateName, 'Action structure');
-  const changed = await world({ noteTemplateBlock: 'builtin:action' }, { [`${TPL}/Action structure.md`]: '## Only\nOne section.\n' });
-  const used = changed.store.runStyle({ outputLanguage: 'en' });
-  assert.deepEqual(JSON.parse(JSON.stringify(names(used.template))), ['Only']);
-  assert.equal(used.contextFields.styleSelection.template.fileName, 'Action structure.md');
+test('kinds (was: an override file of a built-in; grilling Q5/decision #22): a file named like a built-in structure, equal to it or changed, is never read; the built-in stands', async () => {
+  for (const text of [M.builtinTemplateText('action', 'en'), '## Only\nOne section.\n']) {
+    const { store } = await world({ noteStyleByKind: { topic: 'builtin:action' } }, { [`${TPL}/Goal to done.md`]: text });
+    const got = store.runStyle({ outputLanguage: 'en' });
+    assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS.action.en);
+    assert.equal(got.contextFields.styleSelection, undefined);
+    assert.equal(got.label.templateName, 'Goal to done');
+    assert.deepEqual(JSON.parse(JSON.stringify(got.issues.blockIssues)), []);
+  }
 });
 
-test('kinds: a broken override of a kind template is stood in for by the same built-in, with the issues; nothing throws', async () => {
-  const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
+test('kinds (was: a broken override of a kind template; grilling Q5/decision #22): a broken file named like a kind structure is not read, so the built-in has no issue; nothing throws or is written', async () => {
+  // A count line that is not a number: still a problem the sections parser reports (a second format heading is not one any more, Q1).
+  const BROKEN = '## A\nCount: x\nbody\n';
   for (const id of IDS) {
-    const file = { hypothesis: 'Hypothesis structure', evidence: 'Evidence structure', action: 'Action structure', atomic: 'Atomic note structure' }[id];
-    const { store, v } = await world({ noteTemplateBlock: `builtin:${id}` }, { [`${TPL}/${file}.md`]: BROKEN });
+    const file = NAMES.en[id];
+    const { store, v } = await world({ noteStyleByKind: { topic: `builtin:${id}` } }, { [`${TPL}/${file}.md`]: BROKEN });
     let got;
     assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en' }); }, id);
     assert.equal(got.template.id, id);
     assert.deepEqual(JSON.parse(JSON.stringify(names(got.template))), HEADINGS[id].en, id);
-    assert.ok(got.issues.blockIssues.length > 0, id);
-    assert.equal(got.issues.blockIssues[0].fileName, `${file}.md`);
-    assert.doesNotThrow(() => promptOf(got, 'en'), id);
+    assert.deepEqual(JSON.parse(JSON.stringify(got.issues.blockIssues)), [], id);
     assert.ok(promptOf(got, 'en').text.includes(`### ${HEADINGS[id].en[0]}`), id);
     assert.deepEqual(v.writes, []);
+  }
+  // a broken structure file a style names is stood in for by Standard, with the issues
+  for (const id of IDS) {
+    const { store } = await mixWorld({ structure: 'file:Broken' }, {}, { [`${TPL}/Broken.md`]: BROKEN });
+    const got = store.runStyle({ outputLanguage: 'en' });
+    assert.equal(got.template.id, 'standard', id);
+    assert.equal(got.issues.blockIssues[0].fileName, 'Broken.md');
+    assert.doesNotThrow(() => promptOf(got, 'en'), id);
   }
 });
 
 test('kinds: the built-in names are not mistaken for the legacy ids, and Standard and Textbook still resolve as before', async () => {
-  for (const id of ['standard', 'textbook']) {
-    const { store } = await world({ noteTemplateBlock: `builtin:${id}` });
+  for (const [id, recipe] of [['standard', 'general'], ['textbook', 'textbook']]) {
+    const { store } = await world({ noteStyleByKind: { topic: `builtin:${recipe}` } });
     const got = store.runStyle({ outputLanguage: 'en' });
     assert.equal(got.template.id, id);
-    assert.equal(got.label.templateName, id === 'standard' ? 'Standard' : 'Textbook');
+    assert.equal(got.label.templateName, id === 'standard' ? 'Standard six' : 'Intro + six');
   }
   const { store } = await world({});
   assert.equal(store.runStyle({ outputLanguage: 'en' }).template.id, 'standard');
-  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic']);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.listBlocks('template').filter(item => item.kind === 'builtin').map(item => item.ref))), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion']);
 });
 
-test('kinds: a user file named Evidence / Action / Hypothesis / Atomic note stays a file ("mine"), is not claimed by a built-in, and file:<name> resolves to it', async () => {
+test('kinds: a user file named Evidence / Action / Hypothesis / Atomic note stays a file ("mine"), is not claimed by a built-in, and a style naming it resolves to it', async () => {
   const OWN = '## Mine A\nbody\n## Mine B\nbody\n';
   for (const [name, id] of [['Evidence', 'evidence'], ['Action', 'action'], ['Hypothesis', 'hypothesis'], ['Atomic note', 'atomic']]) {
     assert.equal(M.builtinBlockIdOfName('template', name), undefined, name);
-    const { store, v } = await world({ noteTemplateBlock: `file:${name}` }, { [`${TPL}/${name}.md`]: OWN });
+    const { store, v } = await mixWorld({ structure: `file:${name}` }, {}, { [`${TPL}/${name}.md`]: OWN });
     const items = store.listBlocks('template');
     const mine = items.find(item => item.kind === 'file' && item.name === name);
     assert.ok(mine, `${name} is listed as a file item`);
@@ -230,63 +247,65 @@ const plainOf = value => (value === undefined ? undefined : JSON.parse(JSON.stri
 const FREE_TONE = '---\ntone: Short sentences, friendly.\n---\n## A\ntext\n';
 const summaryOf = style => plainOf({ template: style.template, toneText: style.toneText, label: style.label, contextFields: style.contextFields, issues: style.issues });
 
-test('kind level: noteTemplateByKind set but request.topicKind not given (preview, proposal tone, outline import) is the same as no kind level', async () => {
-  const withMap = { template: 'builtin:action' };
-  const a = await world({ noteTemplateByKind: { hypothesis: 'builtin:hypothesis', topic: 'builtin:atomic' } });
+test('kind level (was: noteTemplateByKind with no topicKind is no kind level; grilling Q5): a request with no kind is the general topic kind; the entries of other kinds do not touch it', async () => {
+  const a = await world({ noteStyleByKind: { hypothesis: 'builtin:hypothesis', action: 'builtin:atomic' } });
   const b = await world({});
-  for (const request of [{ outputLanguage: 'en' }, { outputLanguage: 'en', map: withMap }, { outputLanguage: 'zh-TW', topic: { template: 'textbook' } }])
+  for (const request of [{ outputLanguage: 'en' }, { outputLanguage: 'zh-TW', topic: { template: 'textbook' } }])
     assert.deepEqual(summaryOf(a.store.runStyle(request)), summaryOf(b.store.runStyle(request)));
+  const topic = await world({ noteStyleByKind: { topic: 'builtin:atomic' } });
+  assert.equal(topic.store.runStyle({ outputLanguage: 'en' }).template.id, 'atomic', 'no kind counts as the general topic kind');
 });
 
-test('kind level: no noteTemplateByKind key, or no value for that kind, gives the same template, tone and label as no topicKind, for all six kinds', async () => {
+test('kind level (was: no key gives the same as no topicKind; grilling Q5): a kind with no entry gets its built-in style; an entry for another kind changes nothing', async () => {
   const none = await world({});
-  const other = await world({ noteTemplateByKind: { action: 'builtin:action' } });
-  for (const settings of [none, other]) for (const kind of KINDS) {
-    if (settings === other && kind === 'action') continue;
+  const other = await world({ noteStyleByKind: { action: 'builtin:general' } });
+  for (const kind of KINDS) {
+    if (kind === 'action') continue;
     for (const extra of [{}, { map: { template: 'textbook', tone: 'summary' } }]) {
-      const withKind = settings.store.runStyle({ outputLanguage: 'en', topicKind: kind, ...extra });
-      const without = none.store.runStyle({ outputLanguage: 'en', ...extra });
-      assert.deepEqual(summaryOf(withKind), summaryOf(without), kind);
+      const alone = other.store.runStyle({ outputLanguage: 'en', kind, ...extra });
+      const reference = none.store.runStyle({ outputLanguage: 'en', kind });
+      assert.deepEqual(summaryOf(alone), summaryOf(reference), kind);
     }
   }
+  assert.equal(other.store.runStyle({ outputLanguage: 'en', kind: 'action' }).template.id, 'standard', 'the entry of its own kind applies');
+  assert.equal(none.store.runStyle({ outputLanguage: 'en', kind: 'action' }).template.id, 'action');
 });
 
-test('kind level: the kind structure wins over the map and the workspace; the run choice and the topic win over the kind level', async () => {
-  const { store } = await world({ noteTemplateBlock: 'builtin:textbook', noteTemplateByKind: { hypothesis: 'builtin:hypothesis' } }, { [`${TPL}/Mine.md`]: '## Mine\nText.\n', [`${TPL}/Mine2.md`]: '## Mine2\nText.\n' });
-  const request = extra => ({ outputLanguage: 'en', topicKind: 'hypothesis', map: { template: 'standard' }, ...extra });
+test('kind level (was: the kind structure wins over the map and the workspace; grilling Q5/Q10/Q15): run > topic > kind; the map and the workspace are not levels', async () => {
+  const { store } = await world({ noteTemplateBlock: 'builtin:textbook', noteStyleByKind: { hypothesis: 'builtin:hypothesis' } }, { [`${TPL}/Mine.md`]: '## Mine\nText.\n', [`${TPL}/Mine2.md`]: '## Mine2\nText.\n' });
+  const request = extra => ({ outputLanguage: 'en', kind: 'hypothesis', map: { template: 'standard' }, ...extra });
   const got = store.runStyle(request({}));
   assert.equal(got.template.id, 'hypothesis');
   assert.equal(got.label.templateSource, 'kind');
-  const topic = store.runStyle(request({ topic: { template: 'file:Mine' } }));
-  assert.equal(topic.template.id, 'file:Mine');
+  assert.equal(got.recipe.source, 'kind');
+  const topic = store.runStyle(request({ topic: { template: 'textbook' } }));
+  assert.equal(topic.template.id, 'textbook');
   assert.equal(topic.label.templateSource, 'topic');
-  const run = store.runStyle(request({ topic: { template: 'file:Mine' }, choice: { template: 'file:Mine2' } }));
+  const run = store.runStyle(request({ topic: { template: 'textbook' }, choice: { template: 'file:Mine2' } }));
   assert.equal(run.template.id, 'file:Mine2');
   assert.equal(run.label.templateSource, 'run');
-  const mapOnly = store.runStyle({ outputLanguage: 'en', topicKind: 'evidence', map: { template: 'standard' } });
-  assert.equal(mapOnly.label.templateSource, 'map', 'a kind with no value falls to the map');
-  assert.equal(store.runStyle({ outputLanguage: 'en', topicKind: 'evidence' }).label.templateSource, 'workspace');
-  assert.equal((await world({})).store.runStyle({ outputLanguage: 'en' }).label.templateSource, 'standard');
+  const evidence = store.runStyle({ outputLanguage: 'en', kind: 'evidence', map: { template: 'standard' } });
+  assert.equal(evidence.template.id, 'evidence', 'a kind with no entry has its built-in style, whatever the map holds');
+  assert.equal(evidence.label.templateSource, 'kind');
+  assert.equal((await world({})).store.runStyle({ outputLanguage: 'en' }).label.templateSource, 'kind');
 });
 
-test('kind level: the kind structure comes with the same tone as without it, even when the map level is a style file that decides its own tone', async () => {
-  const files = { [`${STYLES}/Free.md`]: FREE_TONE };
-  const { store } = await world({ noteTemplateByKind: { hypothesis: 'builtin:hypothesis' } }, files);
-  const base = { outputLanguage: 'en', map: { template: 'style:Free' } };
-  const without = store.runStyle({ ...base });
-  const got = store.runStyle({ ...base, topicKind: 'hypothesis' });
-  assert.equal(without.toneText, 'Short sentences, friendly.');
+test('kind level (was: a style file at the map level decides its own tone; grilling Q10/Q15): the map\'s stored template and tone never reach the result', async () => {
+  const { store } = await world({ noteStyleByKind: { hypothesis: 'builtin:hypothesis' } });
+  const map = { template: 'style:Free', tone: 'summary' };
+  const without = store.runStyle({ outputLanguage: 'en', kind: 'hypothesis' });
+  const got = store.runStyle({ outputLanguage: 'en', kind: 'hypothesis', map });
   assert.equal(got.template.id, 'hypothesis');
-  assert.equal(got.toneText, without.toneText);
-  assert.equal(got.label.toneName, without.label.toneName);
-  assert.deepEqual(plainOf(got.contextFields.styleSelection?.tone), plainOf(without.contextFields.styleSelection?.tone));
-  // A topic that names a style file wins over the kind and decides its tone too.
-  const topic = store.runStyle({ outputLanguage: 'en', topicKind: 'hypothesis', topic: { template: 'style:Free' } });
-  assert.equal(topic.toneText, 'Short sentences, friendly.');
+  assert.equal(got.toneText, undefined);
+  assert.deepEqual(summaryOf(got), summaryOf(without));
+  // a topic that names an old tone replaces the voice only
+  const topic = store.runStyle({ outputLanguage: 'en', kind: 'hypothesis', topic: { tone: 'summary' }, map });
+  assert.equal(topic.template.id, 'hypothesis');
+  assert.equal(topic.toneText, M.lookupBuiltinBlock('tone', 'summary', 'en'));
   assert.equal(topic.label.templateSource, 'topic');
 });
 
-test('kind level: a stored value that is a style file, an old template id or a random string is dropped on load and skipped by the store, with no toneDecided and no exception', async () => {
+test('kind level (was: a stored value that is a style file ... is dropped on load; grilling Q5): noteTemplateByKind is not read at all; a noteStyleByKind value that is not a readable style is skipped and reported, with no exception', async () => {
   const dirty = { topic: 'style:Free', action: 'standard', atomic: 'whatever', hypothesis: 'builtin:', evidence: '', conclusion: 7, bogus: 'builtin:hypothesis' };
   assert.equal(M.normalizeNoteTemplateByKind(dirty), undefined);
   assert.equal(M.normalizeNoteTemplateByKind([]), undefined);
@@ -294,59 +313,62 @@ test('kind level: a stored value that is a style file, an old template id or a r
   assert.equal(M.normalizeNoteTemplateByKind(null), undefined);
   assert.equal(M.normalizeNoteTemplateByKind({}), undefined);
   assert.deepEqual(plainOf(M.normalizeNoteTemplateByKind({ ...dirty, atomic: 'builtin:atomic', topic: 'file:Mine' })), { atomic: 'builtin:atomic', topic: 'file:Mine' });
-  const files = { [`${STYLES}/Free.md`]: FREE_TONE };
-  const none = await world({}, files);
-  const { store } = await world({ noteTemplateByKind: dirty }, files);
+  const none = await world({});
+  const old = await world({ noteTemplateByKind: { ...dirty, atomic: 'builtin:atomic', topic: 'file:Mine' } });
+  const { store } = await world({ noteStyleByKind: dirty });
   for (const kind of KINDS) {
+    assert.deepEqual(summaryOf(old.store.runStyle({ outputLanguage: 'en', kind })), summaryOf(none.store.runStyle({ outputLanguage: 'en', kind })), `${kind}: noteTemplateByKind is ignored`);
     let got;
-    assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en', topicKind: kind }); }, kind);
-    assert.deepEqual(summaryOf(got), summaryOf(none.store.runStyle({ outputLanguage: 'en' })), kind);
-    assert.equal(got.toneText, undefined, `${kind}: no tone decided by a dropped style file`);
+    assert.doesNotThrow(() => { got = store.runStyle({ outputLanguage: 'en', kind }); }, kind);
+    const reference = none.store.runStyle({ outputLanguage: 'en', kind });
+    assert.equal(got.template.id, reference.template.id, kind);
+    assert.equal(got.recipe.ref, reference.recipe.ref, kind);
+    assert.equal(got.toneText, undefined, `${kind}: no tone from a dropped value`);
+    const stored = dirty[kind];
+    assert.deepEqual(plainOf(got.issues.missing), typeof stored === 'string' && stored ? [stored] : [], kind);
   }
 });
 
-test('kind level: a missing file is reported in missing and the next level is used', async () => {
-  const { store } = await world({ noteTemplateByKind: { hypothesis: 'file:Nope' }, noteTemplateBlock: 'builtin:textbook' });
-  const got = store.runStyle({ outputLanguage: 'en', topicKind: 'hypothesis', map: { template: 'standard' } });
+test('kind level (was: the next level is the map or the workspace; grilling Q5/Q10/Q15): a missing kind style is reported in missing and the kind\'s built-in style is used', async () => {
+  const { store } = await world({ noteStyleByKind: { hypothesis: 'file:Nope' }, noteTemplateBlock: 'builtin:textbook' });
+  const got = store.runStyle({ outputLanguage: 'en', kind: 'hypothesis', map: { template: 'standard' } });
   assert.deepEqual(plainOf(got.issues.missing), ['file:Nope']);
-  assert.equal(got.template.id, 'standard');
-  assert.equal(got.label.templateSource, 'map');
-  const ws = store.runStyle({ outputLanguage: 'en', topicKind: 'hypothesis' });
-  assert.deepEqual(plainOf(ws.issues.missing), ['file:Nope']);
-  assert.equal(ws.template.id, 'textbook');
-  assert.equal(ws.label.templateSource, 'workspace');
-  const std = (await world({ noteTemplateByKind: { hypothesis: 'builtin:ghost' } })).store.runStyle({ outputLanguage: 'en', topicKind: 'hypothesis' });
+  assert.equal(got.template.id, 'hypothesis');
+  assert.equal(got.recipe.ref, 'builtin:hypothesis');
+  assert.equal(got.label.templateSource, 'kind');
+  const std = (await world({ noteStyleByKind: { hypothesis: 'builtin:ghost' } })).store.runStyle({ outputLanguage: 'en', kind: 'hypothesis' });
   assert.deepEqual(plainOf(std.issues.missing), ['builtin:ghost']);
-  assert.equal(std.label.templateSource, 'standard');
+  assert.equal(std.recipe.ref, 'builtin:hypothesis');
 });
 
-test('kind level: a broken file gets the built-in stand-in and block issues, and does not fall to the next level', async () => {
-  const BROKEN = '## A\nbody\n# Format rules\nr\n# Format rules\nr2\n';
-  const { store } = await world({ noteTemplateByKind: { evidence: 'file:Mine' }, noteTemplateBlock: 'builtin:textbook' }, { [`${TPL}/Mine.md`]: BROKEN });
-  const got = store.runStyle({ outputLanguage: 'en', topicKind: 'evidence', map: { template: 'standard' } });
+test('kind level: a broken structure file in the kind style gets the Standard stand-in and block issues, and does not fall to another level', async () => {
+  // A count line that is not a number: still a problem the sections parser reports (a second format heading is not one any more, Q1).
+  const BROKEN = '## A\nCount: x\nbody\n';
+  const { store } = await mixWorld({ structure: 'file:Mine' }, { noteTemplateBlock: 'builtin:textbook' }, { [`${TPL}/Mine.md`]: BROKEN }, 'evidence');
+  const got = store.runStyle({ outputLanguage: 'en', kind: 'evidence', map: { template: 'standard' } });
   assert.equal(got.label.templateSource, 'kind');
   assert.deepEqual(plainOf(got.issues.missing), []);
   assert.ok(got.issues.blockIssues.length > 0);
   assert.equal(got.issues.blockIssues[0].fileName, 'Mine.md');
-  assert.equal(got.template.id, 'standard', 'a non-built-in broken block is stood in for by Standard, as at the other levels');
+  assert.equal(got.template.id, 'standard', 'a non-built-in broken block is stood in for by Standard');
 });
 
-test('kind level: interface zh-TW, output language en, kind structure builtin:hypothesis gives the eight English headings', async () => {
-  const { store } = await world({ language: 'zh-TW', noteTemplateByKind: { hypothesis: 'builtin:hypothesis' } });
-  const got = store.runStyle({ outputLanguage: 'en', topicKind: 'hypothesis' });
+test('kind level: interface zh-TW, output language en, kind style builtin:hypothesis gives the eight English headings', async () => {
+  const { store } = await world({ language: 'zh-TW', noteStyleByKind: { hypothesis: 'builtin:hypothesis' } });
+  const got = store.runStyle({ outputLanguage: 'en', kind: 'hypothesis' });
   assert.deepEqual(plainOf(names(got.template)), HEADINGS.hypothesis.en);
-  assert.equal(got.label.templateName, '假設結構');
+  assert.equal(got.label.templateName, NAMES['zh-TW'].hypothesis);
   assert.equal(got.label.templateSource, 'kind');
   const { text } = promptOf(got, 'en');
   assert.ok(text.includes(HEADINGS.hypothesis.en.map(heading => `### ${heading}`).join(', ')));
   assert.equal(text.includes('### Core conclusions'), false);
 });
 
-test('kind level: a user file named like a built-in kind structure still resolves to that file when the workspace picks file:<name>', async () => {
-  const { store } = await world({ noteTemplateBlock: 'file:假設結構' }, { [`${TPL}/假設結構.md`]: '## 自己的\n說明。\n' });
+test('kind level: a user file named like an old kind structure still resolves to that file when the kind style picks file:<name>', async () => {
+  const { store } = await mixWorld({ structure: 'file:假設結構' }, {}, { [`${TPL}/假設結構.md`]: '## 自己的\n說明。\n' });
   const got = store.runStyle({ outputLanguage: 'en' });
   assert.deepEqual(plainOf(names(got.template)), ['自己的']);
-  assert.equal(got.label.templateSource, 'workspace');
+  assert.equal(got.label.templateSource, 'kind');
 });
 
 test('kind level: the i18n Notice text exists in three languages and names the type and the structure', () => {
@@ -379,19 +401,19 @@ async function viewWorld(settingsPatch, note) {
   return { ...w, view, updates };
 }
 
-test('kind level (view): topicStyle passes the topic\'s type, a topic without one counts as the general topic; mapStyle passes only the kind it is given', async () => {
-  const { view } = await viewWorld({ noteTemplateByKind: { hypothesis: 'builtin:hypothesis', topic: 'builtin:atomic' } }, {});
+test('kind level (view): topicStyle passes the topic\'s type, a topic without one counts as the general topic; mapStyle passes the kind it is given (none counts as topic)', async () => {
+  const { view } = await viewWorld({ noteStyleByKind: { hypothesis: 'builtin:hypothesis', topic: 'builtin:atomic' } }, {});
   assert.equal(view.topicStyle({ topicKind: 'hypothesis' }, undefined, undefined, 'en').template.id, 'hypothesis');
   assert.equal(view.topicStyle({}, undefined, undefined, 'en').template.id, 'atomic');
-  assert.equal(view.topicStyle({ topicKind: 'action' }, undefined, undefined, 'en').template.id, 'standard');
+  assert.equal(view.topicStyle({ topicKind: 'action' }, undefined, undefined, 'en').template.id, 'action');
   assert.equal(view.mapStyle('en', { kind: 'hypothesis' }).template.id, 'hypothesis');
   assert.equal(view.mapStyle('en', { kind: 'topic' }).template.id, 'atomic');
-  assert.equal(view.mapStyle('en').template.id, 'standard', 'a call site that gives no kind has no kind level');
+  assert.equal(view.mapStyle('en').template.id, 'atomic', 'a call site that gives no kind is the general topic kind');
 });
 
 test('kind level (view): a missing kind structure raises the kind Notice once per gate and never rewrites the topic', async () => {
   const note = { path: 'T.md', topicKind: 'hypothesis' };
-  const { view, updates } = await viewWorld({ noteTemplateByKind: { hypothesis: 'file:Nope' } }, note);
+  const { view, updates } = await viewWorld({ noteStyleByKind: { hypothesis: 'file:Nope' } }, note);
   const gate = { shown: false };
   const style = await view.detailTemplateFor({ path: 'T.md' }, undefined, undefined, gate);
   assert.deepEqual(plainOf(style.issues.missing), ['file:Nope']);
@@ -405,7 +427,7 @@ test('kind level (view): a missing kind structure raises the kind Notice once pe
 
 test('kind level (view): when the topic\'s own missing structure is the one named by the kind, only the topic\'s Notice shows', async () => {
   const note = { path: 'T.md', topicKind: 'hypothesis', detailTemplateId: 'file:Nope' };
-  const { view } = await viewWorld({ noteTemplateByKind: { hypothesis: 'file:Nope' } }, note);
+  const { view } = await viewWorld({ noteStyleByKind: { hypothesis: 'file:Nope' } }, note);
   await view.detailTemplateFor({ path: 'T.md' });
   assert.equal(notices.length, 1);
   assert.match(notices[0], /Nope/);
@@ -413,7 +435,7 @@ test('kind level (view): when the topic\'s own missing structure is the one name
 });
 
 test('kind level (view): mapStyle with notify and a kind shows the kind Notice for a missing structure; without notify it is silent', async () => {
-  const { view } = await viewWorld({ noteTemplateByKind: { topic: 'file:Nope' } }, {});
+  const { view } = await viewWorld({ noteStyleByKind: { topic: 'file:Nope' } }, {});
   view.mapStyle('en', { kind: 'topic' });
   assert.equal(notices.length, 0);
   view.mapStyle('en', { kind: 'topic', notify: true });
@@ -423,32 +445,52 @@ test('kind level (view): mapStyle with notify and a kind shows the kind Notice f
 
 test('decision 18: keep current (no explicit choice) writes no detail-template to the topic, even when the kind level applies', async () => {
   const note = { path: 'T.md', topicKind: 'hypothesis' };
-  const { view, updates } = await viewWorld({ noteTemplateByKind: { hypothesis: 'builtin:hypothesis' } }, note);
+  const { view, updates } = await viewWorld({ noteStyleByKind: { hypothesis: 'builtin:hypothesis' } }, note);
   const style = await view.detailTemplateFor({ path: 'T.md' });
   assert.equal(style.template.id, 'hypothesis');
   assert.deepEqual(updates, []);
 });
 
+test('counterexample 14: a topic detail-template that no longer exists shows its Notice, is not cleared, and a dialog choice of template and tone writes nothing', async () => {
+  const note = { path: 'T.md', detailTemplateId: 'gone-id', toneId: 'gone-tone' };
+  const { view, updates } = await viewWorld({}, note);
+  await view.detailTemplateFor({ path: 'T.md' });
+  assert.equal(notices.length, 1, 'the missing template is told');
+  assert.deepEqual(updates, [], 'detail-template is not cleared');
+  await view.detailTemplateFor({ path: 'T.md' }, 'builtin:textbook', 'plain');
+  await view.detailTemplateFor({ path: 'T.md' }, 'file:Mine', 'plain');
+  assert.deepEqual(updates, [], 'a choice in the dialog holds for this run only');
+});
+
+test('counterexample 1 (view half): the map\'s detailTemplateId / toneId change no request of the view, for every kind', async () => {
+  for (const kind of ['topic', 'atomic', 'hypothesis', 'evidence', 'conclusion', 'action']) {
+    const note = { path: 'T.md', ...(kind === 'topic' ? {} : { topicKind: kind }) };
+    const plain = await viewWorld({}, note);
+    const mapped = await viewWorld({}, note);
+    mapped.view.map = { detailTemplateId: 'textbook', toneId: 'plain' };
+    const summary = (view, style) => JSON.stringify({ ref: style.recipe.ref, format: style.formatText, tone: style.toneText, tpl: style.template.id, ctx: style.contextFields, proposal: view.proposalTone(note, { outputLanguage: 'en' }) });
+    assert.equal(summary(mapped.view, mapped.view.topicStyle(note, undefined, undefined, 'en')), summary(plain.view, plain.view.topicStyle(note, undefined, undefined, 'en')), `${kind}: topicStyle`);
+    assert.equal(summary(mapped.view, mapped.view.mapStyle('en', { kind })), summary(plain.view, plain.view.mapStyle('en', { kind })), `${kind}: mapStyle`);
+  }
+});
+
 // P3: the research progress line.
-test('progress label: "Note style: <structure> · <voice> (<source>)" in three languages; run and topic add no bracket', () => {
+test('progress label (was: "(<source>)" with map / default brackets; grilling Q5/Q10/Q12): only the topic-type source names a bracket, in three languages; run and topic add none', () => {
   const label = source => ({ templateName: 'Standard', toneName: 'Plain', templateSource: source });
   const text = (source, lang = 'en') => M.runStyleLabelText(label(source), lang);
-  assert.equal(text('workspace'), 'Note style: Standard · Plain (default)');
-  assert.equal(text('standard'), 'Note style: Standard · Plain (default)');
   assert.equal(text('kind'), 'Note style: Standard · Plain (structure from topic type)');
-  assert.equal(text('map'), 'Note style: Standard · Plain (follows this map)');
   assert.equal(text('run'), 'Note style: Standard · Plain');
   assert.equal(text('topic'), 'Note style: Standard · Plain');
   assert.equal(M.runStyleLabelText({ templateName: '假設結構', toneName: '學術嚴謹', templateSource: 'kind' }, 'zh-TW'), '筆記風格：假設結構 · 學術嚴謹（結構來自議題類型）');
-  assert.equal(text('workspace', 'zh-CN'), '笔记风格：Standard · Plain（跟随默认）');
-  assert.equal(text('map', 'zh-TW'), '筆記風格：Standard · Plain（跟隨這張圖）');
+  assert.equal(text('kind', 'zh-CN'), '笔记风格：Standard · Plain（结构来自议题类型）');
+  for (const retired of ['workspace', 'standard', 'map']) assert.equal(text(retired), 'Note style: Standard · Plain', `${retired} is no source any more`);
 });
 
-test('progress label: the view passes the line only for a style file or a topic-type structure, and the old key has no consumer', () => {
+test('progress label (was: only for a style file or a topic-type structure; grilling Q10/Q12): the line is passed for every style but the topic type\'s built-in general research, and the old key has no consumer', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/topic-run.ts'), 'utf8');
-  assert.match(view, /runStyle\.label\.fileName \|\| runStyle\.label\.templateSource === "kind"\s*\?\s*runStyleLabelText\(runStyle\.label, this\.ports\.settings\(\)\.language\)\s*:\s*undefined/);
+  assert.match(view, /runStyle\.recipe\.source !== "kind" \|\| runStyle\.recipe\.ref !== "builtin:general"\s*\?\s*runStyleLabelText\(runStyle\.label, this\.ports\.settings\(\)\.language\)\s*:\s*undefined/);
   assert.match(view, /progress\?\.begin\(path, progressAttempt, Date\.now\(\), used\.model, styleLabel\)/);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(fs.readFileSync(path.join(__dirname, '..', 'i18n', `${lang}.ts`), 'utf8').includes('progress_note_style_0'), false);
   assert.equal(view.includes('progress_note_style_0'), false);

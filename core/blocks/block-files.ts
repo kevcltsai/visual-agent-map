@@ -3,18 +3,18 @@ import { CANONICAL_LANGUAGES, normalizeStyleContent } from "../../ai/note-style-
 import { BUILTIN_BLOCKS, builtinTemplateText, findBuiltinBlock, type BlockCategory } from "./builtin";
 
 /**
- * Pure rules for the block files of the note style folder: `<style folder>/<Blocks>/<Templates|Tones>/<name>.md`, and
- * backups in `<Blocks>/<Backups>/`. No vault access here; the store passes in what exists. A built-in block is overridden
- * by a file in its folder that carries the block's name (in any registered language); a file that equals a built-in text
- * is not a change.
+ * Pure rules for the part files of the note style folder: `<style folder>/<Styles|Structures|Voices|Formats>/<name>.md`,
+ * and backups in `<style folder>/<Backups>/`. No vault access here; the store passes in what exists. Each folder name
+ * has a spelling per registered language; the first spelling that exists is used.
  */
-export type BlockFolderRole = "root" | "template" | "tone" | "backup";
+export type BlockFolderRole = "recipe" | "template" | "tone" | "format" | "backup";
 
 const FOLDER_KEYS: Record<BlockFolderRole, TranslationKey> = {
-  root: "ui.block_folder_name",
-  template: "ui.block_folder_template",
-  tone: "ui.block_folder_tone",
-  backup: "ui.block_folder_backup"
+  recipe: "ui.style_folder_recipe",
+  template: "ui.style_folder_template",
+  tone: "ui.style_folder_tone",
+  format: "ui.style_folder_format",
+  backup: "ui.style_folder_backup"
 };
 
 /** A stored choice of a block: a built-in by id (`builtin:<id>`) or a file by base name (`file:<name>`). */

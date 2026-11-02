@@ -235,9 +235,7 @@ import { NOTE_STYLE_PRESETS, fileStyleName, styleLabel } from "./note-style";
 import {
   errorNotice,
   actionNotice,
-  NoteStyleFileError,
   openStyleChooser,
-  openVaultFile,
   stylePickerFor,
   styleRefOf,
   type StylePicker,
@@ -2092,15 +2090,14 @@ export class VisualAgentMapView extends ItemView {
    * tones the run, the topic and the map name are asked: no template level, so a proposal still takes no tone from a style.
    */
   private proposalTone(
-    note: Pick<Note, "toneId"> | undefined,
+    note: Pick<Note, "toneId" | "noteStyle" | "topicKind"> | undefined,
     options?: Pick<TaskOptions, "toneId" | "outputLanguage">
   ): { toneText: string } | Record<string, never> {
     const { toneText } = this.noteStyles.runStyle({
       choice: { tone: options?.toneId },
-      topic: { tone: note?.toneId },
-      map: { tone: this.map?.toneId },
-      outputLanguage: options?.outputLanguage ?? this.plugin.settings.language,
-      toneOnly: true
+      topic: { style: note?.noteStyle, tone: note?.toneId },
+      kind: note?.topicKind ?? "topic",
+      outputLanguage: options?.outputLanguage ?? this.plugin.settings.language
     });
     return toneText ? { toneText } : {};
   }
@@ -3688,12 +3685,11 @@ export class VisualAgentMapView extends ItemView {
     const currentModel = this.plugin.currentModelChoice().model;
     const model = (request.shallowResearch && request.model) || currentModel;
     await this.noteStyles.refresh();
-    const importStyle = this.orThrowInvalid(
-      this.noteStyles.runStyle({
-        choice: { template: request.detailTemplateId },
-        outputLanguage: this.plugin.settings.language
-      })
-    );
+    const importStyle = this.noteStyles.runStyle({
+      choice: { template: request.detailTemplateId },
+      kind: "topic",
+      outputLanguage: this.plugin.settings.language
+    });
     // One operation, one Notice: the shallow research that follows shares this gate.
     const noticeGate = { shown: false };
     this.noticeBlockIssues(importStyle.issues, noticeGate);
@@ -11216,7 +11212,6 @@ export class VisualAgentMapView extends ItemView {
           tones: this.toneChoices(),
           currentTone: current.label.toneName,
           currentStyle: current.label.styleName,
-          ...(current.label.styleRef ? { currentStyleRef: current.label.styleRef } : {}),
           currentSummary: note.summary,
           ...(existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {}),
           ...this.outputLanguageMemory(),
@@ -13948,7 +13943,6 @@ export class VisualAgentMapView extends ItemView {
           tones: this.toneChoices(),
           currentTone: current.label.toneName,
           currentStyle: current.label.styleName,
-          ...(current.label.styleRef ? { currentStyleRef: current.label.styleRef } : {}),
           ...this.outputLanguageMemory()
         },
         ...(pending
@@ -17950,8 +17944,9 @@ export class VisualAgentMapView extends ItemView {
     });
   }
   /**
-   * Content template for an AI update of this topic: this run's choice, then the topic, map and workspace defaults.
-   * Only an explicit choice is written to the topic; a topic template that no longer exists is reported once and cleared.
+   * Content template for an AI update of this topic: this run's choice, then the topic, then the topic type's style.
+   * Nothing is written to the topic: a dialog choice holds for this run only, and a topic template that no longer exists
+   * is only reported.
    */
   private async detailTemplateFor(
     node: MapNode,
@@ -17960,10 +17955,6 @@ export class VisualAgentMapView extends ItemView {
     gate?: { shown: boolean },
     outputLanguage: ContentLanguage = this.plugin.settings.language
   ): Promise<RunStyle> {
-    if (chosenToneId) await this.plugin.repo.updateNote(node.path, { toneId: chosenToneId });
-    // Choosing a style file writes it as the topic's template and deletes the topic's own tone; the file decides the tone.
-    else if (chosenId?.startsWith("style:")) await this.plugin.repo.updateNote(node.path, { toneId: "" });
-    if (chosenId) await this.plugin.repo.updateNote(node.path, { detailTemplateId: chosenId });
     const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
     await this.noteStyles.refresh();
     const resolved = this.topicStyle(note, chosenId, chosenToneId, outputLanguage);
@@ -17979,7 +17970,6 @@ export class VisualAgentMapView extends ItemView {
         );
       } else {
         new Notice(this.missingTemplateMessage(note.detailTemplateId));
-        await this.plugin.repo.updateNote(node.path, { detailTemplateId: "" });
       }
     }
     return resolved;
@@ -17995,29 +17985,12 @@ export class VisualAgentMapView extends ItemView {
     chosenToneId?: string,
     outputLanguage: ContentLanguage = this.plugin.settings.language
   ): RunStyle {
-    return this.orThrowInvalid(
-      this.noteStyles.runStyle({
-        choice: { template: chosenId, tone: chosenToneId },
-        topic: { template: note.detailTemplateId, tone: note.toneId },
-        map: { template: this.map?.detailTemplateId, tone: this.map?.toneId },
-        topicKind: note.topicKind ?? "topic",
-        outputLanguage
-      })
-    );
-  }
-  /** A style file that does not parse stops the run with a message naming file and line. */
-  private orThrowInvalid(result: RunStyle): RunStyle {
-    const invalid = result.issues.invalid;
-    if (invalid) {
-      const first = invalid.issues[0];
-      // Only an old style file that the upgrade has not moved yet can be invalid; it is opened where it lies.
-      const path = `${this.noteStyles.folder()}/${invalid.fileName}`;
-      throw new NoteStyleFileError(
-        t("ui.note_style_file_invalid_0_1_2", invalid.fileName, first.line, styleIssueText(first)),
-        () => void openVaultFile(this.app, path)
-      );
-    }
-    return result;
+    return this.noteStyles.runStyle({
+      choice: { template: chosenId, tone: chosenToneId },
+      topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
+      kind: note.topicKind ?? "topic",
+      outputLanguage
+    });
   }
   /**
    * A template block that cannot be read does not stop the run: the built-in template stands in, and the user is told.
@@ -18040,7 +18013,7 @@ export class VisualAgentMapView extends ItemView {
     topicTemplateId: string | undefined,
     gate?: { shown: boolean }
   ): void {
-    const ref = this.plugin.settings.noteTemplateByKind?.[kind];
+    const ref = this.plugin.settings.noteStyleByKind?.[kind];
     if (!ref || ref === topicTemplateId || !issues.missing.includes(ref) || gate?.shown) return;
     if (gate) gate.shown = true;
     new Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
@@ -18080,14 +18053,11 @@ export class VisualAgentMapView extends ItemView {
     language: ContentLanguage,
     options: { template?: string; tone?: string; notify?: boolean; gate?: { shown: boolean }; kind?: TopicKind } = {}
   ): RunStyle {
-    const result = this.orThrowInvalid(
-      this.noteStyles.runStyle({
-        choice: { template: options.template, tone: options.tone },
-        map: { template: this.map?.detailTemplateId, tone: this.map?.toneId },
-        ...(options.kind ? { topicKind: options.kind } : {}),
-        outputLanguage: language
-      })
-    );
+    const result = this.noteStyles.runStyle({
+      choice: { template: options.template, tone: options.tone },
+      kind: options.kind ?? "topic",
+      outputLanguage: language
+    });
     if (options.notify) {
       this.noticeBlockIssues(result.issues, options.gate);
       if (options.kind) this.noticeKindMissing(result.issues, options.kind, undefined, options.gate);

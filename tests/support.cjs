@@ -95,7 +95,7 @@ function attachTopicRuns(plugin) {
     aiTasks: () => plugin.aiTasks ?? { chartEligible: () => false }, mutate: () => work => plugin.mutate ? plugin.mutate(work) : work(), progress: () => plugin.researchProgress,
     repository: () => plugin.repo, running: () => plugin.running ??= new Set(), pendingSuggestions: () => plugin.pendingSuggestions ??= new Map(), activeTasks: () => plugin.activeTasks ??= new Map(),
     askModel: (...args) => plugin.askModel(...args), settings: () => plugin.settings, exchanges: () => plugin.exchanges, recordFailure: (...args) => plugin.recordFailure(...args),
-    runStyle: ({ note, outputLanguage }) => (plugin.noteStyles ??= new NoteStyleStoreClass({ settings: () => plugin.settings, port: {}, save: async () => {} })).runStyle({ topic: { template: note.detailTemplateId, tone: note.toneId }, outputLanguage }), resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
+    runStyle: ({ note, outputLanguage }) => (plugin.noteStyles ??= new NoteStyleStoreClass({ settings: () => plugin.settings, port: {}, save: async () => {} })).runStyle({ topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId }, kind: note.topicKind ?? 'topic', outputLanguage }), resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
     clearOtherHistory: origin => { for (const view of plugin.views?.() ?? []) if (view !== origin) view.clearUndoHistory?.(); },
     refreshViews: () => { for (const view of plugin.views?.() ?? []) view.reloadAfterAiRun?.(); }
   });

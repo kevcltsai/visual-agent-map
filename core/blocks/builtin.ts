@@ -1,13 +1,11 @@
 import {
   instructionLanguageOf,
-  noteLanguageOf,
   translate,
   type ContentLanguage,
   type TranslationKey,
   type UiLanguage
 } from "../../i18n";
 import { CANONICAL_LANGUAGES, type NoteStyleLanguage } from "../../ai/note-style-file";
-import { templateFormatHeading } from "./template-block";
 import { builtinPresets } from "../../ai/prompt-presets";
 import { OBSIDIAN_FORMAT, inLanguage } from "../steps/_shared/fragments";
 import StandardZhTW from "./template/standard.zh-TW.md";
@@ -28,6 +26,13 @@ import ActionEn from "./template/action.en.md";
 import AtomicZhTW from "./template/atomic.zh-TW.md";
 import AtomicZhCN from "./template/atomic.zh-CN.md";
 import AtomicEn from "./template/atomic.en.md";
+import ConclusionZhTW from "./template/conclusion.zh-TW.md";
+import ConclusionZhCN from "./template/conclusion.zh-CN.md";
+import ConclusionEn from "./template/conclusion.en.md";
+import LeanZh from "./format/lean.zh.md";
+import LeanEn from "./format/lean.en.md";
+import RichZh from "./format/rich.zh.md";
+import RichEn from "./format/rich.en.md";
 
 /**
  * Built-in note-style blocks: one registry of the text a block contributes to the task prompt, per category. Bodies
@@ -43,8 +48,6 @@ export interface BuiltinBlock {
   body(language: ContentLanguage): string;
   /** Template blocks only: the sections zone (same text as `body`). */
   sections?(language: ContentLanguage): string;
-  /** Template blocks only: the format rules zone. */
-  format?(language: ContentLanguage): string;
 }
 
 const strip = (text: string): string => (text.endsWith("\n") ? text.slice(0, -1) : text);
@@ -70,8 +73,8 @@ function fileFor(files: Readonly<Record<NoteStyleLanguage, string>>, language: C
 }
 
 /**
- * A template block's body is its section file text (canonical v2 without the tone and format switches); `format` is the
- * Obsidian format rules the prompt carries today. `files` follow the order of CANONICAL_LANGUAGES.
+ * A template block's body is its section file text (canonical v2 without the tone and format switches). The format rules
+ * are a separate part (BUILTIN_FORMATS). `files` follow the order of CANONICAL_LANGUAGES.
  */
 const template = (id: string, nameKey: TranslationKey, files: readonly string[]): BuiltinBlock => {
   const table = Object.fromEntries(CANONICAL_LANGUAGES.map((language, index) => [language, files[index]])) as Record<
@@ -83,27 +86,26 @@ const template = (id: string, nameKey: TranslationKey, files: readonly string[])
     id,
     nameKey,
     body: language => strip(fileFor(table, language)),
-    sections: language => strip(fileFor(table, language)),
-    format: language => inLanguage(OBSIDIAN_FORMAT, language)
+    sections: language => strip(fileFor(table, language))
   };
 };
 
 /**
- * The whole text of a built-in template: the sections, the format rules heading, then today's Obsidian format rules.
- * The text a template editor opens and "restore default" writes.
+ * The whole text of a built-in template: its sections. The format rules are a part of their own (BUILTIN_FORMATS), so
+ * the text a template editor opens and "restore default" writes holds no format rules zone.
  */
 export function builtinTemplateText(id: string, language: ContentLanguage): string {
-  const block = findBuiltinBlock("template", id);
-  return `${block.sections?.(language)}\n\n# ${templateFormatHeading(noteLanguageOf(language))}\n\n${block.format?.(language)}`;
+  return findBuiltinBlock("template", id).sections?.(language) ?? "";
 }
 
 export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
-  template("standard", "ui.note_style_standard_short", [StandardZhTW, StandardZhCN, StandardEn]),
-  template("textbook", "ui.note_style_textbook_short", [TextbookZhTW, TextbookZhCN, TextbookEn]),
-  template("hypothesis", "ui.note_style_hypothesis_short", [HypothesisZhTW, HypothesisZhCN, HypothesisEn]),
-  template("evidence", "ui.note_style_evidence_short", [EvidenceZhTW, EvidenceZhCN, EvidenceEn]),
-  template("action", "ui.note_style_action_short", [ActionZhTW, ActionZhCN, ActionEn]),
-  template("atomic", "ui.note_style_atomic_short", [AtomicZhTW, AtomicZhCN, AtomicEn]),
+  template("standard", "ui.structure_name_standard", [StandardZhTW, StandardZhCN, StandardEn]),
+  template("textbook", "ui.structure_name_textbook", [TextbookZhTW, TextbookZhCN, TextbookEn]),
+  template("hypothesis", "ui.structure_name_hypothesis", [HypothesisZhTW, HypothesisZhCN, HypothesisEn]),
+  template("evidence", "ui.structure_name_evidence", [EvidenceZhTW, EvidenceZhCN, EvidenceEn]),
+  template("action", "ui.structure_name_action", [ActionZhTW, ActionZhCN, ActionEn]),
+  template("atomic", "ui.structure_name_atomic", [AtomicZhTW, AtomicZhCN, AtomicEn]),
+  template("conclusion", "ui.structure_name_conclusion", [ConclusionZhTW, ConclusionZhCN, ConclusionEn]),
   tone("academic", "ui.preset_name_academic"),
   tone("plain", "ui.preset_name_plain"),
   tone("magazine", "ui.preset_name_magazine"),
@@ -111,6 +113,39 @@ export const BUILTIN_BLOCKS: readonly BuiltinBlock[] = [
   tone("guide", "ui.preset_name_guide"),
   tone("auto", "ui.preset_name_auto")
 ];
+
+/** A built-in format rules part: its text in the language's instruction language (zh or en). */
+export interface BuiltinFormat {
+  readonly id: string;
+  readonly nameKey: TranslationKey;
+  text(language: ContentLanguage): string;
+}
+
+/** Two-way file text by instruction language. */
+const byInstruction = (zh: string, en: string) => (language: ContentLanguage) =>
+  instructionLanguageOf(language) === "zh" ? zh : en;
+
+/**
+ * The built-in format rules, apart from the structures. Standard is the Obsidian format fragment itself (no copy), so it
+ * is byte-equal to what the prompt carried before; rich is the standard text plus an additional part, so its diagram and
+ * HTML safety rules are the standard ones; lean is a file of its own.
+ */
+export const BUILTIN_FORMATS: readonly BuiltinFormat[] = [
+  { id: "standard", nameKey: "ui.format_name_standard", text: language => inLanguage(OBSIDIAN_FORMAT, language) },
+  { id: "lean", nameKey: "ui.format_name_lean", text: byInstruction(LeanZh, LeanEn) },
+  {
+    id: "rich",
+    nameKey: "ui.format_name_rich",
+    text: language => `${inLanguage(OBSIDIAN_FORMAT, language)}\n\n${byInstruction(RichZh, RichEn)(language)}`
+  }
+];
+
+/** The text of the built-in format rules `id`; an unknown id throws, it never turns into an empty text. */
+export function lookupBuiltinFormat(id: string, language: ContentLanguage): string {
+  const format = BUILTIN_FORMATS.find(item => item.id === id);
+  if (!format) throw new Error(`Unknown built-in format: ${id}`);
+  return format.text(language);
+}
 
 /** The built-in block of `category` and `id`; an unknown id throws, it never turns into an empty body. */
 export function findBuiltinBlock(category: BlockCategory, id: string): BuiltinBlock {

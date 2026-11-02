@@ -2131,6 +2131,81 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.task-kind-action.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in action style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-action.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in action style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-action.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in action style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-atomic.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in atomic style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-atomic.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in atomic style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-atomic.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in atomic style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-conclusion.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in conclusion style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-conclusion.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in conclusion style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-conclusion.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in conclusion style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-evidence.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in evidence style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-evidence.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in evidence style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-evidence.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in evidence style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.task-kind-hypothesis.en": {
+      "builder": "AiTaskService instructions: mode task with the built-in hypothesis style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "en",
+      "schema": true
+    },
+    "service.task-kind-hypothesis.zh": {
+      "builder": "AiTaskService instructions: mode task with the built-in hypothesis style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.task-kind-hypothesis.zh-CN": {
+      "builder": "AiTaskService instructions: mode task with the built-in hypothesis style resolved by runStyle (its structure, academic voice, standard format)",
+      "language": "zh-CN",
+      "schema": true
+    },
     "service.task-local-fast.en": {
       "builder": "AiTaskService instructions: mode task, local research, fast",
       "language": "en",

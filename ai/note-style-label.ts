@@ -126,15 +126,13 @@ export function runStyleLabelText(
   label: Pick<RunStyle["label"], "templateName" | "toneName" | "templateSource">,
   language: UiLanguage
 ): string {
-  const source =
-    label.templateSource === "kind"
-      ? "ui.note_style_source_kind"
-      : label.templateSource === "map"
-        ? "ui.note_style_source_map"
-        : label.templateSource === "workspace" || label.templateSource === "standard"
-          ? "ui.note_style_source_default"
-          : undefined;
-  return source
-    ? translate(language, "ui.note_style_label_0_1_2", label.templateName, label.toneName, translate(language, source))
+  return label.templateSource === "kind"
+    ? translate(
+        language,
+        "ui.note_style_label_0_1_2",
+        label.templateName,
+        label.toneName,
+        translate(language, "ui.note_style_source_kind")
+      )
     : translate(language, "ui.note_style_label_0_1", label.templateName, label.toneName);
 }

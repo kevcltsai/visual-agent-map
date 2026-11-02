@@ -41,7 +41,7 @@ async function harness(build, { mode } = {}) {
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = element('div'); view.stageEl = element('div');
   view.focusNode = () => {}; view.openDetails = () => {};
-  if (mode) view[mode] = true;
+  if (mode) view.selection.toggleMultiSelect();
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
   const boxFor = id => (id === ids.root ? BOX.root : id === ids.child ? BOX.child : BOX.third);

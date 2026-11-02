@@ -46480,28 +46480,6 @@ var MergeTopicsModal = class extends import_obsidian30.Modal {
 };
 
 // experiences/visual-map/view.ts
-var WriteThroughSet = class extends Set {
-  constructor(owner) {
-    super();
-    __publicField(this, "owner");
-    this.owner = owner;
-    for (const id of owner.state.multiSelected) super.add(id);
-  }
-  add(id) {
-    super.add(id);
-    this.owner.replaceMulti(this);
-    return this;
-  }
-  delete(id) {
-    const had = super.delete(id);
-    this.owner.replaceMulti(this);
-    return had;
-  }
-  clear() {
-    super.clear();
-    this.owner.replaceMulti(this);
-  }
-};
 var BRANCH_DIRECTIONS = ["right", "left", "down", "up"];
 var BRANCH_LABEL = {
   right: "ui.layout_direction_right",
@@ -46728,7 +46706,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "relevanceGoal");
     __publicField(this, "relevanceLevel");
     __publicField(this, "relevanceContext");
-    /** Selection rules (P2a: the old fields below stay in step until P3f removes them). */
+    /** The selection rules and state (selected topic, ticked topics, multi-select mode, selected relation line, tab stop). */
     __publicField(this, "selection", new TopicSelection());
     /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
     __publicField(this, "structureHighlight", /* @__PURE__ */ new Set());
@@ -46854,6 +46832,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "relationExpanded", /* @__PURE__ */ new Set());
     /** Where each label sits, so expanding or collapsing its text keeps it in place. */
     __publicField(this, "relationLabelAt", /* @__PURE__ */ new Map());
+    /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
     /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
     __publicField(this, "hoverRelation", null);
     __publicField(this, "previewRelation", null);
@@ -46872,6 +46851,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "focusResizeAxis", "width");
     /** Space held down: a drag pans the map even while selecting topics. */
     __publicField(this, "spaceHeld", false);
+    /** The single card in the tab order (roving tabindex); arrows move between the rest. */
     /** Card element per topic id, rebuilt on every render, so a selection change touches only the affected cards. */
     __publicField(this, "cardEls", /* @__PURE__ */ new Map());
     /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
@@ -46941,8 +46921,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     // ---- Clipboard: copy and paste of branches inside one map (decisions #25, #29) -----------------------------------
     /** Listeners are on the document (a card without focus sends the event with `body` as target), one per window. */
     __publicField(this, "unbindClipboard", null);
-    /** Apply step for a relation-line change: only the line highlight is repainted. */
-    __publicField(this, "syncRelationOnly", () => this.syncRelationClasses());
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     __publicField(this, "noStyleFiles");
@@ -46977,45 +46955,6 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   /** How many prerequisite links the latest merge dropped to avoid a cycle (0 when none); P4 reports it. */
   droppedCyclesOfLastMerge() {
     return this.lastDroppedCycles;
-  }
-  /** Transitional (removed in P3f): the old fields read and write through the module so unconverted code keeps working. */
-  get selected() {
-    return this.selection.state.selected;
-  }
-  set selected(id) {
-    this.selection.setSelected(id);
-  }
-  get multiSelected() {
-    return new WriteThroughSet(this.selection);
-  }
-  set multiSelected(ids) {
-    this.selection.replaceMulti(ids);
-  }
-  get integrationMode() {
-    return this.selection.state.multiSelectMode;
-  }
-  set integrationMode(on) {
-    if (on === this.selection.state.multiSelectMode) return;
-    const { selected, multiSelected } = this.selection.state;
-    this.selection.toggleMultiSelect();
-    this.selection.setSelected(selected);
-    this.selection.replaceMulti(multiSelected);
-  }
-  /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
-  get selectedRelation() {
-    return this.selection.state.selectedRelation;
-  }
-  set selectedRelation(key2) {
-    const current = this.selection.state.selectedRelation;
-    if (key2 !== null) this.selection.selectRelation(key2);
-    else if (current !== null) this.selection.deselectRelation(current);
-  }
-  /** The single card in the tab order (roving tabindex); arrows move between the rest. */
-  get tabStopId() {
-    return this.selection.state.tabStopId;
-  }
-  set tabStopId(id) {
-    this.selection.moveTabStop(id);
   }
   isTextId(id) {
     var _a2, _b2;
@@ -47145,7 +47084,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat"))
         return;
       if (event.key === "Escape") {
-        this.runSelection((selection) => selection.escape());
+        this.applySelectionChange(this.selection.escape());
       }
     });
     await this.plugin.ready;
@@ -47197,7 +47136,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       var _a2, _b2, _c;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.integrationMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
+      if (this.selection.state.multiSelectMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
       const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
       const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
@@ -47210,7 +47149,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       var _a2, _b2, _c, _d, _e;
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.integrationMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
+      if (this.selection.state.multiSelectMode || ((_a2 = this.map) == null ? void 0 : _a2.aim)) return true;
       const active = (_b2 = this.contentEl.ownerDocument) == null ? void 0 : _b2.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : void 0;
       const node = entry && ((_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === entry[0]));
@@ -47425,13 +47364,13 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   }
   /** The start button is on only when there is something to show and the map is not in select mode. */
   canPresent() {
-    return !!this.map && !this.closed && !this.integrationMode && this.canvasNodes().length > 0;
+    return !!this.map && !this.closed && !this.selection.state.multiSelectMode && this.canvasNodes().length > 0;
   }
   startPresentation() {
     var _a2, _b2, _c;
     if (this.presentation || !this.map || !this.canPresent()) return;
     const order = this.presentationOrder();
-    const first = startingId(order, this.selected);
+    const first = startingId(order, this.selection.state.selected);
     if (first === null) return;
     const active = (_b2 = (_a2 = this.contentEl.ownerDocument) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
     const card = active ? [...this.cardEls.entries()].find(([, el]) => el === active || el.contains(active)) : void 0;
@@ -49461,7 +49400,7 @@ ${request.requirements}` : preset.text,
     var _a2, _b2;
     if (!this.map || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
     if (this.map.aim) return { map: "aim" };
-    const node = this.map.nodes.find((item) => item.id === this.selected);
+    const node = this.map.nodes.find((item) => item.id === this.selection.state.selected);
     if (!node) return { map: "editable" };
     return { map: "editable", selected: { id: node.id, title: (_b2 = (_a2 = this.notes.get(node.id)) == null ? void 0 : _a2.title) != null ? _b2 : node.path } };
   }
@@ -49987,7 +49926,7 @@ ${request.requirements}` : preset.text,
       }
     }
   }
-  async planAimFromSelection(nodeId = this.selected) {
+  async planAimFromSelection(nodeId = this.selection.state.selected) {
     var _a2, _b2, _c, _d, _e, _f;
     const node = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === nodeId);
     if (this.closed || !node || !this.path || !((_b2 = this.map) == null ? void 0 : _b2.aim) || this.aimBusy) return;
@@ -50894,7 +50833,7 @@ ${request.requirements}` : preset.text,
       }
     return true;
   }
-  mergeCheck(ids = this.multiSelected, except) {
+  mergeCheck(ids = this.selection.state.multiSelected, except) {
     var _a2, _b2;
     return mergeEligibility({
       ids,
@@ -50906,7 +50845,7 @@ ${request.requirements}` : preset.text,
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   openMerge() {
     var _a2, _b2, _c, _d;
-    if (!this.map || this.map.aim || this.mergeOpen || !this.multiSelected.size) return;
+    if (!this.map || this.map.aim || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     if (this.mergeTasks.has(this.path)) {
       new import_obsidian31.Notice(t("ui.merge_locked"));
       return;
@@ -51422,8 +51361,8 @@ ${request.requirements}` : preset.text,
   selectedRoots() {
     if (!this.map) return [];
     return this.map.nodes.filter(
-      (node) => this.multiSelected.has(node.id) && !this.map.nodes.some(
-        (parent) => this.multiSelected.has(parent.id) && descendants(this.map.nodes, parent.id).has(node.id)
+      (node) => this.selection.state.multiSelected.has(node.id) && !this.map.nodes.some(
+        (parent) => this.selection.state.multiSelected.has(parent.id) && descendants(this.map.nodes, parent.id).has(node.id)
       )
     );
   }
@@ -51500,7 +51439,7 @@ ${request.requirements}` : preset.text,
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   canEditCanvasItems() {
     var _a2;
-    return !this.integrationMode && !((_a2 = this.map) == null ? void 0 : _a2.aim);
+    return !this.selection.state.multiSelectMode && !((_a2 = this.map) == null ? void 0 : _a2.aim);
   }
   /**
    * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
@@ -52070,7 +52009,7 @@ ${request.requirements}` : preset.text,
     this.enqueue(async () => {
       var _a2;
       if (!this.map || !this.canEditText()) return;
-      const target = parent != null ? parent : this.map.nodes.find((node) => node.id === this.selected);
+      const target = parent != null ? parent : this.map.nodes.find((node) => node.id === this.selection.state.selected);
       const owner = target && this.map.nodes.find((node) => node.id === target.id);
       if (!owner) {
         const center = this.stagePoint(null);
@@ -52239,7 +52178,7 @@ ${request.requirements}` : preset.text,
   }
   /** The topics a summary entry acts on: the multi-selection, or the one selected topic. */
   summaryTargets() {
-    return this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    return this.selection.state.multiSelected.size ? [...this.selection.state.multiSelected] : this.selection.state.selected ? [this.selection.state.selected] : [];
   }
   /** Entry for the toolbar, command and context menu: starts a bracket over the topics and opens its text editor (nothing is written yet). */
   addSummaryOver(ids = this.summaryTargets()) {
@@ -52547,7 +52486,7 @@ ${request.requirements}` : preset.text,
   }
   /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
   openAddBoundary() {
-    const ids = [...this.multiSelected];
+    const ids = [...this.selection.state.multiSelected];
     if (!this.map || this.map.aim || !ids.length) return;
     new NameModal(
       this.app,
@@ -52792,7 +52731,7 @@ ${request.requirements}` : preset.text,
       const cardId = (_c = [...this.cardEls].find(([, el]) => el === card)) == null ? void 0 : _c[0];
       if (cardId) {
         event.preventDefault();
-        const ids = this.multiSelected.has(cardId) ? [...this.multiSelected] : [cardId];
+        const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
         const menu2 = new import_obsidian31.Menu();
         menu2.addItem(
           (item) => item.setTitle(t("ui.summary_add")).setIcon("brackets").onClick(() => this.addSummaryOver(ids))
@@ -52843,13 +52782,13 @@ ${request.requirements}` : preset.text,
     if (!this.canEditCanvasItems()) return false;
     const images = imageFilesFrom({ files: Array.from((_b2 = (_a2 = event.clipboardData) == null ? void 0 : _a2.files) != null ? _b2 : []) });
     if (!images.length) return false;
-    const target = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === this.selected);
+    const target = (_c = this.map) == null ? void 0 : _c.nodes.find((item) => item.id === this.selection.state.selected);
     if (target && this.cardAcceptsImages(target) && !((_d = event.clipboardData) == null ? void 0 : _d.getData("text/plain"))) {
       event.preventDefault();
       this.enqueue(() => this.attachCardImages(target, images));
       return true;
     }
-    if (this.selected || this.multiSelected.size) return false;
+    if (this.selection.state.selected || this.selection.state.multiSelected.size) return false;
     const point = this.stagePoint(this.lastCanvasPointer);
     if (!point) return false;
     event.preventDefault();
@@ -53233,12 +53172,12 @@ ${request.requirements}` : preset.text,
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   clipboardReadOnly() {
     var _a2;
-    return this.integrationMode || !!((_a2 = this.map) == null ? void 0 : _a2.aim) || this.outlineImportTarget().map !== "editable";
+    return this.selection.state.multiSelectMode || !!((_a2 = this.map) == null ? void 0 : _a2.aim) || this.outlineImportTarget().map !== "editable";
   }
   copyToClipboard(event, mode) {
     var _a2, _b2, _c;
     const map = this.map;
-    const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    const ids = this.selection.state.multiSelected.size ? [...this.selection.state.multiSelected] : this.selection.state.selected ? [this.selection.state.selected] : [];
     if (!map || !ids.length || !event.clipboardData) return;
     if (mode === "cut" && this.clipboardReadOnly()) {
       new import_obsidian31.Notice(t("ui.clipboard_cut_readonly"));
@@ -53326,7 +53265,7 @@ ${request.requirements}` : preset.text,
       return;
     }
     if (!parsed.nodes.length) return;
-    const target = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === this.selected)) != null ? _b2 : null;
+    const target = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((node) => node.id === this.selection.state.selected)) != null ? _b2 : null;
     void this.importOutlineIntoMap(
       { nodes: parsed.nodes, source: null, shallowResearch: false },
       target ? { kind: "under", parentId: target.id } : { kind: "tree" }
@@ -53363,7 +53302,7 @@ ${request.requirements}` : preset.text,
       new import_obsidian31.Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
-    const target = (_a2 = map.nodes.find((node) => node.id === this.selected)) != null ? _a2 : null;
+    const target = (_a2 = map.nodes.find((node) => node.id === this.selection.state.selected)) != null ? _a2 : null;
     const record = sessionFor(this.plugin).match(raw);
     let tops = [];
     const source = record && record.sourceMapPath === this.path && record.sourceMapId === map.id ? record : null;
@@ -54672,7 +54611,7 @@ ${request.requirements}` : preset.text,
       this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
-    const selectedNode = (_k = this.map) == null ? void 0 : _k.nodes.find((node) => node.id === this.selected);
+    const selectedNode = (_k = this.map) == null ? void 0 : _k.nodes.find((node) => node.id === this.selection.state.selected);
     if ((_l = this.map) == null ? void 0 : _l.aim) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
@@ -54871,25 +54810,25 @@ ${request.requirements}` : preset.text,
     if (!aimMode) {
       const integrate = this.button(
         tools,
-        this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+        this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
         () => {
-          this.runSelection((selection) => selection.toggleMultiSelect());
+          this.applySelectionChange(this.selection.toggleMultiSelect());
         }
       );
-      integrate.setAttr("aria-pressed", String(this.integrationMode));
-      if (this.integrationMode) integrate.addClass("is-active");
+      integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+      if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
       this.renderRelevanceGoalControl(tools);
     }
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
-    if (this.integrationMode) this.viewportEl.addClass("is-selecting");
+    if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
     const overlay = canvas.createDiv("vam-canvas-overlay");
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     this.mountMapChat(workspace, overlay);
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    this.hintEl = !this.integrationMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
+    this.hintEl = !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
       text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
     }) : null;
@@ -54918,7 +54857,7 @@ ${request.requirements}` : preset.text,
     this.stageEl = this.viewportEl.createDiv("vam-stage");
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
-    this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
+    this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
     this.releaseCovers();
     this.cardEls.clear();
     this.textEls.clear();
@@ -54931,15 +54870,11 @@ ${request.requirements}` : preset.text,
     this.stageEl.appendChild(this.edgesEl);
     const shown = this.canvasNodes();
     this.selection.prune(new Set(shown.map((node) => node.id)));
-    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
-    this.runSelection(
-      (selection) => selection.resetTabStop(shown.map((node) => {
-        var _a3;
-        return { id: node.id, parentId: (_a3 = node.parentId) != null ? _a3 : null };
-      })),
-      () => {
-      }
-    );
+    if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
+    this.selection.resetTabStop(shown.map((node) => {
+      var _a3;
+      return { id: node.id, parentId: (_a3 = node.parentId) != null ? _a3 : null };
+    }));
     this.renderingCard = true;
     try {
       for (const node of shown) this.renderNode(node);
@@ -55023,14 +54958,17 @@ ${request.requirements}` : preset.text,
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
-      cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
+      cls: `vam-node${node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id) ? " is-selected" : ""}`
     });
     this.cardEls.set(node.id, card);
     this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(this.nodeDepth(node)));
-    card.setAttr("aria-selected", String(node.id === this.selected || this.multiSelected.has(node.id)));
+    card.setAttr(
+      "aria-selected",
+      String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
+    );
     if (node.aimKind) card.setAttr("data-aim-kind", node.aimKind);
     if (node.aimKind === "conclusion") {
       const background = createSvg("svg");
@@ -55055,21 +54993,21 @@ ${request.requirements}` : preset.text,
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
     if (shownNode.height) card.style.height = `${shownNode.height}px`;
-    card.tabIndex = node.id === this.tabStopId ? 0 : -1;
+    card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", (event) => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
     this.labelCard(card, (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
-    if (this.integrationMode) {
+    if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
-      select.checked = this.multiSelected.has(node.id);
+      select.checked = this.selection.state.multiSelected.has(node.id);
       select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.runSelection((selection) => selection.setChecked(node.id, select.checked));
+        this.applySelectionChange(this.selection.setChecked(node.id, select.checked));
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
@@ -55203,28 +55141,28 @@ ${request.requirements}` : preset.text,
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = (_x = (_w = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
-    if (pendingCount && !this.integrationMode && !((_y = this.map) == null ? void 0 : _y.aim))
+    if (pendingCount && !this.selection.state.multiSelectMode && !((_y = this.map) == null ? void 0 : _y.aim))
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
-    if (note && note.researchMode === "local" && !this.integrationMode && !((_z = this.map) == null ? void 0 : _z.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
+    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !((_z = this.map) == null ? void 0 : _z.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
       this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
       );
-    if ((note == null ? void 0 : note.status) === "error" && !this.integrationMode && !node.aimKind && !active && !queued && !research && !merging)
+    if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !node.aimKind && !active && !queued && !research && !merging)
       this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.integrationMode && !((_A = this.map) == null ? void 0 : _A.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !((_A = this.map) == null ? void 0 : _A.aim))
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.integrationMode && !((_B = this.map) == null ? void 0 : _B.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !((_B = this.map) == null ? void 0 : _B.aim)) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -55259,7 +55197,7 @@ ${request.requirements}` : preset.text,
       collapse.addClass("vam-collapse-button", ...node.collapsed ? ["is-collapsed"] : []);
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
-    if (!this.integrationMode) {
+    if (!this.selection.state.multiSelectMode) {
       if (!((_C = this.map) == null ? void 0 : _C.aim)) {
         const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure2.addClass("vam-node-tool", "vam-structure-tool");
@@ -55329,9 +55267,9 @@ ${request.requirements}` : preset.text,
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.integrationMode && !((_G = this.map) == null ? void 0 : _G.aim))
+    if (!this.selection.state.multiSelectMode && !((_G = this.map) == null ? void 0 : _G.aim))
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.integrationMode && !((_H = this.map) == null ? void 0 : _H.aim)) {
+    if (!this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
@@ -55340,7 +55278,7 @@ ${request.requirements}` : preset.text,
     const title = card.createEl("h3", { text: (_I = note == null ? void 0 : note.title) != null ? _I : node.path, cls: "vam-card-title" });
     title.setAttr("title", (_J = note == null ? void 0 : note.title) != null ? _J : node.path);
     title.setAttr("dir", "auto");
-    if (note && !this.integrationMode && !((_K = this.map) == null ? void 0 : _K.aim))
+    if (note && !this.selection.state.multiSelectMode && !((_K = this.map) == null ? void 0 : _K.aim))
       card.addEventListener("dblclick", (event) => {
         var _a3;
         const target = event.target;
@@ -55472,7 +55410,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.integrationMode && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -55480,9 +55418,9 @@ ${request.requirements}` : preset.text,
     card.addEventListener("click", (event) => {
       if (Date.now() < this.suppressClickUntil) return;
       if (event.target.closest("button")) return;
-      if ((event.metaKey || event.ctrlKey) && !this.integrationMode) return;
-      if (this.integrationMode) {
-        this.runSelection((selection) => selection.toggleByClick(node.id));
+      if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+      if (this.selection.state.multiSelectMode) {
+        this.applySelectionChange(this.selection.toggleByClick(node.id));
         return;
       }
       this.selectMapNode(node);
@@ -55497,7 +55435,7 @@ ${request.requirements}` : preset.text,
         this.moveKeyboardFocus(target);
         return;
       }
-      const editable = !this.integrationMode && !((_a3 = this.map) == null ? void 0 : _a3.aim);
+      const editable = !this.selection.state.multiSelectMode && !((_a3 = this.map) == null ? void 0 : _a3.aim);
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -55519,15 +55457,15 @@ ${request.requirements}` : preset.text,
           return;
         }
       }
-      if (event.key === "F2" && note && !this.integrationMode && !((_d2 = this.map) == null ? void 0 : _d2.aim)) {
+      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !((_d2 = this.map) == null ? void 0 : _d2.aim)) {
         if (event.defaultPrevented) return;
         event.preventDefault();
         this.renameNode(node, note.title);
         return;
       }
       if (event.key === "Enter") {
-        if (this.integrationMode) {
-          this.runSelection((selection) => selection.toggleByEnter(node.id));
+        if (this.selection.state.multiSelectMode) {
+          this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
           if (node.aimKind === "question") this.openAimAnswer(node);
@@ -55536,7 +55474,7 @@ ${request.requirements}` : preset.text,
       }
     });
     card.addEventListener("mouseenter", () => {
-      if (!note || this.integrationMode || this.dragging) return;
+      if (!note || this.selection.state.multiSelectMode || this.dragging) return;
       this.clearHoverTimer();
       this.hoverTimer = window.setTimeout(() => {
         if (!this.dragging && card.isConnected) this.showHoverCard(card, note);
@@ -55546,7 +55484,7 @@ ${request.requirements}` : preset.text,
     const toolButtons = () => Array.from(card.querySelectorAll("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", (event) => {
       for (const button of toolButtons()) button.tabIndex = 0;
-      if (this.restoringFocus || event.target !== card || !note || this.integrationMode || !card.matches(":focus-visible"))
+      if (this.restoringFocus || event.target !== card || !note || this.selection.state.multiSelectMode || !card.matches(":focus-visible"))
         return;
       this.clearHoverTimer();
       this.hoverTimer = window.setTimeout(() => {
@@ -55699,11 +55637,8 @@ ${request.requirements}` : preset.text,
     const view = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect(), rect2 = card == null ? void 0 : card.getBoundingClientRect();
     if (view && rect2 && (rect2.left < view.left || rect2.right > view.right || rect2.top < view.top || rect2.bottom > view.bottom))
       this.focusNode(target, false);
-    if (this.integrationMode) {
-      this.runSelection(
-        (selection) => selection.moveTabStop(target.id),
-        (change2) => this.paintCards(change2.touched)
-      );
+    if (this.selection.state.multiSelectMode) {
+      this.paintCards(this.selection.moveTabStop(target.id).touched);
     } else {
       this.focusNodeId = target.id;
       try {
@@ -55717,7 +55652,7 @@ ${request.requirements}` : preset.text,
   /** The tab stop when nothing moved it: the selected card, else the first root, else the first card. */
   defaultTabStop(shown) {
     var _a2, _b2, _c, _d, _e;
-    return (_e = (_d = (_b2 = this.selected && shown.some((node) => node.id === this.selected) ? this.selected : null) != null ? _b2 : (_a2 = shown.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
+    return (_e = (_d = (_b2 = this.selection.state.selected && shown.some((node) => node.id === this.selection.state.selected) ? this.selection.state.selected : null) != null ? _b2 : (_a2 = shown.find((node) => !node.parentId)) == null ? void 0 : _a2.id) != null ? _d : (_c = shown[0]) == null ? void 0 : _c.id) != null ? _e : null;
   }
   /** Nesting level of a topic, 1 for a root; guards against a corrupt parent cycle. */
   nodeDepth(node) {
@@ -55737,12 +55672,12 @@ ${request.requirements}` : preset.text,
     for (const id of new Set(ids)) {
       const card = id ? this.cardEls.get(id) : void 0;
       if (!id || !card) continue;
-      const on = id === this.selected || this.multiSelected.has(id);
+      const on = id === this.selection.state.selected || this.selection.state.multiSelected.has(id);
       card.toggleClass("is-selected", on);
       card.setAttr("aria-selected", String(on));
-      card.tabIndex = id === this.tabStopId ? 0 : -1;
+      card.tabIndex = id === this.selection.state.tabStopId ? 0 : -1;
       const check = this.cardChecks.get(id);
-      if (check) check.checked = this.multiSelected.has(id);
+      if (check) check.checked = this.selection.state.multiSelected.has(id);
     }
     (_a2 = this.chat) == null ? void 0 : _a2.refreshSelection();
     this.syncRelationClasses();
@@ -55758,19 +55693,11 @@ ${request.requirements}` : preset.text,
       return { id: node.id, parentId: (_a3 = node.parentId) != null ? _a3 : null };
     });
     const stops = [];
-    this.runSelection(
-      (selection) => {
-        const relation = selection.state.selectedRelation;
-        if (relation) selection.deselectRelation(relation);
-        const change2 = selection.resetTabStop(shown);
-        stops.push(...change2.touched);
-        return change2;
-      },
-      () => {
-      }
-    );
+    const relation = this.selection.state.selectedRelation;
+    if (relation) this.selection.deselectRelation(relation);
+    stops.push(...this.selection.resetTabStop(shown).touched);
     this.paintCards([prevId, nextId, ...stops, ...touched]);
-    if (this.integrationMode && ((_a2 = this.selectionBarEl) == null ? void 0 : _a2.isConnected)) {
+    if (this.selection.state.multiSelectMode && ((_a2 = this.selectionBarEl) == null ? void 0 : _a2.isConnected)) {
       const workspace = this.selectionBarEl.parentElement;
       if (workspace) {
         const bar = this.renderSelectionBar(workspace);
@@ -55796,34 +55723,13 @@ ${request.requirements}` : preset.text,
     }
     this.applySelectionState(prevId, nextId, touched);
   }
-  /** Bring the module up to the old fields (P2a bridge: other paths still write them), run one operation, copy back. */
-  runSelection(operation, apply = (change2) => this.applySelectionChange(change2)) {
-    const sel = this.selection;
-    if (sel.state.multiSelectMode !== this.integrationMode) sel.toggleMultiSelect();
-    sel.replaceMulti(this.multiSelected);
-    sel.setSelected(this.selected);
-    const relation = sel.state.selectedRelation;
-    if (relation !== this.selectedRelation) {
-      if (this.selectedRelation) sel.selectRelation(this.selectedRelation);
-      else if (relation) sel.deselectRelation(relation);
-    }
-    sel.moveTabStop(this.tabStopId);
-    const change2 = operation(sel);
-    const state = sel.state;
-    this.selected = state.selected;
-    this.multiSelected = new Set(state.multiSelected);
-    this.integrationMode = state.multiSelectMode;
-    this.selectedRelation = state.selectedRelation;
-    this.tabStopId = state.tabStopId;
-    apply(change2);
-  }
   /** Mode changed: render the whole map. Only the selection changed: repaint the touched cards, bar and outline. */
   applySelectionChange(change2) {
     if (change2.multiSelectModeChanged) {
       if (!this.closed) this.render();
       return;
     }
-    this.commitSelection(null, this.selected, change2.touched);
+    this.commitSelection(null, this.selection.state.selected, change2.touched);
   }
   clearHoverTimer() {
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
@@ -56142,21 +56048,17 @@ ${request.requirements}` : preset.text,
     }
     const current = (_b2 = this.map) == null ? void 0 : _b2.nodes.find((item) => item.id === node.id);
     if (!current) return false;
-    if (!this.integrationMode) {
+    if (!this.selection.state.multiSelectMode) {
       if (collapsed.length) {
-        this.runSelection(
-          (selection) => selection.click(current.id),
-          () => {
-          }
-        );
+        this.selection.click(current.id);
         this.render();
-      } else this.runSelection((selection) => selection.click(current.id));
+      } else this.applySelectionChange(this.selection.click(current.id));
     } else this.render();
     this.focusNode(current);
     return true;
   }
   selectMapNode(node) {
-    this.runSelection((selection) => selection.selectIfChanged(node.id));
+    this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   hideHoverCardSoon() {
     this.clearHoverTimer();
@@ -56896,14 +56798,16 @@ ${request.requirements}` : preset.text,
       }, false);
       const result = outcome.value;
       if (result === null) {
-        this.runSelection((selection) => selection.deselectRelation(relationIdentity(current)), this.syncRelationOnly);
+        this.selection.deselectRelation(relationIdentity(current));
+        this.syncRelationClasses();
         onChanged == null ? void 0 : onChanged();
         close == null ? void 0 : close();
         return;
       }
       if (result) {
         current = result;
-        this.runSelection((selection) => selection.selectRelation(relationIdentity(current)), this.syncRelationOnly);
+        this.selection.selectRelation(relationIdentity(current));
+        this.syncRelationClasses();
       }
       if (repaint) paint();
       onChanged == null ? void 0 : onChanged();
@@ -57110,7 +57014,7 @@ ${request.requirements}` : preset.text,
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   markersEditable(node) {
-    return this.relationsEnabled() && !node.aimKind && !this.integrationMode;
+    return this.relationsEnabled() && !node.aimKind && !this.selection.state.multiSelectMode;
   }
   /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
   renderMarkerSection(panel, node) {
@@ -58254,8 +58158,8 @@ ${request.requirements}` : preset.text,
     return `multi-research:${this.path}`;
   }
   openMultiResearch(retryBatchKey) {
-    if (!this.map || this.map.aim || !this.multiSelected.size) return;
-    const shown = [...this.multiSelected].flatMap((id) => {
+    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
+    const shown = [...this.selection.state.multiSelected].flatMap((id) => {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
@@ -58280,13 +58184,13 @@ ${request.requirements}` : preset.text,
    * topics that were counted, and how many of those made none.
    */
   async startMultiResearch(request, retryBatchKey, onSettled) {
-    if (!this.map || this.map.aim || !this.multiSelected.size) return;
+    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
     const key2 = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key2)) {
       new import_obsidian31.Notice(t("ui.multi_research_already_running"));
       return;
     }
-    const selected = [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
+    const selected = [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     try {
       const models = request.model ? [request.model] : [
         ...new Set(
@@ -58497,15 +58401,15 @@ ${request.requirements}` : preset.text,
   renderSelectionBar(workspace) {
     var _a2, _b2, _c, _d, _e;
     const selection = workspace.createDiv("vam-selection-bar");
-    const names3 = [...this.multiSelected].map((id) => {
+    const names3 = [...this.selection.state.multiSelected].map((id) => {
       var _a3;
       return (_a3 = this.notes.get(id)) == null ? void 0 : _a3.title;
     }).filter(Boolean);
     selection.createSpan({
       attr: { dir: "auto" },
-      text: this.multiSelected.size ? t(
+      text: this.selection.state.multiSelected.size ? t(
         "ui.selected_0_1_2",
-        this.multiSelected.size,
+        this.selection.state.multiSelected.size,
         names3.slice(0, 2).join(t("ui.list_separator")),
         names3.length > 2 ? "\u2026" : ""
       ) : t("ui.prompt_select_topics")
@@ -58515,13 +58419,23 @@ ${request.requirements}` : preset.text,
       selection,
       t("ui.clear"),
       () => {
-        this.runSelection((selection2) => selection2.clearMulti());
+        this.applySelectionChange(this.selection.clearMulti());
       },
-      !this.multiSelected.size
+      !this.selection.state.multiSelected.size
     );
-    this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+    this.button(
+      selection,
+      t("ui.remove"),
+      () => this.confirmRemoveSelected(),
+      !this.selection.state.multiSelected.size
+    );
     if (!((_a2 = this.map) == null ? void 0 : _a2.aim))
-      this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
+      this.button(
+        selection,
+        t("ui.canvas_boundary_add"),
+        () => this.openAddBoundary(),
+        !this.selection.state.multiSelected.size
+      );
     if (!((_b2 = this.map) == null ? void 0 : _b2.aim)) {
       const check = this.summaryEntryCheck(this.summaryTargets()), bracket = this.button(selection, t("ui.summary_add"), () => this.addSummaryOver());
       if (!check.ok) {
@@ -58529,9 +58443,19 @@ ${request.requirements}` : preset.text,
         bracket.setAttr("title", t(check.reason));
       }
     }
-    this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
-    this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
-    const count = this.multiSelected.size;
+    this.button(
+      selection,
+      t("ui.move_to"),
+      () => this.chooseSelectedParent(false),
+      !this.selection.state.multiSelected.size
+    );
+    this.button(
+      selection,
+      t("ui.copy_to"),
+      () => this.chooseSelectedParent(true),
+      !this.selection.state.multiSelected.size
+    );
+    const count = this.selection.state.multiSelected.size;
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
     synthesize.addClass("mod-cta");
     if (count > 1) synthesize.setAttr("aria-label", t("ui.synthesize_0_topics", count));
@@ -58549,7 +58473,7 @@ ${request.requirements}` : preset.text,
         selection,
         t("ui.multi_research"),
         () => this.openMultiResearch(),
-        !this.multiSelected.size || running
+        !this.selection.state.multiSelected.size || running
       );
       if (count)
         research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
@@ -59102,7 +59026,7 @@ ${request.requirements}` : preset.text,
   }
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
   integrateSelected() {
-    if (!this.map || this.multiSelected.size < 2) {
+    if (!this.map || this.selection.state.multiSelected.size < 2) {
       new import_obsidian31.Notice(t("ui.select_at_least_two_topics"));
       return;
     }
@@ -59117,7 +59041,7 @@ ${request.requirements}` : preset.text,
   openSelectionSynthesis(pending2) {
     var _a2, _b2;
     if (!this.map) return;
-    const nodes = (_a2 = pending2 == null ? void 0 : pending2.sources) != null ? _a2 : [...this.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
+    const nodes = (_a2 = pending2 == null ? void 0 : pending2.sources) != null ? _a2 : [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     const names3 = nodes.map((node) => {
       var _a3, _b3;
       return (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.path;
@@ -59691,7 +59615,7 @@ ${note.detail.trim()}` : "",
     if (this.plugin.settings.canvasHintSeen) return;
     this.plugin.settings.canvasHintSeen = true;
     void this.plugin.saveSettings();
-    if (this.integrationMode) return;
+    if (this.selection.state.multiSelectMode) return;
     (_a2 = this.hintEl) == null ? void 0 : _a2.remove();
     this.hintEl = null;
   }
@@ -59714,7 +59638,7 @@ ${note.detail.trim()}` : "",
     var _a2, _b2;
     const host = viewport.getBoundingClientRect();
     const startX = event.clientX, startY = event.clientY;
-    const already = new Set(this.multiSelected);
+    const already = new Set(this.selection.state.multiSelected);
     const cards = Array.from((_b2 = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelectorAll(".vam-node[data-node-id]")) != null ? _b2 : []).map(
       (card) => {
         var _a3;
@@ -59757,12 +59681,8 @@ ${note.detail.trim()}` : "",
       }
       if (!hits.size) return;
       const how = mode === "marquee-subtract" ? "subtract" : mode === "marquee-enter" ? "enter" : "add";
-      this.runSelection(
-        (selection) => selection.marquee(hits, how, { canMultiSelect: true }),
-        (change2) => {
-          if (change2.multiSelectModeChanged || change2.touched.length) this.applySelectionChange(change2);
-        }
-      );
+      const change2 = this.selection.marquee(hits, how, { canMultiSelect: true });
+      if (change2.multiSelectModeChanged || change2.touched.length) this.applySelectionChange(change2);
     };
     viewport.addEventListener("pointermove", move);
     viewport.addEventListener("pointerup", up);
@@ -59854,7 +59774,7 @@ ${note.detail.trim()}` : "",
         return;
       const intent = canvasPointerIntent({
         button: event.button,
-        integrationMode: this.integrationMode,
+        integrationMode: this.selection.state.multiSelectMode,
         spaceHeld: this.spaceHeld,
         altKey: event.altKey,
         // AIM maps have no topic selection, so Shift+drag there is a plain pan.
@@ -59884,8 +59804,10 @@ ${note.detail.trim()}` : "",
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
         if (!moved && event.button === 0) {
-          if (this.integrationMode) this.runSelection((selection) => selection.clickEmpty(), this.syncRelationOnly);
-          else this.runSelection((selection) => selection.clickEmpty());
+          if (this.selection.state.multiSelectMode) {
+            this.selection.clickEmpty();
+            this.syncRelationClasses();
+          } else this.applySelectionChange(this.selection.clickEmpty());
         }
       };
       viewport.addEventListener("pointermove", move);
@@ -60150,8 +60072,8 @@ ${note.detail.trim()}` : "",
   }
   /** The cards the user has selected: they count as chat references without being dragged in. */
   chatSelectionIds() {
-    if (this.multiSelected.size) return [...this.multiSelected];
-    return this.selected ? [this.selected] : [];
+    if (this.selection.state.multiSelected.size) return [...this.selection.state.multiSelected];
+    return this.selection.state.selected ? [this.selection.state.selected] : [];
   }
   /**
    * The note a chat message goes with: only a note that is on screen beside the map right now (the shown tab of its tab group,
@@ -61303,16 +61225,18 @@ ${note.detail.trim()}` : "",
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
-        if (!this.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
+        if (!this.selection.state.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
         if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()))
           return skipped("ui.map_chat_skip_research_running");
         const chat = this.chat;
         const turns = (_a2 = chat == null ? void 0 : chat.transcript().length) != null ? _a2 : 0;
         const retryModel = action.otherProvider ? this.otherProviderTarget(
-          [...this.multiSelected].flatMap((id) => {
-            var _a3, _b3;
-            return (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes.filter((node) => node.id === id)) != null ? _b3 : [];
-          })
+          [...this.selection.state.multiSelected].flatMap(
+            (id) => {
+              var _a3, _b3;
+              return (_b3 = (_a3 = this.map) == null ? void 0 : _a3.nodes.filter((node) => node.id === id)) != null ? _b3 : [];
+            }
+          )
         ) : null;
         launch(
           this.startMultiResearch(
@@ -62096,7 +62020,7 @@ ${addition}` : addition });
     card.addEventListener("pointerdown", (event) => {
       var _a2, _b2, _c;
       if (event.target.closest("button") || event.button !== 0 || !this.map) return;
-      const selecting = this.integrationMode;
+      const selecting = this.selection.state.multiSelectMode;
       this.clearHoverTimer();
       (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
       this.hoverCard = null;
@@ -62107,7 +62031,7 @@ ${addition}` : addition });
       this.dragOrigin = { id: this.map.id, path: this.path };
       const start = { x: event.clientX, y: event.clientY }, origin = { x: currentNode.x, y: currentNode.y };
       let position = { ...origin }, moved = false, travelled = false;
-      const group = selecting && this.multiSelected.has(node.id) ? this.groupDragMembers(node, card) : null;
+      const group = selecting && this.selection.state.multiSelected.has(node.id) ? this.groupDragMembers(node, card) : null;
       const groupOrigins = /* @__PURE__ */ new Map();
       for (const id of (_c = group == null ? void 0 : group.keys()) != null ? _c : []) {
         const member = this.map.nodes.find((item) => item.id === id);
@@ -62312,9 +62236,9 @@ ${addition}` : addition });
             })
           );
         } else if (e.metaKey || e.ctrlKey) {
-          this.runSelection((selection) => selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
+          this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
-          this.runSelection((selection) => selection.click(node.id));
+          this.applySelectionChange(this.selection.click(node.id));
           if (node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
         }
@@ -62352,7 +62276,7 @@ ${addition}` : addition });
   groupDragMembers(node, card) {
     var _a2, _b2;
     const members = /* @__PURE__ */ new Map();
-    for (const id of this.multiSelected) {
+    for (const id of this.selection.state.multiSelected) {
       const el = id === node.id ? (_a2 = this.cardEls.get(id)) != null ? _a2 : card : this.cardEls.get(id);
       if (el && ((_b2 = this.map) == null ? void 0 : _b2.nodes.some((item) => item.id === id))) members.set(id, el);
     }
@@ -62690,11 +62614,13 @@ ${addition}` : addition });
       const key2 = link.key;
       hit.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
-        this.runSelection((selection) => selection.selectRelation(key2), this.syncRelationOnly);
+        this.selection.selectRelation(key2);
+        this.syncRelationClasses();
       });
       hit.addEventListener("click", (event) => {
         event.stopPropagation();
-        this.runSelection((selection) => selection.selectRelation(key2), this.syncRelationOnly);
+        this.selection.selectRelation(key2);
+        this.syncRelationClasses();
         this.openRelationEditor(link.relation);
       });
       hit.addEventListener("pointerenter", () => {
@@ -62715,11 +62641,7 @@ ${addition}` : addition });
       this.relationLabelEls.set(link.key, label);
       this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
     }
-    this.runSelection(
-      (selection) => selection.pruneRelation(new Set(this.relationEls.keys())),
-      () => {
-      }
-    );
+    this.selection.pruneRelation(new Set(this.relationEls.keys()));
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
@@ -62798,12 +62720,12 @@ ${addition}` : addition });
    */
   syncRelationClasses() {
     var _a2, _b2;
-    const chosen = new Set(this.multiSelected);
-    if (this.selected) chosen.add(this.selected);
+    const chosen = new Set(this.selection.state.multiSelected);
+    if (this.selection.state.selected) chosen.add(this.selection.state.selected);
     const ends = /* @__PURE__ */ new Set();
     for (const [key2, path] of this.relationEls) {
       const [fromId, toId] = key2.split("\0");
-      const related = chosen.has(fromId) || chosen.has(toId), active = key2 === this.selectedRelation || key2 === this.previewRelation;
+      const related = chosen.has(fromId) || chosen.has(toId), active = key2 === this.selection.state.selectedRelation || key2 === this.previewRelation;
       path.toggleClass("is-related", related);
       path.toggleClass("is-dimmed", chosen.size > 0 && !related);
       path.toggleClass("is-selected", active);
@@ -62831,10 +62753,12 @@ ${addition}` : addition });
     row.setAttr("role", "group");
     row.setAttr("aria-label", ariaLabel);
     row.addEventListener("focus", () => {
-      this.runSelection((selection) => selection.selectRelation(key2), this.syncRelationOnly);
+      this.selection.selectRelation(key2);
+      this.syncRelationClasses();
     });
     row.addEventListener("blur", () => {
-      this.runSelection((selection) => selection.deselectRelation(key2), this.syncRelationOnly);
+      this.selection.deselectRelation(key2);
+      this.syncRelationClasses();
     });
     row.addEventListener("mouseenter", () => {
       this.previewRelation = key2;

@@ -268,7 +268,7 @@ test('0.25 retest: Mod+Enter and Shift+Enter live on the view scope (Obsidian ea
   assert.deepEqual(h.added, []);
   doc.activeElement = h.card('leaf');
   assert.equal(fire(['Mod'], { isComposing: true }), true, 'IME composition'); assert.equal(fire(['Mod'], { defaultPrevented: true }), true, 'already handled');
-  for (const mode of ['integrationMode']) { h.view[mode] = true; assert.equal(fire(['Mod']), true, mode); h.view[mode] = false; }
+  for (const mode of ['integrationMode']) { h.view.selection.toggleMultiSelect(); assert.equal(fire(['Mod']), true, mode); h.view.selection.exitMultiSelect('emptyMap'); }
   h.view.map.aim = {}; assert.equal(fire(['Mod']), true, 'AIM map'); delete h.view.map.aim;
   h.view.closed = true; assert.equal(fire(['Mod']), true, 'closed view'); h.view.closed = false;
   await tick(); assert.deepEqual(h.added, [], 'no pass-through branch added anything');

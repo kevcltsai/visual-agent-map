@@ -183,7 +183,7 @@ test('the selection bar is left-anchored above the zoom cluster, names on their 
   const names = css.split('\n').find(line => line.startsWith('.vam-selection-bar > span'));
   assert.match(names, /flex: 0 0 100%/); assert.match(names, /text-overflow: ellipsis/);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /!this\.integrationMode && !this\.plugin\.settings\.canvasHintSeen/, 'no hint while selecting topics');
+  assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.plugin\.settings\.canvasHintSeen/, 'no hint while selecting topics');
 });
 
 

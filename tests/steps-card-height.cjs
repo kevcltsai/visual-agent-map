@@ -375,7 +375,7 @@ const renderedSpans = (setup) => {
     addEventListener() {}, removeEventListener() {}
   });
   const topic = support.node('parent');
-  const view = new View({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} });
+  const view = new View({ app: {} }, support.attachTopicRuns({ running: new Set(), activeTasks: new Map(), pendingSuggestions: new Map(), expansionBatches: new Map(), detailsShown: () => false, setOutlineActive() {} }));
   view.stageEl = element('stage'); view.map = support.map([topic]);
   view.notes = new Map([[topic.id, { title: 'Parent', summary: '', status: 'completed' }]]);
   view.render = () => {};

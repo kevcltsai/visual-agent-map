@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, integrationTest, root, load, core, node, map, plain, obsidian, DEFAULT_SETTINGS, until } = require('../support.cjs');
+const { attachTopicRuns, test, integrationTest, root, load, core, node, map, plain, obsidian, DEFAULT_SETTINGS, until } = require('../support.cjs');
 const dom = require('../support-dom.cjs');
 integrationTest('node plus adds a child without opening a duplicate right-click menu', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian }, { requestAnimationFrame: run => { run(); return 1; }, cancelAnimationFrame() {} });
@@ -1008,7 +1008,7 @@ integrationTest('expansion suggestions panel uses the shared list, treats the to
   let created, closed = 0, rendered = 0;
   const view = {
     map: { nodes: [node] }, render() { rendered++; },
-    plugin: { pendingSuggestions, pendingResearchOptions: new Map(), expansionCoordinator: { isRunning: () => false }, mutate: async work => work() },
+    plugin: attachTopicRuns({ pendingSuggestions, pendingResearchOptions: new Map(), expansionCoordinator: { isRunning: () => false }, mutate: async work => work() }),
     assertSuggestionOrigin: async () => {}, createChildBatch: async (_parent, items) => { created = items; return []; }, startShallowResearch: async () => {}
   };
   const panel = element('panel'), host = element('modal');

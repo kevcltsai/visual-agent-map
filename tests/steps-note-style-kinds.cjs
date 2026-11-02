@@ -447,9 +447,9 @@ test('progress label: "Note style: <structure> · <voice> (<source>)" in three l
 test('progress label: the view passes the line only for a style file or a topic-type structure, and the old key has no consumer', () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(view, /runStyle\.label\.fileName \|\| runStyle\.label\.templateSource === "kind"\s*\?\s*runStyleLabelText\(runStyle\.label, language\)\s*:\s*undefined/);
-  assert.match(view, /progress\?\.begin\(taskPath, progressAttempt, Date\.now\(\), used\.model, styleLine\)/);
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/topic-run.ts'), 'utf8');
+  assert.match(view, /runStyle\.label\.fileName \|\| runStyle\.label\.templateSource === "kind"\s*\?\s*runStyleLabelText\(runStyle\.label, this\.ports\.settings\(\)\.language\)\s*:\s*undefined/);
+  assert.match(view, /progress\?\.begin\(path, progressAttempt, Date\.now\(\), used\.model, styleLabel\)/);
   for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(fs.readFileSync(path.join(__dirname, '..', 'i18n', `${lang}.ts`), 'utf8').includes('progress_note_style_0'), false);
   assert.equal(view.includes('progress_note_style_0'), false);
 });

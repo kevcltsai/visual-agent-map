@@ -87,6 +87,9 @@ import { TopicSelection, type SelectionChange } from "./topic-selection";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
+import { formatIssuesPatch, originBaseline, summaryForPrompt } from "./note-write-helpers";
+
+export { formatIssuesPatch };
 import {
   fishboneSpinePathData,
   relationLabelPoint,
@@ -114,7 +117,7 @@ import {
 } from "../../topic-colors";
 import { appendImageEmbed, resolveCover, withCover, withCoverOff, withoutCover } from "./card-cover";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
 import {
   noteLanguageOf,
@@ -198,7 +201,6 @@ import { allowsBranchLayout, branchDirectionOf, cleanBranchLayouts, type BranchD
 import { inLanguage, NONE } from "../../core/steps/_shared/fragments";
 import { mergeRepair } from "../../core/steps/task/fragments";
 import { checkMergePreservation, findingList, type MergeCheckResult } from "../../core/steps/task/merge-check";
-import { carryForwardSources } from "../../core/steps/task/carry-sources";
 import {
   expansionTask,
   labelCurrentSummary,
@@ -219,23 +221,14 @@ import {
   normalizeMapChatStyle,
   normalizeMapChatOpen,
   rebaseMapNotePaths,
-  failureReason,
   type Note,
   type NotePatch,
   type TopicInfo,
   isPlaceholder
 } from "../../repository";
 import { canonicalDetail, visualReferencesMarkdown } from "../../ai/result-utils";
-import {
-  checkCounts,
-  countIssueText,
-  builtinTemplates,
-  STANDARD_TEMPLATE_ID,
-  type CountIssue,
-  type DetailTemplate
-} from "../../ai/detail-templates";
+import { builtinTemplates, STANDARD_TEMPLATE_ID, type DetailTemplate } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
-import { runStyleLabelText } from "../../ai/note-style-label";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { parseBlockRef } from "../../core/blocks/block-files";
 import { NOTE_STYLE_PRESETS, fileStyleName, styleLabel } from "./note-style";
@@ -330,7 +323,6 @@ import {
   isChatNarrow
 } from "../../core/map-chat-layout";
 import { relevanceMode, relevanceModeAfterWrite, type RelevanceMode, type RelevancePin } from "./relevance-pins";
-import { PendingSuggestions } from "../../pending-suggestions";
 import { createAimMap } from "../aim/create-map";
 import {
   addOutlineToMap,
@@ -482,24 +474,6 @@ function errorMessage(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);
 }
-/** A note's stored "no conclusion yet" placeholder is written in the note's own language; in an AI prompt it is shown in the task's output language. */
-function summaryForPrompt(summary: string, language: ContentLanguage): string {
-  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language), "note.no_conclusion_yet") : summary;
-}
-/**
- * Unmet section counts to store on the topic; undefined (no count check ran) clears an earlier mark. The text is written
- * into the note's frontmatter, so it is in the note language, never a display-only interface language.
- */
-export function formatIssuesPatch(
-  issues: CountIssue[] | undefined,
-  language: ContentLanguage
-): Pick<NotePatch, "detailFormatIssues"> {
-  return { detailFormatIssues: (issues ?? []).map(issue => countIssueText(issue, noteLanguageOf(language))) };
-}
-const originBaseline = (origin?: string): string =>
-  createHash("sha256")
-    .update(origin ?? "")
-    .digest("hex");
 
 /** What resolving a note style gives a view: the template, the ids that could not be used and, for a block, why. */
 type AimQuestionStatus = "running" | "completed" | "partial" | "failed" | "cancelled" | "not_started";
@@ -1815,6 +1789,17 @@ export class VisualAgentMapView extends ItemView {
   syncOutline(): void {
     this.plugin.syncOutline(this.map, this.notes, this);
   }
+  /** Another view changed a note by AI: this view's undo steps no longer match it. */
+  clearUndoHistory(): void {
+    this.history.clear();
+  }
+  /** An AI run settled: reload and redraw once the queue is free. */
+  reloadAfterAiRun(): void {
+    this.enqueue(async () => {
+      await this.hydrate();
+      this.render();
+    });
+  }
   private enqueue(work: () => Promise<void>): void {
     void this.plugin.mutate(work).catch(() => {});
   }
@@ -1852,7 +1837,7 @@ export class VisualAgentMapView extends ItemView {
   private rerunStandard(node: MapNode): void {
     void (async () => {
       const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-      if (this.plugin.running.has(node.path)) {
+      if (this.plugin.topicRuns.isBusy(node.path)) {
         new Notice(t("ui.ai_running_ai"));
         return;
       }
@@ -5070,7 +5055,7 @@ export class VisualAgentMapView extends ItemView {
     const fill = progress.createDiv("vam-research-progress-track").createDiv("vam-research-progress-fill");
     fill.style.width = `${nodes.length ? (done / nodes.length) * 100 : 0}%`;
     const running = nodes.filter(
-      node => this.plugin.running?.has(node.path) || this.plugin.quickExpandPending?.has(node.path)
+      node => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending?.has(node.path)
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
   }
@@ -5207,9 +5192,9 @@ export class VisualAgentMapView extends ItemView {
       task = this.integrationTask;
     return !!(
       this.plugin.relevanceGrades?.get(this.path)?.status === "running" ||
-      this.plugin.running?.has(node.path) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
-      this.plugin.activeTasks?.has(node.path) ||
+      this.plugin.topicRuns.hasTask(node.path) ||
       (batch?.status === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path))) ||
       (task?.state === "running" && task.mapPath === this.path && task.sources.some(source => source.id === node.id)) ||
       this.isMerging(node.id, except)
@@ -8114,7 +8099,7 @@ export class VisualAgentMapView extends ItemView {
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some(node => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    if (found.branch.some(node => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
     return found;
   }
   /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
@@ -8399,9 +8384,9 @@ export class VisualAgentMapView extends ItemView {
     await this.plugin.repo.updateNote(node.path, patch);
     const written = followsSummary ? await this.plugin.repo.readNote(node.path, this.map ?? undefined) : null;
     if (patch.referencePaths !== undefined) {
-      this.plugin.pendingSuggestions.delete(node.path);
+      this.plugin.topicRuns.dropPending(node.path);
       this.plugin.pendingResearchOptions.delete(node.path);
-      if (this.plugin.pendingSuggestions instanceof PendingSuggestions) await this.plugin.pendingSuggestions.flush();
+      await this.plugin.topicRuns.flushPending();
     }
     if (
       [
@@ -8417,7 +8402,7 @@ export class VisualAgentMapView extends ItemView {
         "referencePaths"
       ].some(key => key in patch)
     )
-      this.plugin.activeTasks?.get(node.path)?.abort();
+      this.plugin.topicRuns.stopTask(node.path);
     this.history.push({
       undo: async () => {
         let restore = before;
@@ -8483,7 +8468,7 @@ export class VisualAgentMapView extends ItemView {
       countIssues: job.formatIssues,
       model: job.model,
       apply: async charted => {
-        if (this.plugin.running.has(path)) return false;
+        if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
         if (this.chartSnapshot(latest) !== snapshot) return false;
         await this.plugin.repo.updateNote(
@@ -9729,7 +9714,7 @@ export class VisualAgentMapView extends ItemView {
     const merging = this.isMerging(node.id);
     card.dataset.status =
       merging ||
-      this.plugin.running?.has(node.path) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path)
         ? "running"
@@ -9764,7 +9749,7 @@ export class VisualAgentMapView extends ItemView {
     else this.researchSigs.delete(node.path);
     const active =
       merging ||
-      this.plugin.running?.has(node.path) ||
+      this.plugin.topicRuns.isBusy(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
       this.startingTasks.has(node.path);
     const doc = this.map,
@@ -9911,21 +9896,21 @@ export class VisualAgentMapView extends ItemView {
     const stoppable =
       this.startingTasks.has(node.path) ||
       this.plugin.quickExpandPending?.has(node.path) ||
-      (this.plugin.running?.has(node.path) && this.plugin.activeTasks.has(node.path) && !batchChild);
+      (this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild);
     if (
       stoppable &&
       batch?.status !== "running" &&
       !(ownSynthesis?.state === "running" && ownSynthesis.mapPath === this.path)
     ) {
       this.button(header, t("ui.stop_research"), () =>
-        (this.startingTasks.get(node.path) ?? this.plugin.activeTasks.get(node.path))?.abort()
+        (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
       );
     }
     if (research?.slow && research.resend)
       this.button(header, t("ui.research_resend"), () => this.plugin.researchProgress.get(node.path)?.resend?.());
     if (research?.stage === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
+    const pendingCount = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
     if (pendingCount && !this.selection.state.multiSelectMode && !this.map?.aim)
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
@@ -10594,7 +10579,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** A topic waiting in a batch (multi-topic or shallow research) for a free slot; it is not running yet. */
   private isResearchQueued(node: MapNode): boolean {
-    return !this.plugin.running?.has(node.path) && !!this.plugin.expansionCoordinator?.isQueued(node.path);
+    return !this.plugin.topicRuns.isBusy(node.path) && !!this.plugin.expansionCoordinator?.isQueued(node.path);
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   private relationsEnabled(): boolean {
@@ -11000,7 +10985,7 @@ export class VisualAgentMapView extends ItemView {
         });
     } else if (
       !this.isMerging(node.id) &&
-      !this.plugin.running?.has(node.path) &&
+      !this.plugin.topicRuns.isBusy(node.path) &&
       !this.plugin.quickExpandPending?.has(node.path) &&
       !this.isResearchQueued(node)
     ) {
@@ -11126,7 +11111,7 @@ export class VisualAgentMapView extends ItemView {
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
-          const count = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
+          const count = this.plugin.topicRuns.pending(node.path)?.length ?? 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
             label: t("ui.view_0_expansion_suggestions", count),
             open: () => this.openNodePanel(node, "proposals")
@@ -11153,7 +11138,7 @@ export class VisualAgentMapView extends ItemView {
         this.app,
         note.title,
         this.map?.nodes.filter(item => item.parentId === node.id).length ?? 0,
-        this.plugin.pendingSuggestions.get(node.path)?.length ?? 0,
+        this.plugin.topicRuns.pending(node.path)?.length ?? 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
           const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
@@ -11203,12 +11188,12 @@ export class VisualAgentMapView extends ItemView {
           path: node.path,
           save: patch => this.plugin.mutate(() => this.noteChange(node, patch)),
           running:
-            this.plugin.running.has(node.path) ||
+            this.plugin.topicRuns.isBusy(node.path) ||
             this.plugin.quickExpandPending.has(node.path) ||
             this.startingTasks.has(node.path),
           stop:
-            this.startingTasks.has(node.path) || this.plugin.activeTasks.has(node.path)
-              ? () => (this.startingTasks.get(node.path) ?? this.plugin.activeTasks.get(node.path))?.abort()
+            this.startingTasks.has(node.path) || this.plugin.topicRuns.hasTask(node.path)
+              ? () => (this.startingTasks.get(node.path) ?? this.plugin.topicRuns.taskController(node.path))?.abort()
               : undefined,
           background: this.backgroundHooks(node.path, node),
           quickOutline: this.quickOutline(node),
@@ -11391,7 +11376,7 @@ export class VisualAgentMapView extends ItemView {
     close?: () => void,
     host?: HTMLElement
   ): void {
-    const suggestions = this.plugin.pendingSuggestions.get(node.path);
+    const suggestions = this.plugin.topicRuns.pending(node.path);
     if (!suggestions?.length) return;
     const section = panel.createDiv("vam-inspector-proposals");
     section.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
@@ -11442,7 +11427,7 @@ export class VisualAgentMapView extends ItemView {
           await this.plugin.mutate(async () => {
             const current = this.map?.nodes.find(item => item.id === node.id && item.path === node.path);
             if (!current) throw new Error(t("ui.the_topic_changed_select_it_again"));
-            if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+            if (this.plugin.topicRuns.pending(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
             await this.assertSuggestionOrigin(current, suggestions);
             try {
@@ -11451,9 +11436,9 @@ export class VisualAgentMapView extends ItemView {
               if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(node.path, error);
               throw error;
             }
-            this.plugin.pendingSuggestions.delete(node.path);
+            this.plugin.topicRuns.dropPending(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+            await this.plugin.topicRuns.flushPending();
           });
           if (researchOptions && createdNodes.length)
             await this.startShallowResearch(node, createdNodes, researchOptions);
@@ -11472,11 +11457,11 @@ export class VisualAgentMapView extends ItemView {
         void (async () => {
           try {
             await this.plugin.mutate(async () => {
-              if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+              if (this.plugin.topicRuns.pending(node.path) !== suggestions)
                 throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-              this.plugin.pendingSuggestions.delete(node.path);
+              this.plugin.topicRuns.dropPending(node.path);
               this.plugin.pendingResearchOptions.delete(node.path);
-              await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+              await this.plugin.topicRuns.flushPending();
             });
             close?.();
             this.render();
@@ -12686,12 +12671,12 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     const previousBatch = this.plugin.expansionBatches.get(parent.path);
-    const pending = this.plugin.pendingSuggestions.get(parent.path);
+    const pending = this.plugin.topicRuns.pending(parent.path);
     const present = (items: Suggestion[]): void => {
-      const version = this.plugin.pendingSuggestions.get(parent.path);
+      const version = this.plugin.topicRuns.pending(parent.path);
       const names = items.filter(item => !item.parentTitle).map(item => item.title);
       if (new Set(names).size !== names.length) {
-        this.plugin.pendingSuggestions.delete(parent.path);
+        this.plugin.topicRuns.dropPending(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
@@ -12710,7 +12695,7 @@ export class VisualAgentMapView extends ItemView {
           ? { ...savedOptions, signal: options?.signal, onProgress: options?.onProgress }
           : undefined;
         await this.plugin.mutate(async () => {
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           try {
@@ -12725,9 +12710,9 @@ export class VisualAgentMapView extends ItemView {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
@@ -12742,111 +12727,69 @@ export class VisualAgentMapView extends ItemView {
       present(options ? pending.filter(item => !item.parentTitle) : pending);
       return;
     }
-    if (this.plugin.running.has(parent.path)) {
+    if (this.plugin.topicRuns.isBusy(parent.path)) {
       failed?.(t("ui.ai_running_ai"));
       return;
     }
-    const controller = new AbortController();
-    const modalSignal = options?.signal;
-    const abortBeforeAcceptance = (): void => controller.abort();
-    if (modalSignal?.aborted) controller.abort();
-    else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let accepted = false;
-    const acceptDispatch = (): void => {
-      if (accepted || controller.signal.aborted) return;
-      accepted = true;
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      acceptedCallback?.();
-    };
-    const releaseTask = (): void => {
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
-      this.plugin.running.delete(parent.path);
-      if (!this.plugin.expansionCoordinator.isRunning(parent.path)) this.plugin.quickExpandPending.delete(parent.path);
-    };
-    this.plugin.running.add(parent.path);
-    this.plugin.quickExpandPending.add(parent.path);
-    this.plugin.activeTasks.set(parent.path, controller);
-    this.render();
     try {
-      const note = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      const used = await this.modelFor(note, parent.path, options?.runOnce);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const outputLanguage = options?.outputLanguage ?? this.plugin.settings.language;
-      const existing =
-        this.map?.nodes
-          .filter(item => item.parentId === parent.id)
-          .map(item => {
-            const child = this.notes.get(item.id);
-            return `- ${child?.title || item.path}: ${summaryForPrompt(child?.summary || noSummaryYet(outputLanguage), outputLanguage)}`;
-          })
-          .join("\n") || inLanguage(NONE, outputLanguage);
-      const task = expansionTask(outputLanguage, existing, direction);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
-          {
-            title: note.title,
-            summary: summaryForPrompt(note.summary, outputLanguage),
-            rules: "",
-            detail: note.detail,
-            task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(parent, outputLanguage),
-            referenceGroups: options?.referenceGroups,
-            outputLanguage: options?.outputLanguage,
-            ...this.proposalTone(note, options),
-            mode: "decompose",
-            researchMode: options?.researchMode ?? "research",
-            researchDepth: options?.researchDepth ?? "normal",
-            visualMode: "off"
-          },
-          note
-        ),
-        used.model,
-        used.reasoning,
-        controller.signal,
-        undefined,
-        acceptDispatch
-      );
-      if (!accepted) acceptDispatch();
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const suggestions = result.suggestions.filter(item => !item.parentTitle).slice(0, 7);
-      if (suggestions.length === 0) {
-        const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
-        if (failed) failed(message);
-        else new Notice(message);
-        return;
-      }
-      const latest = await this.plugin.repo.readNote(parent.path, this.map ?? undefined);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (latest.thinkingOrigin !== note.thinkingOrigin)
-        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-      const pendingItems = suggestions.map(item => ({
-        ...item,
-        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
-      }));
-      this.plugin.pendingSuggestions.set(parent.path, pendingItems);
-      await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-      if (controller.signal.aborted) {
-        this.plugin.pendingSuggestions.delete(parent.path);
-        await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-        throw new DOMException("Aborted", "AbortError");
-      }
-      if (options?.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
-      else this.plugin.pendingResearchOptions?.delete(parent.path);
-      present(pendingItems);
-    } catch (error) {
-      const partial = error instanceof PartialChildBatchError;
-      const currentBatch = this.plugin.expansionBatches.get(parent.path);
-      const stoppedBatch = currentBatch !== previousBatch && currentBatch?.status === "stopped";
-      const cancelled = !partial && (controller.signal.aborted || stoppedBatch);
-      if (!cancelled) {
-        console.error("Visual Agent Map AI split", error);
-        const message = this.plugin.recordFailure(t("log.ai_split_failed"), error);
-        if (failed) failed(message, !partial);
-        else new Notice(message);
-      }
+      await this.plugin.topicRuns.start(parent.path, "proposeChildren", {
+        map: this.map ?? undefined,
+        runOnce: options?.runOnce,
+        signal: options?.signal,
+        outputLanguage: options?.outputLanguage,
+        accepted: acceptedCallback,
+        failed,
+        notify: message => new Notice(message),
+        onStarted: () => {
+          this.plugin.quickExpandPending.add(parent.path);
+          this.render();
+        },
+        onReleased: () => {
+          if (!this.plugin.expansionCoordinator.isRunning(parent.path))
+            this.plugin.quickExpandPending.delete(parent.path);
+        },
+        buildContext: async (note, language) => {
+          const existing =
+            this.map?.nodes
+              .filter(item => item.parentId === parent.id)
+              .map(item => {
+                const child = this.notes.get(item.id);
+                return `- ${child?.title || item.path}: ${summaryForPrompt(child?.summary || noSummaryYet(language), language)}`;
+              })
+              .join("\n") || inLanguage(NONE, language);
+          const task = expansionTask(language, existing, direction);
+          return withThinkingOrigin(
+            {
+              title: note.title,
+              summary: summaryForPrompt(note.summary, language),
+              rules: "",
+              detail: note.detail,
+              task: [task, options?.requirements].filter(Boolean).join("\n\n"),
+              ancestors: await this.ancestorContext(parent, language),
+              referenceGroups: options?.referenceGroups,
+              outputLanguage: options?.outputLanguage,
+              ...this.proposalTone(note, options),
+              mode: "decompose",
+              researchMode: options?.researchMode ?? "research",
+              researchDepth: options?.researchDepth ?? "normal",
+              visualMode: "off"
+            },
+            note
+          );
+        },
+        classifyError: error => {
+          if (error instanceof PartialChildBatchError) return "partial";
+          const currentBatch = this.plugin.expansionBatches.get(parent.path);
+          return currentBatch !== previousBatch && currentBatch?.status === "stopped" ? "stopped" : undefined;
+        },
+        onStored: () => {
+          if (options?.shallowResearch)
+            this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
+          else this.plugin.pendingResearchOptions?.delete(parent.path);
+        },
+        offer: items => present(items)
+      });
     } finally {
-      releaseTask();
       await this.hydrate();
       this.render();
     }
@@ -12861,16 +12804,16 @@ export class VisualAgentMapView extends ItemView {
       )
     )
       return;
-    this.plugin.pendingSuggestions.delete(parent.path);
+    this.plugin.topicRuns.dropPending(parent.path);
     this.plugin.pendingResearchOptions.delete(parent.path);
-    await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+    await this.plugin.topicRuns.flushPending();
     throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
   }
   private openChildSuggestions(parent: MapNode, suggestions: Suggestion[]): void {
-    const version = this.plugin.pendingSuggestions.get(parent.path);
+    const version = this.plugin.topicRuns.pending(parent.path);
     const roots = suggestions.filter(item => !item.parentTitle).map(item => item.title);
     if (new Set(roots).size !== roots.length) {
-      this.plugin.pendingSuggestions.delete(parent.path);
+      this.plugin.topicRuns.dropPending(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
       new Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
@@ -12881,7 +12824,7 @@ export class VisualAgentMapView extends ItemView {
         let researchOptions: TaskOptions | undefined,
           createdNodes: MapNode[] = [];
         await this.plugin.mutate(async () => {
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
@@ -12891,9 +12834,9 @@ export class VisualAgentMapView extends ItemView {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if (researchOptions?.shallowResearch && createdNodes.length)
@@ -13217,9 +13160,9 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
         const busy = (node: MapNode): boolean =>
-          this.plugin.running.has(node.path) ||
+          this.plugin.topicRuns.isBusy(node.path) ||
           this.plugin.quickExpandPending.has(node.path) ||
-          this.plugin.activeTasks.has(node.path);
+          this.plugin.topicRuns.hasTask(node.path);
         const nodes = selected.filter(node => !busy(node));
         if (!nodes.length) {
           new Notice(t("ui.multi_research_all_skipped"));
@@ -13507,10 +13450,10 @@ export class VisualAgentMapView extends ItemView {
     return { ...choices, signal: undefined, onProgress: undefined, referenceGroups: options.referenceGroups ?? [] };
   }
   private async clearPendingSuggestions(path: string): Promise<void> {
-    this.plugin.pendingSuggestions.delete(path);
+    this.plugin.topicRuns.dropPending(path);
     this.plugin.pendingResearchOptions.delete(path);
     try {
-      await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
+      await this.plugin.topicRuns.flushPending();
     } catch (error) {
       throw new Error(this.plugin.recordFailure(t("ui.expansion_suggestions_changed_open_them_again"), error));
     }
@@ -13573,35 +13516,28 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(node.path)) {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
     const children = this.map.nodes.filter(item => item.parentId === node.id);
-    if (!children.length && !options.referenceGroups?.some(group => group.documents.length)) {
-      failed(t("ui.choose_another_note_source_first"));
-      return;
-    }
-    const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    const used = await this.modelFor(note, node.path, options.runOnce);
-    this.plugin.running.add(node.path);
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
-    try {
-      const childSources = await this.topicReferenceGroup(
-        children,
-        options?.synthesisContent === "summary" ? "summary" : "strong"
-      );
-      const selectedSources = options.referenceGroups ?? [];
-      if (!children.length && !selectedSources.some(group => group.documents.length)) {
-        failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"));
-        return;
-      }
-      // Task text, placeholders and ancestor labels follow the output note language, as in the other task paths.
-      const promptLanguage = options.outputLanguage ?? this.plugin.settings.language;
-      const task = synthesisDirectionsTask(promptLanguage);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
+    await this.plugin.topicRuns.start(node.path, "integrateDirection", {
+      map: () => this.map ?? undefined,
+      runOnce: options.runOnce,
+      signal: options.signal,
+      precheck: () =>
+        !children.length && !options.referenceGroups?.some(group => group.documents.length)
+          ? t("ui.choose_another_note_source_first")
+          : undefined,
+      onStarted: () => this.render(),
+      buildContext: async note => {
+        const childSources = await this.topicReferenceGroup(
+          children,
+          options?.synthesisContent === "summary" ? "summary" : "strong"
+        );
+        const selectedSources = options.referenceGroups ?? [];
+        if (!children.length && !selectedSources.some(group => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        // Task text, placeholders and ancestor labels follow the output note language, as in the other task paths.
+        const promptLanguage = options.outputLanguage ?? this.plugin.settings.language;
+        const task = synthesisDirectionsTask(promptLanguage);
+        return withThinkingOrigin(
           {
             title: note.title,
             summary: summaryForPrompt(note.summary, promptLanguage),
@@ -13624,37 +13560,16 @@ export class VisualAgentMapView extends ItemView {
             visualMode: "off"
           },
           note
-        ),
-        used.model,
-        used.reasoning,
-        options.signal,
-        undefined,
-        accepted,
-        undefined,
-        progress.observer
-      );
-      progress.end();
-      accepted?.();
-      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
-        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
+        );
+      },
+      accepted,
+      found,
+      failed,
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-      found(angles);
-    } catch (error) {
-      if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        failed(t("ui.research_stopped_existing_content_was_preserved"));
-        return;
-      }
-      console.error("Visual Agent Map integration directions", error);
-      failed(this.plugin.recordFailure(t("log.integration_directions_failed"), error));
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   private async integrateChildren(
     node: MapNode,
@@ -13664,261 +13579,148 @@ export class VisualAgentMapView extends ItemView {
     failed?: (message: string) => void,
     accepted?: () => void
   ): Promise<void> {
-    if (!this.map || this.plugin.running.has(node.path)) {
+    if (!this.map || this.plugin.topicRuns.isBusy(node.path)) {
       failed?.(t("ui.ai_running_ai"));
       return;
     }
-    const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    const used = await this.modelFor(note, node.path, options?.runOnce);
-    const children = this.map.nodes.filter(item => item.parentId === node.id);
-    if (!children.length && !options?.referenceGroups?.some(group => group.documents.length)) {
-      const message = t("ui.choose_another_note_source_first");
-      if (failed) failed(message);
-      else new Notice(message);
-      return;
-    }
-    const childSources = await this.topicReferenceGroup(
-      children,
-      options?.synthesisContent === "summary" ? "summary" : "strong",
-      { language: options?.outputLanguage }
-    );
-    const sourceSnapshot = JSON.stringify(childSources.documents);
-    const childIds = children
+    const map = this.map;
+    const mapPath = this.path,
+      mapId = map.id;
+    const children = map.nodes.filter(item => item.parentId === node.id);
+    const childIds = (): string =>
+      (this.map?.nodes ?? [])
+        .filter(item => item.parentId === node.id)
+        .map(item => item.id)
+        .sort()
+        .join("|");
+    const startIds = children
       .map(child => child.id)
       .sort()
       .join("|");
-    const mapPath = this.path,
-      mapId = this.map.id;
-    const noteSnapshot = JSON.stringify([
-      note.title,
-      note.summary,
-      note.detail,
-      note.prompt,
-      note.rules,
-      note.model,
-      note.reasoning,
-      note.sourcePaths,
-      note.referencePaths,
-      note.thinkingOrigin,
-      note.newFindings
-    ]);
+    const readSources = (): Promise<ReferenceGroup> =>
+      this.topicReferenceGroup(children, options?.synthesisContent === "summary" ? "summary" : "strong", {
+        language: options?.outputLanguage
+      });
     const selectedSources = options?.referenceGroups ?? [];
-    if (!children.length && !selectedSources.some(group => group.documents.length)) {
-      const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
-      if (failed) failed(message);
-      else new Notice(message);
-      return;
-    }
-    const language = this.plugin.settings.language;
-    const task = direction || synthesisGoalTask(language);
-    const synthesisRun = await this.detailTemplateFor(
-      node,
-      options?.detailTemplateId,
-      options?.toneId,
-      undefined,
-      options?.outputLanguage ?? language
-    );
-    const detailTemplate = synthesisRun.template;
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    await this.plugin.repo.updateNote(node.path, { status: "running" });
-    await this.hydrate();
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
-    // True only when the whole of the parent's Working Findings was in the prompt; otherwise they stay for the next run.
     let findingsSent = false;
-    try {
-      const synthesisStyle = {
-        tone: synthesisRun.toneText ? { toneText: synthesisRun.toneText } : {},
-        style: synthesisRun.contextFields
-      };
-      const synthesisContext: TaskContext = withThinkingOrigin(
-        {
-          title: note.title,
-          summary: summaryForPrompt(note.summary, options?.outputLanguage ?? language),
-          rules: "",
-          detail: note.detail,
-          task: [task, options?.requirements].filter(Boolean).join("\n\n"),
-          ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
-          userTexts: this.userTextContext(node.id),
-          ...this.summaryDirections(node.id),
-          workingFindings: note.newFindings,
-          onWorkingFindingsSent: sent => {
-            findingsSent = sent === note.newFindings;
-          },
-          referenceGroups: [...selectedSources, childSources],
-          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-          referenceDelivery: "direct",
-          onProgress: options?.onProgress,
-          outputLanguage: options?.outputLanguage,
-          ...synthesisStyle.tone,
-          mode: "synthesize",
-          researchMode: options?.researchMode ?? "local",
-          researchDepth: options?.researchDepth ?? "normal",
-          visualMode: options?.visualMode ?? note.visualMode,
+    let synthesisRun: Awaited<ReturnType<VisualAgentMapView["detailTemplateFor"]>> | undefined;
+    let task = "";
+    let childSources: ReferenceGroup | undefined;
+    await this.plugin.topicRuns.start(node.path, "integrateChildren", {
+      map: () => this.map ?? undefined,
+      runOnce: options?.runOnce,
+      signal: options?.signal,
+      outputLanguage: options?.outputLanguage,
+      prepare: async note => {
+        if (!children.length && !selectedSources.some(group => group.documents.length))
+          return t("ui.choose_another_note_source_first");
+        childSources = await readSources();
+        const sourceSnapshot = JSON.stringify(childSources.documents);
+        if (!children.length && !selectedSources.some(group => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        const language = this.plugin.settings.language;
+        task = direction || synthesisGoalTask(language);
+        const run = await this.detailTemplateFor(
+          node,
+          options?.detailTemplateId,
+          options?.toneId,
+          undefined,
+          options?.outputLanguage ?? language
+        );
+        const detailTemplate = run.template;
+        synthesisRun = run;
+        return {
           detailTemplate,
-          ...synthesisStyle.style,
-          addCharts: true
-        },
-        note
-      );
-      const result = await this.plugin.askModel(
-        synthesisContext,
-        used.model,
-        used.reasoning,
-        options?.signal,
-        undefined,
-        accepted,
-        undefined,
-        progress.observer
-      );
-      // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-      progress.end();
-      accepted?.();
-      if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      await this.plugin.repo.updateNote(node.path, { status: note.status });
-      const save = async (summary: string, detail: string): Promise<void> =>
-        this.plugin.mutate(async () => {
-          if (
-            options?.signal?.aborted ||
+          viewChanged: () =>
+            options?.signal?.aborted === true ||
             this.closed ||
             this.path !== mapPath ||
             this.map?.id !== mapId ||
-            this.map.nodes
-              .filter(item => item.parentId === node.id)
-              .map(item => item.id)
-              .sort()
-              .join("|") !== childIds
-          )
-            throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const currentSources = await this.topicReferenceGroup(
-            children,
-            options?.synthesisContent === "summary" ? "summary" : "strong",
-            { language: options?.outputLanguage }
-          );
-          if (JSON.stringify(currentSources.documents) !== sourceSnapshot)
-            throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          if (
-            JSON.stringify([
-              latest.title,
-              latest.summary,
-              latest.detail,
-              latest.prompt,
-              latest.rules,
-              latest.model,
-              latest.reasoning,
-              latest.sourcePaths,
-              latest.referencePaths,
-              latest.thinkingOrigin,
-              latest.newFindings
-            ]) !== noteSnapshot
-          )
-            throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-          const canonicalOnly = canonicalDetail(
-            detail,
-            noteLanguageOf(options?.outputLanguage ?? this.plugin.settings.language),
-            detailTemplate
-          );
-          // An edited draft is checked again so the topic's format mark matches what is saved.
-          const issues =
-            result.formatIssues && detail !== result.detail
-              ? checkCounts(canonicalOnly, detailTemplate)
-              : result.formatIssues;
-          // Links the parent's earlier research had and the rewrite dropped are kept (no AI call; part of the saved detail).
-          const references = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language));
-          const canonical = carryForwardSources(
-            canonicalOnly,
-            [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-            [summary, canonicalOnly, references],
-            options?.outputLanguage ?? this.plugin.settings.language,
-            detailTemplate
-          );
-          await this.plugin.repo.updateNote(
-            node.path,
-            {
-              summary,
-              detail: canonical,
-              visualReferences: references,
-              // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
-              ...(findingsSent ? { newFindings: "" } : {}),
-              status: "completed",
-              ...formatIssuesPatch(issues, language)
+            childIds() !== startIds,
+          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+        };
+      },
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
+      },
+      buildContext: async note => {
+        const language = this.plugin.settings.language;
+        const run = synthesisRun!;
+        const synthesisStyle = {
+          tone: run.toneText ? { toneText: run.toneText } : {},
+          style: run.contextFields
+        };
+        return withThinkingOrigin(
+          {
+            title: note.title,
+            summary: summaryForPrompt(note.summary, options?.outputLanguage ?? language),
+            rules: "",
+            detail: note.detail,
+            task: [task, options?.requirements].filter(Boolean).join("\n\n"),
+            ancestors: await this.ancestorContext(node, options?.outputLanguage ?? language),
+            userTexts: this.userTextContext(node.id),
+            ...this.summaryDirections(node.id),
+            workingFindings: note.newFindings,
+            onWorkingFindingsSent: sent => {
+              findingsSent = sent === note.newFindings;
             },
-            { detailTemplate }
-          );
-          const saved = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          this.recordNoteWrite(
-            node.path,
-            { ...latest, status: note.status },
-            saved,
-            [
-              "summary",
-              "detail",
-              "visualReferences",
-              "newFindings",
-              "previewSection",
-              "previewInitialized",
-              "previewAutoHash",
-              "status",
-              "lastError",
-              "detailFormatIssues"
-            ],
-            t("ui.synthesize_subtopics")
-          );
-          await this.hydrate();
-          this.render();
-          this.queueCharts({
-            path: node.path,
-            saved,
-            context: synthesisContext,
-            detail: saved.detail,
-            formatIssues: issues,
-            model: used.model,
-            language: options?.outputLanguage ?? this.plugin.settings.language,
-            template: detailTemplate
-          });
-        });
-      // The result is written directly (no draft review); a write that fails or finds the topic changed writes
-      // nothing and is reported, without marking the parent topic as failed.
-      try {
-        await (
-          drafted ??
-          (async (_result, write, summary, detail) => {
-            const previous = this.history.undoEntry;
-            await write(summary, detail);
-            this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
-          })
-        )(result, save, result.summary, result.detail);
-      } catch (error) {
-        if (options?.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-          if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-        } else {
-          console.error("VAM synthesis write", error);
-          const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-          if (failed) failed(message);
-          else new Notice(message);
-        }
+            referenceGroups: [...selectedSources, childSources!],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
+            onProgress: options?.onProgress,
+            outputLanguage: options?.outputLanguage,
+            ...synthesisStyle.tone,
+            mode: "synthesize",
+            researchMode: options?.researchMode ?? "local",
+            researchDepth: options?.researchDepth ?? "normal",
+            visualMode: options?.visualMode ?? note.visualMode,
+            detailTemplate: run.template,
+            ...synthesisStyle.style,
+            addCharts: true
+          },
+          note
+        );
+      },
+      findingsSent: () => findingsSent,
+      accepted,
+      drafted:
+        drafted ??
+        (async (_result, write, summary, detail, note) => {
+          const previous = this.history.undoEntry;
+          await write(summary, detail);
+          this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
+        }),
+      onWritten: async ({ before, after }) => {
+        this.recordNoteWrite(
+          node.path,
+          before,
+          after,
+          [
+            "summary",
+            "detail",
+            "visualReferences",
+            "newFindings",
+            "previewSection",
+            "previewInitialized",
+            "previewAutoHash",
+            "status",
+            "lastError",
+            "detailFormatIssues"
+          ],
+          t("ui.synthesize_subtopics")
+        );
+        await this.hydrate();
+        this.render();
+      },
+      queueCharts: job => this.queueCharts(job),
+      failed,
+      notify: message => new Notice(message),
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-    } catch (error) {
-      if (options?.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        await this.plugin.repo.updateNote(node.path, { status: note.status });
-        if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      } else {
-        console.error("Visual Agent Map child integration", error);
-        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-        const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-        if (failed) failed(message);
-        else new Notice(message);
-      }
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   private async startSynthesis(
     node: MapNode,
@@ -13935,7 +13737,7 @@ export class VisualAgentMapView extends ItemView {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(path) || this.plugin.activeTasks.has(path) || existing?.state === "running") {
+    if (this.plugin.topicRuns.isBusy(path) || this.plugin.topicRuns.hasTask(path) || existing?.state === "running") {
       failed(t("ui.ai_running_ai"));
       return;
     }
@@ -13979,7 +13781,7 @@ export class VisualAgentMapView extends ItemView {
     task.progress = "";
     task.direction = direction ?? "";
     this.synthesisTasks.set(path, task);
-    this.plugin.activeTasks.set(path, controller);
+    this.plugin.topicRuns.registerTask(path, controller);
     const runOptions: TaskOptions = {
       ...(step === "draft"
         ? { ...task.options, requirements: options.requirements || task.options.requirements }
@@ -14064,7 +13866,7 @@ export class VisualAgentMapView extends ItemView {
       fail(error instanceof Error ? error.message : String(error));
     } finally {
       modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(path) === controller) this.plugin.activeTasks.delete(path);
+      this.plugin.topicRuns.releaseTask(path, controller);
       this.render();
     }
   }
@@ -14155,6 +13957,52 @@ export class VisualAgentMapView extends ItemView {
       }
     ).open();
   }
+  /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
+  async createIntegratedNode(
+    title: string,
+    sources: MapNode[],
+    goal: string,
+    _rules: string,
+    options?: TaskOptions,
+    flow?: {
+      observer?: SynthesisObserver;
+      accepted?: () => void;
+      controller?: AbortController;
+      directions?: Suggestion[];
+      model?: ModelChoice;
+    }
+  ): Promise<void> {
+    if (!this.map || sources.length < 2) return;
+    let failure: unknown;
+    let failed = false;
+    // This call's own sink (not a view field), so a second call that is refused cannot clear it.
+    const errorSink = (error: unknown): void => {
+      failure = error;
+      failed = true;
+    };
+    await this.startSelectionSynthesis(
+      sources,
+      {
+        researchMode: "local",
+        researchDepth: "normal",
+        visualMode: "off",
+        ...options,
+        synthesisTitle: title,
+        signal: flow?.controller?.signal ?? options?.signal
+      },
+      goal,
+      message => {
+        if (!failed) {
+          failure = new Error(message);
+          failed = true;
+        }
+      },
+      () => flow?.accepted?.(),
+      flow?.observer,
+      errorSink
+    );
+    if (failed) throw failure;
+  }
   /**
    * One step of multi-select synthesis: the AI's suggested directions (`direction === null`), then the draft. Both
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
@@ -14165,7 +14013,8 @@ export class VisualAgentMapView extends ItemView {
     direction: string | null,
     failed: (message: string) => void,
     accepted: () => void,
-    observer?: SynthesisObserver
+    observer?: SynthesisObserver,
+    errorSink?: (error: unknown) => void
   ): Promise<void> {
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
@@ -14195,8 +14044,13 @@ export class VisualAgentMapView extends ItemView {
     const abortBeforeAcceptance = (): void => controller.abort();
     if (modalSignal?.aborted) controller.abort();
     else modalSignal?.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    // Shared by settled and refused, so a start the registry refuses does not keep this view blocked or leak the listener.
+    const releaseStarting = (): void => {
+      this.selectionStarting = false;
+      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
+      this.render();
+    };
     let own: NonNullable<VisualAgentMapView["integrationTask"]> | undefined;
-    let progress: { end: () => void } | undefined;
     const runOptions: TaskOptions = {
       ...base,
       requirements: options.requirements || base.requirements,
@@ -14234,6 +14088,12 @@ export class VisualAgentMapView extends ItemView {
             : String(error);
         this.render();
       }
+      if (errorSink && !aborted) {
+        // The thin entry rethrows the original error to its caller instead of logging a user message.
+        errorSink(error);
+        failed(error instanceof Error ? error.message : String(error));
+        return;
+      }
       failed(
         aborted
           ? t("ui.research_stopped_existing_content_was_preserved")
@@ -14243,114 +14103,178 @@ export class VisualAgentMapView extends ItemView {
             )
       );
     };
-    try {
-      const chosen = await this.selectionModel(sources);
-      if (step === "draft") {
-        await this.createIntegratedNode(title, sources, direction ?? "", "", runOptions, {
-          model: chosen,
-          observer,
-          accepted: markAccepted,
+    type Task = NonNullable<VisualAgentMapView["integrationTask"]>;
+    let task: Task | undefined;
+    let modelChoice: ModelChoice | undefined;
+    let draftContext: TaskContext | undefined;
+    const mapPath = this.path,
+      mapId = this.map.id;
+    const summaryMode = base.synthesisContent === "summary" ? "summary" : "strong";
+    const isDraft = step === "draft";
+    await this.plugin.topicRuns.start(mapPath, "synthesizeSelection", {
+      step,
+      signal: controller.signal,
+      stop: () => controller.abort(),
+      refused: () => {
+        releaseStarting();
+        failed(t("ui.ai_running_ai"));
+      },
+      model: async () => (modelChoice = await this.selectionModel(sources)),
+      readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
+      begin: group => {
+        task = {
+          title,
+          goal: isDraft ? (direction ?? "") : "",
+          rules: "",
+          sources,
+          options: { ...runOptions, signal: undefined, onProgress: undefined },
+          mapPath,
+          mapId,
+          sourceContent: JSON.stringify(group.documents),
           controller,
-          directions: continuing && existing ? existing.directions : []
+          state: "running",
+          step: isDraft ? "draft" : "directions",
+          directions: isDraft && continuing && existing ? existing.directions : [],
+          progress: "",
+          model: modelChoice!.model,
+          reasoning: modelChoice!.reasoning
+        };
+        this.integrationTask = task;
+        if (!isDraft) own = task;
+        this.render();
+      },
+      startProgress: model => {
+        return this.startTaskProgress(this.taskProgressKey("integration"), model);
+      },
+      buildContext: async group => {
+        const language = this.plugin.settings.language;
+        if (!isDraft)
+          return {
+            title,
+            summary: translateNote(runOptions.outputLanguage ?? language, "note.no_conclusion_yet"),
+            rules: "",
+            detail: "",
+            task: [synthesisDirectionsTask(runOptions.outputLanguage ?? language), runOptions.requirements]
+              .filter(Boolean)
+              .join("\n\n"),
+            ancestors: "",
+            referenceGroups: [...(runOptions.referenceGroups ?? []), group],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
+            onProgress: runOptions.onProgress,
+            outputLanguage: runOptions.outputLanguage,
+            ...this.proposalTone(undefined, runOptions),
+            mode: "synthesize",
+            researchMode: runOptions.researchMode,
+            researchDepth: runOptions.researchDepth,
+            visualMode: "off"
+          } satisfies TaskContext;
+        await this.noteStyles.refresh();
+        const integrationStyle = this.mapStyle(runOptions.outputLanguage ?? language, {
+          template: runOptions.detailTemplateId,
+          tone: runOptions.toneId,
+          kind: "topic",
+          notify: true
         });
-        markAccepted();
-        return;
-      }
-      const sourceGroup = await this.topicReferenceGroup(
-        sources,
-        base.synthesisContent === "summary" ? "summary" : "strong",
-        { language: runOptions.outputLanguage }
-      );
-      const task: NonNullable<VisualAgentMapView["integrationTask"]> = {
-        title,
-        goal: "",
-        rules: "",
-        sources,
-        options: { ...runOptions, signal: undefined, onProgress: undefined },
-        mapPath: this.path,
-        mapId: this.map.id,
-        sourceContent: JSON.stringify(sourceGroup.documents),
-        controller,
-        state: "running",
-        step: "directions",
-        directions: [],
-        progress: "",
-        model: chosen.model,
-        reasoning: chosen.reasoning
-      };
-      this.integrationTask = task;
-      own = task;
-      this.render();
-      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
-      progress = taskProgress;
-      const language = this.plugin.settings.language;
-      const result = await this.plugin.askModel(
-        {
+        const own = task!;
+        draftContext = {
           title,
           summary: translateNote(runOptions.outputLanguage ?? language, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
-          task: [synthesisDirectionsTask(runOptions.outputLanguage ?? language), runOptions.requirements]
-            .filter(Boolean)
-            .join("\n\n"),
+          task: [direction ?? "", runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
-          referenceGroups: [...(runOptions.referenceGroups ?? []), sourceGroup],
+          referenceGroups: [...(runOptions.referenceGroups ?? []), group],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
-          onProgress: runOptions.onProgress,
+          onProgress: message => {
+            if (this.integrationTask !== own) return;
+            own.progress = message;
+            runOptions.onProgress?.(message);
+            this.render();
+          },
           outputLanguage: runOptions.outputLanguage,
-          ...this.proposalTone(undefined, runOptions),
+          ...(integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {}),
           mode: "synthesize",
-          researchMode: runOptions.researchMode,
-          researchDepth: runOptions.researchDepth,
-          visualMode: "off"
-        },
-        chosen.model,
-        chosen.reasoning,
-        controller.signal,
-        undefined,
-        markAccepted,
-        undefined,
-        taskProgress.observer
-      );
-      taskProgress.end();
-      markAccepted();
-      if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== task.mapPath || this.map?.id !== task.mapId)
-        throw new DOMException("Aborted", "AbortError");
-      const latest = await this.topicReferenceGroup(
-        sources,
-        base.synthesisContent === "summary" ? "summary" : "strong",
-        { language: runOptions.outputLanguage }
-      );
-      if (JSON.stringify(latest.documents) !== task.sourceContent)
-        throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
+          researchMode: runOptions.researchMode ?? "local",
+          researchDepth: runOptions.researchDepth ?? "normal",
+          visualMode: runOptions.visualMode ?? "auto",
+          detailTemplate: integrationStyle.template,
+          ...integrationStyle.contextFields,
+          addCharts: true
+        };
+        return draftContext;
+      },
+      accepted: markAccepted,
+      current: () => this.integrationTask === task,
+      mapChanged: () => this.path !== mapPath || this.map?.id !== mapId,
+      recordedSources: () => task!.sourceContent,
+      found: angles => {
+        const waiting = task!;
+        waiting.state = "directions";
+        waiting.directions = angles;
+        this.render();
+        if (observer?.isOpen() && observer.directions) observer.directions(angles);
+        else
+          backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
+            label: t("ui.choose_synthesis_direction"),
+            open: () => {
+              if (this.integrationTask === waiting && waiting.state === "directions")
+                this.openSelectionSynthesis(waiting);
+            }
+          });
+      },
+      noDirections: () => {
         this.integrationTask = null;
         this.render();
         failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
-      }
-      task.state = "directions";
-      task.directions = angles;
-      this.render();
-      if (observer?.isOpen() && observer.directions) observer.directions(angles);
-      else
-        backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
-          label: t("ui.choose_synthesis_direction"),
-          open: () => {
-            if (this.integrationTask === task && task.state === "directions") this.openSelectionSynthesis(task);
-          }
-        });
-    } catch (error) {
-      fail(error);
-    } finally {
-      progress?.end();
-      this.selectionStarting = false;
-      modalSignal?.removeEventListener("abort", abortBeforeAcceptance);
-      this.render();
-    }
+      },
+      closed: () => this.closed,
+      applying: () => {
+        task!.state = "applying";
+        this.render();
+        return this.history.undoEntry;
+      },
+      write: result => {
+        const language = runOptions.outputLanguage ?? this.plugin.settings.language;
+        return this.saveIntegratedNode(
+          title,
+          sources,
+          direction ?? "",
+          "",
+          modelChoice!.model,
+          result,
+          language,
+          task!,
+          draftContext!
+        );
+      },
+      written: previous => {
+        this.undoNotice(t("ui.synthesis_new_topic_0", title), previous as Action | undefined);
+        if (observer?.isOpen()) observer.written?.();
+      },
+      draftFailed: error => {
+        const draftTask = task!;
+        if (controller.signal.aborted && observer?.isOpen()) {
+          // Stopped from the open dialog: nothing was produced, so no badge stays behind.
+          if (draftTask.directions.length) draftTask.state = "directions";
+          else this.integrationTask = null;
+          this.render();
+          throw error;
+        }
+        draftTask.state = controller.signal.aborted ? "cancelled" : "failed";
+        draftTask.progress = controller.signal.aborted
+          ? t("ui.research_stopped_existing_content_was_preserved")
+          : error instanceof Error
+            ? error.message
+            : String(error);
+        this.render();
+        if (!controller.signal.aborted) throw error;
+      },
+      finished: markAccepted,
+      fail,
+      settled: releaseStarting
+    });
   }
   private discardSelectionSynthesis(): void {
     const task = this.integrationTask;
@@ -14430,155 +14354,6 @@ export class VisualAgentMapView extends ItemView {
       location: this.path,
       documents
     };
-  }
-  private async createIntegratedNode(
-    title: string,
-    sources: MapNode[],
-    goal: string,
-    rules: string,
-    options?: TaskOptions,
-    flow?: {
-      observer?: SynthesisObserver;
-      accepted?: () => void;
-      controller?: AbortController;
-      directions?: Suggestion[];
-      model?: ModelChoice;
-    }
-  ): Promise<void> {
-    if (!this.map || sources.length < 2) return;
-    const chosen = flow?.model ?? (await this.selectionModel(sources));
-    const controller = flow?.controller ?? new AbortController();
-    const mapPath = this.path,
-      mapId = this.map.id;
-    const sourceGroup = await this.topicReferenceGroup(
-      sources,
-      options?.synthesisContent === "summary" ? "summary" : "strong",
-      { language: options?.outputLanguage }
-    );
-    const task: NonNullable<VisualAgentMapView["integrationTask"]> = {
-      title,
-      goal,
-      rules,
-      sources,
-      options: options
-        ? { ...options, signal: undefined, onProgress: undefined }
-        : { researchMode: "local", researchDepth: "normal", visualMode: "off" },
-      mapPath,
-      mapId,
-      sourceContent: JSON.stringify(sourceGroup.documents),
-      controller,
-      state: "running",
-      step: "draft",
-      directions: flow?.directions ?? [],
-      progress: "",
-      model: chosen.model,
-      reasoning: chosen.reasoning
-    };
-    this.integrationTask = task;
-    this.render();
-    const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
-    const model = chosen.model;
-    const language = this.plugin.settings.language;
-    await this.noteStyles.refresh();
-    const integrationStyle = this.mapStyle(options?.outputLanguage ?? language, {
-      template: options?.detailTemplateId,
-      tone: options?.toneId,
-      kind: "topic",
-      notify: true
-    });
-    const detailTemplate = integrationStyle.template;
-    try {
-      const integrationContext: TaskContext = {
-        title,
-        summary: translateNote(options?.outputLanguage ?? language, "note.no_conclusion_yet"),
-        rules: "",
-        detail: "",
-        task: [goal, options?.requirements].filter(Boolean).join("\n\n"),
-        ancestors: "",
-        referenceGroups: [...(options?.referenceGroups ?? []), sourceGroup],
-        // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-        referenceDelivery: "direct",
-        onProgress: message => {
-          if (this.integrationTask !== task) return;
-          task.progress = message;
-          options?.onProgress?.(message);
-          this.render();
-        },
-        outputLanguage: options?.outputLanguage,
-        ...(integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {}),
-        mode: "synthesize",
-        researchMode: options?.researchMode ?? "local",
-        researchDepth: options?.researchDepth ?? "normal",
-        visualMode: options?.visualMode ?? "auto",
-        detailTemplate,
-        ...integrationStyle.contextFields,
-        addCharts: true
-      };
-      const result = await this.plugin.askModel(
-        integrationContext,
-        model,
-        chosen.reasoning,
-        controller.signal,
-        undefined,
-        flow?.accepted,
-        undefined,
-        progress.observer
-      );
-      // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-      progress.end();
-      if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== mapPath || this.map?.id !== mapId)
-        throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
-      const latest = await this.topicReferenceGroup(
-        sources,
-        options?.synthesisContent === "summary" ? "summary" : "strong",
-        { language: options?.outputLanguage }
-      );
-      if (JSON.stringify(latest.documents) !== task.sourceContent)
-        throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      // The result is written directly (no draft review). The fences above and in saveIntegratedNode (stop, stale
-      // sources, map switch, view closed) leave every failure with zero writes.
-      // Stop pressed while the sources were re-read still wins: nothing is written.
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (this.closed) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      task.state = "applying";
-      this.render();
-      const previous = this.history.undoEntry;
-      const write = (): Promise<void> =>
-        this.saveIntegratedNode(
-          title,
-          sources,
-          goal,
-          rules,
-          model,
-          result,
-          options?.outputLanguage ?? language,
-          task,
-          integrationContext
-        );
-      await (flow ? this.plugin.mutate(write) : write());
-      this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
-      if (flow?.observer?.isOpen()) flow.observer.written?.();
-    } catch (error) {
-      if (this.integrationTask !== task) return;
-      if (flow && controller.signal.aborted && flow.observer?.isOpen()) {
-        // Stopped from the open dialog: nothing was produced, so no badge stays behind.
-        if (task.directions.length) task.state = "directions";
-        else this.integrationTask = null;
-        this.render();
-        throw error;
-      }
-      task.state = controller.signal.aborted ? "cancelled" : "failed";
-      task.progress = controller.signal.aborted
-        ? t("ui.research_stopped_existing_content_was_preserved")
-        : error instanceof Error
-          ? error.message
-          : String(error);
-      this.render();
-      if (!controller.signal.aborted) throw error;
-    } finally {
-      progress.end();
-    }
   }
   private async saveIntegratedNode(
     title: string,
@@ -16726,7 +16501,7 @@ export class VisualAgentMapView extends ItemView {
       const node = this.map.nodes.find(candidate => candidate.id === block.nodeId);
       if (!node) return { reason: "ui.map_chat_images_stale_gone" };
       if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
-      if (this.plugin.running?.has(node.path) || this.plugin.activeTasks?.has(node.path))
+      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
         return { reason: "ui.map_chat_images_stale_running" };
       return { node };
     };
@@ -16941,8 +16716,8 @@ export class VisualAgentMapView extends ItemView {
       if (!map.nodes.some(item => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
       const task = this.synthesisTasks.get(node.path);
       if (
-        this.plugin.running.has(node.path) ||
-        this.plugin.activeTasks.has(node.path) ||
+        this.plugin.topicRuns.isBusy(node.path) ||
+        this.plugin.topicRuns.hasTask(node.path) ||
         task?.state === "running" ||
         task?.state === "directions"
       )
@@ -18332,7 +18107,12 @@ export class VisualAgentMapView extends ItemView {
     const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, this.map ?? undefined, runOnce);
     return { model, reasoning };
   }
-  private async runAgent(
+  /**
+   * Starts a research on one topic through the plugin's run module. The module owns registration, progress, the stale
+   * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
+   * and the undo step.
+   */
+  private runAgent(
     node: MapNode,
     done?: (result: AiResult) => void,
     failed?: (message: string) => void,
@@ -18340,275 +18120,42 @@ export class VisualAgentMapView extends ItemView {
     onLaunchAccepted?: () => void,
     runOnce?: RunOnceModel
   ): Promise<AgentTaskHandle | null> {
-    const { runStyle: givenStyle, ...overrides } = request ?? {};
-    const taskPath = node.path;
-    const note = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-    const used = await this.modelFor(note, node.path, runOnce);
-    if (!(overrides?.task ?? note.prompt)) {
-      const message = t("ui.enter_a_question_or_task_for_ai_first");
-      if (failed) failed(message);
-      else new Notice(message);
-      return null;
-    }
-    if (this.plugin.running.has(node.path)) {
-      failed?.(t("ui.ai_running_ai"));
-      return null;
-    }
-    const runStyle =
-      givenStyle ??
-      (await this.detailTemplateFor(
-        node,
-        undefined,
-        undefined,
-        undefined,
-        overrides?.outputLanguage ?? this.plugin.settings.language
-      ));
-    const detailTemplate = runStyle.template;
-    const context: TaskContext = withThinkingOrigin(
-      {
-        title: note.title,
-        summary: summaryForPrompt(note.summary, overrides?.outputLanguage ?? this.plugin.settings.language),
-        rules: "",
-        detail: note.detail,
-        task: note.prompt,
-        ancestors: await this.ancestorContext(node, overrides?.outputLanguage ?? this.plugin.settings.language),
-        userTexts: this.userTextContext(node.id),
-        workingFindings: note.newFindings,
-        sourceContext: "",
-        mode: "task",
-        researchMode: note.researchMode,
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        ...(runStyle.toneText ? { toneText: runStyle.toneText } : {}),
-        ...overrides,
-        detailTemplate,
-        ...runStyle.contextFields,
-        addCharts: overrides?.addCharts ?? true
+    return this.plugin.topicRuns.start(node.path, "research", {
+      origin: this,
+      map: this.map ?? undefined,
+      request,
+      runOnce,
+      done,
+      failed,
+      notify: message => new Notice(message),
+      accepted: onLaunchAccepted,
+      resolveStyle: language => this.detailTemplateFor(node, undefined, undefined, undefined, language),
+      ancestors: language => this.ancestorContext(node, language),
+      userTexts: () => this.userTextContext(node.id),
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
       },
-      note
-    );
-    const language = this.plugin.settings.language;
-    this.plugin.pendingSuggestions.delete(node.path);
-    // A diagram job still running for the previous result of this note must not land on the new run.
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    const controller = new AbortController();
-    const abortFromTaskModal = (): void => controller.abort();
-    if (overrides?.signal?.aborted) controller.abort();
-    else overrides?.signal?.addEventListener("abort", abortFromTaskModal, { once: true });
-    this.plugin.activeTasks.set(taskPath, controller);
-    // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
-    const progress = this.plugin.researchProgress;
-    let progressAttempt = "starting";
-    const styleLine =
-      runStyle.label.fileName || runStyle.label.templateSource === "kind"
-        ? runStyleLabelText(runStyle.label, language)
-        : undefined;
-    progress?.begin(taskPath, progressAttempt, Date.now(), used.model, styleLine);
-    const observer: ResearchObserver = {
-      onAttempt: id => {
-        progressAttempt = id;
-        progress?.newAttempt(taskPath, id, Date.now());
-      },
-      onStage: (id, stage, query) => progress?.stage(taskPath, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress?.preview(taskPath, id, fields ?? {}),
-      onSlow: (id, slow, resend) => progress?.markSlow(taskPath, id, slow, resend)
-    };
-    const releaseStartup = (): void => {
-      progress?.end(taskPath, progressAttempt);
-      overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
-      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-      this.plugin.running.delete(taskPath);
-    };
-    let startupStatusAttempted = false;
-    try {
-      startupStatusAttempted = true;
-      await this.plugin.repo.updateNote(node.path, { status: "running" });
-      await this.hydrate();
-      this.render();
-      if (controller.signal.aborted) {
-        try {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-        } finally {
-          releaseStartup();
-        }
-        return null;
-      }
-    } catch (error) {
-      try {
-        if (startupStatusAttempted) await this.plugin.repo.updateNote(node.path, { status: note.status });
-      } catch {
-        /* Keep the startup error; the registered task still must be released. */
-      } finally {
-        releaseStartup();
-      }
-      throw error;
-    }
-    // Leave the mutation queue immediately: independent branches can run concurrently.
-    let exchangeId = "";
-    let resolveAccepted!: (accepted: boolean) => void;
-    const acceptedPromise = new Promise<boolean>(resolve => {
-      resolveAccepted = resolve;
+      onWritten: ({ before, after }) =>
+        this.recordNoteWrite(
+          node.path,
+          before,
+          after,
+          [
+            "summary",
+            "detail",
+            "visualReferences",
+            "newFindings",
+            "previewSection",
+            "previewInitialized",
+            "previewAutoHash",
+            "status",
+            "lastError",
+            "researchMode"
+          ],
+          t("ui.research_task")
+        ),
+      queueCharts: job => this.queueCharts(job)
     });
-    let requestAccepted = false;
-    const markAccepted = (): void => {
-      if (requestAccepted) return;
-      requestAccepted = true;
-      resolveAccepted(true);
-      onLaunchAccepted?.();
-    };
-    const completion = this.plugin
-      .askModel(
-        context,
-        used.model,
-        used.reasoning,
-        controller.signal,
-        id => {
-          exchangeId = id;
-        },
-        markAccepted,
-        undefined,
-        observer
-      )
-      .then(result =>
-        this.plugin.mutate(async () => {
-          // The answer is final (or about to be dropped): the unsaved preview goes away before anything is written.
-          progress?.end(taskPath, progressAttempt);
-          const latest = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          const stale =
-            latest.thinkingOrigin !== note.thinkingOrigin ||
-            latest.title !== note.title ||
-            latest.prompt !== note.prompt ||
-            latest.rules !== note.rules ||
-            latest.detail !== note.detail ||
-            latest.summary !== note.summary ||
-            latest.model !== note.model ||
-            latest.reasoning !== note.reasoning ||
-            latest.researchMode !== note.researchMode ||
-            latest.visualMode !== note.visualMode ||
-            latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") ||
-            JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-          if (controller.signal.aborted || stale) {
-            await this.plugin.repo.updateNote(node.path, { status: note.status });
-            if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled)
-              this.plugin.exchanges?.failed(
-                exchangeId,
-                t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
-              );
-            if (stale) {
-              if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-              else new Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-            }
-            return;
-          }
-          await this.plugin.repo.updateNote(
-            node.path,
-            {
-              summary: result.summary,
-              detail: canonicalDetail(
-                result.detail,
-                noteLanguageOf(context.outputLanguage ?? this.plugin.settings.language),
-                context.detailTemplate
-              ),
-              visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language)),
-              newFindings: "",
-              status: "completed",
-              // The topic remembers the mode of its latest research (Quick is stored as local).
-              ...(context.researchMode ? { researchMode: context.researchMode } : {}),
-              ...formatIssuesPatch(result.formatIssues, language)
-            },
-            { detailTemplate: context.detailTemplate }
-          );
-          const saved = await this.plugin.repo.readNote(node.path, this.map ?? undefined);
-          this.recordNoteWrite(
-            node.path,
-            { ...latest, status: note.status },
-            saved,
-            [
-              "summary",
-              "detail",
-              "visualReferences",
-              "newFindings",
-              "previewSection",
-              "previewInitialized",
-              "previewAutoHash",
-              "status",
-              "lastError",
-              "researchMode"
-            ],
-            t("ui.research_task")
-          );
-          if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) this.plugin.exchanges?.completed(exchangeId);
-          for (const view of this.plugin.views()) if (view !== this) view.history.clear();
-          this.queueCharts({
-            path: node.path,
-            saved,
-            context,
-            detail: saved.detail,
-            formatIssues: result.formatIssues,
-            model: used.model,
-            language: context.outputLanguage ?? this.plugin.settings.language,
-            template: context.detailTemplate
-          });
-          if (result.suggestions.length) {
-            this.plugin.pendingSuggestions.set(
-              node.path,
-              result.suggestions
-                .slice(0, 7)
-                .map(item => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-            );
-            try {
-              await (this.plugin.pendingSuggestions as PendingSuggestions).flush?.();
-            } catch (error) {
-              const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
-              new Notice(message);
-            }
-          }
-          done?.(result);
-        })
-      )
-      .catch(error =>
-        this.plugin.mutate(async () => {
-          progress?.end(taskPath, progressAttempt);
-          if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
-            await this.plugin.repo.updateNote(node.path, { status: note.status });
-            if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-            else new Notice(t("ui.research_stopped_existing_content_was_preserved"));
-            return;
-          }
-          console.error("Visual Agent Map AI task", error);
-          if (
-            exchangeId &&
-            this.plugin.settings.aiExchangeLoggingEnabled &&
-            this.plugin.exchanges?.getEntries().find(item => item.id === exchangeId)?.status === "parsed"
-          )
-            this.plugin.exchanges.failed(
-              exchangeId,
-              t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
-            );
-          await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-          const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
-          if (failed) failed(message);
-          else new Notice(message);
-        })
-      )
-      .finally(() => {
-        progress?.end(taskPath, progressAttempt);
-        overrides?.signal?.removeEventListener("abort", abortFromTaskModal);
-        if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-        this.plugin.running.delete(taskPath);
-        for (const view of this.plugin.views())
-          view.enqueue(async () => {
-            await view.hydrate();
-            view.render();
-          });
-      })
-      .catch(() => {});
-    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
-    if (!accepted) {
-      await completion;
-      return null;
-    }
-    return { finished: completion };
   }
 }

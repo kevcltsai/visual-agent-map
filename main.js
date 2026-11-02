@@ -21,7 +21,6 @@ var __publicField = (obj, key2, value) => __defNormalProp(obj, typeof key2 !== "
 // main.ts
 var main_exports = {};
 __export(main_exports, {
-  CHART_JOB_LIMIT: () => CHART_JOB_LIMIT,
   ChildProposalModal: () => ChildProposalModal,
   DraftReviewModal: () => DraftReviewModal,
   NextStepModal: () => NextStepModal,
@@ -19942,327 +19941,8 @@ function withThinkingOrigin(context, note) {
   };
 }
 
-// experiences/visual-map/relation-geometry.ts
-var MIN_CONTROL = 16;
-var MAX_CONTROL = 60;
-function axisGap(aStart, aSize, bStart, bSize) {
-  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
-}
-var centreOf = (box) => ({
-  x: box.x + box.width / 2,
-  y: box.y + box.height / 2
-});
-function nearestSides(a, b) {
-  const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
-  if (horizontal < 0 && vertical < 0) {
-    const from = centreOf(a), to = centreOf(b);
-    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
-  }
-  if (horizontal >= vertical) {
-    const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
-    return {
-      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
-      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign2, ny: 0 },
-      gap: horizontal
-    };
-  }
-  const downward = centreOf(b).y >= centreOf(a).y, sign = downward ? 1 : -1;
-  return {
-    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
-    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
-    gap: vertical
-  };
-}
-var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
-function curveOf(a, b) {
-  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
-  return {
-    p1: { x: from.x, y: from.y },
-    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
-    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
-    p2: { x: to.x, y: to.y }
-  };
-}
-function relationPathData(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
-  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
-}
-function relationLabelPoint(a, b) {
-  const { p1, c1, c2, p2 } = curveOf(a, b);
-  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
-}
-function treeEdgePathData(parent, child, direction, depth = 1) {
-  if (direction === "radial") return relationPathData(parent, child);
-  if (direction === "timeline" && depth >= 2)
-    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
-  if (direction === "fishbone")
-    return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
-  if (direction === "down" || direction === "up") {
-    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, bend2 = Math.max(60, Math.abs(y22 - y12) / 2), sign = down ? 1 : -1;
-    return `M ${x12} ${y12} C ${x12} ${y12 + sign * bend2}, ${x22} ${y22 - sign * bend2}, ${x22} ${y22}`;
-  }
-  const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
-  const leftward = direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
-  if (leftward) {
-    const x12 = parent.x, x22 = child.x + child.width, bend2 = Math.max(60, Math.abs(x22 - x12) / 2);
-    return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
-  }
-  const x1 = parent.x + parent.width, x2 = child.x, bend = Math.max(60, Math.abs(x2 - x1) / 2);
-  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
-}
-var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
-function fishboneBone(parent, child) {
-  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2, above = childY < parentY, x = child.x + child.width / 2, y = above ? child.y + child.height : child.y;
-  return { jointX: x + Math.abs(parentY - y) * BONE_RUN2, parentY, x, y };
-}
-function fishboneSpinePathData(head, topics) {
-  if (!topics.length) return "";
-  const end = Math.min(...topics.map((topic) => fishboneBone(head, topic).jointX));
-  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
-}
-function fishboneEdgePathData(parent, child, depth) {
-  if (depth <= 1) {
-    const { jointX, parentY: parentY2, x: x2, y: y2 } = fishboneBone(parent, child);
-    return `M ${jointX} ${parentY2} L ${x2} ${y2}`;
-  }
-  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2;
-  const above = childY > parentY, x = parent.x + parent.width / 2, y = above ? parent.y + parent.height : parent.y, boneX = x + Math.abs(childY - y) * BONE_RUN2;
-  return `M ${boneX} ${childY} L ${child.x + child.width} ${childY}`;
-}
-
-// topic-markers.ts
-var TOPIC_MARKERS = [
-  "done",
-  "warning",
-  "star",
-  "priority-1",
-  "priority-2",
-  "priority-3",
-  "priority-4",
-  "priority-5",
-  "progress-0",
-  "progress-25",
-  "progress-50",
-  "progress-75",
-  "progress-100",
-  "flag-red",
-  "flag-yellow",
-  "flag-green",
-  "flag-blue",
-  "smile",
-  "neutral",
-  "sad",
-  "question"
-];
-var TOPIC_MARKER_GROUPS = [
-  { group: "status", single: false, ids: ["done", "warning", "star"] },
-  { group: "priority", single: true, ids: ["priority-1", "priority-2", "priority-3", "priority-4", "priority-5"] },
-  {
-    group: "progress",
-    single: true,
-    ids: ["progress-0", "progress-25", "progress-50", "progress-75", "progress-100"]
-  },
-  { group: "flag", single: false, ids: ["flag-red", "flag-yellow", "flag-green", "flag-blue"] },
-  { group: "face", single: false, ids: ["smile", "neutral", "sad", "question"] }
-];
-function markerGroup(id) {
-  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).group;
-}
-function isSingleChoiceMarker(id) {
-  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).single;
-}
-var SYMBOLS = {
-  done: "\u2713",
-  warning: "\u26A0",
-  star: "\u2605",
-  "priority-1": "P1",
-  "priority-2": "P2",
-  "priority-3": "P3",
-  "priority-4": "P4",
-  "priority-5": "P5",
-  "progress-0": "\u25CB",
-  "progress-25": "\u25D4",
-  "progress-50": "\u25D1",
-  "progress-75": "\u25D5",
-  "progress-100": "\u25CF",
-  "flag-red": "\u2691R",
-  "flag-yellow": "\u2691Y",
-  "flag-green": "\u2691G",
-  "flag-blue": "\u2691B",
-  smile: "\u263A",
-  neutral: "-_-",
-  sad: "\u2639",
-  question: "?"
-};
-var LABEL_KEYS = {
-  done: "share.viewer_marker_done",
-  warning: "share.viewer_marker_warning",
-  star: "share.viewer_marker_star",
-  "priority-1": "share.viewer_marker_priority_1",
-  "priority-2": "share.viewer_marker_priority_2",
-  "priority-3": "share.viewer_marker_priority_3",
-  "priority-4": "share.viewer_marker_priority_4",
-  "priority-5": "share.viewer_marker_priority_5",
-  "progress-0": "share.viewer_marker_progress_0",
-  "progress-25": "share.viewer_marker_progress_25",
-  "progress-50": "share.viewer_marker_progress_50",
-  "progress-75": "share.viewer_marker_progress_75",
-  "progress-100": "share.viewer_marker_progress_100",
-  "flag-red": "share.viewer_marker_flag_red",
-  "flag-yellow": "share.viewer_marker_flag_yellow",
-  "flag-green": "share.viewer_marker_flag_green",
-  "flag-blue": "share.viewer_marker_flag_blue",
-  smile: "share.viewer_marker_smile",
-  neutral: "share.viewer_marker_neutral",
-  sad: "share.viewer_marker_sad",
-  question: "share.viewer_marker_question"
-};
-function readTopicMarkers(fm) {
-  const raw = fm["topic-markers"];
-  if (!Array.isArray(raw)) return [];
-  const seen = /* @__PURE__ */ new Set();
-  return TOPIC_MARKERS.filter((id) => {
-    if (!raw.includes(id)) return false;
-    if (!isSingleChoiceMarker(id)) return true;
-    const group = markerGroup(id);
-    if (seen.has(group)) return false;
-    seen.add(group);
-    return true;
-  });
-}
-function toggleTopicMarker(raw, id) {
-  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const group = TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id));
-  const groupIds = group.ids;
-  let next;
-  if (group.single) {
-    const shown = groupIds.find((g) => current.includes(g));
-    const rest = current.filter((v) => typeof v !== "string" || !groupIds.includes(v));
-    next = shown === id ? rest : [...rest, id];
-  } else if (current.includes(id)) next = current.filter((v) => v !== id);
-  else next = [...current, id];
-  return next.length ? next : null;
-}
-function markerSymbol(id) {
-  return SYMBOLS[id];
-}
-function markerLabelKey(id) {
-  return LABEL_KEYS[id];
-}
-
-// topic-links.ts
-var TOPIC_LINKS_MAX = 20;
-var TOPIC_LINK_MAX_LENGTH = 2048;
-function normalizeTopicLink(value) {
-  if (typeof value !== "string") return null;
-  const text11 = value.trim();
-  if (!text11 || text11.length > TOPIC_LINK_MAX_LENGTH) return null;
-  if (/[\x00-\x20\x7f-\x9f\u2028\u2029]/.test(text11)) return null;
-  if (!/^https?:\/\//i.test(text11)) return null;
-  let url;
-  try {
-    url = new URL(text11);
-  } catch (e) {
-    return null;
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-  if (!url.hostname || url.username || url.password) return null;
-  if (url.href.length > TOPIC_LINK_MAX_LENGTH) return null;
-  return url.href;
-}
-function readTopicLinks(fm) {
-  const raw = fm["topic-links"];
-  const items = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const item of items) {
-    const href = normalizeTopicLink(item);
-    if (!href || seen.has(href)) continue;
-    seen.add(href);
-    out.push(href);
-    if (out.length >= TOPIC_LINKS_MAX) break;
-  }
-  return out;
-}
-function addTopicLink(raw, input2) {
-  const href = normalizeTopicLink(input2);
-  if (!href) return { ok: false, reason: "invalid" };
-  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const valid = readTopicLinks({ "topic-links": current });
-  if (valid.includes(href)) return { ok: false, reason: "duplicate" };
-  if (valid.length >= TOPIC_LINKS_MAX) return { ok: false, reason: "too-many" };
-  return { ok: true, next: [...current, href] };
-}
-function removeTopicLink(raw, href) {
-  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-  const next = current.filter((item) => typeof item !== "string" || normalizeTopicLink(item) !== href);
-  return next.length ? next : null;
-}
-
-// topic-colors.ts
-var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
-function readTopicColor(fm) {
-  const raw = fm["topic-color"];
-  return TOPIC_COLORS.find((id) => id === raw);
-}
-function colorLabelKey(id) {
-  return `share.viewer_color_${id}`;
-}
-var TOPIC_STYLES = ["bold", "text-small", "text-large", "border-thick", "line-thick"];
-var TEXT_SIZES = ["text-small", "text-large"];
-function rawStyleList(raw) {
-  return Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
-}
-function readTopicStyle(fm) {
-  const list = rawStyleList(fm["topic-style"]);
-  const size = list.find((v) => TEXT_SIZES.some((s) => s === v));
-  return TOPIC_STYLES.filter((id) => TEXT_SIZES.includes(id) ? id === size : list.includes(id));
-}
-function toggleTopicStyle(raw, token) {
-  const current = rawStyleList(raw);
-  const shown = readTopicStyle({ "topic-style": raw });
-  const drop = (ids) => current.filter((v) => typeof v !== "string" || !ids.includes(v));
-  let next;
-  if (TEXT_SIZES.includes(token)) next = shown.includes(token) ? drop(TEXT_SIZES) : [...drop(TEXT_SIZES), token];
-  else next = shown.includes(token) ? drop([token]) : [...current, token];
-  return next.length ? next : null;
-}
-function setTopicStyle(raw, styles) {
-  const wanted = readTopicStyle({ "topic-style": styles });
-  const rest = rawStyleList(raw).filter((v) => typeof v !== "string" || !TOPIC_STYLES.some((id) => id === v));
-  const next = [...rest, ...wanted];
-  return next.length ? next : null;
-}
-var STYLE_LABEL_KEYS = {
-  bold: "ui.topic_style_bold",
-  "text-small": "ui.topic_style_size_small",
-  "text-large": "ui.topic_style_size_large",
-  "border-thick": "ui.topic_style_border_thick",
-  "line-thick": "ui.topic_style_line_thick"
-};
-function styleLabelKey(id) {
-  return STYLE_LABEL_KEYS[id];
-}
-function branchNoteIds(nodes, id) {
-  return [id, ...descendants(nodes, id)];
-}
-
-// repository.ts
-var import_obsidian11 = require("obsidian");
-var import_node_crypto5 = require("node:crypto");
-
-// ai/model-resolution.ts
-var FALLBACK_MODEL = "gpt-5.6-luna";
-function resolveTaskModel(input2) {
-  var _a2, _b2, _c, _d, _e, _f;
-  const once = (_b2 = (_a2 = input2.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
-  if (once) {
-    return { model: once, reasoning: (_d = (_c = input2.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input2.current.reasoning, origin: "run-once" };
-  }
-  const own2 = (_f = (_e = input2.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
-  if (input2.override && own2) return { model: own2, reasoning: input2.override.reasoning, origin: "override" };
-  return { model: input2.current.model, reasoning: input2.current.reasoning, origin: "current" };
-}
+// experiences/visual-map/note-write-helpers.ts
+var import_node_crypto6 = require("node:crypto");
 
 // ai/markdown-blocks.ts
 function fencedLines(lines) {
@@ -20902,6 +20582,242 @@ ${rules.join("\n")}` : ""
     rules: rules.length ? `
 ${rules.join("\n")}` : ""
   });
+}
+
+// repository.ts
+var import_obsidian11 = require("obsidian");
+
+// topic-colors.ts
+var TOPIC_COLORS = ["red", "orange", "yellow", "green", "blue", "purple"];
+function readTopicColor(fm) {
+  const raw = fm["topic-color"];
+  return TOPIC_COLORS.find((id) => id === raw);
+}
+function colorLabelKey(id) {
+  return `share.viewer_color_${id}`;
+}
+var TOPIC_STYLES = ["bold", "text-small", "text-large", "border-thick", "line-thick"];
+var TEXT_SIZES = ["text-small", "text-large"];
+function rawStyleList(raw) {
+  return Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+}
+function readTopicStyle(fm) {
+  const list = rawStyleList(fm["topic-style"]);
+  const size = list.find((v) => TEXT_SIZES.some((s) => s === v));
+  return TOPIC_STYLES.filter((id) => TEXT_SIZES.includes(id) ? id === size : list.includes(id));
+}
+function toggleTopicStyle(raw, token) {
+  const current = rawStyleList(raw);
+  const shown = readTopicStyle({ "topic-style": raw });
+  const drop = (ids) => current.filter((v) => typeof v !== "string" || !ids.includes(v));
+  let next;
+  if (TEXT_SIZES.includes(token)) next = shown.includes(token) ? drop(TEXT_SIZES) : [...drop(TEXT_SIZES), token];
+  else next = shown.includes(token) ? drop([token]) : [...current, token];
+  return next.length ? next : null;
+}
+function setTopicStyle(raw, styles) {
+  const wanted = readTopicStyle({ "topic-style": styles });
+  const rest = rawStyleList(raw).filter((v) => typeof v !== "string" || !TOPIC_STYLES.some((id) => id === v));
+  const next = [...rest, ...wanted];
+  return next.length ? next : null;
+}
+var STYLE_LABEL_KEYS = {
+  bold: "ui.topic_style_bold",
+  "text-small": "ui.topic_style_size_small",
+  "text-large": "ui.topic_style_size_large",
+  "border-thick": "ui.topic_style_border_thick",
+  "line-thick": "ui.topic_style_line_thick"
+};
+function styleLabelKey(id) {
+  return STYLE_LABEL_KEYS[id];
+}
+function branchNoteIds(nodes, id) {
+  return [id, ...descendants(nodes, id)];
+}
+
+// topic-links.ts
+var TOPIC_LINKS_MAX = 20;
+var TOPIC_LINK_MAX_LENGTH = 2048;
+function normalizeTopicLink(value) {
+  if (typeof value !== "string") return null;
+  const text11 = value.trim();
+  if (!text11 || text11.length > TOPIC_LINK_MAX_LENGTH) return null;
+  if (/[\x00-\x20\x7f-\x9f\u2028\u2029]/.test(text11)) return null;
+  if (!/^https?:\/\//i.test(text11)) return null;
+  let url;
+  try {
+    url = new URL(text11);
+  } catch (e) {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (!url.hostname || url.username || url.password) return null;
+  if (url.href.length > TOPIC_LINK_MAX_LENGTH) return null;
+  return url.href;
+}
+function readTopicLinks(fm) {
+  const raw = fm["topic-links"];
+  const items = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const item of items) {
+    const href = normalizeTopicLink(item);
+    if (!href || seen.has(href)) continue;
+    seen.add(href);
+    out.push(href);
+    if (out.length >= TOPIC_LINKS_MAX) break;
+  }
+  return out;
+}
+function addTopicLink(raw, input2) {
+  const href = normalizeTopicLink(input2);
+  if (!href) return { ok: false, reason: "invalid" };
+  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const valid = readTopicLinks({ "topic-links": current });
+  if (valid.includes(href)) return { ok: false, reason: "duplicate" };
+  if (valid.length >= TOPIC_LINKS_MAX) return { ok: false, reason: "too-many" };
+  return { ok: true, next: [...current, href] };
+}
+function removeTopicLink(raw, href) {
+  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const next = current.filter((item) => typeof item !== "string" || normalizeTopicLink(item) !== href);
+  return next.length ? next : null;
+}
+
+// topic-markers.ts
+var TOPIC_MARKERS = [
+  "done",
+  "warning",
+  "star",
+  "priority-1",
+  "priority-2",
+  "priority-3",
+  "priority-4",
+  "priority-5",
+  "progress-0",
+  "progress-25",
+  "progress-50",
+  "progress-75",
+  "progress-100",
+  "flag-red",
+  "flag-yellow",
+  "flag-green",
+  "flag-blue",
+  "smile",
+  "neutral",
+  "sad",
+  "question"
+];
+var TOPIC_MARKER_GROUPS = [
+  { group: "status", single: false, ids: ["done", "warning", "star"] },
+  { group: "priority", single: true, ids: ["priority-1", "priority-2", "priority-3", "priority-4", "priority-5"] },
+  {
+    group: "progress",
+    single: true,
+    ids: ["progress-0", "progress-25", "progress-50", "progress-75", "progress-100"]
+  },
+  { group: "flag", single: false, ids: ["flag-red", "flag-yellow", "flag-green", "flag-blue"] },
+  { group: "face", single: false, ids: ["smile", "neutral", "sad", "question"] }
+];
+function markerGroup(id) {
+  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).group;
+}
+function isSingleChoiceMarker(id) {
+  return TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id)).single;
+}
+var SYMBOLS = {
+  done: "\u2713",
+  warning: "\u26A0",
+  star: "\u2605",
+  "priority-1": "P1",
+  "priority-2": "P2",
+  "priority-3": "P3",
+  "priority-4": "P4",
+  "priority-5": "P5",
+  "progress-0": "\u25CB",
+  "progress-25": "\u25D4",
+  "progress-50": "\u25D1",
+  "progress-75": "\u25D5",
+  "progress-100": "\u25CF",
+  "flag-red": "\u2691R",
+  "flag-yellow": "\u2691Y",
+  "flag-green": "\u2691G",
+  "flag-blue": "\u2691B",
+  smile: "\u263A",
+  neutral: "-_-",
+  sad: "\u2639",
+  question: "?"
+};
+var LABEL_KEYS = {
+  done: "share.viewer_marker_done",
+  warning: "share.viewer_marker_warning",
+  star: "share.viewer_marker_star",
+  "priority-1": "share.viewer_marker_priority_1",
+  "priority-2": "share.viewer_marker_priority_2",
+  "priority-3": "share.viewer_marker_priority_3",
+  "priority-4": "share.viewer_marker_priority_4",
+  "priority-5": "share.viewer_marker_priority_5",
+  "progress-0": "share.viewer_marker_progress_0",
+  "progress-25": "share.viewer_marker_progress_25",
+  "progress-50": "share.viewer_marker_progress_50",
+  "progress-75": "share.viewer_marker_progress_75",
+  "progress-100": "share.viewer_marker_progress_100",
+  "flag-red": "share.viewer_marker_flag_red",
+  "flag-yellow": "share.viewer_marker_flag_yellow",
+  "flag-green": "share.viewer_marker_flag_green",
+  "flag-blue": "share.viewer_marker_flag_blue",
+  smile: "share.viewer_marker_smile",
+  neutral: "share.viewer_marker_neutral",
+  sad: "share.viewer_marker_sad",
+  question: "share.viewer_marker_question"
+};
+function readTopicMarkers(fm) {
+  const raw = fm["topic-markers"];
+  if (!Array.isArray(raw)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  return TOPIC_MARKERS.filter((id) => {
+    if (!raw.includes(id)) return false;
+    if (!isSingleChoiceMarker(id)) return true;
+    const group = markerGroup(id);
+    if (seen.has(group)) return false;
+    seen.add(group);
+    return true;
+  });
+}
+function toggleTopicMarker(raw, id) {
+  const current = Array.isArray(raw) ? raw : typeof raw === "string" && raw ? [raw] : [];
+  const group = TOPIC_MARKER_GROUPS.find((g) => g.ids.includes(id));
+  const groupIds = group.ids;
+  let next;
+  if (group.single) {
+    const shown = groupIds.find((g) => current.includes(g));
+    const rest = current.filter((v) => typeof v !== "string" || !groupIds.includes(v));
+    next = shown === id ? rest : [...rest, id];
+  } else if (current.includes(id)) next = current.filter((v) => v !== id);
+  else next = [...current, id];
+  return next.length ? next : null;
+}
+function markerSymbol(id) {
+  return SYMBOLS[id];
+}
+function markerLabelKey(id) {
+  return LABEL_KEYS[id];
+}
+
+// repository.ts
+var import_node_crypto5 = require("node:crypto");
+
+// ai/model-resolution.ts
+var FALLBACK_MODEL = "gpt-5.6-luna";
+function resolveTaskModel(input2) {
+  var _a2, _b2, _c, _d, _e, _f;
+  const once = (_b2 = (_a2 = input2.runOnce) == null ? void 0 : _a2.model) == null ? void 0 : _b2.trim();
+  if (once) {
+    return { model: once, reasoning: (_d = (_c = input2.runOnce) == null ? void 0 : _c.reasoning) != null ? _d : input2.current.reasoning, origin: "run-once" };
+  }
+  const own2 = (_f = (_e = input2.override) == null ? void 0 : _e.model) == null ? void 0 : _f.trim();
+  if (input2.override && own2) return { model: own2, reasoning: input2.override.reasoning, origin: "override" };
+  return { model: input2.current.model, reasoning: input2.current.reasoning, origin: "current" };
 }
 
 // core/map-chat-layout.ts
@@ -23630,6 +23546,103 @@ ${body}`;
   }
 };
 
+// experiences/visual-map/note-write-helpers.ts
+function summaryForPrompt(summary, language2) {
+  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
+}
+function formatIssuesPatch(issues, language2) {
+  return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
+}
+var originBaseline = (origin) => (0, import_node_crypto6.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
+
+// experiences/visual-map/relation-geometry.ts
+var MIN_CONTROL = 16;
+var MAX_CONTROL = 60;
+function axisGap(aStart, aSize, bStart, bSize) {
+  return Math.max(bStart - (aStart + aSize), aStart - (bStart + bSize));
+}
+var centreOf = (box) => ({
+  x: box.x + box.width / 2,
+  y: box.y + box.height / 2
+});
+function nearestSides(a, b) {
+  const horizontal = axisGap(a.x, a.width, b.x, b.width), vertical = axisGap(a.y, a.height, b.y, b.height);
+  if (horizontal < 0 && vertical < 0) {
+    const from = centreOf(a), to = centreOf(b);
+    return { from: { ...from, nx: 0, ny: 0 }, to: { ...to, nx: 0, ny: 0 }, gap: 0 };
+  }
+  if (horizontal >= vertical) {
+    const rightward = centreOf(b).x >= centreOf(a).x, sign2 = rightward ? 1 : -1;
+    return {
+      from: { x: rightward ? a.x + a.width : a.x, y: a.y + a.height / 2, nx: sign2, ny: 0 },
+      to: { x: rightward ? b.x : b.x + b.width, y: b.y + b.height / 2, nx: -sign2, ny: 0 },
+      gap: horizontal
+    };
+  }
+  const downward = centreOf(b).y >= centreOf(a).y, sign = downward ? 1 : -1;
+  return {
+    from: { x: a.x + a.width / 2, y: downward ? a.y + a.height : a.y, nx: 0, ny: sign },
+    to: { x: b.x + b.width / 2, y: downward ? b.y : b.y + b.height, nx: 0, ny: -sign },
+    gap: vertical
+  };
+}
+var controlLength = (gap) => Math.min(MAX_CONTROL, Math.max(MIN_CONTROL, gap / 2));
+function curveOf(a, b) {
+  const { from, to, gap } = nearestSides(a, b), length = gap > 0 ? controlLength(gap) : 0;
+  return {
+    p1: { x: from.x, y: from.y },
+    c1: { x: from.x + from.nx * length, y: from.y + from.ny * length },
+    c2: { x: to.x + to.nx * length, y: to.y + to.ny * length },
+    p2: { x: to.x, y: to.y }
+  };
+}
+function relationPathData(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return `M ${p1.x} ${p1.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+}
+function relationLabelPoint(a, b) {
+  const { p1, c1, c2, p2 } = curveOf(a, b);
+  return { x: (p1.x + 3 * c1.x + 3 * c2.x + p2.x) / 8, y: (p1.y + 3 * c1.y + 3 * c2.y + p2.y) / 8 };
+}
+function treeEdgePathData(parent, child, direction, depth = 1) {
+  if (direction === "radial") return relationPathData(parent, child);
+  if (direction === "timeline" && depth >= 2)
+    return treeEdgePathData(parent, child, child.y + child.height / 2 >= parent.y + parent.height / 2 ? "down" : "up");
+  if (direction === "fishbone")
+    return depth >= 3 ? treeEdgePathData(parent, child, "left") : fishboneEdgePathData(parent, child, depth);
+  if (direction === "down" || direction === "up") {
+    const x12 = parent.x + parent.width / 2, x22 = child.x + child.width / 2, down = direction === "down", y12 = down ? parent.y + parent.height : parent.y, y22 = down ? child.y : child.y + child.height, bend2 = Math.max(60, Math.abs(y22 - y12) / 2), sign = down ? 1 : -1;
+    return `M ${x12} ${y12} C ${x12} ${y12 + sign * bend2}, ${x22} ${y22 - sign * bend2}, ${x22} ${y22}`;
+  }
+  const y1 = parent.y + parent.height / 2, y2 = child.y + child.height / 2;
+  const leftward = direction === "balanced" ? child.x + child.width / 2 < parent.x + parent.width / 2 : direction === "left";
+  if (leftward) {
+    const x12 = parent.x, x22 = child.x + child.width, bend2 = Math.max(60, Math.abs(x22 - x12) / 2);
+    return `M ${x12} ${y1} C ${x12 - bend2} ${y1}, ${x22 + bend2} ${y2}, ${x22} ${y2}`;
+  }
+  const x1 = parent.x + parent.width, x2 = child.x, bend = Math.max(60, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+}
+var BONE_RUN2 = 1 / Math.tan(Math.PI / 3);
+function fishboneBone(parent, child) {
+  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2, above = childY < parentY, x = child.x + child.width / 2, y = above ? child.y + child.height : child.y;
+  return { jointX: x + Math.abs(parentY - y) * BONE_RUN2, parentY, x, y };
+}
+function fishboneSpinePathData(head, topics) {
+  if (!topics.length) return "";
+  const end = Math.min(...topics.map((topic) => fishboneBone(head, topic).jointX));
+  return `M ${head.x} ${head.y + head.height / 2} L ${end} ${head.y + head.height / 2}`;
+}
+function fishboneEdgePathData(parent, child, depth) {
+  if (depth <= 1) {
+    const { jointX, parentY: parentY2, x: x2, y: y2 } = fishboneBone(parent, child);
+    return `M ${jointX} ${parentY2} L ${x2} ${y2}`;
+  }
+  const parentY = parent.y + parent.height / 2, childY = child.y + child.height / 2;
+  const above = childY > parentY, x = parent.x + parent.width / 2, y = above ? parent.y + parent.height : parent.y, boneX = x + Math.abs(childY - y) * BONE_RUN2;
+  return `M ${boneX} ${childY} L ${child.x + child.width} ${childY}`;
+}
+
 // experiences/visual-map/card-cover.ts
 var COVER_KEY = "topic-cover";
 var IMAGE_EXTENSION2 = /\.(?:png|jpe?g|gif|webp)$/i;
@@ -23771,7 +23784,7 @@ function shapeInsets(kind, content) {
 }
 
 // experiences/visual-map/view.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 var import_obsidian31 = require("obsidian");
 
 // ai/result-utils.ts
@@ -24746,87 +24759,6 @@ function findingList(items, none, limit = 30) {
   const lines = items.slice(0, limit).map((item) => `- ${item}`);
   if (items.length > limit) lines.push(`- \u2026 (+${items.length - limit})`);
   return lines.join("\n");
-}
-
-// core/steps/task/carry-sources.ts
-var HEADING_KEY = "note.earlier_research_sources";
-var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
-var TOKEN = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
-function outsideCode(text11) {
-  const lines = text11.replace(/\r\n/g, "\n").split("\n");
-  const code = fencedLines(lines);
-  return lines.filter((_, index) => !code[index]);
-}
-function keysOf(text11) {
-  return [...linksOf([text11]).keys()];
-}
-function plainLine(line) {
-  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
-  return `- ${stripped}`;
-}
-function linkTokens(line, wanted) {
-  const out = [];
-  for (const match of line.matchAll(TOKEN)) {
-    const token = match[0];
-    if (!wanted(keysOf(token))) continue;
-    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
-    else out.push(token.replace(/^!/, ""));
-  }
-  return out;
-}
-function carriedSourceLines(previousTexts, nextTexts) {
-  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
-  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
-  if (!missing.size) return [];
-  const covered = /* @__PURE__ */ new Set();
-  const lines = [];
-  const add = (line) => {
-    if (line.trim() && !lines.includes(line)) lines.push(line);
-  };
-  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
-  for (const line of previousTexts.flatMap(outsideCode)) {
-    const keys = keysOf(line);
-    if (!open(keys)) continue;
-    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
-    if (definition) add(`- ${definition[1].trim()}`);
-    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
-    else add(plainLine(line));
-    for (const key2 of keys) covered.add(key2);
-  }
-  return lines;
-}
-function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
-  const carried = carriedSourceLines(previousTexts, nextTexts);
-  if (!carried.length) return detail;
-  const heading = translateNote(language2, HEADING_KEY);
-  const lines = detail.split("\n");
-  const code = fencedLines(lines);
-  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
-  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
-  const keys = sourcesHeadingKeys(template2);
-  const start = lines.findIndex((line, index) => {
-    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
-    return !!match && keys.has(match[1].toLocaleLowerCase());
-  });
-  if (start < 0) return `${detail.trimEnd()}
-
-### ${heading}
-
-${carried.join("\n")}
-`;
-  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
-}
-function insertAfterBlock(lines, code, start, add, stop, separate = false) {
-  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
-  if (end < 0) end = lines.length;
-  while (end > start + 1 && !lines[end - 1].trim()) end--;
-  return [
-    ...lines.slice(0, end),
-    ...separate ? [""] : [],
-    ...add,
-    ...end < lines.length && lines[end].trim() ? [""] : [],
-    ...lines.slice(end)
-  ].join("\n");
 }
 
 // ai/visual-guidance.ts
@@ -30407,7 +30339,7 @@ async function loadableImages(candidates, signal) {
 }
 
 // core/ai-task-service.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 
 // ai/context-builder.ts
 var estimateTokens = (value) => Math.ceil((value || "").length / 4);
@@ -30493,7 +30425,7 @@ function isSearchNotPerformed(error) {
 }
 
 // core/ai-calls.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var AiCalls = class {
   constructor(options) {
     this.options = options;
@@ -30556,7 +30488,7 @@ var AiCalls = class {
       requestLog = "request-and-prompt",
       stopped = () => new Error(t("ui.ai_task_cancelled"))
     } = options;
-    const key2 = `${options.taskName}:${(0, import_node_crypto6.randomUUID)()}`;
+    const key2 = `${options.taskName}:${(0, import_node_crypto7.randomUUID)()}`;
     const controller = new AbortController();
     const abort = () => controller.abort();
     options.signal.addEventListener("abort", abort, { once: true });
@@ -30564,7 +30496,7 @@ var AiCalls = class {
     this.activeTasks.set(key2, controller);
     const started = this.options.exchanges();
     const log = () => started ? this.options.exchanges() : void 0;
-    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto6.randomUUID)();
+    const id = (_b2 = options.exchangeId) != null ? _b2 : (0, import_node_crypto7.randomUUID)();
     const milestones = {};
     let milestonesWritten = false;
     const writeMilestones = () => {
@@ -33208,7 +33140,7 @@ var AiTaskService = class {
     for (; ; ) {
       if (taskSignal == null ? void 0 : taskSignal.aborted) throw cancelled();
       attemptNumber++;
-      const attemptId = (0, import_node_crypto7.randomUUID)();
+      const attemptId = (0, import_node_crypto8.randomUUID)();
       const controller = new AbortController();
       const onTaskAbort = () => controller.abort();
       taskSignal == null ? void 0 : taskSignal.addEventListener("abort", onTaskAbort, { once: true });
@@ -33227,7 +33159,7 @@ var AiTaskService = class {
         if ((taskSignal == null ? void 0 : taskSignal.aborted) || !live() || firstEvent) return;
         resendRequested = true;
         disarm();
-        promisedId = (0, import_node_crypto7.randomUUID)();
+        promisedId = (0, import_node_crypto8.randomUUID)();
         extra.resentAs = promisedId;
         controller.abort();
       };
@@ -34207,99 +34139,8 @@ function relevanceModeAfterWrite(planned, setupChanged) {
   return planned === "recalibrate" && !setupChanged ? "recalibrate" : "full";
 }
 
-// store-adapter.ts
-async function readStoreText(adapter, path) {
-  if (await adapter.exists(path)) return adapter.read(path);
-  const temporary = `${path}.tmp`;
-  if (!await adapter.exists(temporary)) return null;
-  const text11 = await adapter.read(temporary);
-  await adapter.rename(temporary, path);
-  return text11;
-}
-async function writeStoreAtomically(adapter, path, text11) {
-  const temporary = `${path}.tmp`;
-  await adapter.write(temporary, text11);
-  if (await adapter.exists(path)) await adapter.remove(path);
-  await adapter.rename(temporary, path);
-}
-
-// pending-suggestions.ts
-var PendingSuggestions = class extends Map {
-  constructor(adapter, path, onError) {
-    super();
-    this.adapter = adapter;
-    this.path = path;
-    this.onError = onError;
-    __publicField(this, "writes", Promise.resolve());
-    __publicField(this, "writeError", null);
-    __publicField(this, "loadError", null);
-  }
-  async load() {
-    try {
-      const text11 = await readStoreText(this.adapter, this.path);
-      if (text11 === null) return;
-      const parsed = JSON.parse(text11);
-      if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
-      const entries = [];
-      for (const item of parsed) {
-        if (!Array.isArray(item) || item.length !== 2 || typeof item[0] !== "string" || !Array.isArray(item[1]))
-          throw new Error(t("error.pending_suggestions_fields_invalid"));
-        const suggestions = item[1].filter((value) => {
-          if (!value || typeof value !== "object") return false;
-          const suggestion = value;
-          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === void 0 || typeof suggestion.parentTitle === "string") && (suggestion.thinkingOriginBaseline === void 0 || typeof suggestion.thinkingOriginBaseline === "string");
-        });
-        if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
-        entries.push([item[0], suggestions]);
-      }
-      for (const [key2, suggestions] of entries) if (suggestions.length) super.set(key2, suggestions);
-      this.loadError = null;
-    } catch (error) {
-      this.loadError = error;
-      this.onError(error);
-    }
-  }
-  set(key2, value) {
-    super.set(key2, value);
-    this.save();
-    return this;
-  }
-  delete(key2) {
-    const removed = super.delete(key2);
-    if (removed) this.save();
-    return removed;
-  }
-  clear() {
-    if (!this.size) return;
-    super.clear();
-    this.save();
-  }
-  async flush() {
-    await this.writes;
-    if (this.writeError)
-      throw this.writeError instanceof Error ? this.writeError : new Error(t("error.pending_suggestions_save_failed"));
-  }
-  save() {
-    if (this.loadError) {
-      this.writeError = this.loadError;
-      this.onError(this.loadError);
-      return;
-    }
-    const snapshot = JSON.stringify([...this.entries()]);
-    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
-      () => {
-        this.writeError = null;
-      },
-      (error) => {
-        this.writeError = error;
-        this.onError(error);
-      }
-    );
-  }
-};
-
 // experiences/aim/create-map.ts
-var import_node_crypto8 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 
 // experiences/aim/outcome-expectations.ts
 var goals = ["auto", "execute", "understand", "explore", "custom"];
@@ -34395,7 +34236,7 @@ async function createAimMap(repository, model, input2) {
     const notePath = repository.unique(repository.topicFolder(mapPath, "Notes"), topic);
     const chosenReasoning = normalizeReasoningLevel((_f = input2.reasoning) != null ? _f : repository.settings.cliReasoning);
     draft = {
-      nodeId: (0, import_node_crypto8.randomUUID)(),
+      nodeId: (0, import_node_crypto9.randomUUID)(),
       notePath,
       title: topic,
       context: rootContext,
@@ -36873,6 +36714,22 @@ var ReferencePicker = class {
 
 // ui/modals/debug-log-modal.ts
 var import_obsidian22 = require("obsidian");
+
+// store-adapter.ts
+async function readStoreText(adapter, path) {
+  if (await adapter.exists(path)) return adapter.read(path);
+  const temporary = `${path}.tmp`;
+  if (!await adapter.exists(temporary)) return null;
+  const text11 = await adapter.read(temporary);
+  await adapter.rename(temporary, path);
+  return text11;
+}
+async function writeStoreAtomically(adapter, path, text11) {
+  const temporary = `${path}.tmp`;
+  await adapter.write(temporary, text11);
+  if (await adapter.exists(path)) await adapter.remove(path);
+  await adapter.rename(temporary, path);
+}
 
 // ai-exchange-log.ts
 function isRecord3(value) {
@@ -40374,7 +40231,7 @@ var TopicTreeModal = class extends import_obsidian25.Modal {
 
 // ui/modals/aim-start-modal.ts
 var import_obsidian26 = require("obsidian");
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto10 = require("node:crypto");
 var AimStartModal = class extends import_obsidian26.Modal {
   constructor(app, submit, models = [], defaultModel = FALLBACK_MODEL, defaultReasoning = "low", refreshModels) {
     super(app);
@@ -40383,7 +40240,7 @@ var AimStartModal = class extends import_obsidian26.Modal {
     this.defaultModel = defaultModel;
     this.defaultReasoning = defaultReasoning;
     this.refreshModels = refreshModels;
-    __publicField(this, "requestId", (0, import_node_crypto9.randomUUID)());
+    __publicField(this, "requestId", (0, import_node_crypto10.randomUUID)());
   }
   onOpen() {
     this.titleEl.setText(t("ui.aim_start_title"));
@@ -40539,7 +40396,7 @@ var AimStartModal = class extends import_obsidian26.Modal {
     answerCount.setAttr("aria-label", t("ui.aim_minimum_answers"));
     answerCountLabel.createEl("p", { cls: "vam-hint", text: t("ui.aim_answer_target_hint") });
     const newRequest = () => {
-      this.requestId = (0, import_node_crypto9.randomUUID)();
+      this.requestId = (0, import_node_crypto10.randomUUID)();
     };
     topic.addEventListener("input", newRequest);
     context.addEventListener("input", newRequest);
@@ -40658,9 +40515,9 @@ var AimStartModal = class extends import_obsidian26.Modal {
 
 // ui/modals/aim-answer-modal.ts
 var import_obsidian27 = require("obsidian");
-var import_node_crypto10 = require("node:crypto");
+var import_node_crypto11 = require("node:crypto");
 var AimAnswerModal = class extends import_obsidian27.Modal {
-  constructor(app, question, options, submit, requestId = (0, import_node_crypto10.randomUUID)()) {
+  constructor(app, question, options, submit, requestId = (0, import_node_crypto11.randomUUID)()) {
     super(app);
     this.question = question;
     this.options = options;
@@ -40683,7 +40540,7 @@ var AimAnswerModal = class extends import_obsidian27.Modal {
       label.createSpan({ text: option.label });
       boxes.set(option.id, input2);
       input2.addEventListener("change", () => {
-        this.requestId = (0, import_node_crypto10.randomUUID)();
+        this.requestId = (0, import_node_crypto11.randomUUID)();
         if (input2.checked && option.id === "__aim_unknown__") {
           for (const [id, peer] of boxes) if (id !== option.id) peer.checked = false;
         } else if (input2.checked) {
@@ -40697,7 +40554,7 @@ var AimAnswerModal = class extends import_obsidian27.Modal {
     const freeText = freeTextLabel.createEl("textarea", { attr: { rows: "3" } });
     freeText.setAttr("aria-label", t("ui.aim_free_text"));
     freeText.addEventListener("input", () => {
-      this.requestId = (0, import_node_crypto10.randomUUID)();
+      this.requestId = (0, import_node_crypto11.randomUUID)();
     });
     const status = this.contentEl.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
     let pending2 = false, submitButton;
@@ -40923,7 +40780,7 @@ function deduplicateAimRequest(context) {
 }
 
 // experiences/aim/final-delivery.ts
-var import_node_crypto11 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 
 // experiences/aim/steps/delivery-outline/task.md
 var task_default = "You are the final-delivery Synthesizer. Design the actual document needed to answer the original user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return the outline in aim.sections: each section has heading, purpose (what the reader can do or understand after it), searchTask (specific web search needed, or empty if already supported), evidenceIds and dependencies (supplied source IDs). Choose a suitable structure, not a fixed template. Open with a section that gives the direct answer or recommendation. Give every section a distinct purpose so no two sections cover the same advice or caveats; gather the items the user must still confirm in at most one section; use no more sections than the answer needs (usually 3 to 5). Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Earlier rounds are part of this answer: the user's earlier answers and their saved results (earlier documents and research) carry into this document, integrated with the current research. Update what the current research changes, and drop an earlier finding only when a later answer replaces it. Do not ask the user or deliver the document yet.\nSupplied evidence IDs and reports:\n{{sourceCatalog}}\n";
@@ -40975,7 +40832,7 @@ ${renderTemplate(open_items_default, { openItems })}` : task;
 
 // experiences/aim/final-delivery.ts
 var DOCUMENT_KEY = "document";
-var fingerprint = (value) => (0, import_node_crypto11.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+var fingerprint = (value) => (0, import_node_crypto12.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
 function parseDeliveryOutline(detail) {
   const marker5 = detail.match(/<!--\s*aim-delivery-outline\s+([\s\S]*?)\s*-->/);
   if (!marker5) throw new Error("Final delivery outline is missing; no conclusion was saved.");
@@ -41265,7 +41122,7 @@ ${draft.detail}`
 }
 
 // experiences/aim/manual-flow.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
 
 // experiences/aim/search-diagnostic.ts
 function createSearchDiagnostic(researchTurn) {
@@ -42312,7 +42169,7 @@ var OTHER_ROUTE_REUSE_LIMIT = 6;
 var SEARCH_NOT_PERFORMED2 = /did not perform web search|沒有實際執行網路搜尋/;
 var CHECKLIST_QUESTION_LIMIT = 5;
 var _AimManualFlow = class _AimManualFlow {
-  constructor(repository, runs, askModel, id = import_node_crypto12.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
+  constructor(repository, runs, askModel, id = import_node_crypto13.randomUUID, persist = (operation) => operation(), limits = ACTIVE_AIM_FLOW_LIMITS) {
     this.repository = repository;
     this.runs = runs;
     this.askModel = askModel;
@@ -42552,7 +42409,7 @@ ${(_d = context.task) != null ? _d : ""}`
       readable.map(async (id) => {
         const ref = this.evidenceReports.get(id);
         const note = await this.repository.readNote(ref.path);
-        if ((0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash)
+        if ((0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex") !== ref.hash)
           throw new Error("AIM evidence changed after indexing; retry with the updated report.");
         return `Evidence ID: ${id}
 Full report:
@@ -44604,7 +44461,7 @@ ${note.detail}`
         });
         this.evidenceReports.set(`${result.nodeId}-v${result.version}`, {
           path: result.notePath,
-          hash: (0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex")
+          hash: (0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex")
         });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
@@ -45124,7 +44981,7 @@ ${dependencyReports}` : "")
     try {
       await this.persist(() => this.runs.recordResearchTurn(mapPath, synthesisHandle));
       const supplementalReports = [];
-      const sourceFingerprint = (0, import_node_crypto12.createHash)("sha256").update(
+      const sourceFingerprint = (0, import_node_crypto13.createHash)("sha256").update(
         JSON.stringify({
           detail: contextBase.detail,
           ancestors: contextBase.ancestors,
@@ -45164,7 +45021,7 @@ ${report.detail}`
         return [
           ...(_a3 = resumeDelivery == null ? void 0 : resumeDelivery.evidence) != null ? _a3 : initialDeliveryEvidence,
           ...supplementalReports.map((item) => ({
-            id: `followup-${(0, import_node_crypto12.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
+            id: `followup-${(0, import_node_crypto13.createHash)("sha256").update(JSON.stringify(item.target)).digest("hex")}`,
             hash: researchContentHash(item),
             detail: `## ${item.target.title}
 
@@ -45666,7 +45523,7 @@ ${beforeSearch.detail}`,
         const evidenceId = `${result.nodeId}-v${result.version}`;
         this.evidenceReports.set(evidenceId, {
           path: result.notePath,
-          hash: (0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex")
+          hash: (0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex")
         });
         if (this.evidenceReports.size > 512) {
           const oldest = [...this.evidenceReports.keys()][0];
@@ -45679,7 +45536,7 @@ ${evidenceCard(evidenceId, note.summary, note.detail)}`
         evidence.push(note);
         sources.push({
           id: evidenceId,
-          hash: (0, import_node_crypto12.createHash)("sha256").update(note.detail).digest("hex"),
+          hash: (0, import_node_crypto13.createHash)("sha256").update(note.detail).digest("hex"),
           detail: `## ${note.title}
 
 ${note.summary}
@@ -45714,12 +45571,12 @@ __publicField(_AimManualFlow, "continuationRuns", /* @__PURE__ */ new Map());
 var AimManualFlow = _AimManualFlow;
 
 // experiences/aim/research-run-store.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 function isRunningAttempt(run, attempt, handle) {
   return run.currentAttemptId === handle.attemptId && attempt.status === "running" && attempt.inputSnapshotHash === handle.inputSnapshotHash;
 }
 var _AimRunStore = class _AimRunStore {
-  constructor(repository, id = import_node_crypto13.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
+  constructor(repository, id = import_node_crypto14.randomUUID, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
     this.repository = repository;
     this.id = id;
     this.now = now;
@@ -46506,7 +46363,7 @@ var _AimRunStore = class _AimRunStore {
     return state;
   }
   snapshotHash(value) {
-    return (0, import_node_crypto13.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
+    return (0, import_node_crypto14.createHash)("sha256").update(JSON.stringify(value)).digest("hex");
   }
   liveKey(mapPath, runId, attemptId) {
     return `${mapPath}
@@ -46739,13 +46596,6 @@ function errorMessage(error) {
   const message = error == null ? void 0 : error.message;
   return typeof message === "string" ? message : String(error);
 }
-function summaryForPrompt(summary, language2) {
-  return isPlaceholder(summary) ? translateNote(noteLanguageOf(language2), "note.no_conclusion_yet") : summary;
-}
-function formatIssuesPatch(issues, language2) {
-  return { detailFormatIssues: (issues != null ? issues : []).map((issue2) => countIssueText(issue2, noteLanguageOf(language2))) };
-}
-var originBaseline = (origin) => (0, import_node_crypto14.createHash)("sha256").update(origin != null ? origin : "").digest("hex");
 function aimQuestionStatus(map, questionNodeId, activeQuestionNodeId) {
   var _a2, _b2;
   if (activeQuestionNodeId === questionNodeId) return "running";
@@ -47868,6 +47718,17 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   syncOutline() {
     this.plugin.syncOutline(this.map, this.notes, this);
   }
+  /** Another view changed a note by AI: this view's undo steps no longer match it. */
+  clearUndoHistory() {
+    this.history.clear();
+  }
+  /** An AI run settled: reload and redraw once the queue is free. */
+  reloadAfterAiRun() {
+    this.enqueue(async () => {
+      await this.hydrate();
+      this.render();
+    });
+  }
   enqueue(work) {
     void this.plugin.mutate(work).catch(() => {
     });
@@ -47906,7 +47767,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     void (async () => {
       var _a2;
       const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-      if (this.plugin.running.has(node.path)) {
+      if (this.plugin.topicRuns.isBusy(node.path)) {
         new import_obsidian31.Notice(t("ui.ai_running_ai"));
         return;
       }
@@ -50218,7 +50079,7 @@ ${request.requirements}` : preset.text,
       }
       this.aimActivityKind = "planning";
       this.render();
-      const result = await this.planAimQuestion(node.id, (0, import_node_crypto14.randomUUID)(), parentBranchId, controller.signal);
+      const result = await this.planAimQuestion(node.id, (0, import_node_crypto15.randomUUID)(), parentBranchId, controller.signal);
       this.noticeDocumentReadyElsewhere(
         result.status === "question" ? void 0 : (_e = result.outcome) == null ? void 0 : _e.status,
         epoch,
@@ -50439,7 +50300,7 @@ ${request.requirements}` : preset.text,
           }
         }
       },
-      (_d = this.aimAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto14.randomUUID)()
+      (_d = this.aimAnswerRequestIds.get(node.id)) != null ? _d : (0, import_node_crypto15.randomUUID)()
     ).open();
   }
   changed(file) {
@@ -50926,8 +50787,8 @@ ${request.requirements}` : preset.text,
     fill2.style.width = `${nodes.length ? done / nodes.length * 100 : 0}%`;
     const running = nodes.filter(
       (node) => {
-        var _a3, _b3;
-        return ((_a3 = this.plugin.running) == null ? void 0 : _a3.has(node.path)) || ((_b3 = this.plugin.quickExpandPending) == null ? void 0 : _b3.has(node.path));
+        var _a3;
+        return this.plugin.topicRuns.isBusy(node.path) || ((_a3 = this.plugin.quickExpandPending) == null ? void 0 : _a3.has(node.path));
       }
     ).length;
     if (running) progress.createSpan({ cls: "vam-status vam-status-running", text: t("ui.researching_0", running) });
@@ -51042,9 +50903,9 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
   }
   mergeBusy(node, except) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d;
     const batch = (_a2 = this.plugin.expansionBatches) == null ? void 0 : _a2.get(this.multiResearchKey()), task = this.integrationTask;
-    return !!(((_c = (_b2 = this.plugin.relevanceGrades) == null ? void 0 : _b2.get(this.path)) == null ? void 0 : _c.status) === "running" || ((_d = this.plugin.running) == null ? void 0 : _d.has(node.path)) || ((_e = this.plugin.quickExpandPending) == null ? void 0 : _e.has(node.path)) || ((_f = this.plugin.activeTasks) == null ? void 0 : _f.has(node.path)) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
+    return !!(((_c = (_b2 = this.plugin.relevanceGrades) == null ? void 0 : _b2.get(this.path)) == null ? void 0 : _c.status) === "running" || this.plugin.topicRuns.isBusy(node.path) || ((_d = this.plugin.quickExpandPending) == null ? void 0 : _d.has(node.path)) || this.plugin.topicRuns.hasTask(node.path) || (batch == null ? void 0 : batch.status) === "running" && (batch.currentPath === node.path || batch.queuedPaths.includes(node.path)) || (task == null ? void 0 : task.state) === "running" && task.mapPath === this.path && task.sources.some((source) => source.id === node.id) || this.isMerging(node.id, except));
   }
   /** True while an AI merge on this map still holds the card (running or being written): the card is locked. */
   isMerging(nodeId, except) {
@@ -52060,7 +51921,7 @@ ${request.requirements}` : preset.text,
   async addFreeText(point) {
     var _a2;
     if (!this.map || !this.canEditText()) return;
-    const id = `txt-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, at = point != null ? point : { x: 0, y: 0 };
+    const id = `txt-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, at = point != null ? point : { x: 0, y: 0 };
     this.pendingTextEditId = id;
     await this.mapChange((map) => {
       var _a3;
@@ -52249,7 +52110,7 @@ ${request.requirements}` : preset.text,
         await this.addFreeText(center && { x: center.x - TEXT_NODE_WIDTH / 2, y: center.y });
         return;
       }
-      const id = `txt-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`;
+      const id = `txt-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`;
       this.pendingTextEditId = id;
       await this.mapChange((map) => {
         var _a3;
@@ -52424,7 +52285,7 @@ ${request.requirements}` : preset.text,
     }
     if (this.suspendSummaryEdit) this.suspendSummaryEdit();
     this.summaryEditDraft = null;
-    this.pendingSummary = { id: `sum-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, members: check.members };
+    this.pendingSummary = { id: `sum-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, members: check.members };
     this.render();
   }
   /**
@@ -52707,7 +52568,7 @@ ${request.requirements}` : preset.text,
     if (!this.map || this.map.aim) return null;
     const known = new Set(this.map.nodes.map((node) => node.id)), members = [...new Set(ids)].filter((id2) => known.has(id2));
     if (!members.length) return null;
-    const id = `frame-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, text11 = label.trim();
+    const id = `frame-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, text11 = label.trim();
     this.focusItemId = id;
     const frame = { id, kind: "boundary", members, ...text11 ? { label: text11 } : {} };
     await this.mapChange((map) => {
@@ -53063,7 +52924,7 @@ ${request.requirements}` : preset.text,
       }
       const name = safeImageName(file.name, accepted.mime);
       if (!name) continue;
-      const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto14.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
+      const natural = (_a2 = imageSize(data)) != null ? _a2 : { width: 240, height: 160 }, scale = Math.min(1, 320 / Math.max(natural.width, natural.height)), w = Math.max(IMAGE_MIN_SIZE, Math.round(natural.width * scale)), h = Math.max(IMAGE_MIN_SIZE, Math.round(natural.height * scale)), id = `img-${(0, import_node_crypto15.randomUUID)().slice(0, 8)}`, x = point.x + offset, y = point.y + offset;
       try {
         if (stale()) return;
         this.focusItemId = id;
@@ -53729,7 +53590,7 @@ ${request.requirements}` : preset.text,
     if (problem === "gone") return refuse("ui.clipboard_cut_missing", true);
     if (problem === "aim") return refuse("ui.clipboard_cut_cross_unsupported");
     if (problem === "changed" || !found) return refuse("ui.clipboard_cut_cross_changed");
-    if (found.branch.some((node) => this.plugin.running.has(node.path))) return refuse("ui.merge_locked");
+    if (found.branch.some((node) => this.plugin.topicRuns.isBusy(node.path))) return refuse("ui.merge_locked");
     return found;
   }
   /** The source map's side of a cross-map cut (decision #28): re-checks it right before the writes, parks the originals. */
@@ -53966,7 +53827,7 @@ ${request.requirements}` : preset.text,
     await this.refreshAfterSavedChange();
   }
   async noteChange(node, patch) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c;
     const current = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0), before = {};
     for (const key2 of Object.keys(patch)) before[key2] = current[key2];
     const followsSummary = patch.summary !== void 0 && patch.preview === void 0 && patch.previewSection === void 0;
@@ -53979,9 +53840,9 @@ ${request.requirements}` : preset.text,
     await this.plugin.repo.updateNote(node.path, patch);
     const written2 = followsSummary ? await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0) : null;
     if (patch.referencePaths !== void 0) {
-      this.plugin.pendingSuggestions.delete(node.path);
+      this.plugin.topicRuns.dropPending(node.path);
       this.plugin.pendingResearchOptions.delete(node.path);
-      if (this.plugin.pendingSuggestions instanceof PendingSuggestions) await this.plugin.pendingSuggestions.flush();
+      await this.plugin.topicRuns.flushPending();
     }
     if ([
       "title",
@@ -53995,7 +53856,7 @@ ${request.requirements}` : preset.text,
       "sourcePaths",
       "referencePaths"
     ].some((key2) => key2 in patch))
-      (_d = (_c = this.plugin.activeTasks) == null ? void 0 : _c.get(node.path)) == null ? void 0 : _d.abort();
+      this.plugin.topicRuns.stopTask(node.path);
     this.history.push({
       undo: async () => {
         var _a3;
@@ -54013,7 +53874,7 @@ ${request.requirements}` : preset.text,
       },
       redo: () => this.plugin.repo.updateNote(node.path, patch)
     });
-    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, (_e = this.map) != null ? _e : void 0));
+    this.notes.set(node.id, await this.plugin.repo.readNote(node.path, (_c = this.map) != null ? _c : void 0));
     this.render();
   }
   /** What "the note is still as written" means for the background diagram step: every field a user or run can change. */
@@ -54053,7 +53914,7 @@ ${request.requirements}` : preset.text,
       countIssues: job.formatIssues,
       model: job.model,
       apply: async (charted) => {
-        if (this.plugin.running.has(path)) return false;
+        if (this.plugin.topicRuns.isBusy(path)) return false;
         const latest = await this.plugin.repo.readNote(path, map);
         if (this.chartSnapshot(latest) !== snapshot) return false;
         await this.plugin.repo.updateNote(
@@ -55187,7 +55048,7 @@ ${request.requirements}` : preset.text,
   }
   /** `shownNode` may be a display copy (sorted by relevance): it only supplies where the card is drawn. */
   renderNode(shownNode) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T;
     if (!this.stageEl) return;
     const node = (_b2 = (_a2 = this.map) == null ? void 0 : _a2.nodes.find((item) => item.id === shownNode.id)) != null ? _b2 : shownNode;
     const note = this.notes.get(node.id), card = this.stageEl.createDiv({
@@ -55221,7 +55082,7 @@ ${request.requirements}` : preset.text,
     card.dataset.nodeId = node.id;
     const queued = this.isResearchQueued(node);
     const merging = this.isMerging(node.id);
-    card.dataset.status = merging || ((_c = this.plugin.running) == null ? void 0 : _c.has(node.path)) || ((_d = this.plugin.quickExpandPending) == null ? void 0 : _d.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : (_e = note == null ? void 0 : note.status) != null ? _e : "error";
+    card.dataset.status = merging || this.plugin.topicRuns.isBusy(node.path) || ((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) || this.startingTasks.has(node.path) ? "running" : queued ? "queued" : (_d = note == null ? void 0 : note.status) != null ? _d : "error";
     card.style.left = `${shownNode.x}px`;
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
@@ -55231,11 +55092,11 @@ ${request.requirements}` : preset.text,
     card.addEventListener("dragleave", (event) => this.onCardDragLeave(event, card));
     card.addEventListener("drop", (event) => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
-    this.labelCard(card, (_f = note == null ? void 0 : note.title) != null ? _f : t("ui.note_missing"));
+    this.labelCard(card, (_e = note == null ? void 0 : note.title) != null ? _e : t("ui.note_missing"));
     if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
       select.checked = this.selection.state.multiSelected.has(node.id);
-      select.setAttr("aria-label", (_g = note == null ? void 0 : note.title) != null ? _g : node.path);
+      select.setAttr("aria-label", (_f = note == null ? void 0 : note.title) != null ? _f : node.path);
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", (event) => {
@@ -55244,10 +55105,10 @@ ${request.requirements}` : preset.text,
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
-    const research = (_h = this.plugin.researchProgress) == null ? void 0 : _h.get(node.path);
+    const research = (_g = this.plugin.researchProgress) == null ? void 0 : _g.get(node.path);
     if (research) this.researchSigs.set(node.path, this.researchSig(research));
     else this.researchSigs.delete(node.path);
-    const active = merging || ((_i = this.plugin.running) == null ? void 0 : _i.has(node.path)) || ((_j = this.plugin.quickExpandPending) == null ? void 0 : _j.has(node.path)) || this.startingTasks.has(node.path);
+    const active = merging || this.plugin.topicRuns.isBusy(node.path) || ((_h = this.plugin.quickExpandPending) == null ? void 0 : _h.has(node.path)) || this.startingTasks.has(node.path);
     const doc = this.map, aimData = doc == null ? void 0 : doc.aim;
     const aimProgress = !!aimData && (node.aimKind === "question" || node.aimKind === "topic" && aimData.branches.some((branch) => branch.questionNodeId === node.id && !branch.parentBranchId));
     if (doc && aimData && aimProgress) {
@@ -55280,14 +55141,14 @@ ${request.requirements}` : preset.text,
           header.createSpan({ cls: "vam-status vam-research-slow", text: t("ui.research_slow_waiting") });
       } else if (!note || note.status !== "completed" || active || queued) {
         const chip = header.createSpan({
-          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_k = note == null ? void 0 : note.status) != null ? _k : "error"}`,
+          cls: `vam-status vam-status-${active ? "running" : queued ? "queued" : (_i = note == null ? void 0 : note.status) != null ? _i : "error"}`,
           text: statusText
         });
         if (active) chip.setAttr("role", "status");
       }
       if (note) this.labelCard(card, t("ui.topic_card_label_0_1", note.title, statusText));
     }
-    const relevance = !node.aimKind && !((_l = this.map) == null ? void 0 : _l.aim) ? note == null ? void 0 : note.relevance : void 0;
+    const relevance = !node.aimKind && !((_j = this.map) == null ? void 0 : _j.aim) ? note == null ? void 0 : note.relevance : void 0;
     if (relevance) {
       const tierLabel = t(RELEVANCE_LABEL[relevance.tier]);
       card.dataset.relevance = relevance.tier;
@@ -55297,14 +55158,14 @@ ${request.requirements}` : preset.text,
         tierLabel,
         t("ui.relevance_tag_label_0", tierLabel),
         (button) => this.openRelevanceMenu(node, relevance.tier, button),
-        ((_m = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _m.status) === "running"
+        ((_k = this.plugin.relevanceGrades.get(this.path)) == null ? void 0 : _k.status) === "running"
       );
       if (relevance.manual) {
         const manualText = t("ui.relevance_manual_reason");
         (0, import_obsidian31.setTooltip)(tagButton, manualText);
         card.setAttr("aria-description", t("ui.relevance_description_0_1", tierLabel, manualText));
       }
-      const named = (_n = cardLabels.get(card)) == null ? void 0 : _n.textContent;
+      const named = (_l = cardLabels.get(card)) == null ? void 0 : _l.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, tierLabel));
     }
     if (kind !== "topic") {
@@ -55313,7 +55174,7 @@ ${request.requirements}` : preset.text,
       const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey);
       if (strength) renderHypothesisTag(header, strength, kindText);
       else header.createSpan({ cls: "vam-hypothesis-tag vam-kind-tag", text: kindText });
-      const named = (_o = cardLabels.get(card)) == null ? void 0 : _o.textContent;
+      const named = (_m = cardLabels.get(card)) == null ? void 0 : _m.textContent;
       if (named) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     this.paintCardMarkers(card, header, node.id);
@@ -55322,15 +55183,15 @@ ${request.requirements}` : preset.text,
     this.paintCardColor(card, note, !!node.aimKind);
     this.paintCardStyle(card, note, !!node.aimKind);
     const errorDetails = [];
-    if ((_p = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _p.length) {
+    if ((_n = note == null ? void 0 : note.detailFormatIssues) == null ? void 0 : _n.length) {
       const issue2 = header.createSpan({ cls: "vam-status vam-status-error", text: t("ui.detail_format_unmet") });
       issue2.setAttr("title", note.detailFormatIssues.join("\n"));
       errorDetails.push(...note.detailFormatIssues);
     }
     if ((note == null ? void 0 : note.status) === "error" && note.lastError) errorDetails.push(note.lastError);
     if (batch) {
-      const currentNode = batch.currentPath ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.path === batch.currentPath) : void 0;
-      const currentTitle = currentNode ? (_r = this.notes.get(currentNode.id)) == null ? void 0 : _r.title : void 0;
+      const currentNode = batch.currentPath ? (_o = this.map) == null ? void 0 : _o.nodes.find((item) => item.path === batch.currentPath) : void 0;
+      const currentTitle = currentNode ? (_p = this.notes.get(currentNode.id)) == null ? void 0 : _p.title : void 0;
       const label = this.batchProgressLabel(
         t("ui.shallow_research_counts", batch.succeeded, batch.total),
         batch,
@@ -55353,16 +55214,16 @@ ${request.requirements}` : preset.text,
       this.renderRetryFailedButton(header, node.path, batch);
     }
     const ownSynthesis = this.synthesisTasks.get(node.path);
-    const parentNode = node.parentId ? (_s = this.map) == null ? void 0 : _s.nodes.find((item) => item.id === node.parentId) : void 0;
-    const batchChild = !!parentNode && !!((_t = this.plugin.expansionCoordinator) == null ? void 0 : _t.isRunning(parentNode.path));
-    const stoppable = this.startingTasks.has(node.path) || ((_u = this.plugin.quickExpandPending) == null ? void 0 : _u.has(node.path)) || ((_v = this.plugin.running) == null ? void 0 : _v.has(node.path)) && this.plugin.activeTasks.has(node.path) && !batchChild;
+    const parentNode = node.parentId ? (_q = this.map) == null ? void 0 : _q.nodes.find((item) => item.id === node.parentId) : void 0;
+    const batchChild = !!parentNode && !!((_r = this.plugin.expansionCoordinator) == null ? void 0 : _r.isRunning(parentNode.path));
+    const stoppable = this.startingTasks.has(node.path) || ((_s = this.plugin.quickExpandPending) == null ? void 0 : _s.has(node.path)) || this.plugin.topicRuns.isBusy(node.path) && this.plugin.topicRuns.hasTask(node.path) && !batchChild;
     if (stoppable && (batch == null ? void 0 : batch.status) !== "running" && !((ownSynthesis == null ? void 0 : ownSynthesis.state) === "running" && ownSynthesis.mapPath === this.path)) {
       this.button(
         header,
         t("ui.stop_research"),
         () => {
           var _a3, _b3;
-          return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b3.abort();
+          return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
         }
       );
     }
@@ -55373,14 +55234,14 @@ ${request.requirements}` : preset.text,
       });
     if ((research == null ? void 0 : research.stage) === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
-    const pendingCount = (_x = (_w = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _w.length) != null ? _x : 0;
-    if (pendingCount && !this.selection.state.multiSelectMode && !((_y = this.map) == null ? void 0 : _y.aim))
+    const pendingCount = (_u = (_t = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _t.length) != null ? _u : 0;
+    if (pendingCount && !this.selection.state.multiSelectMode && !((_v = this.map) == null ? void 0 : _v.aim))
       this.button(
         header,
         t("ui.view_0_expansion_suggestions", pendingCount),
         () => this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
-    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !((_z = this.map) == null ? void 0 : _z.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
+    if (note && note.researchMode === "local" && !this.selection.state.multiSelectMode && !((_w = this.map) == null ? void 0 : _w.aim) && !node.aimKind && !active && !queued && !research && !merging && hasKnowledgeGapMarker(note.detail))
       this.button(header, t("ui.rerun_standard"), () => this.rerunStandard(node)).setAttr(
         "aria-label",
         t("ui.rerun_standard_0", note.title)
@@ -55388,14 +55249,14 @@ ${request.requirements}` : preset.text,
     if ((note == null ? void 0 : note.status) === "error" && !this.selection.state.multiSelectMode && !node.aimKind && !active && !queued && !research && !merging)
       this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !((_A = this.map) == null ? void 0 : _A.aim))
+    if (waitingOutline && waitingOutline.mapPath === this.path && !this.selection.state.multiSelectMode && !((_x = this.map) == null ? void 0 : _x.aim))
       this.button(
         header,
         t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length),
         () => this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !((_B = this.map) == null ? void 0 : _B.aim)) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !((_y = this.map) == null ? void 0 : _y.aim)) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -55431,7 +55292,7 @@ ${request.requirements}` : preset.text,
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
     if (!this.selection.state.multiSelectMode) {
-      if (!((_C = this.map) == null ? void 0 : _C.aim)) {
+      if (!((_z = this.map) == null ? void 0 : _z.aim)) {
         const structure2 = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure2.addClass("vam-node-tool", "vam-structure-tool");
         structure2.setAttr("aria-label", t("ui.structure_and_links"));
@@ -55462,7 +55323,7 @@ ${request.requirements}` : preset.text,
         remove.addClass("vam-node-tool", "vam-remove-tool");
         remove.setAttr("aria-label", t("ui.remove_from_map"));
       }
-      if (((_D = this.map) == null ? void 0 : _D.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
+      if (((_A = this.map) == null ? void 0 : _A.aim) && node.aimKind === "synthesis" && this.map.aim.branches.some((branch) => branch.results.some((result) => result.nodeId === node.id))) {
         const next = this.button(
           header,
           t("ui.aim_new_question"),
@@ -55474,7 +55335,7 @@ ${request.requirements}` : preset.text,
         next.setAttr("title", t("ui.aim_new_question_hint"));
       }
       const assumptions = node.aimKind === "conclusion" && note ? readOpenItems(note.detail) : [];
-      if (((_E = this.map) == null ? void 0 : _E.aim) && assumptions.length) {
+      if (((_B = this.map) == null ? void 0 : _B.aim) && assumptions.length) {
         const correct = this.button(
           header,
           t("ui.aim_correct_assumption"),
@@ -55486,7 +55347,7 @@ ${request.requirements}` : preset.text,
         correct.addClass("vam-node-tool", "vam-pinned-tool");
         correct.setAttr("title", t("ui.aim_correct_assumption_hint"));
       }
-      if (((_F = this.map) == null ? void 0 : _F.aim) && node.aimKind === "conclusion") {
+      if (((_C = this.map) == null ? void 0 : _C.aim) && node.aimKind === "conclusion") {
         const steer = this.button(
           header,
           t("ui.aim_steer"),
@@ -55500,18 +55361,18 @@ ${request.requirements}` : preset.text,
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.selection.state.multiSelectMode && !((_G = this.map) == null ? void 0 : _G.aim))
+    if (!this.selection.state.multiSelectMode && !((_D = this.map) == null ? void 0 : _D.aim))
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim)) {
+    if (!this.selection.state.multiSelectMode && !((_E = this.map) == null ? void 0 : _E.aim)) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
     }
     if (note) this.paintCover(card, node.path);
-    const title = card.createEl("h3", { text: (_I = note == null ? void 0 : note.title) != null ? _I : node.path, cls: "vam-card-title" });
-    title.setAttr("title", (_J = note == null ? void 0 : note.title) != null ? _J : node.path);
+    const title = card.createEl("h3", { text: (_F = note == null ? void 0 : note.title) != null ? _F : node.path, cls: "vam-card-title" });
+    title.setAttr("title", (_G = note == null ? void 0 : note.title) != null ? _G : node.path);
     title.setAttr("dir", "auto");
-    if (note && !this.selection.state.multiSelectMode && !((_K = this.map) == null ? void 0 : _K.aim))
+    if (note && !this.selection.state.multiSelectMode && !((_H = this.map) == null ? void 0 : _H.aim))
       card.addEventListener("dblclick", (event) => {
         var _a3;
         const target = event.target;
@@ -55522,19 +55383,19 @@ ${request.requirements}` : preset.text,
         event.preventDefault();
         this.renameNode(node, note.title);
       });
-    if ((_L = research == null ? void 0 : research.preview) == null ? void 0 : _L.summary)
+    if ((_I = research == null ? void 0 : research.preview) == null ? void 0 : _I.summary)
       this.fillCardPreview(card.createEl("p", { cls: "vam-card-summary" }), research.preview.summary);
     else if (!note || !isPlaceholder(note.summary))
       card.createEl("p", {
         cls: "vam-card-summary",
-        text: (_M = note == null ? void 0 : note.summary) != null ? _M : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
-        attr: { title: (_N = note == null ? void 0 : note.summary) != null ? _N : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
+        text: (_J = note == null ? void 0 : note.summary) != null ? _J : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from"),
+        attr: { title: (_K = note == null ? void 0 : note.summary) != null ? _K : t("ui.the_file_was_moved_or_deleted_you_can_remove_this_node_from") }
       });
     if (errorDetails.length) {
       const error = card.createEl("p", { cls: "vam-card-error", text: errorDetails[0] });
       error.setAttr("title", errorDetails.join("\n"));
     }
-    if (node.aimKind === "conclusion" && ((_O = this.map) == null ? void 0 : _O.aim)) {
+    if (node.aimKind === "conclusion" && ((_L = this.map) == null ? void 0 : _L.aim)) {
       const branch = this.map.aim.branches.find((item) => item.results.some((result) => result.nodeId === node.id));
       const hasFollowup = this.map.nodes.some((item) => item.parentId === node.id && item.aimKind === "question");
       if (branch && !hasFollowup && countAimAnsweredQuestions(this.map, branch.id) < MIN_ANSWERED_QUESTIONS_BEFORE_CONCLUSION) {
@@ -55547,7 +55408,7 @@ ${request.requirements}` : preset.text,
         ).addClass("mod-cta");
       }
     }
-    if (node.aimKind === "topic" && ((_P = this.map) == null ? void 0 : _P.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
+    if (node.aimKind === "topic" && ((_M = this.map) == null ? void 0 : _M.aim) && !this.map.nodes.some((item) => item.aimKind === "question")) {
       const initialBranch = this.map.aim.branches.find((item) => item.questionNodeId === node.id && !item.parentBranchId);
       const initialRuns = initialBranch ? this.map.aim.runs.filter((item) => item.branchId === initialBranch.id) : [];
       const activeInitialRun = initialRuns.some((run) => {
@@ -55583,11 +55444,11 @@ ${request.requirements}` : preset.text,
         );
       }
     }
-    if (node.aimKind === "question" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
+    if (node.aimKind === "question" && ((_N = this.map) == null ? void 0 : _N.aim)) {
       const branch = this.map.aim.branches.find((item) => item.questionNodeId === node.id);
       if (branch) {
         this.renderAimFailure(card, branch);
-        const labels = (_S = (_R = node.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
+        const labels = (_P = (_O = node.aimQuestion) == null ? void 0 : _O.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _P : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -55630,11 +55491,11 @@ ${request.requirements}` : preset.text,
         }
       }
     }
-    if (node.aimKind === "answer" && ((_T = this.map) == null ? void 0 : _T.aim)) {
+    if (node.aimKind === "answer" && ((_Q = this.map) == null ? void 0 : _Q.aim)) {
       const branch = this.map.aim.branches.find((item) => item.answerNodeId === node.id);
       const question = branch && this.map.nodes.find((item) => item.id === branch.questionNodeId);
       if (branch) {
-        const labels = (_V = (_U = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _U.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _V : branch.answerSnapshot.selections;
+        const labels = (_S = (_R = question == null ? void 0 : question.aimQuestion) == null ? void 0 : _R.options.filter((option) => branch.answerSnapshot.selections.includes(option.id)).map((option) => option.label)) != null ? _S : branch.answerSnapshot.selections;
         const answer = [...labels, branch.answerSnapshot.freeText].filter(Boolean).join(" \u2014 ");
         card.createEl("p", {
           cls: "vam-aim-answer-snapshot",
@@ -55643,7 +55504,7 @@ ${request.requirements}` : preset.text,
       }
     }
     this.enableDrag(card, node);
-    if (!this.selection.state.multiSelectMode && !((_W = this.map) == null ? void 0 : _W.aim) && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !((_T = this.map) == null ? void 0 : _T.aim) && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -55970,8 +55831,8 @@ ${request.requirements}` : preset.text,
   }
   /** A topic waiting in a batch (multi-topic or shallow research) for a free slot; it is not running yet. */
   isResearchQueued(node) {
-    var _a2, _b2;
-    return !((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) && !!((_b2 = this.plugin.expansionCoordinator) == null ? void 0 : _b2.isQueued(node.path));
+    var _a2;
+    return !this.plugin.topicRuns.isBusy(node.path) && !!((_a2 = this.plugin.expansionCoordinator) == null ? void 0 : _a2.isQueued(node.path));
   }
   /** Hypothesis and evidence features exist on ordinary maps only: not AIM. */
   relationsEnabled() {
@@ -56349,7 +56210,7 @@ ${request.requirements}` : preset.text,
     preview.style.top = `${Math.max(12, Math.min(rect2.top - host.top, maxTop))}px`;
   }
   refreshCard(node, redrawEdges = true) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c;
     const card = (_a2 = this.stageEl) == null ? void 0 : _a2.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`), note = this.notes.get(node.id);
     if (!card || !note) return;
     const title = card.querySelector(".vam-card-title");
@@ -56379,7 +56240,7 @@ ${request.requirements}` : preset.text,
           cls: `vam-status vam-status-${note.status}`,
           text: topicStatusLabel(note.status, this.plugin.settings.language)
         });
-    } else if (!this.isMerging(node.id) && !((_b2 = this.plugin.running) == null ? void 0 : _b2.has(node.path)) && !((_c = this.plugin.quickExpandPending) == null ? void 0 : _c.has(node.path)) && !this.isResearchQueued(node)) {
+    } else if (!this.isMerging(node.id) && !this.plugin.topicRuns.isBusy(node.path) && !((_b2 = this.plugin.quickExpandPending) == null ? void 0 : _b2.has(node.path)) && !this.isResearchQueued(node)) {
       const label = note.status === "completed" ? t("ui.researched") : topicStatusLabel(note.status, this.plugin.settings.language);
       card.dataset.status = note.status;
       this.labelCard(card, t("ui.topic_card_label_0_1", note.title, label));
@@ -56392,7 +56253,7 @@ ${request.requirements}` : preset.text,
     const kind = this.topicKindOf(node.id);
     if (kind !== "topic") {
       const strength = this.hypothesisStrengthOf(node.id);
-      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_d = cardLabels.get(card)) == null ? void 0 : _d.textContent;
+      const kindText = strength ? this.hypothesisTagText(strength) : t(TOPIC_KIND_SHAPES[kind].labelKey), named = (_c = cardLabels.get(card)) == null ? void 0 : _c.textContent;
       if (named && !named.includes(kindText)) this.labelCard(card, t("ui.topic_card_label_0_1", named, kindText));
     }
     if (header) {
@@ -56491,7 +56352,7 @@ ${request.requirements}` : preset.text,
             ]);
           else backgroundResultNotice(t("ui.background_research_done_0", title), view);
         } else {
-          const count = (_d = (_c = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _c.length) != null ? _d : 0;
+          const count = (_d = (_c = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _c.length) != null ? _d : 0;
           backgroundResultNotice(t("ui.background_expand_ready_0", title), {
             label: t("ui.view_0_expansion_suggestions", count),
             open: () => this.openNodePanel(node, "proposals")
@@ -56519,7 +56380,7 @@ ${request.requirements}` : preset.text,
         this.app,
         note.title,
         (_f = (_e = this.map) == null ? void 0 : _e.nodes.filter((item) => item.parentId === node.id).length) != null ? _f : 0,
-        (_h = (_g = this.plugin.pendingSuggestions.get(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
+        (_h = (_g = this.plugin.topicRuns.pending(node.path)) == null ? void 0 : _g.length) != null ? _h : 0,
         this.plugin,
         async (options, focus, done, failed, accepted) => {
           var _a3, _b3, _c2;
@@ -56566,10 +56427,10 @@ ${request.requirements}` : preset.text,
           rules: note.rules,
           path: node.path,
           save: (patch) => this.plugin.mutate(() => this.noteChange(node, patch)),
-          running: this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path) || this.startingTasks.has(node.path),
-          stop: this.startingTasks.has(node.path) || this.plugin.activeTasks.has(node.path) ? () => {
+          running: this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.startingTasks.has(node.path),
+          stop: this.startingTasks.has(node.path) || this.plugin.topicRuns.hasTask(node.path) ? () => {
             var _a3, _b3;
-            return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.activeTasks.get(node.path)) == null ? void 0 : _b3.abort();
+            return (_b3 = (_a3 = this.startingTasks.get(node.path)) != null ? _a3 : this.plugin.topicRuns.taskController(node.path)) == null ? void 0 : _b3.abort();
           } : void 0,
           background: this.backgroundHooks(node.path, node),
           quickOutline: this.quickOutline(node),
@@ -56741,7 +56602,7 @@ ${request.requirements}` : preset.text,
   }
   renderPendingProposals(panel, node, note, close, host) {
     var _a2;
-    const suggestions = this.plugin.pendingSuggestions.get(node.path);
+    const suggestions = this.plugin.topicRuns.pending(node.path);
     if (!(suggestions == null ? void 0 : suggestions.length)) return;
     const section3 = panel.createDiv("vam-inspector-proposals");
     section3.createEl("p", { text: t("ui.select_and_edit_suggestions_subtopics_are_created_only_after") });
@@ -56789,10 +56650,10 @@ ${request.requirements}` : preset.text,
             shallowResearch: true
           } : void 0;
           await this.plugin.mutate(async () => {
-            var _a4, _b2, _c;
+            var _a4;
             const current = (_a4 = this.map) == null ? void 0 : _a4.nodes.find((item) => item.id === node.id && item.path === node.path);
             if (!current) throw new Error(t("ui.the_topic_changed_select_it_again"));
-            if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+            if (this.plugin.topicRuns.pending(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
             await this.assertSuggestionOrigin(current, suggestions);
             try {
@@ -56801,9 +56662,9 @@ ${request.requirements}` : preset.text,
               if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(node.path, error);
               throw error;
             }
-            this.plugin.pendingSuggestions.delete(node.path);
+            this.plugin.topicRuns.dropPending(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await ((_c = (_b2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c.call(_b2));
+            await this.plugin.topicRuns.flushPending();
           });
           if (researchOptions && createdNodes.length)
             await this.startShallowResearch(node, createdNodes, researchOptions);
@@ -56821,12 +56682,11 @@ ${request.requirements}` : preset.text,
       () => void (async () => {
         try {
           await this.plugin.mutate(async () => {
-            var _a3, _b2;
-            if (this.plugin.pendingSuggestions.get(node.path) !== suggestions)
+            if (this.plugin.topicRuns.pending(node.path) !== suggestions)
               throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
-            this.plugin.pendingSuggestions.delete(node.path);
+            this.plugin.topicRuns.dropPending(node.path);
             this.plugin.pendingResearchOptions.delete(node.path);
-            await ((_b2 = (_a3 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a3));
+            await this.plugin.topicRuns.flushPending();
           });
           close == null ? void 0 : close();
           this.render();
@@ -57957,18 +57817,18 @@ ${request.requirements}` : preset.text,
     if (keyboardFocus && this.cardEls.has(placed.id)) this.moveKeyboardFocus(placed);
   }
   async proposeChildren(parent, options, direction = "", found, failed, acceptedCallback) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
     const previousBatch = this.plugin.expansionBatches.get(parent.path);
-    const pending2 = this.plugin.pendingSuggestions.get(parent.path);
+    const pending2 = this.plugin.topicRuns.pending(parent.path);
     const present = (items) => {
-      const version = this.plugin.pendingSuggestions.get(parent.path);
+      const version = this.plugin.topicRuns.pending(parent.path);
       const names3 = items.filter((item) => !item.parentTitle).map((item) => item.title);
       if (new Set(names3).size !== names3.length) {
-        this.plugin.pendingSuggestions.delete(parent.path);
+        this.plugin.topicRuns.dropPending(parent.path);
         this.plugin.pendingResearchOptions.delete(parent.path);
         const message = t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa");
         if (failed) failed(message);
@@ -57985,8 +57845,8 @@ ${request.requirements}` : preset.text,
         const savedOptions = this.plugin.pendingResearchOptions.get(parent.path);
         const researchOptions = savedOptions ? { ...savedOptions, signal: options == null ? void 0 : options.signal, onProgress: options == null ? void 0 : options.onProgress } : void 0;
         await this.plugin.mutate(async () => {
-          var _a3, _b3, _c2;
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          var _a3;
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           try {
@@ -58001,9 +57861,9 @@ ${request.requirements}` : preset.text,
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_c2 = (_b3 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _c2.call(_b3));
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -58018,128 +57878,88 @@ ${request.requirements}` : preset.text,
       present(options ? pending2.filter((item) => !item.parentTitle) : pending2);
       return;
     }
-    if (this.plugin.running.has(parent.path)) {
+    if (this.plugin.topicRuns.isBusy(parent.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
-    const controller = new AbortController();
-    const modalSignal = options == null ? void 0 : options.signal;
-    const abortBeforeAcceptance = () => controller.abort();
-    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
-    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
-    let accepted = false;
-    const acceptDispatch = () => {
-      if (accepted || controller.signal.aborted) return;
-      accepted = true;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      acceptedCallback == null ? void 0 : acceptedCallback();
-    };
-    const releaseTask = () => {
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(parent.path) === controller) this.plugin.activeTasks.delete(parent.path);
-      this.plugin.running.delete(parent.path);
-      if (!this.plugin.expansionCoordinator.isRunning(parent.path)) this.plugin.quickExpandPending.delete(parent.path);
-    };
-    this.plugin.running.add(parent.path);
-    this.plugin.quickExpandPending.add(parent.path);
-    this.plugin.activeTasks.set(parent.path, controller);
-    this.render();
     try {
-      const note = await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0);
-      const used = await this.modelFor(note, parent.path, options == null ? void 0 : options.runOnce);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const outputLanguage2 = (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
-      const existing = ((_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === parent.id).map((item) => {
-        const child = this.notes.get(item.id);
-        return `- ${(child == null ? void 0 : child.title) || item.path}: ${summaryForPrompt((child == null ? void 0 : child.summary) || noSummaryYet(outputLanguage2), outputLanguage2)}`;
-      }).join("\n")) || inLanguage(NONE, outputLanguage2);
-      const task = expansionTask(outputLanguage2, existing, direction);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
-          {
-            title: note.title,
-            summary: summaryForPrompt(note.summary, outputLanguage2),
-            rules: "",
-            detail: note.detail,
-            task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-            ancestors: await this.ancestorContext(parent, outputLanguage2),
-            referenceGroups: options == null ? void 0 : options.referenceGroups,
-            outputLanguage: options == null ? void 0 : options.outputLanguage,
-            ...this.proposalTone(note, options),
-            mode: "decompose",
-            researchMode: (_d = options == null ? void 0 : options.researchMode) != null ? _d : "research",
-            researchDepth: (_e = options == null ? void 0 : options.researchDepth) != null ? _e : "normal",
-            visualMode: "off"
-          },
-          note
-        ),
-        used.model,
-        used.reasoning,
-        controller.signal,
-        void 0,
-        acceptDispatch
-      );
-      if (!accepted) acceptDispatch();
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const suggestions = result.suggestions.filter((item) => !item.parentTitle).slice(0, 7);
-      if (suggestions.length === 0) {
-        const message = result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to");
-        if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
-        return;
-      }
-      const latest = await this.plugin.repo.readNote(parent.path, (_f = this.map) != null ? _f : void 0);
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (latest.thinkingOrigin !== note.thinkingOrigin)
-        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-      const pendingItems = suggestions.map((item) => ({
-        ...item,
-        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
-      }));
-      this.plugin.pendingSuggestions.set(parent.path, pendingItems);
-      await ((_h = (_g = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h.call(_g));
-      if (controller.signal.aborted) {
-        this.plugin.pendingSuggestions.delete(parent.path);
-        await ((_j = (_i = this.plugin.pendingSuggestions).flush) == null ? void 0 : _j.call(_i));
-        throw new DOMException("Aborted", "AbortError");
-      }
-      if (options == null ? void 0 : options.shallowResearch) this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
-      else (_k = this.plugin.pendingResearchOptions) == null ? void 0 : _k.delete(parent.path);
-      present(pendingItems);
-    } catch (error) {
-      const partial = error instanceof PartialChildBatchError;
-      const currentBatch = this.plugin.expansionBatches.get(parent.path);
-      const stoppedBatch = currentBatch !== previousBatch && (currentBatch == null ? void 0 : currentBatch.status) === "stopped";
-      const cancelled2 = !partial && (controller.signal.aborted || stoppedBatch);
-      if (!cancelled2) {
-        console.error("Visual Agent Map AI split", error);
-        const message = this.plugin.recordFailure(t("log.ai_split_failed"), error);
-        if (failed) failed(message, !partial);
-        else new import_obsidian31.Notice(message);
-      }
+      await this.plugin.topicRuns.start(parent.path, "proposeChildren", {
+        map: (_a2 = this.map) != null ? _a2 : void 0,
+        runOnce: options == null ? void 0 : options.runOnce,
+        signal: options == null ? void 0 : options.signal,
+        outputLanguage: options == null ? void 0 : options.outputLanguage,
+        accepted: acceptedCallback,
+        failed,
+        notify: (message) => new import_obsidian31.Notice(message),
+        onStarted: () => {
+          this.plugin.quickExpandPending.add(parent.path);
+          this.render();
+        },
+        onReleased: () => {
+          if (!this.plugin.expansionCoordinator.isRunning(parent.path))
+            this.plugin.quickExpandPending.delete(parent.path);
+        },
+        buildContext: async (note, language2) => {
+          var _a3, _b2, _c;
+          const existing = ((_a3 = this.map) == null ? void 0 : _a3.nodes.filter((item) => item.parentId === parent.id).map((item) => {
+            const child = this.notes.get(item.id);
+            return `- ${(child == null ? void 0 : child.title) || item.path}: ${summaryForPrompt((child == null ? void 0 : child.summary) || noSummaryYet(language2), language2)}`;
+          }).join("\n")) || inLanguage(NONE, language2);
+          const task = expansionTask(language2, existing, direction);
+          return withThinkingOrigin(
+            {
+              title: note.title,
+              summary: summaryForPrompt(note.summary, language2),
+              rules: "",
+              detail: note.detail,
+              task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
+              ancestors: await this.ancestorContext(parent, language2),
+              referenceGroups: options == null ? void 0 : options.referenceGroups,
+              outputLanguage: options == null ? void 0 : options.outputLanguage,
+              ...this.proposalTone(note, options),
+              mode: "decompose",
+              researchMode: (_b2 = options == null ? void 0 : options.researchMode) != null ? _b2 : "research",
+              researchDepth: (_c = options == null ? void 0 : options.researchDepth) != null ? _c : "normal",
+              visualMode: "off"
+            },
+            note
+          );
+        },
+        classifyError: (error) => {
+          if (error instanceof PartialChildBatchError) return "partial";
+          const currentBatch = this.plugin.expansionBatches.get(parent.path);
+          return currentBatch !== previousBatch && (currentBatch == null ? void 0 : currentBatch.status) === "stopped" ? "stopped" : void 0;
+        },
+        onStored: () => {
+          var _a3;
+          if (options == null ? void 0 : options.shallowResearch)
+            this.plugin.pendingResearchOptions.set(parent.path, this.researchChoices(options));
+          else (_a3 = this.plugin.pendingResearchOptions) == null ? void 0 : _a3.delete(parent.path);
+        },
+        offer: (items) => present(items)
+      });
     } finally {
-      releaseTask();
       await this.hydrate();
       this.render();
     }
   }
   async assertSuggestionOrigin(parent, suggestions) {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2;
     const origin = (_b2 = (await this.plugin.repo.readNote(parent.path, (_a2 = this.map) != null ? _a2 : void 0)).thinkingOrigin) != null ? _b2 : "";
     if (suggestions.every(
       (item) => item.thinkingOriginBaseline === originBaseline(origin) || item.thinkingOriginBaseline === void 0 && !origin
     ))
       return;
-    this.plugin.pendingSuggestions.delete(parent.path);
+    this.plugin.topicRuns.dropPending(parent.path);
     this.plugin.pendingResearchOptions.delete(parent.path);
-    await ((_d = (_c = this.plugin.pendingSuggestions).flush) == null ? void 0 : _d.call(_c));
+    await this.plugin.topicRuns.flushPending();
     throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
   }
   openChildSuggestions(parent, suggestions) {
-    const version = this.plugin.pendingSuggestions.get(parent.path);
+    const version = this.plugin.topicRuns.pending(parent.path);
     const roots = suggestions.filter((item) => !item.parentTitle).map((item) => item.title);
     if (new Set(roots).size !== roots.length) {
-      this.plugin.pendingSuggestions.delete(parent.path);
+      this.plugin.topicRuns.dropPending(parent.path);
       this.plugin.pendingResearchOptions.delete(parent.path);
       new import_obsidian31.Notice(t("ui.ai_proposed_duplicate_first_level_names_generate_the_proposa"));
       return;
@@ -58149,8 +57969,7 @@ ${request.requirements}` : preset.text,
         if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
         let researchOptions, createdNodes = [];
         await this.plugin.mutate(async () => {
-          var _a2, _b2;
-          if (!version || this.plugin.pendingSuggestions.get(parent.path) !== version)
+          if (!version || this.plugin.topicRuns.pending(parent.path) !== version)
             throw new Error(t("ui.expansion_suggestions_changed_open_them_again"));
           await this.assertSuggestionOrigin(parent, version);
           researchOptions = this.plugin.pendingResearchOptions.get(parent.path);
@@ -58160,9 +57979,9 @@ ${request.requirements}` : preset.text,
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
             throw error;
           }
-          this.plugin.pendingSuggestions.delete(parent.path);
+          this.plugin.topicRuns.dropPending(parent.path);
           this.plugin.pendingResearchOptions.delete(parent.path);
-          await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+          await this.plugin.topicRuns.flushPending();
           this.render();
         });
         if ((researchOptions == null ? void 0 : researchOptions.shallowResearch) && createdNodes.length)
@@ -58448,7 +58267,7 @@ ${request.requirements}` : preset.text,
           new import_obsidian31.Notice(t("ui.multi_research_already_running"));
           return;
         }
-        const busy = (node) => this.plugin.running.has(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.activeTasks.has(node.path);
+        const busy = (node) => this.plugin.topicRuns.isBusy(node.path) || this.plugin.quickExpandPending.has(node.path) || this.plugin.topicRuns.hasTask(node.path);
         const nodes = selected.filter((node) => !busy(node));
         if (!nodes.length) {
           new import_obsidian31.Notice(t("ui.multi_research_all_skipped"));
@@ -58723,11 +58542,10 @@ ${request.requirements}` : preset.text,
     return { ...choices, signal: void 0, onProgress: void 0, referenceGroups: (_a2 = options.referenceGroups) != null ? _a2 : [] };
   }
   async clearPendingSuggestions(path) {
-    var _a2, _b2;
-    this.plugin.pendingSuggestions.delete(path);
+    this.plugin.topicRuns.dropPending(path);
     this.plugin.pendingResearchOptions.delete(path);
     try {
-      await ((_b2 = (_a2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+      await this.plugin.topicRuns.flushPending();
     } catch (error) {
       throw new Error(this.plugin.recordFailure(t("ui.expansion_suggestions_changed_open_them_again"), error));
     }
@@ -58781,39 +58599,35 @@ ${request.requirements}` : preset.text,
     return [...new Set(paths)];
   }
   async proposeIntegrationDirections(node, options, found, failed, accepted) {
-    var _a2, _b2, _c, _d, _e, _f;
     if (!this.map) {
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(node.path)) {
-      failed(t("ui.ai_running_ai"));
-      return;
-    }
     const children = this.map.nodes.filter((item) => item.parentId === node.id);
-    if (!children.length && !((_a2 = options.referenceGroups) == null ? void 0 : _a2.some((group) => group.documents.length))) {
-      failed(t("ui.choose_another_note_source_first"));
-      return;
-    }
-    const note = await this.plugin.repo.readNote(node.path, (_b2 = this.map) != null ? _b2 : void 0);
-    const used = await this.modelFor(note, node.path, options.runOnce);
-    this.plugin.running.add(node.path);
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
-    try {
-      const childSources = await this.topicReferenceGroup(
-        children,
-        (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
-      );
-      const selectedSources = (_c = options.referenceGroups) != null ? _c : [];
-      if (!children.length && !selectedSources.some((group) => group.documents.length)) {
-        failed(t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi"));
-        return;
-      }
-      const promptLanguage = (_d = options.outputLanguage) != null ? _d : this.plugin.settings.language;
-      const task = synthesisDirectionsTask(promptLanguage);
-      const result = await this.plugin.askModel(
-        withThinkingOrigin(
+    await this.plugin.topicRuns.start(node.path, "integrateDirection", {
+      map: () => {
+        var _a2;
+        return (_a2 = this.map) != null ? _a2 : void 0;
+      },
+      runOnce: options.runOnce,
+      signal: options.signal,
+      precheck: () => {
+        var _a2;
+        return !children.length && !((_a2 = options.referenceGroups) == null ? void 0 : _a2.some((group) => group.documents.length)) ? t("ui.choose_another_note_source_first") : void 0;
+      },
+      onStarted: () => this.render(),
+      buildContext: async (note) => {
+        var _a2, _b2;
+        const childSources = await this.topicReferenceGroup(
+          children,
+          (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong"
+        );
+        const selectedSources = (_a2 = options.referenceGroups) != null ? _a2 : [];
+        if (!children.length && !selectedSources.some((group) => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        const promptLanguage = (_b2 = options.outputLanguage) != null ? _b2 : this.plugin.settings.language;
+        const task = synthesisDirectionsTask(promptLanguage);
+        return withThinkingOrigin(
           {
             title: note.title,
             summary: summaryForPrompt(note.summary, promptLanguage),
@@ -58836,205 +58650,130 @@ ${request.requirements}` : preset.text,
             visualMode: "off"
           },
           note
-        ),
-        used.model,
-        used.reasoning,
-        options.signal,
-        void 0,
-        accepted,
-        void 0,
-        progress.observer
-      );
-      progress.end();
-      accepted == null ? void 0 : accepted();
-      if ((_e = options.signal) == null ? void 0 : _e.aborted) throw new DOMException("Aborted", "AbortError");
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
-        failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
+        );
+      },
+      accepted,
+      found,
+      failed,
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-      found(angles);
-    } catch (error) {
-      if (((_f = options.signal) == null ? void 0 : _f.aborted) || error instanceof Error && error.name === "AbortError") {
-        failed(t("ui.research_stopped_existing_content_was_preserved"));
-        return;
-      }
-      console.error("Visual Agent Map integration directions", error);
-      failed(this.plugin.recordFailure(t("log.integration_directions_failed"), error));
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   async integrateChildren(node, options, direction = "", drafted, failed, accepted) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
-    if (!this.map || this.plugin.running.has(node.path)) {
+    var _a2;
+    if (!this.map || this.plugin.topicRuns.isBusy(node.path)) {
       failed == null ? void 0 : failed(t("ui.ai_running_ai"));
       return;
     }
-    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-    const used = await this.modelFor(note, node.path, options == null ? void 0 : options.runOnce);
-    const children = this.map.nodes.filter((item) => item.parentId === node.id);
-    if (!children.length && !((_b2 = options == null ? void 0 : options.referenceGroups) == null ? void 0 : _b2.some((group) => group.documents.length))) {
-      const message = t("ui.choose_another_note_source_first");
-      if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
-      return;
-    }
-    const childSources = await this.topicReferenceGroup(
-      children,
-      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
-      { language: options == null ? void 0 : options.outputLanguage }
-    );
-    const sourceSnapshot = JSON.stringify(childSources.documents);
-    const childIds2 = children.map((child) => child.id).sort().join("|");
-    const mapPath = this.path, mapId = this.map.id;
-    const noteSnapshot = JSON.stringify([
-      note.title,
-      note.summary,
-      note.detail,
-      note.prompt,
-      note.rules,
-      note.model,
-      note.reasoning,
-      note.sourcePaths,
-      note.referencePaths,
-      note.thinkingOrigin,
-      note.newFindings
-    ]);
-    const selectedSources = (_c = options == null ? void 0 : options.referenceGroups) != null ? _c : [];
-    if (!children.length && !selectedSources.some((group) => group.documents.length)) {
-      const message = t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
-      if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
-      return;
-    }
-    const language2 = this.plugin.settings.language;
-    const task = direction || synthesisGoalTask(language2);
-    const synthesisRun = await this.detailTemplateFor(
-      node,
-      options == null ? void 0 : options.detailTemplateId,
-      options == null ? void 0 : options.toneId,
-      void 0,
-      (_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2
-    );
-    const detailTemplate = synthesisRun.template;
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    await this.plugin.repo.updateNote(node.path, { status: "running" });
-    await this.hydrate();
-    this.render();
-    const progress = this.startTaskProgress(node.path, used.model);
+    const map = this.map;
+    const mapPath = this.path, mapId = map.id;
+    const children = map.nodes.filter((item) => item.parentId === node.id);
+    const childIds2 = () => {
+      var _a3, _b2;
+      return ((_b2 = (_a3 = this.map) == null ? void 0 : _a3.nodes) != null ? _b2 : []).filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|");
+    };
+    const startIds = children.map((child) => child.id).sort().join("|");
+    const readSources = () => this.topicReferenceGroup(children, (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong", {
+      language: options == null ? void 0 : options.outputLanguage
+    });
+    const selectedSources = (_a2 = options == null ? void 0 : options.referenceGroups) != null ? _a2 : [];
     let findingsSent = false;
-    try {
-      const synthesisStyle = {
-        tone: synthesisRun.toneText ? { toneText: synthesisRun.toneText } : {},
-        style: synthesisRun.contextFields
-      };
-      const synthesisContext = withThinkingOrigin(
-        {
-          title: note.title,
-          summary: summaryForPrompt(note.summary, (_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2),
-          rules: "",
-          detail: note.detail,
-          task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-          ancestors: await this.ancestorContext(node, (_f = options == null ? void 0 : options.outputLanguage) != null ? _f : language2),
-          userTexts: this.userTextContext(node.id),
-          ...this.summaryDirections(node.id),
-          workingFindings: note.newFindings,
-          onWorkingFindingsSent: (sent) => {
-            findingsSent = sent === note.newFindings;
-          },
-          referenceGroups: [...selectedSources, childSources],
-          // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-          referenceDelivery: "direct",
-          onProgress: options == null ? void 0 : options.onProgress,
-          outputLanguage: options == null ? void 0 : options.outputLanguage,
-          ...synthesisStyle.tone,
-          mode: "synthesize",
-          researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
-          researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
-          visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : note.visualMode,
+    let synthesisRun;
+    let task = "";
+    let childSources;
+    await this.plugin.topicRuns.start(node.path, "integrateChildren", {
+      map: () => {
+        var _a3;
+        return (_a3 = this.map) != null ? _a3 : void 0;
+      },
+      runOnce: options == null ? void 0 : options.runOnce,
+      signal: options == null ? void 0 : options.signal,
+      outputLanguage: options == null ? void 0 : options.outputLanguage,
+      prepare: async (note) => {
+        var _a3;
+        if (!children.length && !selectedSources.some((group) => group.documents.length))
+          return t("ui.choose_another_note_source_first");
+        childSources = await readSources();
+        const sourceSnapshot = JSON.stringify(childSources.documents);
+        if (!children.length && !selectedSources.some((group) => group.documents.length))
+          return t("ui.the_selected_sources_contain_no_markdown_content_to_synthesi");
+        const language2 = this.plugin.settings.language;
+        task = direction || synthesisGoalTask(language2);
+        const run = await this.detailTemplateFor(
+          node,
+          options == null ? void 0 : options.detailTemplateId,
+          options == null ? void 0 : options.toneId,
+          void 0,
+          (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2
+        );
+        const detailTemplate = run.template;
+        synthesisRun = run;
+        return {
           detailTemplate,
-          ...synthesisStyle.style,
-          addCharts: true
-        },
-        note
-      );
-      const result = await this.plugin.askModel(
-        synthesisContext,
-        used.model,
-        used.reasoning,
-        options == null ? void 0 : options.signal,
-        void 0,
-        accepted,
-        void 0,
-        progress.observer
-      );
-      progress.end();
-      accepted == null ? void 0 : accepted();
-      if ((_j = options == null ? void 0 : options.signal) == null ? void 0 : _j.aborted) throw new DOMException("Aborted", "AbortError");
-      await this.plugin.repo.updateNote(node.path, { status: note.status });
-      const save = async (summary, detail) => this.plugin.mutate(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2;
-        if (((_a3 = options == null ? void 0 : options.signal) == null ? void 0 : _a3.aborted) || this.closed || this.path !== mapPath || ((_b3 = this.map) == null ? void 0 : _b3.id) !== mapId || this.map.nodes.filter((item) => item.parentId === node.id).map((item) => item.id).sort().join("|") !== childIds2)
-          throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const currentSources = await this.topicReferenceGroup(
-          children,
-          (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
-          { language: options == null ? void 0 : options.outputLanguage }
-        );
-        if (JSON.stringify(currentSources.documents) !== sourceSnapshot)
-          throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const latest = await this.plugin.repo.readNote(node.path, (_c2 = this.map) != null ? _c2 : void 0);
-        if (JSON.stringify([
-          latest.title,
-          latest.summary,
-          latest.detail,
-          latest.prompt,
-          latest.rules,
-          latest.model,
-          latest.reasoning,
-          latest.sourcePaths,
-          latest.referencePaths,
-          latest.thinkingOrigin,
-          latest.newFindings
-        ]) !== noteSnapshot)
-          throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-        const canonicalOnly = canonicalDetail(
-          detail,
-          noteLanguageOf((_d2 = options == null ? void 0 : options.outputLanguage) != null ? _d2 : this.plugin.settings.language),
-          detailTemplate
-        );
-        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
-        const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
-        const canonical = carryForwardSources(
-          canonicalOnly,
-          [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
-          [summary, canonicalOnly, references2],
-          (_e2 = options == null ? void 0 : options.outputLanguage) != null ? _e2 : this.plugin.settings.language,
-          detailTemplate
-        );
-        await this.plugin.repo.updateNote(
-          node.path,
-          {
-            summary,
-            detail: canonical,
-            visualReferences: references2,
-            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
-            ...findingsSent ? { newFindings: "" } : {},
-            status: "completed",
-            ...formatIssuesPatch(issues, language2)
+          viewChanged: () => {
+            var _a4, _b2;
+            return ((_a4 = options == null ? void 0 : options.signal) == null ? void 0 : _a4.aborted) === true || this.closed || this.path !== mapPath || ((_b2 = this.map) == null ? void 0 : _b2.id) !== mapId || childIds2() !== startIds;
           },
-          { detailTemplate }
+          sourcesChanged: async () => JSON.stringify((await readSources()).documents) !== sourceSnapshot
+        };
+      },
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
+      },
+      buildContext: async (note) => {
+        var _a3, _b2, _c, _d, _e;
+        const language2 = this.plugin.settings.language;
+        const run = synthesisRun;
+        const synthesisStyle = {
+          tone: run.toneText ? { toneText: run.toneText } : {},
+          style: run.contextFields
+        };
+        return withThinkingOrigin(
+          {
+            title: note.title,
+            summary: summaryForPrompt(note.summary, (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2),
+            rules: "",
+            detail: note.detail,
+            task: [task, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
+            ancestors: await this.ancestorContext(node, (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : language2),
+            userTexts: this.userTextContext(node.id),
+            ...this.summaryDirections(node.id),
+            workingFindings: note.newFindings,
+            onWorkingFindingsSent: (sent) => {
+              findingsSent = sent === note.newFindings;
+            },
+            referenceGroups: [...selectedSources, childSources],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
+            onProgress: options == null ? void 0 : options.onProgress,
+            outputLanguage: options == null ? void 0 : options.outputLanguage,
+            ...synthesisStyle.tone,
+            mode: "synthesize",
+            researchMode: (_c = options == null ? void 0 : options.researchMode) != null ? _c : "local",
+            researchDepth: (_d = options == null ? void 0 : options.researchDepth) != null ? _d : "normal",
+            visualMode: (_e = options == null ? void 0 : options.visualMode) != null ? _e : note.visualMode,
+            detailTemplate: run.template,
+            ...synthesisStyle.style,
+            addCharts: true
+          },
+          note
         );
-        const saved = await this.plugin.repo.readNote(node.path, (_f2 = this.map) != null ? _f2 : void 0);
+      },
+      findingsSent: () => findingsSent,
+      accepted,
+      drafted: drafted != null ? drafted : async (_result, write, summary, detail, note) => {
+        const previous = this.history.undoEntry;
+        await write(summary, detail);
+        this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
+      },
+      onWritten: async ({ before, after }) => {
         this.recordNoteWrite(
           node.path,
-          { ...latest, status: note.status },
-          saved,
+          before,
+          after,
           [
             "summary",
             "detail",
@@ -59051,52 +58790,15 @@ ${request.requirements}` : preset.text,
         );
         await this.hydrate();
         this.render();
-        this.queueCharts({
-          path: node.path,
-          saved,
-          context: synthesisContext,
-          detail: saved.detail,
-          formatIssues: issues,
-          model: used.model,
-          language: (_g2 = options == null ? void 0 : options.outputLanguage) != null ? _g2 : this.plugin.settings.language,
-          template: detailTemplate
-        });
-      });
-      try {
-        await (drafted != null ? drafted : async (_result, write, summary, detail) => {
-          const previous = this.history.undoEntry;
-          await write(summary, detail);
-          this.undoNotice(t("ui.synthesis_written_0", note.title), previous);
-        })(result, save, result.summary, result.detail);
-      } catch (error) {
-        if (((_k = options == null ? void 0 : options.signal) == null ? void 0 : _k.aborted) || error instanceof Error && error.name === "AbortError") {
-          if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-        } else {
-          console.error("VAM synthesis write", error);
-          const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-          if (failed) failed(message);
-          else new import_obsidian31.Notice(message);
-        }
+      },
+      queueCharts: (job) => this.queueCharts(job),
+      failed,
+      notify: (message) => new import_obsidian31.Notice(message),
+      onSettled: async () => {
+        await this.hydrate();
+        this.render();
       }
-    } catch (error) {
-      if (((_l = options == null ? void 0 : options.signal) == null ? void 0 : _l.aborted) || error instanceof Error && error.name === "AbortError") {
-        await this.plugin.repo.updateNote(node.path, { status: note.status });
-        if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-        else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-      } else {
-        console.error("Visual Agent Map child integration", error);
-        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-        const message = this.plugin.recordFailure(t("log.child_integration_failed"), error);
-        if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
-      }
-    } finally {
-      progress.end();
-      this.plugin.running.delete(node.path);
-      await this.hydrate();
-      this.render();
-    }
+    });
   }
   async startSynthesis(node, options, direction, failed, accepted, observer) {
     const path = node.path;
@@ -59106,7 +58808,7 @@ ${request.requirements}` : preset.text,
       failed(t("ui.no_mind_map_is_available"));
       return;
     }
-    if (this.plugin.running.has(path) || this.plugin.activeTasks.has(path) || (existing == null ? void 0 : existing.state) === "running") {
+    if (this.plugin.topicRuns.isBusy(path) || this.plugin.topicRuns.hasTask(path) || (existing == null ? void 0 : existing.state) === "running") {
       failed(t("ui.ai_running_ai"));
       return;
     }
@@ -59143,7 +58845,7 @@ ${request.requirements}` : preset.text,
     task.progress = "";
     task.direction = direction != null ? direction : "";
     this.synthesisTasks.set(path, task);
-    this.plugin.activeTasks.set(path, controller);
+    this.plugin.topicRuns.registerTask(path, controller);
     const runOptions = {
       ...step === "draft" ? { ...task.options, requirements: options.requirements || task.options.requirements } : options,
       // The model of this step is the dialog's choice now, not the one the first step was started with.
@@ -59224,7 +58926,7 @@ ${request.requirements}` : preset.text,
       fail2(error instanceof Error ? error.message : String(error));
     } finally {
       modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      if (this.plugin.activeTasks.get(path) === controller) this.plugin.activeTasks.delete(path);
+      this.plugin.topicRuns.releaseTask(path, controller);
       this.render();
     }
   }
@@ -59317,12 +59019,48 @@ ${request.requirements}` : preset.text,
       }
     ).open();
   }
+  /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
+  async createIntegratedNode(title, sources, goal, _rules, options, flow) {
+    var _a2, _b2;
+    if (!this.map || sources.length < 2) return;
+    let failure;
+    let failed = false;
+    const errorSink = (error) => {
+      failure = error;
+      failed = true;
+    };
+    await this.startSelectionSynthesis(
+      sources,
+      {
+        researchMode: "local",
+        researchDepth: "normal",
+        visualMode: "off",
+        ...options,
+        synthesisTitle: title,
+        signal: (_b2 = (_a2 = flow == null ? void 0 : flow.controller) == null ? void 0 : _a2.signal) != null ? _b2 : options == null ? void 0 : options.signal
+      },
+      goal,
+      (message) => {
+        if (!failed) {
+          failure = new Error(message);
+          failed = true;
+        }
+      },
+      () => {
+        var _a3;
+        return (_a3 = flow == null ? void 0 : flow.accepted) == null ? void 0 : _a3.call(flow);
+      },
+      flow == null ? void 0 : flow.observer,
+      errorSink
+    );
+    if (failed) throw failure;
+  }
   /**
    * One step of multi-select synthesis: the AI's suggested directions (`direction === null`), then the draft. Both
    * report to the open dialog through `observer`; once it is closed the run carries on and the selection bar shows it.
    */
-  async startSelectionSynthesis(sources, options, direction, failed, accepted, observer) {
-    var _a2, _b2, _c, _d, _e;
+  async startSelectionSynthesis(sources, options, direction, failed, accepted, observer, errorSink) {
+    var _a2;
     if (!this.map || sources.length < 2) {
       failed(t("ui.select_at_least_two_topics"));
       return;
@@ -59346,8 +59084,12 @@ ${request.requirements}` : preset.text,
     const abortBeforeAcceptance = () => controller.abort();
     if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
     else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    const releaseStarting = () => {
+      this.selectionStarting = false;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      this.render();
+    };
     let own2;
-    let progress;
     const runOptions = {
       ...base,
       requirements: options.requirements || base.requirements,
@@ -59370,17 +59112,22 @@ ${request.requirements}` : preset.text,
     };
     const fail2 = (error) => {
       const aborted = controller.signal.aborted || error instanceof Error && error.name === "AbortError";
-      const task = this.integrationTask;
+      const task2 = this.integrationTask;
       if (aborted && (observer == null ? void 0 : observer.isOpen())) {
         if (own2 && this.integrationTask === own2) this.integrationTask = null;
         this.render();
         failed(t("ui.research_stopped_existing_content_was_preserved"));
         return;
       }
-      if (task) {
-        task.state = aborted ? "cancelled" : "failed";
-        task.progress = aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
+      if (task2) {
+        task2.state = aborted ? "cancelled" : "failed";
+        task2.progress = aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
         this.render();
+      }
+      if (errorSink && !aborted) {
+        errorSink(error);
+        failed(error instanceof Error ? error.message : String(error));
+        return;
       }
       failed(
         aborted ? t("ui.research_stopped_existing_content_was_preserved") : this.plugin.recordFailure(
@@ -59389,112 +59136,176 @@ ${request.requirements}` : preset.text,
         )
       );
     };
-    try {
-      const chosen = await this.selectionModel(sources);
-      if (step === "draft") {
-        await this.createIntegratedNode(title, sources, direction != null ? direction : "", "", runOptions, {
-          model: chosen,
-          observer,
-          accepted: markAccepted,
-          controller,
-          directions: continuing && existing ? existing.directions : []
-        });
-        markAccepted();
-        return;
-      }
-      const sourceGroup = await this.topicReferenceGroup(
-        sources,
-        base.synthesisContent === "summary" ? "summary" : "strong",
-        { language: runOptions.outputLanguage }
-      );
-      const task = {
-        title,
-        goal: "",
-        rules: "",
-        sources,
-        options: { ...runOptions, signal: void 0, onProgress: void 0 },
-        mapPath: this.path,
-        mapId: this.map.id,
-        sourceContent: JSON.stringify(sourceGroup.documents),
-        controller,
-        state: "running",
-        step: "directions",
-        directions: [],
-        progress: "",
-        model: chosen.model,
-        reasoning: chosen.reasoning
-      };
-      this.integrationTask = task;
-      own2 = task;
-      this.render();
-      const taskProgress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
-      progress = taskProgress;
-      const language2 = this.plugin.settings.language;
-      const result = await this.plugin.askModel(
-        {
+    let task;
+    let modelChoice;
+    let draftContext;
+    const mapPath = this.path, mapId = this.map.id;
+    const summaryMode = base.synthesisContent === "summary" ? "summary" : "strong";
+    const isDraft = step === "draft";
+    await this.plugin.topicRuns.start(mapPath, "synthesizeSelection", {
+      step,
+      signal: controller.signal,
+      stop: () => controller.abort(),
+      refused: () => {
+        releaseStarting();
+        failed(t("ui.ai_running_ai"));
+      },
+      model: async () => modelChoice = await this.selectionModel(sources),
+      readSources: () => this.topicReferenceGroup(sources, summaryMode, { language: runOptions.outputLanguage }),
+      begin: (group) => {
+        task = {
           title,
-          summary: translateNote((_b2 = runOptions.outputLanguage) != null ? _b2 : language2, "note.no_conclusion_yet"),
+          goal: isDraft ? direction != null ? direction : "" : "",
+          rules: "",
+          sources,
+          options: { ...runOptions, signal: void 0, onProgress: void 0 },
+          mapPath,
+          mapId,
+          sourceContent: JSON.stringify(group.documents),
+          controller,
+          state: "running",
+          step: isDraft ? "draft" : "directions",
+          directions: isDraft && continuing && existing ? existing.directions : [],
+          progress: "",
+          model: modelChoice.model,
+          reasoning: modelChoice.reasoning
+        };
+        this.integrationTask = task;
+        if (!isDraft) own2 = task;
+        this.render();
+      },
+      startProgress: (model) => {
+        return this.startTaskProgress(this.taskProgressKey("integration"), model);
+      },
+      buildContext: async (group) => {
+        var _a3, _b2, _c, _d, _e, _f, _g, _h, _i;
+        const language2 = this.plugin.settings.language;
+        if (!isDraft)
+          return {
+            title,
+            summary: translateNote((_a3 = runOptions.outputLanguage) != null ? _a3 : language2, "note.no_conclusion_yet"),
+            rules: "",
+            detail: "",
+            task: [synthesisDirectionsTask((_b2 = runOptions.outputLanguage) != null ? _b2 : language2), runOptions.requirements].filter(Boolean).join("\n\n"),
+            ancestors: "",
+            referenceGroups: [...(_c = runOptions.referenceGroups) != null ? _c : [], group],
+            // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
+            referenceDelivery: "direct",
+            onProgress: runOptions.onProgress,
+            outputLanguage: runOptions.outputLanguage,
+            ...this.proposalTone(void 0, runOptions),
+            mode: "synthesize",
+            researchMode: runOptions.researchMode,
+            researchDepth: runOptions.researchDepth,
+            visualMode: "off"
+          };
+        await this.noteStyles.refresh();
+        const integrationStyle = this.mapStyle((_d = runOptions.outputLanguage) != null ? _d : language2, {
+          template: runOptions.detailTemplateId,
+          tone: runOptions.toneId,
+          kind: "topic",
+          notify: true
+        });
+        const own3 = task;
+        draftContext = {
+          title,
+          summary: translateNote((_e = runOptions.outputLanguage) != null ? _e : language2, "note.no_conclusion_yet"),
           rules: "",
           detail: "",
-          task: [synthesisDirectionsTask((_c = runOptions.outputLanguage) != null ? _c : language2), runOptions.requirements].filter(Boolean).join("\n\n"),
+          task: [direction != null ? direction : "", runOptions.requirements].filter(Boolean).join("\n\n"),
           ancestors: "",
-          referenceGroups: [...(_d = runOptions.referenceGroups) != null ? _d : [], sourceGroup],
+          referenceGroups: [...(_f = runOptions.referenceGroups) != null ? _f : [], group],
           // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
           referenceDelivery: "direct",
-          onProgress: runOptions.onProgress,
+          onProgress: (message) => {
+            var _a4;
+            if (this.integrationTask !== own3) return;
+            own3.progress = message;
+            (_a4 = runOptions.onProgress) == null ? void 0 : _a4.call(runOptions, message);
+            this.render();
+          },
           outputLanguage: runOptions.outputLanguage,
-          ...this.proposalTone(void 0, runOptions),
+          ...integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {},
           mode: "synthesize",
-          researchMode: runOptions.researchMode,
-          researchDepth: runOptions.researchDepth,
-          visualMode: "off"
-        },
-        chosen.model,
-        chosen.reasoning,
-        controller.signal,
-        void 0,
-        markAccepted,
-        void 0,
-        taskProgress.observer
-      );
-      taskProgress.end();
-      markAccepted();
-      if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== task.mapPath || ((_e = this.map) == null ? void 0 : _e.id) !== task.mapId)
-        throw new DOMException("Aborted", "AbortError");
-      const latest = await this.topicReferenceGroup(
-        sources,
-        base.synthesisContent === "summary" ? "summary" : "strong",
-        { language: runOptions.outputLanguage }
-      );
-      if (JSON.stringify(latest.documents) !== task.sourceContent)
-        throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      const angles = result.suggestions.slice(0, 2);
-      if (!angles.length) {
+          researchMode: (_g = runOptions.researchMode) != null ? _g : "local",
+          researchDepth: (_h = runOptions.researchDepth) != null ? _h : "normal",
+          visualMode: (_i = runOptions.visualMode) != null ? _i : "auto",
+          detailTemplate: integrationStyle.template,
+          ...integrationStyle.contextFields,
+          addCharts: true
+        };
+        return draftContext;
+      },
+      accepted: markAccepted,
+      current: () => this.integrationTask === task,
+      mapChanged: () => {
+        var _a3;
+        return this.path !== mapPath || ((_a3 = this.map) == null ? void 0 : _a3.id) !== mapId;
+      },
+      recordedSources: () => task.sourceContent,
+      found: (angles) => {
+        const waiting = task;
+        waiting.state = "directions";
+        waiting.directions = angles;
+        this.render();
+        if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(angles);
+        else
+          backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
+            label: t("ui.choose_synthesis_direction"),
+            open: () => {
+              if (this.integrationTask === waiting && waiting.state === "directions")
+                this.openSelectionSynthesis(waiting);
+            }
+          });
+      },
+      noDirections: () => {
         this.integrationTask = null;
         this.render();
         failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
-        return;
-      }
-      task.state = "directions";
-      task.directions = angles;
-      this.render();
-      if ((observer == null ? void 0 : observer.isOpen()) && observer.directions) observer.directions(angles);
-      else
-        backgroundResultNotice(t("ui.background_synthesis_directions_ready"), {
-          label: t("ui.choose_synthesis_direction"),
-          open: () => {
-            if (this.integrationTask === task && task.state === "directions") this.openSelectionSynthesis(task);
-          }
-        });
-    } catch (error) {
-      fail2(error);
-    } finally {
-      progress == null ? void 0 : progress.end();
-      this.selectionStarting = false;
-      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
-      this.render();
-    }
+      },
+      closed: () => this.closed,
+      applying: () => {
+        task.state = "applying";
+        this.render();
+        return this.history.undoEntry;
+      },
+      write: (result) => {
+        var _a3;
+        const language2 = (_a3 = runOptions.outputLanguage) != null ? _a3 : this.plugin.settings.language;
+        return this.saveIntegratedNode(
+          title,
+          sources,
+          direction != null ? direction : "",
+          "",
+          modelChoice.model,
+          result,
+          language2,
+          task,
+          draftContext
+        );
+      },
+      written: (previous) => {
+        var _a3;
+        this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
+        if (observer == null ? void 0 : observer.isOpen()) (_a3 = observer.written) == null ? void 0 : _a3.call(observer);
+      },
+      draftFailed: (error) => {
+        const draftTask = task;
+        if (controller.signal.aborted && (observer == null ? void 0 : observer.isOpen())) {
+          if (draftTask.directions.length) draftTask.state = "directions";
+          else this.integrationTask = null;
+          this.render();
+          throw error;
+        }
+        draftTask.state = controller.signal.aborted ? "cancelled" : "failed";
+        draftTask.progress = controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
+        this.render();
+        if (!controller.signal.aborted) throw error;
+      },
+      finished: markAccepted,
+      fail: fail2,
+      settled: releaseStarting
+    });
   }
   discardSelectionSynthesis() {
     const task = this.integrationTask;
@@ -59573,134 +59384,6 @@ ${note.detail.trim()}` : "",
       location: this.path,
       documents
     };
-  }
-  async createIntegratedNode(title, sources, goal, rules, options, flow) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-    if (!this.map || sources.length < 2) return;
-    const chosen = (_a2 = flow == null ? void 0 : flow.model) != null ? _a2 : await this.selectionModel(sources);
-    const controller = (_b2 = flow == null ? void 0 : flow.controller) != null ? _b2 : new AbortController();
-    const mapPath = this.path, mapId = this.map.id;
-    const sourceGroup = await this.topicReferenceGroup(
-      sources,
-      (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
-      { language: options == null ? void 0 : options.outputLanguage }
-    );
-    const task = {
-      title,
-      goal,
-      rules,
-      sources,
-      options: options ? { ...options, signal: void 0, onProgress: void 0 } : { researchMode: "local", researchDepth: "normal", visualMode: "off" },
-      mapPath,
-      mapId,
-      sourceContent: JSON.stringify(sourceGroup.documents),
-      controller,
-      state: "running",
-      step: "draft",
-      directions: (_c = flow == null ? void 0 : flow.directions) != null ? _c : [],
-      progress: "",
-      model: chosen.model,
-      reasoning: chosen.reasoning
-    };
-    this.integrationTask = task;
-    this.render();
-    const progress = this.startTaskProgress(this.taskProgressKey("integration"), chosen.model);
-    const model = chosen.model;
-    const language2 = this.plugin.settings.language;
-    await this.noteStyles.refresh();
-    const integrationStyle = this.mapStyle((_d = options == null ? void 0 : options.outputLanguage) != null ? _d : language2, {
-      template: options == null ? void 0 : options.detailTemplateId,
-      tone: options == null ? void 0 : options.toneId,
-      kind: "topic",
-      notify: true
-    });
-    const detailTemplate = integrationStyle.template;
-    try {
-      const integrationContext = {
-        title,
-        summary: translateNote((_e = options == null ? void 0 : options.outputLanguage) != null ? _e : language2, "note.no_conclusion_yet"),
-        rules: "",
-        detail: "",
-        task: [goal, options == null ? void 0 : options.requirements].filter(Boolean).join("\n\n"),
-        ancestors: "",
-        referenceGroups: [...(_f = options == null ? void 0 : options.referenceGroups) != null ? _f : [], sourceGroup],
-        // Within budget the sources go in as written (one request); only over-budget sources are extracted first.
-        referenceDelivery: "direct",
-        onProgress: (message) => {
-          var _a3;
-          if (this.integrationTask !== task) return;
-          task.progress = message;
-          (_a3 = options == null ? void 0 : options.onProgress) == null ? void 0 : _a3.call(options, message);
-          this.render();
-        },
-        outputLanguage: options == null ? void 0 : options.outputLanguage,
-        ...integrationStyle.toneText ? { toneText: integrationStyle.toneText } : {},
-        mode: "synthesize",
-        researchMode: (_g = options == null ? void 0 : options.researchMode) != null ? _g : "local",
-        researchDepth: (_h = options == null ? void 0 : options.researchDepth) != null ? _h : "normal",
-        visualMode: (_i = options == null ? void 0 : options.visualMode) != null ? _i : "auto",
-        detailTemplate,
-        ...integrationStyle.contextFields,
-        addCharts: true
-      };
-      const result = await this.plugin.askModel(
-        integrationContext,
-        model,
-        chosen.reasoning,
-        controller.signal,
-        void 0,
-        flow == null ? void 0 : flow.accepted,
-        void 0,
-        progress.observer
-      );
-      progress.end();
-      if (this.integrationTask !== task) return;
-      if (controller.signal.aborted || this.path !== mapPath || ((_j = this.map) == null ? void 0 : _j.id) !== mapId)
-        throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
-      const latest = await this.topicReferenceGroup(
-        sources,
-        (options == null ? void 0 : options.synthesisContent) === "summary" ? "summary" : "strong",
-        { language: options == null ? void 0 : options.outputLanguage }
-      );
-      if (JSON.stringify(latest.documents) !== task.sourceContent)
-        throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-      if (this.closed) throw new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
-      task.state = "applying";
-      this.render();
-      const previous = this.history.undoEntry;
-      const write = () => {
-        var _a3;
-        return this.saveIntegratedNode(
-          title,
-          sources,
-          goal,
-          rules,
-          model,
-          result,
-          (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2,
-          task,
-          integrationContext
-        );
-      };
-      await (flow ? this.plugin.mutate(write) : write());
-      this.undoNotice(t("ui.synthesis_new_topic_0", title), previous);
-      if ((_k = flow == null ? void 0 : flow.observer) == null ? void 0 : _k.isOpen()) (_m = (_l = flow.observer).written) == null ? void 0 : _m.call(_l);
-    } catch (error) {
-      if (this.integrationTask !== task) return;
-      if (flow && controller.signal.aborted && ((_n = flow.observer) == null ? void 0 : _n.isOpen())) {
-        if (task.directions.length) task.state = "directions";
-        else this.integrationTask = null;
-        this.render();
-        throw error;
-      }
-      task.state = controller.signal.aborted ? "cancelled" : "failed";
-      task.progress = controller.signal.aborted ? t("ui.research_stopped_existing_content_was_preserved") : error instanceof Error ? error.message : String(error);
-      this.render();
-      if (!controller.signal.aborted) throw error;
-    } finally {
-      progress.end();
-    }
   }
   async saveIntegratedNode(title, sources, goal, rules, model, result, language2, task, context) {
     var _a2;
@@ -61634,14 +61317,13 @@ ${note.detail.trim()}` : "",
    */
   async chatInsertImage(block, item) {
     const fence = () => {
-      var _a2, _b2;
       if (this.closed || !this.map || this.path !== block.mapPath || this.map.id !== block.mapId)
         return { reason: "ui.map_chat_images_stale_map" };
       if (this.map.aim) return { reason: "ui.map_chat_images_stale_locked" };
       const node = this.map.nodes.find((candidate) => candidate.id === block.nodeId);
       if (!node) return { reason: "ui.map_chat_images_stale_gone" };
       if (this.isMerging(node.id)) return { reason: "ui.map_chat_images_stale_merging" };
-      if (((_a2 = this.plugin.running) == null ? void 0 : _a2.has(node.path)) || ((_b2 = this.plugin.activeTasks) == null ? void 0 : _b2.has(node.path)))
+      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path))
         return { reason: "ui.map_chat_images_stale_running" };
       return { node };
     };
@@ -61855,7 +61537,7 @@ ${addition}` : addition });
       const node = nodes[0];
       if (!map.nodes.some((item) => item.parentId === node.id)) return skipped("ui.map_chat_skip_no_children");
       const task = this.synthesisTasks.get(node.path);
-      if (this.plugin.running.has(node.path) || this.plugin.activeTasks.has(node.path) || (task == null ? void 0 : task.state) === "running" || (task == null ? void 0 : task.state) === "directions")
+      if (this.plugin.topicRuns.isBusy(node.path) || this.plugin.topicRuns.hasTask(node.path) || (task == null ? void 0 : task.state) === "running" || (task == null ? void 0 : task.state) === "directions")
         return skipped("ui.map_chat_skip_synthesis_busy");
       const note = await this.plugin.repo.readNote(node.path, map);
       const options2 = chatSynthesisOptions({
@@ -63140,250 +62822,49 @@ ${addition}` : addition });
     const { model, reasoning } = await this.plugin.repo.resolveTopicModel(path, (_a2 = this.map) != null ? _a2 : void 0, runOnce);
     return { model, reasoning };
   }
-  async runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
-    const { runStyle: givenStyle, ...overrides } = request != null ? request : {};
-    const taskPath = node.path;
-    const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
-    const used = await this.modelFor(note, node.path, runOnce);
-    if (!((_b2 = overrides == null ? void 0 : overrides.task) != null ? _b2 : note.prompt)) {
-      const message = t("ui.enter_a_question_or_task_for_ai_first");
-      if (failed) failed(message);
-      else new import_obsidian31.Notice(message);
-      return null;
-    }
-    if (this.plugin.running.has(node.path)) {
-      failed == null ? void 0 : failed(t("ui.ai_running_ai"));
-      return null;
-    }
-    const runStyle = givenStyle != null ? givenStyle : await this.detailTemplateFor(
-      node,
-      void 0,
-      void 0,
-      void 0,
-      (_c = overrides == null ? void 0 : overrides.outputLanguage) != null ? _c : this.plugin.settings.language
-    );
-    const detailTemplate = runStyle.template;
-    const context = withThinkingOrigin(
-      {
-        title: note.title,
-        summary: summaryForPrompt(note.summary, (_d = overrides == null ? void 0 : overrides.outputLanguage) != null ? _d : this.plugin.settings.language),
-        rules: "",
-        detail: note.detail,
-        task: note.prompt,
-        ancestors: await this.ancestorContext(node, (_e = overrides == null ? void 0 : overrides.outputLanguage) != null ? _e : this.plugin.settings.language),
-        userTexts: this.userTextContext(node.id),
-        workingFindings: note.newFindings,
-        sourceContext: "",
-        mode: "task",
-        researchMode: note.researchMode,
-        researchDepth: "normal",
-        visualMode: note.visualMode,
-        ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
-        ...overrides,
-        detailTemplate,
-        ...runStyle.contextFields,
-        addCharts: (_f = overrides == null ? void 0 : overrides.addCharts) != null ? _f : true
+  /**
+   * Starts a research on one topic through the plugin's run module. The module owns registration, progress, the stale
+   * check and the write; this supplies what only the view knows: the map, the ancestors, the style notices, the redraw
+   * and the undo step.
+   */
+  runAgent(node, done, failed, request, onLaunchAccepted, runOnce) {
+    var _a2;
+    return this.plugin.topicRuns.start(node.path, "research", {
+      origin: this,
+      map: (_a2 = this.map) != null ? _a2 : void 0,
+      request,
+      runOnce,
+      done,
+      failed,
+      notify: (message) => new import_obsidian31.Notice(message),
+      accepted: onLaunchAccepted,
+      resolveStyle: (language2) => this.detailTemplateFor(node, void 0, void 0, void 0, language2),
+      ancestors: (language2) => this.ancestorContext(node, language2),
+      userTexts: () => this.userTextContext(node.id),
+      onStarted: async () => {
+        await this.hydrate();
+        this.render();
       },
-      note
-    );
-    const language2 = this.plugin.settings.language;
-    this.plugin.pendingSuggestions.delete(node.path);
-    this.plugin.abortChartJobs(node.path);
-    this.plugin.running.add(node.path);
-    const controller = new AbortController();
-    const abortFromTaskModal = () => controller.abort();
-    if ((_g = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _g.aborted) controller.abort();
-    else (_h = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _h.addEventListener("abort", abortFromTaskModal, { once: true });
-    this.plugin.activeTasks.set(taskPath, controller);
-    const progress = this.plugin.researchProgress;
-    let progressAttempt = "starting";
-    const styleLine = runStyle.label.fileName || runStyle.label.templateSource === "kind" ? runStyleLabelText(runStyle.label, language2) : void 0;
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model, styleLine);
-    const observer = {
-      onAttempt: (id) => {
-        progressAttempt = id;
-        progress == null ? void 0 : progress.newAttempt(taskPath, id, Date.now());
-      },
-      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(taskPath, id, stage, Date.now(), query),
-      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(taskPath, id, fields != null ? fields : {}),
-      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(taskPath, id, slow, resend)
-    };
-    const releaseStartup = () => {
-      var _a3;
-      progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-      (_a3 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
-      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-      this.plugin.running.delete(taskPath);
-    };
-    let startupStatusAttempted = false;
-    try {
-      startupStatusAttempted = true;
-      await this.plugin.repo.updateNote(node.path, { status: "running" });
-      await this.hydrate();
-      this.render();
-      if (controller.signal.aborted) {
-        try {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-        } finally {
-          releaseStartup();
-        }
-        return null;
-      }
-    } catch (error) {
-      try {
-        if (startupStatusAttempted) await this.plugin.repo.updateNote(node.path, { status: note.status });
-      } catch (e) {
-      } finally {
-        releaseStartup();
-      }
-      throw error;
-    }
-    let exchangeId = "";
-    let resolveAccepted;
-    const acceptedPromise = new Promise((resolve) => {
-      resolveAccepted = resolve;
+      onWritten: ({ before, after }) => this.recordNoteWrite(
+        node.path,
+        before,
+        after,
+        [
+          "summary",
+          "detail",
+          "visualReferences",
+          "newFindings",
+          "previewSection",
+          "previewInitialized",
+          "previewAutoHash",
+          "status",
+          "lastError",
+          "researchMode"
+        ],
+        t("ui.research_task")
+      ),
+      queueCharts: (job) => this.queueCharts(job)
     });
-    let requestAccepted = false;
-    const markAccepted = () => {
-      if (requestAccepted) return;
-      requestAccepted = true;
-      resolveAccepted(true);
-      onLaunchAccepted == null ? void 0 : onLaunchAccepted();
-    };
-    const completion = this.plugin.askModel(
-      context,
-      used.model,
-      used.reasoning,
-      controller.signal,
-      (id) => {
-        exchangeId = id;
-      },
-      markAccepted,
-      void 0,
-      observer
-    ).then(
-      (result) => this.plugin.mutate(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h2;
-        progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-        const latest = await this.plugin.repo.readNote(node.path, (_a3 = this.map) != null ? _a3 : void 0);
-        const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
-        if (controller.signal.aborted || stale) {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-          if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled)
-            (_b3 = this.plugin.exchanges) == null ? void 0 : _b3.failed(
-              exchangeId,
-              t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
-            );
-          if (stale) {
-            if (failed) failed(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-            else new import_obsidian31.Notice(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
-          }
-          return;
-        }
-        await this.plugin.repo.updateNote(
-          node.path,
-          {
-            summary: result.summary,
-            detail: canonicalDetail(
-              result.detail,
-              noteLanguageOf((_c2 = context.outputLanguage) != null ? _c2 : this.plugin.settings.language),
-              context.detailTemplate
-            ),
-            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
-            newFindings: "",
-            status: "completed",
-            // The topic remembers the mode of its latest research (Quick is stored as local).
-            ...context.researchMode ? { researchMode: context.researchMode } : {},
-            ...formatIssuesPatch(result.formatIssues, language2)
-          },
-          { detailTemplate: context.detailTemplate }
-        );
-        const saved = await this.plugin.repo.readNote(node.path, (_d2 = this.map) != null ? _d2 : void 0);
-        this.recordNoteWrite(
-          node.path,
-          { ...latest, status: note.status },
-          saved,
-          [
-            "summary",
-            "detail",
-            "visualReferences",
-            "newFindings",
-            "previewSection",
-            "previewInitialized",
-            "previewAutoHash",
-            "status",
-            "lastError",
-            "researchMode"
-          ],
-          t("ui.research_task")
-        );
-        if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled) (_e2 = this.plugin.exchanges) == null ? void 0 : _e2.completed(exchangeId);
-        for (const view of this.plugin.views()) if (view !== this) view.history.clear();
-        this.queueCharts({
-          path: node.path,
-          saved,
-          context,
-          detail: saved.detail,
-          formatIssues: result.formatIssues,
-          model: used.model,
-          language: (_f2 = context.outputLanguage) != null ? _f2 : this.plugin.settings.language,
-          template: context.detailTemplate
-        });
-        if (result.suggestions.length) {
-          this.plugin.pendingSuggestions.set(
-            node.path,
-            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
-          );
-          try {
-            await ((_h2 = (_g2 = this.plugin.pendingSuggestions).flush) == null ? void 0 : _h2.call(_g2));
-          } catch (error) {
-            const message = this.plugin.recordFailure(t("log.expansion_suggestions_save_failed"), error);
-            new import_obsidian31.Notice(message);
-          }
-        }
-        done == null ? void 0 : done(result);
-      })
-    ).catch(
-      (error) => this.plugin.mutate(async () => {
-        var _a3, _b3;
-        progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
-          await this.plugin.repo.updateNote(node.path, { status: note.status });
-          if (failed) failed(t("ui.research_stopped_existing_content_was_preserved"));
-          else new import_obsidian31.Notice(t("ui.research_stopped_existing_content_was_preserved"));
-          return;
-        }
-        console.error("Visual Agent Map AI task", error);
-        if (exchangeId && this.plugin.settings.aiExchangeLoggingEnabled && ((_b3 = (_a3 = this.plugin.exchanges) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
-          this.plugin.exchanges.failed(
-            exchangeId,
-            t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
-          );
-        await this.plugin.repo.updateNote(node.path, { status: "error", lastError: failureReason(error) });
-        const message = this.plugin.recordFailure(t("log.ai_task_failed"), error);
-        if (failed) failed(message);
-        else new import_obsidian31.Notice(message);
-      })
-    ).finally(() => {
-      var _a3;
-      progress == null ? void 0 : progress.end(taskPath, progressAttempt);
-      (_a3 = overrides == null ? void 0 : overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
-      if (this.plugin.activeTasks.get(taskPath) === controller) this.plugin.activeTasks.delete(taskPath);
-      this.plugin.running.delete(taskPath);
-      for (const view of this.plugin.views())
-        view.enqueue(async () => {
-          await view.hydrate();
-          view.render();
-        });
-    }).catch(() => {
-    });
-    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
-    if (!accepted) {
-      await completion;
-      return null;
-    }
-    return { finished: completion };
   }
 };
 
@@ -64473,6 +63954,81 @@ async function fitImageForInput(dataUrl, limits, signal) {
   throw new Error(t("ui.context_ai_image_unavailable"));
 }
 
+// pending-suggestions.ts
+var PendingSuggestions = class extends Map {
+  constructor(adapter, path, onError) {
+    super();
+    this.adapter = adapter;
+    this.path = path;
+    this.onError = onError;
+    __publicField(this, "writes", Promise.resolve());
+    __publicField(this, "writeError", null);
+    __publicField(this, "loadError", null);
+  }
+  async load() {
+    try {
+      const text11 = await readStoreText(this.adapter, this.path);
+      if (text11 === null) return;
+      const parsed = JSON.parse(text11);
+      if (!Array.isArray(parsed)) throw new Error(t("error.pending_suggestions_invalid"));
+      const entries = [];
+      for (const item of parsed) {
+        if (!Array.isArray(item) || item.length !== 2 || typeof item[0] !== "string" || !Array.isArray(item[1]))
+          throw new Error(t("error.pending_suggestions_fields_invalid"));
+        const suggestions = item[1].filter((value) => {
+          if (!value || typeof value !== "object") return false;
+          const suggestion = value;
+          return typeof suggestion.title === "string" && typeof suggestion.task === "string" && typeof suggestion.contribution === "string" && (suggestion.parentTitle === void 0 || typeof suggestion.parentTitle === "string") && (suggestion.thinkingOriginBaseline === void 0 || typeof suggestion.thinkingOriginBaseline === "string");
+        });
+        if (suggestions.length !== item[1].length) throw new Error(t("error.pending_suggestions_fields_invalid"));
+        entries.push([item[0], suggestions]);
+      }
+      for (const [key2, suggestions] of entries) if (suggestions.length) super.set(key2, suggestions);
+      this.loadError = null;
+    } catch (error) {
+      this.loadError = error;
+      this.onError(error);
+    }
+  }
+  set(key2, value) {
+    super.set(key2, value);
+    this.save();
+    return this;
+  }
+  delete(key2) {
+    const removed = super.delete(key2);
+    if (removed) this.save();
+    return removed;
+  }
+  clear() {
+    if (!this.size) return;
+    super.clear();
+    this.save();
+  }
+  async flush() {
+    await this.writes;
+    if (this.writeError)
+      throw this.writeError instanceof Error ? this.writeError : new Error(t("error.pending_suggestions_save_failed"));
+  }
+  save() {
+    if (this.loadError) {
+      this.writeError = this.loadError;
+      this.onError(this.loadError);
+      return;
+    }
+    const snapshot = JSON.stringify([...this.entries()]);
+    this.writes = this.writes.then(() => writeStoreAtomically(this.adapter, this.path, snapshot)).then(
+      () => {
+        this.writeError = null;
+      },
+      (error) => {
+        this.writeError = error;
+        this.onError(error);
+      }
+    );
+  }
+};
+
 // ui/outline-view.ts
 var import_obsidian34 = require("obsidian");
 var OUTLINE_VIEW_TYPE = "visual-agent-map-outline";
@@ -65467,7 +65023,7 @@ var ELEMENT_NODE = 1;
 var TEXT_NODE = 3;
 var PLACEHOLDER_OPEN = "\u27E6";
 var PLACEHOLDER_CLOSE = "\u27E7";
-var TOKEN2 = /⟦(\/?)(\d+)(\/?)⟧/g;
+var TOKEN = /⟦(\/?)(\d+)(\/?)⟧/g;
 var BLOCK_TAGS2 = /* @__PURE__ */ new Set([
   "address",
   "article",
@@ -65602,7 +65158,7 @@ function buildText(nodes, parts) {
   return out;
 }
 function hasTranslatableText(text11) {
-  return HAS_LETTER.test(text11.replace(TOKEN2, ""));
+  return HAS_LETTER.test(text11.replace(TOKEN, ""));
 }
 function extractSegments(root) {
   const units = [];
@@ -65635,7 +65191,7 @@ function extractSegments(root) {
     const raw = buildText(run, parts);
     const text11 = raw.trim();
     if (!text11 || !hasTranslatableText(text11) || raw.includes("\u27E6\u27E6")) return;
-    const stripped = raw.replace(TOKEN2, "");
+    const stripped = raw.replace(TOKEN, "");
     if (stripped.includes(PLACEHOLDER_OPEN) || stripped.includes(PLACEHOLDER_CLOSE)) return;
     const lead = raw.slice(0, raw.length - raw.trimStart().length);
     const trail = raw.slice(raw.trimEnd().length);
@@ -65668,13 +65224,13 @@ function extractSegments(root) {
   walk(root);
   return { units };
 }
-var tokensOf = (text11) => [...text11.matchAll(TOKEN2)].map((match) => match[0]);
+var tokensOf = (text11) => [...text11.matchAll(TOKEN)].map((match) => match[0]);
 function placeholdersMatch(source, translated) {
   if (!translated.trim()) return false;
   const a = tokensOf(source);
   const b = tokensOf(translated);
   if (a.length !== b.length || a.some((token, i) => token !== b[i])) return false;
-  const rest = translated.replace(TOKEN2, "");
+  const rest = translated.replace(TOKEN, "");
   return !rest.includes(PLACEHOLDER_OPEN) && !rest.includes(PLACEHOLDER_CLOSE);
 }
 function rebuild(unit, translated, doc) {
@@ -65691,7 +65247,7 @@ function rebuild(unit, translated, doc) {
   };
   addText(unit.lead);
   let last = 0;
-  for (const match of translated.matchAll(TOKEN2)) {
+  for (const match of translated.matchAll(TOKEN)) {
     addText(translated.slice(last, match.index));
     last = ((_a2 = match.index) != null ? _a2 : 0) + match[0].length;
     const part = unit.parts[Number(match[2]) - 1];
@@ -68956,6 +68512,936 @@ var ResearchProgressStore = class {
   }
 };
 
+// core/steps/task/carry-sources.ts
+var HEADING_KEY = "note.earlier_research_sources";
+var ANY_HEADING = /^#{3,4}[ \t]+(?:先前研究的來源|Sources from earlier research)[ \t]*$/i;
+var TOKEN2 = /!?\[\[[^\]]+\]\]|!?\[[^\]]*\]\(\s*<?[^)\s>]+[^)]*\)|<?https?:\/\/[^\s<>"'`)\]]+>?/g;
+function outsideCode(text11) {
+  const lines = text11.replace(/\r\n/g, "\n").split("\n");
+  const code = fencedLines(lines);
+  return lines.filter((_, index) => !code[index]);
+}
+function keysOf(text11) {
+  return [...linksOf([text11]).keys()];
+}
+function plainLine(line) {
+  const stripped = line.replace(/^[ \t]*(?:>[ \t]*)*/, "").replace(/^(?:[-*+]|\d+[.)])[ \t]+/, "").replace(/\[\^[^\]\s]+\](?!\()/g, "").replace(/!(\[[^\]]*\]\()/g, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  return `- ${stripped}`;
+}
+function linkTokens(line, wanted) {
+  const out = [];
+  for (const match of line.matchAll(TOKEN2)) {
+    const token = match[0];
+    if (!wanted(keysOf(token))) continue;
+    if (/^<?https?:/.test(token)) out.push(`<${token.replace(/^<|>$/g, "")}>`);
+    else out.push(token.replace(/^!/, ""));
+  }
+  return out;
+}
+function carriedSourceLines(previousTexts, nextTexts) {
+  const have = new Set(linksOf(nextTexts.flatMap(outsideCode)).keys());
+  const missing = new Set([...linksOf(previousTexts.flatMap(outsideCode)).keys()].filter((key2) => !have.has(key2)));
+  if (!missing.size) return [];
+  const covered = /* @__PURE__ */ new Set();
+  const lines = [];
+  const add = (line) => {
+    if (line.trim() && !lines.includes(line)) lines.push(line);
+  };
+  const open = (keys) => keys.some((key2) => missing.has(key2) && !covered.has(key2));
+  for (const line of previousTexts.flatMap(outsideCode)) {
+    const keys = keysOf(line);
+    if (!open(keys)) continue;
+    const definition = /^[ \t]*\[\^[^\]\s]+\]:[ \t]*(.*)$/.exec(line);
+    if (definition) add(`- ${definition[1].trim()}`);
+    else if (/^[ \t]*(?:\||#{1,6}[ \t])/.test(line)) for (const token of linkTokens(line, open)) add(`- ${token}`);
+    else add(plainLine(line));
+    for (const key2 of keys) covered.add(key2);
+  }
+  return lines;
+}
+function carryForwardSources(detail, previousTexts, nextTexts, language2, template2) {
+  const carried = carriedSourceLines(previousTexts, nextTexts);
+  if (!carried.length) return detail;
+  const heading = translateNote(language2, HEADING_KEY);
+  const lines = detail.split("\n");
+  const code = fencedLines(lines);
+  const existing = lines.findIndex((line, index) => !code[index] && ANY_HEADING.test(line));
+  if (existing >= 0) return insertAfterBlock(lines, code, existing, carried, /^#{1,4}[ \t]/);
+  const keys = sourcesHeadingKeys(template2);
+  const start = lines.findIndex((line, index) => {
+    const match = code[index] ? null : /^###\s+(.+?)\s*$/.exec(line);
+    return !!match && keys.has(match[1].toLocaleLowerCase());
+  });
+  if (start < 0) return `${detail.trimEnd()}
+
+### ${heading}
+
+${carried.join("\n")}
+`;
+  return insertAfterBlock(lines, code, start, [`#### ${heading}`, "", ...carried], /^###[ \t]/, true);
+}
+function insertAfterBlock(lines, code, start, add, stop, separate = false) {
+  let end = lines.findIndex((line, index) => index > start && !code[index] && stop.test(line));
+  if (end < 0) end = lines.length;
+  while (end > start + 1 && !lines[end - 1].trim()) end--;
+  return [
+    ...lines.slice(0, end),
+    ...separate ? [""] : [],
+    ...add,
+    ...end < lines.length && lines[end].trim() ? [""] : [],
+    ...lines.slice(end)
+  ].join("\n");
+}
+
+// experiences/visual-map/topic-run.ts
+var CHART_JOB_LIMIT = 3;
+var TopicRuns = class {
+  constructor(ports) {
+    this.ports = ports;
+    __publicField(this, "controllers", /* @__PURE__ */ new Map());
+    __publicField(this, "disposed", false);
+    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
+    __publicField(this, "charts", /* @__PURE__ */ new Map());
+    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
+    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
+    __publicField(this, "chartProgressSeq", 0);
+    /** Jobs waiting for a free slot, first in first out. */
+    __publicField(this, "chartQueue", []);
+    __publicField(this, "chartRunning", 0);
+  }
+  /** Topics with a run in flight: the Set the plugin holds as `running`, read through the port. */
+  get running() {
+    return this.ports.running();
+  }
+  /**
+   * Registers a run for the topic. Returns null when the topic already has one or the module is disposed. Every run
+   * calls this synchronously, before its first await, so a second click on the same topic is refused.
+   */
+  begin(path, kind) {
+    if (this.disposed || this.controllers.has(path)) return null;
+    const controller = new AbortController();
+    this.controllers.set(path, controller);
+    this.running.add(path);
+    return {
+      path,
+      kind,
+      signal: controller.signal,
+      release: () => {
+        if (this.controllers.get(path) !== controller) return;
+        this.controllers.delete(path);
+        this.running.delete(path);
+      }
+    };
+  }
+  async start(path, kind, options) {
+    if (kind === "synthesizeSelection") return this.runSelection(path, options);
+    if (kind === "proposeChildren") return this.runProposal(path, options);
+    if (kind === "integrateDirection") return this.runDirections(path, options);
+    if (kind === "integrateChildren") return this.runIntegration(path, options);
+    return this.startResearch(path, kind, options);
+  }
+  async runProposal(path, options) {
+    var _a2, _b2, _c, _d, _e, _f, _g;
+    const fail2 = (message, retryable) => {
+      var _a3;
+      if (options.failed) options.failed(message, retryable);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    if (this.running.has(path)) {
+      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "proposeChildren");
+    if (!handle) return;
+    const controller = this.controllers.get(path);
+    const modalSignal = options.signal;
+    const abortBeforeAcceptance = () => controller.abort();
+    if (modalSignal == null ? void 0 : modalSignal.aborted) controller.abort();
+    else modalSignal == null ? void 0 : modalSignal.addEventListener("abort", abortBeforeAcceptance, { once: true });
+    let accepted = false;
+    const acceptDispatch = () => {
+      var _a3;
+      if (accepted || controller.signal.aborted) return;
+      accepted = true;
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
+    };
+    const activeTasks = this.ports.activeTasks();
+    activeTasks.set(path, controller);
+    (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
+    const aborted = () => new DOMException("Aborted", "AbortError");
+    try {
+      const repo = this.ports.repository();
+      const note = await repo.readNote(path, options.map);
+      const used = ((_c = options.runOnce) == null ? void 0 : _c.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
+      if (controller.signal.aborted) throw aborted();
+      const outputLanguage2 = (_d = options.outputLanguage) != null ? _d : this.ports.settings().language;
+      const result = await this.ports.askModel(
+        await options.buildContext(note, outputLanguage2),
+        used.model,
+        used.reasoning,
+        controller.signal,
+        void 0,
+        acceptDispatch
+      );
+      if (!accepted) acceptDispatch();
+      if (controller.signal.aborted) throw aborted();
+      const suggestions = result.suggestions.filter((item) => !item.parentTitle).slice(0, 7);
+      if (suggestions.length === 0) {
+        fail2(result.detail.trim() || t("ui.ai_does_not_recommend_decomposition_or_did_not_propose_3_to"));
+        return;
+      }
+      const latest = await repo.readNote(path, options.map);
+      if (controller.signal.aborted) throw aborted();
+      if (latest.thinkingOrigin !== note.thinkingOrigin)
+        throw new Error(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+      const pendingItems = suggestions.map((item) => ({
+        ...item,
+        thinkingOriginBaseline: originBaseline(note.thinkingOrigin)
+      }));
+      const flush = async () => {
+        var _a3, _b3;
+        await ((_b3 = (_a3 = this.pendingSuggestions).flush) == null ? void 0 : _b3.call(_a3));
+      };
+      this.pendingSuggestions.set(path, pendingItems);
+      await flush();
+      if (controller.signal.aborted) {
+        this.pendingSuggestions.delete(path);
+        await flush();
+        throw aborted();
+      }
+      (_e = options.onStored) == null ? void 0 : _e.call(options);
+      options.offer(pendingItems);
+    } catch (error) {
+      const kind = (_f = options.classifyError) == null ? void 0 : _f.call(options, error);
+      const cancelled2 = kind !== "partial" && (controller.signal.aborted || kind === "stopped");
+      if (!cancelled2) {
+        console.error("Visual Agent Map AI split", error);
+        fail2(this.ports.recordFailure(t("log.ai_split_failed"), error), kind !== "partial");
+      }
+    } finally {
+      modalSignal == null ? void 0 : modalSignal.removeEventListener("abort", abortBeforeAcceptance);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+      (_g = options.onReleased) == null ? void 0 : _g.call(options);
+    }
+  }
+  /** One signal that aborts when the registered run is stopped (Stop, stopAll, dispose) or the entry's own signal aborts. */
+  linked(handle, external) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (handle.signal.aborted || (external == null ? void 0 : external.aborted)) controller.abort();
+    handle.signal.addEventListener("abort", abort, { once: true });
+    external == null ? void 0 : external.addEventListener("abort", abort, { once: true });
+    return {
+      signal: controller.signal,
+      dispose: () => {
+        handle.signal.removeEventListener("abort", abort);
+        external == null ? void 0 : external.removeEventListener("abort", abort);
+      }
+    };
+  }
+  /** Stage, seconds and the unsaved preview of one request; an entry the topic already has (a chart step) is left alone. */
+  startProgress(path, model) {
+    var _a2;
+    const progress = this.ports.progress();
+    if (!progress || ((_a2 = progress.get) == null ? void 0 : _a2.call(progress, path))) return { end: () => {
+    } };
+    let attempt = "starting";
+    progress.begin(path, attempt, Date.now(), model);
+    return {
+      observer: {
+        onAttempt: (id) => {
+          attempt = id;
+          progress.newAttempt(path, id, Date.now());
+        },
+        onStage: (id, stage, query) => progress.stage(path, id, stage, Date.now(), query),
+        onPreview: (id, fields) => progress.preview(path, id, fields != null ? fields : {})
+      },
+      end: () => progress.end(path, attempt)
+    };
+  }
+  async modelOf(path, note, map, runOnce) {
+    return (runOnce == null ? void 0 : runOnce.model.trim()) ? await this.ports.resolveModel(path, map, runOnce) : { model: note.model, reasoning: note.reasoning };
+  }
+  async runDirections(path, options) {
+    var _a2, _b2, _c, _d;
+    if (this.running.has(path)) {
+      options.failed(t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "integrateDirection");
+    if (!handle) return;
+    const link = this.linked(handle, options.signal);
+    const free = () => {
+      link.dispose();
+      handle.release();
+    };
+    try {
+      const blocked = (_a2 = options.precheck) == null ? void 0 : _a2.call(options);
+      if (blocked) {
+        options.failed(blocked);
+        return;
+      }
+      const repo = this.ports.repository();
+      const note = await repo.readNote(path, options.map());
+      const used = await this.modelOf(path, note, options.map(), options.runOnce);
+      (_b2 = options.onStarted) == null ? void 0 : _b2.call(options);
+      const progress = this.startProgress(path, used.model);
+      try {
+        const context = await options.buildContext(note);
+        if (typeof context === "string") {
+          options.failed(context);
+          return;
+        }
+        const result = await this.ports.askModel(
+          context,
+          used.model,
+          used.reasoning,
+          link.signal,
+          void 0,
+          options.accepted,
+          void 0,
+          progress.observer
+        );
+        progress.end();
+        (_c = options.accepted) == null ? void 0 : _c.call(options);
+        if (link.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        const angles = result.suggestions.slice(0, 2);
+        if (!angles.length) {
+          options.failed(t("ui.ai_did_not_suggest_a_synthesis_direction_please_retry"));
+          return;
+        }
+        options.found(angles);
+      } catch (error) {
+        if (link.signal.aborted || error instanceof Error && error.name === "AbortError") {
+          options.failed(t("ui.research_stopped_existing_content_was_preserved"));
+          return;
+        }
+        console.error("Visual Agent Map integration directions", error);
+        options.failed(this.ports.recordFailure(t("log.integration_directions_failed"), error));
+      } finally {
+        progress.end();
+        free();
+        await ((_d = options.onSettled) == null ? void 0 : _d.call(options));
+      }
+    } finally {
+      free();
+    }
+  }
+  async runIntegration(path, options) {
+    var _a2;
+    if (this.running.has(path)) {
+      (_a2 = options.failed) == null ? void 0 : _a2.call(options, t("ui.ai_running_ai"));
+      return;
+    }
+    const handle = this.begin(path, "integrateChildren");
+    if (!handle) return;
+    const link = this.linked(handle, options.signal);
+    const free = () => {
+      link.dispose();
+      handle.release();
+    };
+    try {
+      await this.integrate(path, options, link.signal, free);
+    } finally {
+      free();
+    }
+  }
+  async integrate(path, options, signal, free) {
+    var _a2, _b2, _c, _d;
+    const fail2 = (message) => {
+      var _a3;
+      if (options.failed) options.failed(message);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map());
+    const used = await this.modelOf(path, note, options.map(), options.runOnce);
+    const noteSnapshot = (item) => JSON.stringify([
+      item.title,
+      item.summary,
+      item.detail,
+      item.prompt,
+      item.rules,
+      item.model,
+      item.reasoning,
+      item.sourcePaths,
+      item.referencePaths,
+      item.thinkingOrigin,
+      item.newFindings
+    ]);
+    const snapshot = noteSnapshot(note);
+    const prepared = await options.prepare(note);
+    if (typeof prepared === "string") {
+      fail2(prepared);
+      return;
+    }
+    const language2 = this.ports.settings().language;
+    const outputLanguage2 = (_a2 = options.outputLanguage) != null ? _a2 : language2;
+    const detailTemplate = prepared.detailTemplate;
+    this.abortCharts(path);
+    try {
+      await repo.updateNote(path, { status: "running" });
+      await ((_b2 = options.onStarted) == null ? void 0 : _b2.call(options));
+    } catch (error) {
+      try {
+        await repo.updateNote(path, { status: note.status });
+      } catch (e) {
+      }
+      throw error;
+    }
+    const progress = this.startProgress(path, used.model);
+    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    try {
+      const context = await options.buildContext(note);
+      const result = await this.ports.askModel(
+        context,
+        used.model,
+        used.reasoning,
+        signal,
+        void 0,
+        options.accepted,
+        void 0,
+        progress.observer
+      );
+      progress.end();
+      (_c = options.accepted) == null ? void 0 : _c.call(options);
+      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+      await repo.updateNote(path, { status: note.status });
+      const save = async (summary, detail) => this.ports.mutate()(async () => {
+        var _a3;
+        if (signal.aborted || prepared.viewChanged()) throw changed();
+        if (await prepared.sourcesChanged()) throw changed();
+        const latest = await repo.readNote(path, options.map());
+        if (noteSnapshot(latest) !== snapshot) throw changed();
+        const canonicalOnly = canonicalDetail(detail, noteLanguageOf(outputLanguage2), detailTemplate);
+        const issues = result.formatIssues && detail !== result.detail ? checkCounts(canonicalOnly, detailTemplate) : result.formatIssues;
+        const references2 = visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2));
+        const canonical = carryForwardSources(
+          canonicalOnly,
+          [latest.summary, latest.detail, latest.newFindings, latest.visualReferences],
+          [summary, canonicalOnly, references2],
+          outputLanguage2,
+          detailTemplate
+        );
+        await repo.updateNote(
+          path,
+          {
+            summary,
+            detail: canonical,
+            visualReferences: references2,
+            // The findings are cleared only when the model saw them (the rewrite folds them in); unsent ones stay.
+            ...options.findingsSent() ? { newFindings: "" } : {},
+            status: "completed",
+            ...formatIssuesPatch(issues, language2)
+          },
+          { detailTemplate }
+        );
+        const saved = await repo.readNote(path, options.map());
+        await options.onWritten({ before: { ...latest, status: note.status }, after: saved });
+        (_a3 = options.queueCharts) == null ? void 0 : _a3.call(options, {
+          path,
+          saved,
+          context,
+          detail: saved.detail,
+          formatIssues: issues,
+          model: used.model,
+          language: outputLanguage2,
+          template: detailTemplate
+        });
+      });
+      try {
+        await options.drafted(result, save, result.summary, result.detail, note);
+      } catch (error) {
+        if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+          fail2(t("ui.research_stopped_existing_content_was_preserved"));
+        } else {
+          console.error("VAM synthesis write", error);
+          fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
+        }
+      }
+    } catch (error) {
+      if (signal.aborted || error instanceof Error && error.name === "AbortError") {
+        await repo.updateNote(path, { status: note.status });
+        fail2(t("ui.research_stopped_existing_content_was_preserved"));
+      } else {
+        console.error("Visual Agent Map child integration", error);
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail2(this.ports.recordFailure(t("log.child_integration_failed"), error));
+      }
+    } finally {
+      progress.end();
+      free();
+      await ((_d = options.onSettled) == null ? void 0 : _d.call(options));
+    }
+  }
+  async runSelection(path, options) {
+    const handle = this.begin(path, "synthesizeSelection");
+    if (!handle) {
+      options.refused();
+      return;
+    }
+    const onStop = () => options.stop();
+    handle.signal.addEventListener("abort", onStop, { once: true });
+    const free = () => {
+      handle.signal.removeEventListener("abort", onStop);
+      handle.release();
+    };
+    try {
+      await this.synthesizeSelection(options, free);
+    } finally {
+      free();
+    }
+  }
+  async synthesizeSelection(options, free) {
+    const aborted = () => new DOMException("Aborted", "AbortError");
+    const changed = () => new Error(t("ui.the_topic_changed_the_synthesis_draft_was_not_saved"));
+    let progress;
+    try {
+      const chosen = await options.model();
+      const sources = await options.readSources();
+      options.begin(sources);
+      const taskProgress = options.startProgress(chosen.model);
+      const context = await options.buildContext(sources);
+      const ask = () => this.ports.askModel(
+        context,
+        chosen.model,
+        chosen.reasoning,
+        options.signal,
+        void 0,
+        options.accepted,
+        void 0,
+        taskProgress.observer
+      );
+      if (options.step === "draft") {
+        const draft = async () => {
+          try {
+            const result2 = await ask();
+            taskProgress.end();
+            if (!options.current()) return;
+            if (options.signal.aborted || options.mapChanged())
+              throw new Error(t("ui.the_map_or_parent_topic_changed_while_ai_was_running_no_subt"));
+            const latest2 = await options.readSources();
+            if (JSON.stringify(latest2.documents) !== options.recordedSources()) throw changed();
+            if (options.signal.aborted) throw aborted();
+            if (options.closed()) throw changed();
+            const mark = options.applying();
+            await this.ports.mutate()(() => options.write(result2));
+            options.written(mark);
+          } catch (error) {
+            if (!options.current()) return;
+            options.draftFailed(error);
+          } finally {
+            taskProgress.end();
+          }
+        };
+        await draft();
+        options.finished();
+        return;
+      }
+      progress = taskProgress;
+      const result = await ask();
+      taskProgress.end();
+      options.accepted();
+      if (!options.current()) return;
+      if (options.signal.aborted || options.mapChanged()) throw aborted();
+      const latest = await options.readSources();
+      if (JSON.stringify(latest.documents) !== options.recordedSources()) throw changed();
+      const angles = result.suggestions.slice(0, 2);
+      if (!angles.length) options.noDirections();
+      else options.found(angles);
+    } catch (error) {
+      options.fail(error);
+    } finally {
+      progress == null ? void 0 : progress.end();
+      free();
+      options.settled();
+    }
+  }
+  /** Reads the note, resolves the model and style and builds the request; null (after telling the entry) when the topic has no task. */
+  async researchPrelude(path, options, givenStyle, overrides) {
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i;
+    const repo = this.ports.repository();
+    const note = await repo.readNote(path, options.map);
+    const used = ((_a2 = options.runOnce) == null ? void 0 : _a2.model.trim()) ? await this.ports.resolveModel(path, options.map, options.runOnce) : { model: note.model, reasoning: note.reasoning };
+    if (!((_b2 = overrides.task) != null ? _b2 : note.prompt)) {
+      const message = t("ui.enter_a_question_or_task_for_ai_first");
+      if (options.failed) options.failed(message);
+      else (_c = options.notify) == null ? void 0 : _c.call(options, message);
+      return null;
+    }
+    const outputLanguage2 = (_d = overrides.outputLanguage) != null ? _d : this.ports.settings().language;
+    const runStyle = givenStyle != null ? givenStyle : options.resolveStyle ? await options.resolveStyle(outputLanguage2) : this.ports.runStyle({ note, outputLanguage: outputLanguage2 });
+    const detailTemplate = runStyle.template;
+    const context = withThinkingOrigin(
+      {
+        title: note.title,
+        summary: summaryForPrompt(note.summary, outputLanguage2),
+        rules: "",
+        detail: note.detail,
+        task: note.prompt,
+        ancestors: (_f = await ((_e = options.ancestors) == null ? void 0 : _e.call(options, outputLanguage2))) != null ? _f : "",
+        userTexts: (_h = (_g = options.userTexts) == null ? void 0 : _g.call(options)) != null ? _h : "",
+        workingFindings: note.newFindings,
+        sourceContext: "",
+        mode: "task",
+        researchMode: note.researchMode,
+        researchDepth: "normal",
+        visualMode: note.visualMode,
+        ...runStyle.toneText ? { toneText: runStyle.toneText } : {},
+        ...overrides,
+        detailTemplate,
+        ...runStyle.contextFields,
+        addCharts: (_i = overrides.addCharts) != null ? _i : true
+      },
+      note
+    );
+    const styleLabel2 = runStyle.label.fileName || runStyle.label.templateSource === "kind" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
+    return { note, used, context, styleLabel: styleLabel2 };
+  }
+  async startResearch(path, kind, options) {
+    var _a2, _b2, _c, _d, _e;
+    if (this.disposed) return null;
+    const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
+    const settings = () => this.ports.settings();
+    if (this.running.has(path)) {
+      (_b2 = options.failed) == null ? void 0 : _b2.call(options, t("ui.ai_running_ai"));
+      return null;
+    }
+    const handle = this.begin(path, kind);
+    if (!handle) return null;
+    const controller = this.controllers.get(path);
+    let prelude;
+    const repo = this.ports.repository();
+    try {
+      prelude = await this.researchPrelude(path, options, givenStyle, overrides);
+    } catch (error) {
+      handle.release();
+      throw error;
+    }
+    if (!prelude) {
+      handle.release();
+      return null;
+    }
+    const { note, used, context, styleLabel: styleLabel2 } = prelude;
+    const language2 = settings().language;
+    this.pendingSuggestions.delete(path);
+    this.abortCharts(path);
+    const activeTasks = this.ports.activeTasks();
+    const abortFromTaskModal = () => controller.abort();
+    if ((_c = overrides.signal) == null ? void 0 : _c.aborted) controller.abort();
+    else (_d = overrides.signal) == null ? void 0 : _d.addEventListener("abort", abortFromTaskModal, { once: true });
+    activeTasks.set(path, controller);
+    const progress = this.ports.progress();
+    let progressAttempt = "starting";
+    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel2);
+    const observer = {
+      onAttempt: (id) => {
+        progressAttempt = id;
+        progress == null ? void 0 : progress.newAttempt(path, id, Date.now());
+      },
+      onStage: (id, stage, query) => progress == null ? void 0 : progress.stage(path, id, stage, Date.now(), query),
+      onPreview: (id, fields) => progress == null ? void 0 : progress.preview(path, id, fields != null ? fields : {}),
+      onSlow: (id, slow, resend) => progress == null ? void 0 : progress.markSlow(path, id, slow, resend)
+    };
+    const releaseRun = () => {
+      var _a3;
+      (_a3 = overrides.signal) == null ? void 0 : _a3.removeEventListener("abort", abortFromTaskModal);
+      if (activeTasks.get(path) === controller) activeTasks.delete(path);
+      handle.release();
+    };
+    const fail2 = (message) => {
+      var _a3;
+      if (options.failed) options.failed(message);
+      else (_a3 = options.notify) == null ? void 0 : _a3.call(options, message);
+    };
+    const releaseStartup = () => {
+      progress == null ? void 0 : progress.end(path, progressAttempt);
+      releaseRun();
+    };
+    let startupStatusAttempted = false;
+    try {
+      startupStatusAttempted = true;
+      await repo.updateNote(path, { status: "running" });
+      await ((_e = options.onStarted) == null ? void 0 : _e.call(options));
+      if (controller.signal.aborted) {
+        try {
+          await repo.updateNote(path, { status: note.status });
+        } finally {
+          releaseStartup();
+        }
+        return null;
+      }
+    } catch (error) {
+      try {
+        if (startupStatusAttempted) await repo.updateNote(path, { status: note.status });
+      } catch (e) {
+      } finally {
+        releaseStartup();
+      }
+      throw error;
+    }
+    let exchangeId = "";
+    let resolveAccepted;
+    const acceptedPromise = new Promise((resolve) => {
+      resolveAccepted = resolve;
+    });
+    let requestAccepted = false;
+    const markAccepted = () => {
+      var _a3;
+      if (requestAccepted) return;
+      requestAccepted = true;
+      resolveAccepted(true);
+      (_a3 = options.accepted) == null ? void 0 : _a3.call(options);
+    };
+    const exchanges = () => settings().aiExchangeLoggingEnabled ? this.ports.exchanges() : void 0;
+    const completion = this.ports.askModel(
+      context,
+      used.model,
+      used.reasoning,
+      controller.signal,
+      (id) => {
+        exchangeId = id;
+      },
+      markAccepted,
+      void 0,
+      observer
+    ).then(
+      (result) => this.ports.mutate()(async () => {
+        var _a3, _b3, _c2, _d2, _e2, _f, _g, _h, _i, _j;
+        progress == null ? void 0 : progress.end(path, progressAttempt);
+        const latest = await repo.readNote(path, options.map);
+        const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
+        if (controller.signal.aborted || stale) {
+          await repo.updateNote(path, { status: note.status });
+          if (exchangeId)
+            (_a3 = exchanges()) == null ? void 0 : _a3.failed(
+              exchangeId,
+              t(stale ? "log.stale_result_not_written" : "log.stopped_result_not_written")
+            );
+          if (stale) fail2(t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved"));
+          return;
+        }
+        await repo.updateNote(
+          path,
+          {
+            summary: result.summary,
+            detail: canonicalDetail(
+              result.detail,
+              noteLanguageOf((_b3 = context.outputLanguage) != null ? _b3 : settings().language),
+              context.detailTemplate
+            ),
+            visualReferences: visualReferencesMarkdown(result.visualReferences, noteLanguageOf(language2)),
+            newFindings: "",
+            status: "completed",
+            // The topic remembers the mode of its latest research (Quick is stored as local).
+            ...context.researchMode ? { researchMode: context.researchMode } : {},
+            ...formatIssuesPatch(result.formatIssues, language2)
+          },
+          { detailTemplate: context.detailTemplate }
+        );
+        const saved = await repo.readNote(path, options.map);
+        (_c2 = options.onWritten) == null ? void 0 : _c2.call(options, { before: { ...latest, status: note.status }, after: saved });
+        if (exchangeId) (_d2 = exchanges()) == null ? void 0 : _d2.completed(exchangeId);
+        this.ports.clearOtherHistory(options.origin);
+        (_f = options.queueCharts) == null ? void 0 : _f.call(options, {
+          path,
+          saved,
+          context,
+          detail: saved.detail,
+          formatIssues: result.formatIssues,
+          model: used.model,
+          language: (_e2 = context.outputLanguage) != null ? _e2 : settings().language,
+          template: context.detailTemplate
+        });
+        if (result.suggestions.length) {
+          this.pendingSuggestions.set(
+            path,
+            result.suggestions.slice(0, 7).map((item) => ({ ...item, thinkingOriginBaseline: originBaseline(note.thinkingOrigin) }))
+          );
+          try {
+            await ((_h = (_g = this.pendingSuggestions).flush) == null ? void 0 : _h.call(_g));
+          } catch (error) {
+            (_i = options.notify) == null ? void 0 : _i.call(options, this.ports.recordFailure(t("log.expansion_suggestions_save_failed"), error));
+          }
+        }
+        (_j = options.done) == null ? void 0 : _j.call(options, result);
+      })
+    ).catch(
+      (error) => this.ports.mutate()(async () => {
+        var _a3, _b3, _c2;
+        progress == null ? void 0 : progress.end(path, progressAttempt);
+        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError") {
+          await repo.updateNote(path, { status: note.status });
+          fail2(t("ui.research_stopped_existing_content_was_preserved"));
+          return;
+        }
+        console.error("Visual Agent Map AI task", error);
+        if (exchangeId && ((_b3 = (_a3 = exchanges()) == null ? void 0 : _a3.getEntries().find((item) => item.id === exchangeId)) == null ? void 0 : _b3.status) === "parsed")
+          (_c2 = exchanges()) == null ? void 0 : _c2.failed(
+            exchangeId,
+            t("log.topic_write_failed_0", error instanceof Error ? error.message : String(error))
+          );
+        await repo.updateNote(path, { status: "error", lastError: failureReason(error) });
+        fail2(this.ports.recordFailure(t("log.ai_task_failed"), error));
+      })
+    ).finally(() => {
+      progress == null ? void 0 : progress.end(path, progressAttempt);
+      releaseRun();
+      this.ports.refreshViews();
+    }).catch(() => {
+    });
+    const accepted = await Promise.race([acceptedPromise, completion.then(() => false)]);
+    if (!accepted) {
+      await completion;
+      return null;
+    }
+    return { finished: completion };
+  }
+  /** The current store of suggestions awaiting a decision (onload swaps the plugin's for the persisted one). */
+  get pendingSuggestions() {
+    return this.ports.pendingSuggestions();
+  }
+  isRunning(path) {
+    return this.controllers.has(path);
+  }
+  /** Whether the topic has a run in flight, or another path (chat expansion, a reload leftover) holds it in the running set. */
+  isBusy(path) {
+    return this.running.has(path);
+  }
+  /** Whether any stoppable AI task (shared registry: AiCalls, shallow expansion, selection synthesis) is registered for the path. */
+  hasTask(path) {
+    return this.ports.activeTasks().has(path);
+  }
+  taskController(path) {
+    return this.ports.activeTasks().get(path);
+  }
+  /** Aborts the registered task of the path, if any. */
+  stopTask(path) {
+    var _a2;
+    (_a2 = this.ports.activeTasks().get(path)) == null ? void 0 : _a2.abort();
+  }
+  /** Registers the stop handle of a run the view owns (selection synthesis, until ticket 05). */
+  registerTask(path, controller) {
+    this.ports.activeTasks().set(path, controller);
+  }
+  /** Releases the stop handle, only when it is still the one registered. */
+  releaseTask(path, controller) {
+    const tasks = this.ports.activeTasks();
+    if (tasks.get(path) === controller) tasks.delete(path);
+  }
+  pending(path) {
+    return this.pendingSuggestions.get(path);
+  }
+  dropPending(path) {
+    this.pendingSuggestions.delete(path);
+  }
+  /** Persists the pending store when it is the persisted one (a plain Map has nothing to flush). */
+  async flushPending() {
+    var _a2, _b2;
+    await ((_b2 = (_a2 = this.pendingSuggestions).flush) == null ? void 0 : _b2.call(_a2));
+  }
+  stop(path) {
+    var _a2;
+    (_a2 = this.controllers.get(path)) == null ? void 0 : _a2.abort();
+  }
+  stopAll() {
+    for (const controller of this.controllers.values()) controller.abort();
+    this.abortCharts();
+  }
+  get chartJobs() {
+    return this.charts;
+  }
+  /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
+  abortCharts(path) {
+    for (const [key2, controller] of [...this.charts])
+      if (path === void 0 || key2 === path) {
+        controller.abort();
+        this.charts.delete(key2);
+        this.endChartProgress(key2);
+        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
+        if (queued >= 0) this.chartQueue.splice(queued, 1);
+      }
+  }
+  endChartProgress(path) {
+    const id = this.chartProgressIds.get(path);
+    if (id === void 0) return;
+    this.chartProgressIds.delete(path);
+    this.ports.progress().end(path, id);
+  }
+  pumpChartQueue() {
+    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
+      this.chartRunning++;
+      this.chartQueue.shift().start();
+    }
+  }
+  /**
+   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
+   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
+   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
+   * write time or is running again; only then are the diagrams not applied.
+   */
+  addChartsAfterWrite(job) {
+    var _a2, _b2;
+    if ((_b2 = (_a2 = this.ports.repository()) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
+    if (!this.ports.aiTasks().chartEligible(job.context) || !job.detail.trim()) return;
+    this.abortCharts(job.path);
+    const controller = new AbortController();
+    this.charts.set(job.path, controller);
+    const progressId = `charts-${++this.chartProgressSeq}`;
+    this.chartProgressIds.set(job.path, progressId);
+    this.ports.progress().begin(job.path, progressId, Date.now(), job.model);
+    this.ports.progress().stage(job.path, progressId, "charts", Date.now());
+    let exchangeId = "";
+    const run = async () => {
+      try {
+        const detail = await this.ports.aiTasks().chartDetail({
+          input: job.context,
+          detail: job.detail,
+          countIssues: job.countIssues,
+          model: job.model,
+          signal: controller.signal,
+          onExchange: (id) => {
+            exchangeId = id;
+          }
+        });
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        if (detail === job.detail) return;
+        let applied = false;
+        await this.ports.mutate()(async () => {
+          applied = !controller.signal.aborted && await job.apply(detail);
+        });
+        if (!applied) this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stale_not_applied"));
+      } catch (error) {
+        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError")
+          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_stopped_not_applied"));
+        else {
+          console.warn("Visual Agent Map chart step", error);
+          this.ports.aiTasks().failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
+        }
+      } finally {
+        if (this.charts.get(job.path) === controller) this.charts.delete(job.path);
+        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
+        this.chartRunning--;
+        this.pumpChartQueue();
+      }
+    };
+    this.chartQueue.push({
+      controller,
+      start: () => {
+        void run();
+      }
+    });
+    this.pumpChartQueue();
+  }
+  /** Stops every run and refuses new ones. */
+  dispose() {
+    this.disposed = true;
+    this.stopAll();
+  }
+};
+
 // core/steps/reframe/language.en.md
 var language_en_default4 = "Write in {{language}}.\n";
 
@@ -70581,7 +71067,6 @@ function settingsFromSaved(saved) {
     canvasHintSeen: (saved == null ? void 0 : saved.canvasHintSeen) === true
   };
 }
-var CHART_JOB_LIMIT = 3;
 var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
   constructor() {
     super(...arguments);
@@ -70597,6 +71082,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       report: (event) => this.reportNoteStyleUpgrade(event)
     }));
     __publicField(this, "ready", Promise.resolve());
+    /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
     __publicField(this, "running", /* @__PURE__ */ new Set());
     __publicField(this, "quickExpandPending", /* @__PURE__ */ new Set());
     __publicField(this, "aiCalls", new AiCalls({
@@ -70605,20 +71091,38 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
       releaseWarm: () => this.aiRuntime.releaseWarm()
     }));
     __publicField(this, "activeTasks", this.aiCalls.activeTasks);
-    /** Background chart steps (running and queued), keyed by note path: one per path, at most {@link CHART_JOB_LIMIT} run at a time. */
-    __publicField(this, "chartJobs", /* @__PURE__ */ new Map());
     /** Set by onunload; a late dialog event must not start a pre-warmed process after it. */
     __publicField(this, "unloaded", false);
     /** Stage, elapsed time and the unsaved answer preview of research and chart steps in flight, keyed by note path. */
     __publicField(this, "researchProgress", new ResearchProgressStore());
-    /** The progress entry each background chart job owns (the research run's own entry ends when the note is written). */
-    __publicField(this, "chartProgressIds", /* @__PURE__ */ new Map());
-    __publicField(this, "chartProgressSeq", 0);
-    /** Jobs waiting for a free slot, first in first out. */
-    __publicField(this, "chartQueue", []);
-    __publicField(this, "chartRunning", 0);
+    /** Owns the background chart queue. Every port is read on use: tests and onload replace these objects after construction. */
+    __publicField(this, "topicRuns", new TopicRuns({
+      aiTasks: () => this.aiTasks,
+      mutate: () => (work) => this.mutate(work),
+      progress: () => this.researchProgress,
+      repository: () => this.repo,
+      running: () => this.running,
+      pendingSuggestions: () => this.pendingSuggestions,
+      activeTasks: () => this.activeTasks,
+      askModel: (...args) => this.askModel(...args),
+      settings: () => this.settings,
+      exchanges: () => this.exchanges,
+      recordFailure: (context, error) => this.recordFailure(context, error),
+      runStyle: ({ note, outputLanguage: outputLanguage2 }) => this.noteStyles.runStyle({
+        topic: { template: note.detailTemplateId, tone: note.toneId },
+        outputLanguage: outputLanguage2
+      }),
+      resolveModel: (path, map, runOnce) => this.repo.resolveTopicModel(path, map, runOnce),
+      clearOtherHistory: (origin) => {
+        for (const view of this.views()) if (view !== origin) view.clearUndoHistory();
+      },
+      refreshViews: () => {
+        for (const view of this.views()) view.reloadAfterAiRun();
+      }
+    }));
     __publicField(this, "expansionBatches", /* @__PURE__ */ new Map());
     __publicField(this, "expansionCoordinator", new ShallowExpansionCoordinator(this.activeTasks, this.expansionBatches));
+    /** Suggestions awaiting a decision; onload replaces it with the persisted store, {@link topicRuns} reads whichever is current. */
     __publicField(this, "pendingSuggestions", /* @__PURE__ */ new Map());
     __publicField(this, "pendingResearchOptions", /* @__PURE__ */ new Map());
     __publicField(this, "logs", debugLog);
@@ -70700,6 +71204,10 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     __publicField(this, "firstInstallMapPath", null);
     __publicField(this, "languageSwitchPending", false);
     __publicField(this, "unreadableReported", /* @__PURE__ */ new Map());
+  }
+  /** Background chart steps (running and queued), keyed by note path; owned by {@link topicRuns}. */
+  get chartJobs() {
+    return this.topicRuns.chartJobs;
   }
   recordFailure(context, error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -71507,7 +72015,7 @@ ${t("ui.organize_link_wait_hint")}`;
   resetCodexRuntime() {
     this.expansionCoordinator.stopAll();
     this.aiCalls.stopAll();
-    this.abortChartJobs();
+    this.topicRuns.stopAll();
     this.modelDiscovery.invalidate("codex");
     this.aiRuntime.reset();
   }
@@ -71552,7 +72060,7 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   onunload() {
     var _a2, _b2;
-    this.abortChartJobs();
+    this.topicRuns.dispose();
     (_a2 = this.repo) == null ? void 0 : _a2.dispose();
     void ((_b2 = this.coffeeManager) == null ? void 0 : _b2.stop());
     this.coffeeManager = null;
@@ -72120,85 +72628,11 @@ ${t("ui.organize_link_wait_hint")}`;
   }
   /** Aborts the background chart step of one note (a new run on that note replaces it), or of every note. */
   abortChartJobs(path) {
-    for (const [key2, controller] of [...this.chartJobs])
-      if (path === void 0 || key2 === path) {
-        controller.abort();
-        this.chartJobs.delete(key2);
-        this.endChartProgress(key2);
-        const queued = this.chartQueue.findIndex((item) => item.controller === controller);
-        if (queued >= 0) this.chartQueue.splice(queued, 1);
-      }
+    this.topicRuns.abortCharts(path);
   }
-  endChartProgress(path) {
-    const id = this.chartProgressIds.get(path);
-    if (id === void 0) return;
-    this.chartProgressIds.delete(path);
-    this.researchProgress.end(path, id);
-  }
-  pumpChartQueue() {
-    while (this.chartRunning < CHART_JOB_LIMIT && this.chartQueue.length) {
-      this.chartRunning++;
-      this.chartQueue.shift().start();
-    }
-  }
-  /**
-   * Runs the chart step in the background for a note that was just written. It never blocks or fails the research:
-   * a failure, Stop, a stale note or unload leaves the note as written (the chart exchange is marked failed with the
-   * reason). `apply` runs in the mutation queue and returns false when the note no longer equals its snapshot at
-   * write time or is running again; only then are the diagrams not applied.
-   */
+  /** Runs the chart step in the background for a note that was just written; see {@link TopicRuns.addChartsAfterWrite}. */
   addChartsAfterWrite(job) {
-    var _a2, _b2;
-    if ((_b2 = (_a2 = this.repo) == null ? void 0 : _a2.isDisposed) == null ? void 0 : _b2.call(_a2)) return;
-    if (!this.aiTasks.chartEligible(job.context) || !job.detail.trim()) return;
-    this.abortChartJobs(job.path);
-    const controller = new AbortController();
-    this.chartJobs.set(job.path, controller);
-    const progressId = `charts-${++this.chartProgressSeq}`;
-    this.chartProgressIds.set(job.path, progressId);
-    this.researchProgress.begin(job.path, progressId, Date.now(), job.model);
-    this.researchProgress.stage(job.path, progressId, "charts", Date.now());
-    let exchangeId = "";
-    const run = async () => {
-      try {
-        const detail = await this.aiTasks.chartDetail({
-          input: job.context,
-          detail: job.detail,
-          countIssues: job.countIssues,
-          model: job.model,
-          signal: controller.signal,
-          onExchange: (id) => {
-            exchangeId = id;
-          }
-        });
-        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
-        if (detail === job.detail) return;
-        let applied = false;
-        await this.mutate(async () => {
-          applied = !controller.signal.aborted && await job.apply(detail);
-        });
-        if (!applied) this.aiTasks.failExchange(exchangeId, t("log.chart_stale_not_applied"));
-      } catch (error) {
-        if (controller.signal.aborted || error instanceof Error && error.name === "AbortError")
-          this.aiTasks.failExchange(exchangeId, t("log.chart_stopped_not_applied"));
-        else {
-          console.warn("Visual Agent Map chart step", error);
-          this.aiTasks.failExchange(exchangeId, t("log.chart_not_added_0", "apply_error"));
-        }
-      } finally {
-        if (this.chartJobs.get(job.path) === controller) this.chartJobs.delete(job.path);
-        if (this.chartProgressIds.get(job.path) === progressId) this.endChartProgress(job.path);
-        this.chartRunning--;
-        this.pumpChartQueue();
-      }
-    };
-    this.chartQueue.push({
-      controller,
-      start: () => {
-        void run();
-      }
-    });
-    this.pumpChartQueue();
+    this.topicRuns.addChartsAfterWrite(job);
   }
   /** The chart step for a finished AIM conclusion; the setting is checked inside, so off returns the detail untouched. */
   async addAimDiagrams(request) {

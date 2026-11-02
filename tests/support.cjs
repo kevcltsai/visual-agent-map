@@ -25,6 +25,11 @@ function load(entry, overrides = {}, windowValues = {}) {
   const code = buildSync({ entryPoints: [path.join(root, entry)], external: ['obsidian', 'node:*'] }).outputFiles[0].text;
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: name => overrides[name] || require(name), console, TextDecoder, TextEncoder, Blob, URL, crypto: require('node:crypto').webcrypto, process, AbortController, navigator: windowValues.navigator, CSS: windowValues.CSS, document: windowValues.document, createSvg: windowValues.createSvg, createEl: windowValues.createEl, Option: class { constructor(text, value) { this.tag = 'option'; this.text = text; this.value = value; this.cls = ''; this.children = []; this.attrs = {}; } }, HTMLInputElement: class {}, HTMLTextAreaElement: class {}, HTMLSelectElement: class {}, window: { setTimeout, clearTimeout, ...windowValues } });
+  // The view reaches the running set, stop registry and pending suggestions only through plugin.topicRuns (04c): a plugin double gets a TopicRuns over its own fields.
+  if ((entry === 'main.ts' || entry === 'experiences/visual-map/view.ts') && module.exports.VisualAgentMapView) {
+    const View = module.exports.VisualAgentMapView;
+    return { ...module.exports, VisualAgentMapView: class extends View { constructor(leaf, plugin) { super(leaf, plugin && !('topicRuns' in plugin) ? attachTopicRuns(plugin) : plugin); } } };
+  }
   return module.exports;
 }
 const core = load('map-model.ts');
@@ -75,12 +80,39 @@ const auditEcho = context => {
   return { summary: review.summary, detail: `<!-- aim-review ${JSON.stringify(marker)} -->\n${review.detail}`, suggestions, visualReferences: [] };
 };
 const tree = () => [node('a'), node('b', 'a'), node('c', 'b'), node('d')];
+let TopicRunsClass;
+/** The run module over a view-level plugin double: every port reads the double on use, like the real composition root. */
+let NoteStyleStoreClass;
+/** Starts a research run straight on the plugin's run module, with no view: the callbacks a view would give are test stand-ins. */
+function startResearch(plugin, node, { map, request, runOnce, done, failed, accepted, ...rest } = {}) {
+  return plugin.topicRuns.start(node.path, 'research', { map, request, runOnce, done, failed, accepted, notify: () => {}, ancestors: async () => '', userTexts: () => '', ...rest });
+}
+function attachTopicRuns(plugin) {
+  if (plugin.topicRuns) return plugin;
+  NoteStyleStoreClass ??= load('ai/note-style-store.ts', { obsidian: module.exports.obsidian ?? {} }).NoteStyleStore;
+  TopicRunsClass ??= load('experiences/visual-map/topic-run.ts', { obsidian: module.exports.obsidian ?? {} }).TopicRuns;
+  plugin.topicRuns = new TopicRunsClass({
+    aiTasks: () => plugin.aiTasks ?? { chartEligible: () => false }, mutate: () => work => plugin.mutate ? plugin.mutate(work) : work(), progress: () => plugin.researchProgress,
+    repository: () => plugin.repo, running: () => plugin.running ??= new Set(), pendingSuggestions: () => plugin.pendingSuggestions ??= new Map(), activeTasks: () => plugin.activeTasks ??= new Map(),
+    askModel: (...args) => plugin.askModel(...args), settings: () => plugin.settings, exchanges: () => plugin.exchanges, recordFailure: (...args) => plugin.recordFailure(...args),
+    runStyle: ({ note, outputLanguage }) => (plugin.noteStyles ??= new NoteStyleStoreClass({ settings: () => plugin.settings, port: {}, save: async () => {} })).runStyle({ topic: { template: note.detailTemplateId, tone: note.toneId }, outputLanguage }), resolveModel: (path, map, runOnce) => plugin.repo.resolveTopicModel(path, map, runOnce),
+    clearOtherHistory: origin => { for (const view of plugin.views?.() ?? []) if (view !== origin) view.clearUndoHistory?.(); },
+    refreshViews: () => { for (const view of plugin.views?.() ?? []) view.reloadAfterAiRun?.(); }
+  });
+  // The chart queue of the double stays the double's: the view-level tests spy on these two calls.
+  return plugin;
+}
+/** Replaces the research run at the module seam (TopicRuns.start); the stub gets what view.runAgent used to get: node, done, failed, request, accepted, runOnce. */
+function researchSeam(view) {
+  return { set run(stub) { const runs = view.plugin.topicRuns, original = runs.start.bind(runs); runs.start = (path, kind, options) => kind !== 'research' ? original(path, kind, options) : stub(view.map?.nodes.find(node => node.path === path) ?? { path }, options.done, options.failed, options.request, options.accepted, options.runOnce); } };
+}
 function withExpansionCoordinator(plugin) {
   const { ShallowExpansionCoordinator } = load('experiences/visual-map/expansion-batch.ts');
   plugin.activeTasks ??= new Map(); plugin.expansionBatches = new Map(); plugin.quickExpandPending ??= new Set();
   // Background chart jobs belong to the real plugin; the view-level doubles only need the two calls to exist.
   plugin.abortChartJobs ??= () => {}; plugin.addChartsAfterWrite ??= () => {};
   plugin.expansionCoordinator = new ShallowExpansionCoordinator(plugin.activeTasks, plugin.expansionBatches);
+  attachTopicRuns(plugin);
   // The real plugin resolves the current model one way (ADR-021); a double over settings answers the same.
   plugin.currentModelChoice ??= () => ({ model: plugin.settings.cliModel, reasoning: normalizeReasoningLevel(plugin.settings.cliReasoning) });
   return plugin;
@@ -247,4 +279,4 @@ async function coverageThreeAnswers(subject) {
 const languageIds = () => load('i18n/languages.ts').LANGUAGES.map(item => item.id);
 /** Dictionary text of the i18n facade plus every registered language file, for tests that scan translation keys and values. */
 const i18nSource = (language) => [language ? [] : ['i18n.ts', ...languageIds().map(id => `i18n/${id}.ts`)], language ? [`i18n/${language}.ts`] : []].flat().map(file => require('node:fs').readFileSync(path.join(root, file), 'utf8')).join('\n');
-module.exports = { i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };
+module.exports = { startResearch, researchSeam, attachTopicRuns, i18nSource, languageIds, test, integrationTest, root, load, core, layout, logging, node, map, plain, plannerReview, seedCoverageAncestors, deliveryFixture, savedEvidenceNeedsSearch, researchGapAudit, aimPhase, auditEcho, tree, withExpansionCoordinator, TFolder, TFile, obsidian, Repository, DEFAULT_SETTINGS, normalizeReasoningLevel, fixture, topicNote, aimMapFixture, coffeeTypes, coffee, coffeePrompts, coffeeInsights, coffeeGuestInvitations, coffeeCustomization, coffeeConvergence, coffeeSession, coffeeTableList, coffeeTopics, deferred, until, coffeeElement, coffeeFind, withCoffeeModelDiscovery, reframingModalFixture, coverageModel, coverageSetup, coverageThreeAnswers };

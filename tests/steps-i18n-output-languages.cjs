@@ -478,8 +478,8 @@ test('output languages: the single-card task line and the selection AI use the r
   assert.match(view, /const taskLanguage =\s+options\.outputLanguage \?\? outputLanguageForMap\(this\.map, this\.plugin\.settings\.language, latest\.title\);\s+const task = researchTopicTask\(taskLanguage, latest\.title\);/);
   assert.equal(view.includes('researchTopicTask(this.plugin.settings.language'), false);
   // The "no conclusion yet" summary placeholder of the synthesis prompts is written in the output language's note language.
-  assert.match(view, /summary: translateNote\(runOptions\.outputLanguage \?\? language, "note\.no_conclusion_yet"\)/);
-  assert.match(view, /summary: translateNote\(options\?\.outputLanguage \?\? language, "note\.no_conclusion_yet"\)/);
+  // The selection synthesis's two steps (directions and draft) both build their context from the run options (04b).
+  assert.equal(view.match(/summary: translateNote\(runOptions\.outputLanguage \?\? language, "note\.no_conclusion_yet"\)/g)?.length, 2);
   // Selection AI: the follow-the-text clause quotes the selection.
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.ts'), 'utf8');
   assert.match(main, /kind: "selection",\s+text: selected/);

@@ -46,7 +46,6 @@ integrationTest('AI exchange log persists exact request and reply with a bounded
 });
 test('debug log command opens the custom modal and exposes copy and clear actions', () => {
   const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8');
-  const mapSource = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
   const modal = fs.readFileSync(path.join(root, 'ui/modals/debug-log-modal.ts'), 'utf8');
   assert.match(source, /addLocalizedCommand\("open-debug-log"/); assert.match(source, /new DebugLogModal\(this\.app, this\.logs, this\.exchanges/);
   assert.match(modal, /navigator\.clipboard\.writeText/); assert.match(modal, /this\.logs\.clear\(\)/);
@@ -54,7 +53,8 @@ test('debug log command opens the custom modal and exposes copy and clear action
   assert.match(modal, /this\.logs\.subscribe/);
   assert.match(source, /codexReadyForAi\(\)/);
   assert.match(source, /ui\.codex_app_server_is_ready_0/);
-  assert.match(mapSource, /log\.ai_task_failed/);
+  // The research run, with its failure log line, moved from the view into the run module.
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/topic-run.ts'), 'utf8'), /log\.ai_task_failed/);
 });
 integrationTest('AI exchange logging captures the sent payload, raw reply and parse failure', async () => {
   const { default: Plugin } = load('main.ts', { obsidian });

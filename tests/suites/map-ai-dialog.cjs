@@ -1091,6 +1091,22 @@ integrationTest('multi-select synthesis: a request needs a name and two requests
   await until(() => h.calls.length === 1); gate.resolve(); await first;
   assert.equal(h.calls.length, 1); assert.equal(h.view.integrationTask.state, 'directions');
 });
+integrationTest('05c: a selection synthesis refused by the run registry frees this view and its modal abort listener', async () => {
+  const h = await synthesisHarness();
+  const options = { researchMode: 'local', researchDepth: 'normal', visualMode: 'off', referenceGroups: [], synthesisTitle: 'T' };
+  const real = h.view.plugin.topicRuns.start.bind(h.view.plugin.topicRuns);
+  let refuseNext = true;
+  h.view.plugin.topicRuns.start = (path, kind, o) => { if (refuseNext) { refuseNext = false; o.refused(); return Promise.resolve(); } return real(path, kind, o); };
+  const listeners = new Set(); const modalSignal = { aborted: false, addEventListener: (_n, f) => listeners.add(f), removeEventListener: (_n, f) => listeners.delete(f) };
+  const failures = [];
+  await h.view.startSelectionSynthesis(h.kids, { ...options, signal: modalSignal }, null, m => failures.push(m), () => {});
+  assert.equal(failures.length, 1); assert.equal(h.view.selectionStarting, false, 'a refused start does not keep the view blocked');
+  assert.equal(listeners.size, 0, 'the modal abort listener is removed');
+  const gate = h.hold();
+  const again = h.view.startSelectionSynthesis(h.kids, options, null, m => failures.push(m), () => {});
+  await until(() => h.calls.length === 1); gate.resolve(); await again;
+  assert.equal(failures.length, 1, 'the same view starts again after the refusal'); assert.equal(h.view.integrationTask.state, 'directions');
+});
 integrationTest('multi-select synthesis: Stop during the draft then Try again runs a fresh request instead of aborting at once (D2)', async () => {
   const h = await synthesisHarness();
   const modal = await h.openSelection();

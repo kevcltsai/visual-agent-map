@@ -3,6 +3,7 @@
 // run-once choice (research, expansion, synthesis, the progress model, the multi-research batch). The dialog menus
 // (P6b) and the outline import window (P6c) are covered further down in this file.
 const { test } = require('node:test');
+const { attachTopicRuns, startResearch } = require('./support.cjs');
 const assert = require('node:assert/strict');
 const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
@@ -39,7 +40,7 @@ async function harness(topics, plugin = {}) {
   });
   repo.settings = host.settings;
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
-  const view = new VisualAgentMapView({ app }, host);
+  const view = new VisualAgentMapView({ app }, attachTopicRuns(host));
   Object.assign(view, { path: MAP, map: mapDoc, contentEl: { querySelector: () => null }, render() {}, hydrate: async () => {}, ancestorContext: async () => '', queueCharts() {} });
   const raw = node => contents.get(node.path);
   return { repo, view, host, nodes, calls, confirms, progress, raw };
@@ -71,7 +72,7 @@ test('multi-topic research without a picked model keeps each topic on its own mo
 test('a run-once choice reaches the research call, its reasoning and the progress model; the topic keeps its own override', async () => {
   const h = await harness([['A', 'model-b', 'manual', 'high']]);
   const before = modelLines(h.raw(h.nodes[0]));
-  await h.view.runAgent(h.nodes[0], undefined, undefined, { task: 'go', ...research }, undefined, { model: 'claude:sonnet', reasoning: 'medium' });
+  await startResearch(h.host, h.nodes[0], { map: h.view.map, done: undefined, failed: undefined, request: { task: 'go', ...research }, runOnce: { model: 'claude:sonnet', reasoning: 'medium' } });
   await until(() => h.calls.length === 1);
   assert.deepEqual(h.calls[0], { mode: 'task', model: 'claude:sonnet', reasoning: 'medium' });
   assert.equal(h.progress[0], 'claude:sonnet', 'the progress line names the model that really runs');
@@ -81,9 +82,9 @@ test('a run-once choice reaches the research call, its reasoning and the progres
 
 test('a run-once model without reasoning uses the current model reasoning; no run-once uses the topic own model', async () => {
   const h = await harness([['A', 'model-b', 'manual', 'high']]);
-  await h.view.runAgent(h.nodes[0], undefined, undefined, { task: 'go', ...research }, undefined, { model: 'claude:sonnet' });
+  await startResearch(h.host, h.nodes[0], { map: h.view.map, done: undefined, failed: undefined, request: { task: 'go', ...research }, runOnce: { model: 'claude:sonnet' } });
   await until(() => !h.host.running.has(h.nodes[0].path));
-  await h.view.runAgent(h.nodes[0], undefined, undefined, { task: 'go', ...research });
+  await startResearch(h.host, h.nodes[0], { map: h.view.map, request: { task: 'go', ...research } });
   await until(() => h.calls.length === 2 && !h.host.running.has(h.nodes[0].path));
   assert.deepEqual(h.calls.map(call => [call.model, call.reasoning]), [['claude:sonnet', 'low'], ['model-b', 'high']]);
 });
@@ -109,7 +110,7 @@ test('the synthesis directions step asks the run-once model', async () => {
 test('the stale check still compares the note itself: a run-once model does not make the result stale', async () => {
   const done = [];
   const h = await harness([['A', 'model-b', 'manual', 'high']]);
-  await h.view.runAgent(h.nodes[0], result => done.push(result), message => assert.fail(message), { task: 'go', ...research }, undefined, { model: 'claude:sonnet', reasoning: 'medium' });
+  await startResearch(h.host, h.nodes[0], { map: h.view.map, done: result => done.push(result), failed: message => assert.fail(message), request: { task: 'go', ...research }, runOnce: { model: 'claude:sonnet', reasoning: 'medium' } });
   await until(() => done.length === 1);
   assert.equal(done.length, 1);
 });

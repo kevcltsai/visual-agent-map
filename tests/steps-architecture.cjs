@@ -254,15 +254,16 @@ const ENTRY_END_ALLOWED = [
 ];
 const EXCHANGE_WRITE_ALLOWED = [
   { file: 'core/ai-task-service.ts', count: 5, reason: 'AttemptSetup failed marking and the observed main call' },
-  { file: 'experiences/visual-map/view.ts', count: 3, reason: 'UI leftover, waits for C1' }
+  { file: 'experiences/visual-map/topic-run.ts', count: 3, reason: 'research run: failed, failed and completed marks of its own exchange' }
 ];
 const ACTIVE_TASKS_SET_ALLOWED = [
   { file: 'core/ai-calls.ts', count: 1, reason: 'the per-call registration' },
   { file: 'experiences/visual-map/expansion-batch.ts', count: 1, reason: 'batch Stop key (parent path), a whole-job key' },
-  { file: 'experiences/visual-map/view.ts', count: 4, reason: 'UI leftover, waits for C1' },
+  { file: 'experiences/visual-map/view.ts', count: 1, reason: 'UI leftover (chatExpand), waits for C1' },
+  { file: 'experiences/visual-map/topic-run.ts', count: 2, reason: 'the research and proposal runs register their controller for the Stop buttons (registerTask goes through the ports() call and is outside this pattern)' },
   { file: 'experiences/coffee-tables/handoff-modal.ts', count: 1, reason: 'reframe-modal key, a whole-job Stop key around one registered AiCalls call' }
 ];
-const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/coffee-tables/handoff-modal.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts'];
+const ACTIVE_TASKS_FILES = ['core/ai-calls.ts', 'core/provider-step-runner.ts', 'main.ts', 'experiences/coffee-tables/handoff-modal.ts', 'experiences/visual-map/modals.ts', 'experiences/visual-map/view.ts', 'experiences/visual-map/expansion-batch.ts', 'experiences/visual-map/topic-run.ts'];
 
 // Every runtime.runTask call outside ai/runtime/ is a provider adapter (or the runtime behind one), pinned by
 // file, enclosing function and count so a new direct call anywhere fails this test.

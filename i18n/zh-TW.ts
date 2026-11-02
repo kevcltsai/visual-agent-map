@@ -1563,7 +1563,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.tone_hint_auto": "由 AI 依主題挑最合適的口吻，並在開頭說明選了哪一種。",
   "ui.note_style_by_kind": "依議題類型",
   "ui.note_style_by_kind_desc": "不同類型的議題可以用不同的筆記結構。議題或執行時自己選的結構仍然優先。",
-  "ui.note_style_kind_none": "不指定（用地圖或預設的結構）",
+  "ui.note_style_kind_none": "不指定（用心智圖或預設的結構）",
   "ui.note_style_kind_row_aria_0": "{0}的筆記結構",
   "ui.note_style_kind_issue_0_1": "⚠ 第 {0} 行：{1}修好之前，這個類型的議題會先用內建版本。",
   "ui.note_style_hypothesis_hint": "八個分類：主張、預測、驗證方式，到支持、反駁與目前判斷。",

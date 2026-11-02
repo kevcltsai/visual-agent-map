@@ -1561,7 +1561,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.tone_hint_auto": "由 AI 依主题挑最合适的口吻，并在开头说明选了哪一种。",
   "ui.note_style_by_kind": "按议题类型",
   "ui.note_style_by_kind_desc": "不同类型的议题可以用不同的笔记结构。议题或运行时自己选的结构仍然优先。",
-  "ui.note_style_kind_none": "不指定（用地图或默认的结构）",
+  "ui.note_style_kind_none": "不指定（用心智图或默认的结构）",
   "ui.note_style_kind_row_aria_0": "{0}的笔记结构",
   "ui.note_style_kind_issue_0_1": "⚠ 第 {0} 行：{1}修好之前，这个类型的议题会先用内置版本。",
   "ui.note_style_hypothesis_hint": "八个分类：主张、预测、验证方式，到支持、反驳与当前判断。",

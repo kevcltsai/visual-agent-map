@@ -25925,7 +25925,7 @@ ${value}` : "";
     withProviderOutput(inLanguage(JSON_CONTRACT2, language2), provider, language2),
     context.toneText ? toneBlock(context.toneText, language2) : "",
     phaseGuidance(phase, language2, context.responseContract, !!context.aimContract),
-    readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
+    phase === "delivery-writing" && context.aimNoteFormat !== void 0 ? context.aimNoteFormat : readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
     context.researchMode === "local" ? inLanguage(WEB_SEARCH_OFF, language2) : context.researchMode === "research" ? inLanguage(WEB_SEARCH_ON, language2) : "",
     field(inLanguage(LABEL_TOPIC, language2), context.title),
     field(inLanguage(LABEL_SUMMARY, language2), context.summary),
@@ -41151,11 +41151,29 @@ function deduplicateAimRequest(context) {
 // experiences/aim/final-delivery.ts
 var import_node_crypto12 = require("node:crypto");
 
+// experiences/aim/aim-note-style.ts
+function renderAimStructure(sections) {
+  return sections.map(
+    (section3) => [
+      `### ${section3.name}`,
+      section3.description,
+      section3.count ? `${section3.count.mode === "exact" ? "Exactly" : "At least"} ${section3.count.n} items.` : ""
+    ].filter(Boolean).join("\n")
+  ).join("\n\n");
+}
+
 // experiences/aim/steps/delivery-outline/task.md
 var task_default = "You are the final-delivery Synthesizer. Design the actual document needed to answer the original user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return the outline in aim.sections: each section has heading, purpose (what the reader can do or understand after it), searchTask (specific web search needed, or empty if already supported), evidenceIds and dependencies (supplied source IDs). Choose a suitable structure, not a fixed template. Open with a section that gives the direct answer or recommendation. Give every section a distinct purpose so no two sections cover the same advice or caveats; gather the items the user must still confirm in at most one section; use no more sections than the answer needs (usually 3 to 5). Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Earlier rounds are part of this answer: the user's earlier answers and their saved results (earlier documents and research) carry into this document, integrated with the current research. Update what the current research changes, and drop an earlier finding only when a later answer replaces it. Do not ask the user or deliver the document yet.\nSupplied evidence IDs and reports:\n{{sourceCatalog}}\n";
 
+// experiences/aim/steps/delivery-outline/note-structure.md
+var note_structure_default = "The user chose a note style for this document. Use exactly these sections, in this order, with these headings verbatim as the aim.sections headings; take each section's purpose from its description. This replaces the instruction above to choose a suitable structure and the usual 3 to 5 sections. Put the direct answer in the section whose description asks for the conclusion or judgment, else in the first section. Still map evidenceIds, dependencies and searchTask as above.\nSections:\n{{structure}}\n";
+
 // experiences/aim/steps/delivery-outline/step.ts
-var renderOutlineTask = (sourceCatalog) => renderTemplate(task_default, { sourceCatalog });
+var renderOutlineTask = (sourceCatalog, structure2) => {
+  const task = renderTemplate(task_default, { sourceCatalog });
+  return structure2 === void 0 ? task : `${task}
+${renderTemplate(note_structure_default, { structure: structure2 })}`;
+};
 
 // experiences/aim/steps/delivery-research/task.md
 var task_default2 = "You are the Researcher for the final document. Search the web to fill and verify the sections of this agreed outline: {{outline}}. Prioritize the explicit searchTasks and the concrete resources, examples, steps, or current facts required to deliver this user's requested result. Reuse supported prior findings; do not search irrelevant topics. Return a section-by-section evidence report. Use a Markdown H2 heading exactly matching each agreed section heading with a nonempty searchTask; place only that section's findings under it. Include explicit source IDs (delivery-research:<section-heading>:<number>) and direct source URLs, what each source supports, usable concrete details and unresolved gaps. Actually use available search tools; never claim a search occurred if it did not. Set aim.status to searched only when search actually ran. If tools fail or are unavailable, set aim.status to unavailable rather than replacing research with memory. Do not write the final document or ask questions.\n";
@@ -41176,13 +41194,20 @@ var additional_research_default = "Additional final-document research:\n{{resear
 // experiences/aim/steps/delivery-writing/no-mapped-source.md
 var no_mapped_source_default = "No external source is mapped to this document. Do not make source-backed claims.\n";
 
+// experiences/aim/steps/delivery-writing/note-structure.md
+var note_structure_default2 = "Section headings come from the user's note style: keep them verbatim and in order, and follow each section's description and item count.\nSections:\n{{structure}}\n";
+
 // experiences/aim/steps/delivery-writing/step.ts
-var renderWritingTask = (variables5) => renderTemplate(task_default3, {
-  outline: variables5.outline,
-  knownConditions: variables5.knownConditions,
-  evidence: variables5.evidence,
-  additionalResearch: variables5.research === void 0 ? "" : renderTemplate(additional_research_default, { research: variables5.research })
-});
+var renderWritingTask = (variables5) => {
+  const task = renderTemplate(task_default3, {
+    outline: variables5.outline,
+    knownConditions: variables5.knownConditions,
+    evidence: variables5.evidence,
+    additionalResearch: variables5.research === void 0 ? "" : renderTemplate(additional_research_default, { research: variables5.research })
+  });
+  return variables5.structure === void 0 ? task : `${task}
+${renderTemplate(note_structure_default2, { structure: variables5.structure })}`;
+};
 var NO_MAPPED_SOURCE = renderTemplate(no_mapped_source_default, {});
 
 // experiences/aim/steps/delivery-acceptance/task.md
@@ -41259,8 +41284,10 @@ async function buildFinalDelivery(base, ask, options = {}) {
     title: base.title,
     rules: base.rules,
     conditions: (_a2 = options.knownConditions) != null ? _a2 : base.detail,
-    language: base.outputLanguage
+    language: base.outputLanguage,
+    ...options.noteStyle ? { noteStyle: options.noteStyle.ref } : {}
   });
+  const structure2 = options.noteStyle ? renderAimStructure(options.noteStyle.sections) : void 0;
   const savedBaseValid = ((_b2 = options.checkpoint) == null ? void 0 : _b2.baseFingerprint) === baseFingerprint || !((_c = options.checkpoint) == null ? void 0 : _c.baseFingerprint) && options.evidence === void 0;
   const savedCheckpoint = savedBaseValid ? options.checkpoint : void 0;
   const checkpoint = {
@@ -41308,6 +41335,7 @@ async function buildFinalDelivery(base, ask, options = {}) {
       ...base,
       ...writingScope,
       ...phase === "delivery-acceptance" ? { responseContract: "aim-delivery-acceptance" } : {},
+      ...phase === "delivery-writing" && options.noteStyle ? { aimNoteFormat: options.noteStyle.formatText } : {},
       ...contract ? { aimContract: contract } : {},
       ...options.timeoutMs === void 0 ? {} : { timeoutMs: options.timeoutMs },
       task: `<!-- aim-phase: ${phase} -->
@@ -41325,7 +41353,7 @@ ${task}`,
 ${source.detail}`).join("\n\n");
   const outlineResult = await stage(
     "outline",
-    () => run("delivery-outline", renderOutlineTask(sourceCatalog)),
+    () => run("delivery-outline", renderOutlineTask(sourceCatalog, structure2)),
     (result2) => {
       parseDeliveryOutline(result2.detail);
     }
@@ -41428,6 +41456,7 @@ ${research.detail}`;
           outline,
           knownConditions: (_k = options.knownConditions) != null ? _k : base.detail,
           evidence: documentEvidence,
+          ...structure2 === void 0 ? {} : { structure: structure2 },
           ...documentResearch === void 0 ? {} : { research: documentResearch }
         })
       );

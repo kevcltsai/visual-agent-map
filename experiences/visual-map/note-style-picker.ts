@@ -121,8 +121,6 @@ const ISSUE_KEYS = new Set([
   "file_long",
   "tone_long",
   "frontmatter_unclosed",
-  "frontmatter_line",
-  "value_invalid",
   "key_duplicate",
   "no_sections",
   "count_invalid",

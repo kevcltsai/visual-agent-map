@@ -5,12 +5,12 @@ const { test, integrationTest, load, plain, obsidian, node, map } = require('../
 const dom = require('../support-dom.cjs');
 const { hasCls, element, find, findAll, byLabel, button, buttons, tick } = dom;
 
-// ---- tone presets library -------------------------------------------------------------------------------------
+// ---- outline presets library (06 P4: the tone library is gone, tones are blocks; the modal lists the outline kind only) --------
 function presetsHarness(settings = {}) {
   const Modal = dom.makeModal();
   const mod = load('ui/modals/prompt-presets-modal.ts', { obsidian: { ...obsidian, Modal } });
   const plugin = { settings: { language: 'en', promptPresets: [], ...settings }, saves: 0, async saveSettings() { this.saves++; } };
-  const modal = new mod.PromptPresetsModal({}, plugin, 'tone'); modal.open();
+  const modal = new mod.PromptPresetsModal({}, plugin); modal.open();
   const rows = () => findAll(modal.contentEl, i => i.cls === 'vam-template-row');
   const names = () => rows().map(r => find(r, i => i.tag === 'strong').text);
   const row = name => rows().find(r => find(r, i => i.tag === 'strong').text === name);
@@ -18,58 +18,60 @@ function presetsHarness(settings = {}) {
   const click = async (root, text) => { const b = button(root, text); assert.ok(b, `button ${text}`); b.click(); await tick(); };
   return { modal, plugin, rows, names, row, rowButtons, click };
 }
-test('tone library: built-ins offer View and Duplicate only; custom tones can be edited, renamed, duplicated and deleted', async () => {
-  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Be brief.' }, { id: 'tree', kind: 'outline', name: 'Tree', text: 'x' }] });
-  assert.deepEqual(h.names(), ['Plain explanation', 'Magazine column', 'Key-point summary', 'Practical guide', 'Academic rigor', 'AI choice', 'Mine'], 'outline presets are not listed');
-  assert.deepEqual(plain(h.rowButtons('Academic rigor')), ['View', 'Duplicate']);
+// Replaces 'tone library: built-ins offer View and Duplicate only...' (same flow, outline kind).
+test('outline library: built-ins offer View and Duplicate only; custom presets can be edited, renamed, duplicated and deleted', async () => {
+  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'outline', name: 'Mine', text: 'Be brief.' }, { id: 'warm', kind: 'tone', name: 'Warm', text: 'x' }] });
+  assert.deepEqual(h.names(), ['Knowledge tree generator', 'Mine'], 'tone presets are not listed');
+  assert.deepEqual(plain(h.rowButtons('Knowledge tree generator')), ['View', 'Duplicate']);
   assert.deepEqual(plain(h.rowButtons('Mine')), ['Edit', 'Duplicate', 'Delete']);
-  assert.ok(find(h.row('Academic rigor'), i => i.cls === 'vam-template-tag' && i.text === 'Built-in'));
+  assert.ok(find(h.row('Knowledge tree generator'), i => i.cls === 'vam-template-tag' && i.text === 'Built-in'));
   // A built-in opens read-only.
-  await h.click(h.row('Academic rigor'), 'View');
-  assert.equal(byLabel(h.modal.contentEl, 'Tone name').disabled, true);
-  assert.equal(byLabel(h.modal.contentEl, 'Describe the tone').disabled, true);
+  await h.click(h.row('Knowledge tree generator'), 'View');
+  assert.equal(byLabel(h.modal.contentEl, 'Preset name').disabled, true);
+  assert.equal(byLabel(h.modal.contentEl, 'Preset instructions').disabled, true);
   assert.equal(button(h.modal.modalEl, 'Save'), undefined);
   await h.click(h.modal.modalEl, 'Close');
-  // Duplicate a built-in: becomes an editable custom tone with the same text.
-  await h.click(h.row('Magazine column'), 'Duplicate');
+  // Duplicate a built-in: becomes an editable custom outline preset with the same text.
+  await h.click(h.row('Knowledge tree generator'), 'Duplicate');
   assert.equal(h.plugin.promptPresets, undefined);
-  const copy = h.plugin.settings.promptPresets.find(item => item.name === 'Magazine column copy');
-  assert.ok(copy && copy.kind === 'tone' && copy.text.length > 10);
+  const copy = h.plugin.settings.promptPresets.find(item => item.name === 'Knowledge tree generator copy');
+  assert.ok(copy && copy.kind === 'outline' && copy.text.length > 10);
   assert.equal(h.plugin.saves, 1);
   // Edit and rename a custom one; Cancel discards, Save persists.
   await h.click(h.row('Mine'), 'Edit');
-  byLabel(h.modal.contentEl, 'Tone name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Tone name').fire('input');
-  byLabel(h.modal.contentEl, 'Describe the tone').value = 'New voice.';
+  byLabel(h.modal.contentEl, 'Preset name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Preset name').fire('input');
+  byLabel(h.modal.contentEl, 'Preset instructions').value = 'New voice.';
   await h.click(h.modal.modalEl, 'Cancel');
   assert.equal(h.plugin.settings.promptPresets.find(item => item.id === 'mine').name, 'Mine');
   await h.click(h.row('Mine'), 'Edit');
-  byLabel(h.modal.contentEl, 'Tone name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Tone name').fire('input');
-  byLabel(h.modal.contentEl, 'Describe the tone').value = 'New voice.';
+  byLabel(h.modal.contentEl, 'Preset name').value = 'Renamed'; byLabel(h.modal.contentEl, 'Preset name').fire('input');
+  byLabel(h.modal.contentEl, 'Preset instructions').value = 'New voice.';
   await h.click(h.modal.modalEl, 'Save');
-  assert.deepEqual(plain(h.plugin.settings.promptPresets.find(item => item.id === 'mine')), { id: 'mine', kind: 'tone', name: 'Renamed', text: 'New voice.' });
+  assert.deepEqual(plain(h.plugin.settings.promptPresets.find(item => item.id === 'mine')), { id: 'mine', kind: 'outline', name: 'Renamed', text: 'New voice.' });
   assert.ok(h.names().includes('Renamed'));
   // A blank name cannot be saved and says why.
   await h.click(h.row('Renamed'), 'Edit');
-  byLabel(h.modal.contentEl, 'Tone name').value = '  '; byLabel(h.modal.contentEl, 'Tone name').fire('input');
+  byLabel(h.modal.contentEl, 'Preset name').value = '  '; byLabel(h.modal.contentEl, 'Preset name').fire('input');
   assert.equal(button(h.modal.modalEl, 'Save').disabled, true);
   assert.ok(find(h.modal.modalEl, i => i.text === 'Enter a name before saving.'));
   await h.click(h.modal.modalEl, 'Cancel');
 });
-test('tone library: delete asks twice (armed for five seconds) and New tone opens an editor that saves a custom tone', async () => {
-  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'tone', name: 'Mine', text: 'Be brief.' }] });
+// Replaces 'tone library: delete asks twice ... New tone ...' (same flow, outline kind).
+test('outline library: delete asks twice (armed for five seconds) and New preset opens an editor that saves a custom outline preset', async () => {
+  const h = presetsHarness({ promptPresets: [{ id: 'mine', kind: 'outline', name: 'Mine', text: 'Be brief.' }] });
   const del = find(h.row('Mine'), i => i.tag === 'button' && i.text === 'Delete');
   del.click();
   assert.equal(h.plugin.settings.promptPresets.length, 1, 'the first press only arms');
-  assert.equal(del.text, 'Delete tone?');
+  assert.equal(del.text, 'Delete preset?');
   assert.ok(find(h.modal.modalEl, i => /Press again within 5 seconds/.test(i.text)));
   del.click(); await tick();
   assert.deepEqual(plain(h.plugin.settings.promptPresets), []);
   assert.equal(h.plugin.saves, 1);
-  await h.click(h.modal.modalEl, 'New tone');
-  assert.equal(byLabel(h.modal.contentEl, 'Tone name').value, 'My tone');
-  byLabel(h.modal.contentEl, 'Describe the tone').value = 'Warm and concrete.';
+  await h.click(h.modal.modalEl, 'New preset');
+  assert.equal(byLabel(h.modal.contentEl, 'Preset name').value, 'My outline preset');
+  byLabel(h.modal.contentEl, 'Preset instructions').value = 'Warm and concrete.';
   await h.click(h.modal.modalEl, 'Save');
-  assert.deepEqual(plain(h.plugin.settings.promptPresets.map(item => [item.kind, item.name, item.text])), [['tone', 'My tone', 'Warm and concrete.']]);
+  assert.deepEqual(plain(h.plugin.settings.promptPresets.map(item => [item.kind, item.name, item.text])), [['outline', 'My outline preset', 'Warm and concrete.']]);
 });
 
 // ---- tone pickers -----------------------------------------------------------------------------------------------
@@ -116,7 +118,7 @@ integrationTest('multi-select research dialog: the tone picker defaults to keepi
   assert.equal(submitted[1].toneId, 'plain');
 });
 
-integrationTest('tone picker: the research dialog has no tone library link any more; the tone library still opens straight into the editor', () => {
+integrationTest('tone picker: the research dialog has no tone library link any more; the preset library (outline kind) still opens straight into the editor', () => {
   const Modal = dom.makeModal();
   const { MultiResearchModal } = load('experiences/visual-map/multi-research-modal.ts', { obsidian: { ...obsidian, Modal } });
   const models = { list: () => [], watch: () => () => {} };
@@ -126,9 +128,9 @@ integrationTest('tone picker: the research dialog has no tone library link any m
   assert.equal(byLabel(modal.contentEl, 'Writing tone'), undefined, 'no tone select: the tone comes with the note style');
   assert.equal(button(modal.contentEl, 'Edit tones…'), undefined);
   const presets = load('ui/modals/prompt-presets-modal.ts', { obsidian: { ...obsidian, Modal } });
-  const host = { settings: { language: 'en', promptPresets: [{ id: 'custom-1', kind: 'tone', name: 'Mine', text: 'Short and warm.' }] }, saveSettings: async () => {} };
-  const library = new presets.PromptPresetsModal({}, host, 'tone', () => {}, 'custom-1'); library.open();
-  assert.equal(byLabel(library.contentEl, 'Tone text')?.value ?? findAll(library.contentEl, i => i.tag === 'textarea')[0].value, 'Short and warm.', 'opens straight into the editor');
+  const host = { settings: { language: 'en', promptPresets: [{ id: 'custom-1', kind: 'outline', name: 'Mine', text: 'Short and warm.' }] }, saveSettings: async () => {} };
+  const library = new presets.PromptPresetsModal({}, host, () => {}, 'custom-1'); library.open();
+  assert.equal(byLabel(library.contentEl, 'Preset instructions')?.value ?? findAll(library.contentEl, i => i.tag === 'textarea')[0].value, 'Short and warm.', 'opens straight into the editor');
 });
 
 integrationTest('template and model pickers: the edit link opens the template library at the chosen template, the fix link checks the chosen model', () => {

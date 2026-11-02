@@ -145,10 +145,9 @@ test('note style: every preset has a full name and hint in both languages; the m
   assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', style.styleLabel('textbook', 'academic', names, 'zh-TW')), '使用預設（教科書）');
   assert.equal(translate('zh-TW', 'ui.note_style_use_default_0', style.styleLabel('mine', 'academic', names, 'zh-TW')), '使用預設（自訂：My notes · academic）');
 });
-test('tone settings row: the description points at the tone line of a note style file', () => {
+test('06 P4: the settings tone-presets row is gone (replaces "tone settings row: the description points at the tone line of a note style file")', () => {
   const { obsidian } = require('../support.cjs');
-  const { renderTonePresetsSetting } = load('ui/modals/prompt-presets-modal.ts', { obsidian: { ...obsidian, Modal: class { open() {} } } });
-  const setting = { setName(n) { this.name = n; return this; }, setDesc(d) { this.desc = d; return this; }, addButton() { return this; } };
-  renderTonePresetsSetting(setting, {}, { settings: { language: 'en', promptPresets: [] }, saveSettings: async () => {} });
-  assert.equal(setting.name, 'Writing tones'); assert.match(setting.desc, /tone: name/); assert.match(setting.desc, /note style file/);
+  const mod = load('ui/modals/prompt-presets-modal.ts', { obsidian: { ...obsidian, Modal: class { open() {} } } });
+  assert.equal(mod.renderTonePresetsSetting, undefined);
+  assert.equal(typeof mod.PromptPresetsModal, 'function');
 });

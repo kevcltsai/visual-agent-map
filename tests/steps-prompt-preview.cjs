@@ -199,7 +199,7 @@ test('F1: the unreadable-block and invalid-style notices never end a reason with
   const i18n = S.load('i18n.ts');
   const obsidian = { ...S.obsidian, PluginSettingTab: class {}, Setting: class {}, Modal: class {} };
   const { styleIssueText } = S.load('experiences/visual-map/note-style-picker.ts', { obsidian });
-  const codes = ['file_long', 'tone_long', 'frontmatter_unclosed', 'frontmatter_line', 'value_invalid', 'key_duplicate', 'no_sections', 'count_invalid', 'comment_unclosed', 'format_heading_repeated'];
+  const codes = ['file_long', 'tone_long', 'frontmatter_unclosed', 'key_duplicate', 'no_sections', 'count_invalid', 'comment_unclosed', 'format_heading_repeated'];
   const doubled = /[。．.！!？?]\s*[。．.！!？?]/;
   try {
     for (const language of LANGUAGES) {

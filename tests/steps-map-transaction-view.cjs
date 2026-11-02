@@ -133,7 +133,7 @@ test('claimToCurrent adds the node at the old spot, selects it, and undo then re
   const node = h.view.map.nodes.find(n => n.id !== h.rootNode.id);
   assert.equal(node.path.startsWith(`${TOPICS}/map-u/Notes/`), true);
   assert.deepEqual([node.x, node.y, node.parentId], [80, h.rootNode.y + 240, null]);
-  assert.equal(h.view.selected, node.id);
+  assert.equal(h.view.selection.state.selected, node.id);
   assert.deepEqual(focused, [node.id]);
   assert.deepEqual(await h.lifecycleOf(node.path), ['map-u', 'map-u', 'active']);
   await h.view.travel(false);
@@ -239,7 +239,7 @@ test('removeToUnassigned V1: adopter takes the children and expands; undo restor
   assert.equal(h.node(grand).parentId, child);
   assert.equal(h.node(sibling).collapsed, false);
   assert.equal(h.node(h.ids.root), undefined);
-  assert.equal(h.view.selected, null);
+  assert.equal(h.view.selection.state.selected, null);
   await h.view.travel(false);
   assert.deepEqual(h.snapshot(), before);
   assert.equal(JSON.stringify(h.view.map), original);
@@ -263,8 +263,8 @@ test('removeToUnassigned V2: undo keeps the viewport the user has panned to', as
 const UNASSIGNED = `${TOPICS}/map-u/Unassigned/`;
 const REFRESH_NOTICE = 'The change was saved, but the view could not refresh. Reopen the map to see it.';
 const parkedPaths = h => [...h.contents.keys()].filter(p => p.startsWith(UNASSIGNED));
-const removeBranch = async (h, id) => { h.view.multiSelected.clear(); h.view.multiSelected.add(id); await h.view.removeSelected(); };
-const copyBranch = async (h, id, targetId) => { h.view.multiSelected.clear(); h.view.multiSelected.add(id); await h.view.copySelected(h.node(targetId)); };
+const removeBranch = async (h, id) => { h.view.selection.replaceMulti([]); h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, id]); await h.view.removeSelected(); };
+const copyBranch = async (h, id, targetId) => { h.view.selection.replaceMulti([]); h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, id]); await h.view.copySelected(h.node(targetId)); };
 
 test('X1: removeSelected then a parked note moved away: undo is stale, nothing is written, the pointer is back', async () => {
   const h = await branchHarness();

@@ -194,7 +194,7 @@ async function viewHarness() {
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
   const node = id => view.map.nodes.find(n => n.id === id);
-  const copyP = async () => { view.multiSelected.clear(); view.multiSelected.add(p.id); await view.copySelected(node(target.id)); };
+  const copyP = async () => { view.selection.replaceMulti([]); view.selection.replaceMulti([...view.selection.state.multiSelected, p.id]); await view.copySelected(node(target.id)); };
   const copies = () => view.map.nodes.filter(n => ![target.id, p.id, q.id].includes(n.id));
   const snapshot = () => new Map([...contents].map(([path, text]) => [path, path.endsWith('Map.md') ? text : stable(text)]));
   return { repo, app, contents, view, spy, p, q, target, copyP, copies, snapshot };

@@ -54,7 +54,7 @@ async function harness({ aim = false, layout = null } = {}) {
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = stage; view.contentEl = content;
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
-  view.render = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
+  view.render = () => { view.cardEls.clear(); stage.children = []; view.selection.moveTabStop(view.defaultTabStop(view.map.nodes)); for (const n of view.map.nodes) view.renderNode(n); };
   await view.hydrate(); view.render();
   return { repo, app, contents, view, plugin, ids, notices, map: () => view.map, saved: () => repo.readMap(MAP), notes: () => view.notes, history: () => view.history.past.length };
 }
@@ -70,8 +70,8 @@ const clipboardEvent = (target, data = {}) => {
   return event;
 };
 const copyOf = (h, ids, target = card) => {
-  h.view.selected = null; h.view.multiSelected.clear();
-  if (ids.length === 1) h.view.selected = h.ids[ids[0]]; else for (const key of ids) h.view.multiSelected.add(h.ids[key]);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  if (ids.length === 1) h.view.selection.setSelected(h.ids[ids[0]]); else for (const key of ids) h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent(target);
   h.view.onClipboardEvent('copy', event);
   h.lastRaw = event.clipboardData.store.get(MIME);
@@ -121,7 +121,7 @@ test('P4 scope: events outside the view, in a text control, in the chat panel, o
     const paste = pasteOf(h, { [MIME]: payloadText([{ id: 'n1', parent: null, title: 'X', kind: 'topic', body: '' }]) }, target);
     assert.equal(paste.defaultPrevented, false);
   }
-  h.view.selected = null; h.view.multiSelected.clear();
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
   const none = clipboardEvent(card); h.view.onClipboardEvent('copy', none);
   assert.equal(none.defaultPrevented, false, 'nothing selected: the default copy runs');
   await tick(); await tick();
@@ -134,7 +134,7 @@ test('P4 paste: the same map under the selected card duplicates the notes with t
   const h = await harness();
   copyOf(h, ['leaf']);
   const raw = h.lastRaw;
-  h.view.selected = h.ids.other; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
   const filesBefore = files(h);
   const event = pasteOf(h, { [MIME]: raw });
   assert.equal(event.defaultPrevented, true);
@@ -155,7 +155,7 @@ test('P4 paste: in a down map the pasted branch goes below its parent, not to it
   const h = await harness({ layout: { direction: 'down' } });
   copyOf(h, ['leaf']);
   const raw = h.lastRaw;
-  h.view.selected = h.ids.other; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
   pasteOf(h, { [MIME]: raw });
   await until(() => h.map().nodes.length === 6); await tick(); await tick();
   const added = h.map().nodes.find(n => !Object.values(h.ids).includes(n.id));
@@ -167,7 +167,7 @@ test('P4 paste: with no selection the branch becomes new top-level trees below t
   const h = await harness();
   copyOf(h, ['branch']);
   const raw = h.lastRaw;
-  h.view.selected = null; h.view.multiSelected.clear();
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
   pasteOf(h, { [MIME]: raw });
   await until(() => h.map().nodes.length === 7); await tick(); await tick();
   const fresh = h.map().nodes.filter(n => !Object.values(h.ids).includes(n.id));
@@ -187,7 +187,7 @@ test('P4 paste: a copy keeps the relations between copied topics', async () => {
   await h.repo.saveMap(MAP, doc);
   copyOf(h, ['branch', 'kid']);
   const raw = h.lastRaw;
-  h.view.selected = h.ids.other; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
   pasteOf(h, { [MIME]: raw });
   await until(() => h.map().nodes.length === 7); await tick(); await tick();
   const fresh = h.map().nodes.filter(n => !Object.values(h.ids).includes(n.id));
@@ -203,7 +203,7 @@ test('P4 paste: the source is copied only when the string is byte for byte what 
   h.contents.set(leafPath, h.contents.get(leafPath).replace('---\n', '---\ncustom-marker: from-source\n'));
   copyOf(h, ['leaf']);
   const raw = h.lastRaw;
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   pasteOf(h, { [MIME]: raw });
   await until(() => h.map().nodes.length === 6); await tick(); await tick();
   const exact = h.map().nodes.at(-1);
@@ -221,7 +221,7 @@ test('P4 paste: an external payload makes new notes with kind, strength and body
   const h = await harness();
   const leafPath = h.map().nodes.find(n => n.id === h.ids.leaf).path;
   const before = h.contents.get(leafPath);
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   const text = payloadText([
     { id: 'a', parent: null, title: 'Claim', kind: 'hypothesis', strength: 'strong', body: 'Why it holds', path: leafPath, mapId: 'other-map' },
     { id: 'b', parent: 'a', title: 'Evidence', kind: 'topic', body: '' }
@@ -242,11 +242,11 @@ test('P4 paste: read-only situations (AIM map, topic selection mode) write nothi
   const valid = payloadText([{ id: 'a', parent: null, title: 'Claim', kind: 'topic', body: '' }]);
   const cases = {
     aim: h => { h.view.map.aim = { version: 1 }; },
-    integration: h => { h.view.integrationMode = true; }
+    integration: h => { h.view.selection.toggleMultiSelect(); }
   };
   for (const [name, arrange] of Object.entries(cases)) {
     const h = await harness();
-    h.view.selected = h.ids.root;
+    h.view.selection.setSelected(h.ids.root);
     arrange(h);
     const filesBefore = files(h), nodes = h.map().nodes.length;
     const event = pasteOf(h, { [MIME]: valid });
@@ -261,7 +261,7 @@ test('P4 paste: read-only situations (AIM map, topic selection mode) write nothi
 
 test('P4 paste: hostile payloads write no file and add no node', async () => {
   const h = await harness();
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   const good = { id: 'a', parent: null, title: 'T', kind: 'topic', body: '' };
   const bad = [
     '{not json',
@@ -298,7 +298,7 @@ test('P4 paste: when a copied topic is gone the paste still works from the paylo
   const raw = h.lastRaw;
   h.map().nodes = h.map().nodes.filter(n => n.id !== h.ids.leaf);
   await h.repo.saveMap(MAP, h.map());
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   pasteOf(h, { [MIME]: raw });
   await until(() => h.map().nodes.length === 5); await tick(); await tick();
   const added = h.map().nodes.at(-1);
@@ -319,7 +319,7 @@ test('P4 binding: listeners go on the window document, one set, and move with th
   assert.deepEqual(popout.log.added.map(([n]) => n), ['copy', 'cut', 'paste']);
   // The registered listener runs the same handler.
   const paste = popout.log.added.find(([n]) => n === 'paste')[1];
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   const event = clipboardEvent(card, { [MIME]: payloadText([{ id: 'a', parent: null, title: 'Pop', kind: 'topic', body: '' }]) });
   paste(event);
   assert.equal(event.defaultPrevented, true);
@@ -330,7 +330,7 @@ test('P4 binding: listeners go on the window document, one set, and move with th
 
 test('P4 Copy to…: the copy keeps the "copy" suffix; only a paste keeps the title', async () => {
   const h = await harness();
-  h.view.multiSelected.add(h.ids.leaf);
+  h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids.leaf]);
   await h.view.copySelected(h.map().nodes.find(n => n.id === h.ids.other));
   const added = h.map().nodes.at(-1);
   assert.equal(h.notes().get(added.id).title, 'Leaf copy');

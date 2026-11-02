@@ -83,6 +83,7 @@ import {
   type Transaction,
   type TransactionEntry
 } from "./map-transaction";
+import { TopicSelection, type SelectionChange } from "./topic-selection";
 import { backgroundResultNotice, renderBackgroundStatus } from "../../ui/background-run";
 import { AimClarificationModal } from "../../ui/modals/aim-clarification-modal";
 import { withThinkingOrigin } from "./thinking-origin";
@@ -804,8 +805,8 @@ export class VisualAgentMapView extends ItemView {
   private relevanceGoal: string | undefined;
   private relevanceLevel: RelevanceLevel | undefined;
   private relevanceContext: string | undefined;
-  private selected: string | null = null;
-  private multiSelected = new Set<string>();
+  /** The selection rules and state (selected topic, ticked topics, multi-select mode, selected relation line, tab stop). */
+  private selection = new TopicSelection();
   /** Cards named by the open structure review; marked with a class, cleared when the review closes. */
   private structureHighlight = new Set<string>();
   /** How many times the map was repainted; a run compares it to repaint once, not twice. */
@@ -962,7 +963,6 @@ export class VisualAgentMapView extends ItemView {
   private announcedStages = new Map<string, string>();
   /** The unsaved-summary line of each synthesis/merge status bar (a plain element outside every live region). */
   private taskPreviewEls = new Map<string, HTMLElement>();
-  private integrationMode = false;
   private dragging = false;
   // A repaint asked for mid-drag waits here; the drag's settle runs it once.
   private renderAfterDrag = false;
@@ -990,7 +990,6 @@ export class VisualAgentMapView extends ItemView {
   /** Where each label sits, so expanding or collapsing its text keeps it in place. */
   private relationLabelAt = new Map<string, { x: number; y: number }>();
   /** The relation line the user picked (key `from\0to\0kind`); view state only, never written to the file. */
-  private selectedRelation: string | null = null;
   /** The line under the pointer (shows its name) and the line of a panel row under the pointer (acts like a selection). */
   private hoverRelation: string | null = null;
   private previewRelation: string | null = null;
@@ -1010,7 +1009,6 @@ export class VisualAgentMapView extends ItemView {
   /** Space held down: a drag pans the map even while selecting topics. */
   private spaceHeld = false;
   /** The single card in the tab order (roving tabindex); arrows move between the rest. */
-  private tabStopId: string | null = null;
   /** Card element per topic id, rebuilt on every render, so a selection change touches only the affected cards. */
   private cardEls = new Map<string, HTMLElement>();
   /** Rendered card height in canvas units (offsetHeight ignores zoom). A card not on screen yet gets the median of the rendered ones; undefined when nothing is rendered. */
@@ -1259,15 +1257,7 @@ export class VisualAgentMapView extends ItemView {
       )
         return;
       if (event.key === "Escape") {
-        const previous = this.selected,
-          touched = [...this.multiSelected];
-        const wasSelecting = this.integrationMode;
-        this.selected = null;
-        this.multiSelected.clear();
-        this.selectedRelation = null;
-        this.integrationMode = false;
-        if (wasSelecting) this.render();
-        else this.commitSelection(previous, null, touched);
+        this.applySelectionChange(this.selection.escape());
       }
     });
     await this.plugin.ready;
@@ -1324,7 +1314,7 @@ export class VisualAgentMapView extends ItemView {
     scope.register([], "F2", (event: KeyboardEvent): boolean => {
       if (this.closed || event.isComposing || event.defaultPrevented) return true;
       if (this.presentation) return false;
-      if (this.integrationMode || this.map?.aim) return true;
+      if (this.selection.state.multiSelectMode || this.map?.aim) return true;
       const active = this.contentEl.ownerDocument?.activeElement;
       const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
       const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
@@ -1341,7 +1331,7 @@ export class VisualAgentMapView extends ItemView {
       (event: KeyboardEvent): boolean => {
         if (this.closed || event.isComposing || event.defaultPrevented) return true;
         if (this.presentation) return false;
-        if (this.integrationMode || this.map?.aim) return true;
+        if (this.selection.state.multiSelectMode || this.map?.aim) return true;
         const active = this.contentEl.ownerDocument?.activeElement;
         const entry = active ? [...this.cardEls.entries()].find(([, card]) => card === active) : undefined;
         const node = entry && this.map?.nodes.find(item => item.id === entry[0]);
@@ -1522,6 +1512,11 @@ export class VisualAgentMapView extends ItemView {
     (back ?? this.contentEl).focus({ preventScroll: true });
   }
   /** The topics a presentation visits: the reading order of what is drawn (folded branches are one stop, not their descendants). */
+  /** The selection a presentation session keeps (the presentation state stores a plain array). */
+  private stashSelection(): { selected: string | null; multiSelected: string[] } {
+    const stash = this.selection.stash();
+    return { selected: stash.selected, multiSelected: [...stash.multiSelected] };
+  }
   private presentationOrder(): string[] {
     if (!this.map) return [];
     const shown = new Set(this.canvasNodes().map(node => node.id));
@@ -1543,12 +1538,12 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The start button is on only when there is something to show and the map is not in select mode. */
   private canPresent(): boolean {
-    return !!this.map && !this.closed && !this.integrationMode && this.canvasNodes().length > 0;
+    return !!this.map && !this.closed && !this.selection.state.multiSelectMode && this.canvasNodes().length > 0;
   }
   private startPresentation(): void {
     if (this.presentation || !this.map || !this.canPresent()) return;
     const order = this.presentationOrder();
-    const first = startingId(order, this.selected);
+    const first = startingId(order, this.selection.state.selected);
     if (first === null) return;
     const active = (this.contentEl.ownerDocument?.activeElement ?? null) as HTMLElement | null;
     const card = active
@@ -1562,8 +1557,7 @@ export class VisualAgentMapView extends ItemView {
       order,
       currentId: first,
       viewport: { ...this.map.viewport },
-      selected: this.selected,
-      multiSelected: [...this.multiSelected],
+      ...this.stashSelection(),
       returnNodeId: card ? card[0] : null,
       returnEl: card ? null : active
     };
@@ -1696,11 +1690,11 @@ export class VisualAgentMapView extends ItemView {
     for (const card of this.cardEls.values()) card.toggleClass("is-presenting", false);
     if (!restore || this.closed || !this.map) return;
     const ids = new Set(this.map.nodes.map(node => node.id));
-    const previous = this.selected,
-      touched = [...this.multiSelected];
-    this.selected = session.selected !== null && ids.has(session.selected) ? session.selected : null;
-    this.multiSelected = new Set(session.multiSelected.filter(id => ids.has(id)));
-    this.commitSelection(previous, this.selected, [...touched, ...this.multiSelected]);
+    const previous = this.selection.state.selected,
+      touched = [...this.selection.state.multiSelected];
+    this.selection.restore(session, ids);
+    const restored = this.selection.state;
+    this.commitSelection(previous, restored.selected, [...touched, ...restored.multiSelected]);
     if (!this.map) return;
     this.map.viewport = { ...session.viewport };
     this.transform();
@@ -2003,9 +1997,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.path !== path) this.dropMapBackground();
     this.path = path;
     this.map = map;
-    this.integrationMode = false;
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.exitMultiSelect("openMap");
     this.history.clear();
     this.restoreCrossProxies();
     await this.hydrate(isCurrent);
@@ -2062,7 +2054,7 @@ export class VisualAgentMapView extends ItemView {
           if (!isCurrent()) return;
           await this.openMapInMutation(created.mapPath);
           if (!isCurrent() || this.path !== created.mapPath || this.map?.id !== created.map.id) return;
-          this.selected = created.root.id;
+          this.selection.setSelected(created.root.id);
           this.render();
           this.focusNode(created.root);
         }),
@@ -3699,7 +3691,7 @@ export class VisualAgentMapView extends ItemView {
   private outlineImportTarget(): OutlineImportTarget {
     if (!this.map || !isManagedMapPath(this.plugin.settings, this.path)) return { map: "none" };
     if (this.map.aim) return { map: "aim" };
-    const node = this.map.nodes.find(item => item.id === this.selected);
+    const node = this.map.nodes.find(item => item.id === this.selection.state.selected);
     if (!node) return { map: "editable" };
     return { map: "editable", selected: { id: node.id, title: this.notes.get(node.id)?.title ?? node.path } };
   }
@@ -3934,7 +3926,7 @@ export class VisualAgentMapView extends ItemView {
         }
         const placed = this.map?.nodes.find(node => node.id === top.id);
         if (placed) {
-          this.selected = placed.id;
+          this.selection.setSelected(placed.id);
           this.render();
           this.focusNode(placed);
         }
@@ -4159,7 +4151,7 @@ export class VisualAgentMapView extends ItemView {
       if (result.status === "waiting-user") {
         const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
         if (question) {
-          this.selected = question.id;
+          this.selection.setSelected(question.id);
           this.render();
           this.focusNode(question);
         }
@@ -4279,7 +4271,7 @@ export class VisualAgentMapView extends ItemView {
       }
     }
   }
-  private async planAimFromSelection(nodeId = this.selected): Promise<void> {
+  private async planAimFromSelection(nodeId = this.selection.state.selected): Promise<void> {
     const node = this.map?.nodes.find(item => item.id === nodeId);
     if (this.closed || !node || !this.path || !this.map?.aim || this.aimBusy) return;
     const epoch = this.aimViewEpoch,
@@ -4351,7 +4343,7 @@ export class VisualAgentMapView extends ItemView {
       );
       if (!this.aimViewIsCurrent(epoch, mapPath) || this.aimController !== controller) return;
       if (result.status === "question") {
-        this.selected = result.node.id;
+        this.selection.setSelected(result.node.id);
         this.render();
         this.focusNode(result.node);
         new Notice(t("ui.aim_question_ready"));
@@ -4361,7 +4353,7 @@ export class VisualAgentMapView extends ItemView {
         else if (outcome.status === "waiting-user") {
           const question = this.map?.nodes.find(item => item.id === outcome.questionNodeId);
           if (question) {
-            this.selected = question.id;
+            this.selection.setSelected(question.id);
             this.render();
             this.focusNode(question);
           }
@@ -4410,7 +4402,7 @@ export class VisualAgentMapView extends ItemView {
       if (result.status === "waiting-user") {
         const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
         if (question) {
-          this.selected = question.id;
+          this.selection.setSelected(question.id);
           this.render();
           this.focusNode(question);
         }
@@ -4461,7 +4453,7 @@ export class VisualAgentMapView extends ItemView {
       if (!isCurrent()) return;
       // Select the new question so the toolbar answers it, not the previously selected one; the finally block re-renders after reloading the map.
       if (result.status === "waiting-user") {
-        this.selected = result.questionNodeId;
+        this.selection.setSelected(result.questionNodeId);
         new Notice(t("ui.aim_waiting_user"));
       } else if (result.status === "partial") new Notice(t("ui.aim_research_partial"));
       else if (result.status === "completed") showDocumentReady();
@@ -4551,7 +4543,7 @@ export class VisualAgentMapView extends ItemView {
           if (result.status === "waiting-user") {
             const question = this.map?.nodes.find(item => item.id === result.questionNodeId);
             if (question) {
-              this.selected = question.id;
+              this.selection.setSelected(question.id);
               this.render();
               this.focusNode(question);
             }
@@ -5204,8 +5196,7 @@ export class VisualAgentMapView extends ItemView {
         this.removeAimReferences(map, ids, prior.nodes);
       })
       .commit();
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.afterRemove();
     this.history.push(entry);
     if (adopterId) this.noticeDroppedCycles();
     await this.refreshAfterSavedChange();
@@ -5242,7 +5233,7 @@ export class VisualAgentMapView extends ItemView {
       }
     return true;
   }
-  private mergeCheck(ids: Iterable<string> = this.multiSelected, except?: MergeTask): MergeEligibility {
+  private mergeCheck(ids: Iterable<string> = this.selection.state.multiSelected, except?: MergeTask): MergeEligibility {
     return mergeEligibility({
       ids,
       nodes: this.map?.nodes ?? [],
@@ -5252,7 +5243,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Asks for the merged topic's name, then merges in the write queue (which checks everything again). */
   private openMerge(): void {
-    if (!this.map || this.map.aim || this.mergeOpen || !this.multiSelected.size) return;
+    if (!this.map || this.map.aim || this.mergeOpen || !this.selection.state.multiSelected.size) return;
     // One AI merge per map: a running one is only reported.
     if (this.mergeTasks.has(this.path)) {
       new Notice(t("ui.merge_locked"));
@@ -5702,9 +5693,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
     this.history.push(this.mergeEntry(entry));
-    this.integrationMode = false;
-    this.selected = created.id;
-    this.multiSelected.clear();
+    this.selection.afterMerge(created.id);
     await this.finishMerge(created.id);
   }
   /**
@@ -5788,9 +5777,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (content && this.mergeTasks.get(mapPath) === content.task) this.mergeTasks.delete(mapPath);
     this.history.push(this.mergeEntry(entry));
-    this.integrationMode = false;
-    this.selected = target.id;
-    this.multiSelected.clear();
+    this.selection.afterMerge(target.id);
     await this.finishMerge(target.id);
   }
   /** Keeps what a merge's relation retargeting dropped, for the notice that follows the save. */
@@ -5835,7 +5822,7 @@ export class VisualAgentMapView extends ItemView {
       } catch (error) {
         throw this.mergeError(error);
       }
-      if (this.selected && !this.map?.nodes.some(item => item.id === this.selected)) this.selected = null;
+      this.selection.pruneSelectedOnly(new Set((this.map?.nodes ?? []).map(item => item.id)));
     };
     return { ...entry, undo: travel(entry.undo), redo: travel(entry.redo) };
   }
@@ -5843,9 +5830,10 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return [];
     return this.map.nodes.filter(
       node =>
-        this.multiSelected.has(node.id) &&
+        this.selection.state.multiSelected.has(node.id) &&
         !this.map!.nodes.some(
-          parent => this.multiSelected.has(parent.id) && descendants(this.map!.nodes, parent.id).has(node.id)
+          parent =>
+            this.selection.state.multiSelected.has(parent.id) && descendants(this.map!.nodes, parent.id).has(node.id)
         )
     );
   }
@@ -5922,7 +5910,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Free images only change on a map the user may edit: not AIM, not while picking topics. */
   private canEditCanvasItems(): boolean {
-    return !this.integrationMode && !this.map?.aim;
+    return !this.selection.state.multiSelectMode && !this.map?.aim;
   }
   /**
    * Draws the map's free images in one layer at the end of the stage, so Tab reaches them after the topic cards and
@@ -6444,7 +6432,7 @@ export class VisualAgentMapView extends ItemView {
         }
       }, false);
       await this.plugin.rebuildDerivedData();
-      this.selected = child.id;
+      this.selection.setSelected(child.id);
       this.announcer?.setText(t("ui.text_node_promoted"));
     } finally {
       this.focusNodeId = null;
@@ -6500,7 +6488,7 @@ export class VisualAgentMapView extends ItemView {
   addTextNodeUnder(parent?: MapNode | null): void {
     this.enqueue(async () => {
       if (!this.map || !this.canEditText()) return;
-      const target = parent ?? this.map.nodes.find(node => node.id === this.selected);
+      const target = parent ?? this.map.nodes.find(node => node.id === this.selection.state.selected);
       const owner = target && this.map.nodes.find(node => node.id === target.id);
       if (!owner) {
         // No topic selected: a free block in the middle of the view (canvas-text-node decision #4).
@@ -6680,7 +6668,11 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The topics a summary entry acts on: the multi-selection, or the one selected topic. */
   private summaryTargets(): string[] {
-    return this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    return this.selection.state.multiSelected.size
+      ? [...this.selection.state.multiSelected]
+      : this.selection.state.selected
+        ? [this.selection.state.selected]
+        : [];
   }
   /** Entry for the toolbar, command and context menu: starts a bracket over the topics and opens its text editor (nothing is written yet). */
   addSummaryOver(ids: readonly string[] = this.summaryTargets()): void {
@@ -6992,7 +6984,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The selection bar's "Add frame": asks for the optional label, then frames the selected topics. */
   private openAddBoundary(): void {
-    const ids = [...this.multiSelected];
+    const ids = [...this.selection.state.multiSelected];
     if (!this.map || this.map.aim || !ids.length) return;
     new NameModal(
       this.app,
@@ -7248,7 +7240,7 @@ export class VisualAgentMapView extends ItemView {
       const cardId = [...this.cardEls].find(([, el]) => el === card)?.[0];
       if (cardId) {
         event.preventDefault();
-        const ids = this.multiSelected.has(cardId) ? [...this.multiSelected] : [cardId];
+        const ids = this.selection.state.multiSelected.has(cardId) ? [...this.selection.state.multiSelected] : [cardId];
         const menu = new Menu();
         menu.addItem(item =>
           item
@@ -7316,13 +7308,13 @@ export class VisualAgentMapView extends ItemView {
     if (!images.length) return false;
     // A selected topic (the one the panel shows) takes the picture on its card; other selections leave it alone.
     // Clipboard text next to the picture (a spreadsheet range, say) still goes to the outline in the clipboard group.
-    const target = this.map?.nodes.find(item => item.id === this.selected);
+    const target = this.map?.nodes.find(item => item.id === this.selection.state.selected);
     if (target && this.cardAcceptsImages(target) && !event.clipboardData?.getData("text/plain")) {
       event.preventDefault();
       this.enqueue(() => this.attachCardImages(target, images));
       return true;
     }
-    if (this.selected || this.multiSelected.size) return false;
+    if (this.selection.state.selected || this.selection.state.multiSelected.size) return false;
     const point = this.stagePoint(this.lastCanvasPointer);
     if (!point) return false;
     event.preventDefault();
@@ -7441,8 +7433,7 @@ export class VisualAgentMapView extends ItemView {
         );
       throw error;
     }
-    this.selected = null;
-    this.multiSelected.clear();
+    this.selection.afterRemove();
     this.history.push(entry);
     await this.refreshAfterSavedChange();
   }
@@ -7489,7 +7480,7 @@ export class VisualAgentMapView extends ItemView {
           map.nodes = arrangeNewTree(map.nodes, root.id, branchOf.get(root.id)!, this.cardHeightOf, layoutOf(map));
       }
     });
-    if (clearSelection) this.multiSelected.clear();
+    this.selection.afterMove(clearSelection);
     this.render();
   }
   private assertAimReferencesRemain(
@@ -7731,7 +7722,7 @@ export class VisualAgentMapView extends ItemView {
     }
     if (cross) await cross.finish(entry);
     else this.history.push(this.copyEntry(entry));
-    this.multiSelected.clear();
+    this.selection.afterPaste();
     await this.refreshAfterSavedChange();
     return copies.filter(copy => copy.parentId === (target?.id ?? null));
   }
@@ -7768,11 +7759,15 @@ export class VisualAgentMapView extends ItemView {
   }
   /** True when branches cannot be changed here: integration mode, AIM, or no saved map. */
   private clipboardReadOnly(): boolean {
-    return this.integrationMode || !!this.map?.aim || this.outlineImportTarget().map !== "editable";
+    return this.selection.state.multiSelectMode || !!this.map?.aim || this.outlineImportTarget().map !== "editable";
   }
   private copyToClipboard(event: ClipboardEvent, mode: "copy" | "cut"): void {
     const map = this.map;
-    const ids = this.multiSelected.size ? [...this.multiSelected] : this.selected ? [this.selected] : [];
+    const ids = this.selection.state.multiSelected.size
+      ? [...this.selection.state.multiSelected]
+      : this.selection.state.selected
+        ? [this.selection.state.selected]
+        : [];
     if (!map || !ids.length || !event.clipboardData) return;
     if (mode === "cut" && this.clipboardReadOnly()) {
       new Notice(t("ui.clipboard_cut_readonly"));
@@ -7859,7 +7854,7 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     if (!parsed.nodes.length) return;
-    const target = this.map?.nodes.find(node => node.id === this.selected) ?? null;
+    const target = this.map?.nodes.find(node => node.id === this.selection.state.selected) ?? null;
     // importOutlineIntoMap queues its own write, so it is not wrapped in enqueue.
     void this.importOutlineIntoMap(
       { nodes: parsed.nodes, source: null, shallowResearch: false },
@@ -7896,7 +7891,7 @@ export class VisualAgentMapView extends ItemView {
       new Notice(t("ui.clipboard_paste_readonly"));
       return;
     }
-    const target = map.nodes.find(node => node.id === this.selected) ?? null;
+    const target = map.nodes.find(node => node.id === this.selection.state.selected) ?? null;
     const record = sessionFor(this.plugin).match(raw);
     let tops: MapNode[] = [];
     const source = record && record.sourceMapPath === this.path && record.sourceMapId === map.id ? record : null;
@@ -7931,7 +7926,7 @@ export class VisualAgentMapView extends ItemView {
       );
       const landed = this.map?.nodes.find(node => node.id === tops[0]?.id);
       if (landed) {
-        this.selected = landed.id;
+        this.selection.setSelected(landed.id);
         this.render();
         this.focusNode(landed);
       }
@@ -7963,7 +7958,7 @@ export class VisualAgentMapView extends ItemView {
         this.refreshCutMarks();
         const moved = this.map?.nodes.find(node => node.id === roots[0].id);
         if (moved) {
-          this.selected = moved.id;
+          this.selection.setSelected(moved.id);
           this.render();
           this.focusNode(moved);
         }
@@ -8016,7 +8011,7 @@ export class VisualAgentMapView extends ItemView {
     }
     const placed = this.map?.nodes.find(node => node.id === tops[0]?.id);
     if (placed) {
-      this.selected = placed.id;
+      this.selection.setSelected(placed.id);
       this.render();
       this.focusNode(placed);
     }
@@ -8331,7 +8326,7 @@ export class VisualAgentMapView extends ItemView {
         });
       })
       .commit();
-    this.selected = id;
+    this.selection.setSelected(id);
     this.history.push(entry);
     await this.refreshAfterSavedChange();
     const node = this.map?.nodes.find(item => item.id === id);
@@ -9323,7 +9318,7 @@ export class VisualAgentMapView extends ItemView {
       this.addExportButton(headerActions);
       this.iconButton(headerActions, "more-vertical", t("ui.more_mind_map_actions"), () => this.openMapActions());
     }
-    const selectedNode = this.map?.nodes.find(node => node.id === this.selected);
+    const selectedNode = this.map?.nodes.find(node => node.id === this.selection.state.selected);
     if (this.map?.aim) {
       const statusbar = this.contentEl.createDiv(`vam-aim-statusbar${this.aimBusy ? " is-active" : ""}`);
       statusbar.setAttr("aria-live", "polite");
@@ -9409,7 +9404,7 @@ export class VisualAgentMapView extends ItemView {
             actions,
             t("ui.aim_answer_pending_question"),
             () => {
-              this.selected = pending.id;
+              this.selection.setSelected(pending.id);
               this.render();
               this.focusNode(pending);
               this.openAimAnswer(pending);
@@ -9529,8 +9524,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map.aim) this.renderBackgroundBars(this.contentEl);
     // An empty map has nothing to select: leave topic selection (undo can empty a map while the bar is open).
     if (!this.map.nodes.length) {
-      this.integrationMode = false;
-      this.multiSelected.clear();
+      this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
     const aimMode = !!this.map.aim;
@@ -9543,23 +9537,20 @@ export class VisualAgentMapView extends ItemView {
     if (!aimMode) {
       const integrate = this.button(
         tools,
-        this.integrationMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+        this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
         () => {
-          this.integrationMode = !this.integrationMode;
-          this.multiSelected.clear();
-          this.selected = null;
-          this.render();
+          this.applySelectionChange(this.selection.toggleMultiSelect());
         }
       );
-      integrate.setAttr("aria-pressed", String(this.integrationMode));
-      if (this.integrationMode) integrate.addClass("is-active");
+      integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+      if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
       this.renderRelevanceGoalControl(tools);
     }
     const workspace = this.contentEl.createDiv("vam-workspace");
     // The workspace is a row: the chat window (put in first by mountMapChat) and the canvas.
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
-    if (this.integrationMode) this.viewportEl.addClass("is-selecting");
+    if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
     // Canvas controls float over the map instead of stacking a second toolbar above it; the overlay covers the canvas only.
     const overlay = canvas.createDiv("vam-canvas-overlay");
     if (tools.childElementCount) overlay.appendChild(tools);
@@ -9569,7 +9560,7 @@ export class VisualAgentMapView extends ItemView {
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
     this.hintEl =
-      !this.integrationMode && !this.plugin.settings.canvasHintSeen
+      !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen
         ? overlay.createSpan({
             cls: "vam-hint vam-canvas-hint",
             text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
@@ -9600,7 +9591,7 @@ export class VisualAgentMapView extends ItemView {
     this.stageEl = this.viewportEl.createDiv("vam-stage");
     this.stageEl.setAttr("role", "tree");
     this.stageEl.setAttr("aria-label", this.map.title);
-    this.stageEl.setAttr("aria-multiselectable", String(this.integrationMode));
+    this.stageEl.setAttr("aria-multiselectable", String(this.selection.state.multiSelectMode));
     this.releaseCovers();
     this.cardEls.clear();
     this.textEls.clear();
@@ -9612,10 +9603,9 @@ export class VisualAgentMapView extends ItemView {
     this.edgesEl.setAttribute("aria-hidden", "true");
     this.stageEl.appendChild(this.edgesEl);
     const shown = this.canvasNodes();
-    if (this.selected && !shown.some(node => node.id === this.selected)) this.selected = null;
-    this.multiSelected = new Set([...this.multiSelected].filter(id => shown.some(node => node.id === id)));
-    if (this.integrationMode) this.selectionBarEl = this.renderSelectionBar(canvas);
-    this.tabStopId = this.defaultTabStop(shown);
+    this.selection.prune(new Set(shown.map(node => node.id)));
+    if (this.selection.state.multiSelectMode) this.selectionBarEl = this.renderSelectionBar(canvas);
+    this.selection.resetTabStop(shown.map(node => ({ id: node.id, parentId: node.parentId ?? null })));
     this.renderingCard = true;
     try {
       for (const node of shown) this.renderNode(node);
@@ -9704,14 +9694,17 @@ export class VisualAgentMapView extends ItemView {
     const node = this.map?.nodes.find(item => item.id === shownNode.id) ?? shownNode;
     const note = this.notes.get(node.id),
       card = this.stageEl.createDiv({
-        cls: `vam-node${node.id === this.selected || this.multiSelected.has(node.id) ? " is-selected" : ""}`
+        cls: `vam-node${node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id) ? " is-selected" : ""}`
       });
     this.cardEls.set(node.id, card);
     this.paintCut(card, node.id);
     if (this.structureHighlight.has(node.id)) card.addClass("vam-structure-suggested");
     card.setAttr("role", "treeitem");
     card.setAttr("aria-level", String(this.nodeDepth(node)));
-    card.setAttr("aria-selected", String(node.id === this.selected || this.multiSelected.has(node.id)));
+    card.setAttr(
+      "aria-selected",
+      String(node.id === this.selection.state.selected || this.selection.state.multiSelected.has(node.id))
+    );
     if (node.aimKind) card.setAttr("data-aim-kind", node.aimKind);
     if (node.aimKind === "conclusion") {
       const background = createSvg("svg");
@@ -9746,24 +9739,22 @@ export class VisualAgentMapView extends ItemView {
     card.style.top = `${shownNode.y}px`;
     if (shownNode.width) card.style.width = `${shownNode.width}px`;
     if (shownNode.height) card.style.height = `${shownNode.height}px`;
-    card.tabIndex = node.id === this.tabStopId ? 0 : -1;
+    card.tabIndex = node.id === this.selection.state.tabStopId ? 0 : -1;
     card.addEventListener("dragover", event => this.onCardDragOver(event, card, node));
     card.addEventListener("dragleave", event => this.onCardDragLeave(event, card));
     card.addEventListener("drop", event => this.onCardDrop(event, card, node));
     const header = card.createDiv("vam-node-header");
     this.labelCard(card, note?.title ?? t("ui.note_missing"));
-    if (this.integrationMode) {
+    if (this.selection.state.multiSelectMode) {
       const select = header.createEl("input", { type: "checkbox" });
-      select.checked = this.multiSelected.has(node.id);
+      select.checked = this.selection.state.multiSelected.has(node.id);
       select.setAttr("aria-label", note?.title ?? node.path);
       // The card itself is the tab stop; a checkbox per card would add one tab stop per topic.
       select.tabIndex = -1;
       this.cardChecks.set(node.id, select);
       select.addEventListener("click", event => {
         event.stopPropagation();
-        if (select.checked) this.multiSelected.add(node.id);
-        else this.multiSelected.delete(node.id);
-        this.commitSelection(this.selected, this.selected, [node.id]);
+        this.applySelectionChange(this.selection.setChecked(node.id, select.checked));
       });
     }
     const batch = this.plugin.expansionBatches.get(node.path);
@@ -9934,7 +9925,7 @@ export class VisualAgentMapView extends ItemView {
     if (research?.stage === "charts")
       this.button(header, t("ui.stop_adding_charts"), () => this.plugin.abortChartJobs(node.path));
     const pendingCount = this.plugin.pendingSuggestions.get(node.path)?.length ?? 0;
-    if (pendingCount && !this.integrationMode && !this.map?.aim)
+    if (pendingCount && !this.selection.state.multiSelectMode && !this.map?.aim)
       this.button(header, t("ui.view_0_expansion_suggestions", pendingCount), () =>
         this.openNodePanel(node, "proposals")
       ).addClass("vam-badge-new");
@@ -9942,7 +9933,7 @@ export class VisualAgentMapView extends ItemView {
     if (
       note &&
       note.researchMode === "local" &&
-      !this.integrationMode &&
+      !this.selection.state.multiSelectMode &&
       !this.map?.aim &&
       !node.aimKind &&
       !active &&
@@ -9958,7 +9949,7 @@ export class VisualAgentMapView extends ItemView {
     // A research that failed with a provider error (quota, login, unavailable model) offers one retry on the other provider.
     if (
       note?.status === "error" &&
-      !this.integrationMode &&
+      !this.selection.state.multiSelectMode &&
       !node.aimKind &&
       !active &&
       !queued &&
@@ -9967,12 +9958,17 @@ export class VisualAgentMapView extends ItemView {
     )
       this.renderOtherProviderButton(header, [node]);
     const waitingOutline = this.quickOutlines.get(node.path);
-    if (waitingOutline && waitingOutline.mapPath === this.path && !this.integrationMode && !this.map?.aim)
+    if (
+      waitingOutline &&
+      waitingOutline.mapPath === this.path &&
+      !this.selection.state.multiSelectMode &&
+      !this.map?.aim
+    )
       this.button(header, t("ui.review_outline_0", outlineProposals(waitingOutline.nodes).length), () =>
         this.openNextStep(node)
       ).addClass("vam-badge-new");
     const synthesis = this.synthesisTasks.get(node.path);
-    if (synthesis && synthesis.mapPath === this.path && !this.integrationMode && !this.map?.aim) {
+    if (synthesis && synthesis.mapPath === this.path && !this.selection.state.multiSelectMode && !this.map?.aim) {
       if (synthesis.state === "running") {
         if (synthesis.progress) header.createSpan({ cls: "vam-status vam-status-running", text: synthesis.progress });
         this.button(header, t("ui.stop_research"), () => synthesis.controller.abort());
@@ -10013,7 +10009,7 @@ export class VisualAgentMapView extends ItemView {
       collapse.addClass("vam-collapse-button", ...(node.collapsed ? ["is-collapsed"] : []));
       collapse.setAttr("aria-expanded", String(!node.collapsed));
     }
-    if (!this.integrationMode) {
+    if (!this.selection.state.multiSelectMode) {
       if (!this.map?.aim) {
         const structure = this.button(tools, t("ui.node_tool_links"), () => this.openNodePanel(node, "structure"));
         structure.addClass("vam-node-tool", "vam-structure-tool");
@@ -10084,9 +10080,9 @@ export class VisualAgentMapView extends ItemView {
     const details = this.button(tools, t("ui.node_tool_details"), () => this.openDetails(node));
     details.addClass("vam-node-tool", "vam-detail-button");
     details.setAttr("aria-label", t("ui.open_details_in_right_sidebar"));
-    if (!this.integrationMode && !this.map?.aim)
+    if (!this.selection.state.multiSelectMode && !this.map?.aim)
       this.button(tools, t("ui.ai_explore"), () => this.openNextStep(node)).addClass("vam-node-tool", "vam-ai-explore");
-    if (!this.integrationMode && !this.map?.aim) {
+    if (!this.selection.state.multiSelectMode && !this.map?.aim) {
       const add = this.button(card, "+", () => this.enqueue(() => this.addNode(node)));
       add.addClass("vam-add-child");
       add.setAttr("aria-label", t("ui.add_subtopic_manually"));
@@ -10098,7 +10094,7 @@ export class VisualAgentMapView extends ItemView {
     title.setAttr("dir", "auto");
     // Double-click renames, the same dialog as F2 and the Rename tool. It is handled on the card: enableDrag captures the
     // pointer on the card, so a real mouse reports the card (not the title) as the dblclick target.
-    if (note && !this.integrationMode && !this.map?.aim)
+    if (note && !this.selection.state.multiSelectMode && !this.map?.aim)
       card.addEventListener("dblclick", event => {
         const target = event.target as Element | null;
         if (target?.closest?.("button")) return;
@@ -10254,7 +10250,7 @@ export class VisualAgentMapView extends ItemView {
     }
     this.enableDrag(card, node);
     // Built during a presentation too: the stylesheet hides them and every handler returns early while presenting, so ending it needs no repaint.
-    if (!this.integrationMode && !this.map?.aim && !node.aimKind) {
+    if (!this.selection.state.multiSelectMode && !this.map?.aim && !node.aimKind) {
       this.attachResizeHandle(card, node);
       this.attachHeightHandle(card, node);
       this.attachCornerHandle(card, node);
@@ -10263,11 +10259,9 @@ export class VisualAgentMapView extends ItemView {
       if (Date.now() < this.suppressClickUntil) return;
       if ((event.target as Element).closest("button")) return;
       // Outside selection mode, Cmd/Ctrl+click is handled on pointerup (enableDrag); inside it a click just toggles.
-      if ((event.metaKey || event.ctrlKey) && !this.integrationMode) return;
-      if (this.integrationMode) {
-        if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-        else this.multiSelected.add(node.id);
-        this.commitSelection(this.selected, this.selected, [node.id]);
+      if ((event.metaKey || event.ctrlKey) && !this.selection.state.multiSelectMode) return;
+      if (this.selection.state.multiSelectMode) {
+        this.applySelectionChange(this.selection.toggleByClick(node.id));
         return;
       }
       // A click selects; an already open details sidebar follows the selection, a closed one stays closed.
@@ -10282,7 +10276,7 @@ export class VisualAgentMapView extends ItemView {
         this.moveKeyboardFocus(target);
         return;
       }
-      const editable = !this.integrationMode && !this.map?.aim;
+      const editable = !this.selection.state.multiSelectMode && !this.map?.aim;
       const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       if (editable && !event.isComposing) {
         if (plain && !event.shiftKey && (event.key === "Delete" || event.key === "Backspace")) {
@@ -10305,17 +10299,15 @@ export class VisualAgentMapView extends ItemView {
           return;
         }
       }
-      if (event.key === "F2" && note && !this.integrationMode && !this.map?.aim) {
+      if (event.key === "F2" && note && !this.selection.state.multiSelectMode && !this.map?.aim) {
         if (event.defaultPrevented) return; // the view scope already handled this F2
         event.preventDefault();
         this.renameNode(node, note.title);
         return;
       }
       if (event.key === "Enter") {
-        if (this.integrationMode) {
-          if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-          else this.multiSelected.add(node.id);
-          this.commitSelection(this.selected, this.selected, [node.id]);
+        if (this.selection.state.multiSelectMode) {
+          this.applySelectionChange(this.selection.toggleByEnter(node.id));
         } else {
           this.selectMapNode(node);
           if (node.aimKind === "question") this.openAimAnswer(node);
@@ -10324,7 +10316,7 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     card.addEventListener("mouseenter", () => {
-      if (!note || this.integrationMode || this.dragging) return;
+      if (!note || this.selection.state.multiSelectMode || this.dragging) return;
       this.clearHoverTimer();
       this.hoverTimer = window.setTimeout(() => {
         if (!this.dragging && card.isConnected) this.showHoverCard(card, note);
@@ -10340,7 +10332,7 @@ export class VisualAgentMapView extends ItemView {
         this.restoringFocus ||
         event.target !== card ||
         !note ||
-        this.integrationMode ||
+        this.selection.state.multiSelectMode ||
         !card.matches(":focus-visible")
       )
         return;
@@ -10500,11 +10492,9 @@ export class VisualAgentMapView extends ItemView {
       (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom)
     )
       this.focusNode(target, false);
-    if (this.integrationMode) {
+    if (this.selection.state.multiSelectMode) {
       // Topic selection mode: moving focus must not clear the topics already ticked.
-      const previous = this.tabStopId;
-      this.tabStopId = target.id;
-      this.paintCards([previous, target.id]);
+      this.paintCards(this.selection.moveTabStop(target.id).touched);
     } else {
       // A full render (AIM) rebuilds every card and restores focus to focusNodeId, so name the target first.
       this.focusNodeId = target.id;
@@ -10517,9 +10507,11 @@ export class VisualAgentMapView extends ItemView {
     (this.cardEls.get(target.id) ?? card)?.focus({ preventScroll: true });
   }
   /** The tab stop when nothing moved it: the selected card, else the first root, else the first card. */
-  private defaultTabStop(shown: MapNode[]): string | null {
+  defaultTabStop(shown: MapNode[]): string | null {
     return (
-      (this.selected && shown.some(node => node.id === this.selected) ? this.selected : null) ??
+      (this.selection.state.selected && shown.some(node => node.id === this.selection.state.selected)
+        ? this.selection.state.selected
+        : null) ??
       shown.find(node => !node.parentId)?.id ??
       shown[0]?.id ??
       null
@@ -10541,12 +10533,12 @@ export class VisualAgentMapView extends ItemView {
     for (const id of new Set(ids)) {
       const card = id ? this.cardEls.get(id) : undefined;
       if (!id || !card) continue;
-      const on = id === this.selected || this.multiSelected.has(id);
+      const on = id === this.selection.state.selected || this.selection.state.multiSelected.has(id);
       card.toggleClass("is-selected", on);
       card.setAttr("aria-selected", String(on));
-      card.tabIndex = id === this.tabStopId ? 0 : -1;
+      card.tabIndex = id === this.selection.state.tabStopId ? 0 : -1;
       const check = this.cardChecks.get(id);
-      if (check) check.checked = this.multiSelected.has(id);
+      if (check) check.checked = this.selection.state.multiSelected.has(id);
     }
     this.chat?.refreshSelection();
     this.syncRelationClasses();
@@ -10557,11 +10549,13 @@ export class VisualAgentMapView extends ItemView {
    */
   applySelectionState(prevId: string | null, nextId: string | null, touched: Iterable<string> = []): void {
     // Picking, clearing or extending the topic selection ends a line selection.
-    this.selectedRelation = null;
-    const previousStop = this.tabStopId;
-    this.tabStopId = this.defaultTabStop(this.map ? this.canvasNodes() : []);
-    this.paintCards([prevId, nextId, previousStop, this.tabStopId, ...touched]);
-    if (this.integrationMode && this.selectionBarEl?.isConnected) {
+    const shown = (this.map ? this.canvasNodes() : []).map(node => ({ id: node.id, parentId: node.parentId ?? null }));
+    const stops: Array<string | null> = [];
+    const relation = this.selection.state.selectedRelation;
+    if (relation) this.selection.deselectRelation(relation);
+    stops.push(...this.selection.resetTabStop(shown).touched);
+    this.paintCards([prevId, nextId, ...stops, ...touched]);
+    if (this.selection.state.multiSelectMode && this.selectionBarEl?.isConnected) {
       const workspace = this.selectionBarEl.parentElement;
       if (workspace) {
         const bar = this.renderSelectionBar(workspace);
@@ -10584,6 +10578,14 @@ export class VisualAgentMapView extends ItemView {
       return;
     }
     this.applySelectionState(prevId, nextId, touched);
+  }
+  /** Mode changed: render the whole map. Only the selection changed: repaint the touched cards, bar and outline. */
+  applySelectionChange(change: SelectionChange): void {
+    if (change.multiSelectModeChanged) {
+      if (!this.closed) this.render();
+      return;
+    }
+    this.commitSelection(null, this.selection.state.selected, change.touched);
   }
   private clearHoverTimer(): void {
     if (this.hoverTimer !== null) window.clearTimeout(this.hoverTimer);
@@ -10894,25 +10896,18 @@ export class VisualAgentMapView extends ItemView {
     }
     const current = this.map?.nodes.find(item => item.id === node.id);
     if (!current) return false;
-    if (!this.integrationMode) {
-      const previous = this.selected,
-        touched = [...this.multiSelected];
-      this.selected = current.id;
-      this.multiSelected.clear();
+    if (!this.selection.state.multiSelectMode) {
       // Opening collapsed ancestors already rendered; a plain reveal only moves the selection.
-      if (collapsed.length) this.render();
-      else this.commitSelection(previous, current.id, touched);
+      if (collapsed.length) {
+        this.selection.click(current.id);
+        this.render();
+      } else this.applySelectionChange(this.selection.click(current.id));
     } else this.render();
     this.focusNode(current);
     return true;
   }
   private selectMapNode(node: MapNode): void {
-    if (this.selected === node.id && this.multiSelected.size === 0) return;
-    const previous = this.selected,
-      touched = [...this.multiSelected];
-    this.selected = node.id;
-    this.multiSelected.clear();
-    this.commitSelection(previous, node.id, touched);
+    this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   private hideHoverCardSoon(): void {
     this.clearHoverTimer();
@@ -11298,7 +11293,7 @@ export class VisualAgentMapView extends ItemView {
               () => {
                 close?.();
                 if (sourceNode) {
-                  this.selected = sourceNode.id;
+                  this.selection.setSelected(sourceNode.id);
                   this.render();
                   this.focusNode(sourceNode);
                 } else if (file instanceof TFile) void this.plugin.openDetails(file);
@@ -11713,7 +11708,7 @@ export class VisualAgentMapView extends ItemView {
       }, false);
       const result = outcome.value;
       if (result === null) {
-        if (this.selectedRelation === relationIdentity(current)) this.selectedRelation = null;
+        this.selection.deselectRelation(relationIdentity(current));
         this.syncRelationClasses();
         onChanged?.();
         close?.();
@@ -11721,7 +11716,7 @@ export class VisualAgentMapView extends ItemView {
       }
       if (result) {
         current = result;
-        this.selectedRelation = relationIdentity(current);
+        this.selection.selectRelation(relationIdentity(current));
         this.syncRelationClasses();
       }
       if (repaint) paint();
@@ -11938,7 +11933,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Markers can be edited only on an ordinary editable map: not an AIM map or the select mode. */
   private markersEditable(node: MapNode): boolean {
-    return this.relationsEnabled() && !node.aimKind && !this.integrationMode;
+    return this.relationsEnabled() && !node.aimKind && !this.selection.state.multiSelectMode;
   }
   /** The marker toggles of the topic panel: one `aria-pressed` button per marker; priority is one of three. */
   private renderMarkerSection(panel: HTMLElement, node: MapNode): void {
@@ -12648,7 +12643,7 @@ export class VisualAgentMapView extends ItemView {
       node.id,
       await this.plugin.repo.readNote(node.path, { ...this.map, nodes: [...this.map.nodes, node] })
     );
-    this.selected = node.id;
+    this.selection.setSelected(node.id);
     await this.mapChangeSnapshots(
       map => {
         map.nodes.push(node);
@@ -13153,8 +13148,8 @@ export class VisualAgentMapView extends ItemView {
     return `multi-research:${this.path}`;
   }
   private openMultiResearch(retryBatchKey?: string): void {
-    if (!this.map || this.map.aim || !this.multiSelected.size) return;
-    const shown = [...this.multiSelected].flatMap(id => {
+    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
+    const shown = [...this.selection.state.multiSelected].flatMap(id => {
       const note = this.notes.get(id);
       return note ? [{ name: note.title, mode: noteAiMode(note.researchMode) }] : [];
     });
@@ -13183,13 +13178,13 @@ export class VisualAgentMapView extends ItemView {
     retryBatchKey?: string,
     onSettled?: (web: ResearchWebTally) => void
   ): Promise<void> {
-    if (!this.map || this.map.aim || !this.multiSelected.size) return;
+    if (!this.map || this.map.aim || !this.selection.state.multiSelected.size) return;
     const key = this.multiResearchKey();
     if (this.plugin.expansionCoordinator.isRunning(key)) {
       new Notice(t("ui.multi_research_already_running"));
       return;
     }
-    const selected = [...this.multiSelected]
+    const selected = [...this.selection.state.multiSelected]
       .map(id => this.map!.nodes.find(node => node.id === id))
       .filter((node): node is MapNode => !!node);
     try {
@@ -13228,8 +13223,7 @@ export class VisualAgentMapView extends ItemView {
         }
         if (nodes.length < selected.length) new Notice(t("ui.multi_research_skipped", selected.length - nodes.length));
         // The batch runs in the background: leave selection mode so the selection bar gets out of the way.
-        this.integrationMode = false;
-        this.multiSelected.clear();
+        this.selection.exitMultiSelect("backgroundRun");
         if (!this.closed) this.render();
         const shared = {
           referenceGroups: [],
@@ -13372,7 +13366,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Retries `nodes` with `model` for this run only (through the batch's run-once model): no setting or frontmatter is written. */
   private async retryWithOtherProvider(nodes: MapNode[], model: string, retryBatchKey?: string): Promise<void> {
-    this.multiSelected = new Set(nodes.map(node => node.id));
+    this.selection.replaceMulti(nodes.map(node => node.id));
     await this.startMultiResearch({ requirements: "", model }, retryBatchKey);
   }
   /** Selects the failed topics and opens the multi-research dialog so the owner can pick another model. */
@@ -13381,8 +13375,7 @@ export class VisualAgentMapView extends ItemView {
     if (!batch) return;
     const failed = this.retryableFailures(batch);
     if (!failed.length) return;
-    this.multiSelected = new Set(failed.map(node => node.id));
-    this.integrationMode = true;
+    this.selection.retryFailed(failed.map(node => node.id));
     if (!this.closed) this.render();
     this.openMultiResearch(batchKey);
   }
@@ -13418,13 +13411,13 @@ export class VisualAgentMapView extends ItemView {
   }
   private renderSelectionBar(workspace: HTMLElement): HTMLElement {
     const selection = workspace.createDiv("vam-selection-bar");
-    const names = [...this.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
+    const names = [...this.selection.state.multiSelected].map(id => this.notes.get(id)?.title).filter(Boolean);
     selection.createSpan({
       attr: { dir: "auto" },
-      text: this.multiSelected.size
+      text: this.selection.state.multiSelected.size
         ? t(
             "ui.selected_0_1_2",
-            this.multiSelected.size,
+            this.selection.state.multiSelected.size,
             names.slice(0, 2).join(t("ui.list_separator")),
             names.length > 2 ? "…" : ""
           )
@@ -13436,16 +13429,24 @@ export class VisualAgentMapView extends ItemView {
       selection,
       t("ui.clear"),
       () => {
-        const touched = [...this.multiSelected];
-        this.multiSelected.clear();
-        this.commitSelection(this.selected, this.selected, touched);
+        this.applySelectionChange(this.selection.clearMulti());
       },
-      !this.multiSelected.size
+      !this.selection.state.multiSelected.size
     );
-    this.button(selection, t("ui.remove"), () => this.confirmRemoveSelected(), !this.multiSelected.size);
+    this.button(
+      selection,
+      t("ui.remove"),
+      () => this.confirmRemoveSelected(),
+      !this.selection.state.multiSelected.size
+    );
     // Frames are added from here (the only multi-selection surface); AIM maps get no entry (D11).
     if (!this.map?.aim)
-      this.button(selection, t("ui.canvas_boundary_add"), () => this.openAddBoundary(), !this.multiSelected.size);
+      this.button(
+        selection,
+        t("ui.canvas_boundary_add"),
+        () => this.openAddBoundary(),
+        !this.selection.state.multiSelected.size
+      );
     if (!this.map?.aim) {
       // Not natively disabled (like Merge): a disabled button cannot take focus, so the reason would stay unreadable.
       const check = this.summaryEntryCheck(this.summaryTargets()),
@@ -13455,9 +13456,19 @@ export class VisualAgentMapView extends ItemView {
         bracket.setAttr("title", t(check.reason));
       }
     }
-    this.button(selection, t("ui.move_to"), () => this.chooseSelectedParent(false), !this.multiSelected.size);
-    this.button(selection, t("ui.copy_to"), () => this.chooseSelectedParent(true), !this.multiSelected.size);
-    const count = this.multiSelected.size;
+    this.button(
+      selection,
+      t("ui.move_to"),
+      () => this.chooseSelectedParent(false),
+      !this.selection.state.multiSelected.size
+    );
+    this.button(
+      selection,
+      t("ui.copy_to"),
+      () => this.chooseSelectedParent(true),
+      !this.selection.state.multiSelected.size
+    );
+    const count = this.selection.state.multiSelected.size;
     // Labels never carry the count (it would shift every button to the right of it on each selection change);
     // screen readers still hear it through aria-label.
     const synthesize = this.button(selection, t("ui.synthesize"), () => this.integrateSelected(), count < 2);
@@ -13479,7 +13490,7 @@ export class VisualAgentMapView extends ItemView {
         selection,
         t("ui.multi_research"),
         () => this.openMultiResearch(),
-        !this.multiSelected.size || running
+        !this.selection.state.multiSelected.size || running
       );
       if (count)
         research.setAttr("aria-label", count > 1 ? t("ui.research_0_topics", count) : t("ui.research_one_topic"));
@@ -14082,7 +14093,7 @@ export class VisualAgentMapView extends ItemView {
   }
   /** Multi-select synthesis: the same dialog and flow as a single topic's, over the selected topics. */
   private integrateSelected(): void {
-    if (!this.map || this.multiSelected.size < 2) {
+    if (!this.map || this.selection.state.multiSelected.size < 2) {
       new Notice(t("ui.select_at_least_two_topics"));
       return;
     }
@@ -14098,7 +14109,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const nodes =
       pending?.sources ??
-      [...this.multiSelected]
+      [...this.selection.state.multiSelected]
         .map(id => this.map!.nodes.find(node => node.id === id))
         .filter((node): node is MapNode => !!node);
     const names = nodes.map(node => this.notes.get(node.id)?.title ?? node.path);
@@ -14635,9 +14646,7 @@ export class VisualAgentMapView extends ItemView {
         if (pushed && pushed !== previousEntry) pushed.label = t("ui.confirm_new_synthesis_topic");
       }
       this.integrationTask = null;
-      this.selected = integrated.id;
-      this.multiSelected.clear();
-      this.integrationMode = false;
+      this.selection.afterSynthesis(integrated.id);
       await this.hydrate();
       this.render();
       this.focusNode(integrated);
@@ -14669,9 +14678,7 @@ export class VisualAgentMapView extends ItemView {
       } else {
         this.integrationTask = null;
         this.map = disk;
-        this.selected = integrated.id;
-        this.multiSelected.clear();
-        this.integrationMode = false;
+        this.selection.afterSynthesis(integrated.id);
         try {
           await this.plugin.rebuildDerivedData();
           await this.hydrate();
@@ -14738,7 +14745,7 @@ export class VisualAgentMapView extends ItemView {
     if (this.plugin.settings.canvasHintSeen) return;
     this.plugin.settings.canvasHintSeen = true;
     void this.plugin.saveSettings();
-    if (this.integrationMode) return;
+    if (this.selection.state.multiSelectMode) return;
     this.hintEl?.remove();
     this.hintEl = null;
   }
@@ -14767,7 +14774,7 @@ export class VisualAgentMapView extends ItemView {
     const host = viewport.getBoundingClientRect();
     const startX = event.clientX,
       startY = event.clientY;
-    const already = new Set(this.multiSelected);
+    const already = new Set(this.selection.state.multiSelected);
     const cards = Array.from(this.stageEl?.querySelectorAll<HTMLElement>(".vam-node[data-node-id]") ?? []).map(
       card => ({
         card,
@@ -14816,20 +14823,10 @@ export class VisualAgentMapView extends ItemView {
         item.card.removeClass("is-marquee-remove");
       }
       if (!hits.size) return;
-      if (mode === "marquee-subtract") {
-        const removed = [...hits].filter(id => this.multiSelected.has(id));
-        if (!removed.length) return;
-        for (const id of removed) this.multiSelected.delete(id);
-        this.commitSelection(this.selected, this.selected, removed);
-        return;
-      }
-      for (const id of hits) this.multiSelected.add(id);
-      if (mode === "marquee-enter") {
-        this.integrationMode = true;
-        if (!this.closed) this.render();
-        return;
-      }
-      this.commitSelection(this.selected, this.selected, hits);
+      const how = mode === "marquee-subtract" ? "subtract" : mode === "marquee-enter" ? "enter" : "add";
+      const change = this.selection.marquee(hits, how, { canMultiSelect: true });
+      // A box that changes nothing (nothing ticked to remove) repaints nothing.
+      if (change.multiSelectModeChanged || change.touched.length) this.applySelectionChange(change);
     };
     viewport.addEventListener("pointermove", move);
     viewport.addEventListener("pointerup", up);
@@ -14932,7 +14929,7 @@ export class VisualAgentMapView extends ItemView {
       // Option (Alt)+drag removes from it, and Space+drag or the middle button pans.
       const intent = canvasPointerIntent({
         button: event.button,
-        integrationMode: this.integrationMode,
+        integrationMode: this.selection.state.multiSelectMode,
         spaceHeld: this.spaceHeld,
         altKey: event.altKey,
         // AIM maps have no topic selection, so Shift+drag there is a plain pan.
@@ -14963,16 +14960,12 @@ export class VisualAgentMapView extends ItemView {
         viewport.removeClass("is-panning");
         this.saveViewport();
         if (moved) this.markCanvasHintSeen();
-        if (!moved && event.button === 0 && this.selectedRelation) {
-          this.selectedRelation = null;
-          this.syncRelationClasses();
-        }
-        if (!moved && !this.integrationMode && event.button === 0) {
-          const previous = this.selected,
-            touched = [...this.multiSelected];
-          this.selected = null;
-          this.multiSelected.clear();
-          this.commitSelection(previous, null, touched);
+        if (!moved && event.button === 0) {
+          // In multi-select a press on the empty canvas only ends a line selection; otherwise it clears the selection.
+          if (this.selection.state.multiSelectMode) {
+            this.selection.clickEmpty();
+            this.syncRelationClasses();
+          } else this.applySelectionChange(this.selection.clickEmpty());
         }
       };
       viewport.addEventListener("pointermove", move);
@@ -15219,8 +15212,8 @@ export class VisualAgentMapView extends ItemView {
   }
   /** The cards the user has selected: they count as chat references without being dragged in. */
   private chatSelectionIds(): string[] {
-    if (this.multiSelected.size) return [...this.multiSelected];
-    return this.selected ? [this.selected] : [];
+    if (this.selection.state.multiSelected.size) return [...this.selection.state.multiSelected];
+    return this.selection.state.selected ? [this.selection.state.selected] : [];
   }
   /**
    * The note a chat message goes with: only a note that is on screen beside the map right now (the shown tab of its tab group,
@@ -16505,9 +16498,7 @@ export class VisualAgentMapView extends ItemView {
     }
   }
   private chatSelect(ids: string[]): void {
-    this.multiSelected = new Set(ids);
-    this.selected = null;
-    this.integrationMode = true;
+    this.selection.chatSelect(ids);
     if (!this.closed) this.render();
   }
   /** Selecting cards, and the run actions that start the map's own tasks; both after every write, outside a mutate. */
@@ -16537,7 +16528,7 @@ export class VisualAgentMapView extends ItemView {
     switch (action.action) {
       case "research_standard": {
         if (targets.length) this.chatSelect(targets);
-        if (!this.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
+        if (!this.selection.state.multiSelected.size) return skipped("ui.map_chat_skip_unavailable");
         // A batch already running is told in the result, not only by the Notice the research itself shows.
         if (this.plugin.expansionCoordinator.isRunning(this.multiResearchKey()))
           return skipped("ui.map_chat_skip_research_running");
@@ -16547,7 +16538,9 @@ export class VisualAgentMapView extends ItemView {
         // otherProvider counts only when every target offers the same other-provider model; otherwise it is ignored (D15).
         const retryModel = action.otherProvider
           ? this.otherProviderTarget(
-              [...this.multiSelected].flatMap(id => this.map?.nodes.filter(node => node.id === id) ?? [])
+              [...this.selection.state.multiSelected].flatMap(
+                id => this.map?.nodes.filter(node => node.id === id) ?? []
+              )
             )
           : null;
         launch(
@@ -17012,9 +17005,7 @@ export class VisualAgentMapView extends ItemView {
     if (!this.map) return;
     const ids = this.map.nodes.filter(item => item.parentId === node.id).map(item => item.id);
     if (!ids.length) return;
-    this.multiSelected = new Set(ids);
-    this.selected = null;
-    this.integrationMode = true;
+    this.selection.selectSubtopics(ids);
     if (!this.closed) this.render();
   }
   /** True while a card drag is running on a map that is no longer the one shown here. */
@@ -17349,7 +17340,7 @@ export class VisualAgentMapView extends ItemView {
     card.addEventListener("pointerdown", event => {
       if ((event.target as Element).closest("button") || event.button !== 0 || !this.map) return;
       // In selection mode a card cannot be moved and a plain click still toggles it, but it can be dragged onto the chat.
-      const selecting = this.integrationMode;
+      const selecting = this.selection.state.multiSelectMode;
       this.clearHoverTimer();
       this.hoverCard?.remove();
       this.hoverCard = null;
@@ -17365,7 +17356,8 @@ export class VisualAgentMapView extends ItemView {
         moved = false,
         travelled = false;
       // Dragging a picked card in selection mode moves every picked card together.
-      const group = selecting && this.multiSelected.has(node.id) ? this.groupDragMembers(node, card) : null;
+      const group =
+        selecting && this.selection.state.multiSelected.has(node.id) ? this.groupDragMembers(node, card) : null;
       const groupOrigins = new Map<string, { x: number; y: number }>();
       for (const id of group?.keys() ?? []) {
         const member = this.map.nodes.find(item => item.id === id);
@@ -17587,27 +17579,10 @@ export class VisualAgentMapView extends ItemView {
             })
           );
         } else if (e.metaKey || e.ctrlKey) {
-          const previous = this.selected,
-            touched = [...this.multiSelected, node.id];
-          // "Click A, then Cmd+click B" selects both: the single selected card seeds the multi-selection.
-          if (this.canSelectTopics() && !this.multiSelected.size && previous && previous !== node.id)
-            this.multiSelected.add(previous);
-          if (this.multiSelected.has(node.id)) this.multiSelected.delete(node.id);
-          else this.multiSelected.add(node.id);
-          this.selected = node.id;
-          // Two or more picked cards is topic selection: show its bar instead of leaving an invisible multi-selection.
-          if (this.canSelectTopics() && this.multiSelected.size >= 2) {
-            this.integrationMode = true;
-            if (!this.closed) this.render();
-            return;
-          }
-          this.commitSelection(previous, node.id, touched);
+          // "Click A, then Cmd+click B" selects both; two or more picked cards is topic selection (the module decides).
+          this.applySelectionChange(this.selection.cmdClick(node.id, { canMultiSelect: this.canSelectTopics() }));
         } else {
-          const previous = this.selected,
-            touched = [...this.multiSelected];
-          this.multiSelected.clear();
-          this.selected = node.id;
-          this.commitSelection(previous, node.id, touched);
+          this.applySelectionChange(this.selection.click(node.id));
           if (node.aimKind === "question") this.openAimAnswer(node);
           else if (this.plugin.detailsShown()) this.openDetails(node);
         }
@@ -17648,7 +17623,7 @@ export class VisualAgentMapView extends ItemView {
   /** The picked cards that move together when one of them is dragged in selection mode, by id. */
   private groupDragMembers(node: MapNode, card: HTMLElement): Map<string, HTMLElement> {
     const members = new Map<string, HTMLElement>();
-    for (const id of this.multiSelected) {
+    for (const id of this.selection.state.multiSelected) {
       const el = id === node.id ? (this.cardEls.get(id) ?? card) : this.cardEls.get(id);
       if (el && this.map?.nodes.some(item => item.id === id)) members.set(id, el);
     }
@@ -18029,13 +18004,13 @@ export class VisualAgentMapView extends ItemView {
       hit.addEventListener("pointerdown", event => {
         // A press on a line is not a press on the empty canvas: no pan, no marquee, no clearing of the selection.
         event.stopPropagation();
-        this.selectedRelation = key;
+        this.selection.selectRelation(key);
         this.syncRelationClasses();
       });
       // The click (not the press) opens the editor, so the dialog never opens under a pointer that is still down.
       hit.addEventListener("click", event => {
         event.stopPropagation();
-        this.selectedRelation = key;
+        this.selection.selectRelation(key);
         this.syncRelationClasses();
         this.openRelationEditor(link.relation);
       });
@@ -18058,7 +18033,7 @@ export class VisualAgentMapView extends ItemView {
       this.placeRelationLabel(link.key, relationLabelPoint(boxOf(link.from), boxOf(link.to)));
     }
     // A relation that is gone (removed, merged, collapsed away) cannot stay selected.
-    if (this.selectedRelation && !this.relationEls.has(this.selectedRelation)) this.selectedRelation = null;
+    this.selection.pruneRelation(new Set(this.relationEls.keys()));
     if (this.hoverRelation && !this.relationEls.has(this.hoverRelation)) this.hoverRelation = null;
     if (this.previewRelation && !this.relationEls.has(this.previewRelation)) this.previewRelation = null;
   }
@@ -18144,13 +18119,13 @@ export class VisualAgentMapView extends ItemView {
    * hovered line; both end cards get `is-relation-end`.
    */
   private syncRelationClasses(): void {
-    const chosen = new Set(this.multiSelected);
-    if (this.selected) chosen.add(this.selected);
+    const chosen = new Set(this.selection.state.multiSelected);
+    if (this.selection.state.selected) chosen.add(this.selection.state.selected);
     const ends = new Set<string>();
     for (const [key, path] of this.relationEls) {
       const [fromId, toId] = key.split("\u0000");
       const related = chosen.has(fromId) || chosen.has(toId),
-        active = key === this.selectedRelation || key === this.previewRelation;
+        active = key === this.selection.state.selectedRelation || key === this.previewRelation;
       path.toggleClass("is-related", related);
       path.toggleClass("is-dimmed", chosen.size > 0 && !related);
       path.toggleClass("is-selected", active);
@@ -18178,11 +18153,11 @@ export class VisualAgentMapView extends ItemView {
     row.setAttr("role", "group");
     row.setAttr("aria-label", ariaLabel);
     row.addEventListener("focus", () => {
-      this.selectedRelation = key;
+      this.selection.selectRelation(key);
       this.syncRelationClasses();
     });
     row.addEventListener("blur", () => {
-      if (this.selectedRelation === key) this.selectedRelation = null;
+      this.selection.deselectRelation(key);
       this.syncRelationClasses();
     });
     row.addEventListener("mouseenter", () => {

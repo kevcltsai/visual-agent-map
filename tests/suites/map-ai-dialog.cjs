@@ -663,7 +663,7 @@ async function synthesisHarness({ language = 'en' } = {}) {
   const hold = () => { const gate = deferred(); gates.push(gate); return gate; };
   const openSingle = async () => { const before = modals.length; view.openNextStep(parent); await until(() => modals.length === before + 1); const modal = modals.at(-1); dom.findAll(modal.contentEl, i => hasCls(i, 'vam-next-cards'))[0].children[2].click(); return modal; };
   const note = async () => repo.readNote(parent.path);
-  const openSelection = async () => { const before = modals.length; view.multiSelected = new Set(kids.map(k => k.id)); view.integrationMode = true; view.integrateSelected(); await until(() => modals.length === before + 1); return modals.at(-1); };
+  const openSelection = async () => { const before = modals.length; view.selection.chatSelect(kids.map(k => k.id)); view.integrateSelected(); await until(() => modals.length === before + 1); return modals.at(-1); };
   return { openSelection, repo, app, view, plugin, doc, parent, kids, calls, notices, Notice, knobs, modals, hold, openSingle, note, mapPath };
 }
 const untilAsync = async predicate => { for (let i = 0; i < 200; i++) { if (await predicate()) return; await new Promise(r => setImmediate(r)); } throw new Error('condition not reached'); };
@@ -1285,7 +1285,7 @@ integrationTest('B2 synthesize (chat): one card with subtopics is integrated int
 });
 integrationTest('B2 synthesize (chat): the selection is the target when the reply names none', async () => {
   const h = await synthesisHarness();
-  h.view.selected = h.parent.id;
+  h.view.selection.setSelected(h.parent.id);
   const lines = await chatApply(h, [synth([])], 'Go');
   assert.deepEqual(plain(lines.map(l => l.status)), ['done']); await untilAsync(async () => (await h.note()).summary === 'Draft summary');
   assert.equal(h.modals.length, 0);

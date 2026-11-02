@@ -7,6 +7,13 @@ const path = require('node:path');
 const support = require('./support.cjs');
 const { obsidian, DEFAULT_SETTINGS } = support;
 const { load } = require('./support-replay.cjs');
+// Sets the selection through the selection module: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.selection.state.multiSelected]) => {
+  const s = view.selection, keep = s.state.selected;
+  if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
+  s.setSelected(keep);
+  return s.replaceMulti(ids);
+};
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -23,7 +30,7 @@ function fakeEl(tag = 'div', init = {}) {
 }
 function bareView(plugin, extra = {}) {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
-  return Object.assign(Object.create(VisualAgentMapView.prototype), { plugin, renderingCard: false, ...extra });
+  return Object.assign(Object.create(VisualAgentMapView.prototype), { plugin, renderingCard: false, selection: new (load('experiences/visual-map/topic-selection.ts').TopicSelection)(), ...extra });
 }
 
 const inset = load('experiences/visual-map/viewport-inset.ts');
@@ -62,24 +69,26 @@ function makeView() {
   const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
   const writes = [];
   const view = Object.create(VisualAgentMapView.prototype);
+  view.selection = new (load('experiences/visual-map/topic-selection.ts').TopicSelection)();
   const nodes = [
     { id: 'a', path: 'a.md', parentId: null, x: 0, y: 0 },
     { id: 'b', path: 'b.md', parentId: 'a', x: 400, y: 2000 }
   ];
   Object.assign(view, {
     map: { nodes, viewport: { x: 40, y: 40, zoom: 1 } },
-    integrationMode: false, multiSelected: new Set(), selected: 'a', cardEls: new Map(), summaryEls: new Map(),
+    cardEls: new Map(), summaryEls: new Map(),
     plugin: { repo: { updateMap: async (...args) => { writes.push(args); } }, mutate: async fn => { await fn(); } },
     viewportEl: { clientWidth: 1000, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, top: 0, right: 1000, bottom: 600 }) },
     stageEl: { style: {}, querySelector: () => null },
     contentEl: { querySelector: () => ({ getBoundingClientRect: () => ({ top: 12, bottom: 50 }) }) },
     path: 'Map.md', viewportTimer: null, viewportQueued: false, history: {}
   });
+  view.selection.setSelected('a');
   view.cardEls.set('b', { getBoundingClientRect: () => ({ left: 400, right: 680, top: 2000, bottom: 2180 }), focus() {} });
   view.relevanceSortOn = () => false;
   view.canvasNodes = () => nodes;
   view.transform = () => {};
-  view.selectMapNode = node => { view.selected = node.id; };
+  view.selectMapNode = node => { view.selection.setSelected(node.id); };
   return { view, writes, nodes };
 }
 
@@ -116,7 +125,8 @@ test('the empty-map hint ignores pointer events but its Topic button receives th
 
 test('the selection bar joins names with the localized list separator and reads each name direction-aware', () => {
   const titles = new Map([['a', { title: 'Alpha' }], ['b', { title: 'שלום' }], ['c', { title: 'C' }]]);
-  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: titles, map: { nodes: [] }, multiSelected: new Set(['a', 'b', 'c']) });
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: titles, map: { nodes: [] } });
+  view.selection.replaceMulti(['a', 'b', 'c']);
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const bar = view.renderSelectionBar(fakeEl());
   const names = bar.children[0];
@@ -154,11 +164,11 @@ test('the topic tree rows get dir="auto" when built', () => {
 
 test('render prunes multiSelected to existing nodes and leaves selecting mode on an empty map before the toolbar is built', () => {
   const view = read('experiences/visual-map/view.ts');
-  assert.match(view, /this\.multiSelected = new Set\(\[\.\.\.this\.multiSelected\]\.filter\(id => shown\.some/);
-  const reset = view.indexOf('if (!this.map.nodes.length) {\n      this.integrationMode = false;');
+  assert.match(view, /this\.selection\.prune\(new Set\(shown\.map\(node => node\.id\)\)\)/);
+  const reset = view.indexOf('if (!this.map.nodes.length) {\n      this.selection.exitMultiSelect("emptyMap");');
   const toolbar = view.indexOf('const tools = createDiv("vam-map-tools");');
-  assert.ok(reset > 0 && reset < toolbar, 'reset must precede the toolbar that reads integrationMode');
-  assert.match(view.slice(reset, toolbar), /this\.multiSelected\.clear\(\)/);
+  assert.ok(reset > 0 && reset < toolbar, 'reset must precede the toolbar that reads the selection mode');
+  assert.match(view.slice(reset, toolbar), /this\.selection\.exitMultiSelect\("emptyMap"\)/);
 });
 
 
@@ -173,16 +183,16 @@ test('the selection bar is left-anchored above the zoom cluster, names on their 
   const names = css.split('\n').find(line => line.startsWith('.vam-selection-bar > span'));
   assert.match(names, /flex: 0 0 100%/); assert.match(names, /text-overflow: ellipsis/);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /!this\.integrationMode && !this\.plugin\.settings\.canvasHintSeen/, 'no hint while selecting topics');
+  assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.plugin\.settings\.canvasHintSeen/, 'no hint while selecting topics');
 });
 
 
 test('bar children keep the same order and fixed labels at counts 0-3 (names span first)', () => {
-  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { multiSelected: new Set(), notes: new Map([['a', { title: 'A very long title '.repeat(8) }], ['b', { title: 'B' }], ['c', { title: 'C' }]]), map: { nodes: [] } });
+  const view = bareView({ expansionBatches: new Map(), settings: { ...DEFAULT_SETTINGS, language: 'en' } }, { notes: new Map([['a', { title: 'A very long title '.repeat(8) }], ['b', { title: 'B' }], ['c', { title: 'C' }]]), map: { nodes: [] } });
   view.mergeCheck = () => ({ ok: true }); view.multiResearchKey = () => 'k';
   const shapes = [];
   for (const ids of [[], ['a'], ['a', 'b'], ['a', 'b', 'c']]) {
-    view.multiSelected = new Set(ids);
+    setSelection(view, false, ids);
     const bar = view.renderSelectionBar(fakeEl());
     assert.equal(bar.children[0].tag, 'span');
     shapes.push(bar.children.slice(1).map(c => c.text).join('|'));

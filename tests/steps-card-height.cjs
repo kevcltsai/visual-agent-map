@@ -302,7 +302,7 @@ test('A6 the corner handle is hidden from assistive tech and not a tab stop; the
   assert.equal(h.corner.attrs['aria-hidden'], 'true');
   assert.equal(h.corner.attrs.role, undefined);
   const source = require('node:fs').readFileSync(path.join(root, 'experiences', 'visual-map', 'view.ts'), 'utf8');
-  assert.match(source, /!this\.integrationMode && !this\.map\?\.aim && !node\.aimKind\) \{\s*this\.attachResizeHandle\(card, node\);\s*this\.attachHeightHandle\(card, node\);\s*this\.attachCornerHandle\(card, node\);/);
+  assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.map\?\.aim && !node\.aimKind\) \{\s*this\.attachResizeHandle\(card, node\);\s*this\.attachHeightHandle\(card, node\);\s*this\.attachCornerHandle\(card, node\);/);
 });
 
 test('A8 the view marks a scene card clipped only for a fixed-height card the view shows as clipped', () => {
@@ -387,7 +387,7 @@ const renderedSpans = (setup) => {
 test('P6 a card rendered during a presentation still has all three handles; they are inert and hidden by CSS, so ending it needs no repaint', () => {
   assert.deepEqual(renderedSpans(() => {}), ['vam-card-resize', 'vam-card-resize-y', 'vam-card-resize-corner']);
   assert.deepEqual(renderedSpans(view => { view.presentation = { currentId: 'parent' }; }), ['vam-card-resize', 'vam-card-resize-y', 'vam-card-resize-corner']);
-  assert.deepEqual(renderedSpans(view => { view.integrationMode = true; }), [], 'selection mode keeps its own rule');
+  assert.deepEqual(renderedSpans(view => { view.selection.toggleMultiSelect(); }), [], 'selection mode keeps its own rule');
   assert.deepEqual(renderedSpans(view => { view.map.aim = { version: 1 }; }), [], 'AIM keeps its own rule');
 });
 

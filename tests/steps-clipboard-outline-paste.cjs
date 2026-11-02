@@ -52,7 +52,7 @@ async function harness({ aim = false } = {}) {
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = stage; view.contentEl = content;
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
-  view.render = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
+  view.render = () => { view.cardEls.clear(); stage.children = []; view.selection.moveTabStop(view.defaultTabStop(view.map.nodes)); for (const n of view.map.nodes) view.renderNode(n); };
   await view.hydrate(); view.render();
   return { repo, app, contents, view, plugin, ids, notices, map: () => view.map, saved: () => repo.readMap(MAP), notes: () => view.notes, history: () => view.history.past.length };
 }
@@ -68,8 +68,8 @@ const clipboardEvent = (target, data = {}) => {
   return event;
 };
 const copyOf = (h, ids, target = card) => {
-  h.view.selected = null; h.view.multiSelected.clear();
-  if (ids.length === 1) h.view.selected = h.ids[ids[0]]; else for (const key of ids) h.view.multiSelected.add(h.ids[key]);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  if (ids.length === 1) h.view.selection.setSelected(h.ids[ids[0]]); else for (const key of ids) h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent(target);
   h.view.onClipboardEvent('copy', event);
   h.lastRaw = event.clipboardData.store.get(MIME);
@@ -94,7 +94,7 @@ test('P5 text paste: every indentation style makes the same levels, under the se
   };
   for (const [name, text] of Object.entries(styles)) {
     const h = await harness();
-    h.view.selected = h.ids.other; h.view.multiSelected.clear();
+    h.view.selection.setSelected(h.ids.other); h.view.selection.replaceMulti([]);
     const event = pasteOf(h, { 'text/plain': text });
     assert.equal(event.defaultPrevented, true, name);
     await until(() => h.map().nodes.length === 9); await settled(h);
@@ -112,7 +112,7 @@ test('P5 text paste: every indentation style makes the same levels, under the se
 
 test('P5 text paste: with nothing selected the text becomes a new top-level tree', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.multiSelected.clear();
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
   pasteOf(h, { 'text/plain': 'Top\n\tChild' });
   await until(() => h.map().nodes.length === 7); await settled(h);
   const fresh = names(h);
@@ -123,7 +123,7 @@ test('P5 text paste: with nothing selected the text becomes a new top-level tree
 
 test('F3 (D5) an unreadable private payload falls back to the plain text beside it; with no text the notice stays', async () => {
   const h = await harness();
-  h.view.selected = null; h.view.multiSelected.clear();
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
   const before = h.map().nodes.length;
   const event = pasteOf(h, { 'application/x-vam-branch': '{not json', 'text/plain': 'Fallback\n\tKid' });
   assert.equal(event.defaultPrevented, true);
@@ -140,7 +140,7 @@ test('F3 (D5) an unreadable private payload falls back to the plain text beside 
 
 test('P5 text paste: one line makes one topic', async () => {
   const h = await harness();
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   pasteOf(h, { 'text/plain': 'Just one idea' });
   await until(() => h.map().nodes.length === 6); await settled(h);
   const fresh = names(h);
@@ -149,7 +149,7 @@ test('P5 text paste: one line makes one topic', async () => {
 
 test('P5 text paste: an empty or blank string does nothing and says nothing', async () => {
   const h = await harness();
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   for (const text of ['', '   ', '\n\n\t\n']) {
     const event = pasteOf(h, { 'text/plain': text });
     assert.equal(event.defaultPrevented, false, JSON.stringify(text));
@@ -160,7 +160,7 @@ test('P5 text paste: an empty or blank string does nothing and says nothing', as
 
 test('P5 text paste: line 101 refuses the whole text, names the line, and creates no note', async () => {
   const h = await harness();
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   const filesBefore = files(h);
   const text = Array.from({ length: 101 }, (_, i) => `Topic ${i + 1}`).join('\n');
   const event = pasteOf(h, { 'text/plain': text });
@@ -185,7 +185,7 @@ test('P5 text paste: more than 100,000 characters is refused before anything is 
 
 test('P5 text paste: a bad line refuses the whole text with its line number', async () => {
   const h = await harness();
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   const cases = [
     ['Fine\n\tbad\u0007title', /^Line 2: .*characters or markup/],
     ['Fine\n' + 'y'.repeat(201), /^Line 2: a title can be at most 200 characters/],
@@ -203,11 +203,11 @@ test('P5 text paste: a bad line refuses the whole text with its line number', as
 test('P5 text paste: a read-only map (AIM, topic selection mode) writes nothing and says so', async () => {
   const cases = {
     aim: h => { h.view.map.aim = { version: 1 }; },
-    integration: h => { h.view.integrationMode = true; }
+    integration: h => { h.view.selection.toggleMultiSelect(); }
   };
   for (const [name, arrange] of Object.entries(cases)) {
     const h = await harness();
-    h.view.selected = h.ids.root;
+    h.view.selection.setSelected(h.ids.root);
     arrange(h);
     const filesBefore = files(h);
     pasteOf(h, { 'text/plain': 'Alpha\n\tBeta' });
@@ -219,7 +219,7 @@ test('P5 text paste: a read-only map (AIM, topic selection mode) writes nothing 
 
 test('P5 text paste: text controls, the chat panel and anywhere outside the view keep their own paste', async () => {
   const h = await harness();
-  h.view.selected = h.ids.root;
+  h.view.selection.setSelected(h.ids.root);
   for (const target of [body, textControl, chatPanel]) {
     const event = pasteOf(h, { 'text/plain': 'Alpha' }, target);
     assert.equal(event.defaultPrevented, false);
@@ -230,10 +230,10 @@ test('P5 text paste: text controls, the chat panel and anywhere outside the view
 
 test('P5 text paste: the private format wins over text/plain when both are present', async () => {
   const h = await harness();
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   copyOf(h, ['leaf']);
   const raw = h.lastRaw;
-  h.view.selected = h.ids.other;
+  h.view.selection.setSelected(h.ids.other);
   pasteOf(h, { [MIME]: raw, 'text/plain': 'Wrong\n\tTitles' });
   await until(() => h.map().nodes.length === 6); await settled(h);
   assert.equal(titleOf(h, names(h)[0]), 'Leaf');

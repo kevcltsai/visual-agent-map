@@ -174,7 +174,7 @@ test('counter-example 3: Delete removes the reference only; undo brings it back 
 test('images cannot be changed on selection mode', async () => {
   for (const mode of ['integrationMode']) {
     const h = await harness([image()]);
-    h.view[mode] = true;
+    h.view.selection.toggleMultiSelect();
     h.view.render();
     const el = find(h.view.stageEl, i => i.hasClass('vam-canvas-image'));
     assert.equal(find(el, i => i.hasClass('vam-canvas-image-handle')), undefined, mode);

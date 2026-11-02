@@ -611,9 +611,9 @@ integrationTest('dragging synthesized roots persists coordinates and removal pre
   const first = await repo.createNote('First','a',mapDoc,path,'workspace'), second=await repo.createNote('Second','a',mapDoc,path,'workspace'); mapDoc.nodes.push(first,second);await repo.saveMap(path,mapDoc);
   let pending=Promise.resolve();
   const plugin={abortChartJobs:()=>{},addChartsAfterWrite:()=>{},repo,settings:{...DEFAULT_SETTINGS},rebuildDerivedData:()=>repo.rebuildDerivedData(),askModel:async()=>({summary:'Merged',detail:'Knowledge',visualReferences:[],suggestions:[]}),mutate(work){pending=pending.then(work);return pending}};
-  const {VisualAgentMapView}=load('main.ts',{obsidian},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){}}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.integrationMode=true;view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
+  const {VisualAgentMapView}=load('main.ts',{obsidian},{requestAnimationFrame:run=>{run();return 1},cancelAnimationFrame(){}}); const view=new VisualAgentMapView({app},plugin);view.path=path;view.map=mapDoc;view.selection.toggleMultiSelect();view.render=()=>{};view.focusNode=()=>{};view.drawEdges=()=>{};view.updateHistoryButtons=()=>{};
   await view.createIntegratedNode('Combined',[first,second],'Combine','');
-  const root=view.map.nodes.find(n=>n.id!==first.id&&n.id!==second.id); assert.equal(root.parentId,null);assert.equal(view.integrationMode,false);
+  const root=view.map.nodes.find(n=>n.id!==first.id&&n.id!==second.id); assert.equal(root.parentId,null);assert.equal(view.selection.state.multiSelectMode,false);
   const origin={x:root.x,y:root.y}; const events=new Map(),card={style:{},setPointerCapture(){},addEventListener(name,fn){events.set(name,fn)},removeEventListener(name){events.delete(name)}};
   view.enableDrag(card,root);events.get('pointerdown')({target:{closest(){return null}},button:0,clientX:10,clientY:10,pointerId:1});assert.equal(view.dragging,true);
   events.get('pointermove')({clientX:80,clientY:50});events.get('pointerup')({type:'pointerup'});await pending;
@@ -825,7 +825,7 @@ const mergeHarness = async ({ details = ['Alpha detail', '', 'Gamma detail'], pa
   await view.hydrate();
   const fm = file => { const text = contents.get(file) ?? ''; const get = key => text.match(new RegExp('^' + key + ': (.*)$', 'm'))?.[1]?.trim(); return { state: get('topic-state'), mapId: get('agent-map-id'), status: get('status') }; };
   const shape = async () => { const m = await repo.readMap(path); return { nodes: m.nodes.map(n => [n.id, n.path, n.parentId]), files: Object.fromEntries(m.nodes.map(n => [n.path, fm(n.path)])), unassigned: (await repo.collectionFiles(path,'Unassigned')).map(f => f.path).sort() }; };
-  const merge = async title => { view.multiSelected = new Set(sources.map(n => n.id)); const sel = view.mergeCheck(); assert.equal(sel.ok, true); await view.mergeSelected(title, { path, mapId: mapDoc.id, sources: sel.sources.map(n => ({ id: n.id, path: n.path })) }); };
+  const merge = async title => { view.selection.replaceMulti(sources.map(n => n.id)); const sel = view.mergeCheck(); assert.equal(sel.ok, true); await view.mergeSelected(title, { path, mapId: mapDoc.id, sources: sel.sources.map(n => ({ id: n.id, path: n.path })) }); };
   return {repo,app,contents,path,mapDoc,parent,sources,kid,view,plugin,fm,shape,merge};
 };
 integrationTest('merging sibling topics builds the new note, moves sources to Unassigned and re-parents their children', async () => {
@@ -845,7 +845,7 @@ integrationTest('merging sibling topics builds the new note, moves sources to Un
   for (const file of unassigned) { assert.equal(h.fm(file).state, 'unassigned'); }
   assert.equal(note.sourcePaths.length, 3); assert.deepEqual([...note.sourcePaths].sort(), unassigned.slice().sort());
   assert.equal(sourcePaths.some(p => h.app.vault.getAbstractFileByPath(p)), false);
-  assert.equal(h.view.selected, merged.id); assert.equal(h.view.integrationMode, false);
+  assert.equal(h.view.selection.state.selected, merged.id); assert.equal(h.view.selection.state.multiSelectMode, false);
   assert.equal(h.view.history.undoEntry.label, 'Merge topics');
   assert.notEqual(historyBefore, undefined); assert.ok(before.nodes.length === 5);
 });
@@ -897,7 +897,7 @@ integrationTest('a failed saveMap during a merge also restores everything', asyn
 integrationTest('merge is refused while a selected topic has an AI task running, and writes nothing', async () => {
   const h = await mergeHarness(); const original = await h.shape();
   h.plugin.running.add(h.sources[1].path);
-  h.view.multiSelected = new Set(h.sources.map(n => n.id));
+  h.view.selection.replaceMulti(h.sources.map(n => n.id));
   assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_busy' });
   await h.view.mergeSelected('Merged', { path: h.path, mapId: h.mapDoc.id, sources: h.sources.map(n => ({ id: n.id, path: n.path })) });
   assert.deepEqual(await h.shape(), original); assert.equal(h.view.history.canUndo, false);
@@ -917,7 +917,7 @@ const aiMergeHarness = async (options = {}) => {
   h.files = () => [...h.contents.entries()].sort(([a], [b]) => a.localeCompare(b));
   h.snapshot = () => ({ id: h.mapDoc.id, parentId: h.parent.id, path: h.path, mapId: h.mapDoc.id, sources: h.sources.map(n => ({ id: n.id, path: n.path })) });
   h.begin = async (title = 'AI merged', signal = new AbortController().signal) => {
-    h.view.multiSelected = new Set(h.sources.map(n => n.id));
+    h.view.selection.replaceMulti(h.sources.map(n => n.id));
     const check = h.view.mergeCheck(); assert.equal(check.ok, true);
     const snapshot = { path: h.path, mapId: h.mapDoc.id, parentId: check.parentId, sources: check.sources.map(n => ({ id: n.id, path: n.path })) };
     const began = await h.view.startMergeDraft(title, snapshot, () => { h.started++; }, signal);
@@ -1155,7 +1155,7 @@ const parentOf = async (h, withOrigin = true) => {
   h.view.map = await h.repo.readMap(h.path); await h.repo.rebuildDerivedData(); await h.view.hydrate();
 };
 const parentSnapshot = (h, kids = [h.sources[0], h.sources[2]]) => {
-  h.view.multiSelected = new Set([h.parent.id, ...kids.map(n => n.id)]);
+  h.view.selection.replaceMulti([h.parent.id, ...kids.map(n => n.id)]);
   const check = h.view.mergeCheck(); assert.equal(check.ok, true); assert.equal(check.targetId, h.parent.id); assert.equal(check.sources[0].id, h.parent.id);
   return { path: h.path, mapId: h.mapDoc.id, parentId: check.parentId, targetId: check.targetId, sources: check.sources.map(n => ({ id: n.id, path: n.path })) };
 };
@@ -1176,7 +1176,7 @@ integrationTest('parent merge (structure): the parent keeps its card, id, path, 
   const unassigned = (await h.repo.collectionFiles(h.path, 'Unassigned')).map(f => f.path);
   assert.equal(unassigned.length, 2); assert.deepEqual([...note.sourcePaths].sort(), unassigned.slice().sort());
   for (const file of unassigned) assert.equal(h.fm(file).state, 'unassigned');
-  assert.equal(h.view.history.undoEntry.label, 'Merge topics'); assert.equal(h.view.selected, h.parent.id);
+  assert.equal(h.view.history.undoEntry.label, 'Merge topics'); assert.equal(h.view.selection.state.selected, h.parent.id);
   assert.notDeepEqual((await h.shape()).nodes, original.nodes);
 });
 integrationTest('parent merge (structure): a new name changes only the title, never the path or id', async () => {
@@ -1238,7 +1238,7 @@ integrationTest('parent merge: a failed saveMap also restores the parent text an
 integrationTest('parent merge: busy on the parent or a subtopic is refused and writes nothing', async () => {
   const h = await mergeHarness(); await parentOf(h); const original = await h.shape(); const text = h.contents.get(h.parent.path);
   h.plugin.running.add(h.parent.path);
-  h.view.multiSelected = new Set([h.parent.id, h.sources[0].id]);
+  h.view.selection.replaceMulti([h.parent.id, h.sources[0].id]);
   assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_busy' });
   await h.view.mergeSelected('Parent', { path: h.path, mapId: h.mapDoc.id, targetId: h.parent.id, sources: [h.parent, h.sources[0]].map(n => ({ id: n.id, path: n.path })) });
   assert.deepEqual(await h.shape(), original); assert.equal(h.contents.get(h.parent.path), text); assert.equal(h.view.history.canUndo, false);
@@ -1372,8 +1372,8 @@ integrationTest('V7: synthesis merge, undo, the parked new note moved away outsi
 });
 integrationTest('V8: undoing a merge clears the selection when the merged card leaves the map', async () => {
   const h = await mergeHarness(); await h.merge('Merged');
-  const merged = (await h.repo.readMap(h.path)).nodes.find(n => n.path.includes('Merged')); assert.equal(h.view.selected, merged.id);
-  await h.view.travel(false); assert.equal(h.view.selected, null);
+  const merged = (await h.repo.readMap(h.path)).nodes.find(n => n.path.includes('Merged')); assert.equal(h.view.selection.state.selected, merged.id);
+  await h.view.travel(false); assert.equal(h.view.selection.state.selected, null);
 });
 integrationTest('V9: a viewport panned before undo (and redo) stays as panned', async () => {
   const h = await mergeHarness(); await h.merge('Merged');
@@ -1539,7 +1539,7 @@ integrationTest('AI merge: a second Merge press while the merge runs only report
   const h = await aiMergeHarness(); let release;
   h.answer = () => new Promise(resolve => { release = () => resolve({ summary: 's', detail: 'd', visualReferences: [], formatIssues: [], suggestions: [] }); });
   const { task } = await h.begin(); await new Promise(r => setImmediate(r));
-  h.view.multiSelected = new Set(h.sources.map(n => n.id));
+  h.view.selection.replaceMulti(h.sources.map(n => n.id));
   h.view.openMerge(); assert.deepEqual(h.notices.slice(-1), ['Merging; try again when it finishes'], 'the merge-specific Notice, not “AI running…”');
   assert.deepEqual(plain(h.view.mergeCheck()), { ok: false, reason: 'ui.merge_busy' }, 'the sources stay locked while it runs');
   release(); await h.untilSettled(task);
@@ -1575,19 +1575,19 @@ integrationTest('AI merge lock: while merging, delete, remove, move, copy and st
   await refused('remove one merging card', () => h.view.removeToUnassigned(alpha, false));
   await refused('remove a branch containing merging cards', () => h.view.removeToUnassigned(h.parent, true));
   await refused('adopt into a merging card', () => h.view.removeToUnassigned(h.kid, false, beta.id));
-  h.view.multiSelected = new Set([beta.id]);
+  h.view.selection.replaceMulti([beta.id]);
   await refused('remove selected', () => h.view.removeSelected());
   await refused('move one card', () => h.view.moveTopic(gamma, h.parent));
   await refused('move under a merging card', () => h.view.moveTopic(h.kid, gamma));
   await refused('move selected', () => h.view.moveBranches(h.view.selectedRoots(), h.parent));
   await refused('copy selected', () => h.view.copySelected(h.parent));
-  h.view.multiSelected = new Set([h.kid.id]);
+  h.view.selection.replaceMulti([h.kid.id]);
   await refused('move something under a merging card (multi)', () => h.view.moveBranches(h.view.selectedRoots(), alpha));
   for (const suggestion of [{ kind: 'move', targetId: alpha.id, newParentId: h.parent.id }, { kind: 'move', targetId: h.kid.id, newParentId: beta.id }, { kind: 'merge', targetId: h.kid.id, mergeIntoId: gamma.id }, { kind: 'reduce', targetId: beta.id }])
     await assert.rejects(() => h.view.applyStructureSuggestion(suggestion, '', () => null), /Merging; try again when it finishes/);
   const before = await state();
   // A card that is not part of the merge is unaffected, and so is the merge.
-  h.view.multiSelected = new Set(); await h.view.moveTopic(h.kid, h.parent);
+  h.view.selection.replaceMulti([]); await h.view.moveTopic(h.kid, h.parent);
   assert.equal((await h.repo.readMap(h.path)).nodes.find(n => n.id === h.kid.id).parentId, h.parent.id);
   assert.notDeepEqual(await state(), before);
   release(); await h.untilSettled(task);
@@ -1604,11 +1604,11 @@ integrationTest('AI merge lock at the door: Delete, Remove selected, Move to, Co
   const seen = async (label, run) => { const count = h.notices.filter(m => m === locked).length; await run(); assert.equal(h.notices.filter(m => m === locked).length, count + 1, `${label}: Notice`); assert.equal(opened, 0, `${label}: no dialog`); };
   await seen('Delete (card)', () => h.view.confirmRemoveNode(alpha));
   await seen('Delete (a branch containing merging cards)', () => h.view.confirmRemoveNode(h.parent));
-  h.view.multiSelected = new Set([beta.id]);
+  h.view.selection.replaceMulti([beta.id]);
   await seen('Remove selected', () => h.view.confirmRemoveSelected());
   await seen('Move to', () => h.view.chooseSelectedParent(false));
   await seen('Copy to', () => h.view.chooseSelectedParent(true));
-  await seen('Merge again', () => { h.view.multiSelected = new Set(h.sources.map(n => n.id)); h.view.openMerge(); });
+  await seen('Merge again', () => { h.view.selection.replaceMulti(h.sources.map(n => n.id)); h.view.openMerge(); });
   await assert.rejects(() => h.view.applyStructureSuggestion({ kind: 'reduce', targetId: alpha.id }, '', () => null), /Merging/);
   assert.equal(opened, 0, 'a structure suggestion opens no dialog'); assert.ok(h.notices.filter(m => m === locked).length > 6);
   // A card outside the merge still opens its delete dialog.

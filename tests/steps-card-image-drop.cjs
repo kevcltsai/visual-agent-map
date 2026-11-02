@@ -66,7 +66,7 @@ async function harness({ aim = false } = {}) {
   view.viewportEl.getBoundingClientRect = () => ({ left: 10, top: 5, right: 810, bottom: 605, width: 800, height: 600 });
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
   if (aim) view.map.aim = { version: 1 };
-  view.integrationMode = false;
+  view.selection.exitMultiSelect('emptyMap');
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
@@ -184,7 +184,7 @@ test('counterexample 3: redo points at the same path and adds no second file', a
 test('counterexample 4: pasting a picture with no selected topic takes the free-image path of ticket 30', async () => {
   const h = await harness();
   const before = h.note();
-  h.view.selected = null;
+  h.view.selection.setSelected(null);
   const event = clipboardEvent([file(png())]);
   assert.equal(h.view.pasteCanvasImages(event), true);
   assert.equal(event.defaultPrevented, true);
@@ -195,7 +195,7 @@ test('counterexample 4: pasting a picture with no selected topic takes the free-
 
 test('pasting a picture with a selected topic puts it on that card, not on the canvas', async () => {
   const h = await harness();
-  h.view.selected = h.node.id;
+  h.view.selection.setSelected(h.node.id);
   const event = clipboardEvent([file(png())]);
   assert.equal(h.view.pasteCanvasImages(event), true);
   assert.equal(event.defaultPrevented, true);
@@ -206,12 +206,12 @@ test('pasting a picture with a selected topic puts it on that card, not on the c
 
 test('paste leaves everything else alone: text only, a selection that cannot take covers, or a read-only map', async () => {
   const h = await harness();
-  h.view.selected = h.node.id;
+  h.view.selection.setSelected(h.node.id);
   const textOnly = clipboardEvent([], { 'text/plain': 'hello' });
   assert.equal(h.view.pasteCanvasImages(textOnly), false);
   assert.equal(textOnly.defaultPrevented, false);
   const aim = await harness({ aim: true });
-  aim.view.selected = aim.node.id;
+  aim.view.selection.setSelected(aim.node.id);
   assert.equal(aim.view.pasteCanvasImages(clipboardEvent([file(png())])), false);
 });
 
@@ -263,7 +263,7 @@ test('renderNode wires the three drag listeners, and the styles exist', () => {
 
 test('a clipboard with text next to the picture is not taken by the card (the outline keeps it)', async () => {
   const h = await harness();
-  h.view.selected = h.node.id;
+  h.view.selection.setSelected(h.node.id);
   const event = clipboardEvent([file(png())], { 'text/plain': 'a\n b' });
   assert.equal(h.view.pasteCanvasImages(event), false);
   assert.equal(event.defaultPrevented, false);

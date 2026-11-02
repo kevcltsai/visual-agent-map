@@ -41,7 +41,7 @@ async function harness(build, { mode } = {}) {
   const view = new VisualAgentMapView({ app }, plugin);
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = element('div'); view.stageEl = element('div');
   view.focusNode = () => {}; view.openDetails = () => {};
-  if (mode) view[mode] = true;
+  if (mode) view.selection.toggleMultiSelect();
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
   const boxFor = id => (id === ids.root ? BOX.root : id === ids.child ? BOX.child : BOX.third);
@@ -226,12 +226,12 @@ test('frames cannot be changed on an AIM map; in selection mode they are drawn b
 
 test('the selection bar offers "Add frame" for the selected topics', async () => {
   const h = await harness();
-  h.view.multiSelected = new Set([h.ids.root, h.ids.child]);
+  h.view.selection.replaceMulti([h.ids.root, h.ids.child]);
   const bar = h.view.renderSelectionBar(element('div'));
   const add = find(bar, i => i.tag === 'button' && i.text === 'Add frame');
   assert.ok(add, 'button present');
   assert.ok(!add.disabled);
-  h.view.multiSelected = new Set();
+  h.view.selection.replaceMulti([]);
   const empty = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.text === 'Add frame');
   assert.equal(empty.disabled, true);
 });

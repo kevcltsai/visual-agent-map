@@ -41,6 +41,7 @@ const make = (cache, extra = {}) => {
         getFirstLinkpathDest: link => (files.has(link) ? new S.obsidian.TFile(link) : null)
       }
     },
+    selection: new (S.load('experiences/visual-map/topic-selection.ts').TopicSelection)(),
     coverObserver: null, ...extra
   });
   return view;
@@ -229,9 +230,10 @@ test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover
     const h = await coverHarness(text);
     const calls = [];
     Object.assign(h.view, {
-      integrationMode: !editable, enqueue: fn => fn(),
+      enqueue: fn => fn(),
       changeTopicCover: async node => { calls.push(node.id); return {}; }
     });
+    if (!editable) h.view.selection.toggleMultiSelect();
     h.view.map = { nodes: [], viewport: { x: 0, y: 0, zoom: 1 } };
     const panel = dom.element('div');
     h.view.renderCoverSection(panel, { id: 'm', path: NOTE });
@@ -255,7 +257,7 @@ test('P4b: the topic panel offers the cover toggle, aria-pressed while the cover
 
 test('P4b: changeTopicCover refuses a topic that is not editable', async () => {
   const h = await coverHarness(TEXT);
-  Object.assign(h.view, { integrationMode: true });
+  h.view.selection.toggleMultiSelect();
   assert.equal(await h.view.changeTopicCover({ id: 'm', path: NOTE }), null);
   assert.equal(h.contents.get(NOTE), TEXT);
 });

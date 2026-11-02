@@ -86,10 +86,10 @@ integrationTest('selected subtopics move together and copied notes keep their co
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.contentEl = { querySelector: () => null }; view.render = () => {}; view.hydrate = async () => {};
-  view.multiSelected = new Set([first.id]);
+  view.selection.replaceMulti([first.id]);
   await view.moveBranches(view.selectedRoots(), second);
   assert.equal((await repo.readMap(mapPath)).nodes.find(node => node.id === first.id).parentId, second.id);
-  view.multiSelected = new Set([first.id]);
+  view.selection.replaceMulti([first.id]);
   await view.copySelected(root);
   const saved = await repo.readMap(mapPath), copied = saved.nodes.find(node => node.id !== first.id && node.id !== second.id && node.id !== root.id);
   assert.equal(saved.nodes.length, 4);
@@ -124,7 +124,7 @@ integrationTest('failed batch copy parks created notes and leaves the map unchan
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  view.multiSelected = new Set([first.id, second.id]);
+  view.selection.replaceMulti([first.id, second.id]);
   const duplicate = repo.duplicateNote.bind(repo); let count = 0;
   repo.duplicateNote = async (...args) => { if (++count === 2) throw new Error('injected duplicate failure'); return duplicate(...args); };
   await assert.rejects(view.copySelected(root), /injected duplicate failure/);
@@ -140,7 +140,7 @@ integrationTest('failed map save during copy parks the duplicate without changin
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  view.multiSelected = new Set([root.id]);
+  view.selection.replaceMulti([root.id]);
   const save = repo.saveMap.bind(repo); let fail = true;
   repo.saveMap = async (...args) => { if (fail) { fail = false; throw new Error('injected map save failure'); } return save(...args); };
   await assert.rejects(view.copySelected(root), /injected map save failure/);
@@ -159,7 +159,7 @@ integrationTest('removing selected subtopic branches parks notes and can be undo
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  view.multiSelected = new Set([child.id]); await view.removeSelected();
+  view.selection.replaceMulti([child.id]); await view.removeSelected();
   assert.equal((await repo.readMap(mapPath)).nodes.length, 1);
   assert.equal((await repo.readNote(`Agent Workspace/Topics/map-a/Unassigned/Child.md`)).topicState, 'unassigned');
   await view.history.undo().undo();
@@ -176,7 +176,7 @@ integrationTest('failed batch removal restores map and active note ownership', a
   const { VisualAgentMapView } = load('main.ts', { obsidian });
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => {} };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  view.multiSelected = new Set([child.id]);
+  view.selection.replaceMulti([child.id]);
   const save = repo.saveMap.bind(repo); let fail = true;
   repo.saveMap = async (...args) => { if (fail) { fail = false; throw new Error('injected map save failure'); } return save(...args); };
   await assert.rejects(view.removeSelected(), /injected map save failure/);
@@ -195,7 +195,7 @@ integrationTest('failed rebuild after batch removal also restores map and notes'
   const { VisualAgentMapView } = load('main.ts', { obsidian }); let fail = true;
   const plugin = { repo, settings: { ...DEFAULT_SETTINGS }, rebuildDerivedData: async () => { if (fail) { fail = false; throw new Error('injected rebuild failure'); } } };
   const view = new VisualAgentMapView({ app }, plugin); view.path = mapPath; view.map = mapDoc; view.render = () => {}; view.hydrate = async () => {};
-  view.multiSelected = new Set([child.id]);
+  view.selection.replaceMulti([child.id]);
   await assert.rejects(view.removeSelected(), /injected rebuild failure/);
   assert.equal((await repo.readMap(mapPath)).nodes.length, 2);
   assert.equal((await repo.readNote(child.path)).topicState, 'active');
@@ -1115,7 +1115,7 @@ async function multiResearchHarness(titles, overrides = {}) {
 integrationTest('multi research runs selected topics in the background with the chosen options and a map-level key', async () => {
   const h = await multiResearchHarness(['A', 'B']);
   await h.repo.updateNote(h.nodes[1].path, { prompt: 'Custom prompt for B' });
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'deep', requirements: 'Focus on 2025', imageSearch: false });
   await until(() => h.runs.length === 2);
   assert.deepEqual(plain(h.confirms), ['gpt-6-luna']);
@@ -1131,7 +1131,7 @@ integrationTest('multi research runs selected topics in the background with the 
 });
 integrationTest('multi research without an explicit language answers each topic in its own title language', async () => {
   const h = await multiResearchHarness(['要如何在陽台養香草', 'Balcony herbs']);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 2);
   assert.equal(h.runs.find(r => r.title === '要如何在陽台養香草').options.outputLanguage, 'zh-TW');
   assert.equal(h.runs.find(r => r.title === 'Balcony herbs').options.outputLanguage, 'same-as-input');
@@ -1140,7 +1140,7 @@ integrationTest('multi research without an explicit language answers each topic 
 });
 integrationTest('multi research with image search runs each topic with auto visual mode', async () => {
   const h = await multiResearchHarness(['Img']);
-  h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.selection.replaceMulti([h.nodes[0].id]);
   await h.view.startMultiResearch({ ...h.request, imageSearch: true });
   await until(() => h.runs.length === 1);
   assert.equal(h.runs[0].options.visualMode, 'auto');
@@ -1148,7 +1148,7 @@ integrationTest('multi research with image search runs each topic with auto visu
 });
 integrationTest('multi research without requirements uses the topic prompt alone and web search maps to research', async () => {
   const h = await multiResearchHarness(['Solo']);
-  h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.selection.replaceMulti([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request);
   await until(() => h.runs.length === 1);
   assert.doesNotMatch(h.runs[0].options.task, /\n\n$/); assert.equal(h.runs[0].options.researchMode, 'research');
@@ -1156,7 +1156,7 @@ integrationTest('multi research without requirements uses the topic prompt alone
 });
 integrationTest('multi research runs at most three topics at once and stop aborts every running one', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C', 'D', 'E']);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
   await until(() => h.runs.length === 3); await new Promise(r => setTimeout(r, 20));
   assert.equal(h.runs.length, 3);
@@ -1170,7 +1170,7 @@ integrationTest('multi research runs at most three topics at once and stop abort
 integrationTest('multi research skips topics already running AI and tells the owner how many', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C', 'D']);
   h.plugin.running.add(h.nodes[0].path); h.plugin.quickExpandPending.add(h.nodes[1].path); h.plugin.activeTasks.set(h.nodes[2].path, new AbortController());
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
   await until(() => h.runs.length === 1);
   assert.deepEqual(plain(h.runs.map(r => r.title)), ['D']);
@@ -1181,16 +1181,16 @@ integrationTest('multi research skips topics already running AI and tells the ow
 integrationTest('multi research starts no batch when every selected topic is already running', async () => {
   const h = await multiResearchHarness(['A', 'B']);
   for (const n of h.nodes) h.plugin.running.add(n.path);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
   assert.equal(h.plugin.expansionBatches.has(h.key), false); assert.equal(h.runs.length, 0);
   assert.equal(h.notices.length, 1); assert.match(h.notices[0], /already running/);
 });
 integrationTest('a second multi research batch on the same map is refused while one is running', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C']);
-  h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.selection.replaceMulti([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
-  h.view.multiSelected = new Set([h.nodes[1].id, h.nodes[2].id]);
+  h.view.selection.replaceMulti([h.nodes[1].id, h.nodes[2].id]);
   h.confirms.length = 0;
   await h.view.startMultiResearch(h.request);
   assert.equal(h.runs.length, 1); assert.equal(h.confirms.length, 0);
@@ -1200,7 +1200,7 @@ integrationTest('a second multi research batch on the same map is refused while 
 });
 integrationTest('a failing topic is recorded and does not stop the others', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C']);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
   await until(() => h.runs.length === 3);
   h.finish.get('B')('model exploded'); h.finish.get('A')(); h.finish.get('C')();
@@ -1211,9 +1211,9 @@ integrationTest('a failing topic is recorded and does not stop the others', asyn
 });
 integrationTest('multi research is not offered on AIM maps and needs at least one topic', async () => {
   const h = await multiResearchHarness(['A']);
-  h.view.multiSelected = new Set(); await h.view.startMultiResearch(h.request);
+  h.view.selection.replaceMulti([]); await h.view.startMultiResearch(h.request);
   assert.equal(h.plugin.expansionBatches.size, 0);
-  h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] }; h.view.selection.replaceMulti([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request);
   assert.equal(h.plugin.expansionBatches.size, 0); assert.equal(h.runs.length, 0);
 });
@@ -1229,13 +1229,13 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
   h.view.notes = new Map(h.nodes.map(n => [n.id, { title: n.id }]));
   let items = bar(); const research = () => items.find(i => i.tag === 'button' && /^Research( 1 topic)?$/.test(i.text));
   items = bar(); assert.ok(research()); assert.equal(research().disabled, true);
-  h.view.multiSelected = new Set([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
+  h.view.selection.replaceMulti([h.nodes[0].id]); items = bar(); assert.equal(research().disabled, false); assert.equal(research().text, 'Research'); assert.equal(research().attrs['aria-label'], 'Research 1 topic');
   h.view.map.aim = {}; items = bar(); assert.equal(research(), undefined); delete h.view.map.aim;
   assert.equal(toolbar().length, 1);
-  h.view.integrationMode = true;
+  h.view.selection.chatSelect([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
-  assert.equal(h.view.integrationMode, false); assert.equal(h.view.multiSelected.size, 0);
-  h.view.multiSelected = new Set([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, true);
+  assert.equal(h.view.selection.state.multiSelectMode, false); assert.equal(h.view.selection.state.multiSelected.size, 0);
+  h.view.selection.replaceMulti([h.nodes[1].id]); items = bar(); assert.equal(research().disabled, true);
   assert.equal(items.find(i => i.text === 'Researching: 0 of 1 done'), undefined);
   items = toolbar();
   assert.ok(items.find(i => i.tag === 'span' && i.text === `Researching: 0 of 1 done · ${h.nodes[0].id}`), items.map(i => i.text).join('|'));
@@ -1248,7 +1248,7 @@ integrationTest('selection bar shows Research; starting leaves selection mode an
 integrationTest('multi research with a chosen model runs each started topic on it once, saves nothing on the topic and confirms usage for it', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C']);
   h.plugin.running.add(h.nodes[2].path);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch({ ...h.request, model: 'model-b' });
   await until(() => h.runs.length === 2);
   assert.deepEqual(plain(h.confirms), ['model-b']);
@@ -1262,7 +1262,7 @@ integrationTest('multi research with a chosen model runs each started topic on i
 });
 integrationTest('multi research without a chosen model runs a workspace topic on the current workspace model', async () => {
   const h = await multiResearchHarness(['A']);
-  h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.selection.replaceMulti([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request); await until(() => h.runs.length === 1);
   const note = await h.repo.readNote(h.nodes[0].path);
   assert.equal(note.model, h.repo.settings.cliModel); assert.equal(note.modelSource, 'workspace');
@@ -1271,14 +1271,14 @@ integrationTest('multi research without a chosen model runs a workspace topic on
 integrationTest('multi research keeps selection mode when nothing starts', async () => {
   const h = await multiResearchHarness(['A']);
   h.plugin.running.add(h.nodes[0].path);
-  h.view.integrationMode = true; h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.selection.chatSelect([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request);
-  assert.equal(h.view.integrationMode, true); assert.equal(h.view.multiSelected.size, 1);
+  assert.equal(h.view.selection.state.multiSelectMode, true); assert.equal(h.view.selection.state.multiSelected.size, 1);
 });
 integrationTest('multi research: stop before any topic is accepted gives exactly one summary Notice and no launch error', async () => {
   const h = await multiResearchHarness(['A']);
   h.view.runAgent = async () => { h.view.stopMultiResearch(); return undefined; };
-  h.view.multiSelected = new Set([h.nodes[0].id]);
+  h.view.selection.replaceMulti([h.nodes[0].id]);
   await h.view.startMultiResearch(h.request);
   await until(() => h.plugin.expansionBatches.get(h.key).status !== 'running');
   assert.equal(h.notices.length, 1, h.notices.join('|'));
@@ -1286,7 +1286,7 @@ integrationTest('multi research: stop before any topic is accepted gives exactly
 });
 integrationTest('multi research: a topic that became busy before dispatch is skipped, not failed', async () => {
   const h = await multiResearchHarness(['A', 'B', 'C', 'D']);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
   await until(() => h.runs.length === 3);
   h.plugin.running.add(h.nodes[3].path);
@@ -1299,7 +1299,7 @@ integrationTest('multi research: a topic that became busy before dispatch is ski
 });
 integrationTest('multi research summary counts only successful topics as succeeded', async () => {
   const h = await multiResearchHarness(['A', 'B']);
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch(h.request);
   await until(() => h.runs.length === 2);
   h.finish.get('A')('boom'); h.finish.get('B')();
@@ -1388,7 +1388,7 @@ integrationTest('FB1 F1: opening the research or the synthesis dialog raises no 
   const view = new VisualAgentMapView({ app: h.app }, h.plugin); view.path = h.mapPath; view.map = h.doc; view.render = () => {};
   view.openNextStep(h.topic);
   await until(() => opened.length === 1);
-  view.multiSelected = new Set([h.topic.id, other.id]);
+  view.selection.replaceMulti([h.topic.id, other.id]);
   view.openSelectionSynthesis(null);
   assert.equal(opened.length, 2, 'both dialogs opened');
   assert.deepEqual(notices, [], 'a label or a dialog is not a run');
@@ -1418,7 +1418,7 @@ integrationTest('FB1 F1: a multi-topic research batch raises the Notice once, no
   const third = await h.repo.createNote('Third', 'model-a', h.doc, h.mapPath, 'workspace'); h.doc.nodes.push(third); await h.repo.saveMap(h.mapPath, h.doc);
   await h.repo.updateNote(second.path, { prompt: 'Research second' }); await h.repo.updateNote(third.path, { prompt: 'Research third' });
   h.plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
-  h.view.multiSelected = new Set([h.topic.id, second.id, third.id]);
+  h.view.selection.replaceMulti([h.topic.id, second.id, third.id]);
   await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'fast', requirements: '' });
   await until(() => h.contexts.length === 3 && !h.plugin.running.size);
   assert.equal(blockNotices(h.notices).length, 1);
@@ -1713,7 +1713,7 @@ integrationTest('multi research with a chosen template records it on each starte
   await h.repo.updateNote(second.path, { prompt: 'Research second' }); await h.repo.updateNote(third.path, { prompt: 'Research third' });
   h.plugin.confirmAiUsage = async (_model, run) => { await run(); return true; };
   h.plugin.running.add(third.path); // busy: skipped before any write
-  h.view.multiSelected = new Set([h.topic.id, second.id, third.id]);
+  h.view.selection.replaceMulti([h.topic.id, second.id, third.id]);
   await h.view.startMultiResearch({ researchMode: 'local', researchDepth: 'fast', requirements: '', detailTemplateId: 'A' });
   await until(() => h.contexts.length === 2 && !h.plugin.running.has(h.topic.path) && !h.plugin.running.has(second.path));
   assert.deepEqual(h.contexts.map(context => context.detailTemplate.id), ['A', 'A']);
@@ -1826,7 +1826,7 @@ integrationTest('run-style P3: "Keep current (…)" in the research and synthesi
     await until(() => opened.length === 1);
     assert.equal(opened[0].modelSettings.currentTone, row.tone, `${row.name}: research dialog tone`);
     assert.equal(opened[0].modelSettings.currentStyle, row.style, `${row.name}: research dialog style`);
-    view.multiSelected = new Set([h.topic.id, other.id]);
+    view.selection.replaceMulti([h.topic.id, other.id]);
     view.openSelectionSynthesis(null);
     assert.equal(opened.length, 2);
     const mapRow = row.note.detailTemplateId ? row : { ...row, tone: row.name === 'topic override' ? 'Pirate' : row.tone, style: row.name === 'topic override' ? 'Custom: Standard · Pirate' : row.style };
@@ -2518,7 +2518,7 @@ integrationTest('multi research without overrides runs each topic in its own not
   const h = await multiResearchHarness(['Quick note', 'Old note', 'Standard note']);
   await h.repo.updateNote(h.nodes[0].path, { researchMode: 'local' });
   await h.repo.updateNote(h.nodes[2].path, { researchMode: 'research' });
-  h.view.multiSelected = new Set(h.nodes.map(n => n.id));
+  h.view.selection.replaceMulti(h.nodes.map(n => n.id));
   await h.view.startMultiResearch({ requirements: 'Be brief' });
   await until(() => h.runs.length === 3);
   const byTitle = Object.fromEntries(h.runs.map(run => [run.title, run.options]));
@@ -2531,13 +2531,13 @@ integrationTest('multi research without overrides runs each topic in its own not
   await until(() => h.plugin.expansionBatches.get(h.key).status === 'completed');
   // With the map chat's overrides the batch follows the override's mode (D-2026-10-231): research = Standard, local = Quick (no charts, the Quick prompt).
   const chat = await multiResearchHarness(['Chat topic']);
-  chat.view.multiSelected = new Set(chat.nodes.map(n => n.id));
+  chat.view.selection.replaceMulti(chat.nodes.map(n => n.id));
   await chat.view.startMultiResearch({ researchMode: 'research', researchDepth: 'deep', requirements: '', imageSearch: true });
   await until(() => chat.runs.length === 1);
   assert.deepEqual(plain([chat.runs[0].options.researchMode, chat.runs[0].options.researchDepth, chat.runs[0].options.visualMode, chat.runs[0].options.addCharts]), ['research', 'deep', 'auto', true]);
   assert.equal(chat.runs[0].options.mapAiMode, 'standard', 'a chat research override carries its mode so the right prompt is used');
   const quick = await multiResearchHarness(['Chat quick topic']);
-  quick.view.multiSelected = new Set(quick.nodes.map(n => n.id));
+  quick.view.selection.replaceMulti(quick.nodes.map(n => n.id));
   await quick.view.startMultiResearch({ researchMode: 'local', researchDepth: 'normal', requirements: '', imageSearch: false });
   await until(() => quick.runs.length === 1);
   assert.deepEqual(plain([quick.runs[0].options.researchMode, quick.runs[0].options.researchDepth, quick.runs[0].options.visualMode, quick.runs[0].options.mapAiMode, quick.runs[0].options.addCharts]), ['local', 'normal', 'off', 'quick', false]);

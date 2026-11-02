@@ -32,19 +32,19 @@ integrationTest('node plus adds a child without opening a duplicate right-click 
   buttons.find(button => button.text === 'AI explore').click({ stopPropagation() {} });
   buttons.find(button => button['aria-label'] === 'Structure and links').click({ stopPropagation() {} });
   assert.deepEqual(opened, [[topic.id, 'proposals'], [topic.id, 'structure']]); assert.deepEqual(next, [topic.id]);
-  assert.equal(view.selected, null);
+  assert.equal(view.selection.state.selected, null);
   events.get('div:click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
-  assert.equal(view.selected, topic.id); assert.equal(renders, 0, 'a click repaints the card in place instead of rendering'); assert.deepEqual(details, [], 'a click selects without opening the sidebar note');
-  view.selected = null; renders = 0; details.length = 0;
+  assert.equal(view.selection.state.selected, topic.id); assert.equal(renders, 0, 'a click repaints the card in place instead of rendering'); assert.deepEqual(details, [], 'a click selects without opening the sidebar note');
+  view.applySelectionChange(view.selection.setSelected(null)); renders = 0; details.length = 0;
   events.get('div:keydown')({ key: 'Enter', target: view.stageEl.children[0] });
-  assert.equal(view.selected, topic.id); assert.equal(renders, 0); assert.deepEqual(details, [topic.id]);
-  view.selected = null; renders = 0; details.length = 0;
+  assert.equal(view.selection.state.selected, topic.id); assert.equal(renders, 0); assert.deepEqual(details, [topic.id]);
+  view.applySelectionChange(view.selection.setSelected(null)); renders = 0; details.length = 0;
   view.mapChange = async () => {}; view.drawEdges = () => {};
   events.get('div:pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 2, clientX: 10, clientY: 10 });
   events.get('div:pointermove')({ clientX: 14, clientY: 10 });
   events.get('div:pointerup')({ type: 'pointerup' });
   events.get('div:click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
-  assert.equal(view.selected, null, 'a >3px pointer movement is treated as a drag and its follow-on click is suppressed');
+  assert.equal(view.selection.state.selected, null, 'a >3px pointer movement is treated as a drag and its follow-on click is suppressed');
   assert.equal(renders, 0);
   events.get('div:pointerdown')({ target: { closest: () => null }, button: 0, pointerId: 1, clientX: 0, clientY: 0 });
   events.get('div:pointerup')({ type: 'pointerup', clientX: 0, clientY: 0 });
@@ -164,14 +164,14 @@ integrationTest('outline reveal expands collapsed ancestors, centers and selects
   view.map = doc; view.viewportEl = { clientWidth: 800, clientHeight: 600 };
   let renders = 0; view.render = () => { renders++; }; view.transform = () => {}; view.saveViewport = () => {};
   view.mapChange = async change => { change(view.map); };
-  view.multiSelected = new Set(['root']);
+  view.selection.replaceMulti(['root']);
   assert.equal(await view.revealPath('leaf.md'), true);
   assert.equal(root.collapsed, false); assert.equal(child.collapsed, false);
-  assert.equal(view.selected, leaf.id); assert.equal(view.multiSelected.size, 0); assert.ok(renders > 0);
+  assert.equal(view.selection.state.selected, leaf.id); assert.equal(view.selection.state.multiSelected.size, 0); assert.ok(renders > 0);
   assert.deepEqual(plain(doc.viewport), { x: 400 - 1140, y: 300 - 480, zoom: 1 });
-  view.integrationMode = true; view.multiSelected = new Set(['root']); view.selected = null;
+  view.selection.toggleMultiSelect(); view.selection.replaceMulti(['root']); view.selection.setSelected(null);
   await view.revealPath('root.md');
-  assert.deepEqual([...view.multiSelected], ['root'], 'topic selection is kept'); assert.equal(view.selected, null);
+  assert.deepEqual([...view.selection.state.multiSelected], ['root'], 'topic selection is kept'); assert.equal(view.selection.state.selected, null);
   assert.equal(await view.revealPath('missing.md'), false);
 });
 integrationTest('AIM outline keeps only note titles and hierarchy', () => {
@@ -1166,7 +1166,7 @@ const selectionView = (load, extra = {}, shim = obsidian) => {
   view.notes = new Map(doc.nodes.map(item => [item.id, { title: item.id, summary: '', status: 'completed' }]));
   let renders = 0; view.render = () => { renders++; };
   view.enqueue = work => work(); view.openDetails = () => {}; view.focusNode = () => {};
-  return { view, doc, outline, renders: () => renders, cards: () => Object.fromEntries(view.stageEl.children.map(card => [card.dataset.nodeId, card])), build: () => { view.cardEls.clear(); view.stageEl.children = []; view.tabStopId = view.defaultTabStop(doc.nodes); for (const item of doc.nodes) view.renderNode(item); } };
+  return { view, doc, outline, renders: () => renders, cards: () => Object.fromEntries(view.stageEl.children.map(card => [card.dataset.nodeId, card])), build: () => { view.cardEls.clear(); view.stageEl.children = []; view.selection.moveTabStop(view.defaultTabStop(doc.nodes)); for (const item of doc.nodes) view.renderNode(item); } };
 };
 integrationTest('selection, arrow keys and select-mode toggles repaint only the affected cards and never render', () => {
   const fixture = selectionView(load);
@@ -1179,24 +1179,24 @@ integrationTest('selection, arrow keys and select-mode toggles repaint only the 
   assert.equal(cards.root.attrs.role, 'treeitem'); assert.equal(cards.root.attrs['aria-level'], '1');
   assert.equal(cards.c.attrs['aria-level'], '3'); assert.equal(cards.a.attrs['aria-level'], '2');
   click('a');
-  assert.equal(fixture.renders(), 0); assert.equal(view.selected, 'a');
+  assert.equal(fixture.renders(), 0); assert.equal(view.selection.state.selected, 'a');
   assert.deepEqual(stops(), ['a']);
   assert.equal(cards.a.attrs['aria-selected'], 'true'); assert.ok(cards.a.classes.has('is-selected'));
   assert.equal(cards.root.attrs['aria-selected'], 'false'); assert.equal(cards.root.tabIndex, -1);
   assert.deepEqual(outline.at(-1), 'a.md');
   // Arrow keys walk the tree and move focus without a render.
   cards.a.handlers.get('keydown')({ key: 'ArrowDown', target: cards.a, preventDefault() {} });
-  assert.equal(view.selected, 'b'); assert.equal(cards.b.focused, 1); assert.deepEqual(stops(), ['b']);
+  assert.equal(view.selection.state.selected, 'b'); assert.equal(cards.b.focused, 1); assert.deepEqual(stops(), ['b']);
   assert.equal(cards.a.classes.has('is-selected'), false);
   cards.b.handlers.get('keydown')({ key: 'ArrowLeft', target: cards.b, preventDefault() {} });
-  assert.equal(view.selected, 'root'); assert.deepEqual(stops(), ['root']);
+  assert.equal(view.selection.state.selected, 'root'); assert.deepEqual(stops(), ['root']);
   assert.equal(fixture.renders(), 0, 'selection and arrow keys never call render()');
 });
 integrationTest('select mode: the selection bar keeps action labels fixed and announces the topic count to screen readers', () => {
   const fixture = selectionView(load); const { view } = fixture;
-  view.integrationMode = true; fixture.build();
+  view.selection.toggleMultiSelect(); fixture.build();
   const labels = ids => {
-    view.multiSelected = new Set(ids);
+    view.applySelectionChange(view.selection.replaceMulti(ids));
     const bar = view.renderSelectionBar(selectionDom()('div'));
     return bar.children.filter(child => child.tag === 'button').map(button => [button.text, button.disabled, button.attrs['aria-label']]);
   };
@@ -1210,21 +1210,21 @@ integrationTest('select mode: the selection bar keeps action labels fixed and an
   assert.equal(translate('zh-TW', 'ui.synthesize_0_topics', 3), '整合 3 個議題'); assert.equal(translate('zh-TW', 'ui.research_0_topics', 3), '研究 3 個議題');
 });
 integrationTest('select mode toggles cards in place, keeps checkboxes out of the tab order and survives a full render', () => {
-  const { view, renders, cards, build } = (() => { const fixture = selectionView(load); fixture.view.integrationMode = true; fixture.build(); return fixture; })();
+  const { view, renders, cards, build } = (() => { const fixture = selectionView(load); fixture.view.selection.toggleMultiSelect(); fixture.build(); return fixture; })();
   const byId = cards();
   const checks = view.cardChecks;
   assert.equal(checks.size, 4);
   for (const check of checks.values()) assert.equal(check.tabIndex, -1, 'no checkbox per card in the tab order');
   const click = id => byId[id].handlers.get('click')({ target: { closest: () => null }, metaKey: false, ctrlKey: false });
   click('a'); click('c');
-  assert.deepEqual([...view.multiSelected].sort(), ['a', 'c']);
+  assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'c']);
   assert.equal(renders(), 0); assert.equal(checks.get('a').checked, true); assert.equal(byId.b.attrs['aria-selected'], 'false');
   assert.equal(byId.c.attrs['aria-selected'], 'true');
   click('a');
-  assert.deepEqual([...view.multiSelected], ['c']); assert.equal(checks.get('a').checked, false); assert.equal(byId.a.classes.has('is-selected'), false);
+  assert.deepEqual([...view.selection.state.multiSelected], ['c']); assert.equal(checks.get('a').checked, false); assert.equal(byId.a.classes.has('is-selected'), false);
   // Keyboard focus in select mode moves the tab stop only; the ticked cards stay ticked.
   byId.c.handlers.get('keydown')({ key: 'ArrowLeft', target: byId.c, preventDefault() {} });
-  assert.deepEqual([...view.multiSelected], ['c']); assert.equal(byId.a.tabIndex, 0); assert.equal(byId.root.tabIndex, -1); assert.equal(byId.a.focused, 1);
+  assert.deepEqual([...view.selection.state.multiSelected], ['c']); assert.equal(byId.a.tabIndex, 0); assert.equal(byId.root.tabIndex, -1); assert.equal(byId.a.focused, 1);
   // A full render afterwards reproduces the same state from the model.
   build();
   const again = cards();
@@ -1241,7 +1241,7 @@ integrationTest('F2 starts rename, Enter opens details, and the collapse button 
   fixture.build();
   const cards = fixture.cards();
   cards.a.handlers.get('keydown')({ key: 'Enter', target: cards.a, preventDefault() {} });
-  assert.deepEqual(opened, ['a']); assert.equal(view.selected, 'a'); assert.equal(fixture.renders(), 0);
+  assert.deepEqual(opened, ['a']); assert.equal(view.selection.state.selected, 'a'); assert.equal(fixture.renders(), 0);
   let renamed = 0;
   cards.a.handlers.get('keydown')({ key: 'F2', target: cards.a, preventDefault() { renamed++; } });
   assert.equal(renamed, 1, 'F2 is handled as the rename shortcut'); assert.equal(dialogs.length, 1, 'F2 opens the name dialog');
@@ -1294,7 +1294,7 @@ integrationTest('canvas hint: a solid chip that goes away after the first zoom o
   view.markCanvasHintSeen();
   assert.equal(saves, 1, 'only the first gesture writes settings');
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(source, /!this\.integrationMode && !this\.plugin\.settings\.canvasHintSeen\s*\?\s*overlay\.createSpan\(\{\s*cls: "vam-hint vam-canvas-hint"/, 'the normal hint shows only until seen; select mode draws none (the selection bar owns that corner)');
+  assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.plugin\.settings\.canvasHintSeen\s*\?\s*overlay\.createSpan\(\{\s*cls: "vam-hint vam-canvas-hint"/, 'the normal hint shows only until seen; select mode draws none (the selection bar owns that corner)');
   assert.match(source, /if \(moved\) this\.markCanvasHintSeen\(\);/, 'a pan counts');
   assert.match(source, /event\.preventDefault\(\);\s*\/\/[^\n]*\n\s*this\.markCanvasHintSeen\(\);/, 'a wheel zoom counts');
   assert.match(fs.readFileSync(path.join(root, 'main.ts'), 'utf8'), /canvasHintSeen: saved\?\.canvasHintSeen === true/);
@@ -1497,7 +1497,7 @@ integrationTest('card tools: labelled actions wait for hover, focus or selection
   assert.equal(buttons[2].attrs['aria-label'], undefined);
   // A leaf has no Collapse; select mode keeps only Details.
   assert.deepEqual(toolsOf(({ view }) => { view.map.nodes = view.map.nodes.filter(item => item.id !== 'c'); }).map(button => button.text), ['Structure', 'Rename', 'Add text', 'Details', 'AI explore']);
-  assert.deepEqual(toolsOf(({ view }) => { view.integrationMode = true; }).map(button => button.text), ['Collapse', 'Details']);
+  assert.deepEqual(toolsOf(({ view }) => { view.selection.toggleMultiSelect(); }).map(button => button.text), ['Collapse', 'Details']);
   const { translate } = load('i18n.ts');
   assert.deepEqual(['ui.collapse', 'ui.node_tool_links', 'ui.node_tool_rename', 'ui.node_tool_details', 'ui.ai_explore'].map(key => translate('zh-TW', key)), ['收合', '結構', '改名', '詳情', 'AI 探索']);
 });
@@ -1581,10 +1581,10 @@ integrationTest('the New map menu no longer imports outlines; the topic side opt
   paste.click();
   const placement = modal => modal.placementRequest();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'no selection: add to the current map');
-  view.selected = 'a'; paste.click();
+  view.selection.setSelected('a'); paste.click();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'under', parentId: 'a' }, 'a selected topic: add under it');
   const count = opened.length;
-  view.path = 'elsewhere/Map.md'; view.selected = null; paste.click();
+  view.path = 'elsewhere/Map.md'; view.selection.setSelected(null); paste.click();
   assert.equal(opened.length, count, 'no editable map open: no import window (a new map starts from + New mind map)');
   view.path = `${DEFAULT_SETTINGS.topicsFolder}/Topic/Map.md`; view.openOutlineImport();
   assert.deepEqual(plain(placement(opened.at(-1))), { kind: 'tree' }, 'the palette command adds to the open map');
@@ -1692,9 +1692,9 @@ integrationTest('AIM map: arrow keys keep moving focus across full renders inste
   view.render = () => { restored.push(view.focusNodeId); fixture.build(); view.focusNodeId = null; };
   const key = (id, name) => fixture.cards()[id].handlers.get('keydown')({ key: name, target: fixture.cards()[id], preventDefault() {} });
   key('root', 'ArrowRight');
-  assert.equal(view.selected, 'a'); assert.deepEqual(restored, ['a'], 'the render restores focus to the target card');
+  assert.equal(view.selection.state.selected, 'a'); assert.deepEqual(restored, ['a'], 'the render restores focus to the target card');
   key('a', 'ArrowDown');
-  assert.equal(view.selected, 'b'); assert.deepEqual(restored, ['a', 'b'], 'the second press moves one more step');
+  assert.equal(view.selection.state.selected, 'b'); assert.deepEqual(restored, ['a', 'b'], 'the second press moves one more step');
   assert.equal(fixture.cards().b.focused, 1, 'the live card gets focus, not a detached one'); assert.equal(view.focusNodeId, null);
 });
 integrationTest('legacy AIM map: a viewport write that stamps the content language leaves no false conflict', async () => {
@@ -1734,7 +1734,7 @@ integrationTest('outline highlight follows the selected topic on in-place and fu
     view.selectMapNode(view.map.nodes.find(item => item.id === 'a'));
     assert.equal(outline.at(-1), 'a.md', `selected topic is active (aim=${aim})`);
     assert.equal(fixture.renders(), aim ? 1 : 0);
-    const previous = view.selected; view.selected = null;
+    const previous = view.selection.state.selected; view.selection.setSelected(null);
     view.commitSelection(previous, null, []);
     assert.equal(outline.at(-1), 'opened.md', `clearing selection falls back to the opened note (aim=${aim})`);
   }
@@ -1783,15 +1783,15 @@ integrationTest('Select subtopics: shown only for an unfolded, non-AIM card that
   assert.equal(has(), true, 'a has the direct subtopic c');
   assert.equal(has(undefined, 'b'), false, 'a leaf has none');
   assert.equal(has(({ doc, view }) => { doc.nodes.find(n => n.id === 'a').collapsed = true; }), false, 'a folded card hides its subtopics and offers Expand instead');
-  assert.equal(has(({ view }) => { view.integrationMode = true; }), false, 'not while selecting');
+  assert.equal(has(({ view }) => { view.selection.toggleMultiSelect(); }), false, 'not while selecting');
   assert.equal(has(({ view }) => { view.map.aim = { branches: [] }; }), false, 'not in an AIM map');
   // Root has direct children a and b but not grandchild c; the button replaces any earlier selection.
   const { fixture, buttons } = toolTexts(undefined, 'root');
   const { view } = fixture;
-  view.multiSelected = new Set(['c']); view.selected = 'b';
+  view.applySelectionChange(view.selection.replaceMulti(['c'])); view.applySelectionChange(view.selection.setSelected('b'));
   buttons.find(button => button.text === 'Select subtopics').handlers.get('click')({ stopPropagation() {} });
-  assert.deepEqual([...view.multiSelected].sort(), ['a', 'b']); assert.equal(view.selected, null);
-  assert.equal(view.integrationMode, true); assert.equal(fixture.renders(), 1);
+  assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'b']); assert.equal(view.selection.state.selected, null);
+  assert.equal(view.selection.state.multiSelectMode, true); assert.equal(fixture.renders(), 1);
 });
 integrationTest('Cmd/Ctrl+click: the first click on a second card enters selection mode, seeds the selected card, and the mode keeps toggling', () => {
   for (const key of ['metaKey', 'ctrlKey']) {
@@ -1801,23 +1801,37 @@ integrationTest('Cmd/Ctrl+click: the first click on a second card enters selecti
     const target = { closest: () => null };
     const tap = (id, extra = {}) => { cards[id].handlers.get('pointerdown')({ target, button: 0, clientX: 0, clientY: 0, pointerId: 1 }); cards[id].handlers.get('pointerup')({ type: 'pointerup', ...extra }); };
     tap('a');
-    assert.equal(view.selected, 'a');
+    assert.equal(view.selection.state.selected, 'a');
     tap('b', { [key]: true });
-    assert.deepEqual([...view.multiSelected].sort(), ['a', 'b'], 'the plain-selected card A joins B');
-    assert.equal(view.integrationMode, true); assert.equal(fixture.renders(), 1, 'the selection bar appears via a render');
+    assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'b'], 'the plain-selected card A joins B');
+    assert.equal(view.selection.state.multiSelectMode, true); assert.equal(fixture.renders(), 1, 'the selection bar appears via a render');
     // Inside the mode a Cmd/Ctrl+click toggles instead of being swallowed.
     const click = id => { view.suppressClickUntil = 0; cards[id].handlers.get('click')({ target, metaKey: key === 'metaKey', ctrlKey: key === 'ctrlKey' }); };
     click('c');
-    assert.deepEqual([...view.multiSelected].sort(), ['a', 'b', 'c']);
+    assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'b', 'c']);
     click('a');
-    assert.deepEqual([...view.multiSelected].sort(), ['b', 'c']);
+    assert.deepEqual([...view.selection.state.multiSelected].sort(), ['b', 'c']);
   }
   // A single Cmd+click with nothing selected stays a one-card selection and does not enter the mode.
   const lone = selectionView(load); lone.build();
   const cards = lone.cards();
   cards.b.handlers.get('pointerdown')({ target: { closest: () => null }, button: 0, clientX: 0, clientY: 0, pointerId: 1 });
   cards.b.handlers.get('pointerup')({ type: 'pointerup', metaKey: true });
-  assert.equal(lone.view.integrationMode, false); assert.deepEqual([...lone.view.multiSelected], ['b']); assert.equal(lone.renders(), 0);
+  assert.equal(lone.view.selection.state.multiSelectMode, false); assert.deepEqual([...lone.view.selection.state.multiSelected], ['b']); assert.equal(lone.renders(), 0);
+});
+integrationTest('applySelectionChange: a mode change renders the whole map, a selection-only change repaints the touched cards and the outline', () => {
+  const fixture = selectionView(load); const { view, outline } = fixture;
+  fixture.build(); const cards = fixture.cards();
+  view.applySelectionChange(view.selection.setSelected('a'));
+  assert.equal(fixture.renders(), 0); assert.ok(cards.a.classes.has('is-selected')); assert.equal(outline.at(-1), 'a.md');
+  view.applySelectionChange(view.selection.click('b'));
+  assert.equal(fixture.renders(), 0); assert.equal(cards.a.classes.has('is-selected'), false); assert.ok(cards.b.classes.has('is-selected')); assert.equal(outline.at(-1), 'b.md');
+  view.applySelectionChange(view.selection.toggleMultiSelect());
+  assert.equal(fixture.renders(), 1, 'turning the mode on renders the whole map'); assert.equal(view.selection.state.multiSelectMode, true); assert.equal(view.selection.state.selected, null);
+  view.applySelectionChange(view.selection.toggleByClick('c'));
+  assert.equal(fixture.renders(), 1, 'ticking a card inside the mode only repaints'); assert.deepEqual([...view.selection.state.multiSelected], ['c']);
+  view.applySelectionChange(view.selection.toggleMultiSelect());
+  assert.equal(fixture.renders(), 2); assert.equal(view.selection.state.multiSelectMode, false); assert.equal(view.selection.state.multiSelected.size, 0);
 });
 integrationTest('box selection: Shift+drag enters selection mode, an empty box changes nothing, Option+drag removes picks, Space and the middle button pan', () => {
   const fixture = selectionView(load); const { view } = fixture;
@@ -1847,23 +1861,23 @@ integrationTest('box selection: Shift+drag enters selection mode, an empty box c
   const before = fixture.renders();
   // Shift+drag over nothing: no state change.
   down({ shiftKey: true, clientX: 600, clientY: 300 }); drag(650, 340);
-  assert.equal(view.integrationMode, false); assert.equal(view.multiSelected.size, 0); assert.equal(fixture.renders(), before);
+  assert.equal(view.selection.state.multiSelectMode, false); assert.equal(view.selection.state.multiSelected.size, 0); assert.equal(fixture.renders(), before);
   // Shift+drag over a and b: enters the mode with both picked.
   down({ shiftKey: true }); drag(350, 200);
-  assert.equal(view.integrationMode, true); assert.deepEqual([...view.multiSelected].sort(), ['a', 'b']);
+  assert.equal(view.selection.state.multiSelectMode, true); assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'b']);
   assert.equal(fixture.renders(), before + 1);
   // Inside the mode, Option+drag removes only the boxed picks and previews them with is-marquee-remove.
-  view.multiSelected = new Set(['a', 'b', 'c']);
+  view.selection.replaceMulti(['a', 'b', 'c']);
   down({ altKey: true, clientX: 150, clientY: 90 }); viewport.handlers.get('pointermove')({ clientX: 350, clientY: 200 });
   assert.equal(cards.b.classes.has('is-marquee-remove'), true); assert.equal(cards.a.classes.has('is-marquee-remove'), false);
   viewport.handlers.get('pointerup')({});
-  assert.equal(cards.b.classes.has('is-marquee-remove'), false, 'the preview clears'); assert.deepEqual([...view.multiSelected].sort(), ['a', 'c']);
+  assert.equal(cards.b.classes.has('is-marquee-remove'), false, 'the preview clears'); assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'c']);
   // Option+drag over cards that are not picked changes nothing.
   down({ altKey: true, clientX: 150, clientY: 90 }); drag(350, 200);
-  assert.deepEqual([...view.multiSelected].sort(), ['a', 'c']);
+  assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'c']);
   // Plain drag adds; Space+drag and the middle button pan instead of boxing.
   down({ clientX: 150, clientY: 90 }); drag(350, 200);
-  assert.deepEqual([...view.multiSelected].sort(), ['a', 'b', 'c']);
+  assert.deepEqual([...view.selection.state.multiSelected].sort(), ['a', 'b', 'c']);
   view.spaceHeld = true; down(); assert.equal(viewport.classes.has('is-marquee'), false); assert.equal(viewport.classes.has('is-panning'), true); viewport.handlers.get('pointerup')({});
   view.spaceHeld = false; viewport.classes.delete('is-panning');
   down({ button: 1 }); assert.equal(viewport.classes.has('is-panning'), true); assert.equal(viewport.classes.has('is-marquee'), false);
@@ -1882,8 +1896,8 @@ integrationTest('selection gestures: hint texts, remove outline and the pan comm
 integrationTest('select mode: the Merge button stays focusable, names the reason in its title, and Notices instead of merging', () => {
   const fixture = selectionView(load); const { view } = fixture;
   const { translate } = load('i18n.ts');
-  view.integrationMode = true; fixture.build();
-  const bar = ids => { view.multiSelected = new Set(ids); const el = view.renderSelectionBar(selectionDom()('div')); return el.children.find(child => child.tag === 'button' && /^Merge/.test(child.text)); };
+  view.selection.toggleMultiSelect(); fixture.build();
+  const bar = ids => { view.selection.replaceMulti(ids); const el = view.renderSelectionBar(selectionDom()('div')); return el.children.find(child => child.tag === 'button' && /^Merge/.test(child.text)); };
   const one = bar(['a']);
   assert.equal(one.disabled, false, 'never natively disabled, so keyboard users can reach it');
   assert.equal(one.attrs['aria-disabled'], 'true'); assert.equal(one.attrs.title, translate('en', 'ui.merge_needs_two'));
@@ -1905,10 +1919,10 @@ integrationTest('merge dialog: Enter confirms once and is consumed; a second Mer
   const shim = { ...obsidian, Modal: FakeModal };
   const fixture = selectionView(load, {}, shim); const { view } = fixture;
   view.app = {}; const queued = []; view.enqueue = work => queued.push(work);
-  view.integrationMode = true; fixture.build();
-  view.multiSelected = new Set();
+  view.selection.toggleMultiSelect(); fixture.build();
+  view.selection.replaceMulti([]);
   view.openMerge(); assert.equal(opened.length, 0, 'empty selection is a no-op');
-  view.multiSelected = new Set(['a', 'b']);
+  view.selection.replaceMulti(['a', 'b']);
   view.openMerge(); view.openMerge(); assert.equal(opened.length, 1, 'a second press while the dialog is open is ignored');
   const modal = opened[0]; const input = modal.contentEl.children.find(c => c.tag === 'input');
   let prevented = 0, run = 0;
@@ -1924,9 +1938,9 @@ integrationTest('merge dialog offers AI only when a selected card has Detail, an
   const make = selectionDom(); const opened = [];
   class FakeModal { constructor(app) { this.app = app; const el = () => { const e = make('div'); e.setText = text => { e.text = text; }; const create = e.createEl.bind(e); e.createEl = (name, init = {}) => { const child = create(name, init); child.value = init.value; child.type = init.type; child.focus = () => {}; child.select = () => {}; child.createEl = e.createEl; child.setText = e.setText; child.createSpan = e.createSpan; return child; }; return e; }; this.titleEl = el(); this.contentEl = el(); this.modalEl = el(); } open() { opened.push(this); this.onOpen(); } close() { this.onClose?.(); } }
   const fixture = selectionView(load, {}, { ...obsidian, Modal: FakeModal }); const { view } = fixture;
-  view.app = {}; view.enqueue = () => {}; view.integrationMode = true; fixture.build();
+  view.app = {}; view.enqueue = () => {}; view.selection.toggleMultiSelect(); fixture.build();
   const checkbox = modal => modal.contentEl.children.flatMap(function walk(c) { return [c, ...c.children.flatMap(walk)]; }).find(c => c.type === 'checkbox');
-  view.multiSelected = new Set(['a', 'b']);
+  view.selection.replaceMulti(['a', 'b']);
   view.openMerge(); assert.equal(checkbox(opened[0]), undefined, 'no content: the plain structure merge');
   opened[0].close();
   view.notes.get('b').detail = 'Has content';
@@ -1944,7 +1958,7 @@ integrationTest('AIM maps never enter selection mode from Shift+drag or Cmd/Ctrl
     // Cards of these maps may not be draggable at all; the click handler must not start the mode either.
     const tap = (id, extra = {}) => { const down = cards[id].handlers.get('pointerdown'); if (down) { down({ target, button: 0, clientX: 0, clientY: 0, pointerId: 1 }); cards[id].handlers.get('pointerup')({ type: 'pointerup', ...extra }); } view.suppressClickUntil = 0; cards[id].handlers.get('click')({ target, metaKey: false, ctrlKey: false, ...extra }); };
     tap('a'); tap('b', { metaKey: true }); tap('c', { ctrlKey: true });
-    assert.equal(view.integrationMode, false, `${name}: Cmd/Ctrl+click does not start selection mode`);
+    assert.equal(view.selection.state.multiSelectMode, false, `${name}: Cmd/Ctrl+click does not start selection mode`);
     for (const [id, [left, top, right, bottom]] of Object.entries({ root: [0, 0, 100, 50], a: [200, 0, 300, 50], b: [200, 100, 300, 150], c: [400, 0, 500, 50] })) cards[id].getBoundingClientRect = () => ({ left, top, right, bottom });
     view.stageEl.querySelectorAll = () => Object.values(cards);
     const viewport = selectionDom()('viewport'); viewport.clientWidth = 800; viewport.clientHeight = 600;
@@ -1953,7 +1967,7 @@ integrationTest('AIM maps never enter selection mode from Shift+drag or Cmd/Ctrl
     assert.equal(viewport.classes.has('is-marquee'), false, `${name}: Shift+drag draws no box`);
     assert.equal(viewport.classes.has('is-panning'), true, `${name}: Shift+drag pans like a plain drag`);
     viewport.handlers.get('pointermove')({ clientX: 350, clientY: 200 }); viewport.handlers.get('pointerup')({});
-    assert.equal(view.integrationMode, false);
+    assert.equal(view.selection.state.multiSelectMode, false);
   }
 });
 
@@ -1988,7 +2002,7 @@ integrationTest('Re-run with Standard on the card: only for an idle Quick topic 
   const render = ({ note = {}, doc = map([topic]), integrationMode = false, plugin = {} } = {}) => {
     const buttons = [];
     const view = new VisualAgentMapView({ app: {} }, { pendingSuggestions: new Map(), expansionBatches: new Map(), running: new Set(), activeTasks: new Map(), quickExpandPending: new Set(), expansionCoordinator: { isQueued: () => false, isRunning: () => false }, ...plugin });
-    view.stageEl = makeElement('stage', buttons); view.map = doc; view.integrationMode = integrationMode;
+    view.stageEl = makeElement('stage', buttons); view.map = doc; if (integrationMode) view.selection.toggleMultiSelect();
     view.notes = new Map([[topic.id, { title: 'Topic', summary: 'S', status: 'completed', researchMode: 'local', detail: 'Model knowledge is insufficient.', ...note }]]);
     const rerun = []; view.rerunStandard = target => rerun.push(target.id);
     view.renderNode(topic);
@@ -2542,7 +2556,7 @@ integrationTest('hypothesis-evidence: a relation name is always shown, expands w
   evHit.fire('pointerenter'); assert.ok(heExpanded(evLabel) && !heExpanded(preLabel), 'hover expands the label'); assert.equal(head(evLabel), 'Supports: FACT → HYP');
   evHit.fire('pointerleave'); assert.ok(!heExpanded(evLabel), 'leaving collapses it'); assert.equal(evLabel.textContent, 'Supports');
   preHit.fire('pointerdown', { stopPropagation() {} }); preHit.fire('pointerleave'); assert.ok(heExpanded(preLabel), 'a selected line keeps its full label');
-  assert.equal(view.selectedRelation, heKey(heRel[1]));
+  assert.equal(view.selection.state.selectedRelation, heKey(heRel[1]));
   const x = Number(evLabel.attrs.x), y = Number(evLabel.attrs.y);
   assert.ok(x > 280 && x < 500, 'the name sits at the midpoint of the curve');
   view.dragEdges('fact', view.cardEls.get('fact')).update(0, 300);
@@ -2552,18 +2566,18 @@ integrationTest('hypothesis-evidence: selecting a topic marks the lines touching
   const { view, ev, pre, kids } = heLines({ relations: [...heRel, { kind: 'prerequisite', from: 'hyp', to: 'other' }] });
   const third = kids.filter(k => k.classes.includes('vam-relation-prerequisite'))[1];
   assert.ok(![ev, pre, third].some(l => l.classes.includes('is-related') || l.classes.includes('is-dimmed')), 'nothing selected: no highlight');
-  view.selected = 'hyp'; view.paintCards(['hyp']);
+  view.selection.setSelected('hyp'); view.paintCards(['hyp']);
   assert.ok(ev.classes.includes('is-related') && third.classes.includes('is-related')); assert.ok(pre.classes.includes('is-dimmed') && !pre.classes.includes('is-related'));
-  view.multiSelected.add('other'); view.paintCards(['other']);
+  view.selection.replaceMulti([...view.selection.state.multiSelected, 'other']); view.paintCards(['other']);
   assert.ok([ev, pre, third].every(l => l.classes.includes('is-related') && !l.classes.includes('is-dimmed')), 'union of selected and multi-selected topics');
-  view.selected = null; view.multiSelected.clear(); view.paintCards(['hyp', 'other']);
+  view.selection.setSelected(null); view.selection.replaceMulti([]); view.paintCards(['hyp', 'other']);
   assert.ok(![ev, pre, third].some(l => l.classes.includes('is-related') || l.classes.includes('is-dimmed')), 'cleared selection removes the classes in place');
   assert.equal(kids.filter(k => k.classes.includes('vam-edge')).length, 0, 'no parent-child edge exists here and none was given a highlight class');
 });
 integrationTest('hypothesis-evidence: parent-child edges get no highlight class from a topic selection', () => {
   const { view } = heLines();
   const edge = { classes: ['vam-edge'], toggleClass(n, on) { this.classes = this.classes.filter(c => c !== n); if (on) this.classes.push(n); } };
-  view.edgeEls.set('fact\u0000hyp', edge); view.selected = 'fact'; view.paintCards(['fact']);
+  view.edgeEls.set('fact\u0000hyp', edge); view.selection.setSelected('fact'); view.paintCards(['fact']);
   assert.deepEqual(edge.classes, ['vam-edge']);
 });
 integrationTest('hypothesis-evidence: a selected line is is-selected and both end cards are is-relation-end; Escape, a blank-canvas press and picking a topic clear it', () => {
@@ -2574,20 +2588,21 @@ integrationTest('hypothesis-evidence: a selected line is is-selected and both en
   preHit.fire('pointerdown', { stopPropagation() {} }); assert.deepEqual(marks(), ['fact', 'other'], 'ends move to the newly selected line'); assert.ok(!ev.classes.includes('is-selected'));
   // Escape
   view.commitSelection = (...args) => view.applySelectionState(...args);
-  view.selectedRelation = heKey(heRel[0]); view.syncRelationClasses();
-  view.selectedRelation = null; view.commitSelection(null, null, []);
+  view.selection.selectRelation(heKey(heRel[0])); view.syncRelationClasses();
+  view.selection.deselectRelation(view.selection.state.selectedRelation); view.commitSelection(null, null, []);
   assert.deepEqual(marks(), []); assert.ok(!ev.classes.includes('is-selected'), 'clearing through the selection path repaints in place');
   // picking a topic
-  evHit.fire('pointerdown', { stopPropagation() {} }); view.cardEls.get('fact').focus = () => {}; view.selected = 'other'; view.applySelectionState(null, 'other', []);
-  assert.equal(view.selectedRelation, null, 'selecting a topic clears the line'); assert.deepEqual(marks(), []);
+  evHit.fire('pointerdown', { stopPropagation() {} }); view.cardEls.get('fact').focus = () => {}; view.selection.setSelected('other'); view.applySelectionState(null, 'other', []);
+  assert.equal(view.selection.state.selectedRelation, null, 'selecting a topic clears the line'); assert.deepEqual(marks(), []);
   // blank canvas / vanished relation
   evHit.fire('pointerdown', { stopPropagation() {} }); view.map.topicRelations = [heRel[1]]; view.drawEdges();
-  assert.equal(view.selectedRelation, null, 'a relation that no longer exists cannot stay selected');
+  assert.equal(view.selection.state.selectedRelation, null, 'a relation that no longer exists cannot stay selected');
 });
 integrationTest('hypothesis-evidence: the Escape key handler and the blank-canvas release clear the line selection (source wiring)', () => {
   const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
-  assert.match(src, /if \(event\.key === "Escape"\) \{[\s\S]{0,260}this\.selectedRelation = null;/, 'Escape');
-  assert.match(src, /if \(!moved && event\.button === 0 && this\.selectedRelation\) \{\s*this\.selectedRelation = null;/, 'blank canvas release');
+  // The module's escape and clickEmpty end the line selection (tests/steps-topic-selection.cjs); the view must call them.
+  assert.match(src, /if \(event\.key === "Escape"\) \{[\s\S]{0,260}selection\.escape\(\)/, 'Escape');
+  assert.match(src, /if \(!moved && event\.button === 0\) \{[\s\S]{0,400}selection\.clickEmpty\(\)/, 'blank canvas release');
 });
 integrationTest('hypothesis-evidence: a panel row is focusable, named by direction, relation and other topic, and focus selects its line while hover previews it', () => {
   const { view, ev, pre } = heLines();
@@ -2598,8 +2613,8 @@ integrationTest('hypothesis-evidence: a panel row is focusable, named by directi
   const row = rows[0];
   assert.equal(row.tabIndex, 0, 'focusable'); assert.equal(row.attrs['aria-label'], 'FACT → Supports');
   row.fire('mouseenter'); assert.ok(ev.classes.includes('is-selected'), 'hover previews like a selection'); row.fire('mouseleave'); assert.ok(!ev.classes.includes('is-selected'));
-  row.fire('focus'); assert.ok(ev.classes.includes('is-selected') && !pre.classes.includes('is-selected')); assert.equal(view.selectedRelation, heKey(heRel[0]));
-  row.fire('blur'); assert.equal(view.selectedRelation, null);
+  row.fire('focus'); assert.ok(ev.classes.includes('is-selected') && !pre.classes.includes('is-selected')); assert.equal(view.selection.state.selectedRelation, heKey(heRel[0]));
+  row.fire('blur'); assert.equal(view.selection.state.selectedRelation, null);
 });
 integrationTest('hypothesis-evidence: pressing a relation line starts neither a pan nor a marquee, and a parent-child edge takes no press', () => {
   const { evHit, preHit, view } = heLines();
@@ -2807,7 +2822,7 @@ integrationTest('hypothesis-evidence: the panel "Edit" opens the editor for that
   const { view, modals, evHit } = heLines();
   let stopped = 0;
   evHit.fire('pointerdown', { stopPropagation() { stopped++; } });
-  assert.equal(modals.length, 0, 'the press selects only'); assert.equal(view.selectedRelation, heKey(heRel[0]));
+  assert.equal(modals.length, 0, 'the press selects only'); assert.equal(view.selection.state.selectedRelation, heKey(heRel[0]));
   evHit.fire('click', { stopPropagation() { stopped++; } });
   assert.equal(stopped, 2); assert.equal(modals.length, 1, 'the click opens the editor dialog');
   const panel = dom.element('panel'); view.renderHypothesisSection(panel, view.map.nodes[0]);
@@ -2833,7 +2848,7 @@ integrationTest('hypothesis-evidence: changing the kind is one mapChange, keeps 
   select().value = 'contradicts'; select().fire('change'); await dom.tick();
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'contradicts', from: 'a', to: 'b', description: 'note' }]);
   assert.deepEqual(calls, [false], 'exactly one undoable change, no derived-data rebuild');
-  assert.equal(view.selectedRelation, heKey({ kind: 'contradicts', from: 'a', to: 'b' }), 'the same line stays selected under its new kind');
+  assert.equal(view.selection.state.selectedRelation, heKey({ kind: 'contradicts', from: 'a', to: 'b' }), 'the same line stays selected under its new kind');
   doc.topicRelations.push({ kind: 'derives_from', from: 'b', to: 'c' }, { kind: 'derives_from', from: 'c', to: 'a' }); // decision #37: a pair holds one relation, so the refused change is now the cycle (Q7)
   select().value = 'derives_from'; select().fire('change'); await dom.tick();
   assert.equal(doc.topicRelations[0].kind, 'contradicts', 'a kind that became a cycle in the map is refused');
@@ -2844,7 +2859,7 @@ integrationTest('hypothesis-evidence: reverse swaps A and B in one change; "rela
   const { view, doc, calls, host } = heEditor(relations, relations[0]);
   dom.button(host, 'Reverse direction').click(); await dom.tick();
   assert.deepEqual(plain(doc.topicRelations), [{ kind: 'supports', from: 'b', to: 'a' }]); assert.deepEqual(calls, [false]);
-  assert.equal(view.selectedRelation, heKey({ kind: 'supports', from: 'b', to: 'a' }));
+  assert.equal(view.selection.state.selectedRelation, heKey({ kind: 'supports', from: 'b', to: 'a' }));
   const related = heEditor([{ kind: 'related', from: 'a', to: 'b' }], { kind: 'related', from: 'a', to: 'b' });
   assert.equal(dom.buttons(related.host).includes('Reverse direction'), false);
 });
@@ -2943,9 +2958,9 @@ integrationTest('hypothesis-evidence: every P24 editor rule is invisible to the 
 integrationTest('hypothesis-evidence: Delete removes the relation in one change, closes the editor, repaints the panel, and an undone/vanished relation says so', async () => {
   const relations = [{ kind: 'supports', from: 'a', to: 'b' }];
   const { view, doc, calls, closed, changed, host } = heEditor(relations, relations[0]);
-  view.selectedRelation = heKey(relations[0]);
+  view.selection.selectRelation(heKey(relations[0]));
   dom.button(host, 'Delete relation').click(); await dom.tick();
-  assert.equal('topicRelations' in doc, false); assert.deepEqual(calls, [false]); assert.equal(closed.length, 1); assert.equal(changed.length, 1); assert.equal(view.selectedRelation, null);
+  assert.equal('topicRelations' in doc, false); assert.deepEqual(calls, [false]); assert.equal(closed.length, 1); assert.equal(changed.length, 1); assert.equal(view.selection.state.selectedRelation, null);
   const gone = heEditor([], { kind: 'supports', from: 'a', to: 'b' });
   assert.ok(dom.texts(gone.host).includes('This relation no longer exists.'));
   assert.equal(dom.buttons(gone.host).includes('Delete relation'), false);
@@ -3060,7 +3075,7 @@ integrationTest('hypothesis-evidence: the labels show each kind name by default;
   assert.equal(labels[0].children[1].attrs.dy, '1.3em', 'the note is the second line'); assert.equal(labels[0].children[1].attrs.x, labels[0].attrs.x);
   hits[4].fire('pointerdown', { stopPropagation() {} });
   assert.equal(labels[4].children[0].textContent, 'Related: HYP — EXTRA'); assert.equal(labels[4].children.length, 1, 'no note, no second line');
-  assert.equal(labels[0].textContent, 'Supports', 'the previously selected label folds back'); assert.equal(view.selectedRelation, heKey(rel[4]));
+  assert.equal(labels[0].textContent, 'Supports', 'the previously selected label folds back'); assert.equal(view.selection.state.selectedRelation, heKey(rel[4]));
 });
 integrationTest('hypothesis-evidence: a long note is cut to 60 characters with an ellipsis, and markup in a note stays text (tspan textContent only, no element is built from it)', () => {
   const long = 'x'.repeat(61), exact = 'y'.repeat(60), html = '<img src=x onerror=alert(1)>';
@@ -3105,7 +3120,7 @@ integrationTest('hypothesis-evidence: a press on any of the six lines stops here
 });
 integrationTest('hypothesis-evidence: selecting a topic adds no fade class to any card; the lines get is-related and is-dimmed in all six kinds', () => {
   const { view, kids } = heSix();
-  view.selected = 'fact'; view.paintCards(['fact']);
+  view.selection.setSelected('fact'); view.paintCards(['fact']);
   for (const [id, card] of view.cardEls) assert.ok(!card.classes.some(c => /dim|fade|muted/.test(c)), `${id} is not faded`);
   const lines = kids.filter(k => k.classes.includes('vam-relation'));
   assert.equal(lines.length, 6);
@@ -3418,7 +3433,7 @@ integrationTest('topic-markers: refreshCard keeps the marker row where it was (a
 integrationTest('topic-markers: an AIM map and select mode have no marker menu and refuse a toggle', async () => {
   for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
-    if (options.integration) view.integrationMode = true;
+    if (options.integration) view.selection.toggleMultiSelect();
     const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[2]);
     assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
     view.beginMapTransaction = () => assert.fail('no transaction');
@@ -3538,7 +3553,7 @@ integrationTest('topic-color: the colour name sits with the marker and model par
 integrationTest('topic-color: an AIM map and select mode have no colour menu and refuse a change', async () => {
   for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
-    if (options.integration) view.integrationMode = true;
+    if (options.integration) view.selection.toggleMultiSelect();
     const panel = dom.element('panel'); view.renderColorSection(panel, view.map.nodes[2]);
     assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
     view.beginMapTransaction = () => assert.fail('no transaction');
@@ -3681,7 +3696,7 @@ integrationTest('topic-style: a card carries only whitelisted data-topic-style-*
 integrationTest('topic-style: an AIM map and select mode have no style menu and refuse a change', async () => {
   for (const options of [{ aim: true }, { integration: true }]) {
     const { view, writes } = heFixture(options);
-    if (options.integration) view.integrationMode = true;
+    if (options.integration) view.selection.toggleMultiSelect();
     const panel = dom.element('panel'); view.renderStyleSection(panel, view.map.nodes[2]);
     assert.deepEqual(dom.buttons(panel), [], `panel ${JSON.stringify(options)}`);
     view.beginMapTransaction = () => assert.fail('no transaction');
@@ -3812,7 +3827,7 @@ integrationTest('topic-links: the panel section lists and opens links in read-on
   {
     for (const options of [{ aim: true }, { integration: true }]) {
       const f = heFixture({ ...options, notes: heNotes([['fact', { links: ['https://a.example/x'] }], ['hyp', {}], ['other', {}]]) });
-      if (options.integration) f.view.integrationMode = true;
+      if (options.integration) f.view.selection.toggleMultiSelect();
       const panel = dom.element('panel'); f.view.renderLinkSection(panel, f.view.map.nodes[0]);
       assert.equal(dom.findAll(panel, c => c.tag === 'input').length, 0, `no input ${JSON.stringify(options)}`);
       assert.deepEqual(dom.findAll(panel, c => c.tag === 'button').map(b => b.attrs['aria-label']), ['Open a.example']);

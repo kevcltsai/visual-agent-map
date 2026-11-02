@@ -77,7 +77,7 @@ async function harness({ aim = false } = {}) {
   view.path = MAP; view.map = await repo.readMap(MAP); view.contentEl = element('div'); view.stageEl = element('div');
   view.viewportEl = element('div'); view.viewportEl.computed = style(THEME);
   if (aim) view.map.aim = { version: 1 };
-  view.integrationMode = false;
+  view.selection.exitMultiSelect('emptyMap');
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
   // The drawn DOM: two cards, a parent edge, the fishbone spine, a relation with an arrowhead marker, and a marker def.
@@ -325,7 +325,7 @@ test('AIM and integration mode can all export', async () => {
     assert.equal(h.counts.createBinary, 1, JSON.stringify(mode));
   }
   const h = await harness();
-  h.view.integrationMode = true;
+  h.view.selection.toggleMultiSelect();
   await h.view.exportMap('svg', 'vault');
   await h.settle();
   assert.equal(h.counts.createBinary, 1, 'integration');

@@ -65,7 +65,7 @@ async function harness({ aim = false, integration = false } = {}) {
   view.viewportEl.getBoundingClientRect = () => ({ left: 10, top: 5, right: 810, bottom: 605, width: 800, height: 600 });
   view.viewportEl.clientWidth = 800; view.viewportEl.clientHeight = 600;
   if (aim) view.map.aim = { version: 1 };
-  view.integrationMode = integration;
+  if (integration) view.selection.toggleMultiSelect();
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
   await view.hydrate();
@@ -244,7 +244,7 @@ test('D6 counter-example 5: a clipboard with the private format goes to the clip
 
 test('D6: image file without a selected topic becomes a canvas image at the last pointer, else the viewport centre; the keydown is never touched', async () => {
   const h = await harness();
-  h.view.selected = null;
+  h.view.selection.setSelected(null);
   // No pointer seen yet: viewport centre (400,300) in viewport pixels -> ((400-50)/2, (300-20)/2) = (175,140)
   const first = clipboardEvent({}, [file(png(300, 150), { name: 'a.png' })]);
   h.view.onClipboardEvent('paste', first);
@@ -263,7 +263,7 @@ test('D6: image file without a selected topic becomes a canvas image at the last
 
 test('D6: image file with a selected topic goes to the card (P5), not the canvas; text next to it still reaches the outline', async () => {
   const h = await harness();
-  h.view.selected = h.root.id;
+  h.view.selection.setSelected(h.root.id);
   const imageOnly = clipboardEvent({}, [file(png())]);
   h.view.onClipboardEvent('paste', imageOnly);
   await h.settle();

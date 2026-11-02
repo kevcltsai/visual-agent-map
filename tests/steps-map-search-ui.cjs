@@ -64,7 +64,7 @@ async function harness({ collapse = true } = {}) {
     view.contentEl.empty(); const overlay = view.contentEl.createDiv('vam-canvas-overlay');
     const makeDiv = overlay.createDiv.bind(overlay); // records caret restores on the search field
     overlay.createDiv = value => { const box = makeDiv(value); const makeEl = box.createEl.bind(box); box.createEl = (name, v) => { const el = makeEl(name, v); if (name === 'input') el.setSelectionRange = (a, b) => carets.push([a, b]); return el; }; return box; };
-    view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes);
+    view.cardEls.clear(); stage.children = []; view.selection.resetTabStop(view.map.nodes.map(n => ({ id: n.id, parentId: n.parentId ?? null })));
     for (const n of visible()) { view.renderNode(n); }
     for (const [id, card] of view.cardEls) { card.focus = () => { doc.activeElement = card; }; card.contains = other => other === card; card.nodeId = id; }
   };
@@ -242,7 +242,7 @@ test('34: Esc closes the box, clears the marks and returns focus to the card sea
   const h = await harness({ collapse: false });
   h.press(h.card('beta')); h.type('plan');
   assert.ok(h.card('alpha').classes.has('is-search-match'));
-  const selectedBefore = h.view.selected;
+  const selectedBefore = h.view.selection.state.selected;
   const e = h.keydown('Escape');
   assert.equal(e.prevented, true);
   assert.equal(h.view.mapSearch, null);
@@ -250,7 +250,7 @@ test('34: Esc closes the box, clears the marks and returns focus to the card sea
   assert.ok(!h.card('alpha').classes.has('is-search-match'), 'marks cleared');
   assert.ok(!h.card('alpha').classes.has('is-search-current'));
   assert.equal(h.doc.activeElement, h.card('beta'), 'focus is back on the original card');
-  assert.equal(h.view.selected, selectedBefore, 'the selection is not changed');
+  assert.equal(h.view.selection.state.selected, selectedBefore, 'the selection is not changed');
 });
 
 test('34: Esc after the original card was deleted returns focus to the map pane', async () => {

@@ -6,6 +6,7 @@ const S = require('./support.cjs');
 const replay = require('./support-replay.cjs');
 
 const { classifyProviderError, providerOfFailure, otherProviderModel } = S.load('ai/provider-error.ts');
+const { TopicSelection } = S.load('experiences/visual-map/topic-selection.ts');
 const { VisualAgentMapView } = replay.load(
   'experiences/visual-map/view.ts',
   { obsidian: { ...S.obsidian, Component: class {}, MarkdownRenderChild: class {} } },
@@ -59,10 +60,9 @@ function fixture({ notes, available = ['gpt-5.6-luna', 'claude:sonnet'], current
     plugin: { availableModels: () => available, settings: { cliModel: current }, modelLabel: id => `L:${id}` },
     notes: noteMap,
     map: { nodes },
-    multiSelected: new Set(),
-    integrationMode: false,
+    selection: new TopicSelection(),
     closed: true,
-    startMultiResearch: async (request, key) => { started.push({ request, key, selected: [...view.multiSelected] }); },
+    startMultiResearch: async (request, key) => { started.push({ request, key, selected: [...view.selection.state.multiSelected] }); },
     buttons: [],
     button(parent, text, onClick) { view.buttons.push({ text, onClick }); return { addClass() {}, setAttr() {} }; }
   });

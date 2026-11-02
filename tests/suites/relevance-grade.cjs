@@ -808,7 +808,7 @@ const manualKeys = /^relevance-(tier|reason|manual):.*\n/gm;
 // Draws one real card on a stage, the way render does, and returns its tag button.
 const paintCard = (h, key) => {
   h.plugin.expansionBatches ??= new Map(); h.plugin.pendingSuggestions ??= new Map(); h.plugin.detailsShown ??= () => false;
-  h.view.labelCard = () => {}; h.view.stageEl = element('stage'); h.view.cardEls = new Map(); h.view.tabStopId = null;
+  h.view.labelCard = () => {}; h.view.stageEl = element('stage'); h.view.cardEls = new Map(); h.view.selection.moveTabStop(null);
   h.view.renderNode(h.view.map.nodes.find(n => n.id === h.ids[key]));
   const card = h.view.stageEl.children[0];
   card.matches = () => false;
@@ -839,7 +839,7 @@ integrationTest('relevance manual: the tag is a keyboard-reachable button with a
   assert.deepEqual(menu.items.map(i => i.separator ? '-' : i.title), ['Must learn', 'Learn when needed', 'Skippable', '-', 'Hand back to AI']);
   assert.deepEqual(menu.items.slice(0, 3).map(i => i.checked), [true, false, false]);
   assert.ok(menu.pos && 'x' in menu.pos && 'y' in menu.pos, 'opens at the tag');
-  assert.equal(h.view.selected, null, 'a click on the tag does not select the card'); assert.equal(detailsOpened, 0);
+  assert.equal(h.view.selection.state.selected, null, 'a click on the tag does not select the card'); assert.equal(detailsOpened, 0);
   assert.equal(h.opened.length, 0);
 });
 

@@ -123,7 +123,7 @@ async function clipHarness({ aim = false } = {}) {
   view.path = MAP; view.map = await repo.readMap(MAP); view.stageEl = stage; view.contentEl = content;
   view.focusNode = () => {}; view.openDetails = () => {};
   view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
-  view.render = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
+  view.render = () => { view.cardEls.clear(); stage.children = []; view.selection.moveTabStop(view.defaultTabStop(view.map.nodes)); for (const n of view.map.nodes) view.renderNode(n); };
   await view.hydrate(); view.render();
   return { repo, app, contents, view, plugin, sessionFor: bundle.sessionFor, ids, notices, map: () => view.map, saved: () => repo.readMap(MAP), notes: () => view.notes, history: () => view.history.past.length };
 }
@@ -139,8 +139,8 @@ const clipboardEvent = (target, data = {}) => {
   return event;
 };
 const copyOf = (h, ids, target = card) => {
-  h.view.selected = null; h.view.multiSelected.clear();
-  if (ids.length === 1) h.view.selected = h.ids[ids[0]]; else for (const key of ids) h.view.multiSelected.add(h.ids[key]);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  if (ids.length === 1) h.view.selection.setSelected(h.ids[ids[0]]); else for (const key of ids) h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent(target);
   h.view.onClipboardEvent('copy', event);
   h.lastRaw = event.clipboardData.store.get(MIME);
@@ -151,8 +151,8 @@ const clipboardModule = load('experiences/visual-map/clipboard.ts', { obsidian }
 const parse = text => JSON.parse(JSON.stringify(clipboardModule.parseClipboard(text)));
 const files = h => [...h.contents.keys()].filter(p => p.endsWith('.md')).sort();
 const cutOf = (h, ids, target = card) => {
-  h.view.selected = null; h.view.multiSelected.clear();
-  if (ids.length === 1) h.view.selected = h.ids[ids[0]]; else for (const key of ids) h.view.multiSelected.add(h.ids[key]);
+  h.view.selection.setSelected(null); h.view.selection.replaceMulti([]);
+  if (ids.length === 1) h.view.selection.setSelected(h.ids[ids[0]]); else for (const key of ids) h.view.selection.replaceMulti([...h.view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent(target);
   h.view.onClipboardEvent('cut', event);
   h.lastRaw = event.clipboardData.store.get(MIME);
@@ -252,13 +252,13 @@ async function popoutOf(h) {
   other.path = MAP; other.map = await h.repo.readMap(MAP); other.stageEl = stage; other.contentEl = content;
   other.focusNode = () => {}; other.openDetails = () => {};
   other.hydrate = async () => { other.notes = new Map(await Promise.all(other.map.nodes.map(async n => [n.id, await h.repo.readNote(n.path)]))); };
-  other.render = () => { other.cardEls.clear(); stage.children = []; other.tabStopId = other.defaultTabStop(other.map.nodes); for (const n of other.map.nodes) other.renderNode(n); };
+  other.render = () => { other.cardEls.clear(); stage.children = []; other.selection.moveTabStop(other.defaultTabStop(other.map.nodes)); for (const n of other.map.nodes) other.renderNode(n); };
   await other.hydrate(); other.render();
   h.app.workspace = { getLeavesOfType: () => [{ view: h.view }, { view: other }] };
   return other;
 }
 const cutIn = (h, view, key) => {
-  view.selected = h.ids[key]; view.multiSelected.clear();
+  view.selection.setSelected(h.ids[key]); view.selection.replaceMulti([]);
   const event = clipboardEvent(card);
   view.onClipboardEvent('cut', event);
   return event.clipboardData.store.get(MIME);
@@ -270,7 +270,7 @@ test('F-4 a cut made in a popout window is cleared there when another view copie
   cutIn(h, pop, 'branch');
   assert.deepEqual(cutMarked(pop), [h.ids.branch, h.ids.kid].sort(), 'the popout shows the cut');
   assert.equal(h.sessionFor(h.plugin).get()?.mode, 'cut');
-  h.view.selected = h.ids.leaf; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.leaf); h.view.selection.replaceMulti([]);
   h.view.onClipboardEvent('copy', clipboardEvent(card));
   assert.equal(h.sessionFor(h.plugin).get()?.mode, 'copy', 'the copy replaced the cut');
   assert.deepEqual(cutMarked(pop), [], 'no is-cut left in the popout');
@@ -285,7 +285,7 @@ test('F-4 a cut shows in every window that shows the map, and goes away everywhe
   cutIn(h, h.view, 'branch');
   assert.deepEqual(cutMarked(h.view), [h.ids.branch, h.ids.kid].sort());
   assert.deepEqual(cutMarked(pop), [h.ids.branch, h.ids.kid].sort(), 'the other window shows it too');
-  pop.selected = h.ids.other; pop.multiSelected.clear();
+  pop.selection.setSelected(h.ids.other); pop.selection.replaceMulti([]);
   const foreign = clipboardEvent(card, { 'text/plain': 'something else' });
   pop.onClipboardEvent('paste', foreign);
   await tick(); await tick();
@@ -295,13 +295,13 @@ test('F-4 a cut shows in every window that shows the map, and goes away everywhe
 test('F-4 counter-example: with no cut pending a copy leaves the other windows alone, and a valid cut keeps its mark through a matching paste check', async () => {
   const h = await clipHarness();
   const pop = await popoutOf(h);
-  h.view.selected = h.ids.leaf; h.view.multiSelected.clear();
+  h.view.selection.setSelected(h.ids.leaf); h.view.selection.replaceMulti([]);
   assert.doesNotThrow(() => h.view.onClipboardEvent('copy', clipboardEvent(card)));
   assert.deepEqual(cutMarked(pop), []);
   const raw = cutIn(h, h.view, 'branch');
   assert.deepEqual(cutMarked(pop), [h.ids.branch, h.ids.kid].sort());
   // A paste of the exact string into a topic of this very branch is refused, but the cut itself is still valid.
-  pop.selected = h.ids.kid; pop.multiSelected.clear();
+  pop.selection.setSelected(h.ids.kid); pop.selection.replaceMulti([]);
   pop.onClipboardEvent('paste', clipboardEvent(card, { [MIME]: raw }));
   await tick(); await tick();
   assert.equal(h.sessionFor(h.plugin).get()?.mode, 'cut', 'the cut is still pending');

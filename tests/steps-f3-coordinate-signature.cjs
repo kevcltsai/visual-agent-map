@@ -103,7 +103,7 @@ async function harness() {
     view.path = path; view.map = await repo.readMap(path); view.stageEl = stage; view.contentEl = content;
     view.focusNode = () => {}; view.openDetails = () => {};
     view.hydrate = async () => { view.notes = new Map(await Promise.all(view.map.nodes.map(async n => [n.id, await repo.readNote(n.path)]))); };
-    view.render = () => { view.cardEls.clear(); stage.children = []; view.tabStopId = view.defaultTabStop(view.map.nodes); for (const n of view.map.nodes) view.renderNode(n); };
+    view.render = () => { view.cardEls.clear(); stage.children = []; view.selection.moveTabStop(view.defaultTabStop(view.map.nodes)); for (const n of view.map.nodes) view.renderNode(n); };
     await view.hydrate(); view.render();
     return view;
   };
@@ -122,14 +122,14 @@ const clipboardEvent = (data = {}) => {
 };
 const cutInA = (h, keys) => {
   const view = h.viewA;
-  view.selected = null; view.multiSelected.clear();
-  for (const key of keys) view.multiSelected.add(h.ids[key]);
+  view.selection.setSelected(null); view.selection.replaceMulti([]);
+  for (const key of keys) view.selection.replaceMulti([...view.selection.state.multiSelected, h.ids[key]]);
   const event = clipboardEvent();
   view.onClipboardEvent('cut', event);
   return event.clipboardData.store.get(MIME);
 };
 const pasteIntoB = async (h, raw, target = 'anchor') => {
-  h.viewB.selected = h.ids[target]; h.viewB.multiSelected.clear();
+  h.viewB.selection.setSelected(h.ids[target]); h.viewB.selection.replaceMulti([]);
   const event = clipboardEvent({ [MIME]: raw });
   h.viewB.onClipboardEvent('paste', event);
   await h.idle();

@@ -226,12 +226,12 @@ test('frames cannot be changed on an AIM map; in selection mode they are drawn b
 
 test('the selection bar offers "Add frame" for the selected topics', async () => {
   const h = await harness();
-  h.view.multiSelected = new Set([h.ids.root, h.ids.child]);
+  h.view.selection.replaceMulti([h.ids.root, h.ids.child]);
   const bar = h.view.renderSelectionBar(element('div'));
   const add = find(bar, i => i.tag === 'button' && i.text === 'Add frame');
   assert.ok(add, 'button present');
   assert.ok(!add.disabled);
-  h.view.multiSelected = new Set();
+  h.view.selection.replaceMulti([]);
   const empty = find(h.view.renderSelectionBar(element('div')), i => i.tag === 'button' && i.text === 'Add frame');
   assert.equal(empty.disabled, true);
 });

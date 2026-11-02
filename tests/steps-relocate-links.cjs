@@ -306,7 +306,7 @@ async function viewScenario() {
   app.fileManager.renameFile = async (item, target) => { calls.file.push([item.path, target]); return renameFile(item, target); };
   const watched = [parent, ...sources].map(note => note.path);
   const original = new Map(watched.map(path => [path, contents.get(path)]));
-  const select = () => { view.multiSelected = new Set(sources.map(note => note.id)); };
+  const select = () => { view.selection.replaceMulti(sources.map(note => note.id)); };
   const merge = async () => {
     select();
     const check = view.mergeCheck();

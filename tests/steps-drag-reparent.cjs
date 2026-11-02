@@ -3,13 +3,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
-// Sets the selection through the module bridge: mode on or off, then the ticked topics; the picked topic is kept.
-const setSelection = (view, mode, ids = [...view.multiSelected]) => view.runSelection(s => {
-  const keep = s.state.selected;
+// Sets the selection through the selection module: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.selection.state.multiSelected]) => {
+  const s = view.selection, keep = s.state.selected;
   if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
   s.setSelected(keep);
   return s.replaceMulti(ids);
-}, () => {});
+};
 
 // root(0,0) -> a(400,0) -> c(800,0); root -> b(400,200); root -> d(400,400). Every card is 280 x 100, zoom 1.
 // The fake card rect equals its position, so a pointer's client position is also its map position.
@@ -154,9 +154,9 @@ test('the highlight moves with the pointer and a drag onto the chat is still a r
 
 test('a single-card drag keeps the picked cards picked', () => {
   const h = harness();
-  setSelection(h.view, h.view.integrationMode, ['a']);
+  setSelection(h.view, h.view.selection.state.multiSelectMode, ['a']);
   h.drag('d', 450, 250); h.drop('d', 450, 250);
-  assert.deepEqual([...h.view.multiSelected], ['a']);
+  assert.deepEqual([...h.view.selection.state.multiSelected], ['a']);
 });
 
 test('group drag: dropping the picked branches on a card outside them moves them under it in one change', async () => {
@@ -168,7 +168,7 @@ test('group drag: dropping the picked branches on a card outside them moves them
   assert.equal(h.changes.length, 1);
   const after = h.saved();
   assert.equal(after.a.parentId, 'd'); assert.equal(after.b.parentId, 'd'); assert.equal(after.c.parentId, 'a', 'c travels inside a');
-  assert.equal(h.view.multiSelected.size, 0, 'moving a group clears the selection, like Move to...');
+  assert.equal(h.view.selection.state.multiSelected.size, 0, 'moving a group clears the selection, like Move to...');
 });
 
 test('group drag: a picked card or a descendant of one is refused with a Notice, nothing is written', () => {

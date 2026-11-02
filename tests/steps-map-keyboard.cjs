@@ -5,13 +5,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinator, until } = require('./support.cjs');
 const dom = require('./support-dom.cjs');
-// Sets the selection through the module bridge: mode on or off, then the ticked topics; the picked topic is kept.
-const setSelection = (view, mode, ids = [...view.multiSelected]) => view.runSelection(s => {
-  const keep = s.state.selected;
+// Sets the selection through the selection module: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.selection.state.multiSelected]) => {
+  const s = view.selection, keep = s.state.selected;
   if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
   s.setSelected(keep);
   return s.replaceMulti(ids);
-}, () => {});
+};
 const { element, tick } = dom;
 // A card-sized DOM stand-in (one handler per event name, like the view's own selection tests).
 const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, focused: 0, isConnected: true,
@@ -63,7 +63,7 @@ async function harness({ language = 'en' } = {}) {
   let renders = 0;
   view.hydrate = reload;
   view.render = () => { renders++; build(); };
-  const build = () => { view.cardEls.clear(); stage.children = []; view.runSelection(s => s.resetTabStop(view.map.nodes.map(n => ({ id: n.id, parentId: n.parentId ?? null }))), () => {}); for (const n of view.map.nodes) view.renderNode(n); };
+  const build = () => { view.cardEls.clear(); stage.children = []; view.selection.resetTabStop(view.map.nodes.map(n => ({ id: n.id, parentId: n.parentId ?? null }))); for (const n of view.map.nodes) view.renderNode(n); };
   await reload(); build();
   const added = [];
   view.addNode = async (parent, title) => { added.push(parent ? parent.id : null); };

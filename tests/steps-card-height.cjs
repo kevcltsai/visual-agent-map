@@ -387,7 +387,7 @@ const renderedSpans = (setup) => {
 test('P6 a card rendered during a presentation still has all three handles; they are inert and hidden by CSS, so ending it needs no repaint', () => {
   assert.deepEqual(renderedSpans(() => {}), ['vam-card-resize', 'vam-card-resize-y', 'vam-card-resize-corner']);
   assert.deepEqual(renderedSpans(view => { view.presentation = { currentId: 'parent' }; }), ['vam-card-resize', 'vam-card-resize-y', 'vam-card-resize-corner']);
-  assert.deepEqual(renderedSpans(view => { view.integrationMode = true; }), [], 'selection mode keeps its own rule');
+  assert.deepEqual(renderedSpans(view => { view.selection.toggleMultiSelect(); }), [], 'selection mode keeps its own rule');
   assert.deepEqual(renderedSpans(view => { view.map.aim = { version: 1 }; }), [], 'AIM keeps its own rule');
 });
 

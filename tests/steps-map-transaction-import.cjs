@@ -125,13 +125,13 @@ for (const kind of ['tree', 'under']) {
 
 test('I4: saveMap fails (locked); the import rejects with locked, the selection stays, the Vault is as before', async () => {
   const h = await harness();
-  h.view.selected = h.root.id;
+  h.view.selection.setSelected(h.root.id);
   const before = h.snapshot(), entries = h.view.history.past.length;
   failOnce(h.spy, 'saveMap', new Error('locked'));
   const error = await h.rejected(h.view.importOutlineIntoMap(request(tree4, { shallowResearch: true }), { kind: 'under', parentId: h.root.id }));
   assert.match(error.message, /locked/);
   assertRolledBack(h, before, entries, 'saveMap');
-  assert.equal(h.view.selected, h.root.id, 'selection unchanged');
+  assert.equal(h.view.selection.state.selected, h.root.id, 'selection unchanged');
   assert.equal(h.trashed().length, 4);
   assert.deepEqual(h.notices, []);
 });

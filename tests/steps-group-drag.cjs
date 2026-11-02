@@ -3,13 +3,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const support = require('./support.cjs');
 const dom = require('./support-dom.cjs');
-// Sets the selection through the module bridge: mode on or off, then the ticked topics; the picked topic is kept.
-const setSelection = (view, mode, ids = [...view.multiSelected]) => view.runSelection(s => {
-  const keep = s.state.selected;
+// Sets the selection through the selection module: mode on or off, then the ticked topics; the picked topic is kept.
+const setSelection = (view, mode, ids = [...view.selection.state.multiSelected]) => {
+  const s = view.selection, keep = s.state.selected;
   if (s.state.multiSelectMode !== mode) s.toggleMultiSelect();
   s.setSelected(keep);
   return s.replaceMulti(ids);
-}, () => {});
+};
 const geometry = support.load('experiences/visual-map/relation-geometry.ts');
 const SEP = '\u0000';
 
@@ -76,7 +76,7 @@ test('group drag: the offset follows the zoom and the saved positions are rounde
 
 test('group drag: an edge with both ends in the group uses both new positions, one end keeps the measured far end', () => {
   const h = harness();
-  setSelection(h.view, h.view.integrationMode, ['a', 'c']);
+  setSelection(h.view, h.view.selection.state.multiSelectMode, ['a', 'c']);
   h.down('a'); h.fire('a', 'pointermove', 0, 100); h.flush();
   assert.notEqual(h.edges['a>c'].attrs.d, undefined);
   assert.match(h.edges['a>c'].attrs.d, /^M 680 150 /, 'starts at the moved parent right edge, centre height');
@@ -87,7 +87,7 @@ test('group drag: an edge with both ends in the group uses both new positions, o
 
 test('group drag: a relation between two picked cards follows both', () => {
   const h = harness();
-  setSelection(h.view, h.view.integrationMode, ['b', 'd']);
+  setSelection(h.view, h.view.selection.state.multiSelectMode, ['b', 'd']);
   h.down('b'); h.fire('b', 'pointermove', 0, 40); h.flush();
   assert.equal(h.relation.attrs.d, geometry.relationPathData(box(400, 240), box(400, 440)));
 });
@@ -161,7 +161,7 @@ test('timeline: a group with a first-level topic does not move and says why once
   assert.equal(h.changes.length, 0); assert.equal(h.cards.a.style.left, '400px');
   assert.deepEqual(notes, ['First-level topics in a timeline are reordered by dragging and cannot move as a group; uncheck them and drag again']);
   const ok = harness({ layout: 'timeline' });
-  setSelection(ok.view, ok.view.integrationMode, ['c']);
+  setSelection(ok.view, ok.view.selection.state.multiSelectMode, ['c']);
   ok.down('c'); ok.fire('c', 'pointermove', 40, 0); ok.fire('c', 'pointerup', 40, 0);
   assert.equal(ok.changes.length, 1); assert.deepEqual(ok.saved().c, [840, 0]);
 });
@@ -194,7 +194,7 @@ test('fishbone: a picked head and topic move the spine with them', () => {
   const spine = { attrs: {}, setAttribute(name, value) { this.attrs[name] = value; } };
   h.view.spineEls = new Map([['root', spine]]);
   h.view.canvasNodes = () => h.doc.nodes;
-  setSelection(h.view, h.view.integrationMode, ['a', 'b']);
+  setSelection(h.view, h.view.selection.state.multiSelectMode, ['a', 'b']);
   h.down('a'); h.fire('a', 'pointermove', 0, 50); h.flush();
   assert.equal(spine.attrs.d, geometry.fishboneSpinePathData(box(0, 0), [box(400, 50), box(400, 250), box(400, 400)]));
 });

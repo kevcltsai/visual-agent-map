@@ -50,7 +50,7 @@ test('counterexample 1: multi-topic research with a picked model leaves every to
   const h = await harness([['A', 'gpt-6-luna', 'workspace'], ['B', 'model-b', 'manual', 'high'], ['C', 'gpt-6-luna', 'inherited']]);
   const before = h.nodes.map(node => modelLines(h.raw(node)));
   const whole = h.nodes.map(node => h.raw(node).match(/^model-source:.*$/m)?.[0]);
-  h.view.multiSelected = new Set(h.nodes.map(node => node.id));
+  h.view.selection.replaceMulti(h.nodes.map(node => node.id));
   await h.view.startMultiResearch({ requirements: '', model: 'claude:sonnet', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
   await until(() => h.calls.length === 3);
   assert.deepEqual(h.calls.map(call => call.model), ['claude:sonnet', 'claude:sonnet', 'claude:sonnet'], 'overridden topics use it too (D4)');
@@ -62,7 +62,7 @@ test('counterexample 1: multi-topic research with a picked model leaves every to
 
 test('multi-topic research without a picked model keeps each topic on its own model', async () => {
   const h = await harness([['A', 'gpt-6-luna', 'workspace'], ['B', 'model-b', 'manual', 'high']]);
-  h.view.multiSelected = new Set(h.nodes.map(node => node.id));
+  h.view.selection.replaceMulti(h.nodes.map(node => node.id));
   await h.view.startMultiResearch({ requirements: '', researchMode: 'local', researchDepth: 'normal', imageSearch: false });
   await until(() => h.calls.length === 2);
   assert.deepEqual(h.calls.map(call => [call.model, call.reasoning]).sort(), [['gpt-6-luna', 'low'], ['model-b', 'high']]);

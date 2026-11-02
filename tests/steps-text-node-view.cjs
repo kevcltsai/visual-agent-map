@@ -154,7 +154,7 @@ test('counter-example: AIM and presentation cannot edit text', async () => {
 test('canvas-text-node: add without a selection makes a free text block in the view center (one undo step, editor opens)', async () => {
   const h = await harness();
   h.view.viewportEl = { clientWidth: 800, clientHeight: 600, getBoundingClientRect: () => ({ left: 0, right: 800, top: 0, bottom: 600 }) };
-  h.view.selected = null;
+  h.view.selection.setSelected(null);
   const past = h.view.history.past.length;
   h.view.addTextNodeUnder();
   await h.settle();
@@ -173,7 +173,7 @@ test('canvas-text-node: add without a selection makes a free text block in the v
 
 test('canvas-text-node: with a selected topic the command still hangs the block on the tree', async () => {
   const h = await harness();
-  h.view.selected = h.root.id;
+  h.view.selection.setSelected(h.root.id);
   h.view.addTextNodeUnder();
   await h.settle();
   assert.equal((await h.onDisk())[0].parentId, h.root.id);

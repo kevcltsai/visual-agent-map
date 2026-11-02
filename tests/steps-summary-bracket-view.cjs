@@ -140,7 +140,7 @@ test('render: a folded parent hides the bracket and keeps the data; each arrange
 
 test('A3 create: three topics under one parent open an editor; Cmd/Ctrl+Enter writes one undo step, undo and redo round-trip', async () => {
   const h = await harness();
-  h.view.multiSelected = new Set([h.ids.c, h.ids.b]);
+  h.view.selection.replaceMulti([h.ids.c, h.ids.b]);
   const past = h.view.history.past.length;
   h.view.addSummaryOver();
   assert.ok(h.area(), 'the editor opens at once');
@@ -163,7 +163,7 @@ test('A3 create: three topics under one parent open an editor; Cmd/Ctrl+Enter wr
 test('Critical Path: Esc, empty text and a view that closes leave no bracket and no editor state', async () => {
   const h = await harness();
   const past = h.view.history.past.length;
-  h.view.multiSelected = new Set([h.ids.b]);
+  h.view.selection.replaceMulti([h.ids.b]);
   h.view.addSummaryOver();
   h.area().value = 'draft';
   h.area().fire('keydown', { key: 'Escape' });
@@ -186,7 +186,7 @@ test('Critical Path: Esc, empty text and a view that closes leave no bracket and
 
 test('Critical Path: a repaint while typing keeps the draft; members that vanish drop the unfinished bracket', async () => {
   const h = await harness();
-  h.view.multiSelected = new Set([h.ids.b, h.ids.c]);
+  h.view.selection.replaceMulti([h.ids.b, h.ids.c]);
   h.view.addSummaryOver();
   h.area().value = 'half written';
   h.view.render();
@@ -202,7 +202,7 @@ test('A3 refusals: not adjacent, across parents, the root, a balanced run over b
   const h = await harness();
   const refuse = async (ids, text) => {
     h.notices.length = 0;
-    h.view.multiSelected = new Set(ids);
+    h.view.selection.replaceMulti(ids);
     h.view.addSummaryOver();
     assert.equal(h.view.pendingSummary, null, text);
     assert.equal(h.area(), undefined, text);
@@ -219,11 +219,11 @@ test('A3 refusals: not adjacent, across parents, the root, a balanced run over b
   const moved = await harness({ direction: 'balanced' });
   Object.assign(moved.layout, { [moved.ids.c]: [-400, 300], [moved.ids.d]: [-400, 450] });
   moved.view.render();
-  moved.view.multiSelected = new Set([moved.ids.b, moved.ids.c]);
+  moved.view.selection.replaceMulti([moved.ids.b, moved.ids.c]);
   moved.view.addSummaryOver();
   assert.equal(moved.view.pendingSummary, null);
   assert.equal(moved.notices[0], 'Select topics on one side only; a bracket cannot span both halves of a balanced map.');
-  moved.view.multiSelected = new Set([moved.ids.c, moved.ids.d]);
+  moved.view.selection.replaceMulti([moved.ids.c, moved.ids.d]);
   moved.view.addSummaryOver();
   assert.ok(moved.view.pendingSummary, 'one half is fine');
   assert.deepEqual(await h.onDisk(), []);
@@ -269,12 +269,12 @@ test('A3 range: the menu replaces the range with the selected topics in one step
   const titles = h.menus.at(-1).items.map(i => i.title);
   assert.deepEqual(titles, ['Edit summary…', 'Use the selected topics as the range', 'Remove summary bracket']);
   const past = h.view.history.past.length;
-  h.view.multiSelected = new Set([h.ids.a, h.ids.c]);
+  h.view.selection.replaceMulti([h.ids.a, h.ids.c]);
   h.menus.at(-1).items[1].click();
   await h.settle();
   assert.deepEqual((await h.onDisk())[0].members, [h.ids.b, h.ids.c], 'not adjacent: unchanged');
   assert.equal(h.view.history.past.length, past);
-  h.view.multiSelected = new Set([h.ids.c, h.ids.d]);
+  h.view.selection.replaceMulti([h.ids.c, h.ids.d]);
   h.menus.at(-1).items[1].click();
   await h.settle();
   assert.deepEqual((await h.onDisk())[0].members, [h.ids.c, h.ids.d]);
@@ -335,7 +335,7 @@ test('entries: right-click on a card offers the bracket for the multi-selection 
     if (mode === 'aim') g.view.map.aim = { branches: [] };
     if (mode === 'presentation') g.view.presentation = { order: [], currentId: 'x' };
     g.view.render();
-    g.view.multiSelected = new Set([g.ids.c]);
+    g.view.selection.replaceMulti([g.ids.c]);
     g.view.addSummaryOver();
     assert.equal(g.view.pendingSummary, null, mode);
     find(g.el('s1'), i => dom.hasCls(i, 'vam-summary-text')).fire('dblclick', {});

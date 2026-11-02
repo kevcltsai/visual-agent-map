@@ -42717,9 +42717,9 @@ ${written2.detail}` : written2.detail,
    * The note style of the final conclusion (the user's AIM row), or undefined for the AIM report. Read once per
    * workflow entry. Research calls never carry a tone; the map tone is not read here.
    */
-  styleOf(language2) {
+  async styleOf(language2) {
     var _a2;
-    return aimNoteStyleOf((_a2 = this.noteStyle) == null ? void 0 : _a2.call(this, language2));
+    return aimNoteStyleOf(await ((_a2 = this.noteStyle) == null ? void 0 : _a2.call(this, language2)));
   }
   /** Content language of the map as read now; never cached on the flow, so a UI language switch cannot change it. */
   languageOf(map) {
@@ -43413,7 +43413,7 @@ ${delivery.evidence}` },
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
-    const aimStyle = this.styleOf(language2);
+    const aimStyle = await this.styleOf(language2);
     const priorAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !priorAttempt || priorAttempt.status !== "failed")
       throw new Error("A saved failed AIM attempt is required to review a diagnostic report.");
@@ -43777,7 +43777,7 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
-    const aimStyle = this.styleOf(language2);
+    const aimStyle = await this.styleOf(language2);
     const currentAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !currentAttempt || ["running", "saving"].includes(currentAttempt.status) || !["partial", "failed", "cancelled"].includes(currentAttempt.status))
       throw new Error("Only a saved partial branch without active work can be continued.");
@@ -44993,7 +44993,7 @@ ${note.detail}`
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     let map = await this.repository.readMap(mapPath);
     const language2 = this.languageOf(map);
-    const aimStyle = this.styleOf(language2);
+    const aimStyle = await this.styleOf(language2);
     let branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch) throw new Error("AIM answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;
@@ -63181,9 +63181,13 @@ ${addition}` : addition });
    * outline cannot hold (0 or more than 12 sections), falls back to the AIM report; the user is told once per map in
    * this view. Nothing is written.
    */
-  aimNoteStyle(language2) {
+  async aimNoteStyle(language2) {
     var _a2;
     if (!this.plugin.settings) return void 0;
+    try {
+      await this.noteStyles.refresh();
+    } catch (e) {
+    }
     const style = this.noteStyles.runStyle({ kind: "aim", outputLanguage: language2 });
     const ref = (_a2 = this.plugin.settings.noteStyleByKind) == null ? void 0 : _a2.aim;
     const sections = style.template.sections.length;

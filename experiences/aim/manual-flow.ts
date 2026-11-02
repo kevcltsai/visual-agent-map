@@ -181,7 +181,7 @@ export class AimManualFlow {
   }) => Promise<string>;
 
   /** The user's AIM note style for the final conclusion; set by the view, absent in tests: the AIM report. */
-  noteStyle?: (language: ContentLanguage) => RunStyle | undefined;
+  noteStyle?: (language: ContentLanguage) => RunStyle | undefined | Promise<RunStyle | undefined>;
 
   private emitProgress(event: AimProgressEvent): void {
     try {
@@ -329,8 +329,8 @@ export class AimManualFlow {
    * The note style of the final conclusion (the user's AIM row), or undefined for the AIM report. Read once per
    * workflow entry. Research calls never carry a tone; the map tone is not read here.
    */
-  private styleOf(language: ContentLanguage): AimNoteStyle | undefined {
-    return aimNoteStyleOf(this.noteStyle?.(language));
+  private async styleOf(language: ContentLanguage): Promise<AimNoteStyle | undefined> {
+    return aimNoteStyleOf(await this.noteStyle?.(language));
   }
 
   /** Content language of the map as read now; never cached on the flow, so a UI language switch cannot change it. */
@@ -1140,7 +1140,7 @@ export class AimManualFlow {
     const map = await this.repository.readMap(mapPath),
       run = map.aim?.runs.find(item => item.id === runId);
     const language = this.languageOf(map);
-    const aimStyle = this.styleOf(language);
+    const aimStyle = await this.styleOf(language);
     const priorAttempt = run?.attempts.find(item => item.id === run.currentAttemptId);
     if (!run || !priorAttempt || priorAttempt.status !== "failed")
       throw new Error("A saved failed AIM attempt is required to review a diagnostic report.");
@@ -1534,7 +1534,7 @@ export class AimManualFlow {
     const map = await this.repository.readMap(mapPath),
       run = map.aim?.runs.find(item => item.id === runId);
     const language = this.languageOf(map);
-    const aimStyle = this.styleOf(language);
+    const aimStyle = await this.styleOf(language);
     const currentAttempt = run?.attempts.find(item => item.id === run.currentAttemptId);
     if (
       !run ||
@@ -3019,7 +3019,7 @@ export class AimManualFlow {
   ): Promise<ManualResearchResult> {
     let map = await this.repository.readMap(mapPath);
     const language = this.languageOf(map);
-    const aimStyle = this.styleOf(language);
+    const aimStyle = await this.styleOf(language);
     let branch = map.aim?.branches.find(item => item.id === branchId);
     if (!branch) throw new Error("AIM answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;

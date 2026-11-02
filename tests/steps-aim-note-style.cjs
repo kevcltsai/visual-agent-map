@@ -171,7 +171,7 @@ const { createAimMap } = S.load('experiences/aim/create-map.ts');
 const MODEL = 'gpt-6-luna';
 const PLAIN_STYLE = runStyle([section('Answer', 'The answer.')], { toneText: 'Write in plain words.' });
 
-async function concludeSeen({ toneId, port, afterRun } = {}) {
+async function concludeSeen({ toneId, port, afterRun, tasks } = {}) {
   const data = S.fixture();
   const model = S.coverageModel();
   const created = await createAimMap(data.repo, MODEL, { requestId: 'style-flow', topic: 'style', context: 'Initial clarification: known background.', minimumAnswersBeforeConclusion: 3 });
@@ -183,7 +183,8 @@ async function concludeSeen({ toneId, port, afterRun } = {}) {
   }
   const seen = [];
   const flow = new AimManualFlow(repo, new AimRunStore(repo), (context, ...rest) => {
-    seen.push({ phase: M.aimPhase(context.task), structured: !!context.aimContract, hasTone: 'toneText' in context, toneText: context.toneText });
+    tasks?.push({ phase: M.aimPhase(context.task), task: String(context.task) });
+    seen.push({ phase: M.aimPhase(context.task),  structured: !!context.aimContract, hasTone: 'toneText' in context, toneText: context.toneText });
     return model.ask(context, ...rest);
   });
   if (port) flow.noteStyle = port;
@@ -217,7 +218,7 @@ test('counter 10: an AIM run writes neither noteStyleByKind nor the map tone', a
   assert.equal(JSON.stringify(S.DEFAULT_SETTINGS.noteStyleByKind ?? null), settingsBefore);
 });
 
-test('counter 6: an AIM row that cannot be read, or has 0 or 13 sections, falls back to the AIM report with one Notice per map', () => {
+test('counter 6: an AIM row that cannot be read, or has 0 or 13 sections, falls back to the AIM report with one Notice per map', async () => {
   const notices = [];
   const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: dom.makeNotice(notices) } });
   const aimDefault = { recipe: { ref: 'builtin:aim', name: 'AIM', source: 'default', aimDelivery: true }, template: { id: 'standard', name: 'S', sections: [section('x')] }, formatText: '', issues: { missing: ['file:Gone'], blockIssues: [] } };
@@ -226,25 +227,25 @@ test('counter 6: an AIM row that cannot be read, or has 0 or 13 sections, falls 
   const plugin = {
     repo: S.fixture().repo,
     settings: { ...S.DEFAULT_SETTINGS, noteStyleByKind: { aim: 'file:Gone' } },
-    noteStyles: { runStyle: request => { assert.equal(request.kind, 'aim'); return answer; }, create: () => writes.push('create'), createFolder: () => writes.push('createFolder'), trash: () => writes.push('trash') }
+    noteStyles: { refresh: async () => undefined, runStyle: request => { assert.equal(request.kind, 'aim'); return answer; }, create: () => writes.push('create'), createFolder: () => writes.push('createFolder'), trash: () => writes.push('trash') }
   };
   const view = new VisualAgentMapView({ app: {} }, plugin);
   view.path = 'Maps/A.md';
-  assert.equal(M.aimNoteStyleOf(view.aimNoteStyle('en')), undefined);
+  assert.equal(M.aimNoteStyleOf(await view.aimNoteStyle('en')), undefined);
   assert.equal(notices.length, 1, 'missing row: one Notice');
-  view.aimNoteStyle('en');
+  await view.aimNoteStyle('en');
   assert.equal(notices.length, 1, 'the same map path is told once');
   view.path = 'Maps/B.md';
   answer = runStyle(Array.from({ length: 13 }, (_, i) => section(`S${i}`)), { issues: { missing: [], blockIssues: [] } });
-  assert.equal(M.aimNoteStyleOf(view.aimNoteStyle('en')), undefined);
+  assert.equal(M.aimNoteStyleOf(await view.aimNoteStyle('en')), undefined);
   assert.equal(notices.length, 2, '13 sections: a Notice for another map');
   view.path = 'Maps/C.md';
   answer = runStyle([], { issues: { missing: [], blockIssues: [] } });
-  assert.equal(M.aimNoteStyleOf(view.aimNoteStyle('en')), undefined);
+  assert.equal(M.aimNoteStyleOf(await view.aimNoteStyle('en')), undefined);
   assert.equal(notices.length, 3, '0 sections: a Notice');
   view.path = 'Maps/D.md';
   answer = runStyle(HYPOTHESIS, { issues: { missing: [], blockIssues: [] } });
-  assert.ok(M.aimNoteStyleOf(view.aimNoteStyle('en')), 'a usable style stands');
+  assert.ok(M.aimNoteStyleOf(await view.aimNoteStyle('en')), 'a usable style stands');
   assert.equal(notices.length, 3);
   assert.deepEqual(writes, [], 'the store port is never written');
 });
@@ -254,4 +255,47 @@ test('counter 6: a flow whose port returns the AIM report style sends the same c
   const none = await concludeSeen();
   const report = await concludeSeen({ port: () => aimStyleRow });
   assert.deepEqual(report, none);
+});
+
+// ---- F1: the AIM entry reads the style folder itself; the store only knows the folder after a refresh ----
+const { NoteStyleStore } = S.load('ai/note-style-store.ts');
+function diskStore() {
+  const files = { 'WS/S/Styles/Mix.md': '---\nstructure: Claim to verdict\n---\n' };
+  const under = folder => Object.keys(files).filter(file => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/'));
+  const port = {
+    list: async folder => under(folder).map(file => file.slice(folder.length + 1)).filter(name => name.endsWith('.md')),
+    read: async file => { if (!(file in files)) throw new Error(file); return files[file]; },
+    folderExists: folder => Object.keys(files).some(file => file.startsWith(`${folder}/`)),
+    createFolder: async () => undefined, create: async () => undefined, trash: async () => undefined
+  };
+  const settings = { ...S.DEFAULT_SETTINGS, detailTemplates: [], promptPresets: [], workspaceFolder: 'WS', noteStylesFolder: 'WS/S', language: 'en', noteStyleByKind: { aim: 'file:Mix' } };
+  return { settings, store: new NoteStyleStore({ settings: () => settings, port, save: async () => undefined }) };
+}
+
+test('F1: an AIM entry before any store refresh still resolves the style file and sends its sections to the outline', async () => {
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: S.obsidian });
+  const { settings, store } = diskStore();
+  const view = new VisualAgentMapView({ app: {} }, { repo: S.fixture().repo, settings, noteStyles: store });
+  view.path = 'Maps/A.md';
+  const style = await view.aimNoteStyle('en');
+  assert.equal(style.recipe.ref, 'file:Mix');
+  assert.deepEqual(plain(style.issues.missing), []);
+  assert.ok(M.aimNoteStyleOf(style).sections.length >= 5);
+  const tasks = [];
+  await concludeSeen({ port: language => view.aimNoteStyle(language), tasks });
+  const outline = tasks.find(item => item.phase === 'delivery-outline');
+  assert.ok(outline, 'the run reached the outline');
+  assert.match(outline.task, /Prediction/);
+});
+
+test('F1: a refresh that fails reads as the style not found, the AIM report', async () => {
+  const notices = [];
+  const { VisualAgentMapView } = S.load('main.ts', { obsidian: { ...S.obsidian, Notice: dom.makeNotice(notices) } });
+  const { settings } = diskStore();
+  const aimDefault = { recipe: { ref: 'builtin:aim', name: 'AIM', source: 'default', aimDelivery: true }, template: { id: 'standard', name: 'S', sections: [section('x')] }, formatText: '', issues: { missing: ['file:Mix'], blockIssues: [] } };
+  const noteStyles = { refresh: async () => { throw new Error('disk'); }, runStyle: () => aimDefault };
+  const view = new VisualAgentMapView({ app: {} }, { repo: S.fixture().repo, settings, noteStyles });
+  view.path = 'Maps/A.md';
+  assert.equal(M.aimNoteStyleOf(await view.aimNoteStyle('en')), undefined);
+  assert.equal(notices.length, 1);
 });

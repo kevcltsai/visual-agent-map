@@ -18026,9 +18026,15 @@ export class VisualAgentMapView extends ItemView {
    * outline cannot hold (0 or more than 12 sections), falls back to the AIM report; the user is told once per map in
    * this view. Nothing is written.
    */
-  private aimNoteStyle(language: ContentLanguage): RunStyle | undefined {
+  private async aimNoteStyle(language: ContentLanguage): Promise<RunStyle | undefined> {
     // A plugin test double without settings has no styles: the AIM report.
     if (!this.plugin.settings) return undefined;
+    // The store only knows the style folder as of its last refresh; read it now, as every other run entry does.
+    try {
+      await this.noteStyles.refresh();
+    } catch {
+      /* an unreadable folder reads as "style not found": the stale snapshot answers and the Notice below tells the user */
+    }
     const style = this.noteStyles.runStyle({ kind: "aim", outputLanguage: language });
     const ref = this.plugin.settings.noteStyleByKind?.aim;
     const sections = style.template.sections.length;

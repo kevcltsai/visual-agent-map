@@ -61,6 +61,11 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     await recordContext(`service.decompose-deep.${tag}`, 'AiTaskService instructions: mode decompose, deep research', language, { ...ctx, mode: 'decompose', researchDepth: 'deep' });
     await recordContext(`service.synthesize-local.${tag}`, 'AiTaskService instructions: mode synthesize, local, visual off', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off' });
     await recordContext(`service.synthesize-summary-direction.${tag}`, 'AiTaskService instructions: mode synthesize with summary-bracket conclusion directions (summary-bracket P1, read-only)', language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off', summaryDirections: language === 'en' ? '- B; C\n  Both point to excessive cost; recommend postponing' : '- B；C\n  兩者都指向成本過高，結論應建議延後' });
+    // Note style recipe T4: the top and fresh write-backs have their own mode text and no conflict rule.
+    for (const updateMode of ['top', 'fresh']) {
+      await recordContext(`service.task-${updateMode}.${tag}`, `AiTaskService instructions: mode task, web research, update mode ${updateMode}`, language, { ...ctx, updateMode });
+      await recordContext(`service.synthesize-${updateMode}.${tag}`, `AiTaskService instructions: mode synthesize, local, visual off, update mode ${updateMode}`, language, { ...ctx, mode: 'synthesize', researchMode: 'local', visualMode: 'off', updateMode });
+    }
     await recordContext(`service.task-tone.${tag}`, 'AiTaskService instructions: mode task with a resolved tone text (B1)', language, { ...ctx, toneText: language === 'en' ? 'Tone: example voice. Write warmly.' : '寫作語氣：範例語氣。請溫暖地寫作。' });
     await recordContext(`service.task-textbook.${tag}`, 'AiTaskService instructions: mode task with the built-in Textbook template (intro, six sections, empty sections omitted)', language, { ...ctx, detailTemplate: loadModule('ai/detail-templates.ts').textbookTemplate(loadModule('i18n.ts').noteLanguageOf(language)) });
     await recordContext(`service.default-adaptive.${tag}`, 'AiTaskService instructions: no mode, adaptive detail, no sources', language, { ...ctx, mode: undefined, detailFormat: 'adaptive', sourceContext: undefined, workingFindings: undefined, detail: '', rules: '', ancestors: '' });

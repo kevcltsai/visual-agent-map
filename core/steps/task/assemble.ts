@@ -53,13 +53,19 @@ import {
   DECOMPOSE,
   DEFAULT_TASK,
   detailStructure,
+  CONFLICT_RULE,
   GENERAL_TASK,
+  GENERAL_TASK_FRESH,
+  GENERAL_TASK_TOP,
   JSON_CONTRACT,
   LABEL_DETAIL,
+  LABEL_DETAIL_TOP,
   LABEL_FINDINGS,
   MERGE,
   outputLanguage,
   SYNTHESIZE,
+  SYNTHESIZE_FRESH,
+  SYNTHESIZE_TOP,
   textbookDetailStructure
 } from "./fragments";
 import { isQuickTask, quickGuidance, readerFacingDetail } from "./render";
@@ -378,16 +384,25 @@ export function assembleTaskPrompt(
     findBuiltinBlock(category, id);
     return options.blocks?.[`${category}/${id}`]?.(language) ?? lookupBuiltinBlock(category, id, language);
   };
-  const modeFragment =
-    step === "research" || (step === "quick" && context.mode === "task")
-      ? GENERAL_TASK
-      : step === "decompose"
-        ? DECOMPOSE
-        : step === "synthesize"
-          ? SYNTHESIZE
-          : step === "merge"
-            ? MERGE
-            : DEFAULT_TASK;
+  const updateMode = context.updateMode ?? "merge";
+  const isGeneral = step === "research" || (step === "quick" && context.mode === "task");
+  const modeFragment = isGeneral
+    ? updateMode === "top"
+      ? GENERAL_TASK_TOP
+      : updateMode === "fresh"
+        ? GENERAL_TASK_FRESH
+        : GENERAL_TASK
+    : step === "decompose"
+      ? DECOMPOSE
+      : step === "synthesize"
+        ? updateMode === "top"
+          ? SYNTHESIZE_TOP
+          : updateMode === "fresh"
+            ? SYNTHESIZE_FRESH
+            : SYNTHESIZE
+        : step === "merge"
+          ? MERGE
+          : DEFAULT_TASK;
   const quick = step === "quick";
   const none = inLanguage(NONE, language);
   const topicAnchor: FollowAnchor = { kind: "topic", text: context.title };
@@ -417,7 +432,13 @@ export function assembleTaskPrompt(
       add(fixed(before ?? "", "tone-rule"), [body, block], fixed(after ?? "", "tone-rule"));
     }
   }
-  add(fixed(inLanguage(modeFragment, language), "step"));
+  // Only a merge update adds the conflict rule; top and fresh have their own mode text (the rest is unchanged).
+  if ((isGeneral || step === "synthesize") && updateMode === "merge")
+    add(
+      fixed(inLanguage(modeFragment, language), "step"),
+      fixed(`\n\n${inLanguage(CONFLICT_RULE, language)}`, "conflict-rule")
+    );
+  else add(fixed(inLanguage(modeFragment, language), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
     const pieces: Piece[][] = [];
@@ -436,7 +457,9 @@ export function assembleTaskPrompt(
   for (const guidance of visualGuidance(context, language)) add(fixed(guidance, "visual-guidance"));
   add(input(`${inLanguage(LABEL_TOPIC, language)}:\n${context.title}`, "topic"));
   add(input(`${inLanguage(LABEL_SUMMARY, language)}:\n${context.summary}`, "summary"));
-  add(input(step !== "decompose" ? `${inLanguage(LABEL_DETAIL, language)}:\n${context.detail || none}` : "", "detail"));
+  const detailLabel = updateMode === "top" && (isGeneral || step === "synthesize") ? LABEL_DETAIL_TOP : LABEL_DETAIL;
+  const hideDetail = step === "decompose" || (updateMode === "fresh" && (isGeneral || step === "synthesize"));
+  add(input(!hideDetail ? `${inLanguage(detailLabel, language)}:\n${context.detail || none}` : "", "detail"));
   add(input(`${inLanguage(LABEL_RULES, language)}:\n${context.rules || none}`, "rules"));
   add(
     input(

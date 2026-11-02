@@ -20379,6 +20379,42 @@ var general_task_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary
 // core/steps/task/general-task.en.md
 var general_task_en_default = "General task: summary is one new insight for the mind map, within 80 characters. Detail replaces the old Detail with a complete knowledge page that incorporates valid existing content and new findings, removes duplication, and retains valid sources. Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
 
+// core/steps/task/general-task-top.zh.md
+var general_task_top_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+
+// core/steps/task/general-task-top.en.md
+var general_task_top_en_default = "General task: summary is one new insight for the mind map, within 80 characters. Detail returns only what this research newly found, split by section heading (###); omit sections with nothing new. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+
+// core/steps/task/general-task-fresh.zh.md
+var general_task_fresh_zh_default = "\u9019\u662F\u4E00\u822C\u4EFB\u52D9\uFF1Asummary \u5FC5\u9808\u662F\u4E00\u53E5\u9069\u5408\u5FC3\u667A\u5716\u986F\u793A\u7684\u65B0\u76EE\u524D\u7406\u89E3\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u672C\u6B21\u7814\u7A76\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u53BB\u9664\u91CD\u8907\u4E26\u4FDD\u7559\u6709\u6548\u7684\u4F86\u6E90\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\u3002\u82E5\u8B70\u984C\u904E\u65BC\u8907\u96DC\u624D\u63D0\u4F9B suggestions\uFF0C\u5426\u5247\u56DE\u50B3\u7A7A\u9663\u5217\u3002\n";
+
+// core/steps/task/general-task-fresh.en.md
+var general_task_fresh_en_default = "General task: summary is one new insight for the mind map, within 80 characters. Detail is a complete knowledge page based on this research, without duplication and keeping valid sources; do not write an update log section (the plugin writes it). Provide suggestions only if the topic is too complex; otherwise return an empty array.\n";
+
+// core/steps/task/conflict-rule.zh.md
+var conflict_rule_zh_default = "\u672C\u6B21\u767C\u73FE\u8207\u73FE\u6709 Detail \u4E0D\u4E00\u81F4\u6642\uFF0C\u5169\u7A2E\u8AAA\u6CD5\u90FD\u4FDD\u7559\u4E26\u5404\u6A19\u65E5\u671F\u8207\u4F86\u6E90\uFF0C\u5BEB\u4E00\u53E5\u76EE\u524D\u5224\u65B7\uFF08\u4F9D\u4F86\u6E90\u65B0\u820A\u8207\u5F37\u5F31\uFF09\uFF1B\u628A\u9019\u4E00\u9EDE\u52A0\u5165\u5F85\u78BA\u8A8D\u4E8B\u9805\u6BB5\uFF0C\u6C92\u6709\u8A72\u6BB5\u5C31\u5728\u76F8\u95DC\u6BB5\u843D\u4E26\u5217\uFF1B\u66F4\u65B0\u7D00\u9304\u5BEB\u4E00\u884C\u300C\u8207\u5148\u524D\u7D50\u8AD6\u4E0D\u4E00\u81F4\uFF1A\u2026\u300D\u3002\n";
+
+// core/steps/task/conflict-rule.en.md
+var conflict_rule_en_default = 'When a new finding disagrees with the existing Detail, keep both statements and label each with its date and source, and write one sentence of current judgment (based on how recent and how strong the sources are). Add the point to the open questions section, or list the two statements side by side in the related section if there is no such section. Write one line in the update log: "Disagrees with an earlier conclusion: \u2026".\n';
+
+// core/steps/task/synthesize-top.zh.md
+var synthesize_top_zh_default = "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u53EA\u56DE\u50B3\u672C\u6B21\u6574\u5408\u7684\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\uFF08###\uFF09\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\uFF0C\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u4E0D\u8981\u91CD\u5BEB\u6216\u91CD\u8907\u73FE\u6709\u7B46\u8A18\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\uFF1B\u82E5\u4ECB\u9762\u63D0\u4F9B\u78BA\u8A8D\u8349\u7A3F\uFF0C\u78BA\u8A8D\u5F8C\u624D\u6703\u5BEB\u56DE\u3002\n";
+
+// core/steps/task/synthesize-top.en.md
+var synthesize_top_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail returns only what this synthesis newly found, split by section heading (###), omitting sections with nothing new, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions. Do not rewrite or repeat the existing note, and do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.\n";
+
+// core/steps/task/synthesize-fresh.zh.md
+var synthesize_fresh_zh_default = "\u9019\u662F Synthesize \u6A21\u5F0F\uFF1Asummary \u5FC5\u9808\u662F\u9AD8\u54C1\u8CEA\u6574\u5408\u7D50\u8AD6\uFF0C80 \u5B57\u5167\uFF1Bdetail \u662F\u4E00\u4EFD\u6839\u64DA\u4F86\u6E90\u7684\u5B8C\u6574\u77E5\u8B58\u9801\uFF0C\u6536\u6582\u91CD\u8907\u5167\u5BB9\u3001\u6E05\u695A\u5448\u73FE\u5171\u8B58\u3001\u5206\u6B67\u3001\u53D6\u6368\u8207\u672A\u89E3\u554F\u984C\uFF1B\u4E0D\u8981\u5BEB\u66F4\u65B0\u7D00\u9304\u6BB5\uFF08\u5916\u639B\u6703\u5BEB\uFF09\uFF1B\u82E5\u4ECB\u9762\u63D0\u4F9B\u78BA\u8A8D\u8349\u7A3F\uFF0C\u78BA\u8A8D\u5F8C\u624D\u6703\u5BEB\u56DE\u3002\n";
+
+// core/steps/task/synthesize-fresh.en.md
+var synthesize_fresh_en_default = "Synthesize mode: summary is a high-quality integrated conclusion within 80 characters. Detail is a complete knowledge page based on the sources, removes duplication, and clearly presents agreements, disagreements, tradeoffs, and unresolved questions; do not write an update log section (the plugin writes it). If the UI offers draft review, write only after confirmation.\n";
+
+// core/steps/task/label-detail-top.zh.md
+var label_detail_top_zh_default = "\u4EE5\u4E0B\u662F\u73FE\u6709\u7B46\u8A18\uFF0C\u53EA\u4F9B\u53C3\u8003\uFF1B\u53EA\u56DE\u50B3\u672C\u6B21\u65B0\u767C\u73FE\uFF0C\u4F9D\u6BB5\u843D\u6A19\u984C\u5206\u6BB5\uFF0C\u6C92\u6709\u65B0\u767C\u73FE\u7684\u6BB5\u843D\u7701\u7565\n";
+
+// core/steps/task/label-detail-top.en.md
+var label_detail_top_en_default = "Existing note, for reference only; return only what is newly found, split by section heading, and omit sections with nothing new\n";
+
 // core/steps/task/json.zh.md
 var json_zh_default = '\u53EA\u56DE\u50B3 JSON\uFF0C\u4E0D\u8981\u4F7F\u7528 Markdown code fence\u3002\u683C\u5F0F\u5FC5\u9808\u7B26\u5408\uFF1A{"summary":"...","detail":"...","suggestions":[{"title":"...","task":"...","contribution":"...","parentTitle":""}],"visualReferences":[{"title":"...","imageUrl":"https://...","sourceUrl":"https://...","description":"...","palette":["navy","white"],"formula":"..."}]}\u3002\u82E5\u6C92\u6709\u8996\u89BA\u53C3\u8003\uFF0CvisualReferences \u56DE\u50B3\u7A7A\u9663\u5217\u3002\n';
 
@@ -20478,6 +20514,12 @@ var DECOMPOSE = pair4(decompose_zh_default, decompose_en_default);
 var DEFAULT_TASK = pair4(default_task_zh_default, default_task_en_default);
 var DETAIL_STRUCTURE_TEMPLATE = { zh: detail_structure_zh_default, en: detail_structure_en_default };
 var GENERAL_TASK = pair4(general_task_zh_default, general_task_en_default);
+var CONFLICT_RULE = pair4(conflict_rule_zh_default, conflict_rule_en_default);
+var GENERAL_TASK_TOP = pair4(general_task_top_zh_default, general_task_top_en_default);
+var GENERAL_TASK_FRESH = pair4(general_task_fresh_zh_default, general_task_fresh_en_default);
+var SYNTHESIZE_TOP = pair4(synthesize_top_zh_default, synthesize_top_en_default);
+var SYNTHESIZE_FRESH = pair4(synthesize_fresh_zh_default, synthesize_fresh_en_default);
+var LABEL_DETAIL_TOP = pair4(label_detail_top_zh_default, label_detail_top_en_default);
 var JSON_CONTRACT = pair4(json_zh_default, json_en_default);
 var LABEL_DETAIL = pair4(label_detail_zh_default, label_detail_en_default);
 var LABEL_FINDINGS = pair4(label_findings_zh_default, label_findings_en_default);
@@ -26121,13 +26163,15 @@ function partsAskForCharts(parts, selection, format) {
 var fixed = (text11, id) => [text11, { kind: "fixed", id }];
 var input = (text11, id) => [text11, { kind: "input", id }];
 function assembleTaskPrompt(selection, step, context, language2, provider = "codex", options = {}) {
-  var _a2;
+  var _a2, _b2;
   const bodyOf = (category, id) => {
-    var _a3, _b2, _c;
+    var _a3, _b3, _c;
     findBuiltinBlock(category, id);
-    return (_c = (_b2 = (_a3 = options.blocks) == null ? void 0 : _a3[`${category}/${id}`]) == null ? void 0 : _b2.call(_a3, language2)) != null ? _c : lookupBuiltinBlock(category, id, language2);
+    return (_c = (_b3 = (_a3 = options.blocks) == null ? void 0 : _a3[`${category}/${id}`]) == null ? void 0 : _b3.call(_a3, language2)) != null ? _c : lookupBuiltinBlock(category, id, language2);
   };
-  const modeFragment = step === "research" || step === "quick" && context.mode === "task" ? GENERAL_TASK : step === "decompose" ? DECOMPOSE : step === "synthesize" ? SYNTHESIZE : step === "merge" ? MERGE : DEFAULT_TASK;
+  const updateMode = (_a2 = context.updateMode) != null ? _a2 : "merge";
+  const isGeneral = step === "research" || step === "quick" && context.mode === "task";
+  const modeFragment = isGeneral ? updateMode === "top" ? GENERAL_TASK_TOP : updateMode === "fresh" ? GENERAL_TASK_FRESH : GENERAL_TASK : step === "decompose" ? DECOMPOSE : step === "synthesize" ? updateMode === "top" ? SYNTHESIZE_TOP : updateMode === "fresh" ? SYNTHESIZE_FRESH : SYNTHESIZE : step === "merge" ? MERGE : DEFAULT_TASK;
   const quick = step === "quick";
   const none = inLanguage(NONE, language2);
   const topicAnchor = { kind: "topic", text: context.title };
@@ -26147,14 +26191,21 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
   );
   add(fixed(withProviderOutput(inLanguage(JSON_CONTRACT, language2), provider, language2), "json-contract"));
   {
-    const body = (_a2 = selection.tone.body) != null ? _a2 : bodyOf("tone", selection.tone.id);
+    const body = (_b2 = selection.tone.body) != null ? _b2 : bodyOf("tone", selection.tone.id);
     if (body) {
       const block = { kind: "block", category: "tone", id: selection.tone.id };
       const [before, after] = toneBlock(TONE_MARKER, language2).split(TONE_MARKER);
       add(fixed(before != null ? before : "", "tone-rule"), [body, block], fixed(after != null ? after : "", "tone-rule"));
     }
   }
-  add(fixed(inLanguage(modeFragment, language2), "step"));
+  if ((isGeneral || step === "synthesize") && updateMode === "merge")
+    add(
+      fixed(inLanguage(modeFragment, language2), "step"),
+      fixed(`
+
+${inLanguage(CONFLICT_RULE, language2)}`, "conflict-rule")
+    );
+  else add(fixed(inLanguage(modeFragment, language2), "step"));
   if (step === "decompose") add(fixed("", "template"));
   else {
     const pieces = [];
@@ -26174,7 +26225,9 @@ function assembleTaskPrompt(selection, step, context, language2, provider = "cod
 ${context.title}`, "topic"));
   add(input(`${inLanguage(LABEL_SUMMARY, language2)}:
 ${context.summary}`, "summary"));
-  add(input(step !== "decompose" ? `${inLanguage(LABEL_DETAIL, language2)}:
+  const detailLabel = updateMode === "top" && (isGeneral || step === "synthesize") ? LABEL_DETAIL_TOP : LABEL_DETAIL;
+  const hideDetail = step === "decompose" || updateMode === "fresh" && (isGeneral || step === "synthesize");
+  add(input(!hideDetail ? `${inLanguage(detailLabel, language2)}:
 ${context.detail || none}` : "", "detail"));
   add(input(`${inLanguage(LABEL_RULES, language2)}:
 ${context.rules || none}`, "rules"));
@@ -30728,6 +30781,7 @@ function buildPreparedTaskContext(input2, model, budget = 32e3, provider = "code
     context.detail = "";
     context.workingFindings = "";
   }
+  if (input2.updateMode === "fresh") context.detail = "";
   const optional = [
     "detail",
     "workingFindings",
@@ -33431,7 +33485,8 @@ var AiTaskService = class {
         result.detail = resolveDetailReferences(result.detail, referenceGroups, input2.detail, input2.detailTemplate);
       if (this.options.exchangeLoggingEnabled()) exchanges == null ? void 0 : exchanges.parsed(exchangeId);
       const template2 = input2.detailTemplate;
-      if (template2 && template2.sections.some((section3) => section3.count) && input2.mode !== "decompose" && input2.detailFormat !== "adaptive") {
+      if (template2 && template2.sections.some((section3) => section3.count) && input2.mode !== "decompose" && input2.detailFormat !== "adaptive" && // A top reply holds only the new findings, so a count over the whole page means nothing.
+      input2.updateMode !== "top") {
         let issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage2), template2), template2);
         if (issues.length && !input2.countRepair) {
           const firstExchangeId = exchangeId;

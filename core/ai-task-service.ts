@@ -296,7 +296,9 @@ export class AiTaskService {
         template &&
         template.sections.some(section => section.count) &&
         input.mode !== "decompose" &&
-        input.detailFormat !== "adaptive"
+        input.detailFormat !== "adaptive" &&
+        // A top reply holds only the new findings, so a count over the whole page means nothing.
+        input.updateMode !== "top"
       ) {
         let issues = checkCounts(canonicalDetail(result.detail, noteLanguageOf(outputLanguage), template), template);
         if (issues.length && !input.countRepair) {

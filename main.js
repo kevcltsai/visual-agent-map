@@ -1597,6 +1597,20 @@ var en = {
   "ui.tone_hint_summary": "Short sentences and lists: conclusions, facts and numbers only.",
   "ui.tone_hint_guide": "Written to follow: steps, checkpoints and common mistakes.",
   "ui.tone_hint_auto": "AI picks the voice that fits the topic and says which one at the start.",
+  "ui.note_style_by_kind": "By topic type",
+  "ui.note_style_by_kind_desc": "Each type of topic can use its own note structure. A structure chosen on the topic or for a run still wins.",
+  "ui.note_style_kind_none": "Not set (use the map or default structure)",
+  "ui.note_style_kind_row_aria_0": "Note structure for {0}",
+  "ui.note_style_kind_issue_0_1": "\u26A0 Line {0}: {1} Until it is fixed, topics of this type use the built-in version.",
+  "ui.note_style_hypothesis_hint": "Claim, prediction, test, support, counterevidence, judgment.",
+  "ui.note_style_evidence_hint": "Content, credibility, and what it supports or refutes.",
+  "ui.note_style_action_hint": "Goal, steps, checkpoints and a done-when check.",
+  "ui.note_style_atomic_hint": "Definition, explanation, example; one idea per note.",
+  "ui.note_style_label_0_1": "Note style: {0} \xB7 {1}",
+  "ui.note_style_label_0_1_2": "Note style: {0} \xB7 {1} ({2})",
+  "ui.note_style_source_kind": "structure from topic type",
+  "ui.note_style_source_map": "follows this map",
+  "ui.note_style_source_default": "default",
   "ui.tone_use_default": "Follow default (Academic rigor)",
   "ui.preset_builtin_tag": "Built-in",
   "ui.preset_view": "View",
@@ -1618,7 +1632,6 @@ var en = {
   "ui.note_style_upgrade_failed": "Your note styles could not be upgraded this time. They keep working as before, and VAM tries again the next time it loads.",
   "ui.note_style_upgrade_skipped_0": "These style files could not be read, so they were not upgraded and stay where they are: {0}",
   "ui.note_style_upgrade_trash_failed_0": "Your note styles were upgraded, but these old files could not be moved to the trash and are no longer used: {0}",
-  "ui.progress_note_style_0": "Style: {0}",
   "ui.note_style_edit": "Edit this style",
   "ui.note_style_edit_button": "Open file",
   "ui.note_style_edit_current_desc": "Open the file of the style in force, to change how AI writes.",
@@ -3863,6 +3876,20 @@ var zhCN = {
   "ui.tone_hint_summary": "\u77ED\u53E5\u4E0E\u6761\u5217\uFF0C\u53EA\u7559\u7ED3\u8BBA\u3001\u4E8B\u5B9E\u4E0E\u6570\u5B57\u3002",
   "ui.tone_hint_guide": "\u5199\u6210\u53EF\u4EE5\u76F4\u63A5\u7167\u505A\u7684\u6837\u5B50\uFF1A\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u3001\u5E38\u89C1\u9519\u8BEF\u3002",
   "ui.tone_hint_auto": "\u7531 AI \u4F9D\u4E3B\u9898\u6311\u6700\u5408\u9002\u7684\u53E3\u543B\uFF0C\u5E76\u5728\u5F00\u5934\u8BF4\u660E\u9009\u4E86\u54EA\u4E00\u79CD\u3002",
+  "ui.note_style_by_kind": "\u6309\u8BAE\u9898\u7C7B\u578B",
+  "ui.note_style_by_kind_desc": "\u4E0D\u540C\u7C7B\u578B\u7684\u8BAE\u9898\u53EF\u4EE5\u7528\u4E0D\u540C\u7684\u7B14\u8BB0\u7ED3\u6784\u3002\u8BAE\u9898\u6216\u8FD0\u884C\u65F6\u81EA\u5DF1\u9009\u7684\u7ED3\u6784\u4ECD\u7136\u4F18\u5148\u3002",
+  "ui.note_style_kind_none": "\u4E0D\u6307\u5B9A\uFF08\u7528\u5730\u56FE\u6216\u9ED8\u8BA4\u7684\u7ED3\u6784\uFF09",
+  "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B14\u8BB0\u7ED3\u6784",
+  "ui.note_style_kind_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u7684\u8BAE\u9898\u4F1A\u5148\u7528\u5185\u7F6E\u7248\u672C\u3002",
+  "ui.note_style_hypothesis_hint": "\u516B\u4E2A\u5206\u7C7B\uFF1A\u4E3B\u5F20\u3001\u9884\u6D4B\u3001\u9A8C\u8BC1\u65B9\u5F0F\uFF0C\u5230\u652F\u6301\u3001\u53CD\u9A73\u4E0E\u5F53\u524D\u5224\u65AD\u3002",
+  "ui.note_style_evidence_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5185\u5BB9\u3001\u53EF\u4FE1\u5EA6\u3001\u652F\u6301\u6216\u53CD\u9A73\uFF0C\u5E76\u9644\u6765\u6E90\u3002",
+  "ui.note_style_action_hint": "\u516D\u4E2A\u5206\u7C7B\uFF1A\u76EE\u6807\u3001\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u4E0E\u5B8C\u6210\u6761\u4EF6\u3002",
+  "ui.note_style_atomic_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5B9A\u4E49\u3001\u8BF4\u660E\u3001\u4F8B\u5B50\uFF1B\u4E00\u5219\u7B14\u8BB0\u53EA\u8BB2\u4E00\u4E2A\u6982\u5FF5\u3002",
+  "ui.note_style_label_0_1": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}",
+  "ui.note_style_label_0_1_2": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}\uFF08{2}\uFF09",
+  "ui.note_style_source_kind": "\u7ED3\u6784\u6765\u81EA\u8BAE\u9898\u7C7B\u578B",
+  "ui.note_style_source_map": "\u8DDF\u968F\u8FD9\u5F20\u56FE",
+  "ui.note_style_source_default": "\u8DDF\u968F\u9ED8\u8BA4",
   "ui.tone_use_default": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5B66\u672F\u4E25\u8C28\uFF09",
   "ui.preset_builtin_tag": "\u5185\u7F6E",
   "ui.preset_view": "\u67E5\u770B",
@@ -3884,7 +3911,6 @@ var zhCN = {
   "ui.note_style_upgrade_failed": "\u8FD9\u6B21\u6CA1\u80FD\u5347\u7EA7\u4F60\u7684\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u3002\u5B83\u4EEC\u7167\u65E7\u53EF\u7528\uFF0CVAM \u4E0B\u6B21\u52A0\u8F7D\u65F6\u4F1A\u518D\u8BD5\u4E00\u6B21\u3002",
   "ui.note_style_upgrade_skipped_0": "\u8FD9\u4E9B\u98CE\u683C\u6587\u4EF6\u8BFB\u4E0D\u51FA\u6765\uFF0C\u6240\u4EE5\u6CA1\u6709\u5347\u7EA7\uFF0C\u7559\u5728\u539F\u5904\uFF1A{0}",
   "ui.note_style_upgrade_trash_failed_0": "\u4F60\u7684\u7B14\u8BB0\u98CE\u683C\u5DF2\u5347\u7EA7\uFF0C\u4F46\u8FD9\u4E9B\u65E7\u6587\u4EF6\u6CA1\u80FD\u79FB\u5230\u5E9F\u7EB8\u7BD3\uFF0C\u4E4B\u540E\u4E0D\u4F1A\u518D\u4F7F\u7528\uFF1A{0}",
-  "ui.progress_note_style_0": "\u98CE\u683C\uFF1A{0}",
   "ui.note_style_edit": "\u7F16\u8F91\u8FD9\u4E2A\u98CE\u683C",
   "ui.note_style_edit_button": "\u6253\u5F00\u6587\u4EF6",
   "ui.note_style_edit_current_desc": "\u6253\u5F00\u5F53\u524D\u751F\u6548\u98CE\u683C\u7684\u6587\u4EF6\uFF0C\u8C03\u6574 AI \u7684\u5199\u6CD5\u3002",
@@ -6129,6 +6155,20 @@ var zhTW = {
   "ui.tone_hint_summary": "\u77ED\u53E5\u8207\u689D\u5217\uFF0C\u53EA\u7559\u7D50\u8AD6\u3001\u4E8B\u5BE6\u8207\u6578\u5B57\u3002",
   "ui.tone_hint_guide": "\u5BEB\u6210\u53EF\u4EE5\u76F4\u63A5\u7167\u505A\u7684\u6A23\u5B50\uFF1A\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u3001\u5E38\u898B\u932F\u8AA4\u3002",
   "ui.tone_hint_auto": "\u7531 AI \u4F9D\u4E3B\u984C\u6311\u6700\u5408\u9069\u7684\u53E3\u543B\uFF0C\u4E26\u5728\u958B\u982D\u8AAA\u660E\u9078\u4E86\u54EA\u4E00\u7A2E\u3002",
+  "ui.note_style_by_kind": "\u4F9D\u8B70\u984C\u985E\u578B",
+  "ui.note_style_by_kind_desc": "\u4E0D\u540C\u985E\u578B\u7684\u8B70\u984C\u53EF\u4EE5\u7528\u4E0D\u540C\u7684\u7B46\u8A18\u7D50\u69CB\u3002\u8B70\u984C\u6216\u57F7\u884C\u6642\u81EA\u5DF1\u9078\u7684\u7D50\u69CB\u4ECD\u7136\u512A\u5148\u3002",
+  "ui.note_style_kind_none": "\u4E0D\u6307\u5B9A\uFF08\u7528\u5730\u5716\u6216\u9810\u8A2D\u7684\u7D50\u69CB\uFF09",
+  "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B46\u8A18\u7D50\u69CB",
+  "ui.note_style_kind_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u9019\u500B\u985E\u578B\u7684\u8B70\u984C\u6703\u5148\u7528\u5167\u5EFA\u7248\u672C\u3002",
+  "ui.note_style_hypothesis_hint": "\u516B\u500B\u5206\u985E\uFF1A\u4E3B\u5F35\u3001\u9810\u6E2C\u3001\u9A57\u8B49\u65B9\u5F0F\uFF0C\u5230\u652F\u6301\u3001\u53CD\u99C1\u8207\u76EE\u524D\u5224\u65B7\u3002",
+  "ui.note_style_evidence_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5167\u5BB9\u3001\u53EF\u4FE1\u5EA6\u3001\u652F\u6301\u6216\u53CD\u99C1\uFF0C\u4E26\u9644\u4F86\u6E90\u3002",
+  "ui.note_style_action_hint": "\u516D\u500B\u5206\u985E\uFF1A\u76EE\u6A19\u3001\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u8207\u5B8C\u6210\u689D\u4EF6\u3002",
+  "ui.note_style_atomic_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5B9A\u7FA9\u3001\u8AAA\u660E\u3001\u4F8B\u5B50\uFF1B\u4E00\u5247\u7B46\u8A18\u53EA\u8B1B\u4E00\u500B\u6982\u5FF5\u3002",
+  "ui.note_style_label_0_1": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}",
+  "ui.note_style_label_0_1_2": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}\uFF08{2}\uFF09",
+  "ui.note_style_source_kind": "\u7D50\u69CB\u4F86\u81EA\u8B70\u984C\u985E\u578B",
+  "ui.note_style_source_map": "\u8DDF\u96A8\u9019\u5F35\u5716",
+  "ui.note_style_source_default": "\u8DDF\u96A8\u9810\u8A2D",
   "ui.tone_use_default": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u5B78\u8853\u56B4\u8B39\uFF09",
   "ui.preset_builtin_tag": "\u5167\u5EFA",
   "ui.preset_view": "\u6AA2\u8996",
@@ -6150,7 +6190,6 @@ var zhTW = {
   "ui.note_style_upgrade_failed": "\u9019\u6B21\u6C92\u80FD\u5347\u7D1A\u4F60\u7684\u7B46\u8A18\u98A8\u683C\u6A94\u3002\u5B83\u5011\u7167\u820A\u53EF\u7528\uFF0CVAM \u4E0B\u6B21\u8F09\u5165\u6642\u6703\u518D\u8A66\u4E00\u6B21\u3002",
   "ui.note_style_upgrade_skipped_0": "\u9019\u4E9B\u98A8\u683C\u6A94\u8B80\u4E0D\u51FA\u4F86\uFF0C\u6240\u4EE5\u6C92\u6709\u5347\u7D1A\uFF0C\u7559\u5728\u539F\u8655\uFF1A{0}",
   "ui.note_style_upgrade_trash_failed_0": "\u4F60\u7684\u7B46\u8A18\u98A8\u683C\u5DF2\u5347\u7D1A\uFF0C\u4F46\u9019\u4E9B\u820A\u6A94\u6C92\u80FD\u79FB\u5230\u5783\u573E\u6876\uFF0C\u4E4B\u5F8C\u4E0D\u6703\u518D\u4F7F\u7528\uFF1A{0}",
-  "ui.progress_note_style_0": "\u98A8\u683C\uFF1A{0}",
   "ui.note_style_edit": "\u7DE8\u8F2F\u9019\u500B\u98A8\u683C",
   "ui.note_style_edit_button": "\u958B\u555F\u6A94\u6848",
   "ui.note_style_edit_current_desc": "\u958B\u555F\u76EE\u524D\u751F\u6548\u98A8\u683C\u7684\u6A94\u6848\uFF0C\u8ABF\u6574 AI \u7684\u5BEB\u6CD5\u3002",
@@ -26567,6 +26606,10 @@ function styleRefOf(templateId, toneId, aliases = {}) {
   const moved = templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : void 0;
   if ((moved == null ? void 0 : moved.template) && ((_b2 = parseBlockRef(moved.template)) == null ? void 0 : _b2.kind) === "file") return { kind: "file", id: moved.template };
   return void 0;
+}
+function runStyleLabelText(label, language2) {
+  const source = label.templateSource === "kind" ? "ui.note_style_source_kind" : label.templateSource === "map" ? "ui.note_style_source_map" : label.templateSource === "workspace" || label.templateSource === "standard" ? "ui.note_style_source_default" : void 0;
+  return source ? translate(language2, "ui.note_style_label_0_1_2", label.templateName, label.toneName, translate(language2, source)) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
 }
 
 // ai/note-style-store.ts
@@ -50673,7 +50716,7 @@ ${request.requirements}` : preset.text,
   researchStageText(progress) {
     const stage = this.researchStageName(progress);
     const withModel = progress.model ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model)) : stage;
-    return progress.style ? `${withModel} \xB7 ${t("ui.progress_note_style_0", progress.style)}` : withModel;
+    return progress.style ? `${withModel} \xB7 ${progress.style}` : withModel;
   }
   researchStageName(progress) {
     switch (progress.stage) {
@@ -63155,7 +63198,8 @@ ${addition}` : addition });
     this.plugin.activeTasks.set(taskPath, controller);
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
+    const styleLine = runStyle.label.fileName || runStyle.label.templateSource === "kind" ? runStyleLabelText(runStyle.label, language2) : void 0;
+    progress == null ? void 0 : progress.begin(taskPath, progressAttempt, Date.now(), used.model, styleLine);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -63658,7 +63702,14 @@ function writeShown(plugin, changed) {
   if (next.tone !== void 0) settings.noteToneBlock = next.tone;
 }
 var BLOCK_HINTS = {
-  template: { standard: "ui.note_style_standard_hint", textbook: "ui.note_style_textbook_hint" },
+  template: {
+    standard: "ui.note_style_standard_hint",
+    textbook: "ui.note_style_textbook_hint",
+    hypothesis: "ui.note_style_hypothesis_hint",
+    evidence: "ui.note_style_evidence_hint",
+    action: "ui.note_style_action_hint",
+    atomic: "ui.note_style_atomic_hint"
+  },
   tone: {
     academic: "ui.tone_hint_academic",
     plain: "ui.tone_hint_plain",
@@ -63853,6 +63904,94 @@ function renderNoteBlockSetting(setting, plugin, category, onFilesChanged) {
     const moreLabel = t(isTemplate ? "ui.block_more_template" : "ui.block_more_tone");
     button.setIcon("more-horizontal").setTooltip(moreLabel).onClick(showMenu);
     button.extraSettingsEl.setAttr("aria-label", moreLabel);
+  });
+  render();
+  void store.refresh().then(
+    () => {
+      loaded = true;
+      render();
+    },
+    () => void 0
+  );
+}
+function renderNoteKindHeading(setting) {
+  setting.setName(t("ui.note_style_by_kind")).setDesc(t("ui.note_style_by_kind_desc")).setHeading();
+}
+var KIND_ROWS = ["topic", "atomic", "hypothesis", "evidence", "conclusion", "action"];
+var KIND_SUGGESTED = /* @__PURE__ */ new Set(["atomic", "hypothesis", "evidence", "action"]);
+function renderNoteKindSetting(setting, plugin, kind) {
+  const { noteStyles: store, settings } = plugin;
+  const kindName = t(`ui.topic_kind_${kind}`);
+  setting.setName(kindName);
+  setting.descEl.setAttr("aria-live", "polite");
+  setting.settingEl.addClass("vam-block-row");
+  let loaded = false;
+  let picker;
+  let shownDesc;
+  const writeDesc = (line) => {
+    const key2 = line ? `${line.error ? "!" : ""}${line.text}` : "";
+    if (key2 === shownDesc) return;
+    shownDesc = key2;
+    setting.descEl.empty();
+    if (line) setting.descEl.createDiv({ text: line.text, cls: line.error ? "vam-block-status-error" : void 0 });
+  };
+  const render = () => {
+    var _a2;
+    if (!picker) return;
+    const items = store.listBlocks("template");
+    const saved = (_a2 = settings.noteTemplateByKind) == null ? void 0 : _a2[kind];
+    const missing = loaded && saved && !items.some((item) => item.ref === saved) ? saved : void 0;
+    picker.selectEl.replaceChildren();
+    picker.addOption("", t("ui.note_style_kind_none"));
+    const optionText = (item) => item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.modified ? t("ui.block_modified_0", item.name) : item.name;
+    const addGroup = (title, group) => {
+      if (!group.length) return;
+      const groupEl = picker.selectEl.createEl("optgroup", { attr: { label: title } });
+      for (const item of group) groupEl.createEl("option", { value: item.ref, text: optionText(item) });
+    };
+    if (missing) {
+      const parsed = parseBlockRef(missing);
+      const name = (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : (parsed == null ? void 0 : parsed.kind) === "builtin" ? parsed.id : missing;
+      picker.addOption(missing, t("ui.block_missing_option_0", name));
+    }
+    const suggestedRef = KIND_SUGGESTED.has(kind) ? builtinRef(kind) : void 0;
+    const builtins = items.filter((item) => item.kind === "builtin");
+    addGroup(
+      t("ui.suggested"),
+      builtins.filter((item) => item.ref === suggestedRef)
+    );
+    addGroup(
+      t("ui.block_group_builtin"),
+      builtins.filter((item) => item.ref !== suggestedRef)
+    );
+    addGroup(
+      t("ui.note_style_group_folder"),
+      items.filter((item) => item.kind === "file")
+    );
+    picker.setValue(saved && (missing || items.some((item) => item.ref === saved)) ? saved : "");
+    const current = saved ? items.find((item) => item.ref === saved) : void 0;
+    const issue2 = current == null ? void 0 : current.issues[0];
+    if (missing) {
+      const parsed = parseBlockRef(missing);
+      const name = (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : (parsed == null ? void 0 : parsed.kind) === "builtin" ? parsed.id : missing;
+      writeDesc({ text: t("ui.note_style_kind_missing_0_1", kindName, name), error: true });
+    } else if (issue2) {
+      writeDesc({ text: t("ui.note_style_kind_issue_0_1", issue2.line, styleIssueText(issue2)), error: true });
+    } else writeDesc(void 0);
+  };
+  setting.addDropdown((dropdown) => {
+    picker = dropdown;
+    dropdown.selectEl.setAttr("aria-label", t("ui.note_style_kind_row_aria_0", kindName));
+    dropdown.onChange(async (value) => {
+      if (value === "") {
+        if (settings.noteTemplateByKind) {
+          delete settings.noteTemplateByKind[kind];
+          if (!Object.keys(settings.noteTemplateByKind).length) delete settings.noteTemplateByKind;
+        }
+      } else settings.noteTemplateByKind = { ...settings.noteTemplateByKind, [kind]: value };
+      await plugin.saveSettings();
+      render();
+    });
   });
   render();
   void store.refresh().then(
@@ -64142,6 +64281,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian33.PluginSettingTab 
           return (_a2 = this.noteLocationChanged) == null ? void 0 : _a2.call(this);
         })
       },
+      { name: t("ui.note_style_by_kind"), render: (setting) => renderNoteKindHeading(setting) },
+      ...KIND_ROWS.map((kind) => ({
+        name: t(`ui.topic_kind_${kind}`),
+        render: (setting) => renderNoteKindSetting(setting, this.plugin, kind)
+      })),
       {
         name: t("ui.note_style_folder_path"),
         render: (setting) => {

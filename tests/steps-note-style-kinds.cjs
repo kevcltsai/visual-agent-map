@@ -14,6 +14,7 @@ export { OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
 export { translate } from "./i18n";
 export { normalizeNoteTemplateByKind } from "./ai/note-style-store";
 export { TOPIC_KINDS } from "./note-values";
+export { runStyleLabelText } from "./ai/note-style-label";
 `);
 
 const LANGUAGES = ['zh-TW', 'zh-CN', 'en'];
@@ -408,4 +409,29 @@ test('decision 18: keep current (no explicit choice) writes no detail-template t
   const style = await view.detailTemplateFor({ path: 'T.md' });
   assert.equal(style.template.id, 'hypothesis');
   assert.deepEqual(updates, []);
+});
+
+// P3: the research progress line.
+test('progress label: "Note style: <structure> · <voice> (<source>)" in three languages; run and topic add no bracket', () => {
+  const label = source => ({ templateName: 'Standard', toneName: 'Plain', templateSource: source });
+  const text = (source, lang = 'en') => M.runStyleLabelText(label(source), lang);
+  assert.equal(text('workspace'), 'Note style: Standard · Plain (default)');
+  assert.equal(text('standard'), 'Note style: Standard · Plain (default)');
+  assert.equal(text('kind'), 'Note style: Standard · Plain (structure from topic type)');
+  assert.equal(text('map'), 'Note style: Standard · Plain (follows this map)');
+  assert.equal(text('run'), 'Note style: Standard · Plain');
+  assert.equal(text('topic'), 'Note style: Standard · Plain');
+  assert.equal(M.runStyleLabelText({ templateName: '假設結構', toneName: '學術嚴謹', templateSource: 'kind' }, 'zh-TW'), '筆記風格：假設結構 · 學術嚴謹（結構來自議題類型）');
+  assert.equal(text('workspace', 'zh-CN'), '笔记风格：Standard · Plain（跟随默认）');
+  assert.equal(text('map', 'zh-TW'), '筆記風格：Standard · Plain（跟隨這張圖）');
+});
+
+test('progress label: the view passes the line only for a style file or a topic-type structure, and the old key has no consumer', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const view = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(view, /runStyle\.label\.fileName \|\| runStyle\.label\.templateSource === "kind"\s*\?\s*runStyleLabelText\(runStyle\.label, language\)\s*:\s*undefined/);
+  assert.match(view, /progress\?\.begin\(taskPath, progressAttempt, Date\.now\(\), used\.model, styleLine\)/);
+  for (const lang of ['en', 'zh-TW', 'zh-CN']) assert.equal(fs.readFileSync(path.join(__dirname, '..', 'i18n', `${lang}.ts`), 'utf8').includes('progress_note_style_0'), false);
+  assert.equal(view.includes('progress_note_style_0'), false);
 });

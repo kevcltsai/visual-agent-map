@@ -235,6 +235,7 @@ import {
   type DetailTemplate
 } from "../../ai/detail-templates";
 import { emptyNoteStyleStore, type NoteStyleStore, type RunStyle } from "../../ai/note-style-store";
+import { runStyleLabelText } from "../../ai/note-style-label";
 import { DEFAULT_OUTLINE_PRESET_ID, DEFAULT_TONE_ID, listPresets, resolvePreset } from "../../ai/prompt-presets";
 import { parseBlockRef } from "../../core/blocks/block-files";
 import { NOTE_STYLE_PRESETS, fileStyleName, styleLabel } from "./note-style";
@@ -4860,7 +4861,7 @@ export class VisualAgentMapView extends ItemView {
     const withModel = progress.model
       ? t("ui.progress_stage_with_model_0_1", stage, this.plugin.modelLabel(progress.model))
       : stage;
-    return progress.style ? `${withModel} · ${t("ui.progress_note_style_0", progress.style)}` : withModel;
+    return progress.style ? `${withModel} · ${progress.style}` : withModel;
   }
   private researchStageName(progress: ResearchProgress): string {
     switch (progress.stage) {
@@ -18399,7 +18400,11 @@ export class VisualAgentMapView extends ItemView {
     // Stage, seconds and the unsaved preview of this run; an attempt id from the service replaces the placeholder.
     const progress = this.plugin.researchProgress;
     let progressAttempt = "starting";
-    progress?.begin(taskPath, progressAttempt, Date.now(), used.model, runStyle.label.fileName);
+    const styleLine =
+      runStyle.label.fileName || runStyle.label.templateSource === "kind"
+        ? runStyleLabelText(runStyle.label, language)
+        : undefined;
+    progress?.begin(taskPath, progressAttempt, Date.now(), used.model, styleLine);
     const observer: ResearchObserver = {
       onAttempt: id => {
         progressAttempt = id;

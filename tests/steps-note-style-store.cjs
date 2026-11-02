@@ -72,11 +72,11 @@ test('no folder, no new keys (was: topic x map x workspace matrix; grilling Q10/
   }
 });
 
-test('old style files (was: unchanged files take today\'s path; grilling Q12): canonical and exported style files in any written language are not read: the 0.28.0 template and tone come out, with no file name', async () => {
+test('old style files (was: unchanged files take today\'s path; grilling Q12): old style files in the folder, in any written language, are not read: the 0.28.0 template and tone come out, with no file name', async () => {
   for (const writeLanguage of ['zh-TW', 'zh-CN', 'en']) for (const readLanguage of ['en', 'zh-TW']) {
     const files = {};
-    for (const id of M.NOTE_STYLE_BUILTIN_IDS)
-      files[`WS/S/${M.builtinStyleFileName(id, writeLanguage)}.md`] = M.canonicalContent(id, writeLanguage).replace(/\n/g, ' \r\n');
+    for (const name of ['Standard', 'Key points', '精簡重點'])
+      files[`WS/S/${name}.md`] = `---\n語氣: 簡明\n---\n## 重點\n${writeLanguage}\n`.replace(/\n/g, ' \r\n');
     files['WS/S/My notes.md'] = M.serializeLegacyV1(LEGACY, writeLanguage).replace(/\n/g, '\r\n');
     const { store, settings } = makeStore({ language: readLanguage, noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' } }, files);
     await store.refresh();
@@ -95,7 +95,7 @@ test('old style files (was: unchanged files take today\'s path; grilling Q12): c
 });
 
 test('edited old files (was: an edited built-in file decides template and tone; grilling Q12/decision #22): an edited style file or an edited exported file changes nothing; the roles and aliases come from the saved template', async () => {
-  const edited = M.canonicalContent('summary', 'en').replace('3–5', '2–4');
+  const edited = '---\n語氣: 簡明\n---\n## 重點\n說明 2–4\n';
   const { store } = makeStore({ noteStylesFolder: 'WS/S', detailTemplates: M.normalizeTemplates([LEGACY]), noteStyleFiles: { 'uuid-1': 'My notes.md' } }, {
     'WS/S/Key points.md': edited,
     'WS/S/My notes.md': M.serializeLegacyV1(LEGACY, 'en').replace('What we found.', 'What we really found.')

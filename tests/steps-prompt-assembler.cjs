@@ -220,12 +220,11 @@ test('counter 8: promptStepOf covers all six values; a quick count repair is a r
   assert.equal(m.promptStepOf({ ...STEP_CONTEXTS.quick, countRepair: true }), 'research');
 });
 
-test('P3: every template block parses as a note style file and has the canonical v2 section headings', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
+test('P3: every template block parses as a note style file and has the section headings of the built-in template (was: the canonical v2 files; grilling Q12)', () => {
   const S = loadSource(`
 export { parseNoteStyleFile } from "./ai/note-style-file";
 export { standardTemplate, textbookTemplate } from "./ai/detail-templates";
+export { noteLanguageOf } from "./i18n";
 `);
   for (const id of ['standard', 'textbook']) {
     for (const language of LANGUAGES) {
@@ -233,11 +232,9 @@ export { standardTemplate, textbookTemplate } from "./ai/detail-templates";
       const parsed = S.parseNoteStyleFile(body, { id, name: id });
       assert.equal(parsed.ok, true, `${id} ${language} ${JSON.stringify(parsed.issues)}`);
       assert.equal(/tone:|語氣|语气|%%/.test(body), false, `${id} ${language} keeps no switch or comment`);
-      const canonical = fs.readFileSync(path.join(__dirname, '..', 'core', 'note-styles', 'canonical', 'v2', `${id}.${language}.md`), 'utf8');
-      const reference = S.parseNoteStyleFile(canonical, { id, name: id });
-      assert.equal(reference.ok, true);
+      const reference = id === 'standard' ? S.standardTemplate(S.noteLanguageOf(language)) : S.textbookTemplate(S.noteLanguageOf(language));
       const names = style => style.sections.map(section => section.name);
-      assert.deepEqual(names(parsed.style), names(reference.style), `${id} ${language}`);
+      assert.deepEqual(names(parsed.style), names(reference), `${id} ${language}`);
     }
   }
   for (const language of ['zh-TW', 'en']) {
@@ -264,7 +261,7 @@ test('counter 10: a built-in template text parses into the sections of today and
       const text = t.builtinTemplateText(id, language);
       const parsed = t.parseTemplateBlock(text, { id, name: id });
       assert.equal(parsed.ok, true, `${id} ${language} ${JSON.stringify(parsed.issues)}`);
-      assert.equal(parsed.format, '', `${id} ${language} format`);
+      assert.equal('format' in parsed, false, `${id} ${language} format`);
       assert.equal(parsed.notices.length, 0, `${id} ${language} notices`);
       assert.equal(text.includes(t.inLanguage(t.OBSIDIAN_FORMAT, language).trim()), false, `${id} ${language} no format rules in the text`);
       const today = (id === 'textbook' ? t.textbookTemplate : t.standardTemplate)(t.noteLanguageOf(language));
@@ -331,7 +328,8 @@ test('counter 10: every spelling of the format heading splits the zones, in any 
   }
   const none = t.parseTemplateBlock('## A\nbody\n', { id: 'x', name: 'x' });
   assert.equal(none.ok, true);
-  assert.equal(none.format, '');
+  assert.equal('format' in none, false);
+  assert.equal(none.notices.length, 0);
 });
 
 test('counter 11: a format rules heading is noted, not read (Q1); a second one is no problem; a heading inside fenced code is not one', () => {

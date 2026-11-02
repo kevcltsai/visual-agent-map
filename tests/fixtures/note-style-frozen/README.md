@@ -1,6 +1,6 @@
 # note-style-frozen
 
-Frozen test inputs. The 0.28.0 note style upgrade module (`ai/note-style-upgrade.ts`) was removed, and these files hold what it
+Frozen test inputs. The 0.28.0 note style upgrade module (`ai/note-style-upgrade.ts`, deleted; source commit dd90ae7) was removed, and these files hold what it
 produced for the tests, so the prompt snapshots and the related tests stay byte-identical. Do not regenerate them: there is
 nothing left to regenerate from. A change in these files means a change in what the snapshots assert.
 

@@ -783,3 +783,163 @@ test('not touched by the write-back: merge-topics and AIM never import it, and t
   assert.ok(selection.length > 1000);
   assert.doesNotMatch(selection, /composeWrite|updateMode|chartGuard/, 'selection synthesis does not go through the write-back');
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// F1 (decision 38): an entry that resolves a style refreshes the store first, so a style edited since the last run is
+// used the first time. The store below has never been refreshed; the kind row names a style file whose voice and
+// structure are files.
+
+const STORE = loadSource('export { NoteStyleStore } from "./ai/note-style-store";');
+function unrefreshedStyles(w) {
+  const files = {
+    'WS/S/Styles/Mix.md': '---\nstructure: Mine\nvoice: Pirate\n---\n',
+    'WS/S/Structures/Mine.md': '## Mine A\nbody\n## Mine B\nbody\n',
+    'WS/S/Voices/Pirate.md': 'Talk like a pirate.\n'
+  };
+  const under = folder => Object.keys(files).filter(file => file.startsWith(`${folder}/`) && !file.slice(folder.length + 1).includes('/'));
+  const port = {
+    list: async folder => under(folder).map(file => file.slice(folder.length + 1)).filter(name => name.endsWith('.md')),
+    read: async file => { if (!(file in files)) throw new Error(file); return files[file]; },
+    folderExists: folder => Object.keys(files).some(file => file.startsWith(`${folder}/`)),
+    createFolder: async () => {}, create: async () => {}, trash: async () => {}
+  };
+  Object.assign(w.host.settings, { workspaceFolder: 'WS', noteStylesFolder: 'WS/S', noteStyleByKind: { topic: 'file:Mix' } });
+  const store = new STORE.NoteStyleStore({ settings: () => w.host.settings, port, save: async () => {} });
+  w.host.noteStyles = store;
+  const before = store.runStyle({ kind: 'topic', outputLanguage: 'zh-TW' });
+  assert.equal(before.toneText, undefined, 'without a refresh the store knows no style file');
+  return { store, files };
+}
+const sectionNames = style => style.template.sections.map(section => section.name);
+const proposalOptions = { researchMode: 'local', researchDepth: 'fast', visualMode: 'off', referenceGroups: [], shallowResearch: false, outputLanguage: 'zh-TW' };
+const proposalReply = reply('d', { suggestions: [{ title: '子議題甲', task: 't', contribution: 'c' }] });
+
+test('F1 entries: proposalTone and mapStyle refresh the store first, so the first call already resolves the kind row file style', async () => {
+  const w = await wiring({ kind: 'topic', reply: proposalReply });
+  unrefreshedStyles(w);
+  const tone = await w.view.proposalTone(undefined, { outputLanguage: 'zh-TW' });
+  assert.match(tone.toneText ?? '', /pirate/);
+  const w2 = await wiring({ kind: 'topic', reply: proposalReply });
+  unrefreshedStyles(w2);
+  assert.deepEqual(plain(sectionNames(await w2.view.mapStyle('zh-TW', { kind: 'topic' }))), ['Mine A', 'Mine B']);
+});
+
+test('F1 entries: a refresh that fails only warns and the cached styles stay in use', async () => {
+  const w = await wiring({ kind: 'topic', reply: proposalReply });
+  const { store } = unrefreshedStyles(w);
+  store.refresh = async () => { throw new Error('disk'); };
+  const warned = [];
+  const original = console.warn;
+  console.warn = (...args) => warned.push(args);
+  try {
+    const style = await w.view.mapStyle('zh-TW', { kind: 'topic' });
+    assert.ok(style.template.sections.length > 0);
+    assert.deepEqual(plain(await w.view.proposalTone(undefined, { outputLanguage: 'zh-TW' })), {});
+  } finally { console.warn = original; }
+  assert.equal(warned.length, 2);
+});
+
+test('F1 entries: proposeChildren, proposeIntegrationDirections and a selection synthesis carry the voice of a style file that was not loaded yet', async () => {
+  const children = await wiring({ kind: 'topic', reply: proposalReply });
+  unrefreshedStyles(children);
+  await children.view.proposeChildren(children.node, proposalOptions, '', () => {}, message => assert.fail(message));
+  assert.equal(children.calls.asks.length, 1);
+  assert.match(children.calls.asks[0].toneText ?? '', /pirate/, 'proposeChildren');
+
+  const directions = await wiring({ kind: 'topic', reply: proposalReply });
+  unrefreshedStyles(directions);
+  await directions.view.proposeIntegrationDirections(directions.node, { ...proposalOptions, researchDepth: 'normal', referenceGroups: [{ id: 'g', name: 'G', location: 'x', documents: [{ path: 'S.md', content: '來源內容' }] }] }, () => {}, message => assert.fail(message));
+  assert.equal(directions.calls.asks.length, 1);
+  assert.match(directions.calls.asks[0].toneText ?? '', /pirate/, 'proposeIntegrationDirections');
+
+  const selection = await wiring({ kind: 'topic', reply: proposalReply });
+  unrefreshedStyles(selection);
+  const second = await selection.repo.createNote('第二', 'model-a', selection.view.map, MAP_PATH, 'workspace');
+  selection.view.map.nodes.push(second);
+  await selection.repo.updateNote(second.path, { detail: '二的內容', summary: '二', status: 'completed' });
+  await selection.view.startSelectionSynthesis([selection.node, second], { ...proposalOptions, researchDepth: 'normal', synthesisTitle: 'S' }, null, message => assert.fail(message), () => {});
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(selection.calls.asks.length, 1);
+  assert.match(selection.calls.asks[0].toneText ?? '', /pirate/, 'startSelectionSynthesis');
+});
+
+test('F1 entries: an AI merge reads a style file that was not loaded yet (its request carries the file structure); the merge writes stay as they were', async () => {
+  const w = await wiring({ kind: 'topic', reply: () => reply('合併內容') });
+  unrefreshedStyles(w);
+  const [a, b] = [w.node, await w.repo.createNote('乙', 'model-a', w.view.map, MAP_PATH, 'workspace')];
+  w.view.map.nodes.push(b);
+  w.view.notes = new Map(await Promise.all(w.view.map.nodes.map(async item => [item.id, await w.repo.readNote(item.path, w.view.map)])));
+  w.host.confirmAiUsage = async (_model, run) => { await run(); return true; };
+  w.host.currentModelChoice = () => ({ model: 'model-a' });
+  const began = await w.view.startMergeDraft('合併', { path: MAP_PATH, mapId: 'map-a', parentId: null, sources: [a, b].map(item => ({ id: item.id, path: item.path })) }, () => {}, new AbortController().signal);
+  await w.view.mergeTasks.get(MAP_PATH)?.run;
+  assert.equal(began, true);
+  assert.deepEqual(plain(w.calls.asks[0].detailTemplate.sections.map(section => section.name)), ['Mine A', 'Mine B']);
+});
+
+test('F1 entries: every mapStyle and proposalTone call site in the view awaits it; the dialog default stays on the cached styles', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
+  assert.deepEqual([...source.matchAll(/(.)this\.(?:mapStyle|proposalTone)\(/g)].filter(match => !/[ (]/.test(match[1]) ).map(match => match[0]), []);
+  for (const match of source.matchAll(/(await )?this\.(mapStyle|proposalTone)\(/g)) assert.ok(match[1], `${match[2]} is awaited`);
+  assert.match(source, /const current = this\.mapStyleCached\(settings\.language\)/);
+});
+
+// F1 reviewer R1: a file that changed after the run started is found before the backup, not after it.
+test('F1 fresh: the note file differing from the run start is reported as outdated before any backup is made', async () => {
+  const w = await wiring({ kind: 'topic', reply: () => { w.answered = true; return reply(`### ${names.core}\n\n全新結論 F1`); } });
+  const rawBefore = w.raw();
+  const original = Object.getPrototypeOf(w.view).writebackHooks;
+  w.view.writebackHooks = function () {
+    const hooks = original.call(this);
+    const read = hooks.readRaw;
+    return { ...hooks, readRaw: async path => { const text = await read(path); return w.answered ? `${text}\nedited elsewhere` : text; } };
+  };
+  await w.run({ runStyle: await fresh(w) });
+  assert.equal(anyBackupFolder(w.files), false, 'no backup was created');
+  assert.equal(stable(w.raw()), stable(rawBefore), 'the note is untouched');
+  assert.ok(MSG.stale.includes(w.calls.failed[0]), w.calls.failed[0]);
+  assert.equal(w.view.history.canUndo, false);
+});
+
+// F1 reviewer R2: a fresh run that cannot read the note file stops before the model is asked.
+test('F1 fresh: a note file that cannot be read stops the run before any AI call (research and synthesis)', async () => {
+  const research = await wiring({ kind: 'topic', reply: () => reply(`### ${names.core}\n\n全新`) });
+  const rawBefore = research.raw();
+  const original = Object.getPrototypeOf(research.view).writebackHooks;
+  research.view.writebackHooks = function () { return { ...original.call(this), readRaw: async () => { throw new Error('gone'); } }; };
+  const handle = await research.run({ runStyle: await fresh(research) });
+  assert.equal(research.calls.asks.length, 0, 'research: no AI call');
+  assert.equal(stable(research.raw()), stable(rawBefore));
+  assert.ok(MSG.backupFailed.includes(research.calls.failed[0]), research.calls.failed[0]);
+  assert.equal(research.host.running.has(research.node.path), false, 'the topic is released');
+  assert.equal(handle, null);
+
+  const integrate = await wiring({ kind: 'topic', reply: () => reply(`### ${names.core}\n\n全新`) });
+  const raw2 = integrate.raw();
+  const original2 = Object.getPrototypeOf(integrate.view).writebackHooks;
+  integrate.view.writebackHooks = function () { return { ...original2.call(this), readRaw: async () => { throw new Error('gone'); } }; };
+  const template = integrate.view.detailTemplateFor;
+  integrate.view.detailTemplateFor = async (...args) => ({ ...(await template.apply(integrate.view, args)), updateMode: 'fresh' });
+  await integrate.view.integrateChildren(integrate.node, { referenceGroups: [{ id: 'g', name: 'G', location: 'x', documents: [{ path: 'S.md', content: 'x' }] }], outputLanguage: 'zh-TW', researchMode: 'local' }, '', async (_r, write, summary, detail) => { await write(summary, detail); }, message => integrate.calls.failed.push(message));
+  assert.equal(integrate.calls.asks.length, 0, 'integration: no AI call');
+  assert.equal(stable(integrate.raw()), stable(raw2));
+  assert.ok(MSG.backupFailed.includes(integrate.calls.failed[0]), integrate.calls.failed[0]);
+  assert.equal(integrate.host.running.has(integrate.node.path), false);
+});
+
+// F1: the log line the plugin writes uses the list marker of the old log lines.
+test('F1 log line marker: top, fresh and a merge supplement follow the old log lines ("- " stays "- "); no old line keeps the template way', () => {
+  const dashed = `${section(names.core, '舊')}\n\n${section(names.log, '- 2026-01-01　舊一\n- 2026-02-01　舊二')}`;
+  const base = { oldDetail: dashed, summary: '摘要', template: standard, language: 'zh-TW', now: NOW, backupPath: 'B/x.md' };
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'top', aiDetail: section(names.core, '新') }).detail)), ['- 2026-01-01　舊一', '- 2026-02-01　舊二', `- ${TODAY}　摘要`]);
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'fresh', aiDetail: section(names.core, '新') }).detail)).slice(2), [`- ${TODAY}　已用新研究取代，舊版備份在 B/x.md`]);
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, mode: 'merge', aiDetail: `${section(names.core, '新')}\n\n${section(names.log, '- 2026-01-01　舊一\n- 2026-02-01　舊二')}` }).detail)), ['- 2026-01-01　舊一', '- 2026-02-01　舊二', `- ${TODAY}　摘要`]);
+  // Plain old lines stay plain, and with no old line the line is written as the template does (no marker).
+  const plainOld = `${section(names.core, '舊')}\n\n${section(names.log, '2026-01-01　舊一')}`;
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, oldDetail: plainOld, mode: 'top', aiDetail: section(names.core, '新') }).detail)), ['2026-01-01　舊一', `${TODAY}　摘要`]);
+  const none = `${section(names.core, '舊')}\n\n${section(names.log, '本次無新增內容。')}`;
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, oldDetail: none, mode: 'top', aiDetail: section(names.core, '新') }).detail)).filter(line => !line.includes('本次無新增')), [`${TODAY}　摘要`]);
+  assert.deepEqual(plain(logBody(W.composeWriteback({ ...base, oldDetail: section(names.core, '舊'), mode: 'top', aiDetail: section(names.core, '新') }).detail)), [`${TODAY}　摘要`]);
+});

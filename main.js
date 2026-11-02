@@ -27922,6 +27922,11 @@ function lastContentLine(view, from, to) {
   return -1;
 }
 var summaryLine = (now, summary) => `${formatDate(now)}\u3000${Array.from(summary.replace(/\s+/g, " ").trim()).slice(0, LOG_LINE_SUMMARY_LIMIT).join("")}`;
+function logMarker(oldLines) {
+  var _a2, _b2;
+  const last = oldLines.at(-1);
+  return last ? (_b2 = (_a2 = /^\s*[-*+]\s+/.exec(last)) == null ? void 0 : _a2[0]) != null ? _b2 : "" : "";
+}
 function logLines(view, key2) {
   const range = sectionRange(view, key2);
   if (!range) return [];
@@ -27949,11 +27954,12 @@ ${view.lines.slice(range.to).join("\n")}` : "";
 ${body}${after}`;
 }
 function mergeLogLines(existing, oldLines, summary, now) {
+  const marker5 = logMarker(oldLines);
   const old = new Set(oldLines.map((line) => line.trim()));
   const added = existing.filter((line) => !old.has(line.trim()));
   const kept = existing.filter((line) => old.has(line.trim()));
   if (added.length === 1) return [...kept, added[0]];
-  if (added.length === 0) return [...kept, summaryLine(now, summary)];
+  if (added.length === 0) return [...kept, `${marker5}${summaryLine(now, summary)}`];
   const [first, ...rest] = added;
   return [...kept, [first, ...rest.map((line) => line.trim().replace(DATE_PREFIX, "").trim())].join("\uFF1B")];
 }
@@ -28097,8 +28103,8 @@ ${body}${needsBlank(at2) ? "\n" : ""}`, order: 0 });
 `, order: 0 });
     } else endParts.push(batch.join("\n\n"));
   }
-  const logLine = summaryLine(now, input2.summary);
   const logRange = sectionRange(oldView, classify2.logKey);
+  const logLine = `${logMarker(logLines(oldView, classify2.logKey))}${summaryLine(now, input2.summary)}`;
   if (logRange) {
     const content = lastContentLine(oldView, logRange.from, logRange.to);
     const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
@@ -28196,7 +28202,7 @@ function composeWriteback(input2) {
     );
   } else {
     const oldLines = logLines(scan2(input2.oldDetail, classify2), key2);
-    const line = `${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
+    const line = `${logMarker(oldLines)}${formatDate(input2.now)}\u3000${translate(input2.language, "note.writeback_fresh_replaced_0", (_a2 = input2.backupPath) != null ? _a2 : "")}`;
     detail = withLogLines(input2.aiDetail, view, key2, heading, () => [...oldLines, line]);
   }
   return { ok: true, detail, record: { inserts: [], kept: [detail] } };
@@ -34293,7 +34299,9 @@ var AiTaskService = class {
             researchMode: "local",
             researchDepth: "fast",
             visualMode: "off",
-            intermediateDetail: true
+            intermediateDetail: true,
+            // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
+            ...context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {}
           },
           model,
           reasoning,
@@ -48847,8 +48855,9 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
    * `{ toneText }` for a proposal run (new subtopics, selection synthesis), or nothing when the tone is academic. Only the
    * tones the run, the topic and the map name are asked: no template level, so a proposal still takes no tone from a style.
    */
-  proposalTone(note, options) {
+  async proposalTone(note, options) {
     var _a2, _b2;
+    await this.refreshNoteStyles();
     const { toneText } = this.noteStyles.runStyle({
       choice: { tone: options == null ? void 0 : options.toneId },
       topic: { style: note == null ? void 0 : note.noteStyle, tone: note == null ? void 0 : note.toneId },
@@ -48856,6 +48865,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       outputLanguage: (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language
     });
     return toneText ? { toneText } : {};
+  }
+  /** Reads the style blocks and files again so an entry sees edits made since the last run; a failure keeps the cached styles. */
+  async refreshNoteStyles() {
+    try {
+      await this.noteStyles.refresh();
+    } catch (error) {
+      console.warn("Visual Agent Map note styles refresh", error);
+    }
   }
   /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
   toneChoices() {
@@ -50437,11 +50454,11 @@ ${request.requirements}` : preset.text,
         const baseModel = parent ? inheritModel((await repo.readNote(parent.path, map)).model, currentModel) : currentModel;
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
-        const template2 = this.mapStyle(settings.language, {
+        const template2 = (await this.mapStyle(settings.language, {
           template: request.detailTemplateId,
           notify: true,
           gate: noticeGate
-        }).template;
+        })).template;
         const result = await addOutlineToMap(
           repo,
           map,
@@ -51838,6 +51855,7 @@ ${request.requirements}` : preset.text,
         return ((_a4 = snapshot.sources.find((source) => source.id === node.id)) == null ? void 0 : _a4.path) === node.path;
       });
     };
+    await this.refreshNoteStyles();
     if (!stillValid()) {
       new import_obsidian31.Notice(t("ui.merge_draft_stale"));
       return false;
@@ -51903,7 +51921,7 @@ ${request.requirements}` : preset.text,
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        detailTemplate: this.mapStyle(language2, { notify: true }).template
+        detailTemplate: this.mapStyleCached(language2, { notify: true }).template
       };
       const ask = (context) => (
         // Each request is its own attempt of one entry: the repair request clears the first request's preview.
@@ -52029,7 +52047,7 @@ ${request.requirements}` : preset.text,
       sourceTexts: notes.flatMap((note) => [note.summary, note.detail, note.newFindings]),
       sourceLinkTexts: notes.map((note) => note.visualReferences),
       allowedTexts: task.sources.map((source) => source.path),
-      logHeadings: this.mapStyle(this.plugin.settings.language).template.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]),
+      logHeadings: this.mapStyleCached(this.plugin.settings.language).template.sections.filter((section3) => section3.role === "log").flatMap((section3) => [section3.name, ...section3.aliases]),
       mergedTexts: [result.summary, result.detail],
       mergedLinkTexts: result.visualReferences.map((reference) => `${reference.imageUrl} ${reference.sourceUrl}`)
     });
@@ -52117,7 +52135,7 @@ ${request.requirements}` : preset.text,
     try {
       if (firstStrength) await repo.writeHypothesisStrength(created.path, firstStrength);
       if (content) {
-        const detailTemplate = this.mapStyle(language2).template;
+        const detailTemplate = (await this.mapStyle(language2)).template;
         await repo.updateNote(
           created.path,
           {
@@ -52183,7 +52201,7 @@ ${request.requirements}` : preset.text,
    */
   async mergeIntoParent(title, sources, content, before) {
     var _a2, _b2;
-    const [target, ...children] = sources, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = this.mapStyle(language2).template;
+    const [target, ...children] = sources, mapPath = this.path, repo = this.plugin.repo, language2 = this.plugin.settings.language, detailTemplate = (await this.mapStyle(language2)).template;
     const sourceNotes = [];
     for (const source of sources) sourceNotes.push(await repo.readNote(source.path, before));
     const name = title.trim(), sourcePaths = [.../* @__PURE__ */ new Set([...sourceNotes[0].sourcePaths, ...children.map((child) => child.path)])];
@@ -58750,7 +58768,7 @@ ${request.requirements}` : preset.text,
               ancestors: await this.ancestorContext(parent, language2),
               referenceGroups: options == null ? void 0 : options.referenceGroups,
               outputLanguage: options == null ? void 0 : options.outputLanguage,
-              ...this.proposalTone(note, options),
+              ...await this.proposalTone(note, options),
               mode: "decompose",
               researchMode: (_b2 = options == null ? void 0 : options.researchMode) != null ? _b2 : "research",
               researchDepth: (_c = options == null ? void 0 : options.researchDepth) != null ? _c : "normal",
@@ -58846,10 +58864,10 @@ ${request.requirements}` : preset.text,
     const historyMark = this.history.mark();
     const createdByTitle = /* @__PURE__ */ new Map(), newNodes = [];
     await this.noteStyles.refresh();
-    const contributionTemplate = this.mapStyle(this.plugin.settings.language, {
+    const contributionTemplate = (await this.mapStyle(this.plugin.settings.language, {
       template: detailTemplateId,
       kind: "topic"
-    }).template;
+    })).template;
     try {
       for (const item of items) {
         if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -59477,7 +59495,7 @@ ${request.requirements}` : preset.text,
             referenceDelivery: "direct",
             onProgress: options.onProgress,
             outputLanguage: options.outputLanguage,
-            ...this.proposalTone(note, options),
+            ...await this.proposalTone(note, options),
             mode: "synthesize",
             researchMode: options.researchMode,
             researchDepth: options.researchDepth,
@@ -59824,7 +59842,7 @@ ${request.requirements}` : preset.text,
     const selectedLabel = t("ui.reference_selected_topics_included", names3.join(", "));
     const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
-    const current = this.mapStyle(settings.language);
+    const current = this.mapStyleCached(settings.language);
     new NextStepModal(
       this.app,
       "",
@@ -60029,14 +60047,14 @@ ${request.requirements}` : preset.text,
             referenceDelivery: "direct",
             onProgress: runOptions.onProgress,
             outputLanguage: runOptions.outputLanguage,
-            ...this.proposalTone(void 0, runOptions),
+            ...await this.proposalTone(void 0, runOptions),
             mode: "synthesize",
             researchMode: runOptions.researchMode,
             researchDepth: runOptions.researchDepth,
             visualMode: "off"
           };
         await this.noteStyles.refresh();
-        const integrationStyle = this.mapStyle((_d = runOptions.outputLanguage) != null ? _d : language2, {
+        const integrationStyle = await this.mapStyle((_d = runOptions.outputLanguage) != null ? _d : language2, {
           template: runOptions.detailTemplateId,
           tone: runOptions.toneId,
           kind: "topic",
@@ -60242,7 +60260,7 @@ ${note.detail.trim()}` : "",
       this.path,
       "workspace"
     );
-    const detailTemplate = this.mapStyle(language2, { template: task.options.detailTemplateId, kind: "topic" }).template;
+    const detailTemplate = (await this.mapStyle(language2, { template: task.options.detailTemplateId, kind: "topic" })).template;
     try {
       await this.plugin.repo.updateNote(
         integrated.path,
@@ -63613,7 +63631,12 @@ ${addition}` : addition });
    * The note style for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
    * choice comes first. A style file that does not parse stops the run; `notify` shows a template block problem once per `gate`.
    */
-  mapStyle(language2, options = {}) {
+  async mapStyle(language2, options = {}) {
+    await this.refreshNoteStyles();
+    return this.mapStyleCached(language2, options);
+  }
+  /** `mapStyle` without the refresh: a dialog's default value reads the cached styles (its own refresh is a later ticket). */
+  mapStyleCached(language2, options = {}) {
     var _a2;
     const result = this.noteStyles.runStyle({
       choice: { template: options.template, tone: options.tone },
@@ -69863,7 +69886,7 @@ var TopicRuns = class {
     }
   }
   async integrate(path, options, signal, free) {
-    var _a2, _b2, _c, _d, _e;
+    var _a2, _b2, _c, _d, _e, _f;
     const fail2 = (message) => {
       var _a3;
       if (options.failed) options.failed(message);
@@ -69898,8 +69921,12 @@ var TopicRuns = class {
     let original = null;
     try {
       original = await this.readOriginal((_b2 = prepared.updateMode) != null ? _b2 : "merge", path, options);
+      if (((_c = prepared.updateMode) != null ? _c : "merge") === "fresh" && original === null) {
+        fail2(t("ui.writeback_backup_failed"));
+        return;
+      }
       await repo.updateNote(path, { status: "running" });
-      await ((_c = options.onStarted) == null ? void 0 : _c.call(options));
+      await ((_d = options.onStarted) == null ? void 0 : _d.call(options));
     } catch (error) {
       try {
         await repo.updateNote(path, { status: note.status });
@@ -69922,7 +69949,7 @@ var TopicRuns = class {
         progress.observer
       );
       progress.end();
-      (_d = options.accepted) == null ? void 0 : _d.call(options);
+      (_e = options.accepted) == null ? void 0 : _e.call(options);
       if (signal.aborted) throw new DOMException("Aborted", "AbortError");
       await repo.updateNote(path, { status: note.status });
       const raw = await this.snapshotRaw(original, path, options);
@@ -70030,7 +70057,7 @@ var TopicRuns = class {
     } finally {
       progress.end();
       free();
-      await ((_e = options.onSettled) == null ? void 0 : _e.call(options));
+      await ((_f = options.onSettled) == null ? void 0 : _f.call(options));
     }
   }
   async runSelection(path, options) {
@@ -70164,6 +70191,8 @@ var TopicRuns = class {
     if (!hooks.backupNote || !hooks.readRaw || !raw) return failed;
     if (signal.aborted) return stopped;
     try {
+      if (await hooks.readRaw(path) !== raw.started)
+        return { ok: false, message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved") };
       const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
       const composed = compose({ ...base, now: /* @__PURE__ */ new Date(), backupPath: backup.path });
@@ -70218,7 +70247,7 @@ var TopicRuns = class {
     return { note, used, context, styleLabel: styleLabel2 };
   }
   async startResearch(path, kind, options) {
-    var _a2, _b2, _c, _d, _e, _f;
+    var _a2, _b2, _c, _d, _e, _f, _g;
     if (this.disposed) return null;
     const { runStyle: givenStyle, ...overrides } = (_a2 = options.request) != null ? _a2 : {};
     const settings = () => this.ports.settings();
@@ -70282,8 +70311,13 @@ var TopicRuns = class {
     try {
       startupStatusAttempted = true;
       const original = await this.readOriginal((_e = context.updateMode) != null ? _e : "merge", path, options);
+      if (((_f = context.updateMode) != null ? _f : "merge") === "fresh" && original === null) {
+        fail2(t("ui.writeback_backup_failed"));
+        releaseStartup();
+        return null;
+      }
       await repo.updateNote(path, { status: "running" });
-      await ((_f = options.onStarted) == null ? void 0 : _f.call(options));
+      await ((_g = options.onStarted) == null ? void 0 : _g.call(options));
       raw = await this.snapshotRaw(original, path, options);
       if (controller.signal.aborted) {
         try {
@@ -70329,7 +70363,7 @@ var TopicRuns = class {
       observer
     ).then(
       (result) => this.ports.mutate()(async () => {
-        var _a3, _b3, _c2, _d2, _e2, _f2, _g, _h, _i, _j, _k, _l, _m;
+        var _a3, _b3, _c2, _d2, _e2, _f2, _g2, _h, _i, _j, _k, _l, _m;
         progress == null ? void 0 : progress.end(path, progressAttempt);
         const latest = await repo.readNote(path, options.map);
         const stale = latest.thinkingOrigin !== note.thinkingOrigin || latest.title !== note.title || latest.prompt !== note.prompt || latest.rules !== note.rules || latest.detail !== note.detail || latest.summary !== note.summary || latest.model !== note.model || latest.reasoning !== note.reasoning || latest.researchMode !== note.researchMode || latest.visualMode !== note.visualMode || latest.sourcePaths.join("\n") !== note.sourcePaths.join("\n") || JSON.stringify(latest.referencePaths) !== JSON.stringify(note.referencePaths);
@@ -70380,7 +70414,7 @@ var TopicRuns = class {
         );
         const saved = await repo.readNote(path, options.map);
         (_f2 = options.onWritten) == null ? void 0 : _f2.call(options, { before: { ...latest, status: note.status }, after: saved });
-        if (exchangeId) (_g = exchanges()) == null ? void 0 : _g.completed(exchangeId);
+        if (exchangeId) (_g2 = exchanges()) == null ? void 0 : _g2.completed(exchangeId);
         this.ports.clearOtherHistory(options.origin);
         (_i = options.queueCharts) == null ? void 0 : _i.call(options, {
           path,

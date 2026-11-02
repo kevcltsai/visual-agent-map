@@ -184,6 +184,12 @@ function lastContentLine(view: Scan, from: number, to: number): number {
 const summaryLine = (now: Date, summary: string): string =>
   `${formatDate(now)}\u3000${Array.from(summary.replace(/\s+/g, " ").trim()).slice(0, LOG_LINE_SUMMARY_LIMIT).join("")}`;
 
+/** The list marker the old log lines use ("- " and the like); empty when the last old line has none (or there is no old line). */
+function logMarker(oldLines: string[]): string {
+  const last = oldLines.at(-1);
+  return last ? (/^\s*[-*+]\s+/.exec(last)?.[0] ?? "") : "";
+}
+
 /** The log section's body lines: non-empty, placeholders left out. */
 function logLines(view: Scan, key: string): string[] {
   const range = sectionRange(view, key);
@@ -213,11 +219,12 @@ function withLogLines(
 }
 
 function mergeLogLines(existing: string[], oldLines: string[], summary: string, now: Date): string[] {
+  const marker = logMarker(oldLines);
   const old = new Set(oldLines.map(line => line.trim()));
   const added = existing.filter(line => !old.has(line.trim()));
   const kept = existing.filter(line => old.has(line.trim()));
   if (added.length === 1) return [...kept, added[0]];
-  if (added.length === 0) return [...kept, summaryLine(now, summary)];
+  if (added.length === 0) return [...kept, `${marker}${summaryLine(now, summary)}`];
   const [first, ...rest] = added;
   return [...kept, [first, ...rest.map(line => line.trim().replace(DATE_PREFIX, "").trim())].join("；")];
 }
@@ -388,8 +395,9 @@ function composeTop(input: WritebackInput): WritebackResult {
   }
 
   // The plugin's own log line goes last in the log section; a missing section is added at the end.
-  const logLine = summaryLine(now, input.summary);
   const logRange = sectionRange(oldView, classify.logKey);
+  // The new line uses the same list marker as the old log lines, so the section stays one list.
+  const logLine = `${logMarker(logLines(oldView, classify.logKey))}${summaryLine(now, input.summary)}`;
   if (logRange) {
     const content = lastContentLine(oldView, logRange.from, logRange.to);
     const at = lineEnd(oldView, content >= 0 ? content : logRange.heading.line);
@@ -500,7 +508,7 @@ export function composeWriteback(input: WritebackInput): WritebackResult {
     );
   } else {
     const oldLines = logLines(scan(input.oldDetail, classify), key);
-    const line = `${formatDate(input.now)}\u3000${translate(input.language, "note.writeback_fresh_replaced_0", input.backupPath ?? "")}`;
+    const line = `${logMarker(oldLines)}${formatDate(input.now)}\u3000${translate(input.language, "note.writeback_fresh_replaced_0", input.backupPath ?? "")}`;
     detail = withLogLines(input.aiDetail, view, key, heading, () => [...oldLines, line]);
   }
   return { ok: true, detail, record: { inserts: [], kept: [detail] } };

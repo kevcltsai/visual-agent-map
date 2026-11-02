@@ -736,7 +736,9 @@ export class AiTaskService {
             researchMode: "local",
             researchDepth: "fast",
             visualMode: "off",
-            intermediateDetail: true
+            intermediateDetail: true,
+            // Merge keeps the default text byte for byte; top and fresh must not tell the pass to absorb or replace an old Detail.
+            ...(context.updateMode && context.updateMode !== "merge" ? { updateMode: context.updateMode } : {})
           },
           model,
           reasoning,

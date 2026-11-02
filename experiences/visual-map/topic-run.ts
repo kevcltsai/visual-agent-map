@@ -665,6 +665,11 @@ export class TopicRuns {
     let original: string | null = null;
     try {
       original = await this.readOriginal(prepared.updateMode ?? "merge", path, options);
+      // A "fresh" write needs the file for its backup: when it cannot be read, stop before any AI call is spent.
+      if ((prepared.updateMode ?? "merge") === "fresh" && original === null) {
+        fail(t("ui.writeback_backup_failed"));
+        return;
+      }
       await repo.updateNote(path, { status: "running" });
       await options.onStarted?.();
     } catch (error) {
@@ -966,6 +971,9 @@ export class TopicRuns {
     if (!hooks.backupNote || !hooks.readRaw || !raw) return failed;
     if (signal.aborted) return stopped;
     try {
+      // The file must still be as the run left it before a backup is made; otherwise the result is outdated.
+      if ((await hooks.readRaw(path)) !== raw.started)
+        return { ok: false as const, message: t("ui.the_topic_changed_so_the_outdated_ai_result_was_not_saved") };
       // The backup is the file from before the run touched anything (status, stamp), byte for byte.
       const backup = await hooks.backupNote(path, raw.original);
       if (!backup.ok) return failed;
@@ -1102,6 +1110,12 @@ export class TopicRuns {
     try {
       startupStatusAttempted = true;
       const original = await this.readOriginal(context.updateMode ?? "merge", path, options);
+      // A "fresh" write needs the file for its backup: when it cannot be read, stop before any AI call is spent.
+      if ((context.updateMode ?? "merge") === "fresh" && original === null) {
+        fail(t("ui.writeback_backup_failed"));
+        releaseStartup();
+        return null;
+      }
       await repo.updateNote(path, { status: "running" });
       await options.onStarted?.();
       raw = await this.snapshotRaw(original, path, options);

@@ -1876,6 +1876,66 @@
       "language": "zh-CN",
       "schema": true
     },
+    "service.reference-groups-fresh.en.1": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-fresh.en.2": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh-CN.1": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh-CN.2": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh.1": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.reference-groups-fresh.zh.2": {
+      "builder": "AiTaskService reference extraction then task, update mode fresh",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.reference-groups-top.en.1": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-top.en.2": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "en",
+      "schema": true
+    },
+    "service.reference-groups-top.zh-CN.1": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-top.zh-CN.2": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "service.reference-groups-top.zh.1": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "service.reference-groups-top.zh.2": {
+      "builder": "AiTaskService reference extraction then task, update mode top",
+      "language": "zh-TW",
+      "schema": true
+    },
     "service.reference-groups.en.1": {
       "builder": "AiTaskService reference extraction then task",
       "language": "en",

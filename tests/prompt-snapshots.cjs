@@ -70,6 +70,10 @@ test('collect snapshots: AiTaskService general task prompt', async () => {
     await recordContext(`service.task-textbook.${tag}`, 'AiTaskService instructions: mode task with the built-in Textbook template (intro, six sections, empty sections omitted)', language, { ...ctx, detailTemplate: loadModule('ai/detail-templates.ts').textbookTemplate(loadModule('i18n.ts').noteLanguageOf(language)) });
     await recordContext(`service.default-adaptive.${tag}`, 'AiTaskService instructions: no mode, adaptive detail, no sources', language, { ...ctx, mode: undefined, detailFormat: 'adaptive', sourceContext: undefined, workingFindings: undefined, detail: '', rules: '', ancestors: '' });
     await recordContext(`service.reference-groups.${tag}`, 'AiTaskService reference extraction then task', language, { ...ctx, sourceContext: undefined, referenceGroups: [{ id: 'g1', name: 'Group', location: '/refs', documents: [{ path: '/refs/a.md', content: 'Reference body A' }] }] });
+    // Note style recipe T4 F1: the reference extraction pass that runs before a top or fresh task follows the update mode (no absorb-or-replace text, no old-Detail label in fresh).
+    for (const updateMode of ['top', 'fresh']) {
+      await recordContext(`service.reference-groups-${updateMode}.${tag}`, `AiTaskService reference extraction then task, update mode ${updateMode}`, language, { ...ctx, sourceContext: undefined, updateMode, referenceGroups: [{ id: 'g1', name: 'Group', location: '/refs', documents: [{ path: '/refs/a.md', content: 'Reference body A' }] }] });
+    }
   }
 });
 

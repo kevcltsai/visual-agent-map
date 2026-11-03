@@ -52,6 +52,7 @@ const suites = [
   'test-affected.cjs',
   'check-test-timing.cjs',
   'check-test-wiring.cjs',
+  'check-workflows.cjs',
   'heavy-lock.cjs'
 ];
 const directory = path.join(__dirname, 'suites');

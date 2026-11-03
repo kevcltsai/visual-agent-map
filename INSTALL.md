@@ -77,7 +77,7 @@ Desktop only; macOS with Obsidian 1.14.4 is the verified environment for AIM. Wi
 
 AIM searches the web and provides source links, but finding a source does not prove its claims are true. AI judgments, unavailable sources, and account limits can leave research incomplete. Check important claims against the original sources.
 
-Researching several topics at once uses more of your provider allowance, and a busy model can make some topics fail; retry them, for example with another model. A content template that requires an item count can send one extra AI request to fix the count.
+Researching several topics at once uses more of your provider allowance, and a busy model can make some topics fail; retry them, for example with another model. A note structure that requires an item count can send one extra AI request to fix the count.
 
 Images found by AI web search may not be free to reuse; check each source page. Outline search covers titles in the current map, not full text. Map undo/redo is temporary and clears when you switch maps or close the view.
 
@@ -170,7 +170,7 @@ CLI 繼承 Obsidian 的作業系統權限；唯讀或工具限制不等於 OS sa
 
 AIM 會搜尋網路並提供來源連結，但找到來源不代表內容已證實。AI 判斷、無法存取的來源與帳號額度，都可能讓研究未能完成。重要主張請回到原始來源核對。
 
-同時研究多個議題會用掉較多額度，模型忙碌時部分議題可能失敗，可以重試，例如換一個模型。內容模板設定了項目數時，可能多送一次 AI 請求來修正數量。
+同時研究多個議題會用掉較多額度，模型忙碌時部分議題可能失敗，可以重試，例如換一個模型。筆記結構設定了項目數時，可能多送一次 AI 請求來修正數量。
 
 AI 從網路找到的圖片不一定能自由使用，請查看各自的來源頁。大綱只搜尋目前地圖的議題名稱，不搜尋全文。地圖的復原／重做是暫存紀錄，切換地圖或關閉視圖後會清除。
 

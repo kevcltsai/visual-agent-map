@@ -127,9 +127,11 @@ import {
   resolveCoverWithFrame,
   withCover,
   withCoverOff,
+  withCoverFrame,
   withCoverOn,
   type CoverFrame
 } from "./card-cover";
+import { CoverFrameModal, frameToWrite } from "./cover-frame-editor";
 import { TOPIC_KIND_SHAPES, hasSvgShape, renderShapeBackground, shapeInsets } from "./topic-kind-shape";
 import { randomUUID } from "node:crypto";
 import type VisualAgentMapPlugin from "../../main";
@@ -3753,6 +3755,66 @@ export class VisualAgentMapView extends ItemView {
     this.history.push(entry);
     await this.refreshAfterSavedChange();
     return entry;
+  }
+  /**
+   * Writes (or, with null or a whole-picture frame, removes) `topic-cover-frame` in one undoable step, the same way
+   * changeTopicCover writes. The picture file is never touched; undo writes the old note text back.
+   */
+  private async changeTopicCoverFrame(node: MapNode, frame: CoverFrame | null): Promise<TransactionEntry | null> {
+    if (!this.map || !this.markersEditable(node)) return null;
+    const write = frameToWrite(frame);
+    const viewport = clone(this.map.viewport);
+    const entry = await this.beginMapTransaction()
+      .rewriteNote(node.path, async path => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) throw new Error(path);
+        await this.app.vault.process(file, content => withCoverFrame(content, write));
+      })
+      .editMap(this.path, map => {
+        map.viewport = clone(viewport);
+      })
+      .commit({ deferRebuild: true, label: t("ui.topic_cover_frame_title") });
+    this.history.push(entry);
+    await this.refreshAfterSavedChange();
+    return entry;
+  }
+  /** The topic's cover picture (resource path) and its valid frame; null when it has no picture or the cover is off. */
+  private coverPictureOf(node: MapNode): { src: string; frame: CoverFrame | null } | null {
+    try {
+      const file = this.app.vault.getAbstractFileByPath(node.path);
+      if (!(file instanceof TFile)) return null;
+      const cover = resolveCoverWithFrame(this.app.metadataCache.getFileCache(file), link =>
+        this.app.metadataCache.getFirstLinkpathDest(link, node.path)
+      );
+      if (!cover || !("path" in cover)) return null;
+      const image = this.app.vault.getAbstractFileByPath(cover.path);
+      const src = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
+      return src ? { src, frame: cover.frame } : null;
+    } catch {
+      return null;
+    }
+  }
+  /** Opens the "Adjust area" dialog for the topic's cover picture. Only Apply writes (one undo step); Cancel and close do not. */
+  private openCoverFrameEditor(node: MapNode): CoverFrameModal | null {
+    if (!this.markersEditable(node)) return null;
+    const picture = this.coverPictureOf(node);
+    if (!picture) return null;
+    const modal = new CoverFrameModal(this.app, {
+      src: picture.src,
+      initial: picture.frame,
+      onApply: frame =>
+        new Promise<void>(done =>
+          this.enqueue(async () => {
+            try {
+              await this.changeTopicCoverFrame(node, frame);
+            } finally {
+              done();
+            }
+          })
+        )
+    });
+    modal.open();
+    return modal;
   }
   /** The six topic types as a menu; `pick` gets the chosen one. Used by the panel's "Add subtopic…". */
   private openKindMenu(event: MouseEvent, pick: (kind: TopicKind) => void): void {
@@ -12810,6 +12872,8 @@ export class VisualAgentMapView extends ItemView {
       choice.setAttr("aria-pressed", String(off));
       if (off) choice.addClass("is-pressed");
       if (focus) choice.focus();
+      if (!off && this.coverPictureOf(node))
+        this.button(group, t("ui.topic_cover_frame_adjust"), () => this.openCoverFrameEditor(node));
     };
     paint();
   }

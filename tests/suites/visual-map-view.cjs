@@ -108,7 +108,7 @@ integrationTest('AIM cards hide generic map actions while ordinary map cards ret
   ordinaryResultView.stageEl = makeElement('stage', ordinaryButtonsForResult); ordinaryResultView.map = map([ordinaryResult]); ordinaryResultView.notes = new Map([[ordinaryResult.id, { title: 'Ordinary note', summary: '', status: 'completed' }]]);
   ordinaryResultView.renderNode(ordinaryResult);
   assert.equal(ordinaryButtonsForResult.some(button => button['aria-label'] === 'Generate another question from this research, keeping existing branches'), false, 'ordinary maps do not expose the AIM action');
-  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /if \(!aimMode\) \{\s*const integrate = this\.button\(\s*tools/);
+  assert.match(fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'), /private renderMapTools\(tools: HTMLElement\): void \{\s*if \(!this\.map \|\| this\.map\.aim\) return;[\s\S]{0,700}const integrate = this\.button\(\s*tools/);
 });
 integrationTest('AIM question cards show branch progress instead of note lifecycle status', () => {
   const { VisualAgentMapView } = load('main.ts', { obsidian });

@@ -2853,13 +2853,13 @@ integrationTest('B1 ui: a suggestion only fills the message field (nothing is se
 test('UX B3: an open-ended suggestion shows an ellipsis, replaces the draft, and leaves the cursor after the words for the topic', () => {
   const f = panelFixture({ suggestions: () => ({ selected: 0, hasTopics: false }) }); f.panel.setOpen(true);
   const buttons = () => findAll(f.panel.suggestEl, i => i.tag === 'button');
-  eq(buttons().map(b => b.text), ['Build a three-level topic tree about…', 'Create a new map about…']);
+  eq(buttons().map(b => b.text), ['Research the coffee industry: players, supply chain, trends', 'Build a three-level topic tree about…', 'Create a new map about…'], 'UX B9: one whole example first');
   f.parts.input().value = 'an old half-written draft'; const ranges = []; f.parts.input().setSelectionRange = (start, end) => ranges.push([start, end]);
-  buttons()[0].click();
+  buttons()[1].click();
   assert.equal(f.parts.input().value, 'Build a three-level topic tree about ', 'replaced, with a space to type the topic after');
   eq(ranges, [[37, 37]], 'the cursor is at the end, where the topic goes');
   assert.equal(f.page.doc.activeElement, f.parts.input());
-  buttons()[1].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
+  buttons()[2].click(); assert.equal(f.parts.input().value, 'Create a new map about ', 'a second pick replaces the first');
 });
 
 test('UX B7: the Concise/Detailed toggle has a visible "Answer length" label and a tooltip on each button that says what it means', () => {
@@ -2873,6 +2873,26 @@ test('UX B7: the Concise/Detailed toggle has a visible "Answer length" label and
   f.setLanguage('zh-TW'); f.panel.relabel();
   assert.equal(tag.text, '回答長度'); assert.equal(concise.attrs.title, '簡短、直接的回覆');
   f.setLanguage('en');
+});
+
+integrationTest('UX B9: an empty map leaves out "Select several topics", the goal control and the gesture hint; a map with topics has them', async () => {
+  // The goal control has its own suite (relevance-grade); here it only marks where it is drawn.
+  const tools = h => { const box = element('div'); h.view.renderRelevanceGoalControl = parent => { parent.createEl('button', { text: 'Prioritize by goal' }); }; h.view.renderMapTools(box); return findAll(box, i => i.tag === 'button').map(b => b.attrs['aria-label'] ?? b.text); };
+  const empty = await harness({ empty: true }); await empty.view.hydrate();
+  const shown = tools(empty);
+  assert.ok(shown.some(l => /Topic$/.test(l)), '+ Topic stays'); assert.equal(shown.some(l => /Select several topics/.test(l)), false, 'nothing to select: not in the toolbar, so not in the Tab order');
+  assert.equal(shown.some(l => /Prioritize by goal/.test(l)), false, 'nothing to prioritise');
+  const full = await harness(); await full.view.hydrate(); const all = tools(full);
+  assert.ok(all.includes('Select several topics')); assert.ok(all.some(l => /Prioritize by goal/.test(l)));
+  const aim = await harness({ aim: true }); await aim.view.hydrate(); eq(tools(aim), [], 'an AIM map has none of them');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.hintEl =\s*this\.map\.nodes\.length > 0 && !this\.selection\.state\.multiSelectMode/, 'no "drag to pan, click a node" hint on a map with no nodes');
+});
+
+test('UX B9: an empty map\'s suggestions start with a whole example; a map with topics suggests three whole messages', () => {
+  const { chatSuggestionKeys } = load('core/map-chat-layout.ts');
+  eq(chatSuggestionKeys({ selected: 0, hasNote: false, hasTopics: false }), ['ui.map_chat_example_research', 'ui.map_chat_suggest_empty_build', 'ui.map_chat_suggest_empty_new_map']);
+  for (const selected of [0, 1, 2]) { const keys = chatSuggestionKeys({ selected, hasNote: true, hasTopics: true }); assert.ok(keys.length >= 3 && keys.length <= 4); }
 });
 
 test('UX B3: chatSuggestionFill adds a space only after a final Latin letter of an open-ended suggestion', () => {
@@ -3274,7 +3294,7 @@ integrationTest('B1 fix 20 and 24: the opening screen asks for a topic and hides
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.match(css, /\.has-chat-hero \.vam-empty \{ display: none; \}/);
   hero.control.reply = async () => ({ reply: 'ok', actions: [], rejected: [] }); hero.type('Coffee'); await hero.view.sendMapChat(); assert.match(chat.inputEl.attrs.placeholder, /^Ask a question, or ask the AI to change the map/);
   const h = await harness(); await h.view.hydrate(); const side = h.open();
-  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. Type below, or pick a suggestion.'); assert.equal(side.logEl.hidden, true);
+  assert.equal(side.guideEl.hidden, false); assert.equal(side.guideEl.text, 'No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:'); assert.equal(side.logEl.hidden, true);
   side.begin('q'); assert.equal(side.guideEl.hidden, true); assert.equal(side.logEl.hidden, false);
 });
 

@@ -56,10 +56,11 @@ export interface ChatSuggestionContext {
   hasTopics: boolean;
 }
 
-/** Two to four messages worth sending now. Choosing one only fills the message field. */
+/** Three or four messages worth sending now. Choosing one only fills the message field. */
 export function chatSuggestionKeys(context: ChatSuggestionContext): TranslationKey[] {
+  // An empty map gets one whole example of what the AI can do, besides the two sentences to finish with a topic.
   const keys: TranslationKey[] = !context.hasTopics
-    ? ["ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"]
+    ? ["ui.map_chat_example_research", "ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"]
     : context.selected > 1
       ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"]
       : context.selected === 1

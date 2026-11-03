@@ -1324,7 +1324,7 @@ var en = {
   "ui.map_chat_plan_group_research_0": "Research and AI work ({0})",
   "ui.map_chat_plan_group_view_0": "Map and view ({0})",
   "ui.map_chat_hero_placeholder": "Say what you want to research or organize. One sentence is enough.",
-  "ui.map_chat_empty_log": "No messages yet. Type below, or pick a suggestion.",
+  "ui.map_chat_empty_log": "No messages yet. The AI can build or extend this map, research its topics, or rearrange it. Try one of these, or type your own:",
   "ui.map_chat_canvas_building": "Building the map\u2026",
   "ui.map_chat_canvas_consent": "Waiting for you to confirm AI usage. The map is built after you agree.",
   "ui.map_chat_canvas_plan": "Once you confirm the plan, the map appears here.",
@@ -3708,7 +3708,7 @@ var zhCN = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u4E0E AI \u4F5C\u4E1A\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5730\u56FE\u4E0E\u753B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8BDD\u8BF4\u8BF4\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u4E48",
-  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002\u5728\u4E0B\u9762\u8F93\u5165\uFF0C\u6216\u70B9\u4E00\u6761\u5EFA\u8BAE\u3002",
+  "ui.map_chat_empty_log": "\u8FD8\u6CA1\u6709\u5BF9\u8BDD\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u6269\u5145\u8FD9\u5F20\u5730\u56FE\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8BAE\u9898\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u5E03\u5C40\u3002\u8BD5\u8BD5\u4E0B\u9762\u7684\u4F8B\u5B50\uFF0C\u6216\u81EA\u5DF1\u8F93\u5165\uFF1A",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5730\u56FE\u2026",
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u786E\u8BA4\u4F7F\u7528\u989D\u5EA6\u3002\u540C\u610F\u540E\u624D\u4F1A\u5F00\u59CB\u5EFA\u7ACB\u5730\u56FE\u3002",
   "ui.map_chat_canvas_plan": "\u786E\u8BA4\u8BA1\u5212\u540E\uFF0C\u5730\u56FE\u4F1A\u51FA\u73B0\u5728\u8FD9\u91CC",
@@ -6092,7 +6092,7 @@ var zhTW = {
   "ui.map_chat_plan_group_research_0": "\u7814\u7A76\u8207 AI \u4F5C\u696D\uFF08{0}\uFF09",
   "ui.map_chat_plan_group_view_0": "\u5FC3\u667A\u5716\u8207\u756B\u9762\uFF08{0}\uFF09",
   "ui.map_chat_hero_placeholder": "\u7528\u4E00\u53E5\u8A71\u8AAA\u8AAA\u4F60\u60F3\u7814\u7A76\u6216\u6574\u7406\u4EC0\u9EBC",
-  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002\u5728\u4E0B\u9762\u8F38\u5165\uFF0C\u6216\u9EDE\u4E00\u5247\u5EFA\u8B70\u3002",
+  "ui.map_chat_empty_log": "\u9084\u6C92\u6709\u5C0D\u8A71\u3002AI \u53EF\u4EE5\u5EFA\u7ACB\u6216\u64F4\u5145\u9019\u5F35\u5FC3\u667A\u5716\u3001\u7814\u7A76\u5176\u4E2D\u7684\u8B70\u984C\uFF0C\u6216\u91CD\u65B0\u6574\u7406\u7248\u9762\u3002\u8A66\u8A66\u4E0B\u9762\u7684\u4F8B\u5B50\uFF0C\u6216\u81EA\u5DF1\u8F38\u5165\uFF1A",
   "ui.map_chat_canvas_building": "\u6B63\u5728\u5EFA\u7ACB\u5FC3\u667A\u5716\u2026",
   "ui.map_chat_canvas_consent": "\u7B49\u5F85\u4F60\u78BA\u8A8D\u4F7F\u7528\u984D\u5EA6\u3002\u540C\u610F\u5F8C\u624D\u6703\u958B\u59CB\u5EFA\u7ACB\u5FC3\u667A\u5716\u3002",
   "ui.map_chat_canvas_plan": "\u78BA\u8A8D\u8A08\u756B\u5F8C\uFF0C\u5FC3\u667A\u5716\u6703\u51FA\u73FE\u5728\u9019\u88E1",
@@ -21269,7 +21269,7 @@ function chatOverlayWidth(paneWidth, setWidth) {
   return Math.max(MAP_CHAT_WIDTH_MIN, Math.min(setWidth, paneWidth - MAP_CHAT_OVERLAY_MARGIN));
 }
 function chatSuggestionKeys(context) {
-  const keys = !context.hasTopics ? ["ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
+  const keys = !context.hasTopics ? ["ui.map_chat_example_research", "ui.map_chat_suggest_empty_build", "ui.map_chat_suggest_empty_new_map"] : context.selected > 1 ? ["ui.map_chat_suggest_many_compare", "ui.map_chat_suggest_many_integrate", "ui.map_chat_suggest_many_group"] : context.selected === 1 ? ["ui.map_chat_suggest_one_expand", "ui.map_chat_suggest_one_research", "ui.map_chat_suggest_one_summary"] : ["ui.map_chat_suggest_all_missing", "ui.map_chat_suggest_all_layout", "ui.map_chat_suggest_all_collapse"];
   if (context.hasNote)
     keys.push(context.hasTopics ? "ui.map_chat_suggest_note_add" : "ui.map_chat_suggest_empty_from_note");
   return keys;
@@ -55818,27 +55818,7 @@ ${request.requirements}` : preset.text,
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    const aimMode = !!this.map.aim;
-    if (!aimMode) {
-      this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-        "mod-cta"
-      );
-      this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
-        "vam-topic-more"
-      );
-    }
-    if (!aimMode) {
-      const integrate = this.button(
-        tools,
-        this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-        () => {
-          this.applySelectionChange(this.selection.toggleMultiSelect());
-        }
-      );
-      integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-      if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-      this.renderRelevanceGoalControl(tools);
-    }
+    this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     const canvas = workspace.createDiv("vam-canvas");
     this.viewportEl = canvas.createDiv("vam-viewport");
@@ -55848,7 +55828,7 @@ ${request.requirements}` : preset.text,
     else tools.remove();
     this.mountMapChat(workspace, overlay);
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
-    this.hintEl = !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
+    this.hintEl = this.map.nodes.length > 0 && !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen ? overlay.createSpan({
       cls: "vam-hint vam-canvas-hint",
       text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
     }) : null;
@@ -55937,6 +55917,31 @@ ${request.requirements}` : preset.text,
     keepMapFocus();
     this.applyPresentationMarks();
     restoreSearch();
+  }
+  /**
+   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
+   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
+   * reaches a control that cannot do anything yet. An AIM map has none of them.
+   */
+  renderMapTools(tools) {
+    if (!this.map || this.map.aim) return;
+    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+      "mod-cta"
+    );
+    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), (event) => this.openTopicMenu(event)).addClass(
+      "vam-topic-more"
+    );
+    if (!this.map.nodes.length) return;
+    const integrate = this.button(
+      tools,
+      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+      () => {
+        this.applySelectionChange(this.selection.toggleMultiSelect());
+      }
+    );
+    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderRelevanceGoalControl(tools);
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   emptyCanvasState() {

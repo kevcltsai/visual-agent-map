@@ -9636,27 +9636,7 @@ export class VisualAgentMapView extends ItemView {
       this.selection.exitMultiSelect("emptyMap");
     }
     const tools = createDiv("vam-map-tools");
-    const aimMode = !!this.map.aim;
-    if (!aimMode) {
-      this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
-        "mod-cta"
-      );
-      this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
-        "vam-topic-more"
-      );
-    }
-    if (!aimMode) {
-      const integrate = this.button(
-        tools,
-        this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
-        () => {
-          this.applySelectionChange(this.selection.toggleMultiSelect());
-        }
-      );
-      integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
-      if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
-      this.renderRelevanceGoalControl(tools);
-    }
+    this.renderMapTools(tools);
     const workspace = this.contentEl.createDiv("vam-workspace");
     // The workspace is a row: the chat window (put in first by mountMapChat) and the canvas.
     const canvas = workspace.createDiv("vam-canvas");
@@ -9670,8 +9650,9 @@ export class VisualAgentMapView extends ItemView {
     if (this.relevancePanelEl) this.placeRelevancePanel(this.relevancePanelEl);
     // The gesture hint goes away once the user has panned or zoomed; select mode keeps its gesture hint inside the selection bar, never over the canvas.
     // In select mode the selection bar (bottom-left) owns that space, so no hint is drawn there.
+    // An empty map shows no gesture hint either: there is nothing to pan to or open yet.
     this.hintEl =
-      !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen
+      this.map.nodes.length > 0 && !this.selection.state.multiSelectMode && !this.plugin.settings.canvasHintSeen
         ? overlay.createSpan({
             cls: "vam-hint vam-canvas-hint",
             text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
@@ -9763,6 +9744,31 @@ export class VisualAgentMapView extends ItemView {
     keepMapFocus();
     this.applyPresentationMarks();
     restoreSearch();
+  }
+  /**
+   * The floating tools over the canvas: "+ Topic" and its menu, and (once the map has topics) "Select several topics" and the
+   * goal control. An empty map has nothing to select or prioritise, so those two are left out rather than disabled: Tab never
+   * reaches a control that cannot do anything yet. An AIM map has none of them.
+   */
+  private renderMapTools(tools: HTMLElement): void {
+    if (!this.map || this.map.aim) return;
+    this.button(tools, t("ui.topic"), () => this.whenEditing(() => this.enqueue(() => this.addNode(null)))).addClass(
+      "mod-cta"
+    );
+    this.iconButton(tools, "chevron-down", t("ui.topic_more_options"), event => this.openTopicMenu(event)).addClass(
+      "vam-topic-more"
+    );
+    if (!this.map.nodes.length) return;
+    const integrate = this.button(
+      tools,
+      this.selection.state.multiSelectMode ? t("ui.finish_topic_selection") : t("ui.select_topics"),
+      () => {
+        this.applySelectionChange(this.selection.toggleMultiSelect());
+      }
+    );
+    integrate.setAttr("aria-pressed", String(this.selection.state.multiSelectMode));
+    if (this.selection.state.multiSelectMode) integrate.addClass("is-active");
+    this.renderRelevanceGoalControl(tools);
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "consent" | "plan" {

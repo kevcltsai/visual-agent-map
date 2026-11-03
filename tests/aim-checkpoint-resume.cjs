@@ -168,7 +168,14 @@ function interruptedAttemptPhase(map, branch) {
   return attempts.at(-1)?.phase;
 }
 
-async function interruptThenResume(point, how) {
+// C9 and C11 interrupt the same point the same way; each (point, how) pair runs once per file and the result is shared (the tests read it, never change it).
+const interruptRuns = new Map();
+function interruptThenResume(point, how) {
+  const key = `${point}|${how}`;
+  if (!interruptRuns.has(key)) interruptRuns.set(key, runInterruptThenResume(point, how));
+  return interruptRuns.get(key);
+}
+async function runInterruptThenResume(point, how) {
   const spec = POINTS[point];
   const subject = await newAimMap(`${point} ${how}`);
   const { data } = subject;

@@ -77,7 +77,7 @@ for (const content of ['zh-TW', 'en']) for (const ui of ['en', 'zh-TW']) {
       if (!SYNTHETIC_ENGLISH_FIXTURE.has(variant)) assert.ok([content, FLOW_LANGUAGE[content]].includes(captured.outputLanguage), `${variant}: the flow must set outputLanguage to the map's content language, not the interface language`);
       const context = { ...captured, outputLanguage: content };
       // The AiTaskService used for the capture runs with the interface language; the prompt must not depend on it.
-      const sent = await promptsFor(context, { language: ui });
+      const sent = await promptsFor(context, { language: ui, reuseModule: true });
       assert.ok(sent.length >= 1, `${variant}: no prompt reached the provider`);
       sent.forEach((call, index) => {
         const prompt = normalizeText(call.prompt), label = `${variant}${sent.length > 1 ? `.${index + 1}` : ''} (${content} content, ${ui} UI)`;

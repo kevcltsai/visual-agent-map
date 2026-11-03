@@ -6,6 +6,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./support-replay.cjs');
 const { duplicatedChars, summarize, SCALES, aimFlowContexts, filler } = require('./tools/payload-size.cjs');
+// One three-answer flow per scale is run at most once in this file; the tests only read calls and reports of the result.
+const flowRuns = new Map();
+const flowOf = scale => { if (!flowRuns.has(scale)) flowRuns.set(scale, aimFlowContexts(scale)); return flowRuns.get(scale); };
 
 const { deduplicateAimRequest, AIM_PASSAGE_MIN_CHARS } = load('experiences/aim/request-context.ts');
 const { PASSAGE_REFERENCE } = load('experiences/aim/steps/_shared/rules.ts');
@@ -80,7 +83,7 @@ test('the repair request keeps the failing fragment and the validation error thr
 });
 
 test('every report paragraph of a three-answer AIM branch reaches every delivery request once, at typical report size', async () => {
-  const { calls, reports } = await aimFlowContexts(SCALES.typical);
+  const { calls, reports } = await flowOf(SCALES.typical);
   assert.ok(reports.length >= 6, 'saved reports were produced');
   const paragraphs = reports.flatMap(report => report.split('\n\n'));
   for (const phase of ['delivery-outline', 'delivery-acceptance']) {
@@ -107,7 +110,7 @@ test('the measurement tool gives sane numbers for an empty note and a very long 
   assert.equal(JSON.stringify(summarize([])), JSON.stringify({ count: 0, chars: 0, tokens: 0, mean: 0, max: 0, dup: 0 }));
   const sizes = {};
   for (const [name, scale] of Object.entries(SCALES)) {
-    const { calls } = await aimFlowContexts(scale);
+    const { calls } = await flowOf(scale);
     sizes[name] = Math.max(...calls.map(call => JSON.stringify(call.context).length));
     assert.ok(calls.length > 0 && Number.isFinite(sizes[name]) && sizes[name] > 0, `${name} scale produced requests`);
   }

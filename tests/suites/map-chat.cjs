@@ -33,10 +33,18 @@ function page() {
   return { doc, root, attach };
 }
 /** The panel module together with the setter of the interface language that the same bundle reads (a bundle has its own copy of it). */
-function loadPanelModule(windowValues = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-map-chat-entry-')); const file = path.join(dir, 'entry.ts');
+// The entry file lives at one fixed path per process, so the esbuild bundle (keyed by its options in tests/build.cjs) is made once; each load still evaluates it in a fresh vm context.
+let panelEntryDir;
+function panelEntryFile() {
+  if (panelEntryDir) return path.join(panelEntryDir, 'entry.ts');
+  panelEntryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-map-chat-entry-'));
+  process.on('exit', () => fs.rmSync(panelEntryDir, { recursive: true, force: true }));
+  const file = path.join(panelEntryDir, 'entry.ts');
   fs.writeFileSync(file, `export { MapChatPanel } from ${JSON.stringify(path.join(root, 'experiences/visual-map/map-chat'))};\nexport { setUiLanguage } from ${JSON.stringify(path.join(root, 'i18n'))};\n`);
-  try { return load(path.relative(root, file), { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } }, windowValues); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  return file;
+}
+function loadPanelModule(windowValues = {}) {
+  return load(path.relative(root, panelEntryFile()), { obsidian: { ...obsidian, Keymap: { isModEvent: event => !!event.ctrlKey } } }, windowValues);
 }
 function panelFixture(overrides = {}, windowValues = {}) {
   const { MapChatPanel, setUiLanguage } = loadPanelModule(windowValues);
@@ -1914,10 +1922,12 @@ test('map chat D5 F1: a [[link]] has no href, can be reached with Tab and opened
 // Before the fix the hostile layouts took 1100 to 5300 ms each against about 0.4 ms for benign text: a ratio above 2000. Measured now (best of 3 per side): ratios up to about 65 (5 runs, loaded machine).
 // The limit is about 3 times the largest measured ratio and far below the old one; it catches a return to quadratic work, not a small slowdown.
 const HOSTILE_REPEATS = 80; const HOSTILE_RATIO_LIMIT = 200;
-const blockTime = (text) => { const t = process.hrtime.bigint(); for (let i = 0; i < HOSTILE_REPEATS; i++) lay(text); return Number(process.hrtime.bigint() - t) / 1e6; };
-const bestBlock = (text, count = 3) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, blockTime(text)); return min; };
+// A hostile layout costs 5 to 65 times a benign one, so the hostile side needs fewer layouts per sample to clear timer noise; it is measured as best of HOSTILE_SIDE_SAMPLES samples of HOSTILE_SIDE_REPEATS layouts (more samples than the benign side, because a short sample is the more exposed to one load spike; under load 170 to 240 the ratio of the earlier 3 x 8 sampling reached 198 against the limit 200) and scaled to HOSTILE_REPEATS, so the ratio is still per-layout hostile over per-layout benign.
+const HOSTILE_SIDE_REPEATS = 16; const HOSTILE_SIDE_SAMPLES = 5;
+const blockTime = (text, repeats = HOSTILE_REPEATS) => { const t = process.hrtime.bigint(); for (let i = 0; i < repeats; i++) lay(text); return Number(process.hrtime.bigint() - t) / 1e6 * (HOSTILE_REPEATS / repeats); };
+const bestBlock = (text, count = 3, repeats = HOSTILE_REPEATS) => { let min = Infinity; for (let i = 0; i < count; i++) min = Math.min(min, blockTime(text, repeats)); return min; };
 const benignOf = (text) => 'word '.repeat(Math.ceil(text.length / 5)).slice(0, text.length);
-const hostileRatio = (text) => { const base = bestBlock(benignOf(text)); const ms = bestBlock(text, 2); return { ms, base, ratio: ms / base }; };
+const hostileRatio = (text) => { const base = bestBlock(benignOf(text)); const ms = bestBlock(text, HOSTILE_SIDE_SAMPLES, HOSTILE_SIDE_REPEATS); return { ms, base, ratio: ms / base }; };
 const ratioNote = (r) => `${r.ms.toFixed(0)} ms is ${r.ratio.toFixed(1)} times benign text (${r.base.toFixed(0)} ms) for ${HOSTILE_REPEATS} layouts`;
 test('map chat D5 F2: a heading line with a long run of blanks parses in a small multiple of benign text of the same length', () => {
   for (const text of ['# a' + ' '.repeat(40000) + 'x', '# a' + ' \t'.repeat(20000) + 'x', '#' + ' '.repeat(40000) + 'x #']) {

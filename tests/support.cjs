@@ -119,11 +119,20 @@ function withExpansionCoordinator(plugin) {
 }
 class TFolder { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.children = []; this.parent = null; } }
 class TFile { constructor(path) { this.path = path; this.name = path.split('/').at(-1); this.basename = this.name.replace(/\.md$/, ''); this.extension = this.name.includes('.') ? this.name.split('.').at(-1) : ''; this.parent = null; this.stat = { mtime: Date.now() }; } }
+// Obsidian caches what it parses from a note's frontmatter, and the fixture's getFileCache asks for it once per note per read; memoising by the text gives the same answers (the key is the content, so a changed note never hits). Callers get a copy, and a text that throws is not cached.
+const yamlMemo = new Map();
+function cachedParseYaml(text) {
+  if (yamlMemo.has(text)) return structuredClone(yamlMemo.get(text));
+  const parsed = YAML.parse(text, null, {});
+  if (yamlMemo.size >= 20000) yamlMemo.clear();
+  yamlMemo.set(text, structuredClone(parsed));
+  return parsed;
+}
 const obsidian = { setIcon: (parent, name) => { parent.iconName = name; }, Menu: class { addItem(callback) { callback({ setTitle() { return this; }, setIcon() { return this; }, setWarning() { return this; }, onClick() { return this; } }); return this; } addSeparator() { return this; } showAtMouseEvent() { return this; } },
   Scope: class { constructor(parent) { this.parent = parent; this.keys = []; } register(modifiers, key, func) { const handler = { modifiers, key, func }; this.keys.push(handler); return handler; } unregister(handler) { this.keys = this.keys.filter(item => item !== handler); } },
   TFile, TFolder, App: class {}, Plugin: class {}, ItemView: class { constructor(leaf) { this.app = leaf.app; } async setState() {} }, PluginSettingTab: class {}, Modal: class {}, FuzzySuggestModal: class {}, Notice: class {}, FileSystemAdapter: class { getBasePath() { return '/vault'; } },
   normalizePath: value => value.replace(/\/+/g, '/').replace(/^\//, ''),
-  parseYaml: text => YAML.parse(text, null, {}),
+  parseYaml: cachedParseYaml,
   stringifyYaml: obj => YAML.stringify(obj, null, { nullStr: '', lineWidth: 0, aliasDuplicateObjects: false })
 };
 const { Repository, DEFAULT_SETTINGS, normalizeReasoningLevel } = load('repository.ts', { obsidian });

@@ -249,31 +249,37 @@ test('translate looks up the language dictionary and falls back to English', () 
   assert.equal(translate('en', 'ui.expand_0', 2), 'Expand 2');
   assert.equal(translate('zh-CN', 'ui.interface_language'), '界面语言');
 });
-test('check:i18n fails on bad placeholder and extra-key fixtures and passes on a good one', () => {
+test('check:i18n fails on bad placeholder and extra-key fixtures and passes on a good one', async () => {
   const os = require('node:os');
-  const { spawnSync } = require('node:child_process');
+  const { execFile } = require('node:child_process');
   const script = path.join(root, 'scripts', 'check-i18n.mjs');
-  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-i18n-'));
-  try {
+  const { LANGUAGES } = load('i18n/languages.ts');
+  const exportName = id => id.replace(/-([A-Za-z])/g, (_, letter) => letter.toUpperCase()).replace(/-/g, '');
+  const fixtures = [];
+  // One fixture directory per case, so the three real CLI runs go at once; each holds the dictionaries the case needs.
+  const makeFixture = chinese => {
+    const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-i18n-')); fixtures.push(fixture);
     fs.mkdirSync(path.join(fixture, 'i18n'));
     fs.copyFileSync(path.join(root, 'i18n', 'languages.ts'), path.join(fixture, 'i18n', 'languages.ts'));
-    const write = (name, exportName, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${exportName} = {\n  // coffee:begin\n  "coffee.a": "Hello **{0}**",\n  // coffee:end\n${entries}};\n`);
+    const write = (name, name2, entries) => fs.writeFileSync(path.join(fixture, 'i18n', name), `export const ${name2} = {\n  // coffee:begin\n  "coffee.a": "Hello **{0}**",\n  // coffee:end\n${entries}};\n`);
     write('en.ts', 'en', '  "ui.b": "Count {0} of {1}",\n');
     // One dictionary per non-English registry language, so a new language needs no edit here.
-    const { LANGUAGES } = load('i18n/languages.ts');
-    const exportName = id => id.replace(/-([A-Za-z])/g, (_, letter) => letter.toUpperCase()).replace(/-/g, '');
-    const writeChinese = entries => { for (const { id } of LANGUAGES) if (id !== 'en') write(`${id}.ts`, exportName(id), entries); };
-    writeChinese('  "ui.b": "第 {0} 項",\n');
-    const bad = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
+    for (const { id } of LANGUAGES) if (id !== 'en') write(`${id}.ts`, exportName(id), chinese);
+    return fixture;
+  };
+  const run = fixture => new Promise(resolve => execFile(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' }, (error, stdout, stderr) => resolve({ status: error ? error.code : 0, stdout, stderr })));
+  try {
+    const [bad, good, extra] = await Promise.all([
+      run(makeFixture('  "ui.b": "第 {0} 項",\n')),
+      run(makeFixture('  "ui.b": "第 {0} 項，共 {1}",\n')),
+      run(makeFixture('  "ui.b": "第 {0} 項，共 {1}",\n  "ui.extra": "x",\n'))
+    ]);
     assert.equal(bad.status, 1);
     assert.match(bad.stderr, /zh-TW ui\.b: placeholders differ/);
-    writeChinese('  "ui.b": "第 {0} 項，共 {1}",\n');
-    assert.equal(spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' }).status, 0);
-    writeChinese('  "ui.b": "第 {0} 項，共 {1}",\n  "ui.extra": "x",\n');
-    const extra = spawnSync(process.execPath, [script, '--root', fixture], { cwd: root, encoding: 'utf8' });
+    assert.equal(good.status, 0);
     assert.equal(extra.status, 1);
     assert.match(extra.stderr, /extra key/);
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    for (const fixture of fixtures) fs.rmSync(fixture, { recursive: true, force: true });
   }
 });

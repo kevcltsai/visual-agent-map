@@ -254,18 +254,20 @@ test('map view colour: topics, edges, tags, toolbar, AI chat and dialog buttons 
         return result.result.value;
       };
       await send('DOM.enable'); await send('CSS.enable');
+      // Waits for every running CSS transition to end, instead of a fixed sleep: reading a computed style first forces the restyle (so the transitions have started), then all CSS transitions must be finished (infinite animations such as a spinner never finish, so they are not waited for) before a value is read. No rAF: it may not fire in a hidden headless page.
+      const settle = () => evaluate(`(() => { getComputedStyle(document.body).color; return Promise.all(document.getAnimations().filter(animation => animation instanceof CSSTransition).map(animation => animation.finished.catch(() => {}))).then(() => true); })()`);
       const hoverOn = async (selector, on) => {
         const { root: doc } = await send('DOM.getDocument', { depth: 0 });
         const { nodeId } = await send('DOM.querySelector', { nodeId: doc.nodeId, selector });
         await send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: on ? ['hover'] : [] });
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await settle();
       };
       const out = {};
       for (const scheme of ['light', 'dark']) {
         const surface = BUTTON_SURFACE[scheme];
         const vars = { ...tokens[scheme], '--interactive-normal': surface['--interactive-normal'], '--interactive-hover': surface['--interactive-hover'] };
         await evaluate(`(() => { document.body.className = ${JSON.stringify(`theme-${scheme}`)}; document.body.removeAttribute('style'); for (const [k, v] of Object.entries(${JSON.stringify(vars)})) document.body.style.setProperty(k, v); })()`);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await settle();
         await evaluate(`window.probe = ${PROBE}`);
         const rows = {};
         for (const [name, selector, kind, need, options = {}] of CASES) {

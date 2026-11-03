@@ -34,9 +34,13 @@ async function conclude(configure) {
   return { outcome, details };
 }
 
+// The no-chart-step flow is deterministic and read-only here, so the two tests that compare against it share one run.
+let baselineRun;
+const baselineConclusion = () => (baselineRun ??= conclude(() => {}));
+
 test('AIM conclusion: the chart step runs on the final detail only, once', async () => {
   const seen = [];
-  const baseline = await conclude(() => {});
+  const baseline = await baselineConclusion();
   const charted = await conclude(flow => {
     flow.addDiagrams = async request => {
       seen.push(request);
@@ -53,7 +57,7 @@ test('AIM conclusion: the chart step runs on the final detail only, once', async
 });
 
 test('AIM conclusion: an unchanged detail from the chart step is byte-identical to no chart step', async () => {
-  const baseline = await conclude(() => {});
+  const baseline = await baselineConclusion();
   const same = await conclude(flow => {
     flow.addDiagrams = async request => request.detail;
   });

@@ -349,6 +349,14 @@ test('sharing viewer language: a translated file carries the interface text of e
   assert.ok(html.renderShareShell(ui, translated.languages).includes('"uiByLanguage"'));
 });
 
+/** Waits until the page of the current document is ready: fonts loaded (the viewer fits again after that) and two painted frames. It never waits longer than `capMs`, the fixed wait this replaced, so a page that never gets there is read after the same time as before. */
+async function settled(send, capMs) {
+  const ready = send('Runtime.evaluate', { expression: 'document.fonts.ready.then(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => done(true)))))', awaitPromise: true, returnByValue: true }).catch(() => {});
+  let timer;
+  await Promise.race([ready, new Promise(resolve => { timer = setTimeout(resolve, capMs); })]);
+  clearTimeout(timer);
+}
+
 /** Runs headless Chrome over CDP with the colour scheme pinned to light, so the DOM does not depend on the OS appearance. */
 async function dumpDomLight(chrome, directory, url, timeoutMs = 60000, drive = undefined) {
   const profile = path.join(directory, 'profile');
@@ -374,18 +382,21 @@ async function dumpDomLight(chrome, directory, url, timeoutMs = 60000, drive = u
     await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
     let id = 0;
     const pending = new Map();
-    socket.onmessage = event => { const message = JSON.parse(event.data); pending.get(message.id)?.(message); };
+    const eventWaiters = new Map();
+    socket.onmessage = event => { const message = JSON.parse(event.data); pending.get(message.id)?.(message); if (message.method) { for (const resolve of eventWaiters.get(message.method) ?? []) resolve(); eventWaiters.delete(message.method); } };
     const send = (method, params = {}) => new Promise((resolve, reject) => {
       const mine = ++id;
       pending.set(mine, message => (message.error ? reject(new Error(message.error.message)) : resolve(message.result)));
       socket.send(JSON.stringify({ id: mine, method, params }));
     });
+    // A promise for the next time Chrome sends this event; ask for it before the call that causes the event, so it cannot be missed.
+    send.waitEvent = method => new Promise(resolve => { eventWaiters.set(method, [...(eventWaiters.get(method) ?? []), resolve]); });
     await send('Page.enable');
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
     const loaded = new Promise(resolve => { const previous = socket.onmessage; socket.onmessage = event => { previous(event); if (JSON.parse(event.data).method === 'Page.loadEventFired') resolve(); }; });
     await send('Page.navigate', { url });
     await loaded;
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await settled(send, 1500);
     // `drive(send)` lets a test operate the page (real mouse and key events) and returns its own result instead of the DOM dump.
     if (drive) {
       try { return await drive(send); } finally { socket.close(); }
@@ -653,8 +664,11 @@ function pageTools(send) {
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code: name, windowsVirtualKeyCode: CODES[name] });
   };
   const reload = async () => {
+    // Wait for the new document's load event first, so the readiness check below runs on the reloaded page and not on the old one.
+    const loaded = send.waitEvent('Page.loadEventFired');
     await send('Page.reload');
-    await new Promise(resolve => setTimeout(resolve, 1800));
+    await Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 1800))]);
+    await settled(send, 1800);
   };
   const row = id => `.vam-outline [data-outline-id="${id}"]`;
   const focusedRow = () => evaluate(`document.activeElement?.closest('.vam-outline [role="treeitem"]')?.dataset.outlineId ?? null`);

@@ -47,8 +47,14 @@ function capturingRuntime(responses = [EMPTY_RESULT]) {
   };
 }
 
-function makeService(runtime, { language = 'en', logging = false, exchanges = null } = {}) {
-  const { AiTaskService } = load('core/ai-task-service.ts');
+// Opt-in (reuseModule): evaluate the AiTaskService bundle once per language and make a new service, and a new runtime, for every call. A new service and runtime never share state; only the module is reused, as the plugin does (one module instance, many services).
+const serviceClasses = new Map();
+function makeService(runtime, { language = 'en', logging = false, exchanges = null, reuseModule = false } = {}) {
+  let AiTaskService;
+  if (reuseModule) {
+    if (!serviceClasses.has(language)) serviceClasses.set(language, load('core/ai-task-service.ts').AiTaskService);
+    AiTaskService = serviceClasses.get(language);
+  } else ({ AiTaskService } = load('core/ai-task-service.ts'));
   return new AiTaskService({
     pluginDirectory: () => '/plugin', language: () => language, defaultReasoning: () => 'low',
     exchangeLoggingEnabled: () => logging, exchanges: () => exchanges,
@@ -57,9 +63,9 @@ function makeService(runtime, { language = 'en', logging = false, exchanges = nu
 }
 
 /** Run a TaskContext through the real AiTaskService; return every prompt+schema it sent to the provider. */
-async function promptsFor(context, { language = 'en', model = 'gpt-6-luna', responses } = {}) {
+async function promptsFor(context, { language = 'en', model = 'gpt-6-luna', responses, reuseModule = false } = {}) {
   const runtime = capturingRuntime(responses);
-  try { await makeService(runtime, { language }).askModel(context, model, 'low'); } catch { /* parsing the canned reply may fail; the sent prompt is what matters */ }
+  try { await makeService(runtime, { language, reuseModule }).askModel(context, model, 'low'); } catch { /* parsing the canned reply may fail; the sent prompt is what matters */ }
   return runtime.calls.map(call => ({ prompt: call.prompt, schema: call.schema }));
 }
 

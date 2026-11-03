@@ -1,5 +1,5 @@
 // Runs the unit layer: tests/run.cjs --layer=unit as parallel shards, plus one `node --test` process for the standalone test files, all at the same time.
-// Output of each part is printed whole when it ends, so logs do not interleave; the failed parts are listed at the end. VAM_TEST_SHARDS sets the shard count (default 4).
+// A passing part prints one summary line, a failing part its whole output (VAM_TEST_VERBOSE=1: every part whole), so logs do not interleave; the failed parts are listed at the end. VAM_TEST_SHARDS sets the shard count (default 4).
 // scripts/check-test-wiring.mjs reads `nodeTestFiles` and `parts`, so a test file under tests/ must be listed here (or be run by run.cjs, or by test-integration.mjs).
 import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";

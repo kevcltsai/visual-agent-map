@@ -249,11 +249,12 @@ test('counterexample 2: over the limits no canvas is made, nothing is written, o
 
 test('too many embedded bytes is refused before anything is encoded or written', async () => {
   const h = await harness();
-  const big = new Uint8Array(11 * 1024 * 1024);
+  // 192 references to one 300,000-byte image add up to 57,600,000 bytes, about 10% over the 50 MB limit (the old test: 5 references to 11 MB = 55 MB); each reference is counted, but only 300 KB is ever encoded.
+  const big = new Uint8Array(300000);
   big.set(new Uint8Array(png()));
   await h.app.vault.createBinary(`${MEDIA}/big.png`, big.buffer);
   h.counts.createBinary = 0;
-  h.view.map.canvasItems = Array.from({ length: 5 }, (_, i) => ({ id: `b${i}`, kind: 'image', path: `${MEDIA}/big.png`, x: i * 10, y: 400, w: 30, h: 30 }));
+  h.view.map.canvasItems = Array.from({ length: 192 }, (_, i) => ({ id: `b${i}`, kind: 'image', path: `${MEDIA}/big.png`, x: i * 10, y: 400, w: 30, h: 30 }));
   await h.view.exportMap('svg', 'vault');
   await h.settle();
   assert.equal(h.counts.createBinary, 0);

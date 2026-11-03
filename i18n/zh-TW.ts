@@ -451,7 +451,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.source_topics": "來源議題",
   "ui.expand": "展開",
   "ui.expansion_suggestions": "展開建議",
-  "ui.expansion_suggestions_none": "這個議題還沒有展開建議。按「AI 探索」讓 AI 建議子議題；建立之前會先在這裡讓你檢查。",
+  "ui.expansion_suggestions_none":
+    "這個議題還沒有展開建議。按「AI 探索」讓 AI 建議子議題；建立之前會先在這裡讓你檢查。",
   "ui.expansion_suggestions_changed_open_them_again": "展開建議已變更，請重新開啟。",
   "ui.suggest_the_most_useful_expansion_direction_or_follow_the_di":
     "請建議最有幫助的展開方向；若我指定方向就依指定方向拆解。",
@@ -1274,7 +1275,8 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.map_chat_plan_group_research_0": "研究與 AI 作業（{0}）",
   "ui.map_chat_plan_group_view_0": "心智圖與畫面（{0}）",
   "ui.map_chat_hero_placeholder": "用一句話說說你想研究或整理什麼",
-  "ui.map_chat_empty_log": "還沒有對話。AI 可以建立或擴充這張心智圖、研究其中的議題，或重新整理版面。試試下面的例子，或自己輸入：",
+  "ui.map_chat_empty_log":
+    "還沒有對話。AI 可以建立或擴充這張心智圖、研究其中的議題，或重新整理版面。試試下面的例子，或自己輸入：",
   "ui.map_chat_canvas_building": "正在建立心智圖…",
   "ui.map_chat_canvas_consent": "等待你確認使用額度。同意後才會開始建立心智圖。",
   "ui.map_chat_canvas_plan": "確認計畫後，心智圖會出現在這裡",

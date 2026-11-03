@@ -65112,7 +65112,7 @@ function bindMapFolderInput(plugin, key2, input2) {
   };
   input2.inputEl.addEventListener("blur", apply);
   input2.inputEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") input2.inputEl.blur();
+    if (event.key === "Enter" && !event.isComposing) input2.inputEl.blur();
   });
 }
 var offersEveryLanguage = (values) => SUPPORTED_LANGUAGES.every((item) => values.includes(item.id));

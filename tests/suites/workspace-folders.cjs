@@ -729,6 +729,12 @@ integrationTest('a folder-name field submits once (Enter then blur), locks while
   plugin.app = {}; value = 'Other'; listeners.blur();   // an app without a Settings window handle still works
   assert.equal(events.filter(event => event === 'mutate').length, 2);
   release(); await new Promise(resolve => setTimeout(resolve, 10));
+  value = 'Half';   // Enter that confirms an IME candidate (Zhuyin, Pinyin, Kana) must not submit the half-typed name
+  listeners.keydown({ key: 'Enter', isComposing: true });
+  assert.equal(events.filter(event => event === 'mutate').length, 2, 'a composing Enter does not move the folder');
+  listeners.keydown({ key: 'Enter', isComposing: false });
+  assert.equal(events.filter(event => event === 'mutate').length, 3, 'the plain Enter after composing still submits');
+  release(); await new Promise(resolve => setTimeout(resolve, 10));
 });
 
 // ---- Empty legacy folders (Topics, Inbox) ----------------------------------------------------------------------

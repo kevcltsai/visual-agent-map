@@ -321,7 +321,8 @@ export function bindMapFolderInput(
   };
   input.inputEl.addEventListener("blur", apply);
   input.inputEl.addEventListener("keydown", event => {
-    if (event.key === "Enter") input.inputEl.blur();
+    // The Enter that picks an IME candidate only finishes the composition; it must not move the folder.
+    if (event.key === "Enter" && !event.isComposing) input.inputEl.blur();
   });
 }
 

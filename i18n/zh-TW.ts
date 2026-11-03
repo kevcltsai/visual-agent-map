@@ -47,9 +47,9 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.claude_cli_found_0": "找到 Claude Code CLI：{0}",
   "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it":
     "找不到 Claude Code CLI。請安裝並檢查設定的路徑。",
-  "ui.claude_usage_notice": "Claude 帳號使用提醒",
+  "ui.claude_usage_notice": "送到 Claude 之前",
   "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses":
-    "VAM 會透過本機 Claude Code 登入狀態執行任務。可用量與限制依你的 Claude 帳號或方案而定。",
+    "為了回答，VAM 會把你的訊息、目前地圖中這項工作需要的內容（以及你附上的筆記）透過這台電腦上登入的 Claude Code 送到 Claude，並使用你的 Claude 帳號額度；可用多少依你的 Claude 方案而定。",
   "ui.install_and_connect_claude_code": "安裝並連接 Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks": "只有 AI 任務需要 Claude Code；你仍可建立及編輯心智圖。",
   "ui.install_claude_code_and_sign_in_with_your_claude_account": "安裝 Claude Code，並使用 Claude 帳號登入：",
@@ -310,10 +310,10 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.aim_retry_subtopics": "重新產生子議題",
   "ui.card_resize_label": "卡片寬度",
   "ui.card_height_label": "卡片高度",
-  "ui.codex_allowance_notice": "Codex 額度提醒",
+  "ui.codex_allowance_notice": "送到 Codex 之前",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
-    "VAM 會透過你目前登入的 Codex 帳號執行 AI 任務，並使用該帳號的 Codex 使用額度。可用額度與限制依你的 ChatGPT 方案而定。",
-  "ui.understand_and_run": "了解並執行",
+    "為了回答，VAM 會把你的訊息、目前地圖中這項工作需要的內容（以及你附上的筆記）透過你登入的 Codex 帳號送到 Codex，並使用該帳號的 Codex 額度；可用多少依你的 ChatGPT 方案而定。",
+  "ui.understand_and_run": "同意並送出",
   "ui.install_and_connect_codex": "安裝並連接 Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete": "開啟官方 Codex CLI 安裝指南並完成安裝：",
   "ui.official_codex_cli_installation_guide": "Codex CLI 官方安裝指南",

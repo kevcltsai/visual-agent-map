@@ -50,9 +50,9 @@ export const en = {
   "ui.claude_cli_found_0": "Claude Code CLI found: {0}",
   "ui.claude_cli_was_not_found_follow_the_installation_guide_to_install_it":
     "Claude Code CLI was not found. Install it and check the configured path.",
-  "ui.claude_usage_notice": "Claude account usage notice",
+  "ui.claude_usage_notice": "Before sending to Claude",
   "ui.vam_runs_ai_tasks_through_your_claude_code_account_and_uses":
-    "VAM runs Claude tasks through your local Claude Code sign-in. Usage and limits depend on your Claude account or plan.",
+    "To answer, VAM sends your message and what the task needs from the current map (and any notes you include) to Claude, through the Claude Code sign-in on this computer. It uses your Claude account's usage; how much you can use depends on your Claude plan.",
   "ui.install_and_connect_claude_code": "Install and connect Claude Code",
   "ui.claude_code_is_only_needed_for_ai_tasks":
     "Claude Code is only needed for AI tasks. You can create and edit mind maps without it.",
@@ -338,10 +338,10 @@ export const en = {
   "ui.aim_retry_subtopics": "Retry subtopic planning",
   "ui.card_resize_label": "Card width",
   "ui.card_height_label": "Card height",
-  "ui.codex_allowance_notice": "Codex allowance notice",
+  "ui.codex_allowance_notice": "Before sending to Codex",
   "ui.vam_runs_ai_tasks_through_your_signed_in_codex_account_and_u":
-    "VAM runs AI tasks through your signed-in Codex account and uses that account's Codex allowance. Available usage and limits depend on your ChatGPT plan.",
-  "ui.understand_and_run": "Understand and run",
+    "To answer, VAM sends your message and what the task needs from the current map (and any notes you include) to Codex, through your signed-in Codex account. It uses that account's Codex allowance; how much you can use depends on your ChatGPT plan.",
+  "ui.understand_and_run": "Agree and send",
   "ui.install_and_connect_codex": "Install and connect Codex",
   "ui.open_the_official_codex_cli_installation_guide_and_complete":
     "Open the official Codex CLI installation guide and complete installation: ",

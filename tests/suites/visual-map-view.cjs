@@ -518,7 +518,7 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const firstUsePlugin = { settings: { codexUsageNoticeSeen: false }, aiReadyForModel: async () => true, confirmAiUsage: async (_model, run) => { if (!firstUseConfirmed) { firstUseConfirmed = true; return false; } acknowledged++; await run(); return true; }, saveSettings: async () => { acknowledged++; } };
   const firstUse = new NextStepModal({}, 'Parent', 1, 0, firstUsePlugin, async (_options, _focus, _done, _failed, accepted) => { began++; accepted(); }, async () => {}, async () => {});
   firstUse.onOpen(); button(firstUse.modalEl, 'Confirm research task').click(); await tick();
-  assert.equal(began, 0); assert.equal(button(firstUse.contentEl, 'Understand and run'), undefined); assert.equal(closed, 3);
+  assert.equal(began, 0); assert.equal(button(firstUse.contentEl, 'Agree and send'), undefined); assert.equal(closed, 3);
   button(firstUse.modalEl, 'Confirm research task').click(); await tick();
   assert.equal(began, 1); assert.equal(acknowledged, 1); assert.equal(closed, 4);
   let pendingCalls = 0;
@@ -527,10 +527,10 @@ integrationTest('Next Step reviews first expansion proposals in place and keeps 
   const pendingModal = new NextStepModal({}, 'Parent', 1, 1, pendingPlugin, async () => {}, async (_options, _direction, found) => { pendingCalls++; found([{ title: 'Existing', task: 'Research', contribution: '', parentTitle: '' }], async () => {}); }, async () => {});
   pendingModal.onOpen(); find(pendingModal.contentEl, item => item.cls === 'vam-next-cards').children[1].click();
   button(pendingModal.modalEl, 'Review AI subtopic suggestions (1)').click(); await tick();
-  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
+  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Agree and send'), undefined);
   button(pendingModal.contentEl, 'Create subtopics (1)').click(); await tick();
   assert.equal(pendingModal.closed, true, 'creating the reviewed subtopics ends the guided expansion'); closed -= 1;
-  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Understand and run'), undefined);
+  assert.equal(pendingCalls, 1); assert.equal(button(pendingModal.contentEl, 'Agree and send'), undefined);
   // C2 (owner decision 2026-10-19): a slow outline runs with the dialog hidden; the outline waits for review and a
   // reopened dialog carries the shallow-research choice to the create step.
   let finishQuick, delayedOptions, delayedNodes, delayedReady, delayedStops = 0;

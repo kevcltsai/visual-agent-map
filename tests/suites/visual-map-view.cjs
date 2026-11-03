@@ -3283,7 +3283,7 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented'), /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-multi'), /grid-template-columns: repeat\(auto-fill, minmax\(8\.5em, 1fr\)\)/);
-  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented .vam-marker[data-marker^="progress-"]'), /font-size: 16px/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented button[data-marker^="progress-"] > .vam-marker'), /font-size: 16px/);
   const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
@@ -3514,6 +3514,9 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
       if (single) assert.ok(b.text === '' && b.attrs['aria-label'] && b.attrs.title === b.attrs['aria-label'], 'symbol-only segment named by aria-label and title');
       else assert.ok(b.text && b.attrs['aria-label'] === undefined, 'many-of buttons keep their text');
       assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
+      // The stylesheet's progress size rule is `button[data-marker^="progress-"] > .vam-marker`: the attribute is on the button, the symbol is its child.
+      assert.ok(b.dataset.marker, 'the marker id is on the button');
+      assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
     }
   });
   assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);

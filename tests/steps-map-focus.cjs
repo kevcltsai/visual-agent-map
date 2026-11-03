@@ -221,6 +221,25 @@ test('#18: the focus that was skipped comes back when the map window is focused 
   assert.match(source, /registerDomEvent\([^\n]*"focus", \(\) => this\.onMapWindowFocus\(\)\)/, 'onOpen wires the window focus event');
 });
 
+test('#18: a text editor reopened while another window was active gets the focus in its field when the map window is focused again', async () => {
+  const h = await harness();
+  const block = h.contentEl.querySelector('.vam-stage').add('div', { cls: 'vam-text-node', tabindex: 0 });
+  block.dataset.itemId = 'tx';
+  const field = block.add('textarea', { cls: 'vam-text-node-input' });
+  h.view.textEls.set('tx', block);
+  h.view.editingTextId = 'tx';
+  h.view.lastMapFocus = { itemId: 'tx' };
+  h.view.focusRestorePending = true;
+  h.doc.activeElement = h.doc.body;
+  h.view.onMapWindowFocus();
+  assert.equal(h.active(), field, 'the editing field, not the block around it, has focus');
+  h.view.focusRestorePending = true;
+  const elsewhere = h.contentEl.querySelector('.vam-layout-button');
+  elsewhere.focus();
+  h.view.onMapWindowFocus();
+  assert.equal(h.active(), elsewhere, 'focus that is not lost is not taken');
+});
+
 test('#18: the repaint restorers for the chat field, the search field and the relevance bar also keep still while another window is active', async () => {
   const h = await harness();
   const w = inactive(h);

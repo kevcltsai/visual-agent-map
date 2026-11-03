@@ -1108,6 +1108,16 @@ export class VisualAgentMapView extends ItemView {
   private onMapWindowFocus(): void {
     if (!this.focusRestorePending) return;
     this.focusRestorePending = false;
+    // A text editor reopened while the window was inactive never had focus: the field, not the block around it, gets it back.
+    const editor = this.editingTextId
+      ? this.textEls.get(this.editingTextId)?.querySelector<HTMLTextAreaElement>(".vam-text-node-input")
+      : null;
+    const doc = this.contentEl?.ownerDocument;
+    if (editor && doc && focusIsLost(doc, this.contentEl)) {
+      editor.focus({ preventScroll: true });
+      editor.select?.();
+      return;
+    }
     this.restoreMapFocus(this.lastMapFocus);
   }
   /** A focus restore was skipped because another window was active; done when this window is focused again. */

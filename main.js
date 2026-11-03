@@ -47978,8 +47978,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     if (map.canvasItems) map.canvasItems = out.items;
   }
   onMapWindowFocus() {
+    var _a2, _b2, _c;
     if (!this.focusRestorePending) return;
     this.focusRestorePending = false;
+    const editor = this.editingTextId ? (_a2 = this.textEls.get(this.editingTextId)) == null ? void 0 : _a2.querySelector(".vam-text-node-input") : null;
+    const doc = (_b2 = this.contentEl) == null ? void 0 : _b2.ownerDocument;
+    if (editor && doc && focusIsLost(doc, this.contentEl)) {
+      editor.focus({ preventScroll: true });
+      (_c = editor.select) == null ? void 0 : _c.call(editor);
+      return;
+    }
     this.restoreMapFocus(this.lastMapFocus);
   }
   getViewType() {

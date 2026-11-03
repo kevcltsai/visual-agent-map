@@ -144,7 +144,9 @@ function imageElement(image: SceneImage | null | undefined): string {
   if (!box) return "";
   const tag = `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>`;
   const win = image.window ? rect(image.window.x, image.window.y, image.window.w, image.window.h) : null;
-  return win ? `<svg x="${win[0]}" y="${win[1]}" width="${win[2]}" height="${win[3]}" viewBox="${win.join(" ")}">${tag}</svg>` : tag;
+  return win
+    ? `<svg x="${win[0]}" y="${win[1]}" width="${win[2]}" height="${win[3]}" viewBox="${win.join(" ")}">${tag}</svg>`
+    : tag;
 }
 /** A finite number inside [min, max], or undefined (so an absent or odd value draws the default). */
 function numberIn(value: unknown, min: number, max: number): number | undefined {

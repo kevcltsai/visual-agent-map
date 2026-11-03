@@ -329,9 +329,7 @@ async function createOutlineNotes(
   nodes: OutlineNode[],
   rootDetail: string,
   parentId: string | null,
-  detailTemplateId?: string,
-  manualModel = false,
-  toneId?: string
+  manualModel = false
 ): Promise<{ created: MapNode[]; failure?: string }> {
   const created: MapNode[] = [];
   for (const node of nodes) {
@@ -354,11 +352,6 @@ async function createOutlineNotes(
       );
       note.parentId = top ? parentId : created[node.parent!].id;
       created.push(note);
-      if (detailTemplateId || toneId)
-        await repository.updateNote(note.path, {
-          ...(detailTemplateId ? { detailTemplateId } : {}),
-          ...(toneId ? { toneId } : {})
-        });
     } catch (error) {
       return { created, failure: errorText(error) };
     }
@@ -396,7 +389,6 @@ export async function createOutlineMap(
     nodes,
     rootDetail,
     null,
-    undefined,
     manualModel
   );
   map.nodes = arrangeMap(created);
@@ -428,8 +420,8 @@ export interface OutlineAddResult {
 
 /**
  * Creates the outline's notes in an existing map's topic folder, its root under `parentId` (null for a new
- * top-level tree). The caller writes the returned nodes into the map. A chosen template and tone are recorded on
- * each created topic; the map's own default is never changed.
+ * top-level tree). The caller writes the returned nodes into the map. No style is recorded on a created topic or on the
+ * map: a style chosen in the import window shapes only the root note's sections (the `template`) and the research.
  */
 export async function addOutlineToMap(
   repository: Repository,
@@ -440,10 +432,8 @@ export async function addOutlineToMap(
   source: OutlineSource,
   parentId: string | null,
   template: DetailTemplate,
-  detailTemplateId?: string,
   now = new Date(),
-  manualModel = false,
-  toneId?: string
+  manualModel = false
 ): Promise<OutlineAddResult> {
   const language = repository.settings.language;
   if (!nodes.length) throw new Error(translate(language, "ui.outline_error_no_headings"));
@@ -456,9 +446,7 @@ export async function addOutlineToMap(
     nodes,
     rootDetail,
     parentId,
-    detailTemplateId,
-    manualModel,
-    toneId
+    manualModel
   );
   return { created, total: nodes.length, ...(failure ? { failure } : {}) };
 }

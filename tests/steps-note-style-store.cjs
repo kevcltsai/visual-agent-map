@@ -65,7 +65,8 @@ test('no folder, no new keys (was: topic x map x workspace matrix; grilling Q10/
     const got = store.runStyle(request([{ template: topic, tone: noteTone }, { template: map, tone: mapTone }]));
     const want = todayTemplate(settings, [topic]);
     eq(got.template, want.template);
-    eq(got.issues.missing, want.missing);
+    // R1-L1 (T6 P3): a topic tone that names nothing is reported after the structure (academic rigor still stands in).
+    eq(got.issues.missing, [...want.missing, ...(noteTone === 'nope' ? ['nope'] : [])]);
     assert.equal(got.toneText, M.resolveToneText(PRESETS, [noteTone], 'en'));
     assert.equal(got.label.fileName, undefined);
     assert.equal(got.issues.invalid, undefined);
@@ -131,9 +132,8 @@ test('voice names (was: the style file\'s tone is a name or free text; grilling 
   const zh = store.runStyle({ outputLanguage: 'en', choice: { style: 'file:Zh' } });
   assert.ok(zh.toneText, 'a built-in name in another language names the same voice');
   assert.equal(zh.label.toneName, 'Practical guide');
-  // a run tone replaces the voice of the style; academic at the run means no tone text
-  assert.equal(store.runStyle({ outputLanguage: 'en', choice: { style: 'file:Free', tone: 'plain' } }).toneText, M.resolveToneText(PRESETS, ['plain'], 'en'));
-  assert.equal(store.runStyle({ outputLanguage: 'en', choice: { style: 'file:Free', tone: 'academic' } }).toneText, undefined);
+  // #18: a run tone no longer replaces the voice of the style (replacement: the run-choice test in steps-run-style.cjs, slice 12)
+  assert.equal(store.runStyle({ outputLanguage: 'en', choice: { style: 'file:Free', tone: 'plain' } }).toneText, 'Short sentences, friendly.');
   // a voice that is not there: academic rigor with an issue that names the style file
   const gone = store.runStyle({ outputLanguage: 'en', choice: { style: 'file:Gone' } });
   assert.equal(gone.toneText, undefined);
@@ -256,9 +256,6 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   const moved = store.runStyle(request([{ template: 'uuid-1' }]));
   assert.equal(moved.contextFields.styleSelection, undefined, 'the saved template is read, not the block');
   eq(moved.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
-  const block = store.runStyle(request([], 'en', { template: 'file:My notes' }));
-  assert.ok(block.contextFields.styleSelection, 'the upgraded block runs as a structure file');
-  eq(block.template.sections.map(section => section.name), LEGACY.sections.map(section => section.name));
   eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard six'], ['builtin', 'Intro + six'], ['builtin', 'Claim to verdict'], ['builtin', 'Content & credibility'], ['builtin', 'Goal to done'], ['builtin', 'Definition & example'], ['builtin', 'Conclusion & basis'], ['file', 'My notes']]);
 });
 
@@ -270,16 +267,12 @@ test('D12 (was restore default; T5 P2b, decisions #22/#31): restoreDefault, buil
 test('D8 (was: the map pickers\' data source, a block at any level; grilling Q10/Q15): a structure file is picked by the dialog as file:<name> or by a style that names it; a topic id is never a part ref; a missing file is "missing"', async () => {
   const { store } = makeStore({ noteStylesFolder: 'WS/Note styles' }, { [`${TEMPLATES_DIR}/Mine.md`]: '## A\ntext\n', [`${ROOT}/Styles/S.md`]: '---\nstructure: Mine\n---\n' });
   await store.refresh();
-  const run = store.runStyle(request([], 'en', { template: 'file:Mine' }));
-  assert.ok(run.contextFields.styleSelection);
-  assert.equal(run.template.id, 'file:Mine');
-  eq(run.issues.missing, []);
-  assert.equal(store.runStyle(request([], 'en', { template: 'file:Mine', tone: 'plain' })).toneText, M.resolveToneText(PRESETS, ['plain'], 'en'), 'the dialog\'s tone is not dropped');
+  // #18: a run no longer names a bare structure file; a structure file is read through a style that names it
   assert.equal(store.runStyle(request([], 'en', { style: 'file:S' })).contextFields.styleSelection.template.fileName, 'Mine.md');
   const asId = store.runStyle(request([{ template: 'file:Mine' }]));
   assert.equal(asId.template.id, 'standard', 'at the topic a file ref is an unknown old id');
   eq(asId.issues.missing, ['file:Mine']);
-  const gone = store.runStyle(request([{ template: 'textbook' }], 'en', { template: 'file:Gone' }));
+  const gone = store.runStyle(request([{ template: 'textbook' }], 'en', { style: 'file:Gone' }));
   eq(gone.issues.missing, ['file:Gone']);
   assert.equal(gone.template.id, 'textbook');
 });
@@ -289,14 +282,12 @@ test('D8 (was: tones, an upgraded custom preset keeps its name through its alias
   assert.equal((await store.migrateLegacy({ mapsWithStyle: [] })).status, 'done');
   assert.equal(settings.noteStyleAliases, undefined);
   await store.refresh();
-  const choices = store.toneChoices();
-  assert.ok(['academic', 'summary', 'plain'].every(id => choices.some(choice => choice.id === id)), 'the built-in tones come by tone id');
-  assert.ok(choices.some(choice => choice.id === 'file:Calm' && choice.name === 'Calm'));
-  assert.ok(choices.some(choice => choice.id === 'file:Pirate' && choice.name === 'Pirate'), 'the custom preset is a tone block now');
-  assert.ok(!choices.some(choice => choice.id === 'custom-tone-1'));
-  assert.equal(store.runStyle({ choice: { tone: 'file:Calm' }, outputLanguage: 'en' }).toneText, 'Speak calmly.');
+  assert.equal(store.toneChoices, undefined, 'the tone list of the old pickers is gone (D9, decision #45)');
+  const tones = store.listBlocks('tone');
+  assert.ok(tones.some(item => item.ref === 'file:Calm' && item.name === 'Calm'));
+  assert.ok(tones.some(item => item.ref === 'file:Pirate' && item.name === 'Pirate'), 'the custom preset is a tone block now');
+  assert.ok(!tones.some(item => item.ref === 'custom-tone-1'));
   assert.equal(store.runStyle({ topic: { tone: 'custom-tone-1' }, outputLanguage: 'en' }).toneText, 'Talk like a pirate.', 'the saved preset is read, not its alias');
-  assert.equal(store.runStyle({ choice: { tone: 'file:Gone' }, topic: { tone: 'plain' }, outputLanguage: 'en' }).toneText, M.resolveToneText(PRESETS, ['plain'], 'en'), 'a tone block that is gone names nothing');
   assert.ok(Object.keys(v.files).some(path => path.includes('/Voices/Pirate')));
 });
 

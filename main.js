@@ -1491,14 +1491,6 @@ var en = {
   "ui.detail_template_standard": "Standard",
   "ui.detail_template_textbook": "Textbook",
   "ui.note_style": "Note style",
-  "ui.note_style_keep_0": "Keep as is ({0})",
-  "ui.note_style_keep_each": "Keep as is",
-  "ui.note_style_use_default_0": "Follow default ({0})",
-  "ui.note_style_custom_0_1": "Custom: {0} \xB7 {1}",
-  "ui.note_style_standard": "Standard (academic)",
-  "ui.note_style_standard_short": "Standard",
-  "ui.note_style_textbook": "Textbook (intro, then sections)",
-  "ui.note_style_textbook_short": "Textbook",
   "ui.note_style_hypothesis_short": "Hypothesis structure",
   "ui.note_style_evidence_short": "Evidence structure",
   "ui.note_style_action_short": "Action structure",
@@ -1539,16 +1531,6 @@ var en = {
   "ui.preview_group_input": "Task input (sample)",
   "ui.preview_issue_0_1_2": 'The structure "{0}" has a problem (line {1}): {2} The built-in structure is used instead.',
   "ui.preview_style_invalid_0_1_2": 'The default note style file "{0}" has a problem (line {1}): {2} Research will not start until it is fixed.',
-  "ui.note_style_summary": "Key points",
-  "ui.note_style_plain": "Plain language",
-  "ui.note_style_guide": "Practical guide",
-  "ui.note_style_standard_hint": "Six fixed sections in a neutral, evidence-first voice.",
-  "ui.note_style_textbook_hint": "Opens with 2\u20134 intro paragraphs, then the six sections; empty sections are left out.",
-  "ui.note_style_summary_hint": "Six sections in short sentences and lists: conclusions, facts and numbers only.",
-  "ui.note_style_plain_hint": "Six sections in everyday words; jargon is explained the first time it appears.",
-  "ui.note_style_guide_hint": "Six sections focused on steps, checkpoints and common mistakes.",
-  "ui.note_style_map_default": "Note style for this map",
-  "ui.note_style_map_default_desc": "New topics, and topics without their own style, use it.",
   "ui.adjust": "Adjust",
   "ui.next_summary_synth_full": "Full content",
   "ui.next_summary_synth_summary": "Summary only",
@@ -1556,8 +1538,6 @@ var en = {
   "ui.synthesis_stage_two_fixed": "Sources, content, language and note structure were fixed when the directions were requested; only the extra requirements can still change.",
   "ui.synthesis_needs_name": "Enter a name for the new topic first.",
   "ui.connection_repair": "Fix connection\u2026",
-  "ui.tone_map_default": "Voice for this map",
-  "ui.tone_map_default_desc": "Notes AI writes in this map use it unless a topic sets its own voice.",
   "ui.note_style_kind_row_aria_0": "Note style for {0}",
   "ui.note_style_recipe_issue_0_1": "\u26A0 Line {0}: {1}",
   "ui.note_style_row_missing_0_1": 'The style set for {0}, "{1}", was not found; this type uses its built-in style instead.',
@@ -1566,7 +1546,6 @@ var en = {
   "ui.note_style_source_kind": "structure from topic type",
   "ui.note_style_source_map": "follows this map",
   "ui.note_style_source_default": "default",
-  "ui.tone_use_default": "Follow default (Academic rigor)",
   "ui.preset_builtin_tag": "Built-in",
   "ui.preset_view": "View",
   "ui.preset_edit": "Edit",
@@ -1584,13 +1563,23 @@ var en = {
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
-  "ui.note_style_edit": "Edit this style",
-  "ui.note_style_edit_button": "Open file",
-  "ui.note_style_edit_current_desc": "Open the file of the style in force, to change how AI writes.",
   "ui.note_style_edit_missing_0": 'Cannot find the style file "{0}".',
   "ui.note_style_open_file": "Open this file",
   "ui.note_style_switch": "Use another style",
   "ui.note_style_group_folder": "Mine",
+  "ui.note_style_line_0": "Note style: {0}",
+  "ui.note_style_change_once": "Use another style this time",
+  "ui.note_style_change_back": "Go back to the original style",
+  "ui.note_style_this_run": "Note style for this run",
+  "ui.note_style_no_change_0": "Keep ({0})",
+  "ui.note_style_each_topic": "Each topic's own setting",
+  "ui.note_style_follow_kind": "Follow the topic type",
+  "ui.note_style_menu": "Note style\u2026",
+  "ui.note_style_topic_title": "Note style of this topic",
+  "ui.note_style_topic_desc": "Only later research is affected; content already written does not change.",
+  "ui.note_style_follow_kind_0": "Follow the topic type ({0})",
+  "ui.note_style_tone_missing_0": 'The writing voice "{0}" was not found; this topic now uses Academic rigor.',
+  "ui.note_style_group_builtin": "Built-in",
   "ui.note_style_unusable_0_1_2": '"{0}" has a problem and cannot be chosen (line {1}): {2}',
   "ui.note_style_unusable_option_0": "{0} (has a problem)",
   "ui.note_style_issue_file_long": "The file is over {0} characters.",
@@ -3871,14 +3860,6 @@ var zhCN = {
   "ui.detail_template_standard": "\u6807\u51C6",
   "ui.detail_template_textbook": "\u6559\u79D1\u4E66",
   "ui.note_style": "\u7B14\u8BB0\u98CE\u683C",
-  "ui.note_style_keep_0": "\u4FDD\u6301\u4E0D\u53D8\uFF08{0}\uFF09",
-  "ui.note_style_keep_each": "\u4FDD\u6301\u4E0D\u53D8",
-  "ui.note_style_use_default_0": "\u8DDF\u968F\u9ED8\u8BA4\uFF08{0}\uFF09",
-  "ui.note_style_custom_0_1": "\u81EA\u8BA2\uFF1A{0} \xB7 {1}",
-  "ui.note_style_standard": "\u6807\u51C6\uFF08\u5B66\u672F\u4E25\u8C28\uFF09",
-  "ui.note_style_standard_short": "\u6807\u51C6",
-  "ui.note_style_textbook": "\u6559\u79D1\u4E66\uFF08\u5148\u5BFC\u8BFB\uFF0C\u518D\u5206\u7C7B\uFF09",
-  "ui.note_style_textbook_short": "\u6559\u79D1\u4E66",
   "ui.note_style_hypothesis_short": "\u5047\u8BBE\u7ED3\u6784",
   "ui.note_style_evidence_short": "\u8BC1\u636E\u7ED3\u6784",
   "ui.note_style_action_short": "\u884C\u52A8\u7ED3\u6784",
@@ -3919,16 +3900,6 @@ var zhCN = {
   "ui.preview_group_input": "\u4EFB\u52A1\u8F93\u5165\uFF08\u793A\u4F8B\uFF09",
   "ui.preview_issue_0_1_2": "\u7B14\u8BB0\u7ED3\u6784\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u8FD9\u6B21\u6539\u7528\u5185\u7F6E\u7ED3\u6784\u3002",
   "ui.preview_style_invalid_0_1_2": "\u9ED8\u8BA4\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u4F1A\u5F00\u59CB\u3002",
-  "ui.note_style_summary": "\u7CBE\u7B80\u91CD\u70B9",
-  "ui.note_style_plain": "\u767D\u8BDD\u8BF4\u660E",
-  "ui.note_style_guide": "\u5B9E\u7528\u6307\u5357",
-  "ui.note_style_standard_hint": "\u516D\u4E2A\u56FA\u5B9A\u5206\u7C7B\uFF0C\u4E2D\u6027\u3001\u4EE5\u8BC1\u636E\u4E3A\u672C\u3002",
-  "ui.note_style_textbook_hint": "\u5148\u7528 2\u20134 \u6BB5\u5BFC\u8BFB\u5E26\u4F60\u8FDB\u5165\u4E3B\u9898\uFF0C\u518D\u63A5\u516D\u4E2A\u5206\u7C7B\uFF1B\u6CA1\u6709\u5185\u5BB9\u7684\u5206\u7C7B\u4F1A\u7701\u7565\u3002",
-  "ui.note_style_summary_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7528\u77ED\u53E5\u548C\u6761\u5217\u53EA\u7559\u7ED3\u8BBA\u3001\u4E8B\u5B9E\u4E0E\u6570\u5B57\u3002",
-  "ui.note_style_plain_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7528\u65E5\u5E38\u7528\u8BED\u89E3\u91CA\uFF0C\u672F\u8BED\u7B2C\u4E00\u6B21\u51FA\u73B0\u5C31\u8BF4\u660E\u3002",
-  "ui.note_style_guide_hint": "\u516D\u4E2A\u5206\u7C7B\uFF0C\u7740\u91CD\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u548C\u5E38\u89C1\u9519\u8BEF\u3002",
-  "ui.note_style_map_default": "\u8FD9\u5F20\u56FE\u7684\u7B14\u8BB0\u98CE\u683C",
-  "ui.note_style_map_default_desc": "\u8FD9\u5F20\u56FE\u91CC\u65B0\u7684\u8BAE\u9898\uFF0C\u4EE5\u53CA\u6CA1\u6709\u81EA\u5DF1\u8BBE\u7F6E\u98CE\u683C\u7684\u8BAE\u9898\uFF0C\u90FD\u7528\u8FD9\u4E2A\u98CE\u683C\u3002",
   "ui.adjust": "\u8C03\u6574",
   "ui.next_summary_synth_full": "\u5B8C\u6574\u5185\u5BB9",
   "ui.next_summary_synth_summary": "\u4EC5\u6458\u8981",
@@ -3936,8 +3907,6 @@ var zhCN = {
   "ui.synthesis_stage_two_fixed": "\u53D6\u5F97\u65B9\u5411\u65F6\u5DF2\u56FA\u5B9A\u6765\u6E90\u3001\u5185\u5BB9\u8303\u56F4\u3001\u8BED\u8A00\u4E0E\u7B14\u8BB0\u7ED3\u6784\uFF1B\u73B0\u5728\u53EA\u80FD\u8C03\u6574\u989D\u5916\u8981\u6C42\u3002",
   "ui.synthesis_needs_name": "\u8BF7\u5148\u66FF\u65B0\u8BAE\u9898\u53D6\u540D\u3002",
   "ui.connection_repair": "\u4FEE\u590D\u8FDE\u63A5\u2026",
-  "ui.tone_map_default": "\u8FD9\u5F20\u56FE\u7684\u5199\u4F5C\u53E3\u543B",
-  "ui.tone_map_default_desc": "\u8FD9\u5F20\u56FE\u4E2D AI \u5199\u7684\u7B14\u8BB0\u4F1A\u7528\u5B83\uFF1B\u8BAE\u9898\u81EA\u5DF1\u6307\u5B9A\u53E3\u543B\u65F6\u4EE5\u8BAE\u9898\u4E3A\u51C6\u3002",
   "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_recipe_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}",
   "ui.note_style_row_missing_0_1": "\u4E3A\u201C{0}\u201D\u6307\u5B9A\u7684\u7B14\u8BB0\u98CE\u683C\u201C{1}\u201D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u6539\u7528\u5185\u7F6E\u7684\u98CE\u683C\u3002",
@@ -3946,7 +3915,6 @@ var zhCN = {
   "ui.note_style_source_kind": "\u7ED3\u6784\u6765\u81EA\u8BAE\u9898\u7C7B\u578B",
   "ui.note_style_source_map": "\u8DDF\u968F\u8FD9\u5F20\u56FE",
   "ui.note_style_source_default": "\u8DDF\u968F\u9ED8\u8BA4",
-  "ui.tone_use_default": "\u8DDF\u968F\u9ED8\u8BA4\uFF08\u5B66\u672F\u4E25\u8C28\uFF09",
   "ui.preset_builtin_tag": "\u5185\u7F6E",
   "ui.preset_view": "\u67E5\u770B",
   "ui.preset_edit": "\u7F16\u8F91",
@@ -3964,13 +3932,23 @@ var zhCN = {
   "ui.note_style_file_invalid_0_1_2": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
   "ui.note_style_folder_opened_0": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A{0}",
-  "ui.note_style_edit": "\u7F16\u8F91\u8FD9\u4E2A\u98CE\u683C",
-  "ui.note_style_edit_button": "\u6253\u5F00\u6587\u4EF6",
-  "ui.note_style_edit_current_desc": "\u6253\u5F00\u5F53\u524D\u751F\u6548\u98CE\u683C\u7684\u6587\u4EF6\uFF0C\u8C03\u6574 AI \u7684\u5199\u6CD5\u3002",
   "ui.note_style_edit_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u3002",
   "ui.note_style_open_file": "\u6253\u5F00\u8FD9\u4E2A\u6587\u4EF6",
   "ui.note_style_switch": "\u6539\u7528\u5176\u4ED6\u98CE\u683C",
   "ui.note_style_group_folder": "\u6211\u7684",
+  "ui.note_style_line_0": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0}",
+  "ui.note_style_change_once": "\u8FD9\u6B21\u6539\u7528\u5176\u4ED6\u98CE\u683C",
+  "ui.note_style_change_back": "\u6062\u590D\u539F\u672C\u7684\u98CE\u683C",
+  "ui.note_style_this_run": "\u8FD9\u6B21\u7684\u7B14\u8BB0\u98CE\u683C",
+  "ui.note_style_no_change_0": "\u4E0D\u6539\uFF08{0}\uFF09",
+  "ui.note_style_each_topic": "\u5404\u8BAE\u9898\u81EA\u5DF1\u7684\u8BBE\u5B9A",
+  "ui.note_style_follow_kind": "\u8DDF\u7740\u8BAE\u9898\u7C7B\u578B",
+  "ui.note_style_menu": "\u7B14\u8BB0\u98CE\u683C\u2026",
+  "ui.note_style_topic_title": "\u8FD9\u4E2A\u8BAE\u9898\u7684\u7B14\u8BB0\u98CE\u683C",
+  "ui.note_style_topic_desc": "\u53EA\u5F71\u54CD\u4E4B\u540E\u7684\u7814\u7A76\uFF0C\u5DF2\u5199\u597D\u7684\u5185\u5BB9\u4E0D\u4F1A\u6539\u3002",
+  "ui.note_style_follow_kind_0": "\u8DDF\u7740\u8BAE\u9898\u7C7B\u578B\uFF08{0}\uFF09",
+  "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5199\u4F5C\u53E3\u543B\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u5B66\u672F\u4E25\u8C28\u3002",
+  "ui.note_style_group_builtin": "\u5185\u7F6E",
   "ui.note_style_unusable_0_1_2": "\u201C{0}\u201D\u6709\u95EE\u9898\uFF0C\u65E0\u6CD5\u9009\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u95EE\u9898\uFF09",
   "ui.note_style_issue_file_long": "\u6587\u4EF6\u8D85\u8FC7 {0} \u5B57\u3002",
@@ -6251,14 +6229,6 @@ var zhTW = {
   "ui.detail_template_standard": "\u6A19\u6E96",
   "ui.detail_template_textbook": "\u6559\u79D1\u66F8",
   "ui.note_style": "\u7B46\u8A18\u98A8\u683C",
-  "ui.note_style_keep_0": "\u4FDD\u6301\u4E0D\u8B8A\uFF08{0}\uFF09",
-  "ui.note_style_keep_each": "\u4FDD\u6301\u4E0D\u8B8A",
-  "ui.note_style_use_default_0": "\u8DDF\u96A8\u9810\u8A2D\uFF08{0}\uFF09",
-  "ui.note_style_custom_0_1": "\u81EA\u8A02\uFF1A{0} \xB7 {1}",
-  "ui.note_style_standard": "\u6A19\u6E96\uFF08\u5B78\u8853\u56B4\u8B39\uFF09",
-  "ui.note_style_standard_short": "\u6A19\u6E96",
-  "ui.note_style_textbook": "\u6559\u79D1\u66F8\uFF08\u5148\u5C0E\u8B80\uFF0C\u518D\u5206\u985E\uFF09",
-  "ui.note_style_textbook_short": "\u6559\u79D1\u66F8",
   "ui.note_style_hypothesis_short": "\u5047\u8A2D\u7D50\u69CB",
   "ui.note_style_evidence_short": "\u8B49\u64DA\u7D50\u69CB",
   "ui.note_style_action_short": "\u884C\u52D5\u7D50\u69CB",
@@ -6299,16 +6269,6 @@ var zhTW = {
   "ui.preview_group_input": "\u4EFB\u52D9\u8F38\u5165\uFF08\u7BC4\u4F8B\uFF09",
   "ui.preview_issue_0_1_2": "\u7B46\u8A18\u7D50\u69CB\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u9019\u6B21\u6539\u7528\u5167\u5EFA\u7D50\u69CB\u3002",
   "ui.preview_style_invalid_0_1_2": "\u9810\u8A2D\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}\u4FEE\u597D\u4E4B\u524D\u7814\u7A76\u4E0D\u6703\u958B\u59CB\u3002",
-  "ui.note_style_summary": "\u7CBE\u7C21\u91CD\u9EDE",
-  "ui.note_style_plain": "\u767D\u8A71\u8AAA\u660E",
-  "ui.note_style_guide": "\u5BE6\u7528\u6307\u5357",
-  "ui.note_style_standard_hint": "\u516D\u500B\u56FA\u5B9A\u5206\u985E\uFF0C\u4E2D\u6027\u3001\u4EE5\u8B49\u64DA\u70BA\u672C\u3002",
-  "ui.note_style_textbook_hint": "\u5148\u7528 2\u20134 \u6BB5\u5C0E\u8B80\u5E36\u4F60\u9032\u5165\u4E3B\u984C\uFF0C\u518D\u63A5\u516D\u500B\u5206\u985E\uFF1B\u6C92\u6709\u5167\u5BB9\u7684\u5206\u985E\u6703\u7701\u7565\u3002",
-  "ui.note_style_summary_hint": "\u516D\u500B\u5206\u985E\uFF0C\u7528\u77ED\u53E5\u548C\u689D\u5217\u53EA\u7559\u7D50\u8AD6\u3001\u4E8B\u5BE6\u8207\u6578\u5B57\u3002",
-  "ui.note_style_plain_hint": "\u516D\u500B\u5206\u985E\uFF0C\u7528\u65E5\u5E38\u7528\u8A9E\u89E3\u91CB\uFF0C\u8853\u8A9E\u7B2C\u4E00\u6B21\u51FA\u73FE\u5C31\u8AAA\u660E\u3002",
-  "ui.note_style_guide_hint": "\u516D\u500B\u5206\u985E\uFF0C\u8457\u91CD\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u548C\u5E38\u898B\u932F\u8AA4\u3002",
-  "ui.note_style_map_default": "\u9019\u5F35\u5716\u7684\u7B46\u8A18\u98A8\u683C",
-  "ui.note_style_map_default_desc": "\u9019\u5F35\u5716\u88E1\u65B0\u7684\u8B70\u984C\uFF0C\u4EE5\u53CA\u6C92\u6709\u81EA\u5DF1\u8A2D\u5B9A\u98A8\u683C\u7684\u8B70\u984C\uFF0C\u90FD\u7528\u9019\u500B\u98A8\u683C\u3002",
   "ui.adjust": "\u8ABF\u6574",
   "ui.next_summary_synth_full": "\u5B8C\u6574\u5167\u5BB9",
   "ui.next_summary_synth_summary": "\u50C5\u6458\u8981",
@@ -6316,8 +6276,6 @@ var zhTW = {
   "ui.synthesis_stage_two_fixed": "\u53D6\u5F97\u65B9\u5411\u6642\u5DF2\u56FA\u5B9A\u4F86\u6E90\u3001\u5167\u5BB9\u7BC4\u570D\u3001\u8A9E\u8A00\u8207\u7B46\u8A18\u7D50\u69CB\uFF1B\u73FE\u5728\u53EA\u80FD\u8ABF\u6574\u984D\u5916\u8981\u6C42\u3002",
   "ui.synthesis_needs_name": "\u8ACB\u5148\u66FF\u65B0\u8B70\u984C\u53D6\u540D\u3002",
   "ui.connection_repair": "\u4FEE\u5FA9\u9023\u7DDA\u2026",
-  "ui.tone_map_default": "\u9019\u5F35\u5716\u7684\u5BEB\u4F5C\u53E3\u543B",
-  "ui.tone_map_default_desc": "\u9019\u5F35\u5716\u4E2D AI \u5BEB\u7684\u7B46\u8A18\u6703\u7528\u5B83\uFF1B\u8B70\u984C\u81EA\u5DF1\u6307\u5B9A\u53E3\u543B\u6642\u4EE5\u8B70\u984C\u70BA\u6E96\u3002",
   "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_recipe_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}",
   "ui.note_style_row_missing_0_1": "\u70BA\u300C{0}\u300D\u6307\u5B9A\u7684\u7B46\u8A18\u98A8\u683C\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u985E\u578B\u6539\u7528\u5167\u5EFA\u7684\u98A8\u683C\u3002",
@@ -6326,7 +6284,6 @@ var zhTW = {
   "ui.note_style_source_kind": "\u7D50\u69CB\u4F86\u81EA\u8B70\u984C\u985E\u578B",
   "ui.note_style_source_map": "\u8DDF\u96A8\u9019\u5F35\u5716",
   "ui.note_style_source_default": "\u8DDF\u96A8\u9810\u8A2D",
-  "ui.tone_use_default": "\u8DDF\u96A8\u9810\u8A2D\uFF08\u5B78\u8853\u56B4\u8B39\uFF09",
   "ui.preset_builtin_tag": "\u5167\u5EFA",
   "ui.preset_view": "\u6AA2\u8996",
   "ui.preset_edit": "\u7DE8\u8F2F",
@@ -6344,13 +6301,23 @@ var zhTW = {
   "ui.note_style_file_invalid_0_1_2": "\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
   "ui.note_style_folder_opened_0": "\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A{0}",
-  "ui.note_style_edit": "\u7DE8\u8F2F\u9019\u500B\u98A8\u683C",
-  "ui.note_style_edit_button": "\u958B\u555F\u6A94\u6848",
-  "ui.note_style_edit_current_desc": "\u958B\u555F\u76EE\u524D\u751F\u6548\u98A8\u683C\u7684\u6A94\u6848\uFF0C\u8ABF\u6574 AI \u7684\u5BEB\u6CD5\u3002",
   "ui.note_style_edit_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u3002",
   "ui.note_style_open_file": "\u958B\u555F\u9019\u500B\u6A94",
   "ui.note_style_switch": "\u6539\u7528\u5176\u4ED6\u98A8\u683C",
   "ui.note_style_group_folder": "\u6211\u7684",
+  "ui.note_style_line_0": "\u7B46\u8A18\u98A8\u683C\uFF1A{0}",
+  "ui.note_style_change_once": "\u9019\u6B21\u6539\u7528\u5176\u4ED6\u98A8\u683C",
+  "ui.note_style_change_back": "\u6062\u5FA9\u539F\u672C\u7684\u98A8\u683C",
+  "ui.note_style_this_run": "\u9019\u6B21\u7684\u7B46\u8A18\u98A8\u683C",
+  "ui.note_style_no_change_0": "\u4E0D\u6539\uFF08{0}\uFF09",
+  "ui.note_style_each_topic": "\u5404\u8B70\u984C\u81EA\u5DF1\u7684\u8A2D\u5B9A",
+  "ui.note_style_follow_kind": "\u8DDF\u8457\u8B70\u984C\u985E\u578B",
+  "ui.note_style_menu": "\u7B46\u8A18\u98A8\u683C\u2026",
+  "ui.note_style_topic_title": "\u9019\u500B\u8B70\u984C\u7684\u7B46\u8A18\u98A8\u683C",
+  "ui.note_style_topic_desc": "\u53EA\u5F71\u97FF\u4E4B\u5F8C\u7684\u7814\u7A76\uFF0C\u5DF2\u5BEB\u597D\u7684\u5167\u5BB9\u4E0D\u6703\u6539\u3002",
+  "ui.note_style_follow_kind_0": "\u8DDF\u8457\u8B70\u984C\u985E\u578B\uFF08{0}\uFF09",
+  "ui.note_style_tone_missing_0": "\u627E\u4E0D\u5230\u5BEB\u4F5C\u53E3\u543B\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u5B78\u8853\u56B4\u8B39\u3002",
+  "ui.note_style_group_builtin": "\u5167\u5EFA",
   "ui.note_style_unusable_0_1_2": "\u300C{0}\u300D\u6709\u554F\u984C\uFF0C\u7121\u6CD5\u9078\u7528\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_unusable_option_0": "{0}\uFF08\u6709\u554F\u984C\uFF09",
   "ui.note_style_issue_file_long": "\u6A94\u6848\u8D85\u904E {0} \u5B57\u3002",
@@ -22873,6 +22840,20 @@ ${body}`);
     );
   }
   /**
+   * Sets a note's own note style. A ref writes `note-style` only (the 0.28.0 `detail-template` and `tone` stay as they are);
+   * null is "follow the topic type" and removes all three keys. Other lines and the body keep their bytes, `updated` is not
+   * bumped, nothing rebuilds.
+   */
+  async writeNoteStyle(path, ref) {
+    await this.app.vault.process(
+      this.file(path),
+      (content) => setFrontmatterKeys(
+        content,
+        ref === null ? { "note-style": null, "detail-template": null, tone: null } : { "note-style": ref }
+      )
+    );
+  }
+  /**
    * Toggles one marker in `topic-markers`, reading the current list inside the same `vault.process` call. Values this
    * version does not know are kept, an emptied list removes the key, and `updated` is not bumped.
    */
@@ -25112,7 +25093,6 @@ function visualGuidance(context, language2) {
 
 // ai/note-style-file.ts
 var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
-var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
 var CANONICAL_LANGUAGES = ["zh-TW", "zh-CN", "en"];
 function byLanguage(zhTW2, zhCN2, en2) {
   return Object.fromEntries([
@@ -26837,32 +26817,16 @@ var NoteStyleStore = class {
       const own2 = saved && Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : void 0;
       chosen = (_d = tryRef(typeof own2 === "string" ? own2 : void 0)) != null ? _d : this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language2);
     }
-    return this.assemble(chosen, source, missing, language2, request.choice);
+    return this.assemble(chosen, source, missing, language2);
   }
   /**
-   * The value of a style from the candidate that was chosen: the old dialog's structure and voice (`choice`) only replace
-   * that part of what the lower levels gave. Shared by `runStyle` and `draftStyle`, so both give the same shape.
+   * The value of a style from the candidate that was chosen. Shared by `runStyle` and `draftStyle`, so both give the same shape.
    */
-  assemble(chosen, sourceOf, missing, language2, choice2) {
+  assemble(chosen, sourceOf, missing, language2) {
     var _a2, _b2;
-    let source = sourceOf;
-    let { structure: structure2, voice } = chosen;
-    let aimDelivery = chosen.aimDelivery;
-    if (choice2 == null ? void 0 : choice2.template) {
-      const replaced = this.legacyStructure(choice2.template, language2, true);
-      if (replaced) {
-        structure2 = replaced;
-        aimDelivery = void 0;
-        source = "run";
-      } else if (!missing.includes(choice2.template)) missing.push(choice2.template);
-    }
-    if (choice2 == null ? void 0 : choice2.tone) {
-      const replaced = this.legacyVoice(choice2.tone, language2, true);
-      if (replaced) {
-        voice = replaced;
-        source = "run";
-      }
-    }
+    const source = sourceOf;
+    const { structure: structure2, voice } = chosen;
+    const aimDelivery = chosen.aimDelivery;
     const { format } = chosen;
     const needsSelection = structure2.choice !== void 0 || format.choice !== void 0;
     const contextFields = needsSelection ? {
@@ -26973,7 +26937,7 @@ var NoteStyleStore = class {
    * academic rigor (voice). Undefined when the topic has neither key.
    */
   implicitRecipe(topic, kind, language2, miss) {
-    var _a2, _b2;
+    var _a2;
     const templateId = (topic == null ? void 0 : topic.template) || void 0;
     const toneId = (topic == null ? void 0 : topic.tone) || void 0;
     if (!templateId && !toneId) return void 0;
@@ -26985,7 +26949,9 @@ var NoteStyleStore = class {
       const own2 = (_a2 = BUILTIN_RECIPES.find((item) => `builtin:${item.id}` === KIND_DEFAULT_RECIPE[kind])) == null ? void 0 : _a2.structure;
       structure2 = this.structurePart(`builtin:${own2 && own2 !== AIM_DELIVERY_STRUCTURE ? own2 : "standard"}`, language2);
     }
-    const voice = (_b2 = toneId ? this.legacyVoice(toneId, language2) : void 0) != null ? _b2 : this.voicePart("builtin:academic", language2);
+    let voice = toneId ? this.legacyVoice(toneId, language2) : void 0;
+    if (toneId && !voice) miss(toneId);
+    voice != null ? voice : voice = this.voicePart("builtin:academic", language2);
     const resolvedStructure = structure2 != null ? structure2 : this.structurePart("builtin:standard", language2);
     return {
       ref: "legacy",
@@ -27000,9 +26966,8 @@ var NoteStyleStore = class {
   }
   /**
    * An old detail template id as a structure: the conversion table, then a built-in id, then a custom template (read only).
-   * With `refs` (the old dialog of a run) a part ref such as `file:<name>` is read too.
    */
-  legacyStructure(id, language2, refs = false) {
+  legacyStructure(id, language2) {
     var _a2, _b2;
     const mapped = (_b2 = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy) == null ? void 0 : _b2.templates;
     if (mapped && Object.prototype.hasOwnProperty.call(mapped, id)) {
@@ -27012,14 +26977,12 @@ var NoteStyleStore = class {
     if (BUILTIN_BLOCKS.some((block) => block.category === "template" && block.id === id))
       return this.structurePart(`builtin:${id}`, language2);
     const custom = this.settings.detailTemplates.find((template2) => template2.id === id);
-    if (!custom && refs) return this.structurePart(id, language2);
     return custom ? { template: custom, name: custom.name, issues: [], notices: [] } : void 0;
   }
   /**
-   * An old tone id as a voice: the conversion table, then a built-in id, then a custom tone preset (read only). With `refs`
-   * (the old dialog of a run) a part ref such as `file:<name>` is read too.
+   * An old tone id as a voice: the conversion table, then a built-in id, then a custom tone preset (read only).
    */
-  legacyVoice(id, language2, refs = false) {
+  legacyVoice(id, language2) {
     var _a2, _b2;
     const mapped = (_b2 = (_a2 = this.settings.noteStyleRecipe) == null ? void 0 : _a2.legacy) == null ? void 0 : _b2.tones;
     if (mapped && Object.prototype.hasOwnProperty.call(mapped, id)) {
@@ -27029,7 +26992,6 @@ var NoteStyleStore = class {
     if (BUILTIN_BLOCKS.some((block) => block.category === "tone" && block.id === id))
       return this.voicePart(`builtin:${id}`, language2);
     const preset = findPreset(this.settings.promptPresets, "tone", id, language2);
-    if (!preset && refs) return this.voicePart(id, language2);
     return preset ? {
       text: preset.id === DEFAULT_TONE_ID ? void 0 : preset.text.trim() || void 0,
       name: preset.name,
@@ -27147,14 +27109,6 @@ var NoteStyleStore = class {
       name: parsed.name,
       issues: []
     };
-  }
-  // ---- the tone choices of the map pickers ----
-  /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
-  toneChoices() {
-    return this.listBlocks("tone").map((item) => {
-      const parsed = parseBlockRef(item.ref);
-      return { id: (parsed == null ? void 0 : parsed.kind) === "builtin" ? parsed.id : item.ref, name: item.name };
-    });
   }
   // ---- writing block files (only on a user action; a file is never overwritten) ----
   serial(task) {
@@ -28024,98 +27978,35 @@ async function backupNote(port, input2) {
   }
 }
 
-// ai/note-style-label.ts
-var NOTE_STYLE_PRESETS = [
-  {
-    id: "standard",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: DEFAULT_TONE_ID,
-    name: "ui.note_style_standard",
-    short: "ui.note_style_standard_short",
-    hint: "ui.note_style_standard_hint"
-  },
-  {
-    id: "textbook",
-    templateId: TEXTBOOK_TEMPLATE_ID,
-    toneId: DEFAULT_TONE_ID,
-    name: "ui.note_style_textbook",
-    short: "ui.note_style_textbook_short",
-    hint: "ui.note_style_textbook_hint"
-  },
-  {
-    id: "summary",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "summary",
-    name: "ui.note_style_summary",
-    short: "ui.note_style_summary",
-    hint: "ui.note_style_summary_hint"
-  },
-  {
-    id: "plain",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "plain",
-    name: "ui.note_style_plain",
-    short: "ui.note_style_plain",
-    hint: "ui.note_style_plain_hint"
-  },
-  {
-    id: "guide",
-    templateId: STANDARD_TEMPLATE_ID,
-    toneId: "guide",
-    name: "ui.note_style_guide",
-    short: "ui.note_style_guide",
-    hint: "ui.note_style_guide_hint"
-  }
-];
-function matchPreset(templateId, toneId) {
-  const template2 = templateId || STANDARD_TEMPLATE_ID;
-  const tone2 = toneId || DEFAULT_TONE_ID;
-  return NOTE_STYLE_PRESETS.find((preset) => preset.templateId === template2 && preset.toneId === tone2);
-}
-function fileStyleName(templateId) {
-  return /^(?:style|file):/.test(templateId) ? templateId.replace(/^(?:style|file):/, "") : void 0;
-}
-function styleLabel(templateId, toneId, names3, language2) {
-  const preset = matchPreset(templateId, toneId);
-  if (preset) return translate(language2, preset.short);
-  return translate(
-    language2,
-    "ui.note_style_custom_0_1",
-    names3.template(templateId || STANDARD_TEMPLATE_ID),
-    names3.tone(toneId || DEFAULT_TONE_ID)
-  );
-}
-var BUILTIN_PAIRS = {
-  standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
-  textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
-  summary: { template: STANDARD_TEMPLATE_ID, tone: "summary" },
-  plain: { template: STANDARD_TEMPLATE_ID, tone: "plain" },
-  guide: { template: STANDARD_TEMPLATE_ID, tone: "guide" }
-};
-function builtinPairOf(templateId, toneId) {
-  const template2 = templateId || STANDARD_TEMPLATE_ID;
-  const tone2 = toneId || DEFAULT_TONE_ID;
-  return NOTE_STYLE_BUILTIN_IDS.find((id) => BUILTIN_PAIRS[id].template === template2 && BUILTIN_PAIRS[id].tone === tone2);
-}
-function styleRefOf(templateId, toneId) {
-  var _a2;
-  const builtin = builtinPairOf(templateId, toneId);
-  if (builtin) return { kind: "builtin", id: builtin };
-  if (((_a2 = parseBlockRef(templateId)) == null ? void 0 : _a2.kind) === "file" && templateId) return { kind: "file", id: templateId };
-  return void 0;
-}
-function runStyleLabelText(label, language2) {
-  return label.templateSource === "kind" ? translate(
-    language2,
-    "ui.note_style_label_0_1_2",
-    label.templateName,
-    label.toneName,
-    translate(language2, "ui.note_style_source_kind")
-  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
-}
-
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian14 = require("obsidian");
+function builtinRecipeItems() {
+  const nameOf = (list, id) => {
+    const found = list.find((item) => item.id === id);
+    return found ? t(found.nameKey) : id;
+  };
+  const templates = BUILTIN_BLOCKS.filter((block) => block.category === "template");
+  const tones = BUILTIN_BLOCKS.filter((block) => block.category === "tone");
+  return BUILTIN_RECIPES.map((recipe) => {
+    const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
+    return {
+      ref: builtinRef(recipe.id),
+      kind: "builtin",
+      name: t(recipe.nameKey),
+      ...aim ? { aimOnly: true } : {},
+      structure: { name: aim ? t(recipe.nameKey) : nameOf(templates, recipe.structure) },
+      voice: { name: nameOf(tones, recipe.voice) },
+      format: { name: nameOf(BUILTIN_FORMATS, recipe.format) },
+      update: recipe.update,
+      issues: []
+    };
+  });
+}
+function recipeTags(item) {
+  const tags = [item.structure.name, item.voice.name, item.format.name];
+  if (!item.aimOnly) tags.push(t(UPDATE_MODE_KEYS[item.update]));
+  return tags.join(" \xB7 ");
+}
 var NoteStyleFileError = class extends Error {
   constructor(message, open) {
     super(message);
@@ -28136,10 +28027,8 @@ function stylePickerFor(app, plugin) {
   if (!store) return void 0;
   return {
     refresh: () => store.refresh(),
-    list: () => store.listBlocks("template").flatMap(
-      (item) => item.kind === "file" && item.fileName !== void 0 ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }] : []
-    ),
-    edit: (ref) => openStyleFile(app, store, ref)
+    recipes: () => store.listRecipes(),
+    openRecipe: (ref) => openRecipeFile(app, store, ref)
   };
 }
 async function openVaultFile(app, path) {
@@ -28148,15 +28037,10 @@ async function openVaultFile(app, path) {
   await app.workspace.getLeaf("tab").openFile(file);
   return true;
 }
-async function openStyleFile(app, store, ref) {
-  var _a2, _b2;
-  const name = ref.kind === "file" ? `${ref.id.slice("file:".length)}.md` : ref.id;
-  try {
-    const blockRef = ref.kind === "file" ? ref.id : builtinRef((_b2 = (_a2 = NOTE_STYLE_PRESETS.find((item) => item.id === ref.id)) == null ? void 0 : _a2.templateId) != null ? _b2 : ref.id);
-    const { path } = await store.ensureBlockFile("template", blockRef);
-    if (!await openVaultFile(app, path)) new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", name));
-  } catch (e) {
-    new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", name));
+async function openRecipeFile(app, store, ref) {
+  const path = store.recipeFilePath(ref);
+  if (path === void 0 || !await openVaultFile(app, path)) {
+    new import_obsidian14.Notice(t("ui.note_style_edit_missing_0", ref.startsWith("file:") ? `${ref.slice("file:".length)}.md` : ref));
   }
 }
 var ISSUE_KEYS = /* @__PURE__ */ new Set([
@@ -28167,62 +28051,84 @@ var ISSUE_KEYS = /* @__PURE__ */ new Set([
   "no_sections",
   "count_invalid",
   "comment_unclosed",
-  "format_heading_repeated"
+  "format_heading_repeated",
+  // The codes only a style file (a recipe) raises.
+  "format_zone_moved",
+  "update_invalid",
+  "part_name_invalid",
+  "part_missing",
+  "builtin_name"
 ]);
 function styleIssueText(issue2) {
   if (ISSUE_KEYS.has(issue2.code)) return t(`ui.note_style_issue_${issue2.code}`, ...issue2.values);
   return t(issue2.code, ...issue2.values);
 }
-function styleProblem(item) {
-  const first = item.issues[0];
-  if (!first) return void 0;
-  return t("ui.note_style_unusable_0_1_2", item.fileName, first.line, styleIssueText(first));
-}
-async function openStyleChooser(app, picker, options) {
-  var _a2, _b2, _c;
-  if (picker) await picker.refresh();
-  const items = (_a2 = picker == null ? void 0 : picker.list()) != null ? _a2 : [];
-  const same = (ref) => {
-    var _a3;
-    return ((_a3 = options.current) == null ? void 0 : _a3.kind) === ref.kind && options.current.id === ref.id;
-  };
-  const mark = (ref) => same(ref) ? { description: t("ui.detail_template_current") } : {};
-  const bad = (item, label) => ({
-    label,
-    description: styleProblem(item),
-    buttonLabel: t("ui.note_style_open_file"),
-    action: () => void (picker == null ? void 0 : picker.edit({ kind: item.kind, id: item.id }))
-  });
-  const choices = [...(_b2 = options.leading) != null ? _b2 : []];
-  for (const preset of NOTE_STYLE_PRESETS) {
-    const ref = { kind: "builtin", id: preset.id };
-    choices.push({ label: t(preset.name), ...mark(ref), action: () => options.pick(preset.templateId, preset.toneId) });
+async function openTopicStyleChooser(app, plugin, options) {
+  var _a2, _b2, _c, _d;
+  const picker = stylePickerFor(app, plugin);
+  const store = (_a2 = plugin.noteStyles) != null ? _a2 : emptyNoteStyleStore(() => plugin.settings);
+  try {
+    await (picker == null ? void 0 : picker.refresh());
+  } catch (e) {
   }
-  for (const item of items) {
+  const recipes = (picker ? picker.recipes() : builtinRecipeItems()).filter((item) => !item.aimOnly);
+  const language2 = (_c = (_b2 = plugin.settings) == null ? void 0 : _b2.language) != null ? _c : "en";
+  const { note } = options;
+  const legacy = !note.noteStyle && (!!note.detailTemplateId || !!note.toneId);
+  const followed = store.runStyle({ kind: options.kind, outputLanguage: language2 });
+  const current = t("ui.detail_template_current");
+  const describe = (tags, isCurrent) => isCurrent ? `${current} \xB7 ${tags}` : tags;
+  const choices = [];
+  const followedItem = recipes.find((item) => item.ref === followed.recipe.ref);
+  const followCurrent = !note.noteStyle && !legacy;
+  choices.push({
+    label: t("ui.note_style_follow_kind_0", followed.recipe.name),
+    description: describe(
+      followedItem ? recipeTags(followedItem) : `${followed.label.templateName} \xB7 ${followed.label.toneName}`,
+      followCurrent
+    ),
+    action: () => {
+      if (!followCurrent) void options.write(null);
+    }
+  });
+  if (legacy) {
+    const old = store.runStyle({
+      kind: options.kind,
+      topic: { template: note.detailTemplateId, tone: note.toneId },
+      outputLanguage: language2
+    });
+    choices.push({
+      label: old.recipe.name,
+      description: describe(`${old.label.templateName} \xB7 ${old.label.toneName}`, true),
+      action: () => void 0
+    });
+  }
+  for (const item of recipes) {
     if (item.issues.length) {
-      choices.push(bad(item, item.name));
+      const first = item.issues[0];
+      choices.push({
+        label: item.name,
+        description: t("ui.note_style_unusable_0_1_2", (_d = item.fileName) != null ? _d : item.name, first.line, styleIssueText(first)),
+        buttonLabel: t("ui.note_style_open_file"),
+        action: () => void (picker == null ? void 0 : picker.openRecipe(item.ref))
+      });
       continue;
     }
-    const ref = { kind: item.kind, id: item.id };
+    const isCurrent = note.noteStyle === item.ref;
     choices.push({
       label: item.name,
-      ...mark(ref),
-      action: () => options.pick(item.id, void 0)
+      description: describe(recipeTags(item), isCurrent),
+      action: () => {
+        if (!isCurrent) void options.write(item.ref);
+      }
     });
   }
-  const editRef = (_c = options.current) != null ? _c : options.editRef;
-  if (editRef && picker)
-    choices.push({
-      label: t("ui.note_style_edit"),
-      description: t("ui.note_style_edit_current_desc"),
-      buttonLabel: t("ui.note_style_edit_button"),
-      action: () => void picker.edit(editRef)
-    });
   new ChoiceModal(
     app,
-    options.title,
-    options.description,
-    choices.map((choice2) => ({ ...choice2, named: true }))
+    t("ui.note_style_topic_title"),
+    t("ui.note_style_topic_desc"),
+    choices.map((choice2) => ({ ...choice2, named: true })),
+    options.dismissed
   ).open();
 }
 
@@ -35153,7 +35059,7 @@ function outlineRootDetail(language2, template2, source, now) {
 
 - ${log}`, noteLanguageOf(language2), template2);
 }
-async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDetail, parentId, detailTemplateId, manualModel = false, toneId) {
+async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDetail, parentId, manualModel = false) {
   const created = [];
   for (const node of nodes) {
     try {
@@ -35171,11 +35077,6 @@ async function createOutlineNotes(repository, map, mapPath, model, nodes, rootDe
       );
       note.parentId = top ? parentId : created[node.parent].id;
       created.push(note);
-      if (detailTemplateId || toneId)
-        await repository.updateNote(note.path, {
-          ...detailTemplateId ? { detailTemplateId } : {},
-          ...toneId ? { toneId } : {}
-        });
     } catch (error) {
       return { created, failure: errorText(error) };
     }
@@ -35202,7 +35103,6 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
     nodes,
     rootDetail,
     null,
-    void 0,
     manualModel
   );
   map.nodes = arrangeMap(created);
@@ -35223,7 +35123,7 @@ async function createOutlineMap(repository, model, nodes, source, now = /* @__PU
   }
   return { mapPath, nodes: map.nodes, created: created.length, total: nodes.length, ...failure ? { failure } : {} };
 }
-async function addOutlineToMap(repository, map, mapPath, model, nodes, source, parentId, template2, detailTemplateId, now = /* @__PURE__ */ new Date(), manualModel = false, toneId) {
+async function addOutlineToMap(repository, map, mapPath, model, nodes, source, parentId, template2, now = /* @__PURE__ */ new Date(), manualModel = false) {
   const language2 = repository.settings.language;
   if (!nodes.length) throw new Error(translate(language2, "ui.outline_error_no_headings"));
   const rootDetail = outlineRootDetail(language2, template2, source, now);
@@ -35235,9 +35135,7 @@ async function addOutlineToMap(repository, map, mapPath, model, nodes, source, p
     nodes,
     rootDetail,
     parentId,
-    detailTemplateId,
-    manualModel,
-    toneId
+    manualModel
   );
   return { created, total: nodes.length, ...failure ? { failure } : {} };
 }
@@ -35908,160 +35806,129 @@ function modelField(parent, models, defaultLabel, repair) {
     dispose
   };
 }
-var STYLE_KEEP = "";
-var STYLE_CUSTOM = "custom";
-var stylePreset = (id) => `preset:${id}`;
-function noteStyleField(parent, options) {
-  const { field, head } = linkedField(parent, t("ui.note_style"));
-  const select = field.createEl("select");
-  select.setAttr("aria-label", t("ui.note_style"));
-  const edit = head.createEl("button", { text: t("ui.note_style_edit"), cls: "vam-field-link" });
-  edit.type = "button";
-  const hint = field.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
-  const problems = field.createDiv("vam-note-style-problems");
-  let custom;
+var choiceCount = 0;
+function styleChoiceField(parent, options) {
+  const id = `vam-style-choice-${++choiceCount}`;
+  const root = parent.createDiv("vam-style-choice");
+  const line = root.createDiv("vam-style-choice-line");
+  const text11 = line.createSpan({ cls: "vam-style-choice-text" });
+  const toggle = line.createEl("button", { text: t("ui.note_style_change_once"), cls: "vam-field-link" });
+  toggle.type = "button";
+  toggle.setAttr("aria-expanded", "false");
+  toggle.setAttr("aria-controls", id);
+  const panel = root.createDiv({ cls: "vam-style-choice-panel", attr: { id } });
+  panel.hidden = true;
+  const select = panel.createEl("select");
+  select.setAttr("aria-label", t("ui.note_style_this_run"));
+  const tags = panel.createEl("p", { cls: "vam-hint", attr: { "aria-live": "polite" } });
+  tags.hidden = true;
+  const problems = panel.createDiv("vam-note-style-problems");
   const picker = options.styles;
-  const preset = (value) => NOTE_STYLE_PRESETS.find((item) => stylePreset(item.id) === value);
-  const nameOf = (list, id, fallback) => {
-    var _a2, _b2, _c;
-    return (_c = id ? (_b2 = (_a2 = list.find((item) => item.id === id)) == null ? void 0 : _a2.name) != null ? _b2 : id.replace(/^(?:style|file):/, "") : void 0) != null ? _c : fallback;
-  };
-  const customName = () => {
+  let recipes = [];
+  let expanded = false;
+  let shownTags = "";
+  const offered = () => recipes.filter((item) => !item.aimOnly);
+  const usable = (ref) => offered().find((item) => item.ref === ref && item.issues.length === 0);
+  const chosen = () => expanded && select.value ? usable(select.value) : void 0;
+  const nameNow = () => {
     var _a2, _b2;
-    return t(
-      "ui.note_style_custom_0_1",
-      (_a2 = nameOf(options.templates, custom == null ? void 0 : custom.template, options.currentTemplate)) != null ? _a2 : "",
-      (_b2 = nameOf(options.tones, custom == null ? void 0 : custom.tone, options.currentTone)) != null ? _b2 : ""
-    );
+    return (_b2 = (_a2 = chosen()) == null ? void 0 : _a2.name) != null ? _b2 : options.current;
   };
-  let items = [];
-  const refOf = (value) => {
-    if (value === STYLE_KEEP) return options.currentRef;
-    const chosen = preset(value);
-    if (chosen) return { kind: "builtin", id: chosen.id };
-    return value.startsWith("file:") ? { kind: "file", id: value } : void 0;
+  const paintLine = () => {
+    text11.replaceChildren();
+    const mark = "";
+    const [before, after = ""] = t("ui.note_style_line_0", mark).split(mark);
+    if (before) text11.createSpan({ text: before });
+    text11.createEl("strong", { text: nameNow() });
+    if (after) text11.createSpan({ text: after });
   };
-  let entries = [];
+  const paintTags = () => {
+    const next = chosen() ? recipeTags(chosen()) : "";
+    if (next !== shownTags) {
+      shownTags = next;
+      tags.setText(next);
+    }
+    tags.hidden = !next;
+  };
+  const paint = () => {
+    toggle.setText(t(expanded ? "ui.note_style_change_back" : "ui.note_style_change_once"));
+    toggle.setAttr("aria-expanded", String(expanded));
+    panel.hidden = !expanded;
+    paintLine();
+    paintTags();
+  };
   const build = () => {
     var _a2;
-    const selected = select.value;
+    const kept = select.value;
     select.replaceChildren();
-    entries = [{ value: STYLE_KEEP, disabled: false }];
-    select.createEl("option", { value: STYLE_KEEP, text: options.keepLabel });
-    const broken = [];
-    for (const item of NOTE_STYLE_PRESETS) {
-      select.createEl("option", { value: stylePreset(item.id), text: t(item.name) });
-      entries.push({ value: stylePreset(item.id), disabled: false });
-    }
-    if (items.length) {
-      const group = select.createEl("optgroup", { attr: { label: t("ui.note_style_group_folder") } });
-      for (const item of items) {
-        if (item.issues.length) broken.push(item);
-        const option = group.createEl("option", {
-          value: item.id,
+    select.createEl("option", { value: "", text: t("ui.note_style_no_change_0", options.current) });
+    const own2 = offered().filter((item) => item.kind === "file");
+    const addAll = (parentEl, list) => {
+      for (const item of list) {
+        const option = parentEl.createEl("option", {
+          value: item.ref,
           text: item.issues.length ? t("ui.note_style_unusable_option_0", item.name) : item.name
         });
         option.disabled = item.issues.length > 0;
-        entries.push({ value: item.id, disabled: item.issues.length > 0 });
       }
-    }
-    if (custom) {
-      select.createEl("option", { value: STYLE_CUSTOM, text: customName() });
-      entries.push({ value: STYLE_CUSTOM, disabled: false });
-    }
-    select.value = entries.some((entry) => entry.value === selected && !entry.disabled) ? selected : STYLE_KEEP;
+    };
+    const builtins = offered().filter((item) => item.kind === "builtin");
+    if (builtins.length)
+      addAll(select.createEl("optgroup", { attr: { label: t("ui.note_style_group_builtin") } }), builtins);
+    if (own2.length) addAll(select.createEl("optgroup", { attr: { label: t("ui.note_style_group_folder") } }), own2);
+    select.value = usable(kept) ? kept : "";
     problems.replaceChildren();
-    for (const item of broken) {
+    for (const item of own2) {
+      const first = item.issues[0];
+      if (!first) continue;
       const row = problems.createDiv({ cls: "vam-note-style-problem", attr: { role: "status" } });
-      row.createSpan({ text: (_a2 = styleProblem(item)) != null ? _a2 : "" });
+      row.createSpan({
+        text: t("ui.note_style_unusable_0_1_2", (_a2 = item.fileName) != null ? _a2 : item.name, first.line, styleIssueText(first))
+      });
       if (picker) {
         const open = row.createEl("button", { text: t("ui.note_style_open_file"), cls: "vam-field-link" });
         open.type = "button";
-        open.addEventListener("click", () => void picker.edit({ kind: item.kind, id: item.id }));
+        open.addEventListener("click", () => void picker.openRecipe(item.ref));
       }
     }
   };
-  const refresh = (notify2 = true) => {
-    var _a2;
-    const chosen = preset(select.value);
-    const text11 = chosen ? t(chosen.hint) : "";
-    hint.setText(text11);
-    hint.hidden = !text11;
-    const target = picker ? refOf(select.value) : void 0;
-    edit.hidden = !picker;
-    edit.disabled = !target;
-    edit.setAttr("aria-disabled", String(!target));
-    if (notify2) (_a2 = options.changed) == null ? void 0 : _a2.call(options);
-  };
   const load = () => {
-    var _a2;
-    items = (_a2 = picker == null ? void 0 : picker.list()) != null ? _a2 : [];
+    recipes = picker ? picker.recipes() : builtinRecipeItems();
     build();
   };
   load();
-  select.addEventListener("change", () => refresh());
-  edit.addEventListener("click", (event) => {
-    event.preventDefault();
-    const target = refOf(select.value);
-    if (target) void (picker == null ? void 0 : picker.edit(target));
-  });
-  refresh(false);
-  const chosenPreset = () => preset(select.value);
-  const chosenFile = () => select.value.startsWith("file:") ? { id: select.value } : void 0;
-  const nameFromList = () => {
+  paint();
+  toggle.addEventListener("click", (event) => {
     var _a2;
-    const file = chosenFile();
-    return file ? (_a2 = nameOf(
-      items.map((item) => ({ id: item.id, name: item.name })),
-      file.id
-    )) != null ? _a2 : "" : "";
-  };
+    event.preventDefault();
+    expanded = !expanded;
+    if (!expanded) select.value = "";
+    paint();
+    (_a2 = options.changed) == null ? void 0 : _a2.call(options);
+  });
+  select.addEventListener("change", () => {
+    var _a2;
+    paint();
+    (_a2 = options.changed) == null ? void 0 : _a2.call(options);
+  });
   return {
-    templateId: () => {
-      var _a2, _b2, _c;
-      if (select.value === STYLE_CUSTOM) return custom == null ? void 0 : custom.template;
-      return (_c = (_a2 = chosenPreset()) == null ? void 0 : _a2.templateId) != null ? _c : (_b2 = chosenFile()) == null ? void 0 : _b2.id;
-    },
-    toneId: () => {
+    style: () => {
       var _a2;
-      return select.value === STYLE_CUSTOM ? custom == null ? void 0 : custom.tone : (_a2 = chosenPreset()) == null ? void 0 : _a2.toneId;
+      return (_a2 = chosen()) == null ? void 0 : _a2.ref;
     },
-    label: () => {
-      var _a2;
-      const current = chosenPreset();
-      if (current) return t(current.name);
-      if (select.value === STYLE_CUSTOM) return customName();
-      if (chosenFile()) return nameFromList();
-      return options.currentStyle ? options.keepLabel : (_a2 = options.currentTone) != null ? _a2 : "";
-    },
-    name: () => {
-      var _a2, _b2;
-      const current = chosenPreset();
-      if (current) return t(current.name);
-      if (select.value === STYLE_CUSTOM) return customName();
-      if (chosenFile()) return nameFromList();
-      return (_b2 = (_a2 = options.currentStyle) != null ? _a2 : options.currentTone) != null ? _b2 : "";
-    },
-    set: (nextTemplate, nextTone) => {
-      custom = void 0;
-      const matched = nextTemplate || nextTone ? matchPreset(nextTemplate, nextTone) : void 0;
-      const plainTone = !nextTone || nextTone === DEFAULT_TONE_ID;
-      const fileOption = nextTemplate && plainTone ? entries.find((entry) => !entry.disabled && entry.value.startsWith("file:") && entry.value === nextTemplate) : void 0;
-      if (matched) select.value = stylePreset(matched.id);
-      else if (fileOption) select.value = fileOption.value;
-      else if (nextTemplate || nextTone) {
-        custom = { template: nextTemplate, tone: nextTone };
-        build();
-        select.value = STYLE_CUSTOM;
-      } else select.value = STYLE_KEEP;
-      refresh(false);
+    label: nameNow,
+    name: nameNow,
+    set: (ref) => {
+      const found = ref ? usable(ref) : void 0;
+      expanded = found !== void 0;
+      select.value = found ? found.ref : "";
+      paint();
     },
     reload: async () => {
       var _a2;
-      if (!picker) return;
-      await picker.refresh();
+      if (picker) await picker.refresh();
       load();
-      refresh(false);
+      paint();
       (_a2 = options.changed) == null ? void 0 : _a2.call(options);
     }
   };
@@ -36074,16 +35941,13 @@ var messageOf = (error) => {
 };
 var OutlineImportModal = class extends import_obsidian18.Modal {
   constructor(app, create, models = { list: () => [], watch: () => () => {
-  } }, templates = [], target = { map: "none" }, initialPlacement = "tree", generator, links = {}, tones = [], defaultStyleLabel = "", defaultModelLabel) {
+  } }, target = { map: "none" }, initialPlacement = "tree", generator, links = {}, defaultModelLabel) {
     super(app);
     this.create = create;
     this.models = models;
-    this.templates = templates;
     this.target = target;
     this.generator = generator;
     this.links = links;
-    this.tones = tones;
-    this.defaultStyleLabel = defaultStyleLabel;
     this.defaultModelLabel = defaultModelLabel;
     __publicField(this, "textarea");
     __publicField(this, "preview");
@@ -36094,8 +35958,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     __publicField(this, "submitting", false);
     __publicField(this, "mode", () => "quick");
     __publicField(this, "model", () => void 0);
-    __publicField(this, "template", () => void 0);
-    __publicField(this, "tone", () => void 0);
+    __publicField(this, "noteStyle", () => void 0);
     __publicField(this, "setModel", () => {
     });
     __publicField(this, "setStyle", () => {
@@ -36167,16 +36030,12 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
       });
     };
     this.syncModelLabel();
-    const style = noteStyleField(researchOptions, {
+    const style = styleChoiceField(researchOptions, {
       styles: this.links.styles,
-      templates: this.templates,
-      tones: this.tones,
-      keepLabel: t("ui.note_style_use_default_0", this.defaultStyleLabel),
-      currentRef: this.links.currentStyleRef
+      current: t("ui.note_style_follow_kind")
     });
     void style.reload();
-    this.template = style.templateId;
-    this.tone = style.toneId;
+    this.noteStyle = style.style;
     this.setStyle = style.set;
     const showOptions = () => researchOptions.toggleClass("is-hidden", !this.shallow.checked);
     this.shallow.addEventListener("change", showOptions);
@@ -36198,7 +36057,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     this.syncResearchOptions();
     this.setMode(inputs.mode);
     this.setModel(inputs.model);
-    this.setStyle(inputs.template, inputs.tone);
+    this.setStyle(inputs.noteStyle);
   }
   /** "Put it in": a new map (default), this map as a new tree, or under the selected topic. */
   placementField() {
@@ -36367,8 +36226,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
       status.setText(t("ui.outline_ai_running"));
       const inputs = () => {
         const model = this.model();
-        const template2 = this.template();
-        const tone2 = this.tone();
+        const noteStyle = this.noteStyle();
         return {
           topic: topic.value.trim(),
           presetId: select.value,
@@ -36378,8 +36236,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
           shallow: this.shallow.checked,
           mode: this.mode(),
           ...model ? { model } : {},
-          ...template2 ? { template: template2 } : {},
-          ...tone2 ? { tone: tone2 } : {}
+          ...noteStyle ? { noteStyle } : {}
         };
       };
       const generationModel = () => {
@@ -36467,8 +36324,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
     try {
       const shallowResearch = this.shallow.checked;
       const model = shallowResearch ? this.model() : void 0;
-      const detailTemplateId = shallowResearch ? this.template() : void 0;
-      const toneId = shallowResearch ? this.tone() : void 0;
+      const noteStyle = shallowResearch ? this.noteStyle() : void 0;
       await this.create({
         nodes: this.nodes,
         placement: this.placementRequest(),
@@ -36476,8 +36332,7 @@ var OutlineImportModal = class extends import_obsidian18.Modal {
         shallowResearch,
         ...shallowResearch ? { aiMode: this.mode() } : {},
         ...model ? { model } : {},
-        ...detailTemplateId ? { detailTemplateId } : {},
-        ...toneId ? { toneId } : {}
+        ...noteStyle ? { noteStyle } : {}
       });
       this.close();
     } catch (error) {
@@ -37008,13 +36863,11 @@ async function exportMapWithNotice(vault, request) {
 // experiences/visual-map/multi-research-modal.ts
 var import_obsidian20 = require("obsidian");
 var MultiResearchModal = class extends import_obsidian20.Modal {
-  constructor(app, names3, models, templates, submit, tones = [], _retired, links = {}, modes = []) {
+  constructor(app, names3, models, submit, links = {}, modes = []) {
     super(app);
     this.names = names3;
     this.models = models;
-    this.templates = templates;
     this.submit = submit;
-    this.tones = tones;
     this.links = links;
     this.modes = modes;
     __publicField(this, "submitted", false);
@@ -37037,11 +36890,9 @@ var MultiResearchModal = class extends import_obsidian20.Modal {
     });
     const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
-    const style = noteStyleField(this.contentEl, {
+    const style = styleChoiceField(this.contentEl, {
       styles: this.links.styles,
-      templates: this.templates,
-      tones: this.tones,
-      keepLabel: t("ui.note_style_keep_each")
+      current: t("ui.note_style_each_topic")
     });
     void style.reload();
     const requirementsLabel = this.contentEl.createEl("label", { cls: "vam-field" });
@@ -37062,8 +36913,7 @@ var MultiResearchModal = class extends import_obsidian20.Modal {
       const request = {
         requirements: requirements.value.trim(),
         ...model.value() ? { model: model.value() } : {},
-        ...style.templateId() ? { detailTemplateId: style.templateId() } : {},
-        ...style.toneId() ? { toneId: style.toneId() } : {}
+        ...style.style() ? { noteStyle: style.style() } : {}
       };
       this.close();
       this.submit(request);
@@ -38417,7 +38267,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
     (_a2 = status()) == null ? void 0 : _a2.setText(t("ui.quick_outline_review_hint"));
   }
   onOpen() {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E;
+    var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
     this.modalEl.addClass("vam-next-modal");
     const selection = this.selectionFlow;
     this.titleEl.setText(t(selection ? "ui.confirm_topic_synthesis" : "ui.how_would_you_like_to_explore_next"));
@@ -38539,8 +38389,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
           ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
           ...this.runOnceOptions(),
-          ...templateId() ? { detailTemplateId: templateId() } : {},
-          ...toneId() ? { toneId: toneId() } : {},
+          ...noteStyle() ? { noteStyle: noteStyle() } : {},
           signal: controller.signal,
           onProgress: (message) => {
             var _a4;
@@ -38673,8 +38522,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
       ...this.runOnceOptions(),
       ...aiModeOptions(aiMode.value(), "subtopic"),
       shallowResearch: shallow.checked,
-      ...templateId() ? { detailTemplateId: templateId() } : {},
-      ...toneId() ? { toneId: toneId() } : {},
+      ...noteStyle() ? { noteStyle: noteStyle() } : {},
       signal,
       onProgress: (message) => {
         var _a3;
@@ -38849,8 +38697,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        ...templateId() ? { detailTemplateId: templateId() } : {},
-        ...toneId() ? { toneId: toneId() } : {},
+        ...noteStyle() ? { noteStyle: noteStyle() } : {},
         ...titleInput ? { synthesisTitle: titleInput.value.trim() } : {},
         signal,
         onProgress: (message) => {
@@ -38964,20 +38811,12 @@ var NextStepModal = class extends import_obsidian23.Modal {
     languageSelect.addEventListener("change", () => {
       this.manualOutputLanguage = languageSelect.value;
     });
-    const style = noteStyleField(compactSettings, {
+    const style = styleChoiceField(compactSettings, {
       styles: stylePickerFor(this.app, this.plugin),
-      templates: (_u = (_t = this.info) == null ? void 0 : _t.templates) != null ? _u : [],
-      tones: (_w = (_v = this.info) == null ? void 0 : _v.tones) != null ? _w : [],
-      keepLabel: t("ui.note_style_keep_0", (_y = (_x = this.info) == null ? void 0 : _x.currentStyle) != null ? _y : ""),
-      currentTemplate: (_z = this.info) == null ? void 0 : _z.currentTemplate,
-      currentTone: (_A = this.info) == null ? void 0 : _A.currentTone,
-      currentStyle: (_B = this.info) == null ? void 0 : _B.currentStyle,
-      currentRef: (_C = this.info) == null ? void 0 : _C.currentStyleRef,
+      current: (_u = (_t = this.info) == null ? void 0 : _t.currentStyle) != null ? _u : "",
       changed: () => refreshSummary()
     });
-    void style.reload();
-    const templateId = style.templateId;
-    const toneId = style.toneId;
+    const noteStyle = style.style;
     const describeOutput = () => {
       outputValue.setText([supportedLanguageLabel(languageSelect.value), style.label()].filter(Boolean).join(" \xB7 "));
     };
@@ -39004,6 +38843,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
       if (styleName) parts.push(styleName);
       summaryEl.setText(parts.join(" \xB7 "));
     };
+    void style.reload();
     this.contentEl.addEventListener("change", refreshSummary);
     this.contentEl.addEventListener("change", () => {
       warmForMode();
@@ -39012,7 +38852,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
     else checkName();
     syncExpand();
     show(initialMode);
-    const waitingOutline = (_D = this.modelSettings) == null ? void 0 : _D.pendingOutline;
+    const waitingOutline = (_v = this.modelSettings) == null ? void 0 : _v.pendingOutline;
     if (waitingOutline && quickOutline) {
       shallow.checked = !!waitingOutline.options.shallowResearch;
       if (waitingOutline.options.mapAiMode) aiMode.set(waitingOutline.options.mapAiMode);
@@ -39036,7 +38876,7 @@ var NextStepModal = class extends import_obsidian23.Modal {
       );
     }
     (titleInput != null ? titleInput : cardFor[initialMode]).focus();
-    ((_E = this.renderModelSettings(adjustBody)) != null ? _E : adjustBody).createEl("p", {
+    ((_w = this.renderModelSettings(adjustBody)) != null ? _w : adjustBody).createEl("p", {
       text: t("ui.if_an_ai_task_exceeds_3_minutes_vam_attempts_to_interrupt_it"),
       cls: "vam-hint"
     });
@@ -48725,7 +48565,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     var _a2, _b2;
     await this.refreshNoteStyles();
     const { toneText } = this.noteStyles.runStyle({
-      choice: { tone: options == null ? void 0 : options.toneId },
+      choice: { style: options == null ? void 0 : options.noteStyle },
       topic: { style: note == null ? void 0 : note.noteStyle, tone: note == null ? void 0 : note.toneId },
       kind: (_a2 = note == null ? void 0 : note.topicKind) != null ? _a2 : "topic",
       outputLanguage: (_b2 = options == null ? void 0 : options.outputLanguage) != null ? _b2 : this.plugin.settings.language
@@ -48740,76 +48580,16 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       console.warn("Visual Agent Map note styles refresh", error);
     }
   }
-  /** Built-in tones plus the tone blocks the user wrote, for the tone selects (call `noteStyles.refresh()` first for the blocks). */
-  toneChoices() {
-    return this.noteStyles.toneChoices();
-  }
   /** The repair and edit-templates links beside a dialog's model and template fields. */
   fieldLinks() {
     return {
       repair: (model) => this.plugin.repairConnection(model),
-      styles: this.stylePicker(),
-      ...this.defaultStyleRef() ? { currentStyleRef: this.defaultStyleRef() } : {}
+      styles: this.stylePicker()
     };
-  }
-  /** Built-in Standard and Textbook plus the workspace's custom templates, for the template selects. */
-  templateChoices() {
-    const settings = this.plugin.settings;
-    return [...builtinTemplates(noteLanguageOf(settings.language), settings.language), ...settings.detailTemplates].map(
-      ({ id, name }) => ({ id, name })
-    );
-  }
-  /** "Keep current (…)" name of the note style a topic (or this map) resolves to: a preset, else "Custom: …". */
-  currentStyleLabel(templateId, toneId) {
-    const fileName = fileStyleName(templateId);
-    if (fileName !== void 0) return fileName;
-    const names3 = (list) => (id) => {
-      var _a2, _b2;
-      return (_b2 = (_a2 = list.find((item) => item.id === id)) == null ? void 0 : _a2.name) != null ? _b2 : id;
-    };
-    return styleLabel(
-      templateId,
-      toneId,
-      { template: names3(this.templateChoices()), tone: names3(this.toneChoices()) },
-      this.plugin.settings.language
-    );
-  }
-  /** Name of the workspace default note style (default template, academic tone) for "Use the default (…)". */
-  defaultStyleLabel() {
-    var _a2, _b2;
-    const block = this.plugin.settings.noteTemplateBlock;
-    const named = block ? (_a2 = this.noteStyles.listBlocks("template").find((item) => item.ref === block)) == null ? void 0 : _a2.name : void 0;
-    if (named) return named;
-    const chosen = this.plugin.settings.defaultNoteStyleId;
-    const preset = NOTE_STYLE_PRESETS.find((item) => item.id === chosen);
-    if (preset) return t(preset.short);
-    return this.currentStyleLabel(
-      (_b2 = chosen != null ? chosen : this.plugin.settings.defaultDetailTemplateId) != null ? _b2 : STANDARD_TEMPLATE_ID,
-      DEFAULT_TONE_ID
-    );
   }
   /** The style folder for the pickers; a plugin without a style store (a test double) has none. */
   stylePicker() {
     return stylePickerFor(this.app, this.plugin);
-  }
-  /** The style behind a stored pair, for "Edit this style" on the first option of a picker. */
-  styleRefFor(templateId, toneId) {
-    return styleRefOf(templateId, toneId);
-  }
-  defaultStyleRef() {
-    var _a2;
-    const block = parseBlockRef(this.plugin.settings.noteTemplateBlock);
-    if ((block == null ? void 0 : block.kind) === "file") return { kind: "file", id: this.plugin.settings.noteTemplateBlock };
-    if ((block == null ? void 0 : block.kind) === "builtin") {
-      const preset = NOTE_STYLE_PRESETS.find((item) => item.templateId === block.id && item.toneId === DEFAULT_TONE_ID);
-      if (preset) return { kind: "builtin", id: preset.id };
-    }
-    const chosen = this.plugin.settings.defaultNoteStyleId;
-    if (chosen) {
-      const preset = NOTE_STYLE_PRESETS.find((item) => item.id === chosen);
-      return preset ? { kind: "builtin", id: preset.id } : this.styleRefFor(chosen, void 0);
-    }
-    return this.styleRefFor((_a2 = this.plugin.settings.defaultDetailTemplateId) != null ? _a2 : STANDARD_TEMPLATE_ID, DEFAULT_TONE_ID);
   }
   /** Adds an outline to the open map: under the selected topic, else as a new tree. A new map starts from + New mind map. */
   openOutlineImport(prefill) {
@@ -48824,13 +48604,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
       this.app,
       (request) => this.importOutline(request),
       this.modelChoices(),
-      this.templateChoices(),
       target,
       placement,
       this.outlineGenerator(prefill ? prefill.inputs.topic : (_a2 = target.selected) == null ? void 0 : _a2.title, prefill),
       this.fieldLinks(),
-      this.toneChoices(),
-      this.defaultStyleLabel(),
       (parentId) => this.outlineModelLabel(parentId)
     ).open();
   }
@@ -49039,11 +48816,11 @@ ${request.requirements}` : preset.text,
             researchOptions: {
               referenceGroups: (_b2 = options.referenceGroups) != null ? _b2 : [],
               ...options.outputLanguage ? { outputLanguage: options.outputLanguage } : {},
-              ...options.toneId ? { toneId: options.toneId } : {},
+              ...options.noteStyle ? { noteStyle: options.noteStyle } : {},
               ...options.requirements ? { requirements: options.requirements } : {}
             }
           } : {},
-          ...options.detailTemplateId ? { detailTemplateId: options.detailTemplateId } : {}
+          ...options.noteStyle ? { noteStyle: options.noteStyle } : {}
         });
       }
     };
@@ -50222,7 +49999,7 @@ ${request.requirements}` : preset.text,
     const model = request.shallowResearch && request.model || currentModel;
     await this.noteStyles.refresh();
     const importStyle = this.noteStyles.runStyle({
-      choice: { template: request.detailTemplateId },
+      choice: { style: request.noteStyle },
       kind: "topic",
       outputLanguage: this.plugin.settings.language
     });
@@ -50248,14 +50025,6 @@ ${request.requirements}` : preset.text,
     let opened = true;
     try {
       await this.plugin.mutate(async () => {
-        const chosenTemplate = request.detailTemplateId;
-        const chosenTone = request.toneId;
-        if (chosenTemplate || chosenTone)
-          await this.plugin.repo.updateMap(result.mapPath, (map) => {
-            if (chosenTemplate) map.detailTemplateId = chosenTemplate;
-            if (chosenTone) map.toneId = chosenTone;
-            else if (chosenTemplate == null ? void 0 : chosenTemplate.startsWith("style:")) delete map.toneId;
-          });
         await this.plugin.rebuildDerivedData();
         await this.openMapInMutation(result.mapPath);
         if (!this.closed && this.path === result.mapPath) this.fit();
@@ -50277,7 +50046,9 @@ ${request.requirements}` : preset.text,
           children,
           {
             ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
-            referenceGroups: []
+            referenceGroups: [],
+            // The style no longer becomes the new map's default (#44), so the research carries it.
+            ...request.noteStyle ? { noteStyle: request.noteStyle } : {}
           },
           noticeGate
         );
@@ -50321,7 +50092,7 @@ ${request.requirements}` : preset.text,
         model = request.shallowResearch && request.model || baseModel;
         await this.noteStyles.refresh();
         const template2 = (await this.mapStyle(settings.language, {
-          template: request.detailTemplateId,
+          style: request.noteStyle,
           notify: true,
           gate: noticeGate
         })).template;
@@ -50334,10 +50105,8 @@ ${request.requirements}` : preset.text,
           request.source,
           (_a3 = parent == null ? void 0 : parent.id) != null ? _a3 : null,
           template2,
-          request.detailTemplateId,
           void 0,
-          Boolean(request.shallowResearch && request.model && request.model !== baseModel),
-          request.toneId
+          Boolean(request.shallowResearch && request.model && request.model !== baseModel)
         );
         state.result = result;
         const created = result.created;
@@ -50445,8 +50214,7 @@ ${request.requirements}` : preset.text,
             ...aiModeOptions((_a3 = request.aiMode) != null ? _a3 : "quick", "subtopic"),
             referenceGroups: [],
             ...request.researchOptions,
-            ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
-            ...request.toneId ? { toneId: request.toneId } : {}
+            ...request.noteStyle ? { noteStyle: request.noteStyle } : {}
           },
           noticeGate
         );
@@ -53534,7 +53302,7 @@ ${request.requirements}` : preset.text,
     }
   }
   onCanvasContextMenu(event) {
-    var _a2, _b2, _c;
+    var _a2, _b2, _c, _d;
     const hit = event.target;
     const card = (_a2 = hit == null ? void 0 : hit.closest) == null ? void 0 : _a2.call(hit, ".vam-node");
     if (card && !((_b2 = hit == null ? void 0 : hit.closest) == null ? void 0 : _b2.call(hit, INTERACTIVE_SELECTOR)) && this.canEditSummary()) {
@@ -53546,7 +53314,15 @@ ${request.requirements}` : preset.text,
         menu2.addItem(
           (item) => item.setTitle(t("ui.summary_add")).setIcon("brackets").onClick(() => this.addSummaryOver(ids))
         );
-        menu2.showAtMouseEvent(event);
+        const topic = ids.length === 1 ? (_d = this.map) == null ? void 0 : _d.nodes.find((item) => item.id === cardId) : void 0;
+        if (topic && !topic.aimKind)
+          menu2.addItem(
+            (item) => item.setTitle(t("ui.note_style_menu")).setIcon("palette").onClick(() => void this.chooseTopicStyle(topic))
+          );
+        if (event.clientX === 0 && event.clientY === 0) {
+          const box = card.getBoundingClientRect();
+          menu2.showAtPosition({ x: box.left, y: box.bottom });
+        } else menu2.showAtMouseEvent(event);
       }
       return;
     }
@@ -55057,18 +54833,6 @@ ${request.requirements}` : preset.text,
         description: t("ui.manage_notes_that_are_currently_outside_the_mind_map"),
         action: () => this.enqueue(() => this.openOrganizer())
       });
-    if (this.map && !this.map.aim)
-      choices.push({
-        label: t("ui.note_style_map_default"),
-        description: t("ui.note_style_map_default_desc"),
-        action: () => this.chooseMapStyle()
-      });
-    if (this.map && this.map.aim)
-      choices.push({
-        label: t("ui.tone_map_default"),
-        description: t("ui.tone_map_default_desc"),
-        action: () => this.chooseMapTone()
-      });
     choices.push({
       label: t("ui.repair_missing_mind_map"),
       description: t("ui.rebuild_a_missing_map_from_existing_topic_notes"),
@@ -55082,62 +54846,6 @@ ${request.requirements}` : preset.text,
         action: () => this.deleteCurrentMap()
       });
     new ChoiceModal(this.app, t("ui.more_mind_map_actions"), t("ui.additional_map_management_actions"), choices).open();
-  }
-  /** The map's default note style: both stored values (template and tone) are set or cleared together. */
-  chooseMapStyle() {
-    var _a2, _b2;
-    const apply = (templateId2, toneId2) => this.enqueue(
-      () => this.mapChange((map) => {
-        if (templateId2) map.detailTemplateId = templateId2;
-        else delete map.detailTemplateId;
-        if (toneId2) map.toneId = toneId2;
-        else delete map.toneId;
-      }, false)
-    );
-    const templateId = (_a2 = this.map) == null ? void 0 : _a2.detailTemplateId;
-    const toneId = (_b2 = this.map) == null ? void 0 : _b2.toneId;
-    const unset = !templateId && !toneId;
-    const known = unset ? void 0 : this.styleRefFor(templateId, toneId);
-    void openStyleChooser(this.app, this.stylePicker(), {
-      title: t("ui.note_style_map_default"),
-      description: t("ui.note_style_map_default_desc"),
-      leading: [
-        {
-          label: t("ui.note_style_use_default_0", this.defaultStyleLabel()),
-          ...unset ? { description: t("ui.detail_template_current") } : {},
-          action: () => apply(void 0, void 0)
-        },
-        // An older template-and-tone pair that is none of the listed styles stays as it is and can be kept.
-        ...!unset && !known ? [
-          {
-            label: this.currentStyleLabel(templateId != null ? templateId : STANDARD_TEMPLATE_ID, toneId != null ? toneId : DEFAULT_TONE_ID),
-            description: t("ui.detail_template_current"),
-            action: () => apply(templateId, toneId)
-          }
-        ] : []
-      ],
-      ...known ? { current: known } : {},
-      ...unset ? { editRef: this.defaultStyleRef() } : {},
-      // Only a style file deletes the layer's tone; an old template keeps the tone the map already has.
-      pick: (template2, tone2) => apply(template2, tone2 != null ? tone2 : template2.startsWith("style:") ? void 0 : toneId)
-    });
-  }
-  chooseMapTone() {
-    var _a2;
-    const apply = (id) => this.enqueue(
-      () => this.mapChange((map) => {
-        if (id) map.toneId = id;
-        else delete map.toneId;
-      }, false)
-    );
-    const current = (_a2 = this.map) == null ? void 0 : _a2.toneId;
-    const mark = (id) => id === current ? { description: t("ui.detail_template_current") } : {};
-    void this.noteStyles.refresh().catch(() => void 0).then(
-      () => new ChoiceModal(this.app, t("ui.tone_map_default"), t("ui.tone_map_default_desc"), [
-        { label: t("ui.tone_use_default"), ...mark(void 0), action: () => apply(void 0) },
-        ...this.toneChoices().map(({ id, name }) => ({ label: name, ...mark(id), action: () => apply(id) }))
-      ]).open()
-    );
   }
   aimActiveForPath(path) {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).some((leaf) => {
@@ -57090,6 +56798,7 @@ ${request.requirements}` : preset.text,
       const currentLabel = t("ui.reference_current_topic_included", note.title);
       const synthesisLabel = t("ui.reference_synthesis_topics_included", note.title);
       const sources = this.taskSourceSettings(currentLabel, (_b2 = this.map) == null ? void 0 : _b2.id, synthesisLabel);
+      await this.refreshNoteStyles();
       const current = this.topicStyle(note);
       sources.synthesisTopics = (_d = (_c = this.map) == null ? void 0 : _c.nodes.filter((item) => item.parentId === node.id).map((item) => {
         var _a3, _b3;
@@ -57108,8 +56817,7 @@ ${request.requirements}` : preset.text,
           const task = researchTopicTask(taskLanguage, latest.title);
           const runStyle = await this.detailTemplateFor(
             node,
-            options.detailTemplateId,
-            options.toneId,
+            options.noteStyle,
             void 0,
             (_c2 = options.outputLanguage) != null ? _c2 : this.plugin.settings.language
           );
@@ -57168,16 +56876,11 @@ ${request.requirements}` : preset.text,
           })(),
           structureReview: this.nextStepStructureReview(node),
           sources,
-          templates: this.templateChoices(),
-          tones: this.toneChoices(),
-          currentTone: current.label.toneName,
-          currentStyle: current.label.styleName,
+          currentStyle: current.recipe.name,
           currentSummary: note.summary,
           ...existingNoteLanguage(note) ? { contentLanguage: existingNoteLanguage(note) } : {},
           ...this.outputLanguageMemory(),
           ...this.aiModeMemory(),
-          // Only a label: a missing topic template is reported at the next AI update, not when the dialog opens.
-          currentTemplate: current.label.templateName,
           topicStatus: note.status,
           childrenCompleted: (_l = (_k = this.map) == null ? void 0 : _k.nodes.filter((item) => {
             var _a3;
@@ -58573,7 +58276,7 @@ ${request.requirements}` : preset.text,
               selected,
               researchOptions,
               void 0,
-              (_a3 = options == null ? void 0 : options.detailTemplateId) != null ? _a3 : researchOptions == null ? void 0 : researchOptions.detailTemplateId
+              (_a3 = options == null ? void 0 : options.noteStyle) != null ? _a3 : researchOptions == null ? void 0 : researchOptions.noteStyle
             );
           } catch (error) {
             if (error instanceof PartialChildBatchError) await this.clearPartialSuggestions(parent.path, error);
@@ -58709,8 +58412,8 @@ ${request.requirements}` : preset.text,
       });
     }).open();
   }
-  /** `detailTemplateId` is the dialog's template choice: it shapes contributions and is recorded on each new child. */
-  async createChildBatch(parent, items, researchOptions, signal, detailTemplateId = researchOptions == null ? void 0 : researchOptions.detailTemplateId) {
+  /** `noteStyle` is the dialog's style choice: it shapes the contributions for this batch only; no child records it (Q18, #44). */
+  async createChildBatch(parent, items, researchOptions, signal, noteStyle = researchOptions == null ? void 0 : researchOptions.noteStyle) {
     var _a2;
     if (this.plugin.expansionCoordinator.isRunning(parent.path)) throw new Error(t("ui.ai_running_ai"));
     if (!((_a2 = this.map) == null ? void 0 : _a2.nodes.some((node) => node.id === parent.id && node.path === parent.path)))
@@ -58731,7 +58434,7 @@ ${request.requirements}` : preset.text,
     const createdByTitle = /* @__PURE__ */ new Map(), newNodes = [];
     await this.noteStyles.refresh();
     const contributionTemplate = (await this.mapStyle(this.plugin.settings.language, {
-      template: detailTemplateId,
+      style: noteStyle,
       kind: "topic"
     })).template;
     try {
@@ -58750,8 +58453,7 @@ ${request.requirements}` : preset.text,
           ...researchOptions ? {
             researchMode: "local",
             visualMode: researchOptions.visualMode
-          } : {},
-          ...detailTemplateId ? { detailTemplateId } : {}
+          } : {}
         });
       }
       if (signal == null ? void 0 : signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -58889,13 +58591,7 @@ ${request.requirements}` : preset.text,
     var _a2, _b2, _c;
     const note = await this.plugin.repo.readNote(child.path, (_a2 = this.map) != null ? _a2 : void 0);
     const outputLanguage2 = (_b2 = choices.outputLanguage) != null ? _b2 : outputLanguageForMap(this.map, this.plugin.settings.language, note.title);
-    const runStyle = await this.detailTemplateFor(
-      child,
-      choices.detailTemplateId,
-      choices.toneId,
-      gate,
-      outputLanguage2
-    );
+    const runStyle = await this.detailTemplateFor(child, choices.noteStyle, gate, outputLanguage2);
     let started = false;
     let failure;
     const handle = await this.runAgent(
@@ -58941,10 +58637,7 @@ ${request.requirements}` : preset.text,
       this.app,
       names3,
       this.modelChoices(),
-      this.templateChoices(),
       (request) => void this.startMultiResearch(request, retryBatchKey),
-      this.toneChoices(),
-      void 0,
       this.fieldLinks(),
       shown.map((item) => item.mode)
     ).open();
@@ -58999,8 +58692,7 @@ ${request.requirements}` : preset.text,
           requirements: request.requirements,
           // The picked model is for this batch only (D4): it never becomes a topic's own model.
           ...request.model ? { runOnce: { model: request.model } } : {},
-          ...request.detailTemplateId ? { detailTemplateId: request.detailTemplateId } : {},
-          ...request.toneId ? { toneId: request.toneId } : {}
+          ...request.noteStyle ? { noteStyle: request.noteStyle } : {}
         };
         const choicesFor = (note) => {
           var _a3;
@@ -59422,8 +59114,7 @@ ${request.requirements}` : preset.text,
         task = direction || synthesisGoalTask(language2);
         const run = await this.detailTemplateFor(
           node,
-          options == null ? void 0 : options.detailTemplateId,
-          options == null ? void 0 : options.toneId,
+          options == null ? void 0 : options.noteStyle,
           void 0,
           (_a3 = options == null ? void 0 : options.outputLanguage) != null ? _a3 : language2
         );
@@ -59698,46 +59389,45 @@ ${request.requirements}` : preset.text,
   }
   /** Opens the synthesis dialog for the selected topics, or for the waiting task's topics with its directions. */
   openSelectionSynthesis(pending2) {
-    var _a2, _b2;
+    var _a2;
     if (!this.map) return;
     const nodes = (_a2 = pending2 == null ? void 0 : pending2.sources) != null ? _a2 : [...this.selection.state.multiSelected].map((id) => this.map.nodes.find((node) => node.id === id)).filter((node) => !!node);
     const names3 = nodes.map((node) => {
-      var _a3, _b3;
-      return (_b3 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b3 : node.path;
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.notes.get(node.id)) == null ? void 0 : _a3.title) != null ? _b2 : node.path;
     });
     const selectedLabel = t("ui.reference_selected_topics_included", names3.join(", "));
     const sources = this.taskSourceSettings(selectedLabel, this.map.id, selectedLabel);
     const settings = this.plugin.settings;
-    const current = this.mapStyleCached(settings.language);
-    new NextStepModal(
-      this.app,
-      "",
-      0,
-      0,
-      this.plugin,
-      async () => {
-      },
-      async () => {
-      },
-      (options, direction, failed, accepted, observer) => this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
-      void 0,
-      {
-        names: names3,
-        initialTitle: (_b2 = pending2 == null ? void 0 : pending2.title) != null ? _b2 : synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names3),
-        defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
-        background: this.backgroundHooks(this.selectionTaskKey()),
-        fields: {
-          sources,
-          templates: this.templateChoices(),
-          currentTemplate: current.label.templateName,
-          tones: this.toneChoices(),
-          currentTone: current.label.toneName,
-          currentStyle: current.label.styleName,
-          ...this.outputLanguageMemory()
+    this.enqueue(async () => {
+      var _a3;
+      const current = await this.mapStyle(settings.language, { kind: "topic" });
+      new NextStepModal(
+        this.app,
+        "",
+        0,
+        0,
+        this.plugin,
+        async () => {
         },
-        ...pending2 ? { pending: { directions: pending2.directions, discard: () => this.discardSelectionSynthesis() } } : {}
-      }
-    ).open();
+        async () => {
+        },
+        (options, direction, failed, accepted, observer) => this.startSelectionSynthesis(nodes, options, direction, failed, accepted, observer),
+        void 0,
+        {
+          names: names3,
+          initialTitle: (_a3 = pending2 == null ? void 0 : pending2.title) != null ? _a3 : synthesisDefaultName(resolveMapTextLanguage(this.map, this.plugin.settings.language), names3),
+          defaultDirection: t("ui.identify_shared_conclusions_key_differences_tradeoffs_and_ne"),
+          background: this.backgroundHooks(this.selectionTaskKey()),
+          fields: {
+            sources,
+            currentStyle: current.recipe.name,
+            ...this.outputLanguageMemory()
+          },
+          ...pending2 ? { pending: { directions: pending2.directions, discard: () => this.discardSelectionSynthesis() } } : {}
+        }
+      ).open();
+    });
   }
   /** Thin entry for one synthesis draft (kept from before the run module): the work runs through startSelectionSynthesis and TopicRuns; a failure is thrown to the caller. */
   async createIntegratedNode(title, sources, goal, _rules, options, flow) {
@@ -59921,8 +59611,7 @@ ${request.requirements}` : preset.text,
           };
         await this.noteStyles.refresh();
         const integrationStyle = await this.mapStyle((_d = runOptions.outputLanguage) != null ? _d : language2, {
-          template: runOptions.detailTemplateId,
-          tone: runOptions.toneId,
+          style: runOptions.noteStyle,
           kind: "topic",
           notify: true
         });
@@ -60126,7 +59815,7 @@ ${note.detail.trim()}` : "",
       this.path,
       "workspace"
     );
-    const detailTemplate = (await this.mapStyle(language2, { template: task.options.detailTemplateId, kind: "topic" })).template;
+    const detailTemplate = (await this.mapStyle(language2, { style: task.options.noteStyle, kind: "topic" })).template;
     try {
       await this.plugin.repo.updateNote(
         integrated.path,
@@ -63412,26 +63101,15 @@ ${addition}` : addition });
    * Nothing is written to the topic: a dialog choice holds for this run only, and a topic template that no longer exists
    * is only reported.
    */
-  async detailTemplateFor(node, chosenId, chosenToneId, gate, outputLanguage2 = this.plugin.settings.language) {
+  async detailTemplateFor(node, chosenStyle, gate, outputLanguage2 = this.plugin.settings.language) {
     var _a2, _b2;
     const note = await this.plugin.repo.readNote(node.path, (_a2 = this.map) != null ? _a2 : void 0);
     await this.noteStyles.refresh();
-    const resolved = this.topicStyle(note, chosenId, chosenToneId, outputLanguage2);
+    const resolved = this.topicStyle(note, chosenStyle, outputLanguage2);
     const { missing } = resolved.issues;
     this.noticeBlockIssues(resolved.issues, gate);
     this.noticeKindMissing(resolved.issues, (_b2 = note.topicKind) != null ? _b2 : "topic", note.detailTemplateId, gate);
-    if (note.detailTemplateId && missing.includes(note.detailTemplateId)) {
-      if (note.detailTemplateId.startsWith("style:") || note.detailTemplateId.startsWith("file:")) {
-        const missingId = note.detailTemplateId;
-        actionNotice(
-          this.missingTemplateMessage(missingId),
-          t("ui.note_style_switch"),
-          () => this.switchNoteStyle(node)
-        );
-      } else {
-        new import_obsidian31.Notice(this.missingTemplateMessage(note.detailTemplateId));
-      }
-    }
+    this.noticeTopicStyleMissing(node, note, missing);
     return resolved;
   }
   /**
@@ -63439,10 +63117,10 @@ ${addition}` : addition });
    * not parse stops the run with a message naming file and line; a template block that does not parse only shows a Notice
    * at the entry of a run and the built-in template stands in.
    */
-  topicStyle(note, chosenId, chosenToneId, outputLanguage2 = this.plugin.settings.language) {
+  topicStyle(note, chosenStyle, outputLanguage2 = this.plugin.settings.language) {
     var _a2;
     return this.noteStyles.runStyle({
-      choice: { template: chosenId, tone: chosenToneId },
+      choice: { style: chosenStyle },
       topic: { style: note.noteStyle, template: note.detailTemplateId, tone: note.toneId },
       kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
       outputLanguage: outputLanguage2
@@ -63500,21 +63178,55 @@ ${addition}` : addition });
     var _a2, _b2;
     return (_b2 = this.plugin.noteStyles) != null ? _b2 : (_a2 = this.noStyleFiles) != null ? _a2 : this.noStyleFiles = emptyNoteStyleStore(() => this.plugin.settings);
   }
-  /** From the "style not found" Notice: pick another style for this topic (a file style also deletes the topic's tone). */
-  switchNoteStyle(node) {
-    void openStyleChooser(this.app, this.stylePicker(), {
-      title: t("ui.note_style"),
-      description: t("ui.note_style_switch"),
-      pick: (templateId, toneId) => this.enqueue(async () => {
-        await this.plugin.repo.updateNote(node.path, {
-          detailTemplateId: templateId,
-          ...toneId !== void 0 ? { toneId } : templateId.startsWith("style:") ? { toneId: "" } : {}
-        });
+  /**
+   * The topic's own `note-style`, `detail-template` or `tone` could not be read: one Notice with a button that opens the
+   * topic's style chooser. Only the entry of a run calls this, and the topic file is never rewritten.
+   */
+  noticeTopicStyleMissing(node, note, missing) {
+    const messages = [];
+    const named = (ref) => `${ref.replace(/^(?:builtin|file|style):/, "")}.md`;
+    const isFile = (ref) => ref.startsWith("style:") || ref.startsWith("file:");
+    if (note.noteStyle && missing.includes(note.noteStyle))
+      messages.push(
+        isFile(note.noteStyle) ? t("ui.note_style_file_missing_0", named(note.noteStyle)) : t("ui.detail_template_missing_0", note.noteStyle)
+      );
+    if (note.detailTemplateId && missing.includes(note.detailTemplateId))
+      messages.push(
+        isFile(note.detailTemplateId) ? t("ui.note_style_file_missing_0", named(note.detailTemplateId)) : t("ui.detail_template_missing_0", note.detailTemplateId)
+      );
+    if (note.toneId && missing.includes(note.toneId)) messages.push(t("ui.note_style_tone_missing_0", note.toneId));
+    if (messages.length)
+      actionNotice(messages.join(" "), t("ui.note_style_switch"), () => void this.chooseTopicStyle(node));
+  }
+  /**
+   * The topic's note style chooser (right-click "Note style…", or the Notice above). Choosing writes `note-style` only; "Follow
+   * the topic type" removes it with the old `detail-template` and `tone`. One undoable step for the topic file; the current
+   * row writes nothing.
+   */
+  async chooseTopicStyle(node) {
+    var _a2;
+    if (!this.map || this.map.aim || this.presentation || node.aimKind) return;
+    const path = node.path;
+    const note = await this.plugin.repo.readNote(path, this.map);
+    const refocus = () => {
+      var _a3, _b2;
+      return (_b2 = (_a3 = this.cardEls.get(node.id)) == null ? void 0 : _a3.focus) == null ? void 0 : _b2.call(_a3);
+    };
+    await openTopicStyleChooser(this.app, this.plugin, {
+      note,
+      kind: (_a2 = note.topicKind) != null ? _a2 : "topic",
+      dismissed: refocus,
+      write: (ref) => this.enqueue(async () => {
+        if (!this.map) return;
+        const viewport = clone(this.map.viewport);
+        const entry = await this.beginMapTransaction().rewriteNote(path, (target) => this.plugin.repo.writeNoteStyle(target, ref)).editMap(this.path, (map) => {
+          map.viewport = clone(viewport);
+        }).commit({ deferRebuild: true, label: t("ui.note_style") });
+        this.history.push(entry);
+        await this.refreshAfterSavedChange();
+        refocus();
       })
     });
-  }
-  missingTemplateMessage(id) {
-    return id.startsWith("style:") || id.startsWith("file:") ? t("ui.note_style_file_missing_0", `${id.replace(/^(?:style|file):/, "")}.md`) : t("ui.detail_template_missing_0", id);
   }
   /**
    * The note style for content that has no topic choice of its own (new integrated topics, child contributions); a dialog
@@ -63524,11 +63236,11 @@ ${addition}` : addition });
     await this.refreshNoteStyles();
     return this.mapStyleCached(language2, options);
   }
-  /** `mapStyle` without the refresh: a dialog's default value reads the cached styles (its own refresh is a later ticket). */
+  /** `mapStyle` without the refresh, for the two merge call sites that resolve the style after the notes were read (`detailTemplate` and `logHeadings`). */
   mapStyleCached(language2, options = {}) {
     var _a2;
     const result = this.noteStyles.runStyle({
-      choice: { template: options.template, tone: options.tone },
+      choice: { style: options.style },
       kind: (_a2 = options.kind) != null ? _a2 : "topic",
       outputLanguage: language2
     });
@@ -63613,7 +63325,7 @@ ${addition}` : addition });
       failed,
       notify: (message) => new import_obsidian31.Notice(message),
       accepted: onLaunchAccepted,
-      resolveStyle: (language2) => this.detailTemplateFor(node, void 0, void 0, void 0, language2),
+      resolveStyle: (language2) => this.detailTemplateFor(node, void 0, void 0, language2),
       ancestors: (language2) => this.ancestorContext(node, language2),
       userTexts: () => this.userTextContext(node.id),
       onStarted: async () => {
@@ -70122,6 +69834,17 @@ function insertAfterBlock(lines, code, start, add, stop, separate = false) {
   ].join("\n");
 }
 
+// ai/note-style-label.ts
+function runStyleLabelText(label, language2) {
+  return label.templateSource === "kind" ? translate(
+    language2,
+    "ui.note_style_label_0_1_2",
+    label.templateName,
+    label.toneName,
+    translate(language2, "ui.note_style_source_kind")
+  ) : translate(language2, "ui.note_style_label_0_1", label.templateName, label.toneName);
+}
+
 // experiences/visual-map/topic-run.ts
 var CHART_JOB_LIMIT = 3;
 var TopicRuns = class {
@@ -70735,8 +70458,8 @@ var TopicRuns = class {
       },
       note
     );
-    const styleLabel2 = runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
-    return { note, used, context, styleLabel: styleLabel2 };
+    const styleLabel = runStyle.recipe.source !== "kind" || runStyle.recipe.ref !== "builtin:general" ? runStyleLabelText(runStyle.label, this.ports.settings().language) : void 0;
+    return { note, used, context, styleLabel };
   }
   async startResearch(path, kind, options) {
     var _a2, _b2, _c, _d, _e, _f, _g;
@@ -70762,7 +70485,7 @@ var TopicRuns = class {
       handle.release();
       return null;
     }
-    const { note, used, context, styleLabel: styleLabel2 } = prelude;
+    const { note, used, context, styleLabel } = prelude;
     const language2 = settings().language;
     this.pendingSuggestions.delete(path);
     this.abortCharts(path);
@@ -70773,7 +70496,7 @@ var TopicRuns = class {
     activeTasks.set(path, controller);
     const progress = this.ports.progress();
     let progressAttempt = "starting";
-    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel2);
+    progress == null ? void 0 : progress.begin(path, progressAttempt, Date.now(), used.model, styleLabel);
     const observer = {
       onAttempt: (id) => {
         progressAttempt = id;
@@ -72719,8 +72442,6 @@ function settingsFromSaved(saved) {
     promptPresets: normalizePresets(saved == null ? void 0 : saved.promptPresets),
     defaultDetailTemplateId: typeof (saved == null ? void 0 : saved.defaultDetailTemplateId) === "string" ? saved.defaultDetailTemplateId : void 0,
     ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
-    ...typeof (saved == null ? void 0 : saved.noteTemplateBlock) === "string" && saved.noteTemplateBlock ? { noteTemplateBlock: saved.noteTemplateBlock } : {},
-    ...typeof (saved == null ? void 0 : saved.noteToneBlock) === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {},
     ...normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) ? { noteStyleByKind: normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) } : {},
     ...normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},

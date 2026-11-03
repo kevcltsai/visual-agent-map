@@ -248,29 +248,34 @@ test('outline modal: AI mode and model show only with shallow research and are s
   modal.onClose(); assert.equal(unwatched, 1);
 });
 
-test('outline modal: the content template select sits in the research options and is sent only with shallow research', async () => {
+test('outline modal: the one-line style choice sits in the research options and is sent as noteStyle only with shallow research (was: the Note style select sent detailTemplateId; Q18, D2)', async () => {
   const h = modalHarness(); const requests = [];
-  const templates = [{ id: 'standard', name: 'Standard' }, { id: 't1', name: 'Template one' }];
-  // 06 P3: the user's own templates are template blocks (file:<name>) in the picker; the old "template without a file" group is gone.
-  const styles = { refresh: async () => {}, list: () => [{ kind: 'file', id: 'file:Template one', name: 'Template one', fileName: 'Template one.md', issues: [] }], edit: async () => {} };
+  const part = name => ({ name });
+  const mine = { ref: 'file:Template one', kind: 'file', name: 'Template one', fileName: 'Template one.md', structure: part('Standard'), voice: part('Academic rigor'), format: part('Standard'), update: 'merge', issues: [] };
+  const styles = { refresh: async () => {}, recipes: () => [mine], openRecipe: async () => {} };
   const submit = async (shallowOn, picked) => {
-    const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, templates, undefined, undefined, undefined, { styles });
+    const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, undefined, undefined, undefined, { styles });
     modal.open();
     const options = h.find(modal.contentEl, item => /vam-outline-research-options/.test(item.cls));
-    const select = h.find(options, item => item.tag === 'select' && item['aria-label'] === 'Note style');
+    assert.ok(h.find(options, item => /vam-style-choice-text/.test(item.cls)), 'the line sits inside the research options');
+    assert.equal(h.all(options, item => item.tag === 'strong').at(-1).text, 'Follow the topic type');
+    h.find(options, item => item.tag === 'button' && item.text === 'Use another style this time').listeners.click({ preventDefault() {} });
+    const select = h.find(options, item => item.tag === 'select' && item['aria-label'] === 'Note style for this run');
     assert.ok(select, 'inside the research options');
-    assert.deepEqual(plain(select.children.filter(c => c.tag === 'option').map(c => c.value)), ['', 'preset:standard', 'preset:textbook', 'preset:summary', 'preset:plain', 'preset:guide']);
+    assert.deepEqual(plain(select.children.filter(c => c.tag === 'option').map(c => c.value)), ['']);
     assert.deepEqual(plain(h.find(select, c => c.tag === 'optgroup').children.map(c => [c.value, c.text])), [['file:Template one', 'Template one']]);
     const textarea = h.find(modal.contentEl, item => item.tag === 'textarea'); textarea.value = '# R\n## A'; textarea.listeners.input();
-    select.value = picked ? `file:${picked}` : '';
+    select.value = picked ? `file:${picked}` : ''; select.listeners.change();
     const shallow = h.find(modal.contentEl, item => item.tag === 'input' && item.type === 'checkbox'); shallow.checked = shallowOn; shallow.listeners.change();
     h.find(modal.modalEl, item => item.tag === 'button' && item.text === 'Add to mind map').listeners.click();
     await new Promise(resolve => setTimeout(resolve, 0));
     return requests.at(-1);
   };
-  assert.equal('detailTemplateId' in await submit(false, 'Template one'), false, 'ignored while shallow research is off');
-  assert.equal((await submit(true, 'Template one')).detailTemplateId, 'file:Template one');
-  assert.equal('detailTemplateId' in await submit(true, ''), false);
+  const off = await submit(false, 'Template one');
+  assert.equal('noteStyle' in off, false, 'ignored while shallow research is off'); assert.equal('detailTemplateId' in off, false);
+  assert.equal((await submit(true, 'Template one')).noteStyle, 'file:Template one');
+  const none = await submit(true, '');
+  assert.equal('noteStyle' in none, false); assert.equal('detailTemplateId' in none, false); assert.equal('toneId' in none, false);
 });
 
 // C2 (owner decision): the vault file picker is removed; an outline is pasted or generated with AI.
@@ -497,33 +502,32 @@ integrationTest('createOutlineMap writes the import line into the template log s
   }
 });
 
-integrationTest('importOutline: the chosen template becomes the map default and holds the root log line', async () => {
+integrationTest('importOutline: a chosen style shapes the root note\'s sections and log line for this import only; the map and every note record nothing (was: the template became the map default; Q18, C5, #44)', async () => {
   const { repo, app } = fixture('en');
-  const template = { id: 't1', name: 'Template one', sections: [
-    { id: 's1', name: 'Findings', description: '', role: 'none', aliases: [] },
-    { id: 's2', name: 'History', description: '', role: 'log', aliases: [] }] };
-  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna', detailTemplates: [template] }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, currentModelChoice() { return { model: this.settings.cliModel, reasoning: 'auto' }; }, confirmAiUsage: async (_m, run) => { await run(); return true; } };
+  const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, currentModelChoice() { return { model: this.settings.cliModel, reasoning: 'auto' }; }, confirmAiUsage: async (_m, run) => { await run(); return true; } };
   repo.settings = plugin.settings;
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   const paths = []; view.openMapInMutation = async path => { paths.push(path); };
-  view.startShallowResearch = async () => {};
+  const researched = []; view.startShallowResearch = async (_parent, _children, options) => { researched.push(options); };
   const nodes = api.parseOutline('# R\n## A').nodes;
-  await view.importOutline({ nodes, source: null, shallowResearch: true, detailTemplateId: 't1' });
+  await view.importOutline({ nodes, source: null, shallowResearch: true, noteStyle: 'builtin:textbook' });
   const map = await repo.readMap(paths[0]);
-  assert.equal(map.detailTemplateId, 't1');
   const root = map.nodes.find(node => node.parentId === null);
-  assert.match((await repo.readNote(root.path)).detail, /### History\n\n- /);
-  assert.equal((await repo.readNote(root.path)).detailTemplateId, undefined, 'a map default, not a per-topic field');
+  assert.match((await repo.readNote(root.path)).detail, /### Update log\n\n- /, 'the chosen style\'s log section holds the import line');
+  assert.equal('detailTemplateId' in map, false, 'no map default'); assert.equal('toneId' in map, false);
+  for (const node of map.nodes) { const note = await repo.readNote(node.path); assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, undefined); assert.equal(note.noteStyle, undefined, 'no topic records the style'); }
+  assert.equal(researched[0].noteStyle, 'builtin:textbook', 'the shallow research gets the choice');
   await view.importOutline({ nodes, source: null, shallowResearch: false });
-  assert.equal((await repo.readMap(paths[1])).detailTemplateId, undefined);
+  const second = await repo.readMap(paths[1]);
+  assert.equal('detailTemplateId' in second, false);
 });
 
 // ---- Placement: a new map, this map as a new tree, or under the selected topic ----
 
 function placementModal(target) {
   const h = modalHarness(); const requests = [];
-  const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, [], target);
+  const modal = new h.mod.OutlineImportModal({ vault: { getMarkdownFiles: () => [] } }, async request => { requests.push(request); }, undefined, target);
   modal.open();
   const radios = h.all(modal.contentEl, item => item.tag === 'input' && item.type === 'radio' && ['new', 'tree', 'under'].includes(item.value));
   const label = value => h.find(modal.contentEl, item => item.tag === 'label' && item.children.some(child => child === radios.find(radio => radio.value === value)));
@@ -660,13 +664,10 @@ integrationTest('importOutline as a new tree: a new top-level topic in the open 
   assert.deepEqual(plain((await h.repo.readMap(h.mapPath)).nodes.map(item => item.id)), plain(before.map(item => item.id)));
 });
 
-integrationTest('importOutline under the selected topic: the outline root becomes its child with the parent model and the chosen template per topic', async () => {
-  const template = { id: 't1', name: 'Template one', sections: [
-    { id: 's1', name: 'Findings', description: '', role: 'none', aliases: [] },
-    { id: 's2', name: 'History', description: '', role: 'log', aliases: [] }] };
-  const h = await placementHarness({ detailTemplates: [template] });
+integrationTest('importOutline under the selected topic: the outline root becomes its child with the parent model; a chosen style shapes the root note only and no topic records it (was: the template was recorded per topic; Q18, #44)', async () => {
+  const h = await placementHarness();
   const before = plain((await h.repo.readMap(h.mapPath)).nodes);
-  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n### S1a').nodes, source: null, shallowResearch: false, placement: { kind: 'under', parentId: h.oldChild.id }, detailTemplateId: 't1' });
+  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n### S1a').nodes, source: null, shallowResearch: false, placement: { kind: 'under', parentId: h.oldChild.id }, noteStyle: 'builtin:textbook' });
   const saved = await h.repo.readMap(h.mapPath);
   for (const old of before) assert.deepEqual(plain(saved.nodes.find(item => item.id === old.id)), { ...old, collapsed: false });
   const fresh = saved.nodes.filter(item => !before.some(old => old.id === item.id));
@@ -678,9 +679,9 @@ integrationTest('importOutline under the selected topic: the outline root become
   for (const item of fresh) {
     const note = await h.repo.readNote(item.path);
     assert.equal(note.model, 'parent-model', 'inherits the parent topic model');
-    assert.equal(note.detailTemplateId, 't1', 'template recorded on each created topic');
+    assert.equal(note.detailTemplateId, undefined, 'no template recorded on a created topic'); assert.equal(note.toneId, undefined); assert.equal(note.noteStyle, undefined);
   }
-  assert.match((await h.repo.readNote(sub.path)).detail, /### History\n\n- Imported from an outline/);
+  assert.match((await h.repo.readNote(sub.path)).detail, /### Update log\n\n- Imported from an outline/);
   assert.equal(saved.detailTemplateId, undefined, 'the map default is untouched');
   for (const item of fresh) for (const old of before) assert.ok(!overlaps(item, old));
   assert.equal(h.view.selection.state.selected, sub.id);
@@ -700,16 +701,15 @@ integrationTest('importOutline under the selected topic with shallow research: r
   for (const item of [sub, ...saved.nodes.filter(node => node.parentId === sub.id)]) assert.equal((await h.repo.readNote(item.path)).model, 'model-x');
 });
 
-integrationTest('quick explore: the real create path researches every created subtopic with the dialog\'s AI mode, as the short overview', async () => {
-  const template = { id: 't1', name: 'Template one', sections: [{ id: 's1', name: 'Findings', description: '', role: 'none', aliases: [] }] };
-  const h = await placementHarness({ detailTemplates: [template] });
+integrationTest('quick explore: the real create path researches every created subtopic with the dialog\'s AI mode, as the short overview, and records no style on a subtopic (was: the template was recorded on each; Q18, #44)', async () => {
+  const h = await placementHarness();
   // The reviewed outline as the Next Step dialog hands it over: the topic's own root is already dropped.
   const nodes = [{ index: 0, title: 'Food', level: 1, parent: null }, { index: 1, title: 'Breakfast', level: 2, parent: 0 }];
   const group = { id: 'group-1', label: 'Sources', documents: [{ path: 'Inbox/source.md', content: 'x' }] };
   const signal = new AbortController().signal;
   await h.view.quickOutline(h.oldRoot).create(nodes, {
     researchMode: 'local', researchDepth: 'fast', visualMode: 'off', mapAiMode: 'quick', referenceGroups: [group], outputLanguage: 'zh-TW',
-    toneId: 'tone-1', requirements: 'Keep it short', detailTemplateId: 't1', shallowResearch: true, signal, onProgress: () => {}
+    noteStyle: 'builtin:textbook', requirements: 'Keep it short', shallowResearch: true, signal, onProgress: () => {}
   });
   const saved = await h.repo.readMap(h.mapPath);
   const food = saved.nodes.find(item => item.parentId === h.oldRoot.id && item.id !== h.oldChild.id);
@@ -721,11 +721,11 @@ integrationTest('quick explore: the real create path researches every created su
   const options = h.researched[0].options;
   // Quick: local context and model knowledge only, the short overview, no images, and the Quick prompt.
   assert.equal(options.researchMode, 'local'); assert.equal(options.researchDepth, 'fast', 'subtopic research is the short overview');
-  assert.equal(options.mapAiMode, 'quick'); assert.equal(options.visualMode, 'off'); assert.equal(options.outputLanguage, 'zh-TW'); assert.equal(options.toneId, 'tone-1');
+  assert.equal(options.mapAiMode, 'quick'); assert.equal(options.visualMode, 'off'); assert.equal(options.outputLanguage, 'zh-TW'); assert.equal(options.noteStyle, 'builtin:textbook'); assert.equal('toneId' in options, false);
   assert.equal(options.requirements, 'Keep it short'); assert.equal(JSON.stringify(options.referenceGroups), JSON.stringify([group]));
   assert.equal(options.signal, undefined); assert.equal(options.onProgress, undefined);
-  assert.equal(options.detailTemplateId, 't1');
-  for (const item of [food, breakfast]) assert.equal((await h.repo.readNote(item.path)).detailTemplateId, 't1', 'the chosen template is recorded on each subtopic');
+  assert.equal('detailTemplateId' in options, false);
+  for (const item of [food, breakfast]) { const note = await h.repo.readNote(item.path); assert.equal(note.detailTemplateId, undefined, 'the chosen style is not recorded on a subtopic'); assert.equal(note.noteStyle, undefined); }
   // Standard: the web and images, still the short overview.
   const web = await placementHarness();
   await web.view.quickOutline(web.oldRoot).create(nodes, { researchMode: 'research', researchDepth: 'fast', visualMode: 'auto', mapAiMode: 'standard', referenceGroups: [], shallowResearch: true });
@@ -1045,47 +1045,45 @@ integrationTest('importOutline under a manual parent: no chosen model, or the pa
   for (const item of saved.nodes.filter(item => item.parentId !== null && item.id !== h.oldChild.id)) { const note = await h.repo.readNote(item.path, saved); assert.equal(note.modelSource, 'inherited'); assert.equal(note.model, 'parent-model'); }
 });
 
-integrationTest('importOutline: a chosen writing tone becomes the new map default next to the template (never a per-topic field)', async () => {
+integrationTest('importOutline: a chosen style never becomes a map default, with or without shallow research (was: the template and tone were written to Map.md; Q18, C5, #44)', async () => {
   const { repo, app } = fixture('en');
   const opened = [];
   const plugin = { repo, settings: { ...require('../support.cjs').DEFAULT_SETTINGS, language: 'en', cliModel: 'gpt-6-luna' }, running: new Set(), abortChartJobs: () => {}, addChartsAfterWrite: () => {}, activeTasks: new Map(), rebuildDerivedData: async () => {}, mutate: async work => work(), releaseOutline() {}, currentModelChoice() { return { model: this.settings.cliModel, reasoning: 'auto' }; }, confirmAiUsage: async (_m, run) => { await run(); return true; } };
+  repo.settings = plugin.settings;
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Notice: class {} } });
   const view = new VisualAgentMapView({ app }, plugin); view.render = () => {}; view.fit = () => {}; view.enqueue = work => work();
   view.openMapInMutation = async path => { opened.push(path); view.path = path; view.map = await repo.readMap(path); };
   view.startShallowResearch = async () => {};
   const nodes = api.parseOutline('# R\n## A').nodes;
-  await view.importOutline({ nodes, source: null, shallowResearch: true, detailTemplateId: 'textbook', toneId: 'academic' });
-  const withBoth = await repo.readMap(opened[0]);
-  assert.equal(withBoth.detailTemplateId, 'textbook'); assert.equal(withBoth.toneId, 'academic');
-  for (const node of withBoth.nodes) { const note = await repo.readNote(node.path); assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, undefined); }
-  await view.importOutline({ nodes, source: null, shallowResearch: true, toneId: 'plain' });
-  const toneOnly = await repo.readMap(opened[1]);
-  assert.equal(toneOnly.toneId, 'plain'); assert.equal(toneOnly.detailTemplateId, undefined);
-  await view.importOutline({ nodes, source: null, shallowResearch: false });
-  const none = await repo.readMap(opened[2]);
-  assert.equal(none.toneId, undefined); assert.equal(none.detailTemplateId, undefined);
+  for (const request of [{ shallowResearch: true, noteStyle: 'builtin:textbook' }, { shallowResearch: true, noteStyle: 'builtin:atomic' }, { shallowResearch: false }]) {
+    await view.importOutline({ nodes, source: null, ...request });
+    const map = await repo.readMap(opened.at(-1));
+    assert.equal('toneId' in map, false); assert.equal('detailTemplateId' in map, false);
+    for (const node of map.nodes) { const note = await repo.readNote(node.path); assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, undefined); assert.equal(note.noteStyle, undefined); }
+  }
+  assert.equal(opened.length, 3);
 });
 
-integrationTest('importOutline into the open map: the chosen template and tone are recorded on each created topic and reach the shallow research, over the quick-explore tone; the map default is untouched', async () => {
+integrationTest('importOutline into the open map: the chosen style reaches the shallow research as noteStyle and is recorded on no created topic or on the map (was: template and tone recorded on each topic; Q18, #44)', async () => {
   const h = await placementHarness();
-  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n### S1a').nodes, source: null, shallowResearch: true, placement: { kind: 'under', parentId: h.oldChild.id }, detailTemplateId: 'textbook', toneId: 'plain', researchOptions: { toneId: 'magazine' } });
+  await h.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1\n### S1a').nodes, source: null, shallowResearch: true, placement: { kind: 'under', parentId: h.oldChild.id }, noteStyle: 'builtin:textbook' });
   const saved = await h.repo.readMap(h.mapPath);
   const fresh = saved.nodes.filter(item => item.id !== h.oldRoot.id && item.id !== h.oldChild.id);
   assert.equal(fresh.length, 3);
   for (const item of fresh) {
     const note = await h.repo.readNote(item.path);
-    assert.equal(note.detailTemplateId, 'textbook'); assert.equal(note.toneId, 'plain');
+    assert.equal(note.detailTemplateId, undefined); assert.equal(note.toneId, undefined); assert.equal(note.noteStyle, undefined, 'the style is not recorded on a created topic');
   }
   assert.equal(saved.detailTemplateId, undefined); assert.equal(saved.toneId, undefined, 'an import never changes the map default');
   assert.equal(h.researched.length, 1);
-  assert.equal(h.researched[0].options.toneId, 'plain', 'the dialog choice overrides researchOptions.toneId');
-  assert.equal(h.researched[0].options.detailTemplateId, 'textbook');
-  // Without a tone choice (quick explore keeps its own), nothing is recorded and researchOptions.toneId stands.
+  assert.equal(h.researched[0].options.noteStyle, 'builtin:textbook');
+  assert.equal('toneId' in h.researched[0].options, false); assert.equal('detailTemplateId' in h.researched[0].options, false);
+  // Without a choice (quick explore\'s own research options stand), nothing is recorded and the options carry no style.
   const second = await placementHarness();
-  await second.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, placement: { kind: 'tree' }, researchOptions: { toneId: 'magazine' } });
-  assert.equal(second.researched[0].options.toneId, 'magazine');
+  await second.view.importOutline({ nodes: api.parseOutline('# Sub\n## S1').nodes, source: null, shallowResearch: true, placement: { kind: 'tree' }, researchOptions: { requirements: 'Keep it short' } });
+  assert.equal(second.researched[0].options.requirements, 'Keep it short'); assert.equal('noteStyle' in second.researched[0].options, false);
   const created = (await second.repo.readMap(second.mapPath)).nodes.filter(item => item.id !== second.oldRoot.id && item.id !== second.oldChild.id);
-  for (const item of created) assert.equal((await second.repo.readNote(item.path)).toneId, undefined);
+  for (const item of created) { const note = await second.repo.readNote(item.path); assert.equal(note.toneId, undefined); assert.equal(note.noteStyle, undefined); }
 });
 
 integrationTest('topics created by an outline import start in Quick mode, the root and the children alike (D-2026-10-244)', async () => {

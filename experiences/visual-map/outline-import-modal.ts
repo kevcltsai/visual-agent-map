@@ -9,7 +9,7 @@ import {
 } from "./outline-import";
 import type { MapAiMode } from "./ai-mode";
 import type { TaskOptions } from "./modals";
-import { aiModeField, modelField, noteStyleField, type FieldLinks, type ModelChoices } from "./research-fields";
+import { aiModeField, modelField, styleChoiceField, type FieldLinks, type ModelChoices } from "./research-fields";
 import { actionStatus, armDiscard, modalActions } from "../../ui/modals/action-bar";
 import type { PromptPresetsHost } from "../../ui/modals/prompt-presets-modal";
 import {
@@ -48,7 +48,7 @@ export interface OutlineImportRequest {
    * The research choices for the shallow research (quick explore passes its dialog's); without them it searches the
    * web with no reference groups, no images, the workspace language and tone, and no extra requirements.
    */
-  researchOptions?: Pick<TaskOptions, "referenceGroups" | "outputLanguage" | "toneId" | "requirements">;
+  researchOptions?: Pick<TaskOptions, "referenceGroups" | "outputLanguage" | "requirements" | "noteStyle">;
   /**
    * The outline has no root of its own (quick explore drops the topic it was generated for): every created topic is
    * researched under the "under" parent, even when the outline has a single top heading.
@@ -57,12 +57,10 @@ export interface OutlineImportRequest {
   /** Model for the new topics and their shallow research; undefined uses the workspace default. */
   model?: string;
   /**
-   * Content template: a new map's default, or recorded on each created topic when importing into an open map; also
-   * used by the shallow research. Undefined uses the map/workspace default.
+   * A note style (`builtin:<id>` or `file:<name>`) for this import only: it shapes the imported root note and the shallow
+   * research. It is never written to the map or to a created topic. Undefined: each topic follows its type.
    */
-  detailTemplateId?: string;
-  /** Writing tone, handled like the template: the new map's default, or recorded on each created topic. */
-  toneId?: string;
+  noteStyle?: string;
 }
 
 /** Everything the window held when AI generation started, so a reopened window shows the same choices. */
@@ -76,8 +74,7 @@ export interface OutlineDraftInputs {
   shallow: boolean;
   mode: MapAiMode;
   model?: string;
-  template?: string;
-  tone?: string;
+  noteStyle?: string;
 }
 
 /** What a reopened window starts from: the inputs of the run and its result (or why there is none). */
@@ -125,10 +122,9 @@ export class OutlineImportModal extends Modal {
   private submitting = false;
   private mode: () => MapAiMode = () => "quick";
   private model: () => string | undefined = () => undefined;
-  private template: () => string | undefined = () => undefined;
-  private tone: () => string | undefined = () => undefined;
+  private noteStyle: () => string | undefined = () => undefined;
   private setModel: (id: string | undefined) => void = () => {};
-  private setStyle: (template: string | undefined, tone: string | undefined) => void = () => {};
+  private setStyle: (style: string | undefined) => void = () => {};
   private setMode: (mode: MapAiMode) => void = () => {};
   private syncResearchOptions: () => void = () => {};
   /** Asks the host what the model menu's default entry means for the current position and shows it. */
@@ -145,13 +141,10 @@ export class OutlineImportModal extends Modal {
     app: App,
     private create: (request: OutlineImportRequest) => Promise<void>,
     private models: ModelChoices = { list: () => [], watch: () => () => {} },
-    private templates: { id: string; name: string }[] = [],
     private target: OutlineImportTarget = { map: "none" },
     initialPlacement: OutlinePlacement["kind"] = "tree",
     private generator?: OutlineGenerator,
     private links: FieldLinks = {},
-    private tones: { id: string; name: string }[] = [],
-    private defaultStyleLabel = "",
     /**
      * The text of the model menu's default entry for a position: "Follow current model (X)" or, under a topic that
      * has a manual upper topic, "Follow upper topic (X)". `parentId` is the topic the outline goes under, else null.
@@ -218,16 +211,12 @@ export class OutlineImportModal extends Modal {
       else answer.then(apply, () => {});
     };
     this.syncModelLabel();
-    const style = noteStyleField(researchOptions, {
+    const style = styleChoiceField(researchOptions, {
       styles: this.links.styles,
-      templates: this.templates,
-      tones: this.tones,
-      keepLabel: t("ui.note_style_use_default_0", this.defaultStyleLabel),
-      currentRef: this.links.currentStyleRef
+      current: t("ui.note_style_follow_kind")
     });
     void style.reload();
-    this.template = style.templateId;
-    this.tone = style.toneId;
+    this.noteStyle = style.style;
     this.setStyle = style.set;
     const showOptions = (): void => researchOptions.toggleClass("is-hidden", !this.shallow.checked);
     this.shallow.addEventListener("change", showOptions);
@@ -250,7 +239,7 @@ export class OutlineImportModal extends Modal {
     this.syncResearchOptions();
     this.setMode(inputs.mode);
     this.setModel(inputs.model);
-    this.setStyle(inputs.template, inputs.tone);
+    this.setStyle(inputs.noteStyle);
   }
 
   /** "Put it in": a new map (default), this map as a new tree, or under the selected topic. */
@@ -426,8 +415,7 @@ export class OutlineImportModal extends Modal {
       // Everything the window holds right now, kept by the host when AI starts so a reopened window matches it.
       const inputs = (): OutlineDraftInputs => {
         const model = this.model();
-        const template = this.template();
-        const tone = this.tone();
+        const noteStyle = this.noteStyle();
         return {
           topic: topic.value.trim(),
           presetId: select.value,
@@ -437,8 +425,7 @@ export class OutlineImportModal extends Modal {
           shallow: this.shallow.checked,
           mode: this.mode(),
           ...(model ? { model } : {}),
-          ...(template ? { template } : {}),
-          ...(tone ? { tone } : {})
+          ...(noteStyle ? { noteStyle } : {})
         };
       };
       // The model menu counts only while it shows (the research option is on); a hidden pick is not used.
@@ -540,8 +527,7 @@ export class OutlineImportModal extends Modal {
     try {
       const shallowResearch = this.shallow.checked;
       const model = shallowResearch ? this.model() : undefined;
-      const detailTemplateId = shallowResearch ? this.template() : undefined;
-      const toneId = shallowResearch ? this.tone() : undefined;
+      const noteStyle = shallowResearch ? this.noteStyle() : undefined;
       await this.create({
         nodes: this.nodes,
         placement: this.placementRequest(),
@@ -549,8 +535,7 @@ export class OutlineImportModal extends Modal {
         shallowResearch,
         ...(shallowResearch ? { aiMode: this.mode() } : {}),
         ...(model ? { model } : {}),
-        ...(detailTemplateId ? { detailTemplateId } : {}),
-        ...(toneId ? { toneId } : {})
+        ...(noteStyle ? { noteStyle } : {})
       });
       this.close();
     } catch (error) {

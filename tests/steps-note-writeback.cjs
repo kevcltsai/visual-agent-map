@@ -877,13 +877,14 @@ test('F1 entries: an AI merge reads a style file that was not loaded yet (its re
   assert.deepEqual(plain(w.calls.asks[0].detailTemplate.sections.map(section => section.name)), ['Mine A', 'Mine B']);
 });
 
-test('F1 entries: every mapStyle and proposalTone call site in the view awaits it; the dialog default stays on the cached styles', () => {
+test('F1 entries: every mapStyle and proposalTone call site in the view awaits it; the dialogs read the styles again first (#38)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'experiences/visual-map/view.ts'), 'utf8');
   assert.deepEqual([...source.matchAll(/(.)this\.(?:mapStyle|proposalTone)\(/g)].filter(match => !/[ (]/.test(match[1]) ).map(match => match[0]), []);
   for (const match of source.matchAll(/(await )?this\.(mapStyle|proposalTone)\(/g)) assert.ok(match[1], `${match[2]} is awaited`);
-  assert.match(source, /const current = this\.mapStyleCached\(settings\.language\)/);
+  // #38 (T6 P2): the selection synthesis dialog reads the styles again before it shows its default.
+  assert.match(source, /const current = await this\.mapStyle\(settings\.language, \{ kind: "topic" \}\)/);
 });
 
 // F1 reviewer R1: a file that changed after the run started is found before the backup, not after it.

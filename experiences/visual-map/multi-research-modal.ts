@@ -2,7 +2,7 @@ import { App, Modal } from "obsidian";
 import { t } from "../../i18n";
 import type { ResearchDepth, ResearchMode } from "../../ai/types";
 import type { MapAiMode } from "./ai-mode";
-import { modelField, noteStyleField, type FieldLinks, type ModelChoices } from "./research-fields";
+import { modelField, styleChoiceField, type FieldLinks, type ModelChoices } from "./research-fields";
 import { modalActions } from "../../ui/modals/action-bar";
 
 export interface MultiResearchRequest {
@@ -17,10 +17,11 @@ export interface MultiResearchRequest {
   requirements: string;
   /** Model for every started topic, for this batch only (never saved on a topic); undefined keeps each topic's model. */
   model?: string;
-  /** Content template for every started topic (saved on the topic); undefined keeps each topic's template. */
-  detailTemplateId?: string;
-  /** Writing tone for every started topic (saved on the topic); undefined keeps each topic's tone. */
-  toneId?: string;
+  /**
+   * A note style (`builtin:<id>` or `file:<name>`) for every started topic, for this batch only (never written to a
+   * topic); undefined keeps each topic's own style.
+   */
+  noteStyle?: string;
 }
 
 export class MultiResearchModal extends Modal {
@@ -31,11 +32,7 @@ export class MultiResearchModal extends Modal {
     app: App,
     private names: string[],
     private models: ModelChoices,
-    private templates: { id: string; name: string }[],
     private submit: (request: MultiResearchRequest) => void,
-    private tones: { id: string; name: string }[] = [],
-    /** The old "Manage tones" callback slot: the tone library link is gone (the tones are blocks now); callers pass nothing. */
-    _retired?: undefined,
     private links: FieldLinks = {},
     /** The mode each listed topic will run in (parallel to `names`), shown beside its name. */
     private modes: MapAiMode[] = []
@@ -60,11 +57,9 @@ export class MultiResearchModal extends Modal {
     });
     const model = modelField(this.contentEl, this.models, t("ui.multi_research_current_model"), this.links.repair);
     this.unwatch = model.dispose;
-    const style = noteStyleField(this.contentEl, {
+    const style = styleChoiceField(this.contentEl, {
       styles: this.links.styles,
-      templates: this.templates,
-      tones: this.tones,
-      keepLabel: t("ui.note_style_keep_each")
+      current: t("ui.note_style_each_topic")
     });
     void style.reload();
     const requirementsLabel = this.contentEl.createEl("label", { cls: "vam-field" });
@@ -85,8 +80,7 @@ export class MultiResearchModal extends Modal {
       const request: MultiResearchRequest = {
         requirements: requirements.value.trim(),
         ...(model.value() ? { model: model.value() } : {}),
-        ...(style.templateId() ? { detailTemplateId: style.templateId() } : {}),
-        ...(style.toneId() ? { toneId: style.toneId() } : {})
+        ...(style.style() ? { noteStyle: style.style() } : {})
       };
       this.close();
       this.submit(request);

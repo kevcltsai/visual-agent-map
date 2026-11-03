@@ -37,8 +37,8 @@ import {
   type OutlineNode
 } from "./outline-import";
 import { FOLLOW_DEFAULT_MODEL, syncModelSelect } from "../../core/model-discovery";
-import { aiModeField, fieldLink, linkedField, noteStyleField } from "./research-fields";
-import { errorNotice, stylePickerFor, type StyleRef } from "./note-style-picker";
+import { aiModeField, fieldLink, linkedField, styleChoiceField } from "./research-fields";
+import { errorNotice, stylePickerFor } from "./note-style-picker";
 import { aiModeOptions, DEFAULT_MAP_AI_MODE, type MapAiMode } from "./ai-mode";
 import { titleProblemText } from "../../ui/modals/title-check";
 
@@ -59,10 +59,11 @@ export interface TaskOptions {
    * Quick prompt. Absent for a run that has no mode (a synthesis, the map chat).
    */
   mapAiMode?: MapAiMode;
-  /** This run's explicit content template choice; recorded on the topic when given. */
-  detailTemplateId?: string;
-  /** This run's explicit writing tone choice; recorded on the topic when given. */
-  toneId?: string;
+  /**
+   * This run's note style (`builtin:<id>` or `file:<name>`), chosen in the dialog for this run only. It is never written to
+   * a topic or a map; absent: each topic resolves its own style.
+   */
+  noteStyle?: string;
   /** Multi-select synthesis only: the name of the new topic. */
   synthesisTitle?: string;
   /** The synthesis draft step retried after chosen directions; it continues them even when the last draft failed. */
@@ -153,15 +154,8 @@ export interface NextStepSettings extends OutputLanguageMemory, AiModeMemory {
   stop?: () => void;
   sources?: TaskSourceSettings;
   synthesisPending?: { directions: Suggestion[]; discard: () => void };
-  templates?: { id: string; name: string }[];
-  currentTemplate?: string;
-  tones?: { id: string; name: string }[];
-  /** Name of the tone the topic resolves to today (shown as the "keep" option). */
-  currentTone?: string;
-  /** Name of the note style (template + tone) the topic resolves to today, shown in "Keep current (…)". */
+  /** Name of the note style the topic resolves to today ("Old setting (…)" for an implicit one): the X of "Note style: X". */
   currentStyle?: string;
-  /** The style behind `currentStyle`, so "Edit this style" works on the first option. */
-  currentStyleRef?: StyleRef;
   /** The topic's summary today, shown beside a draft that would replace it. */
   currentSummary?: string;
   /** The topic's research state and how many of its direct children are researched, for the suggested mode. */
@@ -231,18 +225,7 @@ export interface SelectionSynthesis {
   initialTitle: string;
   /** The direction used when the AI suggestions are skipped. */
   defaultDirection: string;
-  fields: Pick<
-    NextStepSettings,
-    | "sources"
-    | "templates"
-    | "currentTemplate"
-    | "tones"
-    | "currentTone"
-    | "currentStyle"
-    | "currentStyleRef"
-    | "outputLanguage"
-    | "rememberOutputLanguage"
-  >;
+  fields: Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "rememberOutputLanguage">;
   /** Reopened from the selection bar with directions waiting. */
   pending?: { directions: Suggestion[]; discard: () => void };
   background?: BackgroundHooks;
@@ -358,19 +341,7 @@ export class NextStepModal extends Modal {
   }
   /** Where the shared fields (data sources, template, tone) come from: the topic's settings, or the selection's. */
   private get info():
-    | Pick<
-        NextStepSettings,
-        | "sources"
-        | "templates"
-        | "currentTemplate"
-        | "tones"
-        | "currentTone"
-        | "currentStyle"
-        | "currentStyleRef"
-        | "outputLanguage"
-        | "rememberOutputLanguage"
-      >
-    | undefined {
+    Pick<NextStepSettings, "sources" | "currentStyle" | "outputLanguage" | "rememberOutputLanguage"> | undefined {
     return this.modelSettings ?? this.selectionFlow?.fields;
   }
   /** Suggests the next step from where the topic stands: frontier → research, settled leaf → expand, settled branch → synthesize. */
@@ -1154,8 +1125,7 @@ export class NextStepModal extends Modal {
           ...aiModeOptions(mode, "research"),
           requirements: this.requirements(),
           ...this.runOnceOptions(),
-          ...(templateId() ? { detailTemplateId: templateId() } : {}),
-          ...(toneId() ? { toneId: toneId() } : {}),
+          ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
           signal: controller.signal,
           onProgress: message => {
             if (!this.closed && !controller.signal.aborted)
@@ -1296,8 +1266,7 @@ export class NextStepModal extends Modal {
       ...this.runOnceOptions(),
       ...aiModeOptions(aiMode.value(), "subtopic"),
       shallowResearch: shallow.checked,
-      ...(templateId() ? { detailTemplateId: templateId() } : {}),
-      ...(toneId() ? { toneId: toneId() } : {}),
+      ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
       signal,
       onProgress: message => {
         if (!this.closed) expandPanel.querySelector<HTMLElement>(".vam-next-status")?.setText(message);
@@ -1475,8 +1444,7 @@ export class NextStepModal extends Modal {
         researchMode: "local",
         researchDepth: "normal",
         visualMode: "off",
-        ...(templateId() ? { detailTemplateId: templateId() } : {}),
-        ...(toneId() ? { toneId: toneId() } : {}),
+        ...(noteStyle() ? { noteStyle: noteStyle() } : {}),
         ...(titleInput ? { synthesisTitle: titleInput.value.trim() } : {}),
         signal,
         onProgress: message => {
@@ -1593,20 +1561,12 @@ export class NextStepModal extends Modal {
     languageSelect.addEventListener("change", () => {
       this.manualOutputLanguage = languageSelect.value as ContentLanguage;
     });
-    const style = noteStyleField(compactSettings, {
+    const style = styleChoiceField(compactSettings, {
       styles: stylePickerFor(this.app, this.plugin),
-      templates: this.info?.templates ?? [],
-      tones: this.info?.tones ?? [],
-      keepLabel: t("ui.note_style_keep_0", this.info?.currentStyle ?? ""),
-      currentTemplate: this.info?.currentTemplate,
-      currentTone: this.info?.currentTone,
-      currentStyle: this.info?.currentStyle,
-      currentRef: this.info?.currentStyleRef,
+      current: this.info?.currentStyle ?? "",
       changed: () => refreshSummary()
     });
-    void style.reload();
-    const templateId = style.templateId;
-    const toneId = style.toneId;
+    const noteStyle = style.style;
     const describeOutput = (): void => {
       outputValue.setText([supportedLanguageLabel(languageSelect.value), style.label()].filter(Boolean).join(" · "));
     };
@@ -1634,6 +1594,8 @@ export class NextStepModal extends Modal {
       if (styleName) parts.push(styleName);
       summaryEl.setText(parts.join(" · "));
     };
+    // After refreshSummary exists: reload() reports the redrawn list through `changed`.
+    void style.reload();
     // Select, checkbox and radio changes bubble up, so one listener keeps the summary current.
     this.contentEl.addEventListener("change", refreshSummary);
     // A changed model or reasoning level changes the command: pre-start again (the old process is killed).

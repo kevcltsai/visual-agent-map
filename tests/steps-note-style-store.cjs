@@ -60,14 +60,19 @@ test('no folder, no new keys (was: topic x map x workspace matrix; grilling Q10/
   await store.refresh();
   const templates = [undefined, 'standard', 'textbook', 'uuid-1', 'gone'];
   const tones = [undefined, 'summary', 'plain', 'guide', 'custom-tone-1', 'academic', 'nope'];
+  // The expected values depend only on (topic, workspace) and noteTone; compute each once and compare every run against it.
+  const wantTemplates = new Map(), wantTones = new Map();
   for (const topic of templates) for (const map of templates) for (const noteTone of tones) for (const mapTone of tones) for (const workspace of [undefined, 'textbook', 'uuid-1']) {
     settings.defaultDetailTemplateId = workspace;
     const got = store.runStyle(request([{ template: topic, tone: noteTone }, { template: map, tone: mapTone }]));
-    const want = todayTemplate(settings, [topic]);
+    const templateKey = `${topic}|${workspace}`;
+    if (!wantTemplates.has(templateKey)) { const w = todayTemplate(settings, [topic]); wantTemplates.set(templateKey, { template: plain(w.template), missing: plain(w.missing) }); }
+    if (!wantTones.has(noteTone)) wantTones.set(noteTone, M.resolveToneText(PRESETS, [noteTone], 'en'));
+    const want = wantTemplates.get(templateKey);
     eq(got.template, want.template);
     // R1-L1 (T6 P3): a topic tone that names nothing is reported after the structure (academic rigor still stands in).
     eq(got.issues.missing, [...want.missing, ...(noteTone === 'nope' ? ['nope'] : [])]);
-    assert.equal(got.toneText, M.resolveToneText(PRESETS, [noteTone], 'en'));
+    assert.equal(got.toneText, wantTones.get(noteTone));
     assert.equal(got.label.fileName, undefined);
     assert.equal(got.issues.invalid, undefined);
   }

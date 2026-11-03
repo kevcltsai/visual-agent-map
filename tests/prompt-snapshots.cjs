@@ -25,7 +25,7 @@ function record(name, builder, language, prompt, schema) {
   snapshots.set(name, { builder, language, prompt: normalizeText(prompt), schema });
 }
 async function recordContext(name, builder, language, context, model) {
-  const sent = await promptsFor(context, { language, ...(model ? { model } : {}) });
+  const sent = await promptsFor(context, { language, reuseModule: true, ...(model ? { model } : {}) });
   assert.ok(sent.length >= 1, `${name}: no prompt reached the provider`);
   sent.forEach((call, index) => record(sent.length === 1 ? name : `${name}.${index + 1}`, builder, language, call.prompt, call.schema));
 }

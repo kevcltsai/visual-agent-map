@@ -26,7 +26,7 @@ export interface StyleListItem {
 }
 
 /**
- * One style (recipe) in a one-line choice. A structural subset of the store's `RecipeListItem` (T5 adds `listRecipes()`),
+ * One style (recipe) in a one-line choice. A structural subset of the store's `RecipeListItem`,
  * so that list can be handed over as it is.
  */
 export interface PickerRecipe {
@@ -117,11 +117,7 @@ export function stylePickerFor(app: App, plugin: VisualAgentMapPlugin): StylePic
             ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }]
             : []
         ),
-    // T5 adds `listRecipes()` to the store; until it is merged here the built-in styles are what is offered.
-    recipes: () => {
-      const source = store as { listRecipes?: () => PickerRecipe[] };
-      return source.listRecipes ? source.listRecipes() : builtinRecipeItems();
-    },
+    recipes: () => store.listRecipes(),
     edit: ref => openStyleFile(app, store, ref)
   };
 }

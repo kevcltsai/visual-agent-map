@@ -28140,28 +28140,6 @@ function runStyleLabelText(label, language2) {
 
 // experiences/visual-map/note-style-picker.ts
 var import_obsidian14 = require("obsidian");
-function builtinRecipeItems() {
-  const nameOf = (list, id) => {
-    const found = list.find((item) => item.id === id);
-    return found ? t(found.nameKey) : id;
-  };
-  const templates = BUILTIN_BLOCKS.filter((block) => block.category === "template");
-  const tones = BUILTIN_BLOCKS.filter((block) => block.category === "tone");
-  return BUILTIN_RECIPES.map((recipe) => {
-    const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
-    return {
-      ref: builtinRef(recipe.id),
-      kind: "builtin",
-      name: t(recipe.nameKey),
-      ...aim ? { aimOnly: true } : {},
-      structure: { name: aim ? t(recipe.nameKey) : nameOf(templates, recipe.structure) },
-      voice: { name: nameOf(tones, recipe.voice) },
-      format: { name: nameOf(BUILTIN_FORMATS, recipe.format) },
-      update: recipe.update,
-      issues: []
-    };
-  });
-}
 var NoteStyleFileError = class extends Error {
   constructor(message, open) {
     super(message);
@@ -28185,11 +28163,7 @@ function stylePickerFor(app, plugin) {
     list: () => store.listBlocks("template").flatMap(
       (item) => item.kind === "file" && item.fileName !== void 0 ? [{ kind: "file", id: item.ref, name: item.name, fileName: item.fileName, issues: item.issues }] : []
     ),
-    // T5 adds `listRecipes()` to the store; until it is merged here the built-in styles are what is offered.
-    recipes: () => {
-      const source = store;
-      return source.listRecipes ? source.listRecipes() : builtinRecipeItems();
-    },
+    recipes: () => store.listRecipes(),
     edit: (ref) => openStyleFile(app, store, ref)
   };
 }

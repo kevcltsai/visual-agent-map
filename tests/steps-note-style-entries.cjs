@@ -265,12 +265,11 @@ test('styleChoiceField: building, expanding and choosing write nothing to the va
   assert.deepEqual(writes, []);
 });
 
-test('stylePickerFor: recipes() is the store\'s style list when it has one, else the built-in styles by name; list() stays the template blocks', () => {
+test('stylePickerFor: recipes() is the store\'s listRecipes() as it is; builtinRecipeItems() names the built-in styles for a picker-less test double; list() stays the template blocks', () => {
   const file = new (class TFile {})();
   const loaded = load('experiences/visual-map/note-style-picker.ts', { obsidian: { ...obsidian, TFile: file.constructor } });
   const base = { refresh: async () => {}, listBlocks: () => [] };
-  const without = loaded.stylePickerFor({}, { noteStyles: base });
-  const builtins = without.recipes();
+  const builtins = loaded.builtinRecipeItems();
   assert.equal(builtins.length, 8); eq(builtins.filter(i => i.aimOnly).map(i => i.ref), ['builtin:aim']);
   eq(builtins.map(i => i.ref).slice(0, 2), ['builtin:general', 'builtin:atomic']);
   const textbook = builtins.find(i => i.ref === 'builtin:textbook');

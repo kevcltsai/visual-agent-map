@@ -281,7 +281,8 @@ import {
   initialViewport,
   insetFromRects,
   isObscured,
-  rectsIntersect
+  rectsIntersect,
+  statusBarClearance
 } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
@@ -1098,6 +1099,8 @@ export class VisualAgentMapView extends ItemView {
   private coverObserver: IntersectionObserver | null = null;
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
+  private statusBarObserver: ResizeObserver | null = null;
+  private statusBarObserved: Element | null = null;
   /** While a card renders, its buttons stay out of the tab order until that card is focused. */
   private renderingCard = false;
   /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
@@ -1203,10 +1206,16 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("active-leaf-change", leaf => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
         this.chat?.refreshNote();
+        this.syncStatusBarClearance();
       })
     );
     // A tab can be shown or hidden, or moved to another window, without the active leaf changing.
-    this.registerEvent(workspace.on("layout-change", () => this.chat?.refreshNote()));
+    this.registerEvent(
+      workspace.on("layout-change", () => {
+        this.chat?.refreshNote();
+        this.syncStatusBarClearance();
+      })
+    );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
     this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
     // A note whose image or `topic-cover` just changed redraws only its own cover.
@@ -1744,6 +1753,9 @@ export class VisualAgentMapView extends ItemView {
     this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
+    this.statusBarObserver?.disconnect();
+    this.statusBarObserver = null;
+    this.statusBarObserved = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
     this.announcer = null;
@@ -9769,6 +9781,7 @@ export class VisualAgentMapView extends ItemView {
     keepMapFocus();
     this.applyPresentationMarks();
     restoreSearch();
+    this.syncStatusBarClearance();
   }
   /** What the empty canvas says: the usual hint, or (while the chat builds the map, or waits for a plan) what is happening. */
   private emptyCanvasState(): "idle" | "building" | "plan" {
@@ -15140,6 +15153,34 @@ export class VisualAgentMapView extends ItemView {
   onResize(): void {
     this.syncChatNarrow();
     this.fitKindShapes();
+    this.syncStatusBarClearance();
+  }
+  /**
+   * Obsidian's status bar floats over the window's bottom-right corner. How far it reaches into the canvas and into the
+   * chat is written as `--vam-status-clearance` (px), which the zoom controls, the canvas hint, the selection bar and the
+   * chat body add to their bottom spacing. The bar changes size with the active note, so it is also watched.
+   */
+  private syncStatusBarClearance(): void {
+    if (this.closed) return;
+    const doc = this.contentEl?.ownerDocument;
+    const status = doc?.querySelector?.(".status-bar") ?? null;
+    if (status !== this.statusBarObserved) {
+      this.statusBarObserver?.disconnect();
+      this.statusBarObserver = null;
+      this.statusBarObserved = status;
+      const win = doc?.defaultView as (Window & { ResizeObserver?: typeof ResizeObserver }) | null | undefined;
+      if (status && typeof win?.ResizeObserver === "function") {
+        this.statusBarObserver = new win.ResizeObserver(() => this.syncStatusBarClearance());
+        this.statusBarObserver.observe(status);
+      }
+    }
+    const statusRect = status?.getBoundingClientRect?.() ?? null;
+    for (const selector of [".vam-canvas", ".vam-map-chat"]) {
+      const el = this.contentEl.querySelector<HTMLElement>(selector);
+      if (typeof el?.getBoundingClientRect !== "function" || typeof el.style?.setProperty !== "function") continue;
+      const clearance = statusBarClearance(el.getBoundingClientRect(), statusRect);
+      el.style.setProperty("--vam-status-clearance", `${clearance}px`);
+    }
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

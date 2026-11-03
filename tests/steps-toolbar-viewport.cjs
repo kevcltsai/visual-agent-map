@@ -415,3 +415,28 @@ test('the zoom buttons anchor on the selection and the reset is wired to resetZo
   assert.match(render, /this\.zoomBy\(1\.2, this\.selectionAnchor\(\) \?\? undefined\)/);
   assert.match(render, /if \(this\.map\) this\.resetZoom\(\);/);
 });
+
+// ---- UX review A theme 4: status bar clearance ----
+test('statusBarClearance: how far the floating status bar reaches into a target, 0 when it does not', () => {
+  const target = { left: 0, right: 1000, bottom: 760 };
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 1000, top: 733, bottom: 760 }), 27);
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 1000, top: 732.4, bottom: 760 }), 28, 'rounds up');
+  assert.equal(inset.statusBarClearance(target, null), 0, 'no status bar');
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 604, top: 733, bottom: 760 }), 0, 'zero width');
+  assert.equal(inset.statusBarClearance(target, { left: 604, right: 1000, top: 760, bottom: 760 }), 0, 'zero height');
+  assert.equal(inset.statusBarClearance({ left: 0, right: 500, bottom: 760 }, { left: 604, right: 1000, top: 733, bottom: 760 }), 0, 'no horizontal overlap');
+  assert.equal(inset.statusBarClearance({ left: 0, right: 604, bottom: 760 }, { left: 604, right: 1000, top: 733, bottom: 760 }), 0, 'touching edges');
+  assert.equal(inset.statusBarClearance({ left: 0, right: 1000, bottom: 700 }, { left: 604, right: 1000, top: 733, bottom: 760 }), 0, 'status bar starts below the target');
+});
+
+test('the zoom controls, canvas hint, selection bar add the status bar clearance; the viewer defines the variable', () => {
+  // The base rules keep their plain pixels (map-chat.cjs and the selection bar test read them); a following rule adds the clearance.
+  assert.match(css, /^\.vam-zoom-controls \{ bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(css, /^\.vam-canvas-overlay > \.vam-canvas-hint \{ bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(css, /^\.vam-selection-bar \{ bottom: calc\(64px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.match(read('experiences/sharing/viewer/viewer.css'), /--vam-status-clearance: 0px;/);
+  const view = read('experiences/visual-map/view.ts');
+  assert.match(view, /private syncStatusBarClearance\(\): void/);
+  assert.match(view, /onResize\(\): void \{[^}]*this\.syncStatusBarClearance\(\);/);
+  assert.match(view, /this\.statusBarObserver\?\.disconnect\(\);/);
+});

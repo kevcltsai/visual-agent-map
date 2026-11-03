@@ -51,6 +51,8 @@
 .vam-map-tools button:not(.mod-cta):hover, .vam-zoom-controls button:hover { background: var(--background-modifier-hover); }
 .vam-map-tools button.is-active { background: var(--background-modifier-active-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); color: color-mix(in srgb, var(--text-accent) 80%, var(--text-normal)); }
 .vam-zoom-controls { right: 12px; bottom: 12px; }
+/* Obsidian's floating status bar covers the bottom-right corner; the view writes how far it reaches into the canvas. */
+.vam-zoom-controls { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-zoom-controls { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 24px); }
 .vam-zoom-controls > .vam-layout-button { padding: 0 8px; font-size: var(--font-ui-small); }
 .vam-layout-button::after { content: "▾" / ""; margin-left: 4px; color: var(--text-muted); }
@@ -60,6 +62,7 @@
 .vam-note-style-custom:not([hidden]) { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--interactive-accent); }
 /* A solid chip like the zoom cluster, so the hint stays readable when it sits over a card. */
 .vam-canvas-overlay > .vam-canvas-hint { position: absolute; left: 12px; bottom: 12px; max-width: 50%; padding: 6px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); color: var(--text-muted); pointer-events: none; }
+.vam-canvas-overlay > .vam-canvas-hint { bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-workspace { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }
 .vam-viewport { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; background-color: var(--background-secondary); background-image: radial-gradient(var(--background-modifier-border) 1px, transparent 1px); background-size: 24px 24px; }
 .vam-viewport.is-panning { cursor: grabbing; }
@@ -547,6 +550,7 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-aim-answer-option:focus-within { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
 /* Left-anchored and clear of the bottom-right zoom cluster; the names sit on their own line so the buttons never move. */
 .vam-selection-bar { position: absolute; z-index: 6; bottom: 64px; left: 16px; width: max-content; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 32px); padding: 8px 12px; border: 1px solid var(--interactive-accent); border-radius: 10px; background: var(--background-primary); box-shadow: var(--shadow-s); }
+.vam-selection-bar { bottom: calc(64px + var(--vam-status-clearance, 0px)); }
 .vam-selection-bar > span { flex: 0 0 100%; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* AI chat window: the first child of the workspace, left of the canvas. It folds to a narrow edge (one button) and, on a narrow
    pane, lays over the canvas when opened. On an empty map the same elements are the opening screen, in the middle of the canvas. */

@@ -143,3 +143,17 @@ export function isObscured(rect: ScreenRect, view: ScreenRect, covers: ScreenRec
   if (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom) return true;
   return covers.some(cover => rectsIntersect(rect, cover));
 }
+
+/**
+ * Obsidian's status bar floats over the bottom-right of the window. When it sits over `target` (shares horizontal
+ * range and starts above the target's bottom edge) this is how many pixels the target's bottom must rise to clear it;
+ * no status bar, an empty one, or one beside the target gives 0.
+ */
+export function statusBarClearance(
+  target: { left: number; right: number; bottom: number },
+  status: { left: number; right: number; top: number; bottom: number } | null
+): number {
+  if (!status || !(status.right > status.left) || !(status.bottom > status.top)) return 0;
+  if (status.left >= target.right || status.right <= target.left) return 0;
+  return status.top < target.bottom ? Math.max(0, Math.ceil(target.bottom - status.top)) : 0;
+}

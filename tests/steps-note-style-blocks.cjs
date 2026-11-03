@@ -285,7 +285,7 @@ test('counter 8 (was: a style file that decides the tone; grilling Q10/Q12): a s
 });
 
 // ---- counter 9: copy ----
-test('counter 9: copy gives a unique name ("x (my version)", "x (my version) (2)"), never overwrites, never takes a built-in name, is cleaned, stays in the block folder, and the setting points at it', async () => {
+test('counter 9: copy gives a unique name ("My x", "My x (2)"), never overwrites, never takes a built-in name, is cleaned, stays in the block folder, and the setting points at it', async () => {
   for (const language of LANGUAGES) {
     const { store, v, settings, saves } = makeStore({ language });
     await store.refresh();
@@ -308,24 +308,24 @@ test('counter 9: copy gives a unique name ("x (my version)", "x (my version) (2)
   // a user's file of that name, created after the last refresh, is not touched
   const { store, v } = makeStore({});
   await store.refresh();
-  v.files[`${TPL}/Standard six (my version).md`] = 'MINE, do not touch';
+  v.files[`${TPL}/My Standard six.md`] = 'MINE, do not touch';
   v.folders.add(TPL);
   const ref = await store.copyBlock('template', 'builtin:standard');
-  assert.equal(ref, 'file:Standard six (my version) (2)');
-  assert.equal(v.files[`${TPL}/Standard six (my version).md`], 'MINE, do not touch');
+  assert.equal(ref, 'file:My Standard six (2)');
+  assert.equal(v.files[`${TPL}/My Standard six.md`], 'MINE, do not touch');
   // the name is cleaned, and the path stays inside the folder
   const odd = makeStore({}, { [`${TPL}/We*ird [a].md`]: MINE });
   await odd.store.refresh();
   const oddRef = await odd.store.copyBlock('template', 'file:We*ird [a]');
-  assert.equal(oddRef, 'file:We ird a (my version)');
+  assert.equal(oddRef, 'file:My We ird a');
   const made = odd.v.created[odd.v.created.length - 1];
   assert.ok(made.startsWith(`${TPL}/`) && !made.slice(TPL.length + 1).includes('/') && !/[\\/:*?"<>|#^[\]]/.test(made.slice(TPL.length + 1)), made);
   // a tone is copied the same way, into the tone folder; academic with no file copies as the design note (design 3.8), not an empty file
   const tone = makeStore({});
   await tone.store.refresh();
   const toneRef = await tone.store.copyBlock('tone', 'builtin:academic');
-  assert.equal(toneRef, 'file:Academic rigor (my version)');
-  assert.equal(tone.v.files[`${TONE}/Academic rigor (my version).md`], M.academicToneNote('en'));
+  assert.equal(toneRef, 'file:My Academic rigor');
+  assert.equal(tone.v.files[`${TONE}/My Academic rigor.md`], M.academicToneNote('en'));
   assert.equal(tone.settings.noteToneBlock, toneRef);
   // the copy can be edited and the prompt follows
   const edit = makeStore({});
@@ -465,10 +465,10 @@ test('counter 13: two copies started together make two different files and lose 
   await store.refresh();
   const [a, b, c] = await Promise.all([store.copyBlock('template', 'builtin:standard'), store.copyBlock('template', 'builtin:standard'), store.copyBlock('tone', 'builtin:guide')]);
   assert.notEqual(a, b);
-  assert.deepEqual([a, b], ['file:Standard six (my version)', 'file:Standard six (my version) (2)']);
-  assert.equal(c, 'file:Practical guide (my version)');
-  for (const name of ['Standard six (my version)', 'Standard six (my version) (2)']) assert.equal(v.files[`${TPL}/${name}.md`], M.builtinTemplateText('standard', 'en'));
-  assert.equal(v.files[`${TONE}/Practical guide (my version).md`], M.lookupBuiltinBlock('tone', 'guide', 'en'));
+  assert.deepEqual([a, b], ['file:My Standard six', 'file:My Standard six (2)']);
+  assert.equal(c, 'file:My Practical guide');
+  for (const name of ['My Standard six', 'My Standard six (2)']) assert.equal(v.files[`${TPL}/${name}.md`], M.builtinTemplateText('standard', 'en'));
+  assert.equal(v.files[`${TONE}/My Practical guide.md`], M.lookupBuiltinBlock('tone', 'guide', 'en'));
 });
 
 // ---- opening a block: the file exists, in the first spelling that exists ----
@@ -511,7 +511,7 @@ test('block-files: folder names are found by any spelling (existing first), buil
   assert.equal(b.builtinBlockIdOfName('template', '導讀加六段'), 'textbook');
   assert.equal(b.builtinBlockIdOfName('tone', 'Key-point summary'), 'summary');
   assert.equal(b.builtinBlockIdOfName('template', 'Standard (2)'), undefined);
-  assert.equal(b.builtinBlockIdOfName('template', 'Standard six (my version)'), undefined);
+  assert.equal(b.builtinBlockIdOfName('template', 'My Standard six'), undefined);
   assert.equal(b.builtinBlockIdOfName('tone', 'Standard'), undefined);
   for (const language of LANGUAGES) {
     assert.equal(b.isUnmodifiedBlock('template', 'standard', M.builtinTemplateText('standard', language)), true);

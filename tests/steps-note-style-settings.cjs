@@ -343,14 +343,14 @@ test('Edit asks the plugin, locks every control meanwhile (a second press does n
   assert.equal(open.view.focused, open.edit().buttonEl);
 });
 
-test('Save as my own…: asks for a name (default "<name> (my version)", a taken name is refused as typed), then saves, selects the new file and opens it', async () => {
+test('Save as my own…: asks for a name (default "My <name>", a taken name is refused as typed), then saves, selects the new file and opens it', async () => {
   modals.length = 0;
   const state = blockRow('template', { templates: [...TEMPLATES(), item('file:Taken', 'Taken', { fileName: 'Taken.md' })] });
   state.menu().items[0].click();
   assert.equal(modals.length, 1);
   const modal = modals[0];
   assert.equal(modal.titleText, 'Save as my own');
-  assert.equal(modal.value, 'Standard (my version)');
+  assert.equal(modal.value, 'My Standard');
   assert.equal(modal.options.problem('taken'), t('ui.block_name_taken'), 'case-insensitive, existing file');
   assert.equal(modal.options.problem('Textbook'), t('ui.block_name_taken'), 'a built-in name');
   assert.equal(modal.options.problem('Standard'), t('ui.block_name_taken'));
@@ -407,7 +407,7 @@ test('after the upgrade the default is a block: no "(old style file)" item in ei
   assert.equal(tone.view.dropdown.disabled, false, 'the voice row is not turned off by an old default any more');
   assert.equal(tone.edit().disabled, false);
   await tone.menu().items[0].click();
-  assert.equal(modals.at(-1).value, 'plain (my version)', 'Save as acts on the shown voice');
+  assert.equal(modals.at(-1).value, 'My plain', 'Save as acts on the shown voice');
   await template.view.dropdown.change('builtin:textbook');
   assert.equal(template.settings.noteTemplateBlock, 'builtin:textbook');
   assert.equal(template.settings.noteToneBlock, 'builtin:plain', 'the other shown value is kept');

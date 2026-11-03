@@ -1544,7 +1544,7 @@ export const en = {
   "ui.note_style_action_short": "Action structure",
   "ui.note_style_atomic_short": "Atomic note structure",
   "ui.block_template_format_heading": "Format rules",
-  "ui.block_copy_name_0": "{0} (my version)",
+  "ui.block_copy_name_0": "My {0}",
   "ui.block_picker_template": "Structure",
   "ui.block_picker_tone": "Voice",
   "ui.block_picker_template_aria": "Note style structure",
@@ -1731,6 +1731,19 @@ export const en = {
   "ui.recipe_key_voice": "voice",
   "ui.recipe_key_format": "format",
   "ui.recipe_key_update": "update",
+  "ui.part_new_name_structure": "New structure",
+  "ui.part_new_name_voice": "New voice",
+  "ui.part_new_name_format": "New format rules",
+  "ui.part_blank_structure":
+    "## Section title\nWrite here what the AI should put in this section.\n\n%% Each ## heading is a section. The line under it tells the AI what to write; a line such as Count: 3 sets how many. This comment is not sent to the AI. %%\n",
+  "ui.part_notice_saved_as_0": 'Saved as "{0}" and opened it.',
+  "ui.note_style_issue_builtin_name": "This name is a built-in name, so this file is not used. Rename it.",
+  "ui.recipe_notice_saved_0": 'Saved the note style "{0}".',
+  "ui.recipe_notice_name_unavailable":
+    "This name cannot be used: it is empty, taken, a built-in name, or has characters a file name cannot hold. Nothing was saved.",
+  "ui.recipe_notice_changed":
+    "The file was changed while you were editing. Reopen it to continue; nothing was overwritten.",
+  "ui.recipe_notice_failed": "Cannot save this note style. Nothing was overwritten.",
   "ui.note_style_maps_notice_0":
     "Note styles now follow the topic type. The style set on these maps is no longer used: {0}. To keep one for a topic, right-click the topic and choose it.",
   "ui.note_style_maps_notice_default_0": "Your old default template is now the note style of general topics: {0}.",

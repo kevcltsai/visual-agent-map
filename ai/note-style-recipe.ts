@@ -289,3 +289,95 @@ export function parseRecipeFile(text: string): RecipeFile {
       ?.trim() ?? "";
   return result;
 }
+
+/** The four values a style file holds: a part ref (`builtin:<id>` or `file:<name>`) per part, and the update mode. */
+export interface RecipeFileParts {
+  structure: string;
+  voice: string;
+  format: string;
+  update: UpdateMode;
+}
+
+const PART_KEY: Record<PartCategory | "update", TranslationKey> = {
+  structure: "ui.recipe_key_structure",
+  voice: "ui.recipe_key_voice",
+  format: "ui.recipe_key_format",
+  update: "ui.recipe_key_update"
+};
+const SLOTS: readonly (PartCategory | "update")[] = ["structure", "voice", "format", "update"];
+
+/** The name a part ref is written under in a style file: a built-in by the interface language's name, a file by its name. */
+export function partNameOfRef(category: PartCategory, ref: string, language: UiLanguage): string {
+  const parsed = parseRecipeRef(ref, category);
+  if (!parsed) throw new Error(`Not a part reference: ${ref}`);
+  if (parsed.kind === "file") return parsed.name;
+  const found = builtinNames(category).find(item => item.id === parsed.id);
+  if (!found) throw new Error(`Unknown built-in ${category}: ${parsed.id}`);
+  return translate(language, found.nameKey);
+}
+
+function slotValue(slot: PartCategory | "update", parts: RecipeFileParts, language: UiLanguage): string {
+  return slot === "update" ? parts.update : partNameOfRef(slot, parts[slot], language);
+}
+
+/**
+ * The text of a new style file: the frontmatter with the four keys (named in the interface language), then the
+ * description line when there is one. `parseRecipeFile` reads it back to the same four values.
+ */
+export function recipeFileText(input: RecipeFileParts & { description?: string }, language: UiLanguage): string {
+  const lines = [
+    "---",
+    ...SLOTS.map(slot => `${translate(language, PART_KEY[slot])}: ${slotValue(slot, input, language)}`),
+    "---"
+  ];
+  const description = input.description?.trim();
+  return `${lines.join("\n")}\n${description ? `${description}\n` : ""}`;
+}
+
+/**
+ * The text of an existing style file with only the values of the four known keys (a key in any language) changed. A key
+ * whose value already means the wanted one keeps its line as written; a missing key is added before the closing `---`;
+ * a file with no frontmatter gets one in front. Every other byte (other keys, comments, the body, line endings) stays.
+ */
+export function updateRecipeFileText(oldText: string, parts: RecipeFileParts, language: UiLanguage): string {
+  const bom = oldText.startsWith("﻿") ? "﻿" : "";
+  const text = bom ? oldText.slice(1) : oldText;
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split("\n");
+  const bare = (line: string): string => line.replace(/\r$/, "");
+  const closing =
+    bare(lines[0]).trimEnd() === "---"
+      ? lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---")
+      : -1;
+  const wanted = (slot: PartCategory | "update"): string => slotValue(slot, parts, language);
+  if (closing < 0) {
+    const head = ["---", ...SLOTS.map(slot => `${translate(language, PART_KEY[slot])}: ${wanted(slot)}`), "---"];
+    return `${bom}${head.join(eol)}${eol}${text}`;
+  }
+  const seen = new Set<PartCategory | "update">();
+  for (let index = 1; index < closing; index++) {
+    const raw = bare(lines[index]);
+    if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
+    const pair = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
+    if (!pair) continue;
+    const key = pair[2].trim().toLocaleLowerCase();
+    const slot = SLOTS.find(item => KEYS[item].includes(key));
+    if (!slot) continue;
+    seen.add(slot);
+    let value = pair[3].trim();
+    if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
+    const same =
+      slot === "update"
+        ? updateModeOf(value) === parts.update
+        : value !== "" &&
+          (builtinPartIdOf(slot, value) !== undefined || validatePartName(value, slot).ok) &&
+          partRef(slot, value) === parts[slot];
+    if (same) continue;
+    lines[index] = `${pair[1]}${wanted(slot)}${lines[index].endsWith("\r") ? "\r" : ""}`;
+  }
+  const added = SLOTS.filter(slot => !seen.has(slot)).map(
+    slot => `${translate(language, PART_KEY[slot])}: ${wanted(slot)}${eol === "\r\n" ? "\r" : ""}`
+  );
+  lines.splice(closing, 0, ...added);
+  return `${bom}${lines.join("\n")}`;
+}

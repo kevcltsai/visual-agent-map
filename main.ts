@@ -35,8 +35,20 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import { NoteStyleStore, normalizeNoteTemplateByKind, type StyleFilePort } from "./ai/note-style-store";
-import { parseRecipeRef, STYLE_KINDS } from "./ai/note-style-recipe";
+import {
+  NoteStyleStore,
+  normalizeNoteTemplateByKind,
+  type SaveRecipeInput,
+  type SaveRecipeResult,
+  type StyleFilePort
+} from "./ai/note-style-store";
+import {
+  KIND_DEFAULT_RECIPE,
+  parseRecipeRef,
+  STYLE_KINDS,
+  type PartCategory,
+  type StyleKind
+} from "./ai/note-style-recipe";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
@@ -1395,6 +1407,11 @@ export default class VisualAgentMapPlugin extends Plugin {
       create: async (path, content) => {
         await this.app.vault.create(normalizePath(path), content);
       },
+      modify: async (path, content) => {
+        const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+        if (!(file instanceof TFile)) throw new Error(path);
+        await this.app.vault.modify(file, content);
+      },
       trash: async path => {
         const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
         if (file instanceof TFile) await this.app.fileManager.trashFile(file);
@@ -1459,6 +1476,54 @@ export default class VisualAgentMapPlugin extends Plugin {
       new Notice(t("ui.block_notice_copy_failed"));
       return null;
     }
+  }
+  /**
+   * "Edit" a part of the custom note styles: a built-in is first saved as "My <name>" (a new file, no setting changes), a
+   * file is opened as it is. Opens the file in a tab and returns the ref now behind it, or null (with a Notice) when it
+   * could not be done.
+   */
+  async editNotePart(category: PartCategory, ref: string): Promise<string | null> {
+    try {
+      let target = ref;
+      if (parseRecipeRef(ref, category)?.kind !== "file") {
+        target = await this.noteStyles.createPart(category, ref);
+        new Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+      }
+      await this.noteStyles.refresh();
+      const path = this.noteStyles.partFilePath(category, target);
+      const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null;
+      if (!(file instanceof TFile)) throw new Error("not a file");
+      await this.app.workspace.getLeaf("tab").openFile(file);
+      return target;
+    } catch {
+      new Notice(t("ui.block_notice_open_failed"));
+      return null;
+    }
+  }
+  /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
+  async setKindStyle(kind: StyleKind, ref: string): Promise<void> {
+    const next = { ...this.settings.noteStyleByKind };
+    if (ref === KIND_DEFAULT_RECIPE[kind]) delete next[kind];
+    else next[kind] = ref;
+    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
+    else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+  }
+  /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
+  async saveNoteRecipe(input: SaveRecipeInput): Promise<SaveRecipeResult> {
+    const result = await this.noteStyles.saveRecipe(input);
+    if (result.ok) new Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    else
+      new Notice(
+        t(
+          result.reason === "name"
+            ? "ui.recipe_notice_name_unavailable"
+            : result.reason === "changed"
+              ? "ui.recipe_notice_changed"
+              : "ui.recipe_notice_failed"
+        )
+      );
+    return result;
   }
   /** Restores a built-in block after saving a backup of its file; every refusal says why in a Notice. */
   async restoreBlock(category: BlockCategory, ref: string): Promise<boolean> {

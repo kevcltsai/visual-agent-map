@@ -1464,7 +1464,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.note_style_action_short": "行动结构",
   "ui.note_style_atomic_short": "原子知识结构",
   "ui.block_template_format_heading": "格式规则",
-  "ui.block_copy_name_0": "{0} 我的版本",
+  "ui.block_copy_name_0": "我的{0}",
   "ui.block_picker_template": "笔记结构",
   "ui.block_picker_tone": "写作口吻",
   "ui.block_picker_template_aria": "笔记风格的结构",
@@ -1641,6 +1641,18 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.recipe_key_voice": "写作口吻",
   "ui.recipe_key_format": "格式规则",
   "ui.recipe_key_update": "更新方式",
+  "ui.part_new_name_structure": "新段落结构",
+  "ui.part_new_name_voice": "新写作口吻",
+  "ui.part_new_name_format": "新格式规则",
+  "ui.part_blank_structure":
+    "## 段落标题\n在这里写要 AI 在这一段写什么。\n\n%% 每个 ## 标题是一段，标题下面的文字告诉 AI 这段要写什么；可以加“数量: 3”这行指定句数或条数。这段注释不会发给 AI。 %%\n",
+  "ui.part_notice_saved_as_0": "已另存为“{0}”并打开。",
+  "ui.note_style_issue_builtin_name": "这个名称是内置名称，所以这个文件不会被使用。请改名。",
+  "ui.recipe_notice_saved_0": "已保存笔记风格“{0}”。",
+  "ui.recipe_notice_name_unavailable":
+    "这个名称不能用：为空、已被使用、是内置名称，或含有文件名不能用的字符。没有保存。",
+  "ui.recipe_notice_changed": "文件在编辑期间被改过，请重新打开。没有覆盖任何内容。",
+  "ui.recipe_notice_failed": "无法保存这个笔记风格，没有覆盖任何内容。",
   "ui.note_style_maps_notice_0":
     "笔记风格改成按议题类型决定。这些地图原本设的风格不再使用：{0}。想让某个议题沿用，请在议题上右键选择。",
   "ui.note_style_maps_notice_default_0": "原本的默认模板已改成“一般议题”的笔记风格：{0}。",

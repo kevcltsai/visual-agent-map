@@ -1504,7 +1504,7 @@ var en = {
   "ui.note_style_action_short": "Action structure",
   "ui.note_style_atomic_short": "Atomic note structure",
   "ui.block_template_format_heading": "Format rules",
-  "ui.block_copy_name_0": "{0} (my version)",
+  "ui.block_copy_name_0": "My {0}",
   "ui.block_picker_template": "Structure",
   "ui.block_picker_tone": "Voice",
   "ui.block_picker_template_aria": "Note style structure",
@@ -1680,6 +1680,16 @@ var en = {
   "ui.recipe_key_voice": "voice",
   "ui.recipe_key_format": "format",
   "ui.recipe_key_update": "update",
+  "ui.part_new_name_structure": "New structure",
+  "ui.part_new_name_voice": "New voice",
+  "ui.part_new_name_format": "New format rules",
+  "ui.part_blank_structure": "## Section title\nWrite here what the AI should put in this section.\n\n%% Each ## heading is a section. The line under it tells the AI what to write; a line such as Count: 3 sets how many. This comment is not sent to the AI. %%\n",
+  "ui.part_notice_saved_as_0": 'Saved as "{0}" and opened it.',
+  "ui.note_style_issue_builtin_name": "This name is a built-in name, so this file is not used. Rename it.",
+  "ui.recipe_notice_saved_0": 'Saved the note style "{0}".',
+  "ui.recipe_notice_name_unavailable": "This name cannot be used: it is empty, taken, a built-in name, or has characters a file name cannot hold. Nothing was saved.",
+  "ui.recipe_notice_changed": "The file was changed while you were editing. Reopen it to continue; nothing was overwritten.",
+  "ui.recipe_notice_failed": "Cannot save this note style. Nothing was overwritten.",
   "ui.note_style_maps_notice_0": "Note styles now follow the topic type. The style set on these maps is no longer used: {0}. To keep one for a topic, right-click the topic and choose it.",
   "ui.note_style_maps_notice_default_0": "Your old default template is now the note style of general topics: {0}.",
   "ui.note_style_migrate_failed": "The note style conversion did not finish. It will try again the next time VAM opens; your old settings are all still there.",
@@ -3865,7 +3875,7 @@ var zhCN = {
   "ui.note_style_action_short": "\u884C\u52A8\u7ED3\u6784",
   "ui.note_style_atomic_short": "\u539F\u5B50\u77E5\u8BC6\u7ED3\u6784",
   "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
-  "ui.block_copy_name_0": "{0} \u6211\u7684\u7248\u672C",
+  "ui.block_copy_name_0": "\u6211\u7684{0}",
   "ui.block_picker_template": "\u7B14\u8BB0\u7ED3\u6784",
   "ui.block_picker_tone": "\u5199\u4F5C\u53E3\u543B",
   "ui.block_picker_template_aria": "\u7B14\u8BB0\u98CE\u683C\u7684\u7ED3\u6784",
@@ -4041,6 +4051,16 @@ var zhCN = {
   "ui.recipe_key_voice": "\u5199\u4F5C\u53E3\u543B",
   "ui.recipe_key_format": "\u683C\u5F0F\u89C4\u5219",
   "ui.recipe_key_update": "\u66F4\u65B0\u65B9\u5F0F",
+  "ui.part_new_name_structure": "\u65B0\u6BB5\u843D\u7ED3\u6784",
+  "ui.part_new_name_voice": "\u65B0\u5199\u4F5C\u53E3\u543B",
+  "ui.part_new_name_format": "\u65B0\u683C\u5F0F\u89C4\u5219",
+  "ui.part_blank_structure": "## \u6BB5\u843D\u6807\u9898\n\u5728\u8FD9\u91CC\u5199\u8981 AI \u5728\u8FD9\u4E00\u6BB5\u5199\u4EC0\u4E48\u3002\n\n%% \u6BCF\u4E2A ## \u6807\u9898\u662F\u4E00\u6BB5\uFF0C\u6807\u9898\u4E0B\u9762\u7684\u6587\u5B57\u544A\u8BC9 AI \u8FD9\u6BB5\u8981\u5199\u4EC0\u4E48\uFF1B\u53EF\u4EE5\u52A0\u201C\u6570\u91CF: 3\u201D\u8FD9\u884C\u6307\u5B9A\u53E5\u6570\u6216\u6761\u6570\u3002\u8FD9\u6BB5\u6CE8\u91CA\u4E0D\u4F1A\u53D1\u7ED9 AI\u3002 %%\n",
+  "ui.part_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u4E3A\u201C{0}\u201D\u5E76\u6253\u5F00\u3002",
+  "ui.note_style_issue_builtin_name": "\u8FD9\u4E2A\u540D\u79F0\u662F\u5185\u7F6E\u540D\u79F0\uFF0C\u6240\u4EE5\u8FD9\u4E2A\u6587\u4EF6\u4E0D\u4F1A\u88AB\u4F7F\u7528\u3002\u8BF7\u6539\u540D\u3002",
+  "ui.recipe_notice_saved_0": "\u5DF2\u4FDD\u5B58\u7B14\u8BB0\u98CE\u683C\u201C{0}\u201D\u3002",
+  "ui.recipe_notice_name_unavailable": "\u8FD9\u4E2A\u540D\u79F0\u4E0D\u80FD\u7528\uFF1A\u4E3A\u7A7A\u3001\u5DF2\u88AB\u4F7F\u7528\u3001\u662F\u5185\u7F6E\u540D\u79F0\uFF0C\u6216\u542B\u6709\u6587\u4EF6\u540D\u4E0D\u80FD\u7528\u7684\u5B57\u7B26\u3002\u6CA1\u6709\u4FDD\u5B58\u3002",
+  "ui.recipe_notice_changed": "\u6587\u4EF6\u5728\u7F16\u8F91\u671F\u95F4\u88AB\u6539\u8FC7\uFF0C\u8BF7\u91CD\u65B0\u6253\u5F00\u3002\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u5185\u5BB9\u3002",
+  "ui.recipe_notice_failed": "\u65E0\u6CD5\u4FDD\u5B58\u8FD9\u4E2A\u7B14\u8BB0\u98CE\u683C\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u5185\u5BB9\u3002",
   "ui.note_style_maps_notice_0": "\u7B14\u8BB0\u98CE\u683C\u6539\u6210\u6309\u8BAE\u9898\u7C7B\u578B\u51B3\u5B9A\u3002\u8FD9\u4E9B\u5730\u56FE\u539F\u672C\u8BBE\u7684\u98CE\u683C\u4E0D\u518D\u4F7F\u7528\uFF1A{0}\u3002\u60F3\u8BA9\u67D0\u4E2A\u8BAE\u9898\u6CBF\u7528\uFF0C\u8BF7\u5728\u8BAE\u9898\u4E0A\u53F3\u952E\u9009\u62E9\u3002",
   "ui.note_style_maps_notice_default_0": "\u539F\u672C\u7684\u9ED8\u8BA4\u6A21\u677F\u5DF2\u6539\u6210\u201C\u4E00\u822C\u8BAE\u9898\u201D\u7684\u7B14\u8BB0\u98CE\u683C\uFF1A{0}\u3002",
   "ui.note_style_migrate_failed": "\u7B14\u8BB0\u98CE\u683C\u8F6C\u6362\u6CA1\u6709\u5B8C\u6210\uFF0C\u4E0B\u6B21\u6253\u5F00\u65F6\u4F1A\u518D\u8BD5\u4E00\u6B21\uFF1B\u539F\u672C\u7684\u8BBE\u7F6E\u90FD\u8FD8\u5728\u3002",
@@ -6226,7 +6246,7 @@ var zhTW = {
   "ui.note_style_action_short": "\u884C\u52D5\u7D50\u69CB",
   "ui.note_style_atomic_short": "\u539F\u5B50\u77E5\u8B58\u7D50\u69CB",
   "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
-  "ui.block_copy_name_0": "{0} \u6211\u7684\u7248\u672C",
+  "ui.block_copy_name_0": "\u6211\u7684{0}",
   "ui.block_picker_template": "\u7B46\u8A18\u7D50\u69CB",
   "ui.block_picker_tone": "\u5BEB\u4F5C\u53E3\u543B",
   "ui.block_picker_template_aria": "\u7B46\u8A18\u98A8\u683C\u7684\u7D50\u69CB",
@@ -6402,6 +6422,16 @@ var zhTW = {
   "ui.recipe_key_voice": "\u5BEB\u4F5C\u53E3\u543B",
   "ui.recipe_key_format": "\u683C\u5F0F\u898F\u5247",
   "ui.recipe_key_update": "\u66F4\u65B0\u65B9\u5F0F",
+  "ui.part_new_name_structure": "\u65B0\u6BB5\u843D\u7D50\u69CB",
+  "ui.part_new_name_voice": "\u65B0\u5BEB\u4F5C\u53E3\u543B",
+  "ui.part_new_name_format": "\u65B0\u683C\u5F0F\u898F\u5247",
+  "ui.part_blank_structure": "## \u6BB5\u843D\u6A19\u984C\n\u5728\u9019\u88E1\u5BEB\u8981 AI \u5728\u9019\u4E00\u6BB5\u5BEB\u4EC0\u9EBC\u3002\n\n%% \u6BCF\u500B ## \u6A19\u984C\u662F\u4E00\u6BB5\uFF0C\u6A19\u984C\u4E0B\u9762\u7684\u6587\u5B57\u544A\u8A34 AI \u9019\u6BB5\u8981\u5BEB\u4EC0\u9EBC\uFF1B\u53EF\u4EE5\u52A0\u300C\u6578\u91CF: 3\u300D\u9019\u884C\u6307\u5B9A\u53E5\u6578\u6216\u689D\u6578\u3002\u9019\u6BB5\u8A3B\u89E3\u4E0D\u6703\u9001\u7D66 AI\u3002 %%\n",
+  "ui.part_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u70BA\u300C{0}\u300D\u4E26\u958B\u555F\u3002",
+  "ui.note_style_issue_builtin_name": "\u9019\u500B\u540D\u7A31\u662F\u5167\u5EFA\u540D\u7A31\uFF0C\u6240\u4EE5\u9019\u500B\u6A94\u4E0D\u6703\u88AB\u4F7F\u7528\u3002\u8ACB\u6539\u540D\u3002",
+  "ui.recipe_notice_saved_0": "\u5DF2\u5B58\u6A94\u7B46\u8A18\u98A8\u683C\u300C{0}\u300D\u3002",
+  "ui.recipe_notice_name_unavailable": "\u9019\u500B\u540D\u7A31\u4E0D\u80FD\u7528\uFF1A\u7A7A\u767D\u3001\u5DF2\u88AB\u4F7F\u7528\u3001\u662F\u5167\u5EFA\u540D\u7A31\uFF0C\u6216\u542B\u6709\u6A94\u540D\u4E0D\u80FD\u7528\u7684\u5B57\u5143\u3002\u6C92\u6709\u5B58\u6A94\u3002",
+  "ui.recipe_notice_changed": "\u6A94\u6848\u5728\u7DE8\u8F2F\u671F\u9593\u88AB\u6539\u904E\uFF0C\u8ACB\u91CD\u65B0\u958B\u555F\u3002\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u5167\u5BB9\u3002",
+  "ui.recipe_notice_failed": "\u7121\u6CD5\u5B58\u6A94\u9019\u500B\u7B46\u8A18\u98A8\u683C\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u5167\u5BB9\u3002",
   "ui.note_style_maps_notice_0": "\u7B46\u8A18\u98A8\u683C\u6539\u6210\u4F9D\u8B70\u984C\u985E\u578B\u6C7A\u5B9A\u3002\u9019\u4E9B\u5730\u5716\u539F\u672C\u8A2D\u7684\u98A8\u683C\u4E0D\u518D\u4F7F\u7528\uFF1A{0}\u3002\u60F3\u8B93\u67D0\u500B\u8B70\u984C\u6CBF\u7528\uFF0C\u8ACB\u5728\u8B70\u984C\u4E0A\u6309\u53F3\u9375\u9078\u64C7\u3002",
   "ui.note_style_maps_notice_default_0": "\u539F\u672C\u7684\u9810\u8A2D\u6A21\u677F\u5DF2\u6539\u6210\u300C\u4E00\u822C\u8B70\u984C\u300D\u7684\u7B46\u8A18\u98A8\u683C\uFF1A{0}\u3002",
   "ui.note_style_migrate_failed": "\u7B46\u8A18\u98A8\u683C\u8F49\u63DB\u6C92\u6709\u5B8C\u6210\uFF0C\u4E0B\u6B21\u958B\u555F\u6642\u6703\u518D\u8A66\u4E00\u6B21\uFF1B\u539F\u672C\u7684\u8A2D\u5B9A\u90FD\u9084\u5728\u3002",
@@ -26450,6 +26480,70 @@ function parseRecipeFile(text11) {
   result.description = (_b2 = (_a2 = lines.slice(bodyStart).find((line) => line.trim())) == null ? void 0 : _a2.trim()) != null ? _b2 : "";
   return result;
 }
+var PART_KEY = {
+  structure: "ui.recipe_key_structure",
+  voice: "ui.recipe_key_voice",
+  format: "ui.recipe_key_format",
+  update: "ui.recipe_key_update"
+};
+var SLOTS = ["structure", "voice", "format", "update"];
+function partNameOfRef(category, ref, language2) {
+  const parsed = parseRecipeRef(ref, category);
+  if (!parsed) throw new Error(`Not a part reference: ${ref}`);
+  if (parsed.kind === "file") return parsed.name;
+  const found = builtinNames(category).find((item) => item.id === parsed.id);
+  if (!found) throw new Error(`Unknown built-in ${category}: ${parsed.id}`);
+  return translate(language2, found.nameKey);
+}
+function slotValue(slot, parts, language2) {
+  return slot === "update" ? parts.update : partNameOfRef(slot, parts[slot], language2);
+}
+function recipeFileText(input2, language2) {
+  var _a2;
+  const lines = [
+    "---",
+    ...SLOTS.map((slot) => `${translate(language2, PART_KEY[slot])}: ${slotValue(slot, input2, language2)}`),
+    "---"
+  ];
+  const description = (_a2 = input2.description) == null ? void 0 : _a2.trim();
+  return `${lines.join("\n")}
+${description ? `${description}
+` : ""}`;
+}
+function updateRecipeFileText(oldText, parts, language2) {
+  const bom = oldText.startsWith("\uFEFF") ? "\uFEFF" : "";
+  const text11 = bom ? oldText.slice(1) : oldText;
+  const eol = text11.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text11.split("\n");
+  const bare = (line) => line.replace(/\r$/, "");
+  const closing = bare(lines[0]).trimEnd() === "---" ? lines.findIndex((line, index) => index > 0 && bare(line).trimEnd() === "---") : -1;
+  const wanted = (slot) => slotValue(slot, parts, language2);
+  if (closing < 0) {
+    const head = ["---", ...SLOTS.map((slot) => `${translate(language2, PART_KEY[slot])}: ${wanted(slot)}`), "---"];
+    return `${bom}${head.join(eol)}${eol}${text11}`;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  for (let index = 1; index < closing; index++) {
+    const raw = bare(lines[index]);
+    if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
+    const pair6 = /^(([^:：]+?)\s*[:：]\s*)(.*)$/.exec(raw);
+    if (!pair6) continue;
+    const key2 = pair6[2].trim().toLocaleLowerCase();
+    const slot = SLOTS.find((item) => KEYS[item].includes(key2));
+    if (!slot) continue;
+    seen.add(slot);
+    let value = pair6[3].trim();
+    if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
+    const same = slot === "update" ? updateModeOf(value) === parts.update : value !== "" && (builtinPartIdOf(slot, value) !== void 0 || validatePartName(value, slot).ok) && partRef(slot, value) === parts[slot];
+    if (same) continue;
+    lines[index] = `${pair6[1]}${wanted(slot)}${lines[index].endsWith("\r") ? "\r" : ""}`;
+  }
+  const added = SLOTS.filter((slot) => !seen.has(slot)).map(
+    (slot) => `${translate(language2, PART_KEY[slot])}: ${wanted(slot)}${eol === "\r\n" ? "\r" : ""}`
+  );
+  lines.splice(closing, 0, ...added);
+  return `${bom}${lines.join("\n")}`;
+}
 
 // ai/note-style-migrate.ts
 var lower2 = (value) => value.toLocaleLowerCase();
@@ -26716,7 +26810,7 @@ var NoteStyleStore = class {
    * the last stop.
    */
   runStyle(request) {
-    var _a2, _b2, _c, _d, _e, _f, _g, _h;
+    var _a2, _b2, _c, _d;
     const language2 = request.outputLanguage;
     const kind = STYLE_KINDS.includes(request.kind) ? request.kind : "topic";
     const missing = [];
@@ -26741,18 +26835,27 @@ var NoteStyleStore = class {
       const own2 = saved && Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : void 0;
       chosen = (_d = tryRef(typeof own2 === "string" ? own2 : void 0)) != null ? _d : this.recipeFromRef(KIND_DEFAULT_RECIPE[kind], kind, language2);
     }
+    return this.assemble(chosen, source, missing, language2, request.choice);
+  }
+  /**
+   * The value of a style from the candidate that was chosen: the old dialog's structure and voice (`choice`) only replace
+   * that part of what the lower levels gave. Shared by `runStyle` and `draftStyle`, so both give the same shape.
+   */
+  assemble(chosen, sourceOf, missing, language2, choice2) {
+    var _a2, _b2;
+    let source = sourceOf;
     let { structure: structure2, voice } = chosen;
     let aimDelivery = chosen.aimDelivery;
-    if ((_e = request.choice) == null ? void 0 : _e.template) {
-      const replaced = this.legacyStructure(request.choice.template, language2, true);
+    if (choice2 == null ? void 0 : choice2.template) {
+      const replaced = this.legacyStructure(choice2.template, language2, true);
       if (replaced) {
         structure2 = replaced;
         aimDelivery = void 0;
         source = "run";
-      } else miss(request.choice.template);
+      } else if (!missing.includes(choice2.template)) missing.push(choice2.template);
     }
-    if ((_f = request.choice) == null ? void 0 : _f.tone) {
-      const replaced = this.legacyVoice(request.choice.tone, language2, true);
+    if (choice2 == null ? void 0 : choice2.tone) {
+      const replaced = this.legacyVoice(choice2.tone, language2, true);
       if (replaced) {
         voice = replaced;
         source = "run";
@@ -26762,12 +26865,12 @@ var NoteStyleStore = class {
     const needsSelection = structure2.choice !== void 0 || format.choice !== void 0;
     const contextFields = needsSelection ? {
       styleSelection: Object.freeze({
-        template: Object.freeze({ ...(_g = structure2.choice) != null ? _g : { id: structure2.template.id } }),
+        template: Object.freeze({ ...(_a2 = structure2.choice) != null ? _a2 : { id: structure2.template.id } }),
         tone: Object.freeze(toneChoiceFromText(voice.text, language2)),
         ...format.choice ? { format: Object.freeze({ ...format.choice }) } : {}
       })
     } : {};
-    const fileName = (_h = chosen.fileName) != null ? _h : structure2.fileName;
+    const fileName = (_b2 = chosen.fileName) != null ? _b2 : structure2.fileName;
     return Object.freeze({
       recipe: Object.freeze({
         ref: chosen.ref,
@@ -26797,7 +26900,6 @@ var NoteStyleStore = class {
   }
   /** A style ref as a candidate, or undefined when it cannot be read (not a ref, no such file, `builtin:aim` outside AIM). */
   recipeFromRef(ref, kind, language2) {
-    var _a2, _b2, _c;
     const parsed = parseRecipeRef(ref, "recipe");
     if (!parsed) return void 0;
     if (parsed.kind === "builtin") {
@@ -26826,10 +26928,25 @@ var NoteStyleStore = class {
       id: ref,
       fileName
     }));
+    return {
+      ref,
+      name: parsed.name,
+      update: file.update,
+      fileName,
+      ...this.fileParts(ref, fileName, file, file.lines, language2),
+      issues
+    };
+  }
+  /**
+   * The three parts a style file names, each read; a part that cannot be found is the built-in stand-in with an issue at
+   * the line of its key (`lines`). Shared by a style file and by a draft that is not saved yet.
+   */
+  fileParts(ref, fileName, file, lines, language2) {
+    var _a2, _b2, _c;
     const missingPart = (category, partRef2) => {
       var _a3;
       return {
-        line: (_a3 = file.lines[category]) != null ? _a3 : 1,
+        line: (_a3 = lines[category]) != null ? _a3 : 1,
         code: "ui.note_style_issue_part_missing",
         values: [partRef2.replace(/^(?:file|builtin):/, "")],
         message: `The ${category} "${partRef2}" was not found; the built-in one is used.`,
@@ -26843,14 +26960,9 @@ var NoteStyleStore = class {
       issues: [issue2, ...part.issues]
     });
     return {
-      ref,
-      name: parsed.name,
-      update: file.update,
-      fileName,
       structure: (_a2 = this.structurePart(file.structure, language2)) != null ? _a2 : withIssue(this.structurePart("builtin:standard", language2), missingPart("structure", file.structure)),
       voice: (_b2 = this.voicePart(file.voice, language2)) != null ? _b2 : withIssue(this.voicePart("builtin:academic", language2), missingPart("voice", file.voice)),
-      format: (_c = this.formatPart(file.format, language2)) != null ? _c : withIssue(this.formatPart("builtin:standard", language2), missingPart("format", file.format)),
-      issues
+      format: (_c = this.formatPart(file.format, language2)) != null ? _c : withIssue(this.formatPart("builtin:standard", language2), missingPart("format", file.format))
     };
   }
   /**
@@ -27202,6 +27314,292 @@ var NoteStyleStore = class {
       return { ok: true, backup };
     });
   }
+  // ---- the custom note styles: what the manage page and the style editor read and write (note-style-recipe T5) ----
+  /** The cache and the folder of a part category. */
+  partStore(category) {
+    const dirs = this.blockDirectories();
+    if (category === "structure") return { files: this.blocks.template, dir: dirs.template };
+    if (category === "voice") return { files: this.blocks.tone, dir: dirs.tone };
+    return { files: this.formats, dir: dirs.format };
+  }
+  /** The styles (built-in and the user's files) that use `ref` as their part of `category`, by name. */
+  stylesUsing(category, ref) {
+    const names3 = [];
+    for (const recipe of BUILTIN_RECIPES) {
+      const own2 = recipe.structure === AIM_DELIVERY_STRUCTURE && category === "structure" ? void 0 : recipe[category];
+      if (own2 !== void 0 && `builtin:${own2}` === ref) names3.push(translate(this.settings.language, recipe.nameKey));
+    }
+    for (const [base, text11] of [...this.recipes].sort(([a], [b]) => a.localeCompare(b)))
+      if (parseRecipeFile(text11)[category] === ref) names3.push(base);
+    return names3;
+  }
+  /**
+   * Every part of `category` (structure, voice or format): the built-ins first, then the user's files. A file named like a
+   * built-in (any language) is listed as the user's file it is, with an issue: it is not used (decision #22). Reads only
+   * what the last `refresh()` loaded.
+   */
+  listParts(category) {
+    const language2 = this.settings.language;
+    const { files } = this.partStore(category);
+    const builtins = category === "format" ? BUILTIN_FORMATS.map(({ id, nameKey }) => ({ id, nameKey })) : BUILTIN_BLOCKS.filter((block) => block.category === (category === "structure" ? "template" : "tone")).map(
+      ({ id, nameKey }) => ({ id, nameKey })
+    );
+    const items = builtins.map(({ id, nameKey }) => ({
+      ref: builtinRef(id),
+      kind: "builtin",
+      name: translate(language2, nameKey),
+      issues: [],
+      usedBy: this.stylesUsing(category, builtinRef(id))
+    }));
+    for (const [base, text11] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
+      const issues = [];
+      const check = validatePartName(base, category);
+      if (!check.ok)
+        issues.push({
+          line: 1,
+          code: check.reason === "builtin" ? "builtin_name" : "part_name_invalid",
+          values: [base],
+          message: check.reason === "builtin" ? `"${base}" is a built-in name, so this file is not used. Rename it.` : `"${base}" cannot be used as a part name.`
+        });
+      if (category === "structure") {
+        const parsed = parseTemplateBlock(text11, { id: fileRef(base), name: base });
+        if (!parsed.ok) issues.push(...parsed.issues);
+      }
+      items.push({
+        ref: fileRef(base),
+        kind: "file",
+        name: base,
+        fileName: `${base}.md`,
+        issues,
+        usedBy: this.stylesUsing(category, fileRef(base))
+      });
+    }
+    return items;
+  }
+  /** Every style: the built-ins (the AIM report marked `aimOnly`), then the user's style files. */
+  listRecipes() {
+    var _a2;
+    const language2 = this.settings.language;
+    const stored = this.settings.noteStyleByKind;
+    const kindsOf = (ref) => STYLE_KINDS.filter((kind) => {
+      const own2 = stored && Object.prototype.hasOwnProperty.call(stored, kind) ? stored[kind] : void 0;
+      return (typeof own2 === "string" ? own2 : KIND_DEFAULT_RECIPE[kind]) === ref;
+    });
+    const partOf = (category, ref) => {
+      try {
+        return { ref, name: partNameOfRef(category, ref, language2) };
+      } catch (e) {
+        return { ref, name: ref };
+      }
+    };
+    const items = BUILTIN_RECIPES.map((recipe) => {
+      const aim = recipe.structure === AIM_DELIVERY_STRUCTURE;
+      const ref = builtinRef(recipe.id);
+      return {
+        ref,
+        kind: "builtin",
+        name: translate(language2, recipe.nameKey),
+        ...aim ? { aimOnly: true } : {},
+        structure: aim ? { ref: recipe.structure, name: translate(language2, recipe.nameKey) } : partOf("structure", builtinRef(recipe.structure)),
+        voice: partOf("voice", builtinRef(recipe.voice)),
+        format: partOf("format", builtinRef(recipe.format)),
+        update: recipe.update,
+        description: "",
+        issues: [],
+        usedByKinds: kindsOf(ref)
+      };
+    });
+    for (const [base, text11] of [...this.recipes].sort(([a], [b]) => a.localeCompare(b))) {
+      const file = parseRecipeFile(text11);
+      const issues = [...file.issues];
+      const check = validatePartName(base, "recipe");
+      if (!check.ok)
+        issues.push({
+          line: 1,
+          code: check.reason === "builtin" ? "builtin_name" : "part_name_invalid",
+          values: [base],
+          message: check.reason === "builtin" ? `"${base}" is a built-in name, so this file is not used. Rename it.` : `"${base}" cannot be used as a style name.`
+        });
+      const present = {
+        structure: (name) => this.blocks.template.has(name),
+        voice: (name) => this.blocks.tone.has(name),
+        format: (name) => this.formats.has(name)
+      };
+      for (const category of ["structure", "voice", "format"]) {
+        const parsed = parseRecipeRef(file[category], category);
+        if ((parsed == null ? void 0 : parsed.kind) === "file" && !present[category](parsed.name))
+          issues.push({
+            line: (_a2 = file.lines[category]) != null ? _a2 : 1,
+            code: "part_missing",
+            values: [parsed.name],
+            message: `The ${category} "${parsed.name}" was not found; the built-in one is used.`
+          });
+      }
+      const ref = fileRef(base);
+      items.push({
+        ref,
+        kind: "file",
+        name: base,
+        fileName: `${base}.md`,
+        structure: partOf("structure", file.structure),
+        voice: partOf("voice", file.voice),
+        format: partOf("format", file.format),
+        update: file.update,
+        description: file.description,
+        issues,
+        usedByKinds: kindsOf(ref)
+      });
+    }
+    return items;
+  }
+  /** The text of a user's style file as the last `refresh()` or write left it (what the editor compares before it saves). */
+  recipeText(ref) {
+    const parsed = parseRecipeRef(ref, "recipe");
+    return (parsed == null ? void 0 : parsed.kind) === "file" ? this.recipes.get(parsed.name) : void 0;
+  }
+  /** The vault path of a user's part file, or undefined for a built-in or a file that is not there. */
+  partFilePath(category, ref) {
+    const parsed = parseRecipeRef(ref, category);
+    if ((parsed == null ? void 0 : parsed.kind) !== "file") return void 0;
+    const { files, dir } = this.partStore(category);
+    return files.has(parsed.name) ? `${dir}/${parsed.name}.md` : void 0;
+  }
+  /** The vault path of a user's style file, or undefined for a built-in or a file that is not there. */
+  recipeFilePath(ref) {
+    const parsed = parseRecipeRef(ref, "recipe");
+    return (parsed == null ? void 0 : parsed.kind) === "file" && this.recipes.has(parsed.name) ? `${this.blockDirectories().recipe}/${parsed.name}.md` : void 0;
+  }
+  /**
+   * The name a new part file gets by default: "My <name>" for a copy of a part (a built-in's name in the interface
+   * language, or a file's name), the language's "New structure/voice/format" for a blank one; " (2)", " (3)" ... until it
+   * is free and is not a built-in's name. Writes nothing.
+   */
+  suggestPartName(category, from) {
+    const language2 = this.settings.language;
+    let base;
+    if (from === null) base = translate(language2, `ui.part_new_name_${category}`);
+    else {
+      const parsed = parseRecipeRef(from, category);
+      const source = (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.name : parsed ? partNameOfRef(category, from, language2) : from;
+      base = translate(language2, "ui.block_copy_name_0", cleanBlockName(source));
+    }
+    base = cleanBlockName(base) || "copy";
+    const taken = new Set([...this.partStore(category).files.keys()].map(lower3));
+    let name = base;
+    for (let n = 2; taken.has(lower3(name)) || !validatePartName(name, category).ok; n++) {
+      if (n > 999) throw new Error("No free name");
+      name = `${base} (${n})`;
+    }
+    return name;
+  }
+  /**
+   * Writes a new part file of `category` and returns its ref (`file:<name>`); no setting changes. `from` is a built-in ref
+   * (its text in the interface language; academic rigor starts from its design note), a file ref (a copy of that file) or
+   * null (a blank start). Without `name` the file gets `suggestPartName`; with one it must pass `validatePartName`, be free
+   * and be a safe file name, else this throws and nothing is written.
+   */
+  createPart(category, from, name) {
+    return this.serial(async () => {
+      await this.loadBlocks();
+      const language2 = this.settings.language;
+      let text11;
+      if (from === null) text11 = category === "structure" ? translate(language2, "ui.part_blank_structure") : "";
+      else {
+        const parsed = parseRecipeRef(from, category);
+        if ((parsed == null ? void 0 : parsed.kind) === "file") {
+          const held = this.partStore(category).files.get(parsed.name);
+          if (held === void 0) throw new Error(`Part file not found: ${parsed.name}`);
+          text11 = held;
+        } else if ((parsed == null ? void 0 : parsed.kind) === "builtin") {
+          if (category === "format") text11 = lookupBuiltinFormat(parsed.id, language2);
+          else if (category === "voice" && parsed.id === "academic") text11 = academicToneNote(language2);
+          else text11 = builtinBlockText(category === "structure" ? "template" : "tone", parsed.id, language2);
+        } else throw new Error(`Unknown part: ${from}`);
+      }
+      const { files, dir } = this.partStore(category);
+      let base;
+      if (name === void 0) base = this.suggestPartName(category, from);
+      else {
+        base = name;
+        if (!validatePartName(base, category).ok || cleanBlockName(base) !== base || files.has(base) || [...files.keys()].some((key2) => lower3(key2) === lower3(base)))
+          throw new Error(`Part name not available: ${name}`);
+      }
+      await this.pinFolder();
+      await this.deps.port.createFolder(dir);
+      await this.deps.port.create(`${dir}/${base}.md`, text11);
+      files.set(base, text11);
+      return fileRef(base);
+    });
+  }
+  /**
+   * Saves a style. A new style (no `original`, or one whose ref is a built-in) is a new file named `name`. An existing
+   * user's style file (`original.ref` a file) is changed in place: its name stays, only the four values change, and nothing
+   * is written when the file no longer holds `original.text` (the user changed it meanwhile).
+   */
+  saveRecipe(input2) {
+    return this.serial(async () => {
+      const parts = {
+        structure: input2.structure,
+        voice: input2.voice,
+        format: input2.format,
+        update: input2.update
+      };
+      const language2 = this.settings.language;
+      const { port } = this.deps;
+      await this.loadBlocks();
+      const dirs = this.blockDirectories();
+      const original = input2.original ? parseRecipeRef(input2.original.ref, "recipe") : void 0;
+      if (input2.original && (original == null ? void 0 : original.kind) === "file") {
+        const path = `${dirs.recipe}/${original.name}.md`;
+        let live;
+        try {
+          if (!this.recipes.has(original.name)) return { ok: false, reason: "write-failed" };
+          live = await port.read(path);
+        } catch (e) {
+          return { ok: false, reason: "write-failed" };
+        }
+        if (live !== input2.original.text) return { ok: false, reason: "changed" };
+        try {
+          const next = updateRecipeFileText(live, parts, language2);
+          if (next !== live) await port.modify(path, next);
+          this.recipes.set(original.name, next);
+        } catch (e) {
+          return { ok: false, reason: "write-failed" };
+        }
+        return { ok: true, ref: fileRef(original.name) };
+      }
+      const name = input2.name;
+      if (!validatePartName(name, "recipe").ok || cleanBlockName(name) !== name || [...this.recipes.keys()].some((key2) => lower3(key2) === lower3(name)))
+        return { ok: false, reason: "name" };
+      try {
+        const text11 = recipeFileText(parts, language2);
+        await this.pinFolder();
+        await port.createFolder(dirs.recipe);
+        await port.create(`${dirs.recipe}/${name}.md`, text11);
+        this.recipes.set(name, text11);
+      } catch (e) {
+        return { ok: false, reason: "write-failed" };
+      }
+      return { ok: true, ref: fileRef(name) };
+    });
+  }
+  /**
+   * The style a draft (not saved) would give a run of `kind`, in the same shape as `runStyle` and from the same code: for
+   * the same parts, it equals `runStyle` of the style file `saveRecipe` would write. Reads only the loaded cache.
+   */
+  draftStyle(draft, kind, language2) {
+    const ref = fileRef(draft.name);
+    const fileName = `${draft.name}.md`;
+    const chosen = {
+      ref,
+      name: draft.name,
+      update: draft.update,
+      fileName,
+      ...this.fileParts(ref, fileName, draft, {}, language2),
+      issues: []
+    };
+    return this.assemble(chosen, "run", [], language2);
+  }
   // ---- the conversion of the 0.28.0 data (the only write that is not a user action) ----
   /**
    * Turns the custom detail templates and tone presets of 0.28.0 into structure, voice and style files, and records the old
@@ -27311,6 +27709,7 @@ function emptyNoteStyleStore(settings) {
       folderExists: () => false,
       createFolder: async () => void 0,
       create: async () => void 0,
+      modify: async () => void 0,
       trash: async () => void 0
     },
     save: async () => void 0
@@ -72944,6 +73343,11 @@ ${t("ui.organize_link_wait_hint")}`;
       create: async (path, content) => {
         await this.app.vault.create((0, import_obsidian40.normalizePath)(path), content);
       },
+      modify: async (path, content) => {
+        const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
+        if (!(file instanceof import_obsidian40.TFile)) throw new Error(path);
+        await this.app.vault.modify(file, content);
+      },
       trash: async (path) => {
         const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
         if (file instanceof import_obsidian40.TFile) await this.app.fileManager.trashFile(file);
@@ -73007,6 +73411,51 @@ ${t("ui.organize_link_wait_hint")}`;
       new import_obsidian40.Notice(t("ui.block_notice_copy_failed"));
       return null;
     }
+  }
+  /**
+   * "Edit" a part of the custom note styles: a built-in is first saved as "My <name>" (a new file, no setting changes), a
+   * file is opened as it is. Opens the file in a tab and returns the ref now behind it, or null (with a Notice) when it
+   * could not be done.
+   */
+  async editNotePart(category, ref) {
+    var _a2;
+    try {
+      let target = ref;
+      if (((_a2 = parseRecipeRef(ref, category)) == null ? void 0 : _a2.kind) !== "file") {
+        target = await this.noteStyles.createPart(category, ref);
+        new import_obsidian40.Notice(t("ui.part_notice_saved_as_0", target.slice("file:".length)));
+      }
+      await this.noteStyles.refresh();
+      const path = this.noteStyles.partFilePath(category, target);
+      const file = path ? this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path)) : null;
+      if (!(file instanceof import_obsidian40.TFile)) throw new Error("not a file");
+      await this.app.workspace.getLeaf("tab").openFile(file);
+      return target;
+    } catch (e) {
+      new import_obsidian40.Notice(t("ui.block_notice_open_failed"));
+      return null;
+    }
+  }
+  /** Sets the style a kind uses. Choosing the kind's own built-in style removes the entry (a kind with no entry uses it). */
+  async setKindStyle(kind, ref) {
+    const next = { ...this.settings.noteStyleByKind };
+    if (ref === KIND_DEFAULT_RECIPE[kind]) delete next[kind];
+    else next[kind] = ref;
+    if (Object.keys(next).length) this.settings.noteStyleByKind = next;
+    else delete this.settings.noteStyleByKind;
+    await this.saveSettings();
+  }
+  /** Saves a custom style from the editor and says what happened in a Notice; the result goes back to the editor. */
+  async saveNoteRecipe(input2) {
+    const result = await this.noteStyles.saveRecipe(input2);
+    if (result.ok) new import_obsidian40.Notice(t("ui.recipe_notice_saved_0", result.ref.slice("file:".length)));
+    else
+      new import_obsidian40.Notice(
+        t(
+          result.reason === "name" ? "ui.recipe_notice_name_unavailable" : result.reason === "changed" ? "ui.recipe_notice_changed" : "ui.recipe_notice_failed"
+        )
+      );
+    return result;
   }
   /** Restores a built-in block after saving a backup of its file; every refusal says why in a Notice. */
   async restoreBlock(category, ref) {

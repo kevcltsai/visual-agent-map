@@ -104,7 +104,7 @@ async function harness() {
   return { repo, app, view, doc, contentEl, ids, card, build, state, notices, modals, menus, inMap, active: () => doc.activeElement };
 }
 
-const keydown = (h, target, key = 'Escape', over = {}) => ({ key, target, defaultPrevented: false, isComposing: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...over });
+const keydown = (_h, target, key = 'Escape', over = {}) => ({ key, target, defaultPrevented: false, isComposing: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...over });
 
 test('02: Escape on a card clears the selection, is claimed so Obsidian keeps the leaf active, and focus stays in the map', async () => {
   const h = await harness();
@@ -279,4 +279,24 @@ test('wiring: paint holds and restores the map focus, onOpen tracks focusin, and
   for (const dialog of ['OutlineImportModal(', 'ui.organize_notes', 'ui.unassigned_notes', 'ui.archived_notes'])
     assert.match(source, new RegExp(`openMapModal\\(\\s*new [A-Za-z]*\\([^)]*${dialog.replace(/[().]/g, '\\$&')}|openMapModal\\(\\s*new ${dialog.replace(/[().]/g, '\\$&')}`), `${dialog} opens through openMapModal`);
   assert.equal((source.match(/selection\.escape\(\)/g) ?? []).length, 1, 'plan-42-p2: one Esc branch clears the selection');
+});
+
+test('#11 real order: the menu is already closed (onHide fired, .menu gone) when the same Escape reaches the map: selection stays; the next Escape clears it', async () => {
+  for (const open of ['layout', 'card']) {
+    const h = await harness();
+    h.view.selection.setSelected(h.ids.leaf);
+    h.card('leaf').focus();
+    let menu;
+    if (open === 'layout') { h.view.openLayoutMenu({}); menu = h.menus.at(-1); }
+    else { menu = { onHide(fn) { this.hide = fn; } }; h.view.restoreFocusOnMenuHide(menu, h.ids.leaf); }
+    // Obsidian closes the menu on keydown, before the event bubbles to the view.
+    h.doc.body.add('div', { cls: 'menu' }).detach();
+    menu.hide();
+    const event = keydown(h, h.card('leaf'));
+    h.view.onMapKeydown(event);
+    assert.equal(h.view.selection.state.selected, h.ids.leaf, `${open}: selection stays`);
+    await timers(20);
+    h.view.onMapKeydown(keydown(h, h.card('leaf')));
+    assert.equal(h.view.selection.state.selected, null, `${open}: a later Escape clears it`);
+  }
 });

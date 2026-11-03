@@ -1088,6 +1088,8 @@ export class VisualAgentMapView extends ItemView {
   private restoringFocus = false;
   /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
   private lastMapFocus: MapFocusAnchor | null = null;
+  /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
+  private menuClosedByKey = false;
   private closed = false;
   private aimViewEpoch = 0;
   private mapOpenEpoch = 0;
@@ -1275,7 +1277,11 @@ export class VisualAgentMapView extends ItemView {
     const target = event.target as HTMLElement | null;
     if (target?.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
     // Something that already took this Esc (a menu, a dialog), or a menu still open, closes alone; only a bare Esc clears the selection.
-    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
+    // A menu that this very key just closed is already gone from the page, so its hide is remembered for the rest of the key event.
+    if (
+      event.key === "Escape" &&
+      (event.defaultPrevented || this.menuClosedByKey || this.contentEl.ownerDocument.querySelector(".menu"))
+    )
       return;
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
@@ -1905,7 +1911,11 @@ export class VisualAgentMapView extends ItemView {
     return modal;
   }
   private restoreFocusOnMenuHide(menu: Menu, nodeId?: string): void {
-    (menu as unknown as { onHide?: (callback: () => void) => void }).onHide?.(() => this.restoreMapFocusSoon(nodeId));
+    (menu as unknown as { onHide?: (callback: () => void) => void }).onHide?.(() => {
+      this.menuClosedByKey = true;
+      window.setTimeout(() => (this.menuClosedByKey = false), 0);
+      this.restoreMapFocusSoon(nodeId);
+    });
   }
   syncOutline(): void {
     this.plugin.syncOutline(this.map, this.notes, this);

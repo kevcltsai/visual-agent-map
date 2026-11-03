@@ -47587,6 +47587,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "restoringFocus", false);
     /** The last control that had focus inside the map, by identity: where a closed dialog or menu sends focus back to. */
     __publicField(this, "lastMapFocus", null);
+    /** A menu of this view hid a moment ago (cleared on the next task): the Esc that closed it must not also clear the selection. */
+    __publicField(this, "menuClosedByKey", false);
     __publicField(this, "closed", false);
     __publicField(this, "aimViewEpoch", 0);
     __publicField(this, "mapOpenEpoch", 0);
@@ -47817,7 +47819,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   onMapKeydown(event) {
     const target = event.target;
     if (target == null ? void 0 : target.closest("input, textarea, select, [contenteditable=true], .vam-map-chat")) return;
-    if (event.key === "Escape" && (event.defaultPrevented || this.contentEl.ownerDocument.querySelector(".menu")))
+    if (event.key === "Escape" && (event.defaultPrevented || this.menuClosedByKey || this.contentEl.ownerDocument.querySelector(".menu")))
       return;
     if (event.key === "Escape") {
       const anchor = this.describeMapFocus(target);
@@ -48434,7 +48436,11 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   }
   restoreFocusOnMenuHide(menu, nodeId) {
     var _a2;
-    (_a2 = menu.onHide) == null ? void 0 : _a2.call(menu, () => this.restoreMapFocusSoon(nodeId));
+    (_a2 = menu.onHide) == null ? void 0 : _a2.call(menu, () => {
+      this.menuClosedByKey = true;
+      window.setTimeout(() => this.menuClosedByKey = false, 0);
+      this.restoreMapFocusSoon(nodeId);
+    });
   }
   syncOutline() {
     this.plugin.syncOutline(this.map, this.notes, this);

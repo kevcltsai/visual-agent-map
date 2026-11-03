@@ -156,6 +156,7 @@ import { FALLBACK_MODEL, resolveTaskModel, type ModelChoice } from "../../ai/mod
 import { NameModal } from "../../ui/modals/name-modal";
 import { sanitizeGeneratedTitle } from "../../core/title-safety";
 import { ChoiceModal } from "../../ui/modals/choice-modal";
+import { MapSwitcherModal } from "../../ui/modals/map-switcher-modal";
 import {
   applyCollapseLevel,
   canParent,
@@ -4734,16 +4735,15 @@ export class VisualAgentMapView extends ItemView {
     });
     return button;
   }
+  /** "Switch mind map": a searchable list (type to filter) whose rows say how the maps differ. */
   private openMapSwitcher(): void {
     this.enqueue(async () => {
-      const topics = await this.plugin.repo.topics();
-      new ChoiceModal(this.app, t("ui.switch_mind_map"), t("ui.choose_a_research_topic_to_open"), [
-        ...topics.map(topic => ({
-          label: topic.title,
-          description: t("ui.my_editable_mind_map"),
-          action: () => this.enqueue(() => this.openMapInMutation(topic.mapPath))
-        }))
-      ]).open();
+      const items = await this.plugin.repo.mapSwitcherItems();
+      this.openMapModal(
+        new MapSwitcherModal(this.app, items, this.path, item =>
+          this.enqueue(() => this.openMapInMutation(item.mapPath))
+        )
+      );
     });
   }
   /** The three ways to start a map sit together, so none reads as the only or the hidden option. */

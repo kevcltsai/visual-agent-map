@@ -2205,3 +2205,17 @@ integrationTest('a copied note title with $ replacement patterns reaches the bod
     assert.ok((await read(copy)).split('\n').includes(`# ${title}`), `heading kept for ${title}`);
   }
 });
+integrationTest('C3: mapSwitcherItems gives each readable map its topic count, Map.md modification time and the folder its topic folder is in', async () => {
+  const { repo, app } = fixture(); const n = await topicNote(repo);
+  const withTopic = await repo.createMap('Map A', [n]);
+  const empty = await repo.createMap('Map B');
+  app.vault.getAbstractFileByPath(withTopic).stat.mtime = 1700000000000;
+  const items = plain(await repo.mapSwitcherItems());
+  const byPath = new Map(items.map(item => [item.mapPath, item]));
+  assert.equal(byPath.get(withTopic).title, 'Map A');
+  assert.equal(byPath.get(withTopic).topicCount, 1);
+  assert.equal(byPath.get(withTopic).modified, 1700000000000);
+  assert.equal(byPath.get(empty).topicCount, 0);
+  const root = withTopic.slice(0, withTopic.lastIndexOf('/'));
+  assert.equal(byPath.get(withTopic).folder, root.slice(0, root.lastIndexOf('/')), 'the folder holding the topic folder');
+});

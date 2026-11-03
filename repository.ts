@@ -188,6 +188,17 @@ export interface TopicInfo {
   mapPath: string;
   root: string;
 }
+/** One map row of the map switcher: what tells maps apart (size, last edit, where it lives). */
+export interface MapSwitcherItem {
+  title: string;
+  mapPath: string;
+  /** Topics on the map. */
+  topicCount: number;
+  /** Map.md's last modification time (ms). */
+  modified: number;
+  /** The folder that holds the map's topic folder. */
+  folder: string;
+}
 export interface BrokenTopic {
   title: string;
   root: string;
@@ -1989,6 +2000,20 @@ export class Repository {
       topics.push({ id: map.id, title: map.title, mapPath: file.path, root: this.topicRoot(file.path) });
     }
     return topics;
+  }
+
+  /** The map switcher's rows: each readable map with its topic count, last edit and the folder its topic folder is in. */
+  async mapSwitcherItems(): Promise<MapSwitcherItem[]> {
+    return (await this.readableMaps()).map(({ file, map }) => {
+      const root = this.topicRoot(file.path);
+      return {
+        title: map.title,
+        mapPath: file.path,
+        topicCount: map.nodes.length,
+        modified: file.stat?.mtime ?? 0,
+        folder: root.includes("/") ? root.slice(0, root.lastIndexOf("/")) : ""
+      };
+    });
   }
 
   async brokenTopics(): Promise<BrokenTopic[]> {

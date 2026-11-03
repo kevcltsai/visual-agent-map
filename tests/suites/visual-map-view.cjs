@@ -3980,17 +3980,47 @@ test('N5: the empty state offers "Create a new mind map" and no "View sample" (s
 });
 integrationTest('N6: the map switcher lists exactly the topics and no "Sample:" entry', async () => {
   const opened = [];
-  class Modal { constructor(app) { this.app = app; } open() { opened.push(this); } close() {} }
-  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal } });
-  const topics = [{ title: 'Alpha', mapPath: 'A/Map.md' }, { title: 'Beta', mapPath: 'B/Map.md' }];
+  class FuzzySuggestModal { constructor(app) { this.app = app; } setPlaceholder() {} setInstructions() {} open() { opened.push(this); } close() {} }
+  const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, FuzzySuggestModal } });
+  const items = [{ title: 'Alpha', mapPath: 'A/Map.md', topicCount: 1, modified: 2, folder: 'W' }, { title: 'Beta', mapPath: 'B/Map.md', topicCount: 3, modified: 1, folder: 'W' }];
   const view = Object.create(VisualAgentMapView.prototype);
-  Object.assign(view, { app: {}, plugin: { repo: { topics: async () => topics } }, enqueue: work => work() });
+  Object.assign(view, { app: {}, path: 'A/Map.md', plugin: { repo: { mapSwitcherItems: async () => items } }, enqueue: work => work(), restoreMapFocusSoon() {} });
   await view.openMapSwitcher();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(opened.length, 1);
-  const labels = opened[0].choices.map(choice => choice.label);
+  const labels = opened[0].getItems().map(item => item.title);
   assert.deepEqual(plain(labels), ['Alpha', 'Beta']);
   assert.ok(!labels.some(label => label.startsWith('Sample:')));
+});
+integrationTest('C3: the map switcher is a fuzzy search list; rows say topic count, last edit and (only when maps live in several folders) the folder; newest first; choosing opens the map', async () => {
+  const opened = [];
+  class FuzzySuggestModal { constructor(app) { this.app = app; } setPlaceholder(text) { this.placeholder = text; } setInstructions(list) { this.instructions = list; } open() { opened.push(this); } close() {} }
+  const shim = { ...obsidian, FuzzySuggestModal };
+  const { MapSwitcherModal, mapSwitcherDetail } = load('ui/modals/map-switcher-modal.ts', { obsidian: shim });
+  const now = new Date(2026, 10, 3, 15, 0).getTime();
+  const items = [
+    { title: 'Old', mapPath: 'W/Old/Map.md', topicCount: 1, modified: new Date(2026, 0, 2).getTime(), folder: 'Work' },
+    { title: 'New', mapPath: 'P/New/Map.md', topicCount: 12, modified: now - 60000, folder: 'Personal' }
+  ];
+  const chosen = [];
+  const modal = new MapSwitcherModal({}, items, 'W/Old/Map.md', item => chosen.push(item.mapPath));
+  assert.equal(modal.placeholder, 'Type a mind map name…');
+  assert.equal(modal.emptyStateText, 'No mind map matches.');
+  assert.deepEqual(plain(modal.getItems().map(item => item.title)), ['New', 'Old'], 'the most recently edited map first');
+  assert.equal(modal.getItemText(items[0]), 'Old Work', 'two folders: the folder is searchable too');
+  const one = mapSwitcherDetail(items[0], true, now), many = mapSwitcherDetail(items[1], true, now);
+  assert.match(one, /^1 topic · edited .*2026.* · Work$/);
+  assert.match(many, /^12 topics · edited \d{1,2}:\d{2}.* · Personal$/, 'today: the time');
+  assert.notEqual(one, many, 'the rows are not all the same');
+  assert.doesNotMatch(mapSwitcherDetail(items[0], false, now), /Work/, 'one folder only: not repeated on every row');
+  const single = new MapSwitcherModal({}, [items[0], { ...items[1], folder: 'Work' }], '', () => {});
+  assert.equal(single.getItemText(items[0]), 'Old');
+  const el = dom.element('div');
+  modal.renderSuggestion({ item: items[0], match: { score: 0, matches: [] } }, el);
+  const texts = []; const walk = node => { if (node.text) texts.push(node.text); (node.children ?? []).forEach(walk); }; walk(el);
+  assert.ok(texts.includes('Old') && texts.some(text => /open now/.test(text)), texts.join('|'));
+  modal.onChooseItem(items[1]);
+  assert.deepEqual(plain(chosen), ['P/New/Map.md']);
 });
 // ---- bug bash A #01: dragging a card's own cover image must never be taken for a dropped file ----
 function coverDragHarness() {

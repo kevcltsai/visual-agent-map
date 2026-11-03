@@ -8,7 +8,7 @@ const { load, core, fixture, DEFAULT_SETTINGS, obsidian, withExpansionCoordinato
 const dom = require('./support-dom.cjs');
 const { element } = dom;
 
-const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: {}, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, isConnected: true,
+const make = (tag, init = {}) => ({ tag, children: [], dataset: {}, style: { setProperty(name, value) { this[name] = value; } }, attrs: {}, handlers: new Map(), classes: new Set(String(init.cls ?? '').split(' ').filter(Boolean)), text: init.text, tabIndex: init.tabIndex, checked: false, isConnected: true,
   createDiv(value) { return this.createEl('div', typeof value === 'string' ? { cls: value } : value); },
   createSpan(value) { return this.createEl('span', typeof value === 'string' ? { cls: value } : value); },
   createEl(name, value = {}) { const child = make(name, value); child.parent = this; this.children.push(child); return child; },

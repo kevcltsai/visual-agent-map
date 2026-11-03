@@ -276,11 +276,15 @@ import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
 import {
   cardToolsPlacement,
+  clearToolbar,
   fitIsClamped,
   fitViewport,
   focusViewport,
   initialViewport,
-  insetFromRects
+  insetFromRects,
+  isObscured,
+  rectsIntersect,
+  statusBarClearance
 } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
@@ -1109,6 +1113,8 @@ export class VisualAgentMapView extends ItemView {
   private coverObserver: IntersectionObserver | null = null;
   private selectionBarEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
+  private statusBarObserver: ResizeObserver | null = null;
+  private statusBarObserved: Element | null = null;
   /** While a card renders, its buttons stay out of the tab order until that card is focused. */
   private renderingCard = false;
   /** Set while render hands focus back to a card, so that refocus does not restart its preview. */
@@ -1214,10 +1220,16 @@ export class VisualAgentMapView extends ItemView {
       workspace.on("active-leaf-change", leaf => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) this.lastMarkdownPath = leaf.view.file.path;
         this.chat?.refreshNote();
+        this.syncStatusBarClearance();
       })
     );
     // A tab can be shown or hidden, or moved to another window, without the active leaf changing.
-    this.registerEvent(workspace.on("layout-change", () => this.chat?.refreshNote()));
+    this.registerEvent(
+      workspace.on("layout-change", () => {
+        this.chat?.refreshNote();
+        this.syncStatusBarClearance();
+      })
+    );
     // Collapsing or widening a side panel resizes the workspace, and it can hide the note that sat beside the map.
     this.registerEvent(workspace.on("resize", () => this.chat?.refreshNote()));
     // A note whose image or `topic-cover` just changed redraws only its own cover.
@@ -1759,6 +1771,9 @@ export class VisualAgentMapView extends ItemView {
     this.releaseCovers();
     this.unbindClipboard?.();
     this.unbindClipboard = null;
+    this.statusBarObserver?.disconnect();
+    this.statusBarObserver = null;
+    this.statusBarObserved = null;
     this.renderAfterDrag = false;
     this.announcer?.remove();
     this.announcer = null;
@@ -9820,6 +9835,8 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) this.viewportEl.addClass("is-selecting");
     // Canvas controls float over the map instead of stacking a second toolbar above it; the overlay covers the canvas only.
     const overlay = canvas.createDiv("vam-canvas-overlay");
+    // Keyboard order is toolbar, then the cards, then the zoom controls (second overlay below): the toolbar comes first in the DOM.
+    canvas.insertBefore(overlay, this.viewportEl);
     if (tools.childElementCount) overlay.appendChild(tools);
     else tools.remove();
     this.mountMapChat(workspace, overlay);
@@ -9833,8 +9850,13 @@ export class VisualAgentMapView extends ItemView {
             text: t("ui.drag_empty_space_to_pan_scroll_to_zoom_click_a_node_to_open")
           })
         : null;
-    const zoom = overlay.createDiv("vam-zoom-controls");
-    this.iconButton(zoom, "minus", t("ui.zoom_out"), () => this.zoomBy(1 / 1.2));
+    const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
+    const zoom = controls.createDiv("vam-zoom-controls");
+    // The hint teaches pan, zoom and opening a card, so using a zoom-control button retires it too.
+    this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
+      this.markCanvasHintSeen();
+      this.zoomBy(1 / 1.2, this.selectionAnchor() ?? undefined);
+    });
     const zoomReset = zoom.createEl("button", {
       text: `${Math.round(this.map.viewport.zoom * 100)}%`,
       cls: "vam-zoom",
@@ -9842,11 +9864,18 @@ export class VisualAgentMapView extends ItemView {
     });
     zoomReset.addEventListener("click", event => {
       event.stopPropagation();
-      if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
+      this.markCanvasHintSeen();
+      if (this.map) this.resetZoom();
     });
     this.zoomLabel = zoomReset;
-    this.iconButton(zoom, "plus", t("ui.zoom_in"), () => this.zoomBy(1.2));
-    this.iconButton(zoom, "maximize", t("ui.show_all"), () => this.fit());
+    this.iconButton(zoom, "plus", t("ui.zoom_in"), () => {
+      this.markCanvasHintSeen();
+      this.zoomBy(1.2, this.selectionAnchor() ?? undefined);
+    });
+    this.iconButton(zoom, "maximize", t("ui.show_all"), () => {
+      this.markCanvasHintSeen();
+      this.fit();
+    });
     const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
     present.disabled = !this.canPresent();
     const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
@@ -9917,6 +9946,7 @@ export class VisualAgentMapView extends ItemView {
     restoreRelevanceFocus();
     restoreChatFocus();
     keepMapFocus();
+    this.syncStatusBarClearance();
     this.applyPresentationMarks();
     restoreSearch();
   }
@@ -10761,12 +10791,8 @@ export class VisualAgentMapView extends ItemView {
       this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(target.id)}"]`);
     const view = this.viewportEl?.getBoundingClientRect(),
       rect = card?.getBoundingClientRect();
-    if (
-      view &&
-      rect &&
-      (rect.left < view.left || rect.right > view.right || rect.top < view.top || rect.bottom > view.bottom)
-    )
-      this.focusNode(target, false);
+    // Off the canvas, or under the toolbar / zoom controls / hint, counts as not seen: the camera follows.
+    if (view && rect && isObscured(rect, view, this.floatingControlRects())) this.focusNode(target, false);
     if (this.selection.state.multiSelectMode) {
       // Topic selection mode: moving focus must not clear the topics already ticked.
       this.paintCards(this.selection.moveTabStop(target.id).touched);
@@ -10780,6 +10806,15 @@ export class VisualAgentMapView extends ItemView {
       }
     }
     (this.cardEls.get(target.id) ?? card)?.focus({ preventScroll: true });
+  }
+  /** Screen rectangles of the floating controls that cover part of the canvas (toolbar, zoom controls, hint). */
+  private floatingControlRects(): { left: number; top: number; right: number; bottom: number }[] {
+    const rects = [];
+    for (const selector of [".vam-map-tools", ".vam-zoom-controls", ".vam-canvas-hint"]) {
+      const rect = this.contentEl?.querySelector?.<HTMLElement>(selector)?.getBoundingClientRect?.();
+      if (rect && rect.right > rect.left && rect.bottom > rect.top) rects.push(rect);
+    }
+    return rects;
   }
   /** The tab stop when nothing moved it: the selected card, else the first root, else the first card. */
   defaultTabStop(shown: MapNode[]): string | null {
@@ -10828,7 +10863,8 @@ export class VisualAgentMapView extends ItemView {
     tools.toggleClass("is-align-left", place.side === "left");
     if (place.maxWidth !== null) {
       tools.toggleClass("is-wrapped", true);
-      tools.style.maxWidth = `${place.maxWidth / zoom}px`;
+      // The row is drawn at `zoom * toolsScale` on screen (the stylesheet counter-scales it below 100%); max-width is in its own units.
+      tools.style.maxWidth = `${place.maxWidth / (zoom * Math.max(1, 1 / zoom))}px`;
     }
     if (place.shift) tools.style.marginLeft = `${place.shift / zoom}px`;
   }
@@ -11212,6 +11248,8 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   private selectMapNode(node: MapNode): void {
+    // Opening a card is one of the things the canvas hint teaches; mark it first so the repaint does not draw the hint again.
+    if (this.hintEl) this.markCanvasHintSeen();
     this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   private hideHoverCardSoon(): void {
@@ -12275,8 +12313,11 @@ export class VisualAgentMapView extends ItemView {
         const box = group.createDiv(`vam-choice-group vam-topic-marker-group is-${def.single ? "single" : "multi"}`);
         box.setAttr("role", "group");
         box.setAttr("aria-label", def.single ? t("ui.topic_marker_group_single", title) : title);
+        // One-of groups (priority, progress) are a row of symbol-only segments; the full name stays in aria-label and title.
+        if (def.single) box.addClass("is-segmented");
         for (const id of def.ids) {
-          const choice = this.button(box, t(markerLabelKey(id)), () => {
+          const label = t(markerLabelKey(id));
+          const choice = this.button(box, def.single ? "" : label, () => {
             this.enqueue(async () => {
               await this.changeTopicMarker(node, id);
               paint(id);
@@ -12284,6 +12325,10 @@ export class VisualAgentMapView extends ItemView {
           });
           choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           choice.dataset.marker = id;
+          if (def.single) {
+            choice.setAttr("aria-label", label);
+            choice.setAttr("title", label);
+          }
           const on = active.includes(id);
           choice.setAttr("aria-pressed", String(on));
           if (on) choice.addClass("is-pressed");
@@ -14800,10 +14845,21 @@ export class VisualAgentMapView extends ItemView {
       throw error;
     }
   }
+  /** The zoom the selected card's tool row was last fitted at. */
+  private toolsZoom: number | null = null;
   private transform(): void {
     if (!this.map || !this.stageEl) return;
     const { x, y, zoom } = this.map.viewport;
     this.stageEl.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+    // The stylesheet counter-scales each card's tool row by this, so its buttons stay a tappable size when zoomed out.
+    this.stageEl.style.setProperty("--vam-zoom", String(zoom));
+    if (zoom !== this.toolsZoom) {
+      this.toolsZoom = zoom;
+      // The open row was fitted at the old zoom: its max-width and shift would linger.
+      const selected = this.selection?.state.selected;
+      const card = selected ? this.cardEls?.get(selected) : undefined;
+      if (card) this.alignCardTools(card);
+    }
     // Small enough that a name would only crowd the lines: the stylesheet hides every relation label on this attribute.
     if (zoom < RELATION_LABEL_MIN_ZOOM) this.stageEl.setAttribute("data-relation-labels", "hidden");
     else this.stageEl.removeAttribute("data-relation-labels");
@@ -14855,6 +14911,27 @@ export class VisualAgentMapView extends ItemView {
     if (this.selection.state.multiSelectMode) return;
     this.hintEl?.remove();
     this.hintEl = null;
+  }
+  /** Where −/+ zoom around: the selected card's centre while it is on the canvas, else (undefined) the canvas centre. */
+  private selectionAnchor(): { x: number; y: number } | null {
+    const selected = this.selection.state.selected;
+    const rect = selected ? this.cardEls.get(selected)?.getBoundingClientRect() : undefined;
+    const view = this.viewportEl?.getBoundingClientRect();
+    if (!rect || !view) return null;
+    const x = (rect.left + rect.right) / 2,
+      y = (rect.top + rect.bottom) / 2;
+    if (x < view.left || x > view.right || y < view.top || y > view.bottom) return null;
+    return { x: x - view.left, y: y - view.top };
+  }
+  /** The percentage button: back to 100% around the selected card, which is brought into view if it ended up hidden. */
+  private resetZoom(): void {
+    if (!this.map) return;
+    this.zoomBy(1 / this.map.viewport.zoom, this.selectionAnchor() ?? undefined);
+    const selected = this.selection.state.selected;
+    const node = selected ? this.map.nodes.find(item => item.id === selected) : undefined;
+    const rect = selected ? this.cardEls.get(selected)?.getBoundingClientRect() : undefined;
+    const view = this.viewportEl?.getBoundingClientRect();
+    if (node && rect && view && isObscured(rect, view, this.floatingControlRects())) this.focusNode(node);
   }
   private zoomBy(factor: number, point?: { x: number; y: number }): void {
     if (!this.map || !this.viewportEl) return;
@@ -14948,7 +15025,43 @@ export class VisualAgentMapView extends ItemView {
   /** Lifts a never-moved default viewport below the toolbar. In memory only; it is saved with the next real pan or zoom. */
   private applyInitialViewport(): void {
     if (!this.map) return;
-    this.map.viewport = initialViewport(this.map.viewport, this.canvasInset());
+    const inset = this.canvasInset();
+    const viewport = initialViewport(this.map.viewport, inset);
+    // Only the first paint of a map clears the toolbar: a later render must not move a view the user panned to.
+    if (this.toolbarClearedFor === this.path) {
+      this.map.viewport = viewport;
+      return;
+    }
+    this.toolbarClearedFor = this.path;
+    this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
+  }
+  /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
+  private toolbarClearedFor: string | null = null;
+  /**
+   * Screen tops (canvas coordinates) of the cards the saved viewport would draw under the toolbar. Computed from the
+   * saved positions, as the stage is not transformed yet when this runs; a card's height is its laid-out height.
+   */
+  private topsUnderToolbar(zoomHint: number): number[] {
+    const canvas = this.viewportEl?.getBoundingClientRect?.();
+    const tools = this.contentEl?.querySelector<HTMLElement>(".vam-map-tools")?.getBoundingClientRect?.();
+    if (!this.map || !canvas || !tools || !(tools.bottom > tools.top)) return [];
+    const bar = {
+      left: tools.left - canvas.left,
+      right: tools.right - canvas.left,
+      top: tools.top - canvas.top,
+      bottom: tools.bottom - canvas.top
+    };
+    const v = initialViewport(this.map.viewport, this.canvasInset());
+    const zoom = v.zoom || zoomHint;
+    const tops: number[] = [];
+    for (const node of this.canvasNodes()) {
+      const left = node.x * zoom + v.x,
+        top = node.y * zoom + v.y;
+      const height = this.cardEls.get(node.id)?.offsetHeight || 180;
+      const rect = { left, top, right: left + (node.width ?? CARD_WIDTH) * zoom, bottom: top + height * zoom };
+      if (rectsIntersect(rect, bar)) tops.push(top);
+    }
+    return tops;
   }
   /** `persist` false is keyboard navigation: the camera follows in memory and Map.md is not written. */
   private focusNode(target: MapNode, persist = true): void {
@@ -15218,6 +15331,34 @@ export class VisualAgentMapView extends ItemView {
   onResize(): void {
     this.syncChatNarrow();
     this.fitKindShapes();
+    this.syncStatusBarClearance();
+  }
+  /**
+   * Obsidian's status bar floats over the window's bottom-right corner. How far it reaches into the canvas and into the
+   * chat is written as `--vam-status-clearance` (px), which the zoom controls, the canvas hint, the selection bar and the
+   * chat body add to their bottom spacing. The bar changes size with the active note, so it is also watched.
+   */
+  private syncStatusBarClearance(): void {
+    if (this.closed) return;
+    const doc = this.contentEl?.ownerDocument;
+    const status = doc?.querySelector?.(".status-bar") ?? null;
+    if (status !== this.statusBarObserved) {
+      this.statusBarObserver?.disconnect();
+      this.statusBarObserver = null;
+      this.statusBarObserved = status;
+      const win = doc?.defaultView as (Window & { ResizeObserver?: typeof ResizeObserver }) | null | undefined;
+      if (status && typeof win?.ResizeObserver === "function") {
+        this.statusBarObserver = new win.ResizeObserver(() => this.syncStatusBarClearance());
+        this.statusBarObserver.observe(status);
+      }
+    }
+    const statusRect = status?.getBoundingClientRect?.() ?? null;
+    for (const selector of [".vam-canvas", ".vam-map-chat"]) {
+      const el = this.contentEl.querySelector<HTMLElement>(selector);
+      if (typeof el?.getBoundingClientRect !== "function" || typeof el.style?.setProperty !== "function") continue;
+      const clearance = statusBarClearance(el.getBoundingClientRect(), statusRect);
+      el.style.setProperty("--vam-status-clearance", `${clearance}px`);
+    }
   }
   private chatWidth(): number {
     return clampMapChatWidth(this.plugin.settings.mapChatWidth);

@@ -1292,6 +1292,22 @@ const viewportFixture = () => {
   plugin.views = () => [view];
   return { plugin, view, counts, doc, frames, cancelled, a, b, windowValues, load: () => ({ VisualAgentMapView }) };
 };
+integrationTest('canvas hint: selecting a card (click or arrow-key focus) and using a zoom-control button dismiss it; the zoom maths itself does not', () => {
+  const { plugin, view, a } = viewportFixture();
+  let saves = 0; plugin.saveSettings = async () => { saves++; };
+  const hint = { removed: 0, remove() { this.removed++; } };
+  view.hintEl = hint;
+  view.applySelectionChange = () => {};
+  view.selection = { state: { multiSelectMode: false }, selectIfChanged: () => ({}) };
+  view.selectMapNode(a);
+  assert.equal(plugin.settings.canvasHintSeen, true, 'selecting a card marks the hint seen');
+  assert.equal(hint.removed, 1); assert.equal(view.hintEl, null); assert.equal(saves, 1);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  for (const label of ['zoom_out', 'zoom_in', 'show_all'])
+    assert.match(source, new RegExp(`t\\("ui\\.${label}"\\), \\(\\) => \\{\\s*this\\.markCanvasHintSeen\\(\\);`), `${label} button marks the hint seen`);
+  assert.match(source, /event\.stopPropagation\(\);\s*this\.markCanvasHintSeen\(\);\s*if \(this\.map\) this\.resetZoom\(\);/, 'the percentage button counts');
+  assert.match(source, /private selectMapNode\(node: MapNode\): void \{\s*\/\/[^\n]*\n\s*if \(this\.hintEl\) this\.markCanvasHintSeen\(\);/);
+});
 integrationTest('canvas hint: a solid chip that goes away after the first zoom or pan and remembers it in settings; select mode keeps its hint inside the selection bar', () => {
   const { plugin, view } = viewportFixture();
   let saves = 0; plugin.saveSettings = async () => { saves++; };
@@ -3122,7 +3138,7 @@ integrationTest('hypothesis-evidence: a long note is cut to 60 characters with a
 });
 integrationTest('hypothesis-evidence: relation labels are hidden below 60% zoom (0.59 hidden, 0.6 shown) through an attribute on the stage', () => {
   const { view } = heFixture();
-  const attrs = {}; view.stageEl = { style: {}, setAttribute(n, v) { attrs[n] = v; }, removeAttribute(n) { delete attrs[n]; } };
+  const attrs = {}; view.stageEl = { style: { setProperty() {} }, setAttribute(n, v) { attrs[n] = v; }, removeAttribute(n) { delete attrs[n]; } };
   for (const [zoom, hidden] of [[0.25, true], [0.59, true], [0.6, false], [1, false], [2, false]]) {
     view.map.viewport.zoom = zoom; view.transform();
     assert.equal(attrs['data-relation-labels'], hidden ? 'hidden' : undefined, `zoom ${zoom}`);
@@ -3288,6 +3304,9 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented'), /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-multi'), /grid-template-columns: repeat\(auto-fill, minmax\(8\.5em, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented button[data-marker^="progress-"] > .vam-marker'), /font-size: 16px/);
   const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
@@ -3493,14 +3512,16 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
   const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
-  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  // Priority and progress buttons are symbol-only; their name is the aria-label.
+  const name = c => c.attrs['aria-label'] ?? c.text;
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(name);
   const { TOPIC_MARKERS, TOPIC_MARKER_GROUPS } = load('topic-markers.ts', { obsidian });
   assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length);
   const sub = dom.findAll(group(), c => (c.cls ?? '').includes('vam-topic-marker-group') && c.attrs.role === 'group');
   assert.equal(sub.length, TOPIC_MARKER_GROUPS.length);
   sub.forEach((box, i) => assert.equal(dom.findAll(box, c => c.tag === 'button').length, TOPIC_MARKER_GROUPS[i].ids.length));
   assert.deepEqual(pressed(), []);
-  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => (c.attrs['aria-label'] ?? c.text).includes(name)).click();
   click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
   assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
   assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
@@ -3509,6 +3530,18 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   click('Progress 25%'); await dom.tick(); click('Progress 50%'); await dom.tick(); click('Red flag'); await dom.tick(); click('Blue flag'); await dom.tick();
   assert.deepEqual(pressed().map(t => t.replace(/^.*?(Progress|Priority|Red|Blue)/, '$1')).sort(), ['Blue flag', 'Priority 3', 'Progress 50%', 'Red flag'].map(t => t).sort().map(t => t), 'progress is single choice, flags can coexist');
   assert.ok(sub.every(box => box.attrs['aria-label']), 'every section is a labelled group');
+  sub.forEach((box, i) => {
+    const single = TOPIC_MARKER_GROUPS[i].single;
+    assert.equal((box.cls ?? '').includes('is-segmented'), !!single, 'only one-of groups are segmented');
+    for (const b of dom.findAll(box, c => c.tag === 'button')) {
+      if (single) assert.ok(b.text === '' && b.attrs['aria-label'] && b.attrs.title === b.attrs['aria-label'], 'symbol-only segment named by aria-label and title');
+      else assert.ok(b.text && b.attrs['aria-label'] === undefined, 'many-of buttons keep their text');
+      assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
+      // The stylesheet's progress size rule is `button[data-marker^="progress-"] > .vam-marker`: the attribute is on the button, the symbol is its child.
+      assert.ok(b.dataset.marker, 'the marker id is on the button');
+      assert.ok(b.children.some(c => (c.cls ?? '').includes('vam-marker')), 'the symbol span is a direct child');
+    }
+  });
   assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);
 });
 integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {
@@ -4192,7 +4225,7 @@ function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft 
   });
   const classes = new Set();
   const style = { removeProperty: key => { delete style[key.replace(/-(\w)/g, (m, c) => c.toUpperCase())]; } };
-  const tools = { style, getBoundingClientRect() { const max = parseFloat(style.maxWidth) * zoom; return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
+  const tools = { style, getBoundingClientRect() { const max = parseFloat(style.maxWidth) * zoom * Math.max(1, 1 / zoom); return { width: Number.isFinite(max) ? Math.min(toolsWidth, max) : toolsWidth }; }, toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
   const card = { offsetWidth: cardWidth, getBoundingClientRect: () => ({ left: cardLeft, right: cardLeft + cardWidth, width: cardWidth }), querySelector: () => tools };
   const chat = chatRight === null ? null : { getBoundingClientRect: () => ({ left: 0, right: chatRight }) };
   const view = Object.create(VisualAgentMapView.prototype);
@@ -4282,4 +4315,20 @@ integrationTest('C5: Keyboard shortcuts lists the map keys (Mod reads ⌘ on mac
   view.openMapActions();
   menus.at(-1).items.find(item => item.title === 'Keyboard shortcuts').click();
   assert.equal(opened, 1);
+});
+
+// ---- UX review A theme 1: the tool row counter-scales below 100% so its buttons stay tappable ----
+test('UX-A canvas: zoomed out, the tool row wraps in screen pixels (its own scale included) and the stylesheet counter-scales it only below 100%', () => {
+  // Zoom 0.5: the row is drawn at 0.5 * 2 = 1x on screen. Its max-width is in its own units: available / (zoom * 2).
+  const narrow = toolsHarness({ cardLeft: 700, toolsWidth: 480, zoom: 0.5, canvasLeft: 664, canvasRight: 1024 });
+  assert.ok(narrow.wrapped && narrow.toolsLeft >= 674 && narrow.toolsRight <= 1014, `zoomed out, every button lies inside the canvas (${narrow.toolsLeft}..${narrow.toolsRight})`);
+  // Zoom >= 1: no extra scale, the max-width divides by the zoom alone (the existing 1.5 case stays valid).
+  const zoomedIn = toolsHarness({ cardLeft: 700, toolsWidth: 480, zoom: 1.5, canvasLeft: 664, canvasRight: 1024 });
+  assert.ok(zoomedIn.wrapped && zoomedIn.toolsRight <= 1014);
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.vam-node > \.vam-node-tools \{[^}]*scale: max\(1, calc\(1 \/ var\(--vam-zoom, 1\)\)\);[^}]*transform-origin: right bottom;/, 'counter-scale with a fallback of 1; never shrinks at zoom >= 1');
+  assert.match(css, /\.vam-node > \.vam-node-tools\.is-align-left \{[^}]*transform-origin: left bottom/);
+  assert.match(css, /\.vam-node > \.vam-node-tools \{[^}]*transform: translateY\(4px\)/, 'the reveal animation keeps its own transform');
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(source, /this\.stageEl\.style\.setProperty\("--vam-zoom", String\(zoom\)\)/);
 });

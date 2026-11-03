@@ -4,7 +4,8 @@ import { resolveAimContentLanguage } from "./content-language";
 import { buildFinalDelivery, type DeliveryEvidence } from "./final-delivery";
 import { createHash, randomUUID } from "node:crypto";
 import type { AiResult, TaskContext } from "../../ai/types";
-import { resolveToneText } from "../../ai/prompt-presets";
+import type { RunStyle } from "../../ai/note-style-store";
+import { aimNoteStyleOf, type AimNoteStyle } from "./aim-note-style";
 import { reportedSearchFailure } from "../../ai/result-utils";
 import { createSearchDiagnostic } from "./search-diagnostic";
 import { aimTimedOut } from "./failure-hint";
@@ -179,6 +180,9 @@ export class AimManualFlow {
     onStart?: () => void;
   }) => Promise<string>;
 
+  /** The user's AIM note style for the final conclusion; set by the view, absent in tests: the AIM report. */
+  noteStyle?: (language: ContentLanguage) => RunStyle | undefined | Promise<RunStyle | undefined>;
+
   private emitProgress(event: AimProgressEvent): void {
     try {
       this.onProgress?.(event);
@@ -282,19 +286,22 @@ export class AimManualFlow {
       signal?: AbortSignal;
       mapPath: string;
       branchId: string;
+      noteStyle?: AimNoteStyle;
     }
   ): Promise<string> {
     // The chart step sees the final conclusion body only (not interim notes, not the hidden marker); it returns the body
     // unchanged when diagrams are off or any check fails, and throws only when the user stopped.
-    const { mapPath, branchId, ...request } = charts;
-    const body = this.addDiagrams
-      ? await this.addDiagrams({
-          ...request,
-          detail: review.detail,
-          // Called only when the step really runs (the setting is on), so the UI never shows a stage that is skipped.
-          onStart: () => this.emitProgress({ kind: "stage", mapPath, branchId, stage: "add-diagrams" })
-        })
-      : review.detail;
+    const { mapPath, branchId, noteStyle, ...request } = charts;
+    // A style without charts (the lean format) skips the chart step and its progress stage.
+    const body =
+      this.addDiagrams && noteStyle?.charts !== false
+        ? await this.addDiagrams({
+            ...request,
+            detail: review.detail,
+            // Called only when the step really runs (the setting is on), so the UI never shows a stage that is skipped.
+            onStart: () => this.emitProgress({ kind: "stage", mapPath, branchId, stage: "add-diagrams" })
+          })
+        : review.detail;
     return review.openItems?.length ? `${body}\n\n${openItemsMarker(review.openItems.map(item => item.title))}` : body;
   }
 
@@ -319,11 +326,11 @@ export class AimManualFlow {
   }
 
   /**
-   * Tone text for prose-producing AIM calls (research and final delivery). Structured Planner/review calls carry an
-   * aimContract and never get it (askAimModel drops it), so tone cannot disturb their schemas.
+   * The note style of the final conclusion (the user's AIM row), or undefined for the AIM report. Read once per
+   * workflow entry. Research calls never carry a tone; the map tone is not read here.
    */
-  private toneOf(map: MapDocument, language: ContentLanguage): string | undefined {
-    return resolveToneText(this.repository.settings.promptPresets, [map.toneId], language);
+  private async styleOf(language: ContentLanguage): Promise<AimNoteStyle | undefined> {
+    return aimNoteStyleOf(await this.noteStyle?.(language));
   }
 
   /** Content language of the map as read now; never cached on the flow, so a UI language switch cannot change it. */
@@ -951,6 +958,7 @@ export class AimManualFlow {
         step => this.askAimModel({ ...step, outputLanguage: deliveryContext.outputLanguage }, model, reasoning, signal),
         {
           checkpoint,
+          ...(context.noteStyle ? { noteStyle: context.noteStyle } : {}),
           timeoutMs: context.timeoutMs,
           webSearch: this.limits.webSearch,
           evidence: context.deliveryEvidence,
@@ -1132,6 +1140,7 @@ export class AimManualFlow {
     const map = await this.repository.readMap(mapPath),
       run = map.aim?.runs.find(item => item.id === runId);
     const language = this.languageOf(map);
+    const aimStyle = await this.styleOf(language);
     const priorAttempt = run?.attempts.find(item => item.id === run.currentAttemptId);
     if (!run || !priorAttempt || priorAttempt.status !== "failed")
       throw new Error("A saved failed AIM attempt is required to review a diagnostic report.");
@@ -1288,7 +1297,8 @@ export class AimManualFlow {
             goalDetail: topic.detail,
             unattended: this.isUnattended(map),
             outputLanguage: language,
-            toneText: this.toneOf(map, language),
+            toneText: aimStyle?.toneText,
+            ...(aimStyle ? { noteStyle: aimStyle } : {}),
             conditions: branch.inputSnapshot.conditions,
             currentQuestion: parent.summary,
             currentAnswer: answerDescription,
@@ -1359,7 +1369,6 @@ export class AimManualFlow {
             task,
             ancestors: `Topic: ${topic.title}\n\n${topic.detail}\n\nConditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             outputLanguage: language,
-            ...(this.toneOf(map, language) ? { toneText: this.toneOf(map, language) } : {}),
             mode: "task",
             researchMode: this.researchMode(),
             researchDepth: "normal",
@@ -1389,7 +1398,8 @@ export class AimManualFlow {
               model,
               signal,
               mapPath,
-              branchId: branch.id
+              branchId: branch.id,
+              noteStyle: aimStyle
             })
           : this.interimDetail([
               this.interimNotice(finalReview, language),
@@ -1524,6 +1534,7 @@ export class AimManualFlow {
     const map = await this.repository.readMap(mapPath),
       run = map.aim?.runs.find(item => item.id === runId);
     const language = this.languageOf(map);
+    const aimStyle = await this.styleOf(language);
     const currentAttempt = run?.attempts.find(item => item.id === run.currentAttemptId);
     if (
       !run ||
@@ -1626,7 +1637,8 @@ export class AimManualFlow {
           goalDetail: topicNote.detail,
           unattended: this.isUnattended(map),
           outputLanguage: language,
-          toneText: this.toneOf(map, language),
+          toneText: aimStyle?.toneText,
+          ...(aimStyle ? { noteStyle: aimStyle } : {}),
           conditions: branch.inputSnapshot.conditions,
           currentQuestion: parent.summary,
           currentAnswer: JSON.stringify(branch.answerSnapshot),
@@ -1718,7 +1730,6 @@ export class AimManualFlow {
               task,
               ancestors: `Original goal: ${topicNote.title}\n\n${topicNote.detail}\n\n${lineage.context}\n\nPersisted answer branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
               outputLanguage: language,
-              ...(this.toneOf(map, language) ? { toneText: this.toneOf(map, language) } : {}),
               mode: "task",
               researchMode: this.researchMode(),
               researchDepth: "normal",
@@ -1817,7 +1828,8 @@ export class AimManualFlow {
             goalDetail: topicNote.detail,
             unattended: this.isUnattended(map),
             outputLanguage: language,
-            toneText: this.toneOf(map, language),
+            toneText: aimStyle?.toneText,
+            ...(aimStyle ? { noteStyle: aimStyle } : {}),
             conditions: branch.inputSnapshot.conditions,
             currentQuestion: parent.summary,
             currentAnswer: JSON.stringify(branch.answerSnapshot),
@@ -1883,7 +1895,8 @@ export class AimManualFlow {
               model: modelToUse,
               signal,
               mapPath,
-              branchId: branch.id
+              branchId: branch.id,
+              noteStyle: aimStyle
             })
           : this.interimDetail([
               this.interimNotice(finalReview, language),
@@ -3006,6 +3019,7 @@ export class AimManualFlow {
   ): Promise<ManualResearchResult> {
     let map = await this.repository.readMap(mapPath);
     const language = this.languageOf(map);
+    const aimStyle = await this.styleOf(language);
     let branch = map.aim?.branches.find(item => item.id === branchId);
     if (!branch) throw new Error("AIM answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;
@@ -3023,7 +3037,6 @@ export class AimManualFlow {
       task: "",
       ancestors: `Original goal and background:\n${topicNote.title}\n\n${topicNote.detail}\n\nBranch lineage:\n${lineageContext || "None."}`,
       outputLanguage: language,
-      ...(this.toneOf(map, language) ? { toneText: this.toneOf(map, language) } : {}),
       mode: "task" as const,
       researchMode: "local" as const,
       researchDepth: "fast" as const,
@@ -3577,7 +3590,8 @@ export class AimManualFlow {
           goalDetail: topicNote.detail,
           unattended: this.isUnattended(map),
           outputLanguage: language,
-          toneText: this.toneOf(map, language),
+          toneText: aimStyle?.toneText,
+          ...(aimStyle ? { noteStyle: aimStyle } : {}),
           conditions: branch.inputSnapshot.conditions,
           currentQuestion: parent.summary,
           currentAnswer: answerDescription,
@@ -3849,7 +3863,8 @@ export class AimManualFlow {
               model,
               signal,
               mapPath,
-              branchId
+              branchId,
+              noteStyle: aimStyle
             });
       const presentation = isPartial
         ? {

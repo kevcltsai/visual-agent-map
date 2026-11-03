@@ -2,6 +2,12 @@
   "note": "G2: every string/template literal in experiences/aim/**/*.ts that contains a capitalized Latin word must be classified here. Classes: content (written into notes; must go through i18n), ui (interface text), machine-marker (parsed or identifier text, stays English), attempt-record (persisted on attempt/plan records, not in notes), prompt-only (sent to the model only).",
   "literals": [
     {
+      "file": "experiences/aim/aim-note-style.ts",
+      "text": "Exactly",
+      "class": "prompt-only",
+      "reason": "Item-count line of a note style section inside the outline and writing prompts; the model reads it, never a note"
+    },
+    {
       "file": "experiences/aim/create-map.ts",
       "text": "Notes",
       "class": "machine-marker",

@@ -43,15 +43,7 @@ import {
   type StyleKind,
   type UpdateMode
 } from "./note-style-recipe";
-import {
-  builtinPairOf,
-  NOTE_STYLE_UPGRADE_VERSION,
-  planNoteStyleUpgrade,
-  type NoteStyleAliases,
-  type NoteStyleUpgradeMarker,
-  type UpgradePlan
-} from "./note-style-upgrade";
-export { builtinPairOf };
+import { planRecipeMigration } from "./note-style-migrate";
 
 /**
  * Finds the note style of a run: a style (structure, voice, format and update mode) from the run's choice, the topic or the
@@ -86,10 +78,6 @@ export interface NoteStyleSettings {
   noteToneBlock?: string;
   /** The template block each topic kind uses (`builtin:<id>` or `file:<name>`); a kind with no entry has no kind level. */
   noteTemplateByKind?: Partial<Record<TopicKind, string>>;
-  /** Old ids (style file, old template, built-in style whose file was changed, custom tone preset) -> the blocks that replaced them. */
-  noteStyleAliases?: NoteStyleAliases;
-  /** Set when the one-time upgrade of the old note style data has finished. */
-  noteStyleUpgrade?: NoteStyleUpgradeMarker;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
   /** The marker of the conversion to this model, and the old id -> new ref table that implicit styles read. */
@@ -201,16 +189,12 @@ export interface BlockListItem {
   issues: NoteStyleIssue[];
 }
 
-/** What the one-time upgrade could not do; each is shown to the user once. */
-export type NoteStyleUpgradeEvent =
-  { kind: "failed" } | { kind: "trash-failed"; names: string[] } | { kind: "skipped"; names: string[] };
-
-export interface NoteStyleUpgradeResult {
-  status: "done" | "already" | "failed";
-  /** Old style files that do not read: they were not upgraded and stay where they are. */
-  skipped: string[];
-  /** Old files that were upgraded but could not be moved to the trash. */
-  trashFailed: string[];
+/** What the conversion of the 0.28.0 data did. `notify` is set once, when maps carried a style that is no longer used. */
+export interface MigrationResult {
+  status: "already" | "done" | "failed";
+  notify?: { maps: string[]; defaultName?: string };
+  /** The message of the error behind `failed`, or of the save that could not record the maps on an `already` result. */
+  error?: string;
 }
 
 export type RestoreBlockResult =
@@ -264,8 +248,6 @@ interface Candidate {
 }
 
 export class NoteStyleStore {
-  /** The old style files of the style folder's root, read only by the old upgrade (`runUpgrade`). */
-  private files = new Map<string, string>();
   /** Structure (template) and voice (tone) file text by base name (no ".md"), as of the last `refresh()` or write. */
   private blocks: Record<BlockCategory, Map<string, string>> = { template: new Map(), tone: new Map() };
   /** Format rules file text by base name, as of the last `refresh()`. */
@@ -274,10 +256,8 @@ export class NoteStyleStore {
   private recipes = new Map<string, string>();
   /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
   private writeQueue: Promise<unknown> = Promise.resolve();
-  /** The one upgrade run of this session (started once; later calls get the same answer). */
-  private upgradeRun?: Promise<NoteStyleUpgradeResult>;
-  /** An upgrade that could not be written out: its blocks, aliases and keys answer in memory until the next load retries it. */
-  private pending?: Pick<UpgradePlan, "blocks" | "aliases" | "keys">;
+  /** The conversion of the 0.28.0 data that is under way (never rejects); `refresh()` waits for it. */
+  private migration?: Promise<unknown>;
 
   constructor(
     private readonly deps: {
@@ -286,8 +266,6 @@ export class NoteStyleStore {
       save: () => Promise<void>;
       /** The clock for backup names; tests inject one. */
       now?: () => Date;
-      /** Told what the upgrade could not do, so the plugin can say so once. */
-      report?: (event: NoteStyleUpgradeEvent) => void;
     }
   ) {}
 
@@ -306,29 +284,9 @@ export class NoteStyleStore {
    * see this snapshot. Writes nothing.
    */
   async refresh(): Promise<void> {
-    // A run waits for an upgrade that is under way: it must not see half of it.
-    if (this.upgradeRun) await this.upgradeRun;
+    // The conversion of the 0.28.0 data writes files: a run must not read the folders half way through it.
+    if (this.migration) await this.migration;
     await this.loadBlocks();
-  }
-
-  /** The old style files directly in the style folder (only the old upgrade reads them). */
-  private async loadFiles(): Promise<void> {
-    const folder = this.folder();
-    const next = new Map<string, string>();
-    let names: string[] = [];
-    try {
-      names = await this.deps.port.list(folder);
-    } catch {
-      names = [];
-    }
-    for (const name of names) {
-      try {
-        next.set(stripMd(name), await this.deps.port.read(`${folder}/${name}`));
-      } catch {
-        /* an unreadable file is simply not a style */
-      }
-    }
-    this.files = next;
   }
 
   // ---- block files ----
@@ -381,10 +339,6 @@ export class NoteStyleStore {
       template: await this.readFolder(dirs.template),
       tone: await this.readFolder(dirs.tone)
     };
-    // An upgrade that was not written out still answers from memory.
-    for (const block of this.pending?.blocks ?? [])
-      if (![...next[block.category].keys()].some(base => lower(base) === lower(block.base)))
-        next[block.category].set(block.base, block.text);
     this.blocks = next;
     this.formats = await this.readFolder(dirs.format);
     this.recipes = await this.readFolder(dirs.recipe);
@@ -800,22 +754,11 @@ export class NoteStyleStore {
     };
   }
 
-  // ---- upgrade state the settings page reads (a run does not): what is saved, else what an unfinished upgrade holds in memory ----
+  // ---- what the settings page reads ----
 
-  private templateKey(): string | undefined {
-    return this.settings.noteTemplateBlock || this.pending?.keys.noteTemplateBlock;
-  }
-
-  private toneKey(): string | undefined {
-    return this.settings.noteToneBlock || this.pending?.keys.noteToneBlock;
-  }
-
-  /**
-   * The template and tone blocks the runs use: what is saved, else what an unfinished upgrade holds in memory. Read-only;
-   * the settings page shows these, so a failed or unfinished upgrade does not show the standard template over the result.
-   */
-  effectiveBlockKeys(): { template?: string; tone?: string; pending: boolean } {
-    return { template: this.templateKey(), tone: this.toneKey(), pending: this.pending !== undefined };
+  /** The template and tone blocks the runs use, as saved. Read-only. */
+  effectiveBlockKeys(): { template?: string; tone?: string } {
+    return { template: this.settings.noteTemplateBlock, tone: this.settings.noteToneBlock };
   }
 
   // ---- the tone choices of the map pickers ----
@@ -998,140 +941,103 @@ export class NoteStyleStore {
     });
   }
 
-  // ---- the one-time upgrade of the old note style data (the only write that is not a user action) ----
+  // ---- the conversion of the 0.28.0 data (the only write that is not a user action) ----
 
   /**
-   * Starts the upgrade once (`after` is awaited first, for example the plugin's start-up); later calls get the same
-   * promise. It never rejects: a failure is reported once, the unfinished upgrade answers from memory this session, and
-   * the next load tries again. `refresh()` waits for it.
+   * Turns the custom detail templates and tone presets of 0.28.0 into structure, voice and style files, and records the old
+   * id -> new ref table, once: the marker `noteStyleRecipe.migrated` ends it. Only new files are created (a file that holds
+   * the same text is reused, other text gets " (n)"), no old key is changed, and the files, the folder, the general-topic
+   * style and the marker reach data.json in one save. A failure sets no marker and leaves the settings as they were; files
+   * already written stay and are reused by the next try. Never rejects. `mapsWithStyle` are the titles of maps that carry a
+   * style of their own: they are handed back once (`notify`) because that style is not read any more.
    */
-  startUpgrade(after?: Promise<unknown>): Promise<NoteStyleUpgradeResult> {
-    this.upgradeRun ??= (async (): Promise<NoteStyleUpgradeResult> => {
-      try {
-        if (after) await after.catch(() => undefined);
-        return await this.runUpgrade();
-      } catch {
-        this.deps.report?.({ kind: "failed" });
-        return { status: "failed", skipped: [], trashFailed: [] };
-      }
-    })();
-    return this.upgradeRun;
+  migrateLegacy(input: { mapsWithStyle: string[] }): Promise<MigrationResult> {
+    const run = this.serial(() => this.runMigration(input.mapsWithStyle));
+    const fence: Promise<unknown> = run
+      .catch(() => undefined)
+      .then(() => {
+        if (this.migration === fence) this.migration = undefined;
+      });
+    this.migration = fence;
+    return run;
   }
 
-  upgradeLegacy(): Promise<NoteStyleUpgradeResult> {
-    return this.startUpgrade();
-  }
-
-  /**
-   * Order: the plan is applied in memory, then backups of the old files, the block files, data.json (new keys, aliases,
-   * marker), and only then the old files go to the trash. A failure before the marker leaves the marker, the keys and the
-   * old files alone. Nothing is ever overwritten: a name taken by other text was given a new name by the plan.
-   */
-  private async runUpgrade(): Promise<NoteStyleUpgradeResult> {
+  private async runMigration(mapsWithStyle: string[]): Promise<MigrationResult> {
     const settings = this.settings;
-    if (settings.noteStyleUpgrade) return { status: "already", skipped: [], trashFailed: [] };
-    await this.loadFiles();
-    await this.loadBlocks();
-    const plan = planNoteStyleUpgrade({
-      language: settings.language,
-      files: this.files,
-      detailTemplates: settings.detailTemplates,
-      promptPresets: settings.promptPresets,
-      noteStyleFiles: settings.noteStyleFiles,
-      defaultNoteStyleId: settings.defaultNoteStyleId,
-      defaultDetailTemplateId: settings.defaultDetailTemplateId,
-      noteTemplateBlock: settings.noteTemplateBlock,
-      noteToneBlock: settings.noteToneBlock,
-      blocks: this.blocks
-    });
-    // From here the plan answers in memory, whatever happens to the writes.
-    if (!plan.nothing) {
-      this.pending = { blocks: plan.blocks, aliases: plan.aliases, keys: plan.keys };
-      for (const block of plan.blocks) this.blocks[block.category].set(block.base, block.text);
-    }
+    const maps = [...mapsWithStyle];
     try {
-      // Block actions of the user wait behind the upgrade's writes, as they wait behind each other.
-      await this.serial(() => this.writeUpgrade(plan));
-    } catch {
-      this.deps.report?.({ kind: "failed" });
-      return { status: "failed", skipped: plan.skipped, trashFailed: [] };
-    }
-    this.pending = undefined;
-    const trashFailed = await this.trashUpgraded(plan);
-    if (plan.skipped.length) this.deps.report?.({ kind: "skipped", names: plan.skipped });
-    if (trashFailed.length) this.deps.report?.({ kind: "trash-failed", names: trashFailed });
-    return { status: "done", skipped: plan.skipped, trashFailed };
-  }
-
-  private async writeUpgrade(plan: UpgradePlan): Promise<void> {
-    const { port } = this.deps;
-    const settings = this.settings;
-    const dirs = this.blockDirectories();
-    // The folders are about to be made: the path they get is the one kept, whatever the interface language becomes.
-    const pinned = settings.noteStylesFolder ? undefined : this.folder();
-    if (plan.oldFiles.length) {
-      let present: string[] = [];
+      const marker = settings.noteStyleRecipe;
+      if (marker?.migrated) {
+        if (marker.mapsNotified) return { status: "already" };
+        // The maps are looked at once: this save is that record.
+        settings.noteStyleRecipe = { ...marker, mapsNotified: true };
+        try {
+          await this.deps.save();
+        } catch (error) {
+          // The conversion itself finished earlier: only the record of the maps is missing, so it is tried again next load.
+          settings.noteStyleRecipe = marker;
+          return { status: "already", error: error instanceof Error ? error.message : String(error) };
+        }
+        return { status: "already", ...(maps.length ? { notify: { maps } } : {}) };
+      }
+      await this.loadBlocks();
+      const plan = planRecipeMigration({
+        language: settings.language,
+        detailTemplates: settings.detailTemplates,
+        promptPresets: settings.promptPresets,
+        defaultDetailTemplateId: settings.defaultDetailTemplateId,
+        noteStyleByKind: settings.noteStyleByKind,
+        existing: { recipe: this.recipes, template: this.blocks.template, tone: this.blocks.tone }
+      });
+      const { port } = this.deps;
+      const dirs = this.blockDirectories();
+      // The folders are about to be made: the path they get is the one kept, whatever the interface language becomes.
+      const pinned = settings.noteStylesFolder ? undefined : this.folder();
+      for (const category of ["template", "tone", "recipe"] as const) {
+        const items = plan.files.filter(file => file.category === category);
+        if (!items.length) continue;
+        const dir = dirs[category];
+        await port.createFolder(dir);
+        // Looked at again right before writing: a file that showed up meanwhile is never written over.
+        const present = await this.readFolder(dir);
+        for (const item of items) {
+          const held = [...present].find(([base]) => lower(base) === lower(item.base));
+          if (held) {
+            if (held[1] === item.text) continue;
+            throw new Error(`File appeared while converting: ${dir}/${item.base}.md`);
+          }
+          await port.create(`${dir}/${item.base}.md`, item.text);
+        }
+      }
+      // data.json: the folder, the general-topic style and the marker in one save; undone when the save fails.
+      const before = {
+        noteStylesFolder: settings.noteStylesFolder,
+        noteStyleByKind: settings.noteStyleByKind,
+        noteStyleRecipe: settings.noteStyleRecipe
+      };
+      if (pinned !== undefined && plan.files.length) settings.noteStylesFolder = pinned;
+      if (plan.topicStyle && !settings.noteStyleByKind?.topic)
+        settings.noteStyleByKind = { ...settings.noteStyleByKind, topic: plan.topicStyle };
+      const hasLegacy = Object.keys(plan.legacy.templates).length > 0 || Object.keys(plan.legacy.tones).length > 0;
+      settings.noteStyleRecipe = { migrated: 1, ...(hasLegacy ? { legacy: plan.legacy } : {}), mapsNotified: true };
       try {
-        present = await port.list(dirs.backup);
-      } catch {
-        present = [];
+        await this.deps.save();
+      } catch (error) {
+        for (const [key, value] of Object.entries(before)) {
+          if (value === undefined) delete settings[key as keyof typeof before];
+          else (settings as unknown as Record<string, unknown>)[key] = value;
+        }
+        throw error;
       }
-      await port.createFolder(dirs.backup);
-      const taken = new Set(present.map(lower));
-      const now = this.deps.now?.() ?? new Date();
-      for (const old of plan.oldFiles) {
-        const name = backupName(old.base, now, taken);
-        taken.add(lower(name));
-        await port.create(`${dirs.backup}/${name}`, old.text);
-      }
-    }
-    for (const category of ["tone", "template"] as const) {
-      const items = plan.blocks.filter(block => block.category === category);
-      if (!items.length) continue;
-      await port.createFolder(dirs[category]);
-      for (const item of items) await port.create(`${dirs[category]}/${item.base}.md`, item.text);
-    }
-    // data.json: the new keys only where they have no value, the aliases, then the marker; undone when the save fails.
-    const before = {
-      noteStylesFolder: settings.noteStylesFolder,
-      noteTemplateBlock: settings.noteTemplateBlock,
-      noteToneBlock: settings.noteToneBlock,
-      noteStyleAliases: settings.noteStyleAliases,
-      noteStyleUpgrade: settings.noteStyleUpgrade
-    };
-    if (pinned !== undefined && (plan.oldFiles.length || plan.blocks.length)) settings.noteStylesFolder = pinned;
-    if (plan.keys.noteTemplateBlock && !settings.noteTemplateBlock)
-      settings.noteTemplateBlock = plan.keys.noteTemplateBlock;
-    if (plan.keys.noteToneBlock && !settings.noteToneBlock) settings.noteToneBlock = plan.keys.noteToneBlock;
-    if (Object.keys(plan.aliases).length) settings.noteStyleAliases = { ...plan.aliases, ...settings.noteStyleAliases };
-    settings.noteStyleUpgrade = { version: NOTE_STYLE_UPGRADE_VERSION };
-    try {
-      await this.deps.save();
+      return {
+        status: "done",
+        ...(maps.length
+          ? { notify: { maps, ...(plan.defaultConverted ? { defaultName: plan.defaultConverted } : {}) } }
+          : {})
+      };
     } catch (error) {
-      for (const [key, value] of Object.entries(before)) {
-        if (value === undefined) delete settings[key as keyof typeof before];
-        else (settings as unknown as Record<string, unknown>)[key] = value;
-      }
-      throw error;
+      return { status: "failed", error: error instanceof Error ? error.message : String(error) };
     }
-  }
-
-  /** The old files that became blocks go to the trash, each only while it still holds the text that was backed up. */
-  private async trashUpgraded(plan: UpgradePlan): Promise<string[]> {
-    const { port } = this.deps;
-    const folder = this.folder();
-    const failed: string[] = [];
-    for (const old of plan.oldFiles) {
-      const path = `${folder}/${old.base}.md`;
-      try {
-        if ((await port.read(path)) !== old.text) throw new Error("changed");
-        await port.trash(path);
-        this.files.delete(old.base);
-      } catch {
-        failed.push(old.base);
-      }
-    }
-    return failed;
   }
 
   /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */

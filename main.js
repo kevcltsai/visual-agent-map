@@ -1621,14 +1621,11 @@ var en = {
   "ui.detail_template_missing_0": 'The note structure "{0}" no longer exists; this topic now uses the next default.',
   "ui.note_styles_folder_name": "Note styles",
   "ui.note_style_file_missing_0": 'The note style file "{0}" is missing; this topic now uses the next default.',
+  "ui.note_style_kind_aim": "AIM conclusion note",
   "ui.note_style_kind_missing_0_1": 'The structure set for {0} topics, "{1}", was not found; this topic uses the next one in line.',
   "ui.note_style_file_invalid_0_1_2": 'The note style file "{0}" has a problem (line {1}): {2}',
   "ui.note_style_open_folder_command": "Open the note styles folder",
   "ui.note_style_folder_opened_0": "Note styles folder: {0}",
-  "ui.note_style_upgrade_tone_name_0": "{0} tone",
-  "ui.note_style_upgrade_failed": "Your note styles could not be upgraded this time. They keep working as before, and VAM tries again the next time it loads.",
-  "ui.note_style_upgrade_skipped_0": "These style files could not be read, so they were not upgraded and stay where they are: {0}",
-  "ui.note_style_upgrade_trash_failed_0": "Your note styles were upgraded, but these old files could not be moved to the trash and are no longer used: {0}",
   "ui.note_style_edit": "Edit this style",
   "ui.note_style_edit_button": "Open file",
   "ui.note_style_edit_current_desc": "Open the file of the style in force, to change how AI writes.",
@@ -1679,6 +1676,13 @@ var en = {
   "ui.style_folder_backup_notes": "Notes",
   "ui.writeback_top_failed": "Could not add the new findings without touching your existing text, so the note was left as it is.",
   "ui.writeback_backup_failed": "Could not save a backup of the note, so the note was left as it is.",
+  "ui.recipe_key_structure": "structure",
+  "ui.recipe_key_voice": "voice",
+  "ui.recipe_key_format": "format",
+  "ui.recipe_key_update": "update",
+  "ui.note_style_maps_notice_0": "Note styles now follow the topic type. The style set on these maps is no longer used: {0}. To keep one for a topic, right-click the topic and choose it.",
+  "ui.note_style_maps_notice_default_0": "Your old default template is now the note style of general topics: {0}.",
+  "ui.note_style_migrate_failed": "The note style conversion did not finish. It will try again the next time VAM opens; your old settings are all still there.",
   "ui.note_style_legacy_0_1": "Old setting ({0} \xB7 {1})",
   "ui.note_style_folder_missing": "File location not found",
   "ui.note_style_folder_missing_desc_0": '"{0}" does not exist. Choose the folder again or show it in the file explorer to create it.',
@@ -3978,14 +3982,11 @@ var zhCN = {
   "ui.detail_template_missing_0": "\u7B14\u8BB0\u7ED3\u6784\u201C{0}\u201D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u7ED3\u6784\u3002",
   "ui.note_styles_folder_name": "\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u9ED8\u8BA4\u3002",
+  "ui.note_style_kind_aim": "AIM \u7ED3\u8BBA\u7B14\u8BB0",
   "ui.note_style_kind_missing_0_1": "\u4E3A\u201C{0}\u201D\u8BAE\u9898\u7C7B\u578B\u6307\u5B9A\u7684\u7B14\u8BB0\u7ED3\u6784\u201C{1}\u201D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u8BAE\u9898\u6539\u7528\u4E0B\u4E00\u987A\u4F4D\u7684\u7ED3\u6784\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u201C{0}\u201D\u6709\u95EE\u9898\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u6253\u5F00\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939",
   "ui.note_style_folder_opened_0": "\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u5939\uFF1A{0}",
-  "ui.note_style_upgrade_tone_name_0": "{0} \u8BED\u6C14",
-  "ui.note_style_upgrade_failed": "\u8FD9\u6B21\u6CA1\u80FD\u5347\u7EA7\u4F60\u7684\u7B14\u8BB0\u98CE\u683C\u6587\u4EF6\u3002\u5B83\u4EEC\u7167\u65E7\u53EF\u7528\uFF0CVAM \u4E0B\u6B21\u52A0\u8F7D\u65F6\u4F1A\u518D\u8BD5\u4E00\u6B21\u3002",
-  "ui.note_style_upgrade_skipped_0": "\u8FD9\u4E9B\u98CE\u683C\u6587\u4EF6\u8BFB\u4E0D\u51FA\u6765\uFF0C\u6240\u4EE5\u6CA1\u6709\u5347\u7EA7\uFF0C\u7559\u5728\u539F\u5904\uFF1A{0}",
-  "ui.note_style_upgrade_trash_failed_0": "\u4F60\u7684\u7B14\u8BB0\u98CE\u683C\u5DF2\u5347\u7EA7\uFF0C\u4F46\u8FD9\u4E9B\u65E7\u6587\u4EF6\u6CA1\u80FD\u79FB\u5230\u5E9F\u7EB8\u7BD3\uFF0C\u4E4B\u540E\u4E0D\u4F1A\u518D\u4F7F\u7528\uFF1A{0}",
   "ui.note_style_edit": "\u7F16\u8F91\u8FD9\u4E2A\u98CE\u683C",
   "ui.note_style_edit_button": "\u6253\u5F00\u6587\u4EF6",
   "ui.note_style_edit_current_desc": "\u6253\u5F00\u5F53\u524D\u751F\u6548\u98CE\u683C\u7684\u6587\u4EF6\uFF0C\u8C03\u6574 AI \u7684\u5199\u6CD5\u3002",
@@ -4036,6 +4037,13 @@ var zhCN = {
   "ui.style_folder_backup_notes": "\u7B14\u8BB0",
   "ui.writeback_top_failed": "\u65E0\u6CD5\u5728\u4E0D\u52A8\u5230\u73B0\u6709\u6587\u5B57\u7684\u60C5\u51B5\u4E0B\u52A0\u5165\u65B0\u53D1\u73B0\uFF0C\u6240\u4EE5\u6CA1\u6709\u66F4\u6539\u7B14\u8BB0\u3002",
   "ui.writeback_backup_failed": "\u65E0\u6CD5\u5907\u4EFD\u8FD9\u4EFD\u7B14\u8BB0\uFF0C\u6240\u4EE5\u6CA1\u6709\u66F4\u6539\u7B14\u8BB0\u3002",
+  "ui.recipe_key_structure": "\u6BB5\u843D\u7ED3\u6784",
+  "ui.recipe_key_voice": "\u5199\u4F5C\u53E3\u543B",
+  "ui.recipe_key_format": "\u683C\u5F0F\u89C4\u5219",
+  "ui.recipe_key_update": "\u66F4\u65B0\u65B9\u5F0F",
+  "ui.note_style_maps_notice_0": "\u7B14\u8BB0\u98CE\u683C\u6539\u6210\u6309\u8BAE\u9898\u7C7B\u578B\u51B3\u5B9A\u3002\u8FD9\u4E9B\u5730\u56FE\u539F\u672C\u8BBE\u7684\u98CE\u683C\u4E0D\u518D\u4F7F\u7528\uFF1A{0}\u3002\u60F3\u8BA9\u67D0\u4E2A\u8BAE\u9898\u6CBF\u7528\uFF0C\u8BF7\u5728\u8BAE\u9898\u4E0A\u53F3\u952E\u9009\u62E9\u3002",
+  "ui.note_style_maps_notice_default_0": "\u539F\u672C\u7684\u9ED8\u8BA4\u6A21\u677F\u5DF2\u6539\u6210\u201C\u4E00\u822C\u8BAE\u9898\u201D\u7684\u7B14\u8BB0\u98CE\u683C\uFF1A{0}\u3002",
+  "ui.note_style_migrate_failed": "\u7B14\u8BB0\u98CE\u683C\u8F6C\u6362\u6CA1\u6709\u5B8C\u6210\uFF0C\u4E0B\u6B21\u6253\u5F00\u65F6\u4F1A\u518D\u8BD5\u4E00\u6B21\uFF1B\u539F\u672C\u7684\u8BBE\u7F6E\u90FD\u8FD8\u5728\u3002",
   "ui.note_style_legacy_0_1": "\u65E7\u8BBE\u7F6E\uFF08{0} \xB7 {1}\uFF09",
   "ui.note_style_folder_missing": "\u627E\u4E0D\u5230\u6587\u4EF6\u4F4D\u7F6E",
   "ui.note_style_folder_missing_desc_0": "\u201C{0}\u201D\u4E0D\u5B58\u5728\u3002\u8BF7\u91CD\u65B0\u9009\u62E9\u6587\u4EF6\u5939\uFF0C\u6216\u5728\u6587\u4EF6\u5217\u8868\u4E2D\u663E\u793A\u5B83\u8BA9\u5B83\u91CD\u65B0\u521B\u5EFA\u3002",
@@ -6335,14 +6343,11 @@ var zhTW = {
   "ui.detail_template_missing_0": "\u7B46\u8A18\u7D50\u69CB\u300C{0}\u300D\u5DF2\u4E0D\u5B58\u5728\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u7D50\u69CB\u3002",
   "ui.note_styles_folder_name": "\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_file_missing_0": "\u627E\u4E0D\u5230\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u9810\u8A2D\u3002",
+  "ui.note_style_kind_aim": "AIM \u7D50\u8AD6\u7B46\u8A18",
   "ui.note_style_kind_missing_0_1": "\u70BA\u300C{0}\u300D\u8B70\u984C\u985E\u578B\u6307\u5B9A\u7684\u7B46\u8A18\u7D50\u69CB\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u8B70\u984C\u6539\u7528\u4E0B\u4E00\u9806\u4F4D\u7684\u7D50\u69CB\u3002",
   "ui.note_style_file_invalid_0_1_2": "\u7B46\u8A18\u98A8\u683C\u6A94\u300C{0}\u300D\u6709\u554F\u984C\uFF08\u7B2C {1} \u884C\uFF09\uFF1A{2}",
   "ui.note_style_open_folder_command": "\u958B\u555F\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E",
   "ui.note_style_folder_opened_0": "\u7B46\u8A18\u98A8\u683C\u8CC7\u6599\u593E\uFF1A{0}",
-  "ui.note_style_upgrade_tone_name_0": "{0} \u8A9E\u6C23",
-  "ui.note_style_upgrade_failed": "\u9019\u6B21\u6C92\u80FD\u5347\u7D1A\u4F60\u7684\u7B46\u8A18\u98A8\u683C\u6A94\u3002\u5B83\u5011\u7167\u820A\u53EF\u7528\uFF0CVAM \u4E0B\u6B21\u8F09\u5165\u6642\u6703\u518D\u8A66\u4E00\u6B21\u3002",
-  "ui.note_style_upgrade_skipped_0": "\u9019\u4E9B\u98A8\u683C\u6A94\u8B80\u4E0D\u51FA\u4F86\uFF0C\u6240\u4EE5\u6C92\u6709\u5347\u7D1A\uFF0C\u7559\u5728\u539F\u8655\uFF1A{0}",
-  "ui.note_style_upgrade_trash_failed_0": "\u4F60\u7684\u7B46\u8A18\u98A8\u683C\u5DF2\u5347\u7D1A\uFF0C\u4F46\u9019\u4E9B\u820A\u6A94\u6C92\u80FD\u79FB\u5230\u5783\u573E\u6876\uFF0C\u4E4B\u5F8C\u4E0D\u6703\u518D\u4F7F\u7528\uFF1A{0}",
   "ui.note_style_edit": "\u7DE8\u8F2F\u9019\u500B\u98A8\u683C",
   "ui.note_style_edit_button": "\u958B\u555F\u6A94\u6848",
   "ui.note_style_edit_current_desc": "\u958B\u555F\u76EE\u524D\u751F\u6548\u98A8\u683C\u7684\u6A94\u6848\uFF0C\u8ABF\u6574 AI \u7684\u5BEB\u6CD5\u3002",
@@ -6393,6 +6398,13 @@ var zhTW = {
   "ui.style_folder_backup_notes": "\u7B46\u8A18",
   "ui.writeback_top_failed": "\u7121\u6CD5\u5728\u4E0D\u52D5\u5230\u73FE\u6709\u6587\u5B57\u7684\u60C5\u6CC1\u4E0B\u52A0\u5165\u65B0\u767C\u73FE\uFF0C\u6240\u4EE5\u6C92\u6709\u66F4\u52D5\u7B46\u8A18\u3002",
   "ui.writeback_backup_failed": "\u7121\u6CD5\u5099\u4EFD\u9019\u4EFD\u7B46\u8A18\uFF0C\u6240\u4EE5\u6C92\u6709\u66F4\u52D5\u7B46\u8A18\u3002",
+  "ui.recipe_key_structure": "\u6BB5\u843D\u7D50\u69CB",
+  "ui.recipe_key_voice": "\u5BEB\u4F5C\u53E3\u543B",
+  "ui.recipe_key_format": "\u683C\u5F0F\u898F\u5247",
+  "ui.recipe_key_update": "\u66F4\u65B0\u65B9\u5F0F",
+  "ui.note_style_maps_notice_0": "\u7B46\u8A18\u98A8\u683C\u6539\u6210\u4F9D\u8B70\u984C\u985E\u578B\u6C7A\u5B9A\u3002\u9019\u4E9B\u5730\u5716\u539F\u672C\u8A2D\u7684\u98A8\u683C\u4E0D\u518D\u4F7F\u7528\uFF1A{0}\u3002\u60F3\u8B93\u67D0\u500B\u8B70\u984C\u6CBF\u7528\uFF0C\u8ACB\u5728\u8B70\u984C\u4E0A\u6309\u53F3\u9375\u9078\u64C7\u3002",
+  "ui.note_style_maps_notice_default_0": "\u539F\u672C\u7684\u9810\u8A2D\u6A21\u677F\u5DF2\u6539\u6210\u300C\u4E00\u822C\u8B70\u984C\u300D\u7684\u7B46\u8A18\u98A8\u683C\uFF1A{0}\u3002",
+  "ui.note_style_migrate_failed": "\u7B46\u8A18\u98A8\u683C\u8F49\u63DB\u6C92\u6709\u5B8C\u6210\uFF0C\u4E0B\u6B21\u958B\u555F\u6642\u6703\u518D\u8A66\u4E00\u6B21\uFF1B\u539F\u672C\u7684\u8A2D\u5B9A\u90FD\u9084\u5728\u3002",
   "ui.note_style_legacy_0_1": "\u820A\u8A2D\u5B9A\uFF08{0} \xB7 {1}\uFF09",
   "ui.note_style_folder_missing": "\u627E\u4E0D\u5230\u6A94\u6848\u4F4D\u7F6E",
   "ui.note_style_folder_missing_desc_0": "\u300C{0}\u300D\u4E0D\u5B58\u5728\u3002\u8ACB\u91CD\u65B0\u9078\u64C7\u8CC7\u6599\u593E\uFF0C\u6216\u5728\u6A94\u6848\u7E3D\u7BA1\u986F\u793A\u5B83\u8B93\u5B83\u91CD\u65B0\u5EFA\u7ACB\u3002",
@@ -25041,96 +25053,6 @@ function visualGuidance(context, language2) {
   return instructions;
 }
 
-// core/note-styles/canonical/v1/standard.zh-TW.md
-var standard_zh_TW_default = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6A19\u6E96\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v1/standard.zh-CN.md
-var standard_zh_CN_default = "---\n\u8BED\u6C14: \u5B66\u672F\u4E25\u8C28\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u6807\u51C6\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v1/standard.en.md
-var standard_en_default = '---\ntone: Academic\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Standard" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v1/textbook.zh-TW.md
-var textbook_zh_TW_default = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6559\u79D1\u66F8\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n\u5148\u7528 2\u20134 \u6BB5\u6D41\u66A2\u7684\u6BB5\u843D\u5E36\u8B80\u8005\u9032\u5165\u4E3B\u984C\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\u3002\u4F9D\u5E8F\u5BEB\uFF1A\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\uFF1B\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7C21\u77ED\u9EDE\u51FA\u5E38\u898B\u8AA4\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\u6700\u5F8C\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v1/textbook.zh-CN.md
-var textbook_zh_CN_default = "---\n\u8BED\u6C14: \u5B66\u672F\u4E25\u8C28\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u6559\u79D1\u4E66\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n\u5148\u7528 2\u20134 \u6BB5\u6D41\u7545\u7684\u6BB5\u843D\u5E26\u8BFB\u8005\u8FDB\u5165\u4E3B\u9898\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6807\u9898\u3002\u4F9D\u5E8F\u5199\uFF1A\u4E3A\u4EC0\u4E48\u8FD9\u4E2A\u4E3B\u9898\u503C\u5F97\u5B66\u3001\u8DDF\u8BFB\u8005\u6709\u4EC0\u4E48\u5173\u7CFB\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6D45\u767D\u7684\u8BED\u8A00\u8BF4\u660E\uFF0C\u5FC5\u8981\u65F6\u624D\u4E0B\u4E13\u6709\u540D\u8BCD\u5E76\u7ACB\u523B\u89E3\u91CA\uFF1B\u4E00\u4E2A\u4ECE\u5934\u8D70\u5230\u5C3E\u3001\u542B\u5B9E\u9645\u6570\u5B57\u6216\u6B65\u9AA4\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8BFB\u8005\u53EA\u8BFB\u8FD9\u4E00\u6BB5\uFF0C\u5C31\u5E94\u8BE5\u5DF2\u7ECF\u61C2\u4E2A\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u6838\u5FC3\u7ED3\u8BBA\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u590D\u5BFC\u8BFB\u5DF2\u7ECF\u8BB2\u8FC7\u7684\u53E5\u5B50\u3002\u6CA1\u6709\u53EF\u9760\u5185\u5BB9\u7684\u5206\u7C7B\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B66\u8005\u5E38\u4EE5\u4E3A\u2026\uFF0C\u5176\u5B9E\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7B80\u77ED\u70B9\u51FA\u5E38\u89C1\u8BEF\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\u6700\u540E\u52A0\u4E00\u5C0F\u5757\u300C**\u81EA\u6211\u68C0\u6838**\u300D\uFF08\u7C97\u4F53\u5B57\u5F00\u5934\uFF0C\u4E0D\u7528\u6807\u9898\uFF09\uFF0C\u5217 2\u20133 \u4E2A\u8BA9\u8BFB\u8005\u68C0\u67E5\u81EA\u5DF1\u662F\u5426\u5B66\u4F1A\u7684\u95EE\u9898\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v1/textbook.en.md
-var textbook_en_default = '---\ntone: Academic\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Textbook" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\nOpen with 2\u20134 flowing paragraphs that bring the reader into the topic, with no headings. In order: why the topic is worth learning and how it relates to the reader; the core concepts in plain language, using a technical term only when needed and explaining it right away; one complete worked example from start to finish with real numbers or steps. A reader who reads only this part should already get the gist.\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 core conclusions by default, conclusion first and then the reason, without repeating sentences the intro already said. Omit a section entirely when there is no reliable content for it.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n> [!warning]\n> Use the pattern "Beginners often assume \u2026, but actually \u2026" to point out a common misconception briefly.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\nEnd with a short block headed by bold **Self-check** (bold text, not a heading) listing 2\u20133 questions that let the reader check whether they learned it, optionally with a one-line hint.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v1/summary.zh-TW.md
-var summary_zh_TW_default = "---\n\u8A9E\u6C23: \u91CD\u9EDE\u6458\u8981\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u7CBE\u7C21\u91CD\u9EDE\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v1/summary.zh-CN.md
-var summary_zh_CN_default = "---\n\u8BED\u6C14: \u91CD\u70B9\u6458\u8981\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u7CBE\u7B80\u91CD\u70B9\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v1/summary.en.md
-var summary_en_default = '---\ntone: Key-point summary\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Key points" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v1/plain.zh-TW.md
-var plain_zh_TW_default = "---\n\u8A9E\u6C23: \u767D\u8A71\u8AAA\u660E\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u767D\u8A71\u8AAA\u660E\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v1/plain.zh-CN.md
-var plain_zh_CN_default = "---\n\u8BED\u6C14: \u767D\u8BDD\u8BF4\u660E\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u767D\u8BDD\u8BF4\u660E\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v1/plain.en.md
-var plain_en_default = '---\ntone: Plain explanation\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Plain language" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v1/guide.zh-TW.md
-var guide_zh_TW_default = "---\n\u8A9E\u6C23: \u5BE6\u7528\u6307\u5357\n\u65B9\u6846: \u81EA\u52D5\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u5BE6\u7528\u6307\u5357\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v1/guide.zh-CN.md
-var guide_zh_CN_default = "---\n\u8BED\u6C14: \u5B9E\u7528\u6307\u5357\n\u65B9\u6846: \u81EA\u52A8\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u5B9E\u7528\u6307\u5357\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v1/guide.en.md
-var guide_en_default = '---\ntone: Practical guide\ncallouts: auto\n---\n%% This file decides how the AI writes notes in the "Practical guide" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v2/standard.zh-TW.md
-var standard_zh_TW_default2 = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n\u7D50\u8AD6\u65B9\u6846: summary\n\u98A8\u96AA\u65B9\u6846: warning\n\u554F\u984C\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6A19\u6E96\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 \u7D50\u8AD6\u3001\u98A8\u96AA\u3001\u554F\u984C\u3001\u6280\u5DE7\u9019\u56DB\u7A2E\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5167\u5EFA\u7684\u65B9\u6846\u985E\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5BEB\u300C\u95DC\u300D\u5C31\u4E0D\u7528\uFF1B\u9019\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52D5\u300D\u6642\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v2/standard.zh-CN.md
-var standard_zh_CN_default2 = "---\n\u8BED\u6C14: \u5B66\u672F\u4E25\u8C28\n\u65B9\u6846: \u81EA\u52A8\n\u7ED3\u8BBA\u65B9\u6846: summary\n\u98CE\u9669\u65B9\u6846: warning\n\u95EE\u9898\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u6807\u51C6\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 \u7ED3\u8BBA\u3001\u98CE\u9669\u3001\u95EE\u9898\u3001\u6280\u5DE7\u8FD9\u56DB\u79CD\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5185\u7F6E\u7684\u65B9\u6846\u7C7B\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5199\u300C\u5173\u300D\u5C31\u4E0D\u7528\uFF1B\u8FD9\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52A8\u300D\u65F6\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v2/standard.en.md
-var standard_en_default2 = '---\ntone: Academic\ncallouts: auto\nsummary callout: summary\nrisk callout: warning\nquestion callout: question\ntip callout: tip\n---\n%% This file decides how the AI writes notes in the "Standard" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. The four callout types (summary, risk, question, tip) can be changed to any built-in Obsidian callout type (for example abstract), or set to off to skip one; these four lines only apply when "callouts: auto". %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v2/textbook.zh-TW.md
-var textbook_zh_TW_default2 = "---\n\u8A9E\u6C23: \u5B78\u8853\u56B4\u8B39\n\u65B9\u6846: \u81EA\u52D5\n\u7D50\u8AD6\u65B9\u6846: summary\n\u98A8\u96AA\u65B9\u6846: warning\n\u554F\u984C\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u6559\u79D1\u66F8\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 \u7D50\u8AD6\u3001\u98A8\u96AA\u3001\u554F\u984C\u3001\u6280\u5DE7\u9019\u56DB\u7A2E\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5167\u5EFA\u7684\u65B9\u6846\u985E\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5BEB\u300C\u95DC\u300D\u5C31\u4E0D\u7528\uFF1B\u9019\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52D5\u300D\u6642\u751F\u6548\u3002 %%\n\n\u5148\u7528 2\u20134 \u6BB5\u6D41\u66A2\u7684\u6BB5\u843D\u5E36\u8B80\u8005\u9032\u5165\u4E3B\u984C\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\u3002\u4F9D\u5E8F\u5BEB\uFF1A\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\uFF1B\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7C21\u77ED\u9EDE\u51FA\u5E38\u898B\u8AA4\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\u6700\u5F8C\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v2/textbook.zh-CN.md
-var textbook_zh_CN_default2 = "---\n\u8BED\u6C14: \u5B66\u672F\u4E25\u8C28\n\u65B9\u6846: \u81EA\u52A8\n\u7ED3\u8BBA\u65B9\u6846: summary\n\u98CE\u9669\u65B9\u6846: warning\n\u95EE\u9898\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u6559\u79D1\u4E66\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 \u7ED3\u8BBA\u3001\u98CE\u9669\u3001\u95EE\u9898\u3001\u6280\u5DE7\u8FD9\u56DB\u79CD\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5185\u7F6E\u7684\u65B9\u6846\u7C7B\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5199\u300C\u5173\u300D\u5C31\u4E0D\u7528\uFF1B\u8FD9\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52A8\u300D\u65F6\u751F\u6548\u3002 %%\n\n\u5148\u7528 2\u20134 \u6BB5\u6D41\u7545\u7684\u6BB5\u843D\u5E26\u8BFB\u8005\u8FDB\u5165\u4E3B\u9898\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6807\u9898\u3002\u4F9D\u5E8F\u5199\uFF1A\u4E3A\u4EC0\u4E48\u8FD9\u4E2A\u4E3B\u9898\u503C\u5F97\u5B66\u3001\u8DDF\u8BFB\u8005\u6709\u4EC0\u4E48\u5173\u7CFB\uFF1B\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6D45\u767D\u7684\u8BED\u8A00\u8BF4\u660E\uFF0C\u5FC5\u8981\u65F6\u624D\u4E0B\u4E13\u6709\u540D\u8BCD\u5E76\u7ACB\u523B\u89E3\u91CA\uFF1B\u4E00\u4E2A\u4ECE\u5934\u8D70\u5230\u5C3E\u3001\u542B\u5B9E\u9645\u6570\u5B57\u6216\u6B65\u9AA4\u7684\u5B8C\u6574\u4F8B\u5B50\u3002\u8BFB\u8005\u53EA\u8BFB\u8FD9\u4E00\u6BB5\uFF0C\u5C31\u5E94\u8BE5\u5DF2\u7ECF\u61C2\u4E2A\u5927\u6982\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u6838\u5FC3\u7ED3\u8BBA\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u590D\u5BFC\u8BFB\u5DF2\u7ECF\u8BB2\u8FC7\u7684\u53E5\u5B50\u3002\u6CA1\u6709\u53EF\u9760\u5185\u5BB9\u7684\u5206\u7C7B\u6574\u6BB5\u7701\u7565\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n> [!warning]\n> \u7528\u300C\u521D\u5B66\u8005\u5E38\u4EE5\u4E3A\u2026\uFF0C\u5176\u5B9E\u2026\u300D\u7684\u53E5\u578B\uFF0C\u7B80\u77ED\u70B9\u51FA\u5E38\u89C1\u8BEF\u89E3\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\u6700\u540E\u52A0\u4E00\u5C0F\u5757\u300C**\u81EA\u6211\u68C0\u6838**\u300D\uFF08\u7C97\u4F53\u5B57\u5F00\u5934\uFF0C\u4E0D\u7528\u6807\u9898\uFF09\uFF0C\u5217 2\u20133 \u4E2A\u8BA9\u8BFB\u8005\u68C0\u67E5\u81EA\u5DF1\u662F\u5426\u5B66\u4F1A\u7684\u95EE\u9898\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v2/textbook.en.md
-var textbook_en_default2 = '---\ntone: Academic\ncallouts: auto\nsummary callout: summary\nrisk callout: warning\nquestion callout: question\ntip callout: tip\n---\n%% This file decides how the AI writes notes in the "Textbook" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. The four callout types (summary, risk, question, tip) can be changed to any built-in Obsidian callout type (for example abstract), or set to off to skip one; these four lines only apply when "callouts: auto". %%\n\nOpen with 2\u20134 flowing paragraphs that bring the reader into the topic, with no headings. In order: why the topic is worth learning and how it relates to the reader; the core concepts in plain language, using a technical term only when needed and explaining it right away; one complete worked example from start to finish with real numbers or steps. A reader who reads only this part should already get the gist.\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 core conclusions by default, conclusion first and then the reason, without repeating sentences the intro already said. Omit a section entirely when there is no reliable content for it.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n> [!warning]\n> Use the pattern "Beginners often assume \u2026, but actually \u2026" to point out a common misconception briefly.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\nEnd with a short block headed by bold **Self-check** (bold text, not a heading) listing 2\u20133 questions that let the reader check whether they learned it, optionally with a one-line hint.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v2/summary.zh-TW.md
-var summary_zh_TW_default2 = "---\n\u8A9E\u6C23: \u91CD\u9EDE\u6458\u8981\n\u65B9\u6846: \u81EA\u52D5\n\u7D50\u8AD6\u65B9\u6846: summary\n\u98A8\u96AA\u65B9\u6846: warning\n\u554F\u984C\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u7CBE\u7C21\u91CD\u9EDE\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 \u7D50\u8AD6\u3001\u98A8\u96AA\u3001\u554F\u984C\u3001\u6280\u5DE7\u9019\u56DB\u7A2E\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5167\u5EFA\u7684\u65B9\u6846\u985E\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5BEB\u300C\u95DC\u300D\u5C31\u4E0D\u7528\uFF1B\u9019\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52D5\u300D\u6642\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v2/summary.zh-CN.md
-var summary_zh_CN_default2 = "---\n\u8BED\u6C14: \u91CD\u70B9\u6458\u8981\n\u65B9\u6846: \u81EA\u52A8\n\u7ED3\u8BBA\u65B9\u6846: summary\n\u98CE\u9669\u65B9\u6846: warning\n\u95EE\u9898\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u7CBE\u7B80\u91CD\u70B9\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 \u7ED3\u8BBA\u3001\u98CE\u9669\u3001\u95EE\u9898\u3001\u6280\u5DE7\u8FD9\u56DB\u79CD\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5185\u7F6E\u7684\u65B9\u6846\u7C7B\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5199\u300C\u5173\u300D\u5C31\u4E0D\u7528\uFF1B\u8FD9\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52A8\u300D\u65F6\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v2/summary.en.md
-var summary_en_default2 = '---\ntone: Key-point summary\ncallouts: auto\nsummary callout: summary\nrisk callout: warning\nquestion callout: question\ntip callout: tip\n---\n%% This file decides how the AI writes notes in the "Key points" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. The four callout types (summary, risk, question, tip) can be changed to any built-in Obsidian callout type (for example abstract), or set to off to skip one; these four lines only apply when "callouts: auto". %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v2/plain.zh-TW.md
-var plain_zh_TW_default2 = "---\n\u8A9E\u6C23: \u767D\u8A71\u8AAA\u660E\n\u65B9\u6846: \u81EA\u52D5\n\u7D50\u8AD6\u65B9\u6846: summary\n\u98A8\u96AA\u65B9\u6846: warning\n\u554F\u984C\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u767D\u8A71\u8AAA\u660E\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 \u7D50\u8AD6\u3001\u98A8\u96AA\u3001\u554F\u984C\u3001\u6280\u5DE7\u9019\u56DB\u7A2E\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5167\u5EFA\u7684\u65B9\u6846\u985E\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5BEB\u300C\u95DC\u300D\u5C31\u4E0D\u7528\uFF1B\u9019\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52D5\u300D\u6642\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v2/plain.zh-CN.md
-var plain_zh_CN_default2 = "---\n\u8BED\u6C14: \u767D\u8BDD\u8BF4\u660E\n\u65B9\u6846: \u81EA\u52A8\n\u7ED3\u8BBA\u65B9\u6846: summary\n\u98CE\u9669\u65B9\u6846: warning\n\u95EE\u9898\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u767D\u8BDD\u8BF4\u660E\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 \u7ED3\u8BBA\u3001\u98CE\u9669\u3001\u95EE\u9898\u3001\u6280\u5DE7\u8FD9\u56DB\u79CD\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5185\u7F6E\u7684\u65B9\u6846\u7C7B\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5199\u300C\u5173\u300D\u5C31\u4E0D\u7528\uFF1B\u8FD9\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52A8\u300D\u65F6\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v2/plain.en.md
-var plain_en_default2 = '---\ntone: Plain explanation\ncallouts: auto\nsummary callout: summary\nrisk callout: warning\nquestion callout: question\ntip callout: tip\n---\n%% This file decides how the AI writes notes in the "Plain language" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. The four callout types (summary, risk, question, tip) can be changed to any built-in Obsidian callout type (for example abstract), or set to off to skip one; these four lines only apply when "callouts: auto". %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
-// core/note-styles/canonical/v2/guide.zh-TW.md
-var guide_zh_TW_default2 = "---\n\u8A9E\u6C23: \u5BE6\u7528\u6307\u5357\n\u65B9\u6846: \u81EA\u52D5\n\u7D50\u8AD6\u65B9\u6846: summary\n\u98A8\u96AA\u65B9\u6846: warning\n\u554F\u984C\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u9019\u500B\u6A94\u6C7A\u5B9A AI \u600E\u9EBC\u5BEB\u300C\u5BE6\u7528\u6307\u5357\u300D\u98A8\u683C\u7684\u7B46\u8A18\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u7167\u65B0\u5167\u5BB9\u5BEB\uFF0C\u5DF2\u5BEB\u597D\u7684\u7B46\u8A18\u4E0D\u6703\u8B8A\u3002\u6539\u58DE\u4E86\uFF1A\u5728\u6A94\u6848\u4E0A\u6309\u53F3\u9375 \u2192 \u6062\u5FA9\u9810\u8A2D\u5167\u5BB9\u3002 \u7D50\u8AD6\u3001\u98A8\u96AA\u3001\u554F\u984C\u3001\u6280\u5DE7\u9019\u56DB\u7A2E\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5167\u5EFA\u7684\u65B9\u6846\u985E\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5BEB\u300C\u95DC\u300D\u5C31\u4E0D\u7528\uFF1B\u9019\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52D5\u300D\u6642\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
-
-// core/note-styles/canonical/v2/guide.zh-CN.md
-var guide_zh_CN_default2 = "---\n\u8BED\u6C14: \u5B9E\u7528\u6307\u5357\n\u65B9\u6846: \u81EA\u52A8\n\u7ED3\u8BBA\u65B9\u6846: summary\n\u98CE\u9669\u65B9\u6846: warning\n\u95EE\u9898\u65B9\u6846: question\n\u6280\u5DE7\u65B9\u6846: tip\n---\n%% \u8FD9\u4E2A\u6587\u4EF6\u51B3\u5B9A AI \u600E\u4E48\u5199\u300C\u5B9E\u7528\u6307\u5357\u300D\u98CE\u683C\u7684\u7B14\u8BB0\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u66F4\u65B0\u5C31\u6309\u65B0\u5185\u5BB9\u5199\uFF0C\u5DF2\u5199\u597D\u7684\u7B14\u8BB0\u4E0D\u4F1A\u53D8\u3002\u6539\u574F\u4E86\uFF1A\u5728\u6587\u4EF6\u4E0A\u53F3\u952E \u2192 \u6062\u590D\u9ED8\u8BA4\u5185\u5BB9\u3002 \u7ED3\u8BBA\u3001\u98CE\u9669\u3001\u95EE\u9898\u3001\u6280\u5DE7\u8FD9\u56DB\u79CD\u65B9\u6846\u53EF\u6539\u6210 Obsidian \u5185\u7F6E\u7684\u65B9\u6846\u7C7B\u578B\uFF08\u4F8B\u5982 abstract\uFF09\uFF0C\u5199\u300C\u5173\u300D\u5C31\u4E0D\u7528\uFF1B\u8FD9\u56DB\u884C\u53EA\u5728\u300C\u65B9\u6846: \u81EA\u52A8\u300D\u65F6\u751F\u6548\u3002 %%\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u95EE\u9898\uFF0C\u9ED8\u8BA4 3\u20135 \u70B9\uFF0C\u5148\u8BB2\u7ED3\u8BBA\u518D\u8BB2\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7ED3\u8BBA\u9700\u8981\u7684\u6982\u5FF5\u3001\u6570\u636E\u3001\u673A\u5236\u4E0E\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7ED3\u8BBA\u7684\u4E8B\u5B9E\u4E0E\u6570\u636E\uFF0C\u5E76\u6807\u51FA\u5904\uFF1B\u6765\u6E90\u5217\u8868\u4F1A\u81EA\u52A8\u653E\u5728\u8FD9\u6BB5\u6700\u540E\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9009\u9879\u7684\u4F18\u7F3A\u70B9\u3001\u9002\u7528\u6761\u4EF6\u3001\u98CE\u9669\uFF0C\u4EE5\u53CA\u8FD9\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u8FD8\u6CA1\u67E5\u8BC1\u6216\u6570\u636E\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u95EE\u9898\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u6DFB\u52A0\u4E00\u884C\uFF0C\u5199\u8FD9\u6B21\u66F4\u65B0\u4E86\u4EC0\u4E48\u3002\n";
-
-// core/note-styles/canonical/v2/guide.en.md
-var guide_en_default2 = '---\ntone: Practical guide\ncallouts: auto\nsummary callout: summary\nrisk callout: warning\nquestion callout: question\ntip callout: tip\n---\n%% This file decides how the AI writes notes in the "Practical guide" style. Save your edits and the next AI update follows them; notes already written do not change. If you break it: right-click this file \u2192 Restore default content. The four callout types (summary, risk, question, tip) can be changed to any built-in Obsidian callout type (for example abstract), or set to off to skip one; these four lines only apply when "callouts: auto". %%\n\n## Core conclusions\nAnswer the research question directly: 3\u20135 points by default, conclusion first, then the reason.\n\n## Key knowledge\nConcepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nFacts and data that support the conclusions, with sources; the source list is placed at the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of each option, when it applies, risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
-
 // ai/note-style-file.ts
 var NOTE_STYLE_LIMITS = { file: 8e3, tone: 1e3 };
 var NOTE_STYLE_BUILTIN_IDS = ["standard", "textbook", "summary", "plain", "guide"];
@@ -25142,44 +25064,8 @@ function byLanguage(zhTW2, zhCN2, en2) {
     ["en", en2]
   ]);
 }
-var CANONICAL_VERSIONS = [
-  {
-    standard: byLanguage(standard_zh_TW_default, standard_zh_CN_default, standard_en_default),
-    textbook: byLanguage(textbook_zh_TW_default, textbook_zh_CN_default, textbook_en_default),
-    summary: byLanguage(summary_zh_TW_default, summary_zh_CN_default, summary_en_default),
-    plain: byLanguage(plain_zh_TW_default, plain_zh_CN_default, plain_en_default),
-    guide: byLanguage(guide_zh_TW_default, guide_zh_CN_default, guide_en_default)
-  },
-  // v2: v1 plus the four callout-rule keys at their defaults and one explanatory sentence; same prompt as v1.
-  {
-    standard: byLanguage(standard_zh_TW_default2, standard_zh_CN_default2, standard_en_default2),
-    textbook: byLanguage(textbook_zh_TW_default2, textbook_zh_CN_default2, textbook_en_default2),
-    summary: byLanguage(summary_zh_TW_default2, summary_zh_CN_default2, summary_en_default2),
-    plain: byLanguage(plain_zh_TW_default2, plain_zh_CN_default2, plain_en_default2),
-    guide: byLanguage(guide_zh_TW_default2, guide_zh_CN_default2, guide_en_default2)
-  }
-];
-function builtinStyleFileName(id, language2) {
-  const key2 = {
-    standard: "ui.note_style_standard_short",
-    textbook: "ui.note_style_textbook_short",
-    summary: "ui.note_style_summary",
-    plain: "ui.note_style_plain",
-    guide: "ui.note_style_guide"
-  };
-  return translate(language2, key2[id]);
-}
 function normalizeStyleContent(text11) {
   return text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+$/, "")).join("\n").replace(/\n+$/, "") + "\n";
-}
-function matchCanonical(text11) {
-  const normalized = normalizeStyleContent(text11);
-  for (let version = 0; version < CANONICAL_VERSIONS.length; version++)
-    for (const id of NOTE_STYLE_BUILTIN_IDS)
-      for (const language2 of CANONICAL_LANGUAGES)
-        if (normalizeStyleContent(CANONICAL_VERSIONS[version][id][language2]) === normalized)
-          return { id, language: language2, version: version + 1 };
-  return void 0;
 }
 var LEGACY_V1 = byLanguage(
   {
@@ -25418,7 +25304,7 @@ function parseNoteStyleFile(text11, options) {
 var plain_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u767D\u8A71\u8AAA\u660E\u3002\u7528\u65E5\u5E38\u7528\u8A9E\u5411\u975E\u5C08\u696D\u8B80\u8005\u89E3\u91CB\uFF0C\u53E5\u5B50\u77ED\u3001\u5C11\u7528\u8853\u8A9E\uFF1B\u5FC5\u8981\u7684\u8853\u8A9E\u7B2C\u4E00\u6B21\u51FA\u73FE\u6642\u7528\u4E00\u53E5\u8A71\u8AAA\u660E\u3002\u5148\u8B1B\u7D50\u8AD6\u8207\u91CD\u9EDE\uFF0C\u518D\u88DC\u80CC\u666F\uFF0C\u4E0D\u5806\u780C\u5C08\u6709\u540D\u8A5E\u3002\n";
 
 // ai/prompt-presets/plain.en.md
-var plain_en_default3 = "Tone: plain explanation. Explain to a non-specialist reader in everyday language with short sentences and little jargon; explain any necessary term in one sentence the first time it appears. Lead with the conclusion and the key points, then add background, and do not pile up technical terms.\n";
+var plain_en_default = "Tone: plain explanation. Explain to a non-specialist reader in everyday language with short sentences and little jargon; explain any necessary term in one sentence the first time it appears. Lead with the conclusion and the key points, then add background, and do not pile up technical terms.\n";
 
 // ai/prompt-presets/magazine.zh.md
 var magazine_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u96DC\u8A8C\u5C08\u6B04\u3002\u4EE5\u6D41\u66A2\u3001\u6709\u89C0\u9EDE\u3001\u6709\u756B\u9762\u7684\u6558\u4E8B\u7B46\u8ABF\u5BEB\u4F5C\uFF0C\u53EF\u7528\u5C0F\u6A19\u8207\u5177\u9AD4\u4F8B\u5B50\u5E36\u51FA\u91CD\u9EDE\uFF0C\u8B93\u8B80\u8005\u9858\u610F\u4E00\u8DEF\u8B80\u4E0B\u53BB\uFF1B\u4FDD\u6301\u5167\u5BB9\u6E96\u78BA\uFF0C\u4E0D\u8A87\u5927\u3001\u4E0D\u7DE8\u9020\u3002\n";
@@ -25430,13 +25316,13 @@ var magazine_en_default = "Tone: magazine column. Write in a fluent, opinionated
 var summary_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u91CD\u9EDE\u6458\u8981\u3002\u4EE5\u7CBE\u7C21\u7684\u689D\u5217\u8207\u77ED\u53E5\u5448\u73FE\u7D50\u8AD6\u3001\u95DC\u9375\u4E8B\u5BE6\u8207\u6578\u5B57\uFF0C\u53BB\u9664\u92EA\u9673\u8207\u4FEE\u98FE\uFF1B\u6BCF\u9EDE\u53EA\u8AAA\u4E00\u4EF6\u4E8B\uFF0C\u8B93\u8B80\u8005\u5728\u6700\u77ED\u6642\u9593\u5167\u638C\u63E1\u5168\u8C8C\u3002\n";
 
 // ai/prompt-presets/summary.en.md
-var summary_en_default3 = "Tone: key-point summary. Present conclusions, key facts and figures as compact bullets and short sentences, without build-up or embellishment; each point says one thing, so the reader grasps the whole picture in the least time.\n";
+var summary_en_default = "Tone: key-point summary. Present conclusions, key facts and figures as compact bullets and short sentences, without build-up or embellishment; each point says one thing, so the reader grasps the whole picture in the least time.\n";
 
 // ai/prompt-presets/guide.zh.md
 var guide_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u5BE6\u7528\u6307\u5357\u3002\u4EE5\u53EF\u76F4\u63A5\u7167\u505A\u7684\u53E3\u543B\u5BEB\u4F5C\uFF1A\u5148\u8AAA\u9069\u7528\u60C5\u5883\u8207\u76EE\u6A19\uFF0C\u518D\u4F9D\u5E8F\u7D66\u51FA\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u8207\u5E38\u898B\u932F\u8AA4\uFF1B\u512A\u5148\u63D0\u4F9B\u53EF\u64CD\u4F5C\u7684\u5EFA\u8B70\u8207\u53D6\u6368\u5224\u6E96\u3002\n";
 
 // ai/prompt-presets/guide.en.md
-var guide_en_default3 = "Tone: practical guide. Write so the reader can act on it directly: state the situation and goal first, then give steps, checkpoints and common mistakes in order; prefer actionable advice and criteria for trade-offs.\n";
+var guide_en_default = "Tone: practical guide. Write so the reader can act on it directly: state the situation and goal first, then give steps, checkpoints and common mistakes in order; prefer actionable advice and criteria for trade-offs.\n";
 
 // ai/prompt-presets/academic.zh.md
 var academic_zh_default = "\u5BEB\u4F5C\u8A9E\u6C23\uFF1A\u5B78\u8853\u56B4\u8B39\uFF08\u9810\u8A2D\uFF09\u3002\u4EE5\u4E2D\u6027\u3001\u7CBE\u78BA\u3001\u4EE5\u8B49\u64DA\u70BA\u672C\u7684\u66F8\u9762\u8A9E\u5BEB\u4F5C\uFF1B\u660E\u78BA\u5340\u5206\u4E8B\u5BE6\u3001\u63A8\u8AD6\u8207\u4E0D\u78BA\u5B9A\u4E4B\u8655\uFF0C\u6A19\u660E\u4F86\u6E90\u8207\u9650\u5236\uFF0C\u907F\u514D\u53E3\u8A9E\u8207\u4FEE\u8FAD\u6027\u8A87\u98FE\u3002\n";
@@ -25468,7 +25354,7 @@ var OUTLINE_TOPIC_PLACEHOLDER = Object.fromEntries(
 );
 var strip = (text11) => text11.endsWith("\n") ? text11.slice(0, -1) : text11;
 var BUILTINS = [
-  { id: "plain", kind: "tone", nameKey: "ui.preset_name_plain", zh: plain_zh_default, en: plain_en_default3 },
+  { id: "plain", kind: "tone", nameKey: "ui.preset_name_plain", zh: plain_zh_default, en: plain_en_default },
   {
     id: "magazine",
     kind: "tone",
@@ -25476,8 +25362,8 @@ var BUILTINS = [
     zh: magazine_zh_default,
     en: magazine_en_default
   },
-  { id: "summary", kind: "tone", nameKey: "ui.preset_name_summary", zh: summary_zh_default, en: summary_en_default3 },
-  { id: "guide", kind: "tone", nameKey: "ui.preset_name_guide", zh: guide_zh_default, en: guide_en_default3 },
+  { id: "summary", kind: "tone", nameKey: "ui.preset_name_summary", zh: summary_zh_default, en: summary_en_default },
+  { id: "guide", kind: "tone", nameKey: "ui.preset_name_guide", zh: guide_zh_default, en: guide_en_default },
   {
     id: DEFAULT_TONE_ID,
     kind: "tone",
@@ -25531,14 +25417,6 @@ function resolvePreset(custom, kind, id, language2) {
   const fallbackId = kind === "tone" ? DEFAULT_TONE_ID : DEFAULT_OUTLINE_PRESET_ID;
   return { preset: found != null ? found : findPreset(custom, kind, fallbackId, language2), missing: !!id && !found };
 }
-function resolveToneText(custom, ids, language2) {
-  for (const id of ids) {
-    const found = findPreset(custom, "tone", id, language2);
-    if (!found) continue;
-    return found.id === DEFAULT_TONE_ID ? void 0 : found.text.trim() || void 0;
-  }
-  return void 0;
-}
 function uniqueId(existing, kind) {
   for (let n = 1; ; n++) {
     const id = `custom-${kind}-${n}`;
@@ -25570,22 +25448,22 @@ function deletePreset(custom, id) {
 }
 
 // core/blocks/template/standard.zh-TW.md
-var standard_zh_TW_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var standard_zh_TW_default = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/standard.zh-CN.md
-var standard_zh_CN_default3 = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var standard_zh_CN_default = "## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/standard.en.md
-var standard_en_default3 = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
+var standard_en_default = "## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n";
 
 // core/blocks/template/textbook.zh-TW.md
-var textbook_zh_TW_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_TW_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.zh-CN.md
-var textbook_zh_CN_default3 = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
+var textbook_zh_CN_default = "detail \u662F\u4E00\u7BC7\u7D66\u521D\u5B78\u8005\u8B80\u7684\u77E5\u8B58\u9801\uFF0C\u5728 Obsidian \u4E2D\u6E32\u67D3\u3002\u5B83\u5206\u5169\u500B\u90E8\u5206\uFF1A\u5148\u7528\u4E00\u6BB5\u9023\u8CAB\u7684\u6558\u8FF0\u628A\u8B80\u8005\u5E36\u9032\u4E3B\u984C\uFF0C\u518D\u4F9D\u4E0B\u5217\u5206\u985E\u628A\u5167\u5BB9\u6574\u7406\u6E05\u695A\u3002\n\n\u958B\u982D\uFF08\u5C0E\u8B80\uFF09\uFF1A2\u20134 \u500B\u6D41\u66A2\u7684\u6BB5\u843D\uFF0C\u4E0D\u52A0\u4EFB\u4F55\u6A19\u984C\uFF0C\u4F9D\u5E8F\u5BEB\u300C\u70BA\u4EC0\u9EBC\u9019\u500B\u4E3B\u984C\u503C\u5F97\u5B78\u3001\u8DDF\u8B80\u8005\u6709\u4EC0\u9EBC\u95DC\u4FC2\u300D\u2192\u300C\u6838\u5FC3\u6982\u5FF5\uFF0C\u7528\u6DFA\u767D\u7684\u8A9E\u8A00\u8AAA\u660E\uFF0C\u5FC5\u8981\u6642\u624D\u4E0B\u5C08\u6709\u540D\u8A5E\u4E26\u7ACB\u523B\u89E3\u91CB\u300D\u2192\u300C\u4E00\u500B\u5F9E\u982D\u8D70\u5230\u5C3E\u3001\u542B\u5BE6\u969B\u6578\u5B57\u6216\u6B65\u9A5F\u7684\u5B8C\u6574\u4F8B\u5B50\u300D\u3002\u8B80\u8005\u53EA\u8B80\u9019\u4E00\u6BB5\uFF0C\u5C31\u61C9\u8A72\u5DF2\u7D93\u61C2\u500B\u5927\u6982\u3002\n\n\u6B63\u6587\uFF1A\u5C0E\u8B80\u4E4B\u5F8C\uFF0C\u4F9D\u5E8F\u4F7F\u7528\u4EE5\u4E0B\u516D\u500B\u4E09\u7D1A\u6A19\u984C\uFF08###\uFF09\uFF0C\u6A19\u984C\u6587\u5B57\u7167\u6284\uFF0C\u9806\u5E8F\u56FA\u5B9A\uFF1A### \u6838\u5FC3\u7D50\u8AD6, ### \u95DC\u9375\u77E5\u8B58, ### \u8B49\u64DA\u8207\u4F86\u6E90, ### \u53D6\u6368\u8207\u9650\u5236, ### \u5F85\u78BA\u8A8D\u4E8B\u9805, ### \u66F4\u65B0\u7D00\u9304\u3002\u6C92\u6709\u53EF\u9760\u5167\u5BB9\u7684\u5206\u985E\u6574\u6BB5\u7701\u7565\uFF08\u4E0D\u8981\u4FDD\u7559\u6A19\u984C\uFF0C\u4E5F\u4E0D\u8981\u5BEB\u300C\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300D\uFF1B\u9019\u4E00\u689D\u512A\u5148\u65BC\u5F8C\u9762\u683C\u5F0F\u898F\u5247\u4E2D\u300C\u6C92\u6709\u5167\u5BB9\u7684\u6BB5\u843D\u53EA\u5BEB\u300E\u672C\u6B21\u7121\u65B0\u589E\u5167\u5BB9\u300F\u300D\uFF09\u3002\u6838\u5FC3\u7D50\u8AD6\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\uFF0C\u4E0D\u8981\u91CD\u8907\u5C0E\u8B80\u5DF2\u7D93\u8B1B\u904E\u7684\u53E5\u5B50\u3002### \u66F4\u65B0\u7D00\u9304 \u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u5BEB\u4E86\u4EC0\u9EBC\u3002\n\n\u6536\u5C3E\uFF1A\u5E38\u898B\u8AA4\u89E3\u653E\u5728\u6700\u9069\u5408\u7684\u5206\u985E\u88E1\uFF0C\u7528\u4E00\u500B `> [!warning]` callout \u7C21\u77ED\u9EDE\u51FA\u300C\u521D\u5B78\u8005\u5E38\u4EE5\u70BA\u2026\uFF0C\u5176\u5BE6\u2026\u300D\u3002\u5728\u300C### \u66F4\u65B0\u7D00\u9304\u300D\u4E4B\u524D\uFF08\u4E5F\u5C31\u662F\u5B83\u4E0A\u9762\uFF09\u52A0\u4E00\u5C0F\u584A\u300C**\u81EA\u6211\u6AA2\u6838**\u300D\uFF08\u7C97\u9AD4\u5B57\u958B\u982D\uFF0C\u4E0D\u7528\u6A19\u984C\uFF09\uFF0C\u5217 2\u20133 \u500B\u8B93\u8B80\u8005\u6AA2\u67E5\u81EA\u5DF1\u662F\u5426\u5B78\u6703\u7684\u554F\u984C\uFF0C\u53EF\u9644\u4E00\u53E5\u63D0\u793A\u3002\n\n## \u6838\u5FC3\u7D50\u8AD6\n\u76F4\u63A5\u56DE\u7B54\u7814\u7A76\u554F\u984C\uFF0C\u9810\u8A2D 3\u20135 \u9EDE\uFF0C\u5148\u8B1B\u7D50\u8AD6\u518D\u8B1B\u7406\u7531\u3002\n\n## \u95DC\u9375\u77E5\u8B58\n\u7406\u89E3\u7D50\u8AD6\u9700\u8981\u7684\u6982\u5FF5\u3001\u6578\u64DA\u3001\u6A5F\u5236\u8207\u80CC\u666F\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u53D6\u6368\u8207\u9650\u5236\n\u5404\u9078\u9805\u7684\u512A\u7F3A\u9EDE\u3001\u9069\u7528\u689D\u4EF6\u3001\u98A8\u96AA\uFF0C\u4EE5\u53CA\u9019\u6B21\u7814\u7A76\u7684\u9650\u5236\u3002\n\n## \u5F85\u78BA\u8A8D\u4E8B\u9805\n\u9084\u6C92\u67E5\u8B49\u6216\u8CC7\u6599\u4E0D\u8DB3\u3001\u503C\u5F97\u4E0B\u4E00\u6B65\u7814\u7A76\u7684\u554F\u984C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
 
 // core/blocks/template/textbook.en.md
-var textbook_en_default3 = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
+var textbook_en_default = 'The detail is a knowledge page for a beginner, rendered in Obsidian. It has two parts: first a connected narrative that draws the reader into the topic, then the content sorted into the categories below.\n\nOpening (lead-in): 2\u20134 flowing paragraphs with no heading at all, in this order: why the topic is worth learning and how it relates to the reader, then the core concepts in plain language (introduce a technical term only when needed and explain it right away), then one worked example followed from start to finish with real numbers or steps. A reader who reads only this part should already understand the gist.\n\nBody: after the lead-in, use exactly these six level-three headings (###), with the heading text copied exactly and in this fixed order: ### Core conclusions, ### Key knowledge, ### Evidence and sources, ### Tradeoffs and limitations, ### Open questions, ### Update log. Leave out a whole category that has no reliable material (no heading, and never write "No new content this time"; this rule overrides the later formatting rule that says to write \'No new content this time\' in sections with nothing to say). Give the core conclusions 3\u20135 points by default, conclusion first and then the reason, and do not repeat sentences the lead-in already said. ### Update log gets only one line saying what this page covers.\n\nClosing: put common misconceptions in the category where they fit best, as one short `> [!warning]` callout in the form "beginners often think ..., but actually ...". Just before "### Update log" (that is, above it) add a short block led by bold "**Self-check**" (no heading), with 2\u20133 questions the reader can use to test their understanding, optionally with a one-line hint.\n\n## Core conclusions\nAnswer the research question directly, 3\u20135 points by default; give the conclusion first, then the reason.\n\n## Key knowledge\nThe concepts, data, mechanisms and background needed to understand the conclusions.\n\n## Evidence and sources\nThe facts and data that support the conclusions, with their sources; the source list is added to the end of this section automatically.\n\n## Tradeoffs and limitations\nPros and cons of the options, when each applies, the risks, and the limits of this research.\n\n## Open questions\nQuestions not yet verified or lacking data that are worth researching next.\n\n## Update log\nAdd only one line saying what this update changed.\n';
 
 // core/blocks/template/hypothesis.zh-TW.md
 var hypothesis_zh_TW_default = "## \u4E3B\u5F35\n\u7528\u4E00\u53E5\u8A71\u5BEB\u51FA\u9019\u500B\u5047\u8A2D\u4E3B\u5F35\u4EC0\u9EBC\uFF0C\u53EF\u88AB\u9A57\u8B49\u6216\u63A8\u7FFB\u3002\n\n## \u9810\u6E2C\n\u5982\u679C\u4E3B\u5F35\u6210\u7ACB\uFF0C\u61C9\u8A72\u89C0\u5BDF\u5230\u4EC0\u9EBC\uFF1B\u5BEB\u5177\u9AD4\u3001\u53EF\u6AA2\u67E5\u7684\u7D50\u679C\u3002\n\n## \u9A57\u8B49\u65B9\u5F0F\n\u8981\u600E\u9EBC\u78BA\u8A8D\u6216\u63A8\u7FFB\uFF1A\u627E\u4EC0\u9EBC\u8CC7\u6599\u3001\u505A\u4EC0\u9EBC\u6BD4\u8F03\u6216\u5BE6\u9A57\u3002\n\n## \u652F\u6301\n\u652F\u6301\u4E3B\u5F35\u7684\u8B49\u64DA\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\u3002\n\n## \u53CD\u99C1\n\u8207\u4E3B\u5F35\u885D\u7A81\u7684\u8B49\u64DA\u6216\u53CD\u4F8B\uFF0C\u6BCF\u9EDE\u8A3B\u660E\u51FA\u8655\u8207\u5F37\u5EA6\uFF1B\u6C92\u6709\u5C31\u8AAA\u9084\u6C92\u627E\u5230\u3002\n\n## \u76EE\u524D\u5224\u65B7\n\u7D9C\u5408\u652F\u6301\u8207\u53CD\u99C1\uFF0C\u5BEB\u76EE\u524D\u5F37\u5F31\uFF08\u5F31\uFF0F\u4E2D\uFF0F\u5F37\uFF09\u8207\u9084\u7F3A\u54EA\u4E9B\u8B49\u64DA\u3002\n\n## \u8B49\u64DA\u8207\u4F86\u6E90\n\u652F\u6301\u7D50\u8AD6\u7684\u4E8B\u5BE6\u8207\u6578\u64DA\uFF0C\u4E26\u6A19\u51FA\u8655\uFF1B\u4F86\u6E90\u6E05\u55AE\u6703\u81EA\u52D5\u653E\u5728\u9019\u6BB5\u6700\u5F8C\u3002\n\n## \u66F4\u65B0\u7D00\u9304\n\u53EA\u65B0\u589E\u4E00\u884C\uFF0C\u5BEB\u9019\u6B21\u66F4\u65B0\u4E86\u4EC0\u9EBC\u3002\n";
@@ -25683,8 +25561,8 @@ function builtinTemplateText(id, language2) {
   return (_c = (_b2 = (_a2 = findBuiltinBlock("template", id)).sections) == null ? void 0 : _b2.call(_a2, language2)) != null ? _c : "";
 }
 var BUILTIN_BLOCKS = [
-  template("standard", "ui.structure_name_standard", [standard_zh_TW_default3, standard_zh_CN_default3, standard_en_default3]),
-  template("textbook", "ui.structure_name_textbook", [textbook_zh_TW_default3, textbook_zh_CN_default3, textbook_en_default3]),
+  template("standard", "ui.structure_name_standard", [standard_zh_TW_default, standard_zh_CN_default, standard_en_default]),
+  template("textbook", "ui.structure_name_textbook", [textbook_zh_TW_default, textbook_zh_CN_default, textbook_en_default]),
   template("hypothesis", "ui.structure_name_hypothesis", [hypothesis_zh_TW_default, hypothesis_zh_CN_default, hypothesis_en_default]),
   template("evidence", "ui.structure_name_evidence", [evidence_zh_TW_default, evidence_zh_CN_default, evidence_en_default]),
   template("action", "ui.structure_name_action", [action_zh_TW_default, action_zh_CN_default, action_en_default]),
@@ -25765,7 +25643,6 @@ function splitTemplateZones(text11) {
   };
 }
 function parseTemplateBlock(text11, options) {
-  var _a2;
   const zones = splitTemplateZones(text11);
   const parsed = parseNoteStyleFile(zones.sections, options);
   if (!parsed.ok) return parsed;
@@ -25774,8 +25651,7 @@ function parseTemplateBlock(text11, options) {
     ok: true,
     template: { ...template2, layout: "sections", intro: "" },
     lead: intro,
-    notices: zones.separatorLines.length ? [{ line: zones.separatorLines[0], code: "format_zone_moved" }] : [],
-    format: (_a2 = zones.format) != null ? _a2 : ""
+    notices: zones.separatorLines.length ? [{ line: zones.separatorLines[0], code: "format_zone_moved" }] : []
   };
 }
 
@@ -25979,7 +25855,7 @@ ${value}` : "";
     withProviderOutput(inLanguage(JSON_CONTRACT2, language2), provider, language2),
     context.toneText ? toneBlock(context.toneText, language2) : "",
     phaseGuidance(phase, language2, context.responseContract, !!context.aimContract),
-    readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
+    phase === "delivery-writing" && context.aimNoteFormat !== void 0 ? context.aimNoteFormat : readerFacingAimPhase(phase) ? inLanguage(OBSIDIAN_FORMAT, language2) : "",
     context.researchMode === "local" ? inLanguage(WEB_SEARCH_OFF, language2) : context.researchMode === "research" ? inLanguage(WEB_SEARCH_ON, language2) : "",
     field(inLanguage(LABEL_TOPIC, language2), context.title),
     field(inLanguage(LABEL_SUMMARY, language2), context.summary),
@@ -26575,107 +26451,23 @@ function parseRecipeFile(text11) {
   return result;
 }
 
-// core/steps/_shared/format-preferences.zh.md
-var format_preferences_zh_default = "\u9019\u500B\u98A8\u683C\u4E0D\u4F7F\u7528\uFF1A{{list}}\uFF1B\u4E0B\u5217\u898F\u5247\u8981\u6C42\u9019\u4E9B\u8A9E\u6CD5\u6642\u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\uFF1B\u5176\u4ED6\u9650\u5236\u7167\u5E38\u9069\u7528\u3002\n";
-
-// core/steps/_shared/format-preferences.en.md
-var format_preferences_en_default = "This style does not use: {{list}}; where the rules below ask for this syntax, use a plain list or a #### subheading instead; the other limits still apply.\n";
-
-// core/steps/_shared/format-preferences-placed.zh.md
-var format_preferences_placed_zh_default = "callout \u53EA\u7528\u5728\u98A8\u683C\u6307\u5B9A\u7684\u4F4D\u7F6E\uFF1B\u898F\u5247 5 \u7684\u53EF\u647A\u758A callout \u6539\u7528\u4E00\u822C\u6E05\u55AE\u6216 #### \u5C0F\u6A19\u984C\u3002\n";
-
-// core/steps/_shared/format-preferences-placed.en.md
-var format_preferences_placed_en_default = "Use callouts only where the style places them; the foldable callout in rule 5 becomes a plain list or a #### subheading.\n";
-
-// core/steps/_shared/legacy-format-preferences.ts
-var LEGACY_FORMAT_PREFERENCES = {
-  zh: format_preferences_zh_default,
-  en: format_preferences_en_default,
-  placedZh: format_preferences_placed_zh_default,
-  placedEn: format_preferences_placed_en_default
-};
-
-// ai/note-style-upgrade.ts
-var NOTE_STYLE_UPGRADE_VERSION = 1;
-var styleAliasKey = (base) => `style:${base}`;
-var pairAliasKey = (id) => `pair:${id}`;
-var BUILTIN_PAIRS = {
-  standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
-  textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
-  summary: { template: STANDARD_TEMPLATE_ID, tone: "summary" },
-  plain: { template: STANDARD_TEMPLATE_ID, tone: "plain" },
-  guide: { template: STANDARD_TEMPLATE_ID, tone: "guide" }
-};
-function builtinPairOf(templateId, toneId) {
-  const template2 = templateId || STANDARD_TEMPLATE_ID;
-  const tone2 = toneId || DEFAULT_TONE_ID;
-  return NOTE_STYLE_BUILTIN_IDS.find((id) => BUILTIN_PAIRS[id].template === template2 && BUILTIN_PAIRS[id].tone === tone2);
-}
+// ai/note-style-migrate.ts
 var lower2 = (value) => value.toLocaleLowerCase();
-var has = (object2, key2) => Boolean(Object.prototype.hasOwnProperty.call(object2, key2));
-var escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function normalizeNoteStyleAliases(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
-  const result = {};
-  for (const [key2, entry] of Object.entries(value)) {
-    if (!entry || typeof entry !== "object") continue;
-    const { template: template2, tone: tone2 } = entry;
-    const alias = {
-      ...typeof template2 === "string" && template2 ? { template: template2 } : {},
-      ...typeof tone2 === "string" && tone2 ? { tone: tone2 } : {}
-    };
-    if (alias.template || alias.tone) result[key2] = alias;
-  }
-  return result;
-}
-function normalizeNoteStyleUpgradeMarker(value) {
-  const version = value && typeof value === "object" ? value.version : void 0;
-  return typeof version === "number" && Number.isFinite(version) ? { version } : void 0;
-}
-function isBuiltinStyleFileText(id, text11) {
-  var _a2, _b2;
-  if (((_a2 = matchCanonical(text11)) == null ? void 0 : _a2.id) === id) return true;
-  for (const version of CANONICAL_VERSIONS)
-    for (const language2 of CANONICAL_LANGUAGES) {
-      const canonical = version[id][language2];
-      const comment = (_b2 = /%%[^\n]*/.exec(canonical)) == null ? void 0 : _b2[0];
-      const name = builtinStyleFileName(id, language2);
-      const at = comment ? comment.indexOf(name) : -1;
-      if (comment && at >= 0 && text11.includes(comment.slice(0, at + name.length + 1))) return true;
-    }
-  return false;
-}
-function builtinStyleFileBase(files, id, preferred) {
-  const languages = [preferred, ...CANONICAL_LANGUAGES.filter((language2) => language2 !== preferred)];
-  const names3 = [...new Set(languages.map((language2) => builtinStyleFileName(id, language2)))];
-  for (const name of names3) {
-    const matches = [...files.keys()].filter(
-      (base) => lower2(base) === lower2(name) || new RegExp(`^${escapeRegExp(lower2(name))} \\(\\d+\\)$`).test(lower2(base))
-    ).sort();
-    const found = matches.find((base) => isBuiltinStyleFileText(id, files.get(base)));
-    if (found) return found;
-  }
-  return void 0;
-}
-var reservedNames = (category) => new Set(
-  BUILTIN_BLOCKS.filter((block) => block.category === category).flatMap(
-    (block) => builtinBlockNames(category, block.id).map(lower2)
-  )
-);
+var safeName2 = (name) => cleanBlockName(name.replace(/\.{2,}/g, " "));
 var Namer = class {
-  constructor(category, existing, reserved) {
+  constructor(category, nameCategory, existing) {
     this.category = category;
-    this.reserved = reserved;
+    this.nameCategory = nameCategory;
     __publicField(this, "held", /* @__PURE__ */ new Map());
     __publicField(this, "planned", []);
     for (const [base, text11] of existing) this.held.set(lower2(base), { base, text: text11 });
   }
   place(wanted, fallback, text11) {
-    const safe = cleanBlockName(wanted) || cleanBlockName(fallback) || "Block";
+    const safe = safeName2(wanted) || safeName2(fallback) || "Style";
     for (let n = 1; ; n++) {
       const name = n === 1 ? safe : `${safe} (${n})`;
+      if (!validatePartName(name, this.nameCategory).ok) continue;
       const key2 = lower2(name);
-      if (this.reserved.has(key2)) continue;
       const held = this.held.get(key2);
       if (!held) {
         this.held.set(key2, { base: name, text: text11 });
@@ -26694,185 +26486,6 @@ var trimBlankLines2 = (text11) => {
   while (end > start && !lines[end - 1].trim()) end--;
   return lines.slice(start, end).join("\n");
 };
-function styleFileBody(text11) {
-  const lines = text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
-  if (lines[0].trimEnd() !== "---") return trimBlankLines2(lines.join("\n"));
-  const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
-  return trimBlankLines2(lines.slice(end < 0 ? lines.length : end + 1).join("\n"));
-}
-var OBSIDIAN_CALLOUT_TYPES = /* @__PURE__ */ new Set([
-  "note",
-  "abstract",
-  "summary",
-  "tldr",
-  "info",
-  "todo",
-  "tip",
-  "hint",
-  "important",
-  "success",
-  "check",
-  "done",
-  "question",
-  "help",
-  "faq",
-  "warning",
-  "caution",
-  "attention",
-  "failure",
-  "fail",
-  "missing",
-  "danger",
-  "error",
-  "bug",
-  "example",
-  "quote",
-  "cite"
-]);
-var FORMAT_PREFERENCES = { zh: LEGACY_FORMAT_PREFERENCES.zh, en: LEGACY_FORMAT_PREFERENCES.en };
-var FORMAT_PREFERENCES_PLACED = {
-  zh: renderTemplate(LEGACY_FORMAT_PREFERENCES.placedZh, {}),
-  en: renderTemplate(LEGACY_FORMAT_PREFERENCES.placedEn, {})
-};
-var FORMAT_ITEM_NAMES = {
-  zh: ["callout", "\u5716\u8868\uFF08mermaid\uFF09", "\u8868\u683C", "\u5F85\u8FA6\u6E05\u55AE\uFF08- [ ]\uFF09", "\u87A2\u5149\u6A19\u8A18\uFF08==highlight==\uFF09"],
-  en: ["callouts", "diagrams (mermaid)", "tables", "task lists (- [ ])", "highlights (==highlight==)"]
-};
-function legacyObsidianFormat(language2, preferences) {
-  return applyFormatPreferences(inLanguage(OBSIDIAN_FORMAT, language2), language2, preferences);
-}
-function applyFormatPreferences(body, language2, preferences) {
-  var _a2;
-  const original = body;
-  if (!preferences) return original;
-  const { callouts, diagrams, tables, tasks, highlight } = preferences;
-  const placed = callouts === "placed";
-  const calloutMap = (_a2 = preferences.calloutMap) != null ? _a2 : {};
-  if (!placed && diagrams && tables && tasks && highlight && !Object.keys(calloutMap).length) return original;
-  const zh = instructionLanguageOf(language2) === "zh";
-  const off = [placed, !diagrams, !tables, !tasks, !highlight];
-  const lines = [];
-  let lastBullet = 0;
-  for (let line of original.split("\n")) {
-    if (line.startsWith("- ")) {
-      if (placed && line.includes("> [!")) continue;
-      const lead = /^- [^`]*`> \[!(summary|warning|question|tip)\]`/.exec(line);
-      const to = lead ? calloutMap[lead[1]] : void 0;
-      if (lead && to === "off") continue;
-      if (lead && to)
-        line = lead[1] === "tip" ? line.replace(zh ? "`> [!tip]` \u6216 `> [!example]`" : "`> [!tip]` or `> [!example]`", `\`> [!${to}]\``) : line.replace(`\`> [!${lead[1]}]\``, `\`> [!${to}]\``);
-      if (!diagrams && line.includes("```mermaid```")) continue;
-      if (!tasks && line.includes("`- [ ]`")) continue;
-      if (!highlight && line.includes("==highlight==")) continue;
-      if (line.includes(zh ? "Markdown \u8868\u683C" : "a Markdown table")) {
-        if (!tables) continue;
-        if (!diagrams) line = line.slice(0, line.indexOf(zh ? "\u8868\u683C\u88E1\u6709" : " When the table holds")).trimEnd();
-      }
-      lines.push(line);
-      lastBullet = lines.length - 1;
-    } else lines.push(line);
-  }
-  if (!off.some(Boolean)) return lines.join("\n");
-  const names3 = FORMAT_ITEM_NAMES[instructionLanguageOf(language2)];
-  const list = names3.filter((_, index) => off[index]).join(zh ? "\u3001" : ", ");
-  const sentence = [
-    renderTemplate(inLanguage(FORMAT_PREFERENCES, language2), { list }),
-    placed ? inLanguage(FORMAT_PREFERENCES_PLACED, language2) : ""
-  ].filter(Boolean).join(zh ? "" : " ");
-  if (lastBullet) lines.splice(lastBullet + 1, 0, "", sentence);
-  else {
-    const rest = lines.slice(1).filter((line, index, all) => line || all[index - 1] !== "");
-    lines.splice(1, lines.length - 1, ...rest);
-    lines.splice(2, 0, sentence, "");
-  }
-  return lines.join("\n");
-}
-var ON = /* @__PURE__ */ new Set(["\u958B", "\u5F00", "on", "true"]);
-var OFF = /* @__PURE__ */ new Set(["\u95DC", "\u5173", "off", "false"]);
-var SWITCH_KEYS = {
-  \u65B9\u6846: "callouts",
-  callouts: "callouts",
-  \u5716\u8868: "diagrams",
-  \u56FE\u8868: "diagrams",
-  diagrams: "diagrams",
-  \u8868\u683C: "tables",
-  tables: "tables",
-  \u5F85\u8FA6\u6E05\u55AE: "tasks",
-  \u5F85\u529E\u6E05\u5355: "tasks",
-  tasks: "tasks",
-  \u87A2\u5149\u6A19\u8A18: "highlight",
-  \u8367\u5149\u6807\u8BB0: "highlight",
-  highlight: "highlight"
-};
-var CALLOUT_KEYS = {
-  \u7D50\u8AD6\u65B9\u6846: "summary",
-  \u7ED3\u8BBA\u65B9\u6846: "summary",
-  "summary callout": "summary",
-  \u98A8\u96AA\u65B9\u6846: "warning",
-  \u98CE\u9669\u65B9\u6846: "warning",
-  "risk callout": "warning",
-  \u554F\u984C\u65B9\u6846: "question",
-  \u95EE\u9898\u65B9\u6846: "question",
-  "question callout": "question",
-  \u6280\u5DE7\u65B9\u6846: "tip",
-  "tip callout": "tip"
-};
-function readLegacyFormatPreferences(text11) {
-  const lines = text11.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
-  const preferences = {
-    callouts: "placed",
-    diagrams: true,
-    tables: true,
-    tasks: true,
-    highlight: true
-  };
-  const calloutMap = {};
-  const seen = /* @__PURE__ */ new Set();
-  if (lines[0].trimEnd() !== "---") return preferences;
-  const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
-  if (end < 0) return void 0;
-  for (let index = 1; index < end; index++) {
-    const raw = lines[index];
-    if (!raw.trim() || /^\s*#/.test(raw) || /^[\s-]/.test(raw)) continue;
-    const pair6 = /^([^:：]+?)\s*[:：]\s*(.*)$/.exec(raw);
-    if (!pair6) return void 0;
-    const keyName = pair6[1].trim().toLocaleLowerCase().replace(/\s+/g, " ");
-    let value = pair6[2].trim();
-    if (/^(["']).*\1$/.test(value) && value.length >= 2) value = value.slice(1, -1).trim();
-    const calloutField = CALLOUT_KEYS[keyName];
-    if (calloutField) {
-      const lowerValue = value.toLocaleLowerCase();
-      if (seen.has(calloutField)) return void 0;
-      seen.add(calloutField);
-      if (OFF.has(lowerValue)) calloutMap[calloutField] = "off";
-      else if (OBSIDIAN_CALLOUT_TYPES.has(lowerValue)) {
-        if (lowerValue !== calloutField) calloutMap[calloutField] = lowerValue;
-      } else return void 0;
-      continue;
-    }
-    const field = SWITCH_KEYS[keyName];
-    if (!field) continue;
-    const key2 = value.toLocaleLowerCase();
-    if (field === "callouts") {
-      if (key2 === "\u81EA\u52D5" || key2 === "\u81EA\u52A8" || key2 === "auto") preferences.callouts = "auto";
-      else if (key2 === "\u6307\u5B9A" || key2 === "placed") preferences.callouts = "placed";
-      else return void 0;
-    } else if (ON.has(key2)) preferences[field] = true;
-    else if (OFF.has(key2)) preferences[field] = false;
-    else return void 0;
-  }
-  if (Object.keys(calloutMap).length) preferences.calloutMap = calloutMap;
-  return preferences;
-}
-function formatZone(language2, preferences) {
-  return trimBlankLines2(legacyObsidianFormat(language2, preferences));
-}
-var templateText = (body, format, language2) => `${body}
-
-# ${templateFormatHeading(noteLanguageOf(language2))}
-
-${format}
-`;
 function templateSectionsText(template2, language2) {
   const head = serializeLegacyV1({ ...template2, sections: [] }, language2);
   const full = serializeLegacyV1(template2, language2);
@@ -26887,115 +26500,65 @@ var sectionShape = (section3) => {
     (_b2 = section3.callouts) != null ? _b2 : []
   ]);
 };
-function planNoteStyleUpgrade(input2) {
-  var _a2, _b2, _c, _d;
+function recipeText(structureBase, language2) {
+  const voice = translate(language2, findBuiltinBlock("tone", "academic").nameKey);
+  const format = translate(language2, BUILTIN_FORMATS.find((item) => item.id === "standard").nameKey);
+  return [
+    "---",
+    `${translate(language2, "ui.recipe_key_structure")}: ${structureBase}`,
+    `${translate(language2, "ui.recipe_key_voice")}: ${voice}`,
+    `${translate(language2, "ui.recipe_key_format")}: ${format}`,
+    `${translate(language2, "ui.recipe_key_update")}: merge`,
+    "---",
+    ""
+  ].join("\n");
+}
+function planRecipeMigration(input2) {
+  var _a2, _b2;
   const { language: language2 } = input2;
-  const templates = new Namer("template", input2.blocks.template, reservedNames("template"));
-  const tones = new Namer("tone", input2.blocks.tone, reservedNames("tone"));
-  const aliases = {};
-  const oldFiles = /* @__PURE__ */ new Map();
+  const structures = new Namer("template", "structure", input2.existing.template);
+  const voices = new Namer("tone", "voice", input2.existing.tone);
+  const recipes = new Namer("recipe", "recipe", input2.existing.recipe);
+  const legacy = { templates: {}, tones: {} };
   const skipped2 = [];
-  const toneNameKey = "ui.note_style_upgrade_tone_name_0";
-  const presetRefs = /* @__PURE__ */ new Map();
-  for (const preset of ((_a2 = input2.promptPresets) != null ? _a2 : []).filter((item) => item.kind === "tone")) {
-    const base = tones.place(preset.name, preset.id, preset.text);
-    presetRefs.set(preset.id, fileRef(base));
-    aliases[preset.id] = { tone: fileRef(base) };
-  }
-  const toneRefOf = (raw, fileBase) => {
-    if (!raw) return void 0;
-    const key2 = lower2(raw.trim());
-    const pools = [language2, ...LANGUAGES.map((item) => item.id)].map(
-      (item) => listPresets(input2.promptPresets, "tone", item)
-    );
-    for (const pool of pools) {
-      const found = pool.find((item) => lower2(item.id) === key2 || lower2(item.name) === key2);
-      if (!found) continue;
-      if (found.id === DEFAULT_TONE_ID) return builtinRef(DEFAULT_TONE_ID);
-      if (!isBuiltinPreset(found.id)) return presetRefs.get(found.id);
-      const own2 = pools[0].find((item) => item.id === found.id);
-      if (own2 && own2.text.trim() === found.text.trim()) return builtinRef(found.id);
-      return fileRef(tones.place(translate(language2, toneNameKey, fileBase), fileBase, found.text.trim()));
-    }
-    return fileRef(tones.place(translate(language2, toneNameKey, fileBase), fileBase, raw.trim()));
-  };
-  const pairBase = new Map(
-    NOTE_STYLE_BUILTIN_IDS.map((id) => [id, builtinStyleFileBase(input2.files, id, language2)])
-  );
-  const blockOfFile = /* @__PURE__ */ new Map();
-  for (const base of [...input2.files.keys()].sort()) {
-    const text11 = input2.files.get(base);
-    const pair6 = NOTE_STYLE_BUILTIN_IDS.find((id) => pairBase.get(id) === base);
-    if (pair6 && ((_b2 = matchCanonical(text11)) == null ? void 0 : _b2.id) === pair6) {
-      oldFiles.set(base, text11);
-      continue;
-    }
-    const parsed = parseNoteStyleFile(text11, { id: styleAliasKey(base), name: base });
-    if (!parsed.ok) {
-      skipped2.push(base);
-      continue;
-    }
-    const style = parsed.style;
-    const preferences = readLegacyFormatPreferences(text11);
-    if (!preferences) {
-      skipped2.push(base);
-      continue;
-    }
-    const format = formatZone(language2, preferences);
-    const full = templateText(styleFileBody(text11), format, language2);
-    const check = parseTemplateBlock(full, { id: fileRef(base), name: base });
-    if (!check.ok || check.lead !== style.intro || check.format !== format || check.template.sections.length !== style.sections.length || check.template.sections.some((section3, index) => sectionShape(section3) !== sectionShape(style.sections[index]))) {
-      skipped2.push(base);
-      continue;
-    }
-    const templateRef = fileRef(templates.place(base, base, full));
-    const toneRef = toneRefOf(style.tone, base);
-    oldFiles.set(base, text11);
-    blockOfFile.set(base, { template: templateRef, ...toneRef ? { tone: toneRef } : {} });
-    aliases[styleAliasKey(base)] = { template: templateRef, tone: toneRef != null ? toneRef : builtinRef(DEFAULT_TONE_ID) };
-    if (pair6) aliases[pairAliasKey(pair6)] = { ...aliases[styleAliasKey(base)] };
-  }
-  for (const [id, name] of Object.entries((_c = input2.noteStyleFiles) != null ? _c : {})) {
-    const converted = blockOfFile.get(stripMd2(name));
-    if (converted) aliases[id] = { ...converted };
-  }
+  const recipeOf = /* @__PURE__ */ new Map();
   for (const template2 of input2.detailTemplates) {
-    if (has(aliases, template2.id)) continue;
-    const format = formatZone(language2);
-    const full = templateText(templateSectionsText(template2, language2), format, language2);
-    const check = parseTemplateBlock(full, { id: fileRef(template2.name), name: template2.name });
-    if (!check.ok || check.lead || check.format !== format || check.template.sections.length !== template2.sections.length || check.template.sections.some((section3, index) => sectionShape(section3) !== sectionShape(template2.sections[index])))
+    if (isBuiltinTemplateId(template2.id)) continue;
+    const text11 = `${templateSectionsText(template2, language2)}
+`;
+    const check = parseTemplateBlock(text11, { id: fileRef(template2.name), name: template2.name });
+    if (!check.ok || check.lead || check.template.sections.length !== template2.sections.length || check.template.sections.some((section3, index) => sectionShape(section3) !== sectionShape(template2.sections[index]))) {
+      skipped2.push(template2.name);
       continue;
-    aliases[template2.id] = { template: fileRef(templates.place(template2.name, "Style", full)) };
-  }
-  const keys = {};
-  const chosen = input2.defaultNoteStyleId || input2.defaultDetailTemplateId;
-  if (chosen) {
-    const preset = input2.defaultNoteStyleId ? NOTE_STYLE_BUILTIN_IDS.find((id) => id === input2.defaultNoteStyleId) : void 0;
-    const level = preset ? { template: BUILTIN_PAIRS[preset].template, tone: BUILTIN_PAIRS[preset].tone } : { template: chosen, tone: void 0 };
-    let template2;
-    let tone2;
-    if (level.template === STANDARD_TEMPLATE_ID || level.template === TEXTBOOK_TEMPLATE_ID) {
-      const pair6 = builtinPairOf(level.template, level.tone);
-      const alias = pair6 ? aliases[pairAliasKey(pair6)] : void 0;
-      template2 = (_d = alias == null ? void 0 : alias.template) != null ? _d : builtinRef(level.template);
-      tone2 = alias ? alias.tone : level.tone ? builtinRef(level.tone) : void 0;
-    } else if (has(aliases, level.template)) {
-      template2 = aliases[level.template].template;
-      tone2 = aliases[level.template].tone;
     }
-    if (!input2.noteTemplateBlock && template2) keys.noteTemplateBlock = template2;
-    const toneToSet = input2.noteTemplateBlock ? level.tone ? builtinRef(level.tone) : void 0 : tone2;
-    if (!input2.noteToneBlock && toneToSet) keys.noteToneBlock = toneToSet;
+    const structure2 = structures.place(template2.name, "Style", text11);
+    legacy.templates[template2.id] = fileRef(structure2);
+    recipeOf.set(template2.id, recipes.place(structure2, "Style", recipeText(structure2, language2)));
   }
-  const blocks = [...templates.planned, ...tones.planned];
+  for (const preset of (_a2 = input2.promptPresets) != null ? _a2 : []) {
+    if (preset.kind !== "tone" || isBuiltinPreset(preset.id)) continue;
+    legacy.tones[preset.id] = fileRef(voices.place(preset.name, preset.id, preset.text));
+  }
+  let topicStyle;
+  let defaultConverted;
+  const chosen = input2.defaultDetailTemplateId;
+  if (chosen && !((_b2 = input2.noteStyleByKind) == null ? void 0 : _b2.topic)) {
+    if (chosen === "textbook") {
+      topicStyle = "builtin:textbook";
+      defaultConverted = translate(language2, "ui.recipe_name_textbook");
+    } else if (recipeOf.has(chosen)) {
+      topicStyle = fileRef(recipeOf.get(chosen));
+      defaultConverted = recipeOf.get(chosen);
+    }
+  }
+  const files = [...structures.planned, ...voices.planned, ...recipes.planned];
   return {
-    blocks,
-    oldFiles: [...oldFiles].map(([base, text11]) => ({ base, text: text11 })),
+    files,
+    legacy,
+    ...topicStyle ? { topicStyle } : {},
+    ...defaultConverted ? { defaultConverted } : {},
     skipped: skipped2,
-    aliases,
-    keys,
-    nothing: !blocks.length && !oldFiles.size && !Object.keys(aliases).length && !keys.noteTemplateBlock && !keys.noteToneBlock
+    nothing: !files.length && !Object.keys(legacy.templates).length && !Object.keys(legacy.tones).length && topicStyle === void 0
   };
 }
 
@@ -27018,8 +26581,6 @@ function defaultStylesFolderName(language2) {
 var NoteStyleStore = class {
   constructor(deps) {
     this.deps = deps;
-    /** The old style files of the style folder's root, read only by the old upgrade (`runUpgrade`). */
-    __publicField(this, "files", /* @__PURE__ */ new Map());
     /** Structure (template) and voice (tone) file text by base name (no ".md"), as of the last `refresh()` or write. */
     __publicField(this, "blocks", { template: /* @__PURE__ */ new Map(), tone: /* @__PURE__ */ new Map() });
     /** Format rules file text by base name, as of the last `refresh()`. */
@@ -27028,10 +26589,8 @@ var NoteStyleStore = class {
     __publicField(this, "recipes", /* @__PURE__ */ new Map());
     /** Block writes run one after the other, so two quick clicks cannot pick the same name. */
     __publicField(this, "writeQueue", Promise.resolve());
-    /** The one upgrade run of this session (started once; later calls get the same answer). */
-    __publicField(this, "upgradeRun");
-    /** An upgrade that could not be written out: its blocks, aliases and keys answer in memory until the next load retries it. */
-    __publicField(this, "pending");
+    /** The conversion of the 0.28.0 data that is under way (never rejects); `refresh()` waits for it. */
+    __publicField(this, "migration");
   }
   get settings() {
     return this.deps.settings();
@@ -27046,26 +26605,8 @@ var NoteStyleStore = class {
    * see this snapshot. Writes nothing.
    */
   async refresh() {
-    if (this.upgradeRun) await this.upgradeRun;
+    if (this.migration) await this.migration;
     await this.loadBlocks();
-  }
-  /** The old style files directly in the style folder (only the old upgrade reads them). */
-  async loadFiles() {
-    const folder = this.folder();
-    const next = /* @__PURE__ */ new Map();
-    let names3 = [];
-    try {
-      names3 = await this.deps.port.list(folder);
-    } catch (e) {
-      names3 = [];
-    }
-    for (const name of names3) {
-      try {
-        next.set(stripMd3(name), await this.deps.port.read(`${folder}/${name}`));
-      } catch (e) {
-      }
-    }
-    this.files = next;
   }
   // ---- block files ----
   /** The part folders: each is the first spelling that exists, else the interface language's (where it would be created). */
@@ -27108,15 +26649,11 @@ var NoteStyleStore = class {
     return found;
   }
   async loadBlocks() {
-    var _a2, _b2;
     const dirs = this.blockDirectories();
     const next = {
       template: await this.readFolder(dirs.template),
       tone: await this.readFolder(dirs.tone)
     };
-    for (const block of (_b2 = (_a2 = this.pending) == null ? void 0 : _a2.blocks) != null ? _b2 : [])
-      if (![...next[block.category].keys()].some((base) => lower3(base) === lower3(block.base)))
-        next[block.category].set(block.base, block.text);
     this.blocks = next;
     this.formats = await this.readFolder(dirs.format);
     this.recipes = await this.readFolder(dirs.recipe);
@@ -27497,21 +27034,10 @@ var NoteStyleStore = class {
       issues: []
     };
   }
-  // ---- upgrade state the settings page reads (a run does not): what is saved, else what an unfinished upgrade holds in memory ----
-  templateKey() {
-    var _a2;
-    return this.settings.noteTemplateBlock || ((_a2 = this.pending) == null ? void 0 : _a2.keys.noteTemplateBlock);
-  }
-  toneKey() {
-    var _a2;
-    return this.settings.noteToneBlock || ((_a2 = this.pending) == null ? void 0 : _a2.keys.noteToneBlock);
-  }
-  /**
-   * The template and tone blocks the runs use: what is saved, else what an unfinished upgrade holds in memory. Read-only;
-   * the settings page shows these, so a failed or unfinished upgrade does not show the standard template over the result.
-   */
+  // ---- what the settings page reads ----
+  /** The template and tone blocks the runs use, as saved. Read-only. */
   effectiveBlockKeys() {
-    return { template: this.templateKey(), tone: this.toneKey(), pending: this.pending !== void 0 };
+    return { template: this.settings.noteTemplateBlock, tone: this.settings.noteToneBlock };
   }
   // ---- the tone choices of the map pickers ----
   /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
@@ -27676,135 +27202,93 @@ var NoteStyleStore = class {
       return { ok: true, backup };
     });
   }
-  // ---- the one-time upgrade of the old note style data (the only write that is not a user action) ----
+  // ---- the conversion of the 0.28.0 data (the only write that is not a user action) ----
   /**
-   * Starts the upgrade once (`after` is awaited first, for example the plugin's start-up); later calls get the same
-   * promise. It never rejects: a failure is reported once, the unfinished upgrade answers from memory this session, and
-   * the next load tries again. `refresh()` waits for it.
+   * Turns the custom detail templates and tone presets of 0.28.0 into structure, voice and style files, and records the old
+   * id -> new ref table, once: the marker `noteStyleRecipe.migrated` ends it. Only new files are created (a file that holds
+   * the same text is reused, other text gets " (n)"), no old key is changed, and the files, the folder, the general-topic
+   * style and the marker reach data.json in one save. A failure sets no marker and leaves the settings as they were; files
+   * already written stay and are reused by the next try. Never rejects. `mapsWithStyle` are the titles of maps that carry a
+   * style of their own: they are handed back once (`notify`) because that style is not read any more.
    */
-  startUpgrade(after) {
-    var _a2;
-    (_a2 = this.upgradeRun) != null ? _a2 : this.upgradeRun = (async () => {
-      var _a3, _b2;
-      try {
-        if (after) await after.catch(() => void 0);
-        return await this.runUpgrade();
-      } catch (e) {
-        (_b2 = (_a3 = this.deps).report) == null ? void 0 : _b2.call(_a3, { kind: "failed" });
-        return { status: "failed", skipped: [], trashFailed: [] };
-      }
-    })();
-    return this.upgradeRun;
-  }
-  upgradeLegacy() {
-    return this.startUpgrade();
-  }
-  /**
-   * Order: the plan is applied in memory, then backups of the old files, the block files, data.json (new keys, aliases,
-   * marker), and only then the old files go to the trash. A failure before the marker leaves the marker, the keys and the
-   * old files alone. Nothing is ever overwritten: a name taken by other text was given a new name by the plan.
-   */
-  async runUpgrade() {
-    var _a2, _b2, _c, _d, _e, _f;
-    const settings = this.settings;
-    if (settings.noteStyleUpgrade) return { status: "already", skipped: [], trashFailed: [] };
-    await this.loadFiles();
-    await this.loadBlocks();
-    const plan = planNoteStyleUpgrade({
-      language: settings.language,
-      files: this.files,
-      detailTemplates: settings.detailTemplates,
-      promptPresets: settings.promptPresets,
-      noteStyleFiles: settings.noteStyleFiles,
-      defaultNoteStyleId: settings.defaultNoteStyleId,
-      defaultDetailTemplateId: settings.defaultDetailTemplateId,
-      noteTemplateBlock: settings.noteTemplateBlock,
-      noteToneBlock: settings.noteToneBlock,
-      blocks: this.blocks
+  migrateLegacy(input2) {
+    const run = this.serial(() => this.runMigration(input2.mapsWithStyle));
+    const fence = run.catch(() => void 0).then(() => {
+      if (this.migration === fence) this.migration = void 0;
     });
-    if (!plan.nothing) {
-      this.pending = { blocks: plan.blocks, aliases: plan.aliases, keys: plan.keys };
-      for (const block of plan.blocks) this.blocks[block.category].set(block.base, block.text);
-    }
-    try {
-      await this.serial(() => this.writeUpgrade(plan));
-    } catch (e) {
-      (_b2 = (_a2 = this.deps).report) == null ? void 0 : _b2.call(_a2, { kind: "failed" });
-      return { status: "failed", skipped: plan.skipped, trashFailed: [] };
-    }
-    this.pending = void 0;
-    const trashFailed = await this.trashUpgraded(plan);
-    if (plan.skipped.length) (_d = (_c = this.deps).report) == null ? void 0 : _d.call(_c, { kind: "skipped", names: plan.skipped });
-    if (trashFailed.length) (_f = (_e = this.deps).report) == null ? void 0 : _f.call(_e, { kind: "trash-failed", names: trashFailed });
-    return { status: "done", skipped: plan.skipped, trashFailed };
+    this.migration = fence;
+    return run;
   }
-  async writeUpgrade(plan) {
-    var _a2, _b2, _c;
-    const { port } = this.deps;
+  async runMigration(mapsWithStyle) {
+    var _a2;
     const settings = this.settings;
-    const dirs = this.blockDirectories();
-    const pinned = settings.noteStylesFolder ? void 0 : this.folder();
-    if (plan.oldFiles.length) {
-      let present = [];
-      try {
-        present = await port.list(dirs.backup);
-      } catch (e) {
-        present = [];
-      }
-      await port.createFolder(dirs.backup);
-      const taken = new Set(present.map(lower3));
-      const now = (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date();
-      for (const old of plan.oldFiles) {
-        const name = backupName(old.base, now, taken);
-        taken.add(lower3(name));
-        await port.create(`${dirs.backup}/${name}`, old.text);
-      }
-    }
-    for (const category of ["tone", "template"]) {
-      const items = plan.blocks.filter((block) => block.category === category);
-      if (!items.length) continue;
-      await port.createFolder(dirs[category]);
-      for (const item of items) await port.create(`${dirs[category]}/${item.base}.md`, item.text);
-    }
-    const before = {
-      noteStylesFolder: settings.noteStylesFolder,
-      noteTemplateBlock: settings.noteTemplateBlock,
-      noteToneBlock: settings.noteToneBlock,
-      noteStyleAliases: settings.noteStyleAliases,
-      noteStyleUpgrade: settings.noteStyleUpgrade
-    };
-    if (pinned !== void 0 && (plan.oldFiles.length || plan.blocks.length)) settings.noteStylesFolder = pinned;
-    if (plan.keys.noteTemplateBlock && !settings.noteTemplateBlock)
-      settings.noteTemplateBlock = plan.keys.noteTemplateBlock;
-    if (plan.keys.noteToneBlock && !settings.noteToneBlock) settings.noteToneBlock = plan.keys.noteToneBlock;
-    if (Object.keys(plan.aliases).length) settings.noteStyleAliases = { ...plan.aliases, ...settings.noteStyleAliases };
-    settings.noteStyleUpgrade = { version: NOTE_STYLE_UPGRADE_VERSION };
+    const maps = [...mapsWithStyle];
     try {
-      await this.deps.save();
-    } catch (error) {
-      for (const [key2, value] of Object.entries(before)) {
-        if (value === void 0) delete settings[key2];
-        else settings[key2] = value;
+      const marker5 = settings.noteStyleRecipe;
+      if (marker5 == null ? void 0 : marker5.migrated) {
+        if (marker5.mapsNotified) return { status: "already" };
+        settings.noteStyleRecipe = { ...marker5, mapsNotified: true };
+        try {
+          await this.deps.save();
+        } catch (error) {
+          settings.noteStyleRecipe = marker5;
+          return { status: "already", error: error instanceof Error ? error.message : String(error) };
+        }
+        return { status: "already", ...maps.length ? { notify: { maps } } : {} };
       }
-      throw error;
-    }
-  }
-  /** The old files that became blocks go to the trash, each only while it still holds the text that was backed up. */
-  async trashUpgraded(plan) {
-    const { port } = this.deps;
-    const folder = this.folder();
-    const failed = [];
-    for (const old of plan.oldFiles) {
-      const path = `${folder}/${old.base}.md`;
+      await this.loadBlocks();
+      const plan = planRecipeMigration({
+        language: settings.language,
+        detailTemplates: settings.detailTemplates,
+        promptPresets: settings.promptPresets,
+        defaultDetailTemplateId: settings.defaultDetailTemplateId,
+        noteStyleByKind: settings.noteStyleByKind,
+        existing: { recipe: this.recipes, template: this.blocks.template, tone: this.blocks.tone }
+      });
+      const { port } = this.deps;
+      const dirs = this.blockDirectories();
+      const pinned = settings.noteStylesFolder ? void 0 : this.folder();
+      for (const category of ["template", "tone", "recipe"]) {
+        const items = plan.files.filter((file) => file.category === category);
+        if (!items.length) continue;
+        const dir = dirs[category];
+        await port.createFolder(dir);
+        const present = await this.readFolder(dir);
+        for (const item of items) {
+          const held = [...present].find(([base]) => lower3(base) === lower3(item.base));
+          if (held) {
+            if (held[1] === item.text) continue;
+            throw new Error(`File appeared while converting: ${dir}/${item.base}.md`);
+          }
+          await port.create(`${dir}/${item.base}.md`, item.text);
+        }
+      }
+      const before = {
+        noteStylesFolder: settings.noteStylesFolder,
+        noteStyleByKind: settings.noteStyleByKind,
+        noteStyleRecipe: settings.noteStyleRecipe
+      };
+      if (pinned !== void 0 && plan.files.length) settings.noteStylesFolder = pinned;
+      if (plan.topicStyle && !((_a2 = settings.noteStyleByKind) == null ? void 0 : _a2.topic))
+        settings.noteStyleByKind = { ...settings.noteStyleByKind, topic: plan.topicStyle };
+      const hasLegacy = Object.keys(plan.legacy.templates).length > 0 || Object.keys(plan.legacy.tones).length > 0;
+      settings.noteStyleRecipe = { migrated: 1, ...hasLegacy ? { legacy: plan.legacy } : {}, mapsNotified: true };
       try {
-        if (await port.read(path) !== old.text) throw new Error("changed");
-        await port.trash(path);
-        this.files.delete(old.base);
-      } catch (e) {
-        failed.push(old.base);
+        await this.deps.save();
+      } catch (error) {
+        for (const [key2, value] of Object.entries(before)) {
+          if (value === void 0) delete settings[key2];
+          else settings[key2] = value;
+        }
+        throw error;
       }
+      return {
+        status: "done",
+        ...maps.length ? { notify: { maps, ...plan.defaultConverted ? { defaultName: plan.defaultConverted } : {} } } : {}
+      };
+    } catch (error) {
+      return { status: "failed", error: error instanceof Error ? error.message : String(error) };
     }
-    return failed;
   }
   /** The style folder itself was renamed or moved in Obsidian: follow it. Returns true when the setting changed. */
   async followFolderRename(oldPath, newPath) {
@@ -28298,13 +27782,23 @@ function styleLabel(templateId, toneId, names3, language2) {
     names3.tone(toneId || DEFAULT_TONE_ID)
   );
 }
-function styleRefOf(templateId, toneId, aliases = {}) {
-  var _a2, _b2;
+var BUILTIN_PAIRS = {
+  standard: { template: STANDARD_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
+  textbook: { template: TEXTBOOK_TEMPLATE_ID, tone: DEFAULT_TONE_ID },
+  summary: { template: STANDARD_TEMPLATE_ID, tone: "summary" },
+  plain: { template: STANDARD_TEMPLATE_ID, tone: "plain" },
+  guide: { template: STANDARD_TEMPLATE_ID, tone: "guide" }
+};
+function builtinPairOf(templateId, toneId) {
+  const template2 = templateId || STANDARD_TEMPLATE_ID;
+  const tone2 = toneId || DEFAULT_TONE_ID;
+  return NOTE_STYLE_BUILTIN_IDS.find((id) => BUILTIN_PAIRS[id].template === template2 && BUILTIN_PAIRS[id].tone === tone2);
+}
+function styleRefOf(templateId, toneId) {
+  var _a2;
   const builtin = builtinPairOf(templateId, toneId);
   if (builtin) return { kind: "builtin", id: builtin };
   if (((_a2 = parseBlockRef(templateId)) == null ? void 0 : _a2.kind) === "file" && templateId) return { kind: "file", id: templateId };
-  const moved = templateId && Object.prototype.hasOwnProperty.call(aliases, templateId) ? aliases[templateId] : void 0;
-  if ((moved == null ? void 0 : moved.template) && ((_b2 = parseBlockRef(moved.template)) == null ? void 0 : _b2.kind) === "file") return { kind: "file", id: moved.template };
   return void 0;
 }
 function runStyleLabelText(label, language2) {
@@ -41627,11 +41121,50 @@ function deduplicateAimRequest(context) {
 // experiences/aim/final-delivery.ts
 var import_node_crypto12 = require("node:crypto");
 
+// experiences/aim/aim-note-style.ts
+var AIM_MAX_SECTIONS = 12;
+var CHART_BLOCK2 = "```mermaid";
+function aimNoteStyleOf(style) {
+  var _a2, _b2;
+  if (!style || style.recipe.aimDelivery) return void 0;
+  const sections = style.template.sections;
+  if (!sections.length || sections.length > AIM_MAX_SECTIONS) return void 0;
+  const mapped = sections.map((section3) => ({
+    name: section3.name,
+    description: section3.description.trim(),
+    ...section3.count ? { count: section3.count } : {}
+  }));
+  const lean = ((_b2 = (_a2 = style.contextFields.styleSelection) == null ? void 0 : _a2.format) == null ? void 0 : _b2.id) === "lean";
+  return {
+    ref: style.recipe.ref,
+    sections: mapped,
+    ...style.toneText === void 0 ? {} : { toneText: style.toneText },
+    formatText: style.formatText,
+    charts: !lean && (style.formatText.includes(CHART_BLOCK2) || mapped.some((s) => s.description.includes(CHART_BLOCK2)))
+  };
+}
+function renderAimStructure(sections) {
+  return sections.map(
+    (section3) => [
+      `### ${section3.name}`,
+      section3.description,
+      section3.count ? `${section3.count.mode === "exact" ? "Exactly" : "At least"} ${section3.count.n} items.` : ""
+    ].filter(Boolean).join("\n")
+  ).join("\n\n");
+}
+
 // experiences/aim/steps/delivery-outline/task.md
 var task_default = "You are the final-delivery Synthesizer. Design the actual document needed to answer the original user goal with all supplied conditions and outcome preferences. Previous research informs the outline; do not merely concatenate reports or reuse their headings. Return the outline in aim.sections: each section has heading, purpose (what the reader can do or understand after it), searchTask (specific web search needed, or empty if already supported), evidenceIds and dependencies (supplied source IDs). Choose a suitable structure, not a fixed template. Open with a section that gives the direct answer or recommendation. Give every section a distinct purpose so no two sections cover the same advice or caveats; gather the items the user must still confirm in at most one section; use no more sections than the answer needs (usually 3 to 5). Include concrete examples, resources, execution details or comparisons when required by this user. Map each section to the minimal supplied evidenceIds it needs. Dependencies also name supplied source IDs. Leave searchTask empty when mapped supplied reports already support the section; do not request a full search merely to repeat them. Identify exact source gaps for the deliverable. Earlier rounds are part of this answer: the user's earlier answers and their saved results (earlier documents and research) carry into this document, integrated with the current research. Update what the current research changes, and drop an earlier finding only when a later answer replaces it. Do not ask the user or deliver the document yet.\nSupplied evidence IDs and reports:\n{{sourceCatalog}}\n";
 
+// experiences/aim/steps/delivery-outline/note-structure.md
+var note_structure_default = "The user chose a note style for this document. Use exactly these sections, in this order, with these headings verbatim as the aim.sections headings; take each section's purpose from its description. This replaces the instruction above to choose a suitable structure and the usual 3 to 5 sections, and it replaces the earlier instruction not to impose a fixed heading template. Put the direct answer in the section whose description asks for the conclusion or judgment, else in the first section. Still map evidenceIds, dependencies and searchTask as above.\nSections:\n{{structure}}\n";
+
 // experiences/aim/steps/delivery-outline/step.ts
-var renderOutlineTask = (sourceCatalog) => renderTemplate(task_default, { sourceCatalog });
+var renderOutlineTask = (sourceCatalog, structure2) => {
+  const task = renderTemplate(task_default, { sourceCatalog });
+  return structure2 === void 0 ? task : `${task}
+${renderTemplate(note_structure_default, { structure: structure2 })}`;
+};
 
 // experiences/aim/steps/delivery-research/task.md
 var task_default2 = "You are the Researcher for the final document. Search the web to fill and verify the sections of this agreed outline: {{outline}}. Prioritize the explicit searchTasks and the concrete resources, examples, steps, or current facts required to deliver this user's requested result. Reuse supported prior findings; do not search irrelevant topics. Return a section-by-section evidence report. Use a Markdown H2 heading exactly matching each agreed section heading with a nonempty searchTask; place only that section's findings under it. Include explicit source IDs (delivery-research:<section-heading>:<number>) and direct source URLs, what each source supports, usable concrete details and unresolved gaps. Actually use available search tools; never claim a search occurred if it did not. Set aim.status to searched only when search actually ran. If tools fail or are unavailable, set aim.status to unavailable rather than replacing research with memory. Do not write the final document or ask questions.\n";
@@ -41652,13 +41185,20 @@ var additional_research_default = "Additional final-document research:\n{{resear
 // experiences/aim/steps/delivery-writing/no-mapped-source.md
 var no_mapped_source_default = "No external source is mapped to this document. Do not make source-backed claims.\n";
 
+// experiences/aim/steps/delivery-writing/note-structure.md
+var note_structure_default2 = "Section headings come from the user's note style: keep them verbatim and in order, and follow each section's description and item count. This user-chosen section structure replaces the earlier instruction not to impose a fixed heading template.\nSections:\n{{structure}}\n";
+
 // experiences/aim/steps/delivery-writing/step.ts
-var renderWritingTask = (variables5) => renderTemplate(task_default3, {
-  outline: variables5.outline,
-  knownConditions: variables5.knownConditions,
-  evidence: variables5.evidence,
-  additionalResearch: variables5.research === void 0 ? "" : renderTemplate(additional_research_default, { research: variables5.research })
-});
+var renderWritingTask = (variables5) => {
+  const task = renderTemplate(task_default3, {
+    outline: variables5.outline,
+    knownConditions: variables5.knownConditions,
+    evidence: variables5.evidence,
+    additionalResearch: variables5.research === void 0 ? "" : renderTemplate(additional_research_default, { research: variables5.research })
+  });
+  return variables5.structure === void 0 ? task : `${task}
+${renderTemplate(note_structure_default2, { structure: variables5.structure })}`;
+};
 var NO_MAPPED_SOURCE = renderTemplate(no_mapped_source_default, {});
 
 // experiences/aim/steps/delivery-acceptance/task.md
@@ -41735,8 +41275,10 @@ async function buildFinalDelivery(base, ask, options = {}) {
     title: base.title,
     rules: base.rules,
     conditions: (_a2 = options.knownConditions) != null ? _a2 : base.detail,
-    language: base.outputLanguage
+    language: base.outputLanguage,
+    ...options.noteStyle ? { noteStyle: options.noteStyle.ref } : {}
   });
+  const structure2 = options.noteStyle ? renderAimStructure(options.noteStyle.sections) : void 0;
   const savedBaseValid = ((_b2 = options.checkpoint) == null ? void 0 : _b2.baseFingerprint) === baseFingerprint || !((_c = options.checkpoint) == null ? void 0 : _c.baseFingerprint) && options.evidence === void 0;
   const savedCheckpoint = savedBaseValid ? options.checkpoint : void 0;
   const checkpoint = {
@@ -41784,6 +41326,7 @@ async function buildFinalDelivery(base, ask, options = {}) {
       ...base,
       ...writingScope,
       ...phase === "delivery-acceptance" ? { responseContract: "aim-delivery-acceptance" } : {},
+      ...phase === "delivery-writing" && options.noteStyle ? { aimNoteFormat: options.noteStyle.formatText } : {},
       ...contract ? { aimContract: contract } : {},
       ...options.timeoutMs === void 0 ? {} : { timeoutMs: options.timeoutMs },
       task: `<!-- aim-phase: ${phase} -->
@@ -41801,7 +41344,7 @@ ${task}`,
 ${source.detail}`).join("\n\n");
   const outlineResult = await stage(
     "outline",
-    () => run("delivery-outline", renderOutlineTask(sourceCatalog)),
+    () => run("delivery-outline", renderOutlineTask(sourceCatalog, structure2)),
     (result2) => {
       parseDeliveryOutline(result2.detail);
     }
@@ -41904,6 +41447,7 @@ ${research.detail}`;
           outline,
           knownConditions: (_k = options.knownConditions) != null ? _k : base.detail,
           evidence: documentEvidence,
+          ...structure2 === void 0 ? {} : { structure: structure2 },
           ...documentResearch === void 0 ? {} : { research: documentResearch }
         })
       );
@@ -43030,6 +42574,8 @@ var _AimManualFlow = class _AimManualFlow {
     __publicField(this, "onProgress");
     /** The chart step for a finished conclusion; set by the view (it checks the "Add diagrams" setting). Absent in tests. */
     __publicField(this, "addDiagrams");
+    /** The user's AIM note style for the final conclusion; set by the view, absent in tests: the AIM report. */
+    __publicField(this, "noteStyle");
   }
   emitProgress(event) {
     var _a2;
@@ -43110,8 +42656,8 @@ var _AimManualFlow = class _AimManualFlow {
   /** A conclusion note keeps its open items in a hidden marker, so the user can correct them later. */
   async concludedDetail(review, charts) {
     var _a2;
-    const { mapPath, branchId, ...request } = charts;
-    const body = this.addDiagrams ? await this.addDiagrams({
+    const { mapPath, branchId, noteStyle, ...request } = charts;
+    const body = this.addDiagrams && (noteStyle == null ? void 0 : noteStyle.charts) !== false ? await this.addDiagrams({
       ...request,
       detail: review.detail,
       // Called only when the step really runs (the setting is on), so the UI never shows a stage that is skipped.
@@ -43143,11 +42689,12 @@ ${written2.detail}` : written2.detail,
     );
   }
   /**
-   * Tone text for prose-producing AIM calls (research and final delivery). Structured Planner/review calls carry an
-   * aimContract and never get it (askAimModel drops it), so tone cannot disturb their schemas.
+   * The note style of the final conclusion (the user's AIM row), or undefined for the AIM report. Read once per
+   * workflow entry. Research calls never carry a tone; the map tone is not read here.
    */
-  toneOf(map, language2) {
-    return resolveToneText(this.repository.settings.promptPresets, [map.toneId], language2);
+  async styleOf(language2) {
+    var _a2;
+    return aimNoteStyleOf(await ((_a2 = this.noteStyle) == null ? void 0 : _a2.call(this, language2)));
   }
   /** Content language of the map as read now; never cached on the flow, so a UI language switch cannot change it. */
   languageOf(map) {
@@ -43683,6 +43230,7 @@ ${renderOpenItemsContext(openItems)}` : ""}`
         (step) => this.askAimModel({ ...step, outputLanguage: deliveryContext.outputLanguage }, model, reasoning, signal),
         {
           checkpoint,
+          ...context.noteStyle ? { noteStyle: context.noteStyle } : {},
           timeoutMs: context.timeoutMs,
           webSearch: this.limits.webSearch,
           evidence: context.deliveryEvidence,
@@ -43840,6 +43388,7 @@ ${delivery.evidence}` },
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
+    const aimStyle = await this.styleOf(language2);
     const priorAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !priorAttempt || priorAttempt.status !== "failed")
       throw new Error("A saved failed AIM attempt is required to review a diagnostic report.");
@@ -44002,7 +43551,8 @@ Branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             goalDetail: topic.detail,
             unattended: this.isUnattended(map),
             outputLanguage: language2,
-            toneText: this.toneOf(map, language2),
+            toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+            ...aimStyle ? { noteStyle: aimStyle } : {},
             conditions: branch.inputSnapshot.conditions,
             currentQuestion: parent.summary,
             currentAnswer: answerDescription,
@@ -44070,7 +43620,6 @@ ${topic.detail}
 
 Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             outputLanguage: language2,
-            ...this.toneOf(map, language2) ? { toneText: this.toneOf(map, language2) } : {},
             mode: "task",
             researchMode: this.researchMode(),
             researchDepth: "normal",
@@ -44098,7 +43647,8 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
         model,
         signal,
         mapPath,
-        branchId: branch.id
+        branchId: branch.id,
+        noteStyle: aimStyle
       }) : this.interimDetail([
         this.interimNotice(finalReview, language2),
         this.readerDetail(finalReview),
@@ -44202,6 +43752,7 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
     throwIfAborted(signal);
     const map = await this.repository.readMap(mapPath), run = (_a2 = map.aim) == null ? void 0 : _a2.runs.find((item) => item.id === runId);
     const language2 = this.languageOf(map);
+    const aimStyle = await this.styleOf(language2);
     const currentAttempt = run == null ? void 0 : run.attempts.find((item) => item.id === run.currentAttemptId);
     if (!run || !currentAttempt || ["running", "saving"].includes(currentAttempt.status) || !["partial", "failed", "cancelled"].includes(currentAttempt.status))
       throw new Error("Only a saved partial branch without active work can be continued.");
@@ -44284,7 +43835,8 @@ ${runId}`, fingerprint2 = JSON.stringify({ model, reasoning });
           goalDetail: topicNote.detail,
           unattended: this.isUnattended(map),
           outputLanguage: language2,
-          toneText: this.toneOf(map, language2),
+          toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+          ...aimStyle ? { noteStyle: aimStyle } : {},
           conditions: branch.inputSnapshot.conditions,
           currentQuestion: parent.summary,
           currentAnswer: JSON.stringify(branch.answerSnapshot),
@@ -44378,7 +43930,6 @@ ${lineage.context}
 
 Persisted answer branch conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
               outputLanguage: language2,
-              ...this.toneOf(map, language2) ? { toneText: this.toneOf(map, language2) } : {},
               mode: "task",
               researchMode: this.researchMode(),
               researchDepth: "normal",
@@ -44489,7 +44040,8 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
             goalDetail: topicNote.detail,
             unattended: this.isUnattended(map),
             outputLanguage: language2,
-            toneText: this.toneOf(map, language2),
+            toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+            ...aimStyle ? { noteStyle: aimStyle } : {},
             conditions: branch.inputSnapshot.conditions,
             currentQuestion: parent.summary,
             currentAnswer: JSON.stringify(branch.answerSnapshot),
@@ -44545,7 +44097,8 @@ Conditions: ${JSON.stringify(branch.inputSnapshot.conditions)}`,
         model: modelToUse,
         signal,
         mapPath,
-        branchId: branch.id
+        branchId: branch.id,
+        noteStyle: aimStyle
       }) : this.interimDetail([
         this.interimNotice(finalReview, language2),
         finalReview.decision === "research_more" ? translateNote(language2, "note.aim_research_status_partial") : translateNote(language2, "note.aim_interim_result"),
@@ -45415,6 +44968,7 @@ ${note.detail}`
     var _a2, _b2, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     let map = await this.repository.readMap(mapPath);
     const language2 = this.languageOf(map);
+    const aimStyle = await this.styleOf(language2);
     let branch = (_a2 = map.aim) == null ? void 0 : _a2.branches.find((item) => item.id === branchId);
     if (!branch) throw new Error("AIM answer branch disappeared before planning its research.");
     const questionNodeId = branch.questionNodeId;
@@ -45435,7 +44989,6 @@ ${topicNote.detail}
 Branch lineage:
 ${lineageContext || "None."}`,
       outputLanguage: language2,
-      ...this.toneOf(map, language2) ? { toneText: this.toneOf(map, language2) } : {},
       mode: "task",
       researchMode: "local",
       researchDepth: "fast",
@@ -45964,7 +45517,8 @@ ${currentReports.detail}`,
           goalDetail: topicNote.detail,
           unattended: this.isUnattended(map),
           outputLanguage: language2,
-          toneText: this.toneOf(map, language2),
+          toneText: aimStyle == null ? void 0 : aimStyle.toneText,
+          ...aimStyle ? { noteStyle: aimStyle } : {},
           conditions: branch.inputSnapshot.conditions,
           currentQuestion: parent.summary,
           currentAnswer: answerDescription,
@@ -46196,7 +45750,8 @@ ${beforeSearch.detail}`,
         model,
         signal,
         mapPath,
-        branchId
+        branchId,
+        noteStyle: aimStyle
       });
       const presentation = isPartial ? {
         title: translateNote(language2, "note.aim_needs_followup"),
@@ -47851,6 +47406,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "unbindClipboard", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
+    __publicField(this, "aimStyleNoticed", /* @__PURE__ */ new Set());
     __publicField(this, "noStyleFiles");
     this.installUndoScope();
     this.aimRuns = new AimRunStore(plugin.repo);
@@ -47869,12 +47425,14 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     );
     this.aimManual.onProgress = (event) => this.onAimProgress(event);
     this.aimManual.addDiagrams = (request) => plugin.addAimDiagrams(request);
+    this.aimManual.noteStyle = (language2) => this.aimNoteStyle(language2);
     this.aimRecovery = new AimManualFlow(
       plugin.repo,
       this.aimRuns,
       (context, model, reasoning, signal, onWebSearchEvent) => plugin.askModel(context, model, reasoning, signal, void 0, void 0, onWebSearchEvent)
     );
     this.aimRecovery.addDiagrams = (request) => plugin.addAimDiagrams(request);
+    this.aimRecovery.noteStyle = (language2) => this.aimNoteStyle(language2);
   }
   /** How many same-pair relations the latest merge dropped (0 when none). */
   droppedSamePairOfLastMerge() {
@@ -48931,7 +48489,7 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   }
   /** The style behind a stored pair, for "Edit this style" on the first option of a picker. */
   styleRefFor(templateId, toneId) {
-    return styleRefOf(templateId, toneId, this.plugin.settings.noteStyleAliases);
+    return styleRefOf(templateId, toneId);
   }
   defaultStyleRef() {
     var _a2;
@@ -63609,6 +63167,30 @@ ${addition}` : addition });
     if (gate) gate.shown = true;
     new import_obsidian31.Notice(t("ui.note_style_kind_missing_0_1", t(`ui.topic_kind_${kind}`), ref.replace(/^(?:builtin|file):/, "")));
   }
+  /**
+   * The note style of the AIM conclusion note (the "aim" row). A row that cannot be read, or whose structure the AIM
+   * outline cannot hold (0 or more than 12 sections), falls back to the AIM report; the user is told once per map in
+   * this view. Nothing is written.
+   */
+  async aimNoteStyle(language2) {
+    var _a2;
+    if (!this.plugin.settings) return void 0;
+    try {
+      await this.noteStyles.refresh();
+    } catch (e) {
+    }
+    const style = this.noteStyles.runStyle({ kind: "aim", outputLanguage: language2 });
+    const ref = (_a2 = this.plugin.settings.noteStyleByKind) == null ? void 0 : _a2.aim;
+    const sections = style.template.sections.length;
+    const unusable = !style.recipe.aimDelivery && (sections === 0 || sections > AIM_MAX_SECTIONS);
+    if (ref && (style.issues.missing.includes(ref) || unusable) && !this.aimStyleNoticed.has(this.path)) {
+      this.aimStyleNoticed.add(this.path);
+      new import_obsidian31.Notice(
+        t("ui.note_style_kind_missing_0_1", t("ui.note_style_kind_aim"), ref.replace(/^(?:builtin|file):/, ""))
+      );
+    }
+    return style;
+  }
   /** The plugin's note style store. A plugin without one (a test double) has no style folder: nothing changes then. */
   get noteStyles() {
     var _a2, _b2;
@@ -64043,12 +63625,12 @@ function shownBlocks(plugin) {
   const chosen = (_b2 = (_a2 = settings.defaultNoteStyleId) != null ? _a2 : settings.defaultDetailTemplateId) != null ? _b2 : "standard";
   const preset = NOTE_STYLE_PRESETS.find((item) => item.id === chosen);
   const standard = NOTE_STYLE_PRESETS[0];
-  const has2 = (category, ref) => ref !== void 0 && store.listBlocks(category).some((item) => item.ref === ref);
+  const has = (category, ref) => ref !== void 0 && store.listBlocks(category).some((item) => item.ref === ref);
   const effective = store.effectiveBlockKeys();
   const keyed = effective.template;
-  const template2 = keyed ? has2("template", keyed) ? keyed : builtinRef(standard.templateId) : preset ? builtinRef(preset.templateId) : builtinRef(standard.templateId);
+  const template2 = keyed ? has("template", keyed) ? keyed : builtinRef(standard.templateId) : preset ? builtinRef(preset.templateId) : builtinRef(standard.templateId);
   const toneKey = effective.tone;
-  const tone2 = toneKey ? has2("tone", toneKey) ? toneKey : builtinRef(standard.toneId) : builtinRef((preset != null ? preset : standard).toneId);
+  const tone2 = toneKey ? has("tone", toneKey) ? toneKey : builtinRef(standard.toneId) : builtinRef((preset != null ? preset : standard).toneId);
   return { template: template2, tone: tone2 };
 }
 function writeShown(plugin, changed) {
@@ -72241,8 +71823,6 @@ function settingsFromSaved(saved) {
         Object.entries(saved.noteStyleFiles).filter(([, name]) => typeof name === "string" && name)
       )
     } : {},
-    ...normalizeNoteStyleAliases(saved == null ? void 0 : saved.noteStyleAliases) ? { noteStyleAliases: normalizeNoteStyleAliases(saved == null ? void 0 : saved.noteStyleAliases) } : {},
-    ...normalizeNoteStyleUpgradeMarker(saved == null ? void 0 : saved.noteStyleUpgrade) ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved == null ? void 0 : saved.noteStyleUpgrade) } : {},
     coffeeStyles: Array.isArray(saved == null ? void 0 : saved.coffeeStyles) ? saved.coffeeStyles.filter(
       (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
     ) : [],
@@ -72286,8 +71866,7 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     __publicField(this, "noteStyles", new NoteStyleStore({
       settings: () => this.settings,
       port: this.noteStylePort(),
-      save: () => this.saveSettings(),
-      report: (event) => this.reportNoteStyleUpgrade(event)
+      save: () => this.saveSettings()
     }));
     __publicField(this, "ready", Promise.resolve());
     /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
@@ -72843,6 +72422,9 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
     this.app.workspace.onLayoutReady(() => {
       void this.finishStartup();
     });
+    this.app.workspace.onLayoutReady(() => {
+      void this.migrateNoteStyles().then(() => this.refreshNoteStyles());
+    });
     this.registerVaultEvents();
   }
   /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
@@ -72885,6 +72467,57 @@ var VisualAgentMapPlugin = class extends import_obsidian40.Plugin {
         t("log.initialization_incomplete_0", error instanceof Error ? error.message : String(error))
       );
       console.warn("Visual Agent Map initialization", error);
+    }
+  }
+  /** Reads the style files into the store once at start (read only), so a `file:` style resolves on its first use. */
+  async refreshNoteStyles() {
+    try {
+      await this.noteStyles.refresh();
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note styles were not read at start: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  /**
+   * Converts the 0.28.0 custom templates and tones once (the one write VAM makes on load), then says once which maps
+   * carried a style that is no longer used. After the first load that has done both, nothing is scanned or written.
+   * Never throws.
+   */
+  async migrateNoteStyles() {
+    var _a2;
+    try {
+      await this.ready;
+      const marker5 = this.settings.noteStyleRecipe;
+      if ((marker5 == null ? void 0 : marker5.migrated) && marker5.mapsNotified) return;
+      const found = /* @__PURE__ */ new Map();
+      for (const { file, map } of await this.repo.readableMaps()) {
+        const styled = [map.detailTemplateId, map.toneId].some((id) => typeof id === "string" && id !== "");
+        if (styled) found.set(file.path, map.title.trim() || file.name.replace(/\.md$/i, ""));
+      }
+      const mapsWithStyle = [
+        ...new Set([...found].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, name]) => name))
+      ];
+      const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
+      if (result.status === "already" && result.error) {
+        this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
+      } else if (result.status === "failed") {
+        this.logs.appendLog("warn", `Note style conversion failed: ${(_a2 = result.error) != null ? _a2 : "unknown error"}`);
+        new import_obsidian40.Notice(t("ui.note_style_migrate_failed"));
+      } else if (result.notify) {
+        const maps = result.notify.maps.join(t("ui.list_separator"));
+        const text11 = [
+          t("ui.note_style_maps_notice_0", maps),
+          result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
+        ].filter(Boolean).join(" ");
+        new import_obsidian40.Notice(text11, 0);
+      }
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note style conversion did not run: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   registerVaultEvents() {
@@ -73283,12 +72916,6 @@ ${t("ui.organize_link_wait_hint")}`;
     this.resetCodexRuntime();
     this.unloaded = true;
     this.aiRuntime.dispose();
-  }
-  /** Says once what the note style upgrade could not do (it never stops the plugin). */
-  reportNoteStyleUpgrade(event) {
-    if (event.kind === "failed") new import_obsidian40.Notice(t("ui.note_style_upgrade_failed"));
-    else if (event.kind === "skipped") new import_obsidian40.Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
-    else new import_obsidian40.Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   noteStylePort() {

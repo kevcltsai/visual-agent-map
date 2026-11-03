@@ -35,14 +35,8 @@ import {
   type Command,
   type TAbstractFile
 } from "obsidian";
-import {
-  NoteStyleStore,
-  normalizeNoteTemplateByKind,
-  type NoteStyleUpgradeEvent,
-  type StyleFilePort
-} from "./ai/note-style-store";
+import { NoteStyleStore, normalizeNoteTemplateByKind, type StyleFilePort } from "./ai/note-style-store";
 import { parseRecipeRef, STYLE_KINDS } from "./ai/note-style-recipe";
-import { normalizeNoteStyleAliases, normalizeNoteStyleUpgradeMarker } from "./ai/note-style-upgrade";
 import type { BlockCategory } from "./core/blocks/builtin";
 import { ChoiceModal } from "./ui/modals/choice-modal";
 import { PromptPreviewModal } from "./ui/modals/prompt-preview-modal";
@@ -222,12 +216,6 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
           )
         }
       : {}),
-    ...(normalizeNoteStyleAliases(saved?.noteStyleAliases)
-      ? { noteStyleAliases: normalizeNoteStyleAliases(saved?.noteStyleAliases) }
-      : {}),
-    ...(normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade)
-      ? { noteStyleUpgrade: normalizeNoteStyleUpgradeMarker(saved?.noteStyleUpgrade) }
-      : {}),
     coffeeStyles: Array.isArray(saved?.coffeeStyles)
       ? saved.coffeeStyles.filter(
           (item: unknown): item is { id: string; name: string; prompt: string } =>
@@ -280,8 +268,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   readonly noteStyles = new NoteStyleStore({
     settings: () => this.settings,
     port: this.noteStylePort(),
-    save: () => this.saveSettings(),
-    report: event => this.reportNoteStyleUpgrade(event)
+    save: () => this.saveSettings()
   });
   ready: Promise<void> = Promise.resolve();
   /** The topics with a run in flight; {@link topicRuns} reads this same Set. */
@@ -841,6 +828,11 @@ export default class VisualAgentMapPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       void this.finishStartup();
     });
+    // Its own callback, not part of finishStartup: the conversion writes files and must stay apart from the start-up
+    // checks that call finishStartup on a bare plugin.
+    this.app.workspace.onLayoutReady(() => {
+      void this.migrateNoteStyles().then(() => this.refreshNoteStyles());
+    });
     this.registerVaultEvents();
   }
   /** First install only (no saved settings, no workspace, nothing to reconnect): make one blank map to land on. */
@@ -883,6 +875,59 @@ export default class VisualAgentMapPlugin extends Plugin {
         t("log.initialization_incomplete_0", error instanceof Error ? error.message : String(error))
       );
       console.warn("Visual Agent Map initialization", error);
+    }
+  }
+  /** Reads the style files into the store once at start (read only), so a `file:` style resolves on its first use. */
+  private async refreshNoteStyles(): Promise<void> {
+    try {
+      await this.noteStyles.refresh();
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note styles were not read at start: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  /**
+   * Converts the 0.28.0 custom templates and tones once (the one write VAM makes on load), then says once which maps
+   * carried a style that is no longer used. After the first load that has done both, nothing is scanned or written.
+   * Never throws.
+   */
+  async migrateNoteStyles(): Promise<void> {
+    try {
+      await this.ready;
+      const marker = this.settings.noteStyleRecipe;
+      if (marker?.migrated && marker.mapsNotified) return;
+      // Read only: maps with a style of their own, by title (the file name when the title is empty), in path order.
+      const found = new Map<string, string>();
+      for (const { file, map } of await this.repo.readableMaps()) {
+        const styled = [map.detailTemplateId, map.toneId].some(id => typeof id === "string" && id !== "");
+        if (styled) found.set(file.path, map.title.trim() || file.name.replace(/\.md$/i, ""));
+      }
+      const mapsWithStyle = [
+        ...new Set([...found].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, name]) => name))
+      ];
+      const result = await this.noteStyles.migrateLegacy({ mapsWithStyle });
+      if (result.status === "already" && result.error) {
+        this.logs.appendLog("warn", `Note style maps record was not saved: ${result.error}`);
+      } else if (result.status === "failed") {
+        this.logs.appendLog("warn", `Note style conversion failed: ${result.error ?? "unknown error"}`);
+        new Notice(t("ui.note_style_migrate_failed"));
+      } else if (result.notify) {
+        const maps = result.notify.maps.join(t("ui.list_separator"));
+        const text = [
+          t("ui.note_style_maps_notice_0", maps),
+          result.notify.defaultName ? t("ui.note_style_maps_notice_default_0", result.notify.defaultName) : ""
+        ]
+          .filter(Boolean)
+          .join(" ");
+        new Notice(text, 0);
+      }
+    } catch (error) {
+      this.logs.appendLog(
+        "warn",
+        `Note style conversion did not run: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   registerVaultEvents(): void {
@@ -1322,12 +1367,6 @@ export default class VisualAgentMapPlugin extends Plugin {
     // After this no late dialog event can start a pre-warmed process.
     this.unloaded = true;
     this.aiRuntime.dispose();
-  }
-  /** Says once what the note style upgrade could not do (it never stops the plugin). */
-  private reportNoteStyleUpgrade(event: NoteStyleUpgradeEvent): void {
-    if (event.kind === "failed") new Notice(t("ui.note_style_upgrade_failed"));
-    else if (event.kind === "skipped") new Notice(t("ui.note_style_upgrade_skipped_0", event.names.join(", ")));
-    else new Notice(t("ui.note_style_upgrade_trash_failed_0", event.names.join(", ")));
   }
   /** The vault operations of the note style store (Vault and FileManager APIs only). */
   private noteStylePort(): StyleFilePort {

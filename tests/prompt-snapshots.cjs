@@ -4,6 +4,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const { load: loadModule, loadSource, normalizeText, promptsFor, root } = require('./support-replay.cjs');
 const support = require('./support.cjs');
@@ -31,21 +32,16 @@ async function recordContext(name, builder, language, context, model) {
 
 const base = { title: 'Topic T', summary: 'Current summary S', rules: 'Rule R', detail: 'Existing detail D', task: 'Do task X', ancestors: 'Ancestor A', workingFindings: 'Older finding F', sourceContext: 'Source [S1]: fact', mode: 'task', researchMode: 'research', researchDepth: 'normal', visualMode: 'auto' };
 
-// Ticket 06 P2: the old note style switches no longer reach the prompt. A style file is turned into the block the upgrade
-// writes for it (the switches are applied to the format rules zone there) and goes in as the request's styleSelection (the
-// sections as the template, the format rules zone as the format);
-// the snapshot files stay what they were (the old file and its switches produced exactly this prompt).
+// Ticket 06 P2: the old note style switches no longer reach the prompt. A style file goes in as the request's styleSelection:
+// the sections as the template, the format rules zone as the format. The pairs were produced once by the (since deleted)
+// upgrade module and are frozen in tests/fixtures/note-style-frozen (see its README); the snapshot files stay what they were
+// (the old file and its switches produced exactly this prompt). A missing key throws; nothing is recomputed.
+const FROZEN_SELECTIONS = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'note-style-frozen', 'upgraded-selections.json'), 'utf8')).entries;
 function upgradedSelection(text, language) {
-  const { planNoteStyleUpgrade } = loadModule('ai/note-style-upgrade.ts');
-  const none = new Map();
-  const plan = planNoteStyleUpgrade({ language, files: new Map([['S', text]]), detailTemplates: [], promptPresets: undefined, noteStyleFiles: undefined, blocks: { template: none, tone: none } });
-  const blocks = plan.blocks.filter(block => block.category === 'template');
-  assert.equal(blocks.length, 1, 'the style file upgrades into one template block');
-  // The format rules are a part of their own (Q1): the block's format rules zone goes in as the format choice, the sections
-  // zone as the template body. An input mapping only; the snapshot files and the compare mode stay as they were (decision 24).
-  const { splitTemplateZones } = loadModule('core/blocks/template-block.ts');
-  const zones = splitTemplateZones(blocks[0].text);
-  return { template: { id: 'style:S', body: zones.sections }, format: { id: 'file:S', body: zones.format ?? '' }, tone: { id: 'academic' } };
+  const key = `${crypto.createHash('sha256').update(text).digest('hex')}:${language}`;
+  const frozen = FROZEN_SELECTIONS[key];
+  if (!frozen) throw new Error(`no frozen upgraded selection for ${key}`);
+  return { template: { id: frozen.template.id, body: frozen.template.body }, format: { id: frozen.format.id, body: frozen.format.body }, tone: { id: 'academic' } };
 }
 
 test('collect snapshots: AiTaskService general task prompt', async () => {
@@ -202,6 +198,49 @@ test('collect snapshots: AIM flow phase tasks (manual-flow, final-delivery)', as
   for (const [phase, context] of [...first.entries()].sort(([a], [b]) => a.localeCompare(b)))
     for (const [language, tag] of LANGUAGES)
       await recordContext(`aim-flow.${phase}.${tag}`, `AimManualFlow/final-delivery phase ${phase} through AiTaskService`, language, { ...context, outputLanguage: language });
+});
+
+test('collect snapshots: AIM flow final delivery with a note style (claim to judgment, plain voice, lean format)', async () => {
+  const { AimManualFlow } = loadModule('experiences/aim/manual-flow.ts');
+  const { AimRunStore } = loadModule('experiences/aim/research-run-store.ts');
+  const { lookupBuiltinFormat } = loadModule('core/blocks/builtin.ts');
+  const names = ['Claim', 'Prediction', 'How to check', 'Support', 'Counter', 'Current judgment', 'Evidence and sources', 'Update log'];
+  const drive = async (language, withStyle) => {
+    const subject = await support.coverageSetup('Snapshot goal');
+    const first = new Map();
+    const inner = subject.model.ask;
+    const ask = async context => {
+      const phase = context.task.match(/aim-phase:\s*([a-z-]+)/)?.[1] ?? 'none';
+      const key = phase === 'report-review' && /Hard floor: \d+ answered/.test(context.task) ? `${phase}-${first.has(phase) ? 'later' : 'first'}` : phase;
+      if (!first.has(key)) first.set(key, { ...context, onProgress: undefined, signal: undefined });
+      return inner(context);
+    };
+    subject.flow = new AimManualFlow(subject.repo, new AimRunStore(subject.repo), ask);
+    if (withStyle)
+      subject.flow.noteStyle = () => ({
+        recipe: { ref: 'file:AIM plain lean', name: 'AIM plain lean', source: 'kind' },
+        template: { id: 'aim-plain-lean', name: 'AIM plain lean', sections: names.map(name => ({ id: name, name, description: `${name}: what this section says.`, role: 'none', aliases: [] })) },
+        toneText: 'Write in plain words: short sentences, everyday terms, the conclusion first.',
+        formatText: lookupBuiltinFormat('lean', language),
+        contextFields: { styleSelection: { template: { id: 'aim-plain-lean' }, tone: {}, format: { id: 'lean' } } }
+      });
+    await support.coverageThreeAnswers(subject);
+    return first;
+  };
+  for (const [language, tag] of LANGUAGES) {
+    const plain = await drive(language, false);
+    const styled = await drive(language, true);
+    for (const [phase, context] of styled) {
+      if (phase === 'delivery-outline' || phase === 'delivery-writing') continue;
+      // askAimModel drops the tone of structured calls, so the contract phases are compared without it.
+      const { toneText, ...rest } = context;
+      const { toneText: _plainTone, ...plainRest } = plain.get(phase) ?? {};
+      const ids = value => JSON.parse(JSON.stringify(value).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '<id>')); // each run has its own ids
+      assert.deepEqual(ids(rest), ids(plainRest), `${language}: phase ${phase} is unchanged by the style`);
+    }
+    for (const phase of ['delivery-outline', 'delivery-writing'])
+      await recordContext(`aim-flow.style-${phase}.${tag}`, `AimManualFlow/final-delivery phase ${phase} with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService`, language, { ...styled.get(phase), outputLanguage: language });
+  }
 });
 
 test('collect snapshots: AIM flow phase task variants (safety net before the templates move)', async () => {

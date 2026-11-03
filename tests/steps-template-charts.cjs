@@ -16,8 +16,16 @@ export { selectionFromContext, assembleTaskPrompt, promptStepOf } from "./core/s
 export { generalTaskPrompt } from "./core/steps/task/render";
 export { splitTemplateZones } from "./core/blocks/template-block";
 export { inLanguage, OBSIDIAN_FORMAT } from "./core/steps/_shared/fragments";
-export { legacyObsidianFormat } from "./ai/note-style-upgrade";
 `);
+const FROZEN_FORMATS = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'note-style-frozen', 'legacy-formats.json'), 'utf8'));
+// legacyObsidianFormat(language, { diagrams: false, ... }) as the deleted upgrade module produced it, frozen in
+// tests/fixtures/note-style-frozen/legacy-formats.json. A missing key throws.
+function frozenLegacyFormat(language, preferences) {
+  const key = `${language}:${JSON.stringify(Object.fromEntries(Object.entries(preferences).sort()))}`;
+  const text = FROZEN_FORMATS.legacyFormats[key];
+  if (typeof text !== 'string') throw new Error(`no frozen legacy format for ${key}`);
+  return text;
+}
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const P1 = 'The larva stage lasts 3 days at 25°C and reaches 160–180 mm.';
 const NOTE = `${P1}\n\nThe pupa stage lasts 5 days.`;
@@ -59,7 +67,7 @@ async function run(mode, extra = {}) {
 
 const noMermaid = body => body.split('\n').filter(line => !line.includes('```mermaid')).join('\n');
 /** The built-in format rules with the old diagrams switch applied, the way the upgrade writes it into a block. */
-const diagramsOff = body => body.replace(M.inLanguage(M.OBSIDIAN_FORMAT, 'en'), () => M.legacyObsidianFormat('en', { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true }));
+const diagramsOff = body => body.replace(M.inLanguage(M.OBSIDIAN_FORMAT, 'en'), () => frozenLegacyFormat('en', { callouts: 'auto', diagrams: false, tables: true, tasks: true, highlight: true }));
 const withTemplate = (body, id = 'standard', format) => ({ styleSelection: { ...M.selectionFromContext(base('task'), 'en'), template: { id, body }, ...(format === undefined ? {} : { format: { id: 'file:F', body: format } }) } });
 const STANDARD_FORMAT = M.inLanguage(M.OBSIDIAN_FORMAT, 'en');
 

@@ -78,11 +78,6 @@ export type TemplateBlockParse =
       lead: string;
       /** A format rules zone found in the text is not read (the format rules are a part of their own); each is noted here. */
       notices: TemplateNotice[];
-      /**
-       * Legacy: the text of the format rules zone, or "" when there is none. Nothing reads it to build a prompt; only
-       * the old note style upgrade (ai/note-style-upgrade.ts, removed in T3) compares it in its self-check.
-       */
-      format: string;
     }
   | { ok: false; issues: NoteStyleIssue[] };
 
@@ -99,7 +94,6 @@ export function parseTemplateBlock(text: string, options: { id: string; name: st
     ok: true,
     template: { ...template, layout: "sections", intro: "" },
     lead: intro,
-    notices: zones.separatorLines.length ? [{ line: zones.separatorLines[0], code: "format_zone_moved" }] : [],
-    format: zones.format ?? ""
+    notices: zones.separatorLines.length ? [{ line: zones.separatorLines[0], code: "format_zone_moved" }] : []
   };
 }

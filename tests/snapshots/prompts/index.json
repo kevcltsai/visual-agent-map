@@ -736,6 +736,36 @@
       "language": "zh-CN",
       "schema": true
     },
+    "aim-flow.style-delivery-outline.en": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "en",
+      "schema": true
+    },
+    "aim-flow.style-delivery-outline.zh": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.style-delivery-outline.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-outline with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
+    "aim-flow.style-delivery-writing.en": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "en",
+      "schema": true
+    },
+    "aim-flow.style-delivery-writing.zh": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-TW",
+      "schema": true
+    },
+    "aim-flow.style-delivery-writing.zh-CN": {
+      "builder": "AimManualFlow/final-delivery phase delivery-writing with an AIM note style (claim to judgment, plain voice, lean format) through AiTaskService",
+      "language": "zh-CN",
+      "schema": true
+    },
     "aim-flow.subtopic-research-reuse-rejected.en": {
       "builder": "AimManualFlow/planner-review phase task variant subtopic-research-reuse-rejected through AiTaskService",
       "language": "en",

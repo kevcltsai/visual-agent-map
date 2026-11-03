@@ -6,12 +6,10 @@ import {
   type StyleSelection
 } from "../core/steps/task/assemble";
 import {
-  backupName,
   builtinBlockNames,
   builtinBlockText,
   builtinRef,
   cleanBlockName,
-  copyBlockName,
   fileRef,
   isUnmodifiedBlock,
   parseBlockRef,
@@ -31,7 +29,6 @@ import {
 import { parseTemplateBlock, trimFormatBody, type TemplateNotice } from "../core/blocks/template-block";
 import { builtinTemplates, isBuiltinTemplateId, type DetailTemplate } from "./detail-templates";
 import { NOTE_STYLE_LIMITS, type NoteStyleIssue } from "./note-style-file";
-import { TOPIC_KINDS, type TopicKind } from "../note-values";
 import { DEFAULT_TONE_ID, findPreset, type PromptPreset } from "./prompt-presets";
 import {
   AIM_DELIVERY_STRUCTURE,
@@ -84,8 +81,6 @@ export interface NoteStyleSettings {
   noteTemplateBlock?: string;
   /** The workspace tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the old default. */
   noteToneBlock?: string;
-  /** The template block each topic kind uses (`builtin:<id>` or `file:<name>`); a kind with no entry has no kind level. */
-  noteTemplateByKind?: Partial<Record<TopicKind, string>>;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
   /** The marker of the conversion to this model, and the old id -> new ref table that implicit styles read. */
@@ -168,21 +163,6 @@ export interface RunStyle {
   }>;
 }
 
-/**
- * The kind -> template block map as it may be saved: only known kinds, with a non-empty `builtin:`/`file:` ref. Anything else
- * (a style file ref, an old template id, free text, a non-object) is dropped; undefined when nothing is left.
- */
-export function normalizeNoteTemplateByKind(value: unknown): Partial<Record<TopicKind, string>> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const saved = value as Record<string, unknown>;
-  const kept: Partial<Record<TopicKind, string>> = {};
-  for (const kind of TOPIC_KINDS) {
-    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : undefined;
-    if (typeof ref === "string" && ref && parseBlockRef(ref)) kept[kind] = ref;
-  }
-  return Object.keys(kept).length ? kept : undefined;
-}
-
 /** One entry of a block picker. */
 export interface BlockListItem {
   /** `builtin:<id>` or `file:<name>`, as stored in the settings. */
@@ -244,10 +224,6 @@ export interface SaveRecipeInput extends RecipeFileParts {
   original?: { ref: string; text: string };
 }
 export type SaveRecipeResult = { ok: true; ref: string } | { ok: false; reason: "name" | "changed" | "write-failed" };
-
-export type RestoreBlockResult =
-  | { ok: true; backup: string }
-  | { ok: false; reason: "not-builtin" | "no-override" | "read-failed" | "backup-failed" | "trash-failed" };
 
 const stripMd = (name: string) => name.replace(/\.md$/i, "");
 const lower = (value: string) => value.toLocaleLowerCase();
@@ -832,13 +808,6 @@ export class NoteStyleStore {
     };
   }
 
-  // ---- what the settings page reads ----
-
-  /** The template and tone blocks the runs use, as saved. Read-only. */
-  effectiveBlockKeys(): { template?: string; tone?: string } {
-    return { template: this.settings.noteTemplateBlock, tone: this.settings.noteToneBlock };
-  }
-
   // ---- the tone choices of the map pickers ----
 
   /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
@@ -918,104 +887,6 @@ export class NoteStyleStore {
       await this.deps.port.create(`${dir}/${base}.md`, text);
       this.blocks[category].set(base, text);
       return { path: `${dir}/${base}.md`, base, created: true };
-    });
-  }
-
-  /**
-   * Copies a block into a new file of the category, named "<name> (my version)" (unique, never a built-in's name), and
-   * makes it the workspace's choice. Returns the new ref. The text copied is the block's file when it has one, else its
-   * built-in text. With `chosenName` the file gets that name (cleaned); a name that is empty, taken or a built-in's
-   * throws and nothing is written or changed.
-   */
-  copyBlock(category: BlockCategory, ref: string, chosenName?: string): Promise<string> {
-    return this.serial(async () => {
-      await this.loadBlocks();
-      const parsed = parseBlockRef(ref);
-      const language = this.settings.language;
-      let name: string;
-      let text: string;
-      if (parsed?.kind === "file") {
-        const held = this.blocks[category].get(parsed.base);
-        if (held === undefined) throw new Error(`Block file not found: ${parsed.base}`);
-        name = parsed.base;
-        text = held;
-      } else if (parsed?.kind === "builtin" && this.isBuiltinBlockId(category, parsed.id)) {
-        const override = this.overrideBase(category, parsed.id);
-        name = translate(language, findBuiltinBlock(category, parsed.id).nameKey);
-        // Academic rigor has no text of its own: without a file the copy starts from the design note, like Edit does.
-        const builtinText =
-          category === "tone" && parsed.id === "academic"
-            ? academicToneNote(language)
-            : builtinBlockText(category, parsed.id, language);
-        text = override === undefined ? builtinText : this.blocks[category].get(override)!;
-      } else throw new Error(`Unknown block: ${ref}`);
-      const dir = this.blockDirectories()[category];
-      let base: string;
-      if (chosenName === undefined) base = copyBlockName(category, name, language, this.takenNames(category));
-      else {
-        base = cleanBlockName(chosenName);
-        const reserved = new Set(this.takenNames(category));
-        for (const block of BUILTIN_BLOCKS)
-          if (block.category === category)
-            for (const builtinName of builtinBlockNames(category, block.id)) reserved.add(lower(builtinName));
-        if (!base || reserved.has(lower(base))) throw new Error(`Block name not available: ${chosenName}`);
-      }
-      await this.pinFolder();
-      await this.deps.port.createFolder(dir);
-      await this.deps.port.create(`${dir}/${base}.md`, text);
-      this.blocks[category].set(base, text);
-      const created = fileRef(base);
-      if (category === "template") this.settings.noteTemplateBlock = created;
-      else this.settings.noteToneBlock = created;
-      await this.deps.save();
-      return created;
-    });
-  }
-
-  /**
-   * Restores a built-in block: its file is saved to the backup folder first, then moved to the trash, so the built-in
-   * text applies again. Refused for an own block and for a built-in with no file. If the backup cannot be written the
-   * file stays as it is.
-   */
-  restoreBlock(category: BlockCategory, ref: string): Promise<RestoreBlockResult> {
-    return this.serial(async (): Promise<RestoreBlockResult> => {
-      await this.loadBlocks();
-      const parsed = parseBlockRef(ref);
-      if (parsed?.kind !== "builtin" || !this.isBuiltinBlockId(category, parsed.id))
-        return { ok: false, reason: "not-builtin" };
-      const base = this.overrideBase(category, parsed.id);
-      if (base === undefined) return { ok: false, reason: "no-override" };
-      const { port } = this.deps;
-      const dirs = this.blockDirectories();
-      const path = `${dirs[category]}/${base}.md`;
-      let live: string;
-      try {
-        live = await port.read(path);
-      } catch {
-        return { ok: false, reason: "read-failed" };
-      }
-      let backup: string;
-      try {
-        let present: string[] = [];
-        try {
-          present = await port.list(dirs.backup);
-        } catch {
-          present = [];
-        }
-        await this.pinFolder();
-        await port.createFolder(dirs.backup);
-        backup = `${dirs.backup}/${backupName(base, this.deps.now?.() ?? new Date(), new Set(present.map(lower)))}`;
-        await port.create(backup, live);
-      } catch {
-        return { ok: false, reason: "backup-failed" };
-      }
-      try {
-        await port.trash(path);
-      } catch {
-        return { ok: false, reason: "trash-failed" };
-      }
-      this.blocks[category].delete(base);
-      return { ok: true, backup };
     });
   }
 

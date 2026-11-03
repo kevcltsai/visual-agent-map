@@ -56,6 +56,7 @@ test('onload with only the unpublished workspace keys (no 0.28.0 custom template
   const { writes } = await onloadWrites(saved, { saves });
   assert.deepEqual(writes, []);
   assert.equal(saves.at(-1).noteStyleRecipe.migrated, 1, 'only data.json gets the marker (D6)');
+  assert.equal('noteTemplateByKind' in saves.at(-1), false, 'the removed key is gone from data.json after the save (T5 P2b, #31)');
 });
 
 test('onload with only an outline preset writes nothing to the vault (D6: data.json marker only)', async () => {

@@ -285,55 +285,12 @@ test('counter 8 (was: a style file that decides the tone; grilling Q10/Q12): a s
 });
 
 // ---- counter 9: copy ----
-test('counter 9: copy gives a unique name ("My x", "My x (2)"), never overwrites, never takes a built-in name, is cleaned, stays in the block folder, and the setting points at it', async () => {
-  for (const language of LANGUAGES) {
-    const { store, v, settings, saves } = makeStore({ language });
-    await store.refresh();
-    const name = M.translate(language, 'ui.structure_name_standard');
-    const first = await store.copyBlock('template', 'builtin:standard');
-    const second = await store.copyBlock('template', 'builtin:standard');
-    const copy = M.translate(language, 'ui.block_copy_name_0', name);
-    assert.equal(first, `file:${copy}`, language);
-    assert.equal(second, `file:${copy} (2)`, language);
-    assert.equal(settings.noteTemplateBlock, second);
-    assert.ok(saves() >= 2);
-    const root = `${STYLES}/${M.translate(language, 'ui.style_folder_template')}`;
-    assert.equal(v.files[`${root}/${copy}.md`], M.builtinTemplateText('standard', language), language);
-    assert.equal(v.files[`${root}/${copy} (2).md`], M.builtinTemplateText('standard', language), language);
-    const items = store.listBlocks('template');
-    assert.ok(items.some(item => item.ref === first && item.kind === 'file'));
-    assert.ok(items.some(item => item.ref === second && item.kind === 'file'));
-    assert.deepEqual(plain(items.filter(item => item.kind === 'builtin').map(item => item.ref)), ['builtin:standard', 'builtin:textbook', 'builtin:hypothesis', 'builtin:evidence', 'builtin:action', 'builtin:atomic', 'builtin:conclusion']);
-  }
-  // a user's file of that name, created after the last refresh, is not touched
-  const { store, v } = makeStore({});
-  await store.refresh();
-  v.files[`${TPL}/My Standard six.md`] = 'MINE, do not touch';
-  v.folders.add(TPL);
-  const ref = await store.copyBlock('template', 'builtin:standard');
-  assert.equal(ref, 'file:My Standard six (2)');
-  assert.equal(v.files[`${TPL}/My Standard six.md`], 'MINE, do not touch');
-  // the name is cleaned, and the path stays inside the folder
-  const odd = makeStore({}, { [`${TPL}/We*ird [a].md`]: MINE });
-  await odd.store.refresh();
-  const oddRef = await odd.store.copyBlock('template', 'file:We*ird [a]');
-  assert.equal(oddRef, 'file:My We ird a');
-  const made = odd.v.created[odd.v.created.length - 1];
-  assert.ok(made.startsWith(`${TPL}/`) && !made.slice(TPL.length + 1).includes('/') && !/[\\/:*?"<>|#^[\]]/.test(made.slice(TPL.length + 1)), made);
-  // a tone is copied the same way, into the tone folder; academic with no file copies as the design note (design 3.8), not an empty file
-  const tone = makeStore({});
-  await tone.store.refresh();
-  const toneRef = await tone.store.copyBlock('tone', 'builtin:academic');
-  assert.equal(toneRef, 'file:My Academic rigor');
-  assert.equal(tone.v.files[`${TONE}/My Academic rigor.md`], M.academicToneNote('en'));
-  assert.equal(tone.settings.noteToneBlock, toneRef);
-  // the copy can be edited and the prompt follows
+test('counter 9 (was copyBlock; decisions #31): a part created from a built-in structure and edited reaches a run through a style that names it, in the preview and the service prompt', async () => {
   const edit = makeStore({});
   await edit.store.refresh();
-  const editRef = await edit.store.copyBlock('template', 'builtin:standard');
+  const editRef = await edit.store.createPart('structure', 'builtin:standard');
   const file = `${TPL}/${editRef.slice('file:'.length)}.md`;
   edit.v.files[file] = `${edit.v.files[file]}\nADDED-LINE-COPY\n`;
-  // the copy reaches a run through a style that names it (the workspace key the copy also sets is no longer read)
   edit.v.files[`${RECIPES}/Mix.md`] = `---\nstructure: ${editRef.slice('file:'.length)}\n---\n`;
   edit.settings.noteStyleByKind = { topic: 'file:Mix' };
   const fields = await fieldsOf(edit.store);
@@ -354,68 +311,6 @@ test('counter 9 (names): a copy name is never a built-in name, backup names carr
 });
 
 // ---- counter 10: restore ----
-test('counter 10 (was: the prompt returns to the built-in text after the restore; decision #22): restore saves a byte-equal backup first, then moves the override to the trash; the run was the built-in text before and stays so', async () => {
-  const clock = new Date(2026, 10, 2, 3, 4, 5);
-  for (const [category, ref, file, text] of [
-    ['template', 'builtin:standard', `${TPL}/Standard six.md`, `${M.builtinTemplateText('standard', 'en')}\nCHANGED-LINE\r\n  `],
-    ['tone', 'builtin:plain', `${TONE}/Plain explanation.md`, 'My own plain tone \r\n']
-  ]) {
-    const { store, v, settings } = makeStore({ noteTemplateBlock: 'builtin:standard', noteToneBlock: 'builtin:plain' }, { [file]: text }, () => clock);
-    const builtinFields = await fieldsOf(makeStore({}).store);
-    await store.refresh();
-    const before = await fieldsOf(store);
-    // decision #22: an override file of a built-in is not read, so the run is the built-in one before and after the restore
-    assert.equal(before.styleSelection, undefined);
-    assert.equal(before.toneText, undefined);
-    const result = await store.restoreBlock(category, ref);
-    assert.equal(result.ok, true, category);
-    const backupFile = Object.keys(v.files).find(name => name.startsWith(`${BAK}/`));
-    assert.ok(backupFile, category);
-    assert.ok(/ 2026-11-02 030405\.md$/.test(backupFile), backupFile);
-    assert.equal(v.files[backupFile], text, 'byte-equal');
-    assert.equal(v.trashed.length, 1);
-    assert.equal(v.trashed[0].file, file);
-    assert.deepEqual(v.trashed[0].backups, [backupFile], 'the backup existed before the trash');
-    assert.equal(file in v.files, false);
-    const after = await fieldsOf(store);
-    assert.equal(after.styleSelection, undefined);
-    assert.equal(after.toneText, builtinFields.toneText);
-    if (category === 'template') for (const step of M.PREVIEW_STEPS) assert.equal(M.previewPrompt(step.id, 'en', 'codex', after).text, M.previewPrompt(step.id, 'en', 'codex', { toneText: after.toneText }).text);
-    // the backup folder is not a menu
-    for (const c of ['template', 'tone']) assert.equal(store.listBlocks(c).some(item => item.name.includes('2026-11-02')), false);
-    assert.equal(settings.noteTemplateBlock, 'builtin:standard');
-    // again: nothing to restore
-    const again = await store.restoreBlock(category, ref);
-    assert.equal(again.ok, false);
-    assert.equal(v.trashed.length, 1);
-  }
-});
-
-test('counter 10 (refusals): a failed backup leaves the override alone; own blocks, files without an override and unknown refs are refused', async () => {
-  const text = `${M.builtinTemplateText('standard', 'en')}\nCHANGED\n`;
-  const files = { [`${TPL}/Standard six.md`]: text, [`${TPL}/Mine.md`]: MINE };
-  const failing = makeStore({}, files);
-  await failing.store.refresh();
-  failing.v.failCreateUnder = `${BAK}/`;
-  const result = await failing.store.restoreBlock('template', 'builtin:standard');
-  assert.equal(result.ok, false);
-  assert.equal(failing.v.trashed.length, 0, 'no trash without a backup');
-  assert.equal(failing.v.files[`${TPL}/Standard six.md`], text);
-  const ok = makeStore({}, files);
-  await ok.store.refresh();
-  for (const ref of ['file:Mine', 'builtin:textbook', 'builtin:nope', 'junk']) {
-    const refused = await ok.store.restoreBlock('template', ref);
-    assert.equal(refused.ok, false, ref);
-  }
-  assert.equal(ok.v.trashed.length, 0);
-  assert.equal(Object.keys(ok.v.files).filter(name => name.startsWith(`${BAK}/`)).length, 0);
-  // a file that is only named like a built-in with a "(2)" suffix is a user block, not an override
-  const suffixed = makeStore({}, { [`${TPL}/Standard (2).md`]: MINE });
-  await suffixed.store.refresh();
-  assert.equal((await suffixed.store.restoreBlock('template', 'builtin:standard')).ok, false);
-  assert.equal(suffixed.store.listBlocks('template').some(item => item.ref === 'file:Standard (2)'), true);
-});
-
 test('counter 10 (menu): the list marks a changed built-in, shows own files, ignores the backup folder', async () => {
   const { store } = makeStore({}, {
     [`${TPL}/標準六段.md`]: `${M.builtinTemplateText('standard', 'zh-TW')}\nX\n`,
@@ -460,17 +355,6 @@ test('counter 12: the zh-CN built-in template text has no Simplified heading, pa
 });
 
 // ---- counter 13: double copy ----
-test('counter 13: two copies started together make two different files and lose nothing', async () => {
-  const { store, v } = makeStore({});
-  await store.refresh();
-  const [a, b, c] = await Promise.all([store.copyBlock('template', 'builtin:standard'), store.copyBlock('template', 'builtin:standard'), store.copyBlock('tone', 'builtin:guide')]);
-  assert.notEqual(a, b);
-  assert.deepEqual([a, b], ['file:My Standard six', 'file:My Standard six (2)']);
-  assert.equal(c, 'file:My Practical guide');
-  for (const name of ['My Standard six', 'My Standard six (2)']) assert.equal(v.files[`${TPL}/${name}.md`], M.builtinTemplateText('standard', 'en'));
-  assert.equal(v.files[`${TONE}/My Practical guide.md`], M.lookupBuiltinBlock('tone', 'guide', 'en'));
-});
-
 // ---- opening a block: the file exists, in the first spelling that exists ----
 test('ensureBlockFile writes a built-in block once in the UI language, reuses an existing folder spelling and an existing file, and never overwrites', async () => {
   const { store, v } = makeStore({ language: 'zh-TW' });
@@ -673,22 +557,6 @@ test('P2 academic Edit: ensureBlockFile writes only the design note (three langu
   }
 });
 
-test('P2 save as: a chosen name is used (cleaned) and selected; a taken name, a built-in name in any language, or an empty name throws and changes nothing', async () => {
-  const { store, v, settings } = makeStore({ noteToneBlock: 'builtin:plain' }, { [`${TONE}/Mine.md`]: 'x' });
-  await store.refresh();
-  const ref = await store.copyBlock('tone', 'builtin:plain', 'Weekly: calm');
-  assert.equal(ref, 'file:Weekly calm');
-  assert.equal(settings.noteToneBlock, ref);
-  assert.equal(v.files[`${TONE}/Weekly calm.md`], M.lookupBuiltinBlock('tone', 'plain', 'en'));
-  const before = { files: { ...v.files }, key: settings.noteToneBlock, created: v.created.length };
-  for (const bad of ['mine', 'MINE', 'Weekly calm', 'Plain explanation', '白話說明', '   ', '...'])
-    await assert.rejects(() => store.copyBlock('tone', 'builtin:plain', bad), undefined, bad);
-  assert.deepEqual(v.files, before.files);
-  assert.equal(v.files[`${TONE}/Mine.md`], 'x', 'the existing file is not overwritten');
-  assert.equal(settings.noteToneBlock, before.key, 'the setting does not move');
-  assert.equal(v.created.length, before.created);
-});
-
 test('P2 preview: with the default voice the modal shows the voice heading and "(Default voice; no extra instruction)"; with a voice it shows the voice text instead', async () => {
   const none = makeStore({});
   await none.store.refresh();
@@ -706,21 +574,6 @@ test('P2 preview: with the default voice the modal shows the voice heading and "
   assert.equal(second.dom.findAll(second.modal.contentEl, item => (item.attrs.class ?? item.cls ?? '').toString().includes('vam-prompt-preview-empty')).length, 0);
   assert.ok(second.dom.findAll(second.modal.contentEl, item => item.tag === 'h2').some(item => item.text === 'Voice'));
   second.modal.close();
-});
-
-test('Low 1: Save as my own from academic rigor with no file starts the new file from the design note (three languages); with an edited file it copies that file', async () => {
-  for (const language of LANGUAGES) {
-    const { store, v } = makeStore({ language });
-    await store.refresh();
-    const ref = await store.copyBlock('tone', 'builtin:academic', 'My rigor');
-    const path = Object.keys(v.files).find(key => key.endsWith('/My rigor.md'));
-    assert.equal(v.files[path], M.academicToneNote(language), language);
-    assert.equal(ref, 'file:My rigor', language);
-  }
-  const edited = makeStore({}, { [`${TONE}/Academic rigor.md`]: `${M.academicToneNote('en')}\nUse short sentences.\n` });
-  await edited.store.refresh();
-  await edited.store.copyBlock('tone', 'builtin:academic', 'Mine two');
-  assert.equal(edited.v.files[`${TONE}/Mine two.md`], `${M.academicToneNote('en')}\nUse short sentences.\n`);
 });
 
 test('ensureBlockFile reports created: true for a file it just wrote, false for an existing file or an override', async () => {

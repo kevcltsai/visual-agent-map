@@ -1505,40 +1505,10 @@ var en = {
   "ui.note_style_atomic_short": "Atomic note structure",
   "ui.block_template_format_heading": "Format rules",
   "ui.block_copy_name_0": "My {0}",
-  "ui.block_picker_template": "Structure",
-  "ui.block_picker_tone": "Voice",
-  "ui.block_picker_template_aria": "Note style structure",
-  "ui.block_picker_tone_aria": "Note style voice",
-  "ui.block_open": "Edit",
   "ui.block_copy": "Save as my own\u2026",
-  "ui.block_restore": "Restore built-in",
-  "ui.block_modified_0": "{0} (modified)",
-  "ui.block_notice_opened_0": "Opened {0}",
-  "ui.block_notice_created_0_1": 'Created "{0}" for you to edit: {1}. Save your changes and the next AI notes will use it.',
-  "ui.block_notice_restored_0": "Restored the built-in version. Your version is backed up at {0}.",
   "ui.block_notice_open_failed": "Cannot open this file. It may have been renamed or deleted.",
-  "ui.block_notice_copy_failed": "Cannot save this file as your own. Nothing was overwritten.",
-  "ui.block_notice_restore_not_available": "There is no built-in version to restore here.",
-  "ui.block_notice_restore_backup_failed": "Cannot save a backup, so the file was left as it is.",
-  "ui.block_notice_restore_failed": "Cannot restore the built-in version. Check the Backups folder before trying again.",
   "ui.block_group_builtin": "Built-in",
-  "ui.block_status_modified_template": "You edited this built-in structure; AI writes with your version.",
-  "ui.block_status_modified_tone": "You edited this built-in voice; AI writes with your version.",
-  "ui.block_status_own_template": "A structure you created yourself.",
-  "ui.block_status_own_tone": "A voice you created yourself.",
-  "ui.block_status_issue_template_0_1": '\u26A0 Line {0}: {1} Until it is fixed, AI uses the built-in "Standard".',
-  "ui.block_status_issue_tone_0_1": '\u26A0 Line {0}: {1} Until it is fixed, AI uses the built-in "Academic rigor".',
-  "ui.block_status_missing_template_0": '\u26A0 "{0}" was not found; AI is using the built-in "Standard". Pick another from the menu.',
-  "ui.block_status_missing_tone_0": '\u26A0 "{0}" was not found; AI is using the built-in "Academic rigor". Pick another from the menu.',
   "ui.block_missing_option_0": "Not found: {0}",
-  "ui.block_edit_aria_template": "Edit note structure",
-  "ui.block_edit_aria_tone": "Edit writing voice",
-  "ui.block_more_template": "More actions: structure",
-  "ui.block_more_tone": "More actions: voice",
-  "ui.block_save_as_title": "Save as my own",
-  "ui.block_name_taken": "A file or built-in item already has this name. Pick another.",
-  "ui.block_notice_saved_as_0": 'Saved as "{0}" and switched to it.',
-  "ui.block_notice_open_backup": "Open backup",
   "ui.note_style_location_desc": "Structures and voices you edited or created are stored here.",
   "ui.note_style_location_empty": "No files yet. The first edit or save creates them.",
   "ui.preview_tone_empty": "(Default voice; no extra instruction)",
@@ -1588,23 +1558,9 @@ var en = {
   "ui.connection_repair": "Fix connection\u2026",
   "ui.tone_map_default": "Voice for this map",
   "ui.tone_map_default_desc": "Notes AI writes in this map use it unless a topic sets its own voice.",
-  "ui.tone_hint_academic": "Neutral, precise, evidence-first, no opinions. The default voice; adds no instruction.",
-  "ui.tone_hint_plain": "Everyday words; jargon is explained the first time it appears.",
-  "ui.tone_hint_magazine": "A flowing, opinionated voice with headings and concrete examples.",
-  "ui.tone_hint_summary": "Short sentences and lists: conclusions, facts and numbers only.",
-  "ui.tone_hint_guide": "Written to follow: steps, checkpoints and common mistakes.",
-  "ui.tone_hint_auto": "AI picks the voice that fits the topic and says which one at the start.",
-  "ui.note_style_by_kind": "By topic type",
-  "ui.note_style_by_kind_desc": "Each type of topic can use its own note structure. A structure chosen on the topic or for a run still wins.",
-  "ui.note_style_kind_none": "Not set (use the map or default structure)",
   "ui.note_style_kind_row_aria_0": "Note style for {0}",
   "ui.note_style_recipe_issue_0_1": "\u26A0 Line {0}: {1}",
   "ui.note_style_row_missing_0_1": 'The style set for {0}, "{1}", was not found; this type uses its built-in style instead.',
-  "ui.note_style_kind_issue_0_1_2": '\u26A0 Line {0}: {1} Until it is fixed, topics of this type use the built-in "{2}".',
-  "ui.note_style_hypothesis_hint": "Claim, prediction, test, support, counterevidence, judgment.",
-  "ui.note_style_evidence_hint": "Content, credibility, and what it supports or refutes.",
-  "ui.note_style_action_hint": "Goal, steps, checkpoints and a done-when check.",
-  "ui.note_style_atomic_hint": "Definition, explanation, example; one idea per note.",
   "ui.note_style_label_0_1": "Note style: {0} \xB7 {1}",
   "ui.note_style_label_0_1_2": "Note style: {0} \xB7 {1} ({2})",
   "ui.note_style_source_kind": "structure from topic type",
@@ -2433,7 +2389,6 @@ var en = {
   "ui.settings_group_notes": "Notes",
   "ui.settings_group_map": "Map",
   "ui.settings_group_advanced": "Advanced",
-  "ui.settings_group_default": "Default",
   "ui.settings_group_kinds": "Topic types",
   "ui.settings_group_more": "More",
   "ui.settings_group_debug": "Debugging",
@@ -2455,12 +2410,6 @@ var en = {
   "ui.settings_claude_path_desc": "VAM uses it to start Claude Code.",
   "ui.settings_note_style_page_desc": "The style AI uses for notes, by topic type.",
   "ui.settings_note_style_intro": "Pick the note style AI uses for each topic type. A style picked on a topic or for one run still wins.",
-  "ui.settings_structure": "Structure",
-  "ui.settings_voice": "Voice",
-  "ui.settings_by_kind_desc": "Let types like hypothesis or evidence each use their own structure.",
-  "ui.settings_by_kind_intro": "A structure picked on a topic or for one run still wins.",
-  "ui.settings_kinds_unset": "Not set",
-  "ui.settings_kinds_set_count_0": "{0} set",
   "ui.settings_selection_ai_name": "Show AI button on selected text",
   "ui.settings_selection_ai_desc": "Still available from the command palette when off.",
   "ui.settings_diagrams_desc": "Adds up to three Mermaid diagrams after writing.",
@@ -3879,40 +3828,10 @@ var zhCN = {
   "ui.note_style_atomic_short": "\u539F\u5B50\u77E5\u8BC6\u7ED3\u6784",
   "ui.block_template_format_heading": "\u683C\u5F0F\u89C4\u5219",
   "ui.block_copy_name_0": "\u6211\u7684{0}",
-  "ui.block_picker_template": "\u7B14\u8BB0\u7ED3\u6784",
-  "ui.block_picker_tone": "\u5199\u4F5C\u53E3\u543B",
-  "ui.block_picker_template_aria": "\u7B14\u8BB0\u98CE\u683C\u7684\u7ED3\u6784",
-  "ui.block_picker_tone_aria": "\u7B14\u8BB0\u98CE\u683C\u7684\u53E3\u543B",
-  "ui.block_open": "\u7F16\u8F91",
   "ui.block_copy": "\u53E6\u5B58\u4E3A\u6211\u7684\u7248\u672C\u2026",
-  "ui.block_restore": "\u6062\u590D\u5185\u7F6E\u7248\u672C",
-  "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
-  "ui.block_notice_opened_0": "\u5DF2\u6253\u5F00 {0}",
-  "ui.block_notice_created_0_1": "\u5DF2\u521B\u5EFA\u53EF\u7F16\u8F91\u7684\u201C{0}\u201D\uFF1A{1}\u3002\u6539\u5B8C\u4FDD\u5B58\uFF0C\u4E0B\u6B21 AI \u5199\u7B14\u8BB0\u5C31\u4F1A\u7528\u3002",
-  "ui.block_notice_restored_0": "\u5DF2\u6062\u590D\u5185\u7F6E\u7248\u672C\uFF0C\u4F60\u7684\u7248\u672C\u5DF2\u5907\u4EFD\u5728 {0}\u3002",
   "ui.block_notice_open_failed": "\u65E0\u6CD5\u6253\u5F00\u8FD9\u4EFD\u6587\u4EF6\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u5220\u9664\u3002",
-  "ui.block_notice_copy_failed": "\u65E0\u6CD5\u53E6\u5B58\u8FD9\u4EFD\u6587\u4EF6\uFF0C\u6CA1\u6709\u8986\u76D6\u4EFB\u4F55\u6587\u4EF6\u3002",
-  "ui.block_notice_restore_not_available": "\u8FD9\u91CC\u6CA1\u6709\u53EF\u6062\u590D\u7684\u5185\u7F6E\u7248\u672C\u3002",
-  "ui.block_notice_restore_backup_failed": "\u65E0\u6CD5\u5199\u5165\u5907\u4EFD\uFF0C\u6240\u4EE5\u6CA1\u6709\u52A8\u8FD9\u4E2A\u6587\u4EF6\u3002",
-  "ui.block_notice_restore_failed": "\u65E0\u6CD5\u6062\u590D\u5185\u7F6E\u7248\u672C\u3002\u518D\u8BD5\u4E00\u6B21\u4E4B\u524D\uFF0C\u8BF7\u5148\u770B\u5907\u4EFD\u6587\u4EF6\u5939\u3002",
   "ui.block_group_builtin": "\u5185\u7F6E",
-  "ui.block_status_modified_template": "\u4F60\u6539\u8FC7\u8FD9\u4EFD\u5185\u7F6E\u7ED3\u6784\uFF0CAI \u4F1A\u7167\u4F60\u7684\u7248\u672C\u5199\u3002",
-  "ui.block_status_modified_tone": "\u4F60\u6539\u8FC7\u8FD9\u4EFD\u5185\u7F6E\u53E3\u543B\uFF0CAI \u4F1A\u7167\u4F60\u7684\u7248\u672C\u5199\u3002",
-  "ui.block_status_own_template": "\u4F60\u81EA\u5DF1\u521B\u5EFA\u7684\u7ED3\u6784\u3002",
-  "ui.block_status_own_tone": "\u4F60\u81EA\u5DF1\u521B\u5EFA\u7684\u53E3\u543B\u3002",
-  "ui.block_status_issue_template_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u4F1A\u5148\u7528\u5185\u7F6E\u201C\u6807\u51C6\u201D\u3002",
-  "ui.block_status_issue_tone_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u4F1A\u5148\u7528\u5185\u7F6E\u201C\u5B66\u672F\u4E25\u8C28\u201D\u3002",
-  "ui.block_status_missing_template_0": "\u26A0 \u627E\u4E0D\u5230\u201C{0}\u201D\uFF0CAI \u76EE\u524D\u7528\u5185\u7F6E\u201C\u6807\u51C6\u201D\u3002\u8BF7\u4ECE\u83DC\u5355\u91CD\u65B0\u9009\u4E00\u4E2A\u3002",
-  "ui.block_status_missing_tone_0": "\u26A0 \u627E\u4E0D\u5230\u201C{0}\u201D\uFF0CAI \u76EE\u524D\u7528\u5185\u7F6E\u201C\u5B66\u672F\u4E25\u8C28\u201D\u3002\u8BF7\u4ECE\u83DC\u5355\u91CD\u65B0\u9009\u4E00\u4E2A\u3002",
   "ui.block_missing_option_0": "\u627E\u4E0D\u5230\uFF1A{0}",
-  "ui.block_edit_aria_template": "\u7F16\u8F91\u7B14\u8BB0\u7ED3\u6784",
-  "ui.block_edit_aria_tone": "\u7F16\u8F91\u5199\u4F5C\u53E3\u543B",
-  "ui.block_more_template": "\u66F4\u591A\u64CD\u4F5C\uFF1A\u7B14\u8BB0\u7ED3\u6784",
-  "ui.block_more_tone": "\u66F4\u591A\u64CD\u4F5C\uFF1A\u5199\u4F5C\u53E3\u543B",
-  "ui.block_save_as_title": "\u53E6\u5B58\u4E3A\u6211\u7684\u7248\u672C",
-  "ui.block_name_taken": "\u5DF2\u6709\u540C\u540D\u7684\u6587\u4EF6\u6216\u5185\u7F6E\u9879\u76EE\uFF0C\u8BF7\u6362\u4E00\u4E2A\u540D\u79F0\u3002",
-  "ui.block_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u4E3A\u201C{0}\u201D\u5E76\u6539\u7528\u5B83\u3002",
-  "ui.block_notice_open_backup": "\u6253\u5F00\u5907\u4EFD",
   "ui.note_style_location_desc": "\u4F60\u6539\u8FC7\u6216\u65B0\u5EFA\u7684\u7ED3\u6784\u4E0E\u53E3\u543B\u5B58\u5728\u8FD9\u91CC\u3002",
   "ui.note_style_location_empty": "\u8FD8\u6CA1\u6709\u6587\u4EF6\u3002\u7B2C\u4E00\u6B21\u7F16\u8F91\u6216\u53E6\u5B58\u65F6\u4F1A\u521B\u5EFA\u3002",
   "ui.preview_tone_empty": "\uFF08\u9ED8\u8BA4\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
@@ -3962,23 +3881,9 @@ var zhCN = {
   "ui.connection_repair": "\u4FEE\u590D\u8FDE\u63A5\u2026",
   "ui.tone_map_default": "\u8FD9\u5F20\u56FE\u7684\u5199\u4F5C\u53E3\u543B",
   "ui.tone_map_default_desc": "\u8FD9\u5F20\u56FE\u4E2D AI \u5199\u7684\u7B14\u8BB0\u4F1A\u7528\u5B83\uFF1B\u8BAE\u9898\u81EA\u5DF1\u6307\u5B9A\u53E3\u543B\u65F6\u4EE5\u8BAE\u9898\u4E3A\u51C6\u3002",
-  "ui.tone_hint_academic": "\u7528\u8BED\u4E2D\u6027\u7CBE\u786E\uFF0C\u91CD\u8BC1\u636E\uFF0C\u4E0D\u52A0\u4E2A\u4EBA\u610F\u89C1\u3002\u8FD9\u662F\u9ED8\u8BA4\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\u3002",
-  "ui.tone_hint_plain": "\u7528\u65E5\u5E38\u7528\u8BED\u89E3\u91CA\uFF0C\u672F\u8BED\u7B2C\u4E00\u6B21\u51FA\u73B0\u5C31\u8BF4\u660E\u3002",
-  "ui.tone_hint_magazine": "\u6D41\u7545\u3001\u6709\u89C2\u70B9\u7684\u53D9\u4E8B\u7B14\u8C03\uFF0C\u7528\u5C0F\u6807\u548C\u4F8B\u5B50\u5E26\u51FA\u91CD\u70B9\u3002",
-  "ui.tone_hint_summary": "\u77ED\u53E5\u4E0E\u6761\u5217\uFF0C\u53EA\u7559\u7ED3\u8BBA\u3001\u4E8B\u5B9E\u4E0E\u6570\u5B57\u3002",
-  "ui.tone_hint_guide": "\u5199\u6210\u53EF\u4EE5\u76F4\u63A5\u7167\u505A\u7684\u6837\u5B50\uFF1A\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u3001\u5E38\u89C1\u9519\u8BEF\u3002",
-  "ui.tone_hint_auto": "\u7531 AI \u4F9D\u4E3B\u9898\u6311\u6700\u5408\u9002\u7684\u53E3\u543B\uFF0C\u5E76\u5728\u5F00\u5934\u8BF4\u660E\u9009\u4E86\u54EA\u4E00\u79CD\u3002",
-  "ui.note_style_by_kind": "\u6309\u8BAE\u9898\u7C7B\u578B",
-  "ui.note_style_by_kind_desc": "\u4E0D\u540C\u7C7B\u578B\u7684\u8BAE\u9898\u53EF\u4EE5\u7528\u4E0D\u540C\u7684\u7B14\u8BB0\u7ED3\u6784\u3002\u8BAE\u9898\u6216\u8FD0\u884C\u65F6\u81EA\u5DF1\u9009\u7684\u7ED3\u6784\u4ECD\u7136\u4F18\u5148\u3002",
-  "ui.note_style_kind_none": "\u4E0D\u6307\u5B9A\uFF08\u7528\u5FC3\u667A\u56FE\u6216\u9ED8\u8BA4\u7684\u7ED3\u6784\uFF09",
   "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B14\u8BB0\u98CE\u683C",
   "ui.note_style_recipe_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}",
   "ui.note_style_row_missing_0_1": "\u4E3A\u201C{0}\u201D\u6307\u5B9A\u7684\u7B14\u8BB0\u98CE\u683C\u201C{1}\u201D\u627E\u4E0D\u5230\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u6539\u7528\u5185\u7F6E\u7684\u98CE\u683C\u3002",
-  "ui.note_style_kind_issue_0_1_2": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u8FD9\u4E2A\u7C7B\u578B\u7684\u8BAE\u9898\u4F1A\u5148\u7528\u5185\u7F6E\u7684\u201C{2}\u201D\u3002",
-  "ui.note_style_hypothesis_hint": "\u516B\u4E2A\u5206\u7C7B\uFF1A\u4E3B\u5F20\u3001\u9884\u6D4B\u3001\u9A8C\u8BC1\u65B9\u5F0F\uFF0C\u5230\u652F\u6301\u3001\u53CD\u9A73\u4E0E\u5F53\u524D\u5224\u65AD\u3002",
-  "ui.note_style_evidence_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5185\u5BB9\u3001\u53EF\u4FE1\u5EA6\u3001\u652F\u6301\u6216\u53CD\u9A73\uFF0C\u5E76\u9644\u6765\u6E90\u3002",
-  "ui.note_style_action_hint": "\u516D\u4E2A\u5206\u7C7B\uFF1A\u76EE\u6807\u3001\u6B65\u9AA4\u3001\u68C0\u67E5\u70B9\u4E0E\u5B8C\u6210\u6761\u4EF6\u3002",
-  "ui.note_style_atomic_hint": "\u4E94\u4E2A\u5206\u7C7B\uFF1A\u5B9A\u4E49\u3001\u89E3\u91CA\u3001\u4F8B\u5B50\uFF1B\u4E00\u5219\u7B14\u8BB0\u53EA\u8BB2\u4E00\u4E2A\u6982\u5FF5\u3002",
   "ui.note_style_label_0_1": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}",
   "ui.note_style_label_0_1_2": "\u7B14\u8BB0\u98CE\u683C\uFF1A{0} \xB7 {1}\uFF08{2}\uFF09",
   "ui.note_style_source_kind": "\u7ED3\u6784\u6765\u81EA\u8BAE\u9898\u7C7B\u578B",
@@ -4807,7 +4712,6 @@ var zhCN = {
   "ui.settings_group_notes": "\u7B14\u8BB0",
   "ui.settings_group_map": "\u5FC3\u667A\u56FE",
   "ui.settings_group_advanced": "\u9AD8\u7EA7",
-  "ui.settings_group_default": "\u9ED8\u8BA4",
   "ui.settings_group_kinds": "\u8BAE\u9898\u7C7B\u578B",
   "ui.settings_group_more": "\u66F4\u591A",
   "ui.settings_group_debug": "\u8C03\u8BD5",
@@ -4829,12 +4733,6 @@ var zhCN = {
   "ui.settings_claude_path_desc": "VAM \u7528\u5B83\u542F\u52A8 Claude Code\u3002",
   "ui.settings_note_style_page_desc": "AI \u5199\u7B14\u8BB0\u7528\u7684\u98CE\u683C\uFF0C\u6309\u8BAE\u9898\u7C7B\u578B\u8BBE\u7F6E\u3002",
   "ui.settings_note_style_intro": "\u4E3A\u6BCF\u79CD\u8BAE\u9898\u7C7B\u578B\u9009 AI \u5199\u7B14\u8BB0\u7684\u98CE\u683C\u3002\u5728\u8BAE\u9898\u4E0A\u6216\u5355\u6B21\u8FD0\u884C\u65F6\u53E6\u5916\u9009\u7684\u98CE\u683C\uFF0C\u4ECD\u4EE5\u90A3\u8FB9\u4E3A\u51C6\u3002",
-  "ui.settings_structure": "\u7ED3\u6784",
-  "ui.settings_voice": "\u53E3\u543B",
-  "ui.settings_by_kind_desc": "\u8BA9\u5047\u8BBE\u3001\u8BC1\u636E\u7B49\u7C7B\u578B\u5404\u7528\u4E00\u79CD\u7ED3\u6784\u3002",
-  "ui.settings_by_kind_intro": "\u8BAE\u9898\u6216\u5355\u6B21\u8FD0\u884C\u81EA\u5DF1\u9009\u7684\u7ED3\u6784\u4ECD\u4F18\u5148\u3002",
-  "ui.settings_kinds_unset": "\u672A\u8BBE\u7F6E",
-  "ui.settings_kinds_set_count_0": "\u5DF2\u8BBE\u7F6E {0} \u79CD",
   "ui.settings_selection_ai_name": "\u9009\u4E2D\u6587\u5B57\u65F6\u663E\u793A AI \u6309\u94AE",
   "ui.settings_selection_ai_desc": "\u5173\u95ED\u540E\u4ECD\u53EF\u4ECE\u547D\u4EE4\u9762\u677F\u4F7F\u7528\u3002",
   "ui.settings_diagrams_desc": "\u5199\u5B8C\u540E\u6700\u591A\u52A0\u4E09\u5F20 Mermaid \u56FE\u3002",
@@ -6253,40 +6151,10 @@ var zhTW = {
   "ui.note_style_atomic_short": "\u539F\u5B50\u77E5\u8B58\u7D50\u69CB",
   "ui.block_template_format_heading": "\u683C\u5F0F\u898F\u5247",
   "ui.block_copy_name_0": "\u6211\u7684{0}",
-  "ui.block_picker_template": "\u7B46\u8A18\u7D50\u69CB",
-  "ui.block_picker_tone": "\u5BEB\u4F5C\u53E3\u543B",
-  "ui.block_picker_template_aria": "\u7B46\u8A18\u98A8\u683C\u7684\u7D50\u69CB",
-  "ui.block_picker_tone_aria": "\u7B46\u8A18\u98A8\u683C\u7684\u53E3\u543B",
-  "ui.block_open": "\u7DE8\u8F2F",
   "ui.block_copy": "\u53E6\u5B58\u70BA\u6211\u7684\u7248\u672C\u2026",
-  "ui.block_restore": "\u6062\u5FA9\u5167\u5EFA\u7248\u672C",
-  "ui.block_modified_0": "{0}\uFF08\u5DF2\u4FEE\u6539\uFF09",
-  "ui.block_notice_opened_0": "\u5DF2\u958B\u555F {0}",
-  "ui.block_notice_created_0_1": "\u5DF2\u5EFA\u7ACB\u53EF\u7DE8\u8F2F\u7684\u300C{0}\u300D\uFF1A{1}\u3002\u6539\u5B8C\u5B58\u6A94\uFF0C\u4E0B\u6B21 AI \u5BEB\u7B46\u8A18\u5C31\u6703\u7528\u3002",
-  "ui.block_notice_restored_0": "\u5DF2\u6062\u5FA9\u5167\u5EFA\u7248\u672C\uFF0C\u4F60\u7684\u7248\u672C\u5099\u4EFD\u5728 {0}\u3002",
   "ui.block_notice_open_failed": "\u7121\u6CD5\u958B\u555F\u9019\u4EFD\u6A94\u6848\uFF0C\u53EF\u80FD\u5DF2\u88AB\u6539\u540D\u6216\u522A\u9664\u3002",
-  "ui.block_notice_copy_failed": "\u7121\u6CD5\u53E6\u5B58\u9019\u4EFD\u6A94\u6848\uFF0C\u6C92\u6709\u8986\u5BEB\u4EFB\u4F55\u6A94\u6848\u3002",
-  "ui.block_notice_restore_not_available": "\u9019\u88E1\u6C92\u6709\u53EF\u6062\u5FA9\u7684\u5167\u5EFA\u7248\u672C\u3002",
-  "ui.block_notice_restore_backup_failed": "\u7121\u6CD5\u5BEB\u5165\u5099\u4EFD\uFF0C\u6240\u4EE5\u6C92\u6709\u52D5\u9019\u500B\u6A94\u6848\u3002",
-  "ui.block_notice_restore_failed": "\u7121\u6CD5\u6062\u5FA9\u5167\u5EFA\u7248\u672C\u3002\u518D\u8A66\u4E00\u6B21\u4E4B\u524D\uFF0C\u8ACB\u5148\u770B\u5099\u4EFD\u8CC7\u6599\u593E\u3002",
   "ui.block_group_builtin": "\u5167\u5EFA",
-  "ui.block_status_modified_template": "\u4F60\u6539\u904E\u9019\u4EFD\u5167\u5EFA\u7D50\u69CB\uFF0CAI \u6703\u7167\u4F60\u7684\u7248\u672C\u5BEB\u3002",
-  "ui.block_status_modified_tone": "\u4F60\u6539\u904E\u9019\u4EFD\u5167\u5EFA\u53E3\u543B\uFF0CAI \u6703\u7167\u4F60\u7684\u7248\u672C\u5BEB\u3002",
-  "ui.block_status_own_template": "\u4F60\u81EA\u5DF1\u5EFA\u7ACB\u7684\u7D50\u69CB\u3002",
-  "ui.block_status_own_tone": "\u4F60\u81EA\u5DF1\u5EFA\u7ACB\u7684\u53E3\u543B\u3002",
-  "ui.block_status_issue_template_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u6703\u5148\u7528\u5167\u5EFA\u300C\u6A19\u6E96\u300D\u3002",
-  "ui.block_status_issue_tone_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0CAI \u6703\u5148\u7528\u5167\u5EFA\u300C\u5B78\u8853\u56B4\u8B39\u300D\u3002",
-  "ui.block_status_missing_template_0": "\u26A0 \u627E\u4E0D\u5230\u300C{0}\u300D\uFF0CAI \u76EE\u524D\u7528\u5167\u5EFA\u300C\u6A19\u6E96\u300D\u3002\u8ACB\u5F9E\u9078\u55AE\u91CD\u65B0\u9078\u4E00\u500B\u3002",
-  "ui.block_status_missing_tone_0": "\u26A0 \u627E\u4E0D\u5230\u300C{0}\u300D\uFF0CAI \u76EE\u524D\u7528\u5167\u5EFA\u300C\u5B78\u8853\u56B4\u8B39\u300D\u3002\u8ACB\u5F9E\u9078\u55AE\u91CD\u65B0\u9078\u4E00\u500B\u3002",
   "ui.block_missing_option_0": "\u627E\u4E0D\u5230\uFF1A{0}",
-  "ui.block_edit_aria_template": "\u7DE8\u8F2F\u7B46\u8A18\u7D50\u69CB",
-  "ui.block_edit_aria_tone": "\u7DE8\u8F2F\u5BEB\u4F5C\u53E3\u543B",
-  "ui.block_more_template": "\u66F4\u591A\u52D5\u4F5C\uFF1A\u7B46\u8A18\u7D50\u69CB",
-  "ui.block_more_tone": "\u66F4\u591A\u52D5\u4F5C\uFF1A\u5BEB\u4F5C\u53E3\u543B",
-  "ui.block_save_as_title": "\u53E6\u5B58\u70BA\u6211\u7684\u7248\u672C",
-  "ui.block_name_taken": "\u5DF2\u6709\u540C\u540D\u7684\u6A94\u6848\u6216\u5167\u5EFA\u9805\u76EE\uFF0C\u8ACB\u63DB\u4E00\u500B\u540D\u7A31\u3002",
-  "ui.block_notice_saved_as_0": "\u5DF2\u53E6\u5B58\u70BA\u300C{0}\u300D\u4E26\u6539\u7528\u5B83\u3002",
-  "ui.block_notice_open_backup": "\u958B\u555F\u5099\u4EFD",
   "ui.note_style_location_desc": "\u4F60\u6539\u904E\u6216\u65B0\u5EFA\u7684\u7D50\u69CB\u8207\u53E3\u543B\u5B58\u5728\u9019\u88E1\u3002",
   "ui.note_style_location_empty": "\u9084\u6C92\u6709\u6A94\u6848\u3002\u7B2C\u4E00\u6B21\u7DE8\u8F2F\u6216\u53E6\u5B58\u6642\u6703\u5EFA\u7ACB\u3002",
   "ui.preview_tone_empty": "\uFF08\u9810\u8A2D\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\uFF09",
@@ -6336,23 +6204,9 @@ var zhTW = {
   "ui.connection_repair": "\u4FEE\u5FA9\u9023\u7DDA\u2026",
   "ui.tone_map_default": "\u9019\u5F35\u5716\u7684\u5BEB\u4F5C\u53E3\u543B",
   "ui.tone_map_default_desc": "\u9019\u5F35\u5716\u4E2D AI \u5BEB\u7684\u7B46\u8A18\u6703\u7528\u5B83\uFF1B\u8B70\u984C\u81EA\u5DF1\u6307\u5B9A\u53E3\u543B\u6642\u4EE5\u8B70\u984C\u70BA\u6E96\u3002",
-  "ui.tone_hint_academic": "\u7528\u8A9E\u4E2D\u6027\u7CBE\u78BA\uFF0C\u91CD\u8B49\u64DA\uFF0C\u4E0D\u52A0\u500B\u4EBA\u610F\u898B\u3002\u9019\u662F\u9810\u8A2D\u53E3\u543B\uFF0C\u4E0D\u53E6\u52A0\u6307\u793A\u3002",
-  "ui.tone_hint_plain": "\u7528\u65E5\u5E38\u7528\u8A9E\u89E3\u91CB\uFF0C\u8853\u8A9E\u7B2C\u4E00\u6B21\u51FA\u73FE\u5C31\u8AAA\u660E\u3002",
-  "ui.tone_hint_magazine": "\u6D41\u66A2\u3001\u6709\u89C0\u9EDE\u7684\u6558\u4E8B\u7B46\u8ABF\uFF0C\u7528\u5C0F\u6A19\u548C\u4F8B\u5B50\u5E36\u51FA\u91CD\u9EDE\u3002",
-  "ui.tone_hint_summary": "\u77ED\u53E5\u8207\u689D\u5217\uFF0C\u53EA\u7559\u7D50\u8AD6\u3001\u4E8B\u5BE6\u8207\u6578\u5B57\u3002",
-  "ui.tone_hint_guide": "\u5BEB\u6210\u53EF\u4EE5\u76F4\u63A5\u7167\u505A\u7684\u6A23\u5B50\uFF1A\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u3001\u5E38\u898B\u932F\u8AA4\u3002",
-  "ui.tone_hint_auto": "\u7531 AI \u4F9D\u4E3B\u984C\u6311\u6700\u5408\u9069\u7684\u53E3\u543B\uFF0C\u4E26\u5728\u958B\u982D\u8AAA\u660E\u9078\u4E86\u54EA\u4E00\u7A2E\u3002",
-  "ui.note_style_by_kind": "\u4F9D\u8B70\u984C\u985E\u578B",
-  "ui.note_style_by_kind_desc": "\u4E0D\u540C\u985E\u578B\u7684\u8B70\u984C\u53EF\u4EE5\u7528\u4E0D\u540C\u7684\u7B46\u8A18\u7D50\u69CB\u3002\u8B70\u984C\u6216\u57F7\u884C\u6642\u81EA\u5DF1\u9078\u7684\u7D50\u69CB\u4ECD\u7136\u512A\u5148\u3002",
-  "ui.note_style_kind_none": "\u4E0D\u6307\u5B9A\uFF08\u7528\u5FC3\u667A\u5716\u6216\u9810\u8A2D\u7684\u7D50\u69CB\uFF09",
   "ui.note_style_kind_row_aria_0": "{0}\u7684\u7B46\u8A18\u98A8\u683C",
   "ui.note_style_recipe_issue_0_1": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}",
   "ui.note_style_row_missing_0_1": "\u70BA\u300C{0}\u300D\u6307\u5B9A\u7684\u7B46\u8A18\u98A8\u683C\u300C{1}\u300D\u627E\u4E0D\u5230\uFF0C\u9019\u500B\u985E\u578B\u6539\u7528\u5167\u5EFA\u7684\u98A8\u683C\u3002",
-  "ui.note_style_kind_issue_0_1_2": "\u26A0 \u7B2C {0} \u884C\uFF1A{1}\u4FEE\u597D\u4E4B\u524D\uFF0C\u9019\u500B\u985E\u578B\u7684\u8B70\u984C\u6703\u5148\u7528\u5167\u5EFA\u7684\u300C{2}\u300D\u3002",
-  "ui.note_style_hypothesis_hint": "\u516B\u500B\u5206\u985E\uFF1A\u4E3B\u5F35\u3001\u9810\u6E2C\u3001\u9A57\u8B49\u65B9\u5F0F\uFF0C\u5230\u652F\u6301\u3001\u53CD\u99C1\u8207\u76EE\u524D\u5224\u65B7\u3002",
-  "ui.note_style_evidence_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5167\u5BB9\u3001\u53EF\u4FE1\u5EA6\u3001\u652F\u6301\u6216\u53CD\u99C1\uFF0C\u4E26\u9644\u4F86\u6E90\u3002",
-  "ui.note_style_action_hint": "\u516D\u500B\u5206\u985E\uFF1A\u76EE\u6A19\u3001\u6B65\u9A5F\u3001\u6AA2\u67E5\u9EDE\u8207\u5B8C\u6210\u689D\u4EF6\u3002",
-  "ui.note_style_atomic_hint": "\u4E94\u500B\u5206\u985E\uFF1A\u5B9A\u7FA9\u3001\u89E3\u91CB\u3001\u4F8B\u5B50\uFF1B\u4E00\u5247\u7B46\u8A18\u53EA\u8B1B\u4E00\u500B\u6982\u5FF5\u3002",
   "ui.note_style_label_0_1": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}",
   "ui.note_style_label_0_1_2": "\u7B46\u8A18\u98A8\u683C\uFF1A{0} \xB7 {1}\uFF08{2}\uFF09",
   "ui.note_style_source_kind": "\u7D50\u69CB\u4F86\u81EA\u8B70\u984C\u985E\u578B",
@@ -7181,7 +7035,6 @@ var zhTW = {
   "ui.settings_group_notes": "\u7B46\u8A18",
   "ui.settings_group_map": "\u5FC3\u667A\u5716",
   "ui.settings_group_advanced": "\u9032\u968E",
-  "ui.settings_group_default": "\u9810\u8A2D",
   "ui.settings_group_kinds": "\u8B70\u984C\u985E\u578B",
   "ui.settings_group_more": "\u66F4\u591A",
   "ui.settings_group_debug": "\u5075\u932F",
@@ -7203,12 +7056,6 @@ var zhTW = {
   "ui.settings_claude_path_desc": "VAM \u7528\u5B83\u555F\u52D5 Claude Code\u3002",
   "ui.settings_note_style_page_desc": "AI \u5BEB\u7B46\u8A18\u7528\u7684\u98A8\u683C\uFF0C\u4F9D\u8B70\u984C\u985E\u578B\u8A2D\u5B9A\u3002",
   "ui.settings_note_style_intro": "\u70BA\u6BCF\u7A2E\u8B70\u984C\u985E\u578B\u9078 AI \u5BEB\u7B46\u8A18\u7684\u98A8\u683C\u3002\u5728\u8B70\u984C\u4E0A\u6216\u55AE\u6B21\u57F7\u884C\u6642\u53E6\u5916\u9078\u7684\u98A8\u683C\uFF0C\u4ECD\u4EE5\u90A3\u908A\u70BA\u6E96\u3002",
-  "ui.settings_structure": "\u7D50\u69CB",
-  "ui.settings_voice": "\u53E3\u543B",
-  "ui.settings_by_kind_desc": "\u8B93\u5047\u8A2D\u3001\u8B49\u64DA\u7B49\u985E\u578B\u5404\u7528\u4E00\u7A2E\u7D50\u69CB\u3002",
-  "ui.settings_by_kind_intro": "\u8B70\u984C\u6216\u55AE\u6B21\u57F7\u884C\u81EA\u5DF1\u9078\u7684\u7D50\u69CB\u4ECD\u512A\u5148\u3002",
-  "ui.settings_kinds_unset": "\u672A\u8A2D\u5B9A",
-  "ui.settings_kinds_set_count_0": "\u5DF2\u8A2D\u5B9A {0} \u7A2E",
   "ui.settings_selection_ai_name": "\u9078\u53D6\u6587\u5B57\u6642\u986F\u793A AI \u6309\u9215",
   "ui.settings_selection_ai_desc": "\u95DC\u9589\u5F8C\u4ECD\u53EF\u5F9E\u547D\u4EE4\u9762\u677F\u4F7F\u7528\u3002",
   "ui.settings_diagrams_desc": "\u5BEB\u5B8C\u5F8C\u6700\u591A\u52A0\u4E09\u5F35 Mermaid \u5716\u3002",
@@ -26232,7 +26079,6 @@ function parseBlockRef(ref) {
 var builtinRef = (id) => `builtin:${id}`;
 var fileRef = (base) => `file:${base}`;
 var lower = (value) => value.toLocaleLowerCase();
-var stripMd2 = (name) => name.replace(/\.md$/i, "");
 var UNSAFE_NAME = /[\\/:*?"<>|#^[\]]/g;
 function cleanBlockName(name) {
   const cleaned = name.replace(UNSAFE_NAME, " ").replace(/\s+/g, " ").trim();
@@ -26262,20 +26108,6 @@ function uniqueBlockName(base, taken) {
   let name = base;
   for (let n = 2; taken.has(lower(name)); n++) name = `${base} (${n})`;
   return name;
-}
-function copyBlockName(category, sourceName, language2, taken) {
-  const reserved = new Set(taken);
-  for (const block of BUILTIN_BLOCKS)
-    if (block.category === category)
-      for (const name of builtinBlockNames(category, block.id)) reserved.add(lower(name));
-  const base = cleanBlockName(translate(language2, "ui.block_copy_name_0", cleanBlockName(sourceName))) || "copy";
-  return uniqueBlockName(base, reserved);
-}
-var two = (value) => String(value).padStart(2, "0");
-function backupName(name, now, taken) {
-  const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
-  const takenBases = new Set([...taken].map((item) => stripMd2(item)));
-  return `${uniqueBlockName(`${name} ${stamp}`, takenBases)}.md`;
 }
 
 // ai/note-style-recipe.ts
@@ -26666,17 +26498,7 @@ function planRecipeMigration(input2) {
 }
 
 // ai/note-style-store.ts
-function normalizeNoteTemplateByKind(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
-  const saved = value;
-  const kept = {};
-  for (const kind of TOPIC_KINDS) {
-    const ref = Object.prototype.hasOwnProperty.call(saved, kind) ? saved[kind] : void 0;
-    if (typeof ref === "string" && ref && parseBlockRef(ref)) kept[kind] = ref;
-  }
-  return Object.keys(kept).length ? kept : void 0;
-}
-var stripMd3 = (name) => name.replace(/\.md$/i, "");
+var stripMd2 = (name) => name.replace(/\.md$/i, "");
 var lower3 = (value) => value.toLocaleLowerCase();
 function defaultStylesFolderName(language2) {
   return translate(language2, "ui.note_styles_folder_name");
@@ -26745,7 +26567,7 @@ var NoteStyleStore = class {
     for (const name of names3) {
       if (!/\.md$/i.test(name) || name.includes("/")) continue;
       try {
-        found.set(stripMd3(name), await this.deps.port.read(`${folder}/${name}`));
+        found.set(stripMd2(name), await this.deps.port.read(`${folder}/${name}`));
       } catch (e) {
       }
     }
@@ -27155,11 +26977,6 @@ var NoteStyleStore = class {
       issues: []
     };
   }
-  // ---- what the settings page reads ----
-  /** The template and tone blocks the runs use, as saved. Read-only. */
-  effectiveBlockKeys() {
-    return { template: this.settings.noteTemplateBlock, tone: this.settings.noteToneBlock };
-  }
   // ---- the tone choices of the map pickers ----
   /** The tones a map, topic or run can pick: the built-in tones (by tone id) and the tone blocks (`file:<name>`). Call `refresh()` first. */
   toneChoices() {
@@ -27228,99 +27045,6 @@ var NoteStyleStore = class {
       await this.deps.port.create(`${dir}/${base}.md`, text11);
       this.blocks[category].set(base, text11);
       return { path: `${dir}/${base}.md`, base, created: true };
-    });
-  }
-  /**
-   * Copies a block into a new file of the category, named "<name> (my version)" (unique, never a built-in's name), and
-   * makes it the workspace's choice. Returns the new ref. The text copied is the block's file when it has one, else its
-   * built-in text. With `chosenName` the file gets that name (cleaned); a name that is empty, taken or a built-in's
-   * throws and nothing is written or changed.
-   */
-  copyBlock(category, ref, chosenName) {
-    return this.serial(async () => {
-      await this.loadBlocks();
-      const parsed = parseBlockRef(ref);
-      const language2 = this.settings.language;
-      let name;
-      let text11;
-      if ((parsed == null ? void 0 : parsed.kind) === "file") {
-        const held = this.blocks[category].get(parsed.base);
-        if (held === void 0) throw new Error(`Block file not found: ${parsed.base}`);
-        name = parsed.base;
-        text11 = held;
-      } else if ((parsed == null ? void 0 : parsed.kind) === "builtin" && this.isBuiltinBlockId(category, parsed.id)) {
-        const override = this.overrideBase(category, parsed.id);
-        name = translate(language2, findBuiltinBlock(category, parsed.id).nameKey);
-        const builtinText = category === "tone" && parsed.id === "academic" ? academicToneNote(language2) : builtinBlockText(category, parsed.id, language2);
-        text11 = override === void 0 ? builtinText : this.blocks[category].get(override);
-      } else throw new Error(`Unknown block: ${ref}`);
-      const dir = this.blockDirectories()[category];
-      let base;
-      if (chosenName === void 0) base = copyBlockName(category, name, language2, this.takenNames(category));
-      else {
-        base = cleanBlockName(chosenName);
-        const reserved = new Set(this.takenNames(category));
-        for (const block of BUILTIN_BLOCKS)
-          if (block.category === category)
-            for (const builtinName of builtinBlockNames(category, block.id)) reserved.add(lower3(builtinName));
-        if (!base || reserved.has(lower3(base))) throw new Error(`Block name not available: ${chosenName}`);
-      }
-      await this.pinFolder();
-      await this.deps.port.createFolder(dir);
-      await this.deps.port.create(`${dir}/${base}.md`, text11);
-      this.blocks[category].set(base, text11);
-      const created = fileRef(base);
-      if (category === "template") this.settings.noteTemplateBlock = created;
-      else this.settings.noteToneBlock = created;
-      await this.deps.save();
-      return created;
-    });
-  }
-  /**
-   * Restores a built-in block: its file is saved to the backup folder first, then moved to the trash, so the built-in
-   * text applies again. Refused for an own block and for a built-in with no file. If the backup cannot be written the
-   * file stays as it is.
-   */
-  restoreBlock(category, ref) {
-    return this.serial(async () => {
-      var _a2, _b2, _c;
-      await this.loadBlocks();
-      const parsed = parseBlockRef(ref);
-      if ((parsed == null ? void 0 : parsed.kind) !== "builtin" || !this.isBuiltinBlockId(category, parsed.id))
-        return { ok: false, reason: "not-builtin" };
-      const base = this.overrideBase(category, parsed.id);
-      if (base === void 0) return { ok: false, reason: "no-override" };
-      const { port } = this.deps;
-      const dirs = this.blockDirectories();
-      const path = `${dirs[category]}/${base}.md`;
-      let live;
-      try {
-        live = await port.read(path);
-      } catch (e) {
-        return { ok: false, reason: "read-failed" };
-      }
-      let backup;
-      try {
-        let present = [];
-        try {
-          present = await port.list(dirs.backup);
-        } catch (e) {
-          present = [];
-        }
-        await this.pinFolder();
-        await port.createFolder(dirs.backup);
-        backup = `${dirs.backup}/${backupName(base, (_c = (_b2 = (_a2 = this.deps).now) == null ? void 0 : _b2.call(_a2)) != null ? _c : /* @__PURE__ */ new Date(), new Set(present.map(lower3)))}`;
-        await port.create(backup, live);
-      } catch (e) {
-        return { ok: false, reason: "backup-failed" };
-      }
-      try {
-        await port.trash(path);
-      } catch (e) {
-        return { ok: false, reason: "trash-failed" };
-      }
-      this.blocks[category].delete(base);
-      return { ok: true, backup };
     });
   }
   // ---- the custom note styles: what the manage page and the style editor read and write (note-style-recipe T5) ----
@@ -71941,7 +71665,6 @@ function settingsFromSaved(saved) {
     ...typeof (saved == null ? void 0 : saved.defaultNoteStyleId) === "string" && saved.defaultNoteStyleId ? { defaultNoteStyleId: saved.defaultNoteStyleId } : {},
     ...typeof (saved == null ? void 0 : saved.noteTemplateBlock) === "string" && saved.noteTemplateBlock ? { noteTemplateBlock: saved.noteTemplateBlock } : {},
     ...typeof (saved == null ? void 0 : saved.noteToneBlock) === "string" && saved.noteToneBlock ? { noteToneBlock: saved.noteToneBlock } : {},
-    ...normalizeNoteTemplateByKind(saved == null ? void 0 : saved.noteTemplateByKind) ? { noteTemplateByKind: normalizeNoteTemplateByKind(saved == null ? void 0 : saved.noteTemplateByKind) } : {},
     ...normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) ? { noteStyleByKind: normalizeNoteStyleByKind(saved == null ? void 0 : saved.noteStyleByKind) } : {},
     ...normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) ? { noteStyleRecipe: normalizeNoteStyleRecipeMarker(saved == null ? void 0 : saved.noteStyleRecipe) } : {},
     ...typeof (saved == null ? void 0 : saved.noteStylesFolder) === "string" && saved.noteStylesFolder ? { noteStylesFolder: saved.noteStylesFolder } : {},
@@ -73111,35 +72834,6 @@ ${t("ui.organize_link_wait_hint")}`;
       return null;
     }
   }
-  /** Opens the file behind a block of the note style pickers in a tab (a built-in with no file gets one first). */
-  async openBlock(category, ref) {
-    try {
-      const { path, base, created } = await this.noteStyles.ensureBlockFile(category, ref);
-      const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(path));
-      if (!(file instanceof import_obsidian40.TFile)) throw new Error("not a file");
-      await this.app.workspace.getLeaf("tab").openFile(file);
-      new import_obsidian40.Notice(created ? t("ui.block_notice_created_0_1", base, path) : t("ui.block_notice_opened_0", path));
-      return true;
-    } catch (e) {
-      new import_obsidian40.Notice(t("ui.block_notice_open_failed"));
-      return false;
-    }
-  }
-  /**
-   * "Save as my own": copies a block into a new file (named `name`, else "<name> (my version)"), which becomes the
-   * workspace's choice; it is not opened here. Returns the new ref, or null (nothing written) when it cannot be saved.
-   */
-  async copyBlock(category, ref, name) {
-    try {
-      const created = await this.noteStyles.copyBlock(category, ref, name);
-      const parsed = parseBlockRef(created);
-      new import_obsidian40.Notice(t("ui.block_notice_saved_as_0", (parsed == null ? void 0 : parsed.kind) === "file" ? parsed.base : created));
-      return created;
-    } catch (e) {
-      new import_obsidian40.Notice(t("ui.block_notice_copy_failed"));
-      return null;
-    }
-  }
   /**
    * "Edit" a part of the custom note styles: a built-in is first saved as "My <name>" (a new file, no setting changes), a
    * file is opened as it is. Opens the file in a tab and returns the ref now behind it, or null (with a Notice) when it
@@ -73184,33 +72878,6 @@ ${t("ui.organize_link_wait_hint")}`;
         )
       );
     return result;
-  }
-  /** Restores a built-in block after saving a backup of its file; every refusal says why in a Notice. */
-  async restoreBlock(category, ref) {
-    try {
-      const result = await this.noteStyles.restoreBlock(category, ref);
-      if (result.ok) {
-        const backup = result.backup;
-        backgroundResultNotice(t("ui.block_notice_restored_0", backup), {
-          label: t("ui.block_notice_open_backup"),
-          open: () => {
-            const file = this.app.vault.getAbstractFileByPath((0, import_obsidian40.normalizePath)(backup));
-            if (file instanceof import_obsidian40.TFile) void this.app.workspace.getLeaf("tab").openFile(file);
-            else new import_obsidian40.Notice(t("ui.block_notice_open_failed"));
-          }
-        });
-        return true;
-      }
-      const reason = result.reason;
-      new import_obsidian40.Notice(
-        t(
-          reason === "backup-failed" ? "ui.block_notice_restore_backup_failed" : reason === "not-builtin" || reason === "no-override" ? "ui.block_notice_restore_not_available" : "ui.block_notice_restore_failed"
-        )
-      );
-    } catch (e) {
-      new import_obsidian40.Notice(t("ui.block_notice_restore_failed"));
-    }
-    return false;
   }
   async saveSettings() {
     await this.saveData(this.settings);

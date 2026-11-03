@@ -173,65 +173,6 @@ test('the old template library is gone from the code and the dictionaries', () =
   for (const language of ['en', 'zh-TW', 'zh-CN']) assert.ok(!fs.readFileSync(path.join(root, `i18n/${language}.ts`), 'utf8').includes('"ui.note_style_custom"'));
 });
 
-// ---- the plugin methods behind the menu: Save as my own and Restore built-in ----
-function pluginSelf(store) {
-  const opened = [];
-  const file = new obsidian.TFile('WS/Styles/Backups/Standard backup.md');
-  const self = { noteStyles: store, app: { vault: { getAbstractFileByPath: path => (path === file.path ? file : null) }, workspace: { getLeaf: () => ({ openFile: async target => { opened.push(target); } }) } } };
-  return { self, opened, file };
-}
-
-test('plugin copyBlock: passes the chosen name, says "Saved as … and switched to it", and returns the new ref; a refusal writes nothing, says so and returns null', async () => {
-  notices.length = 0;
-  const asked = [];
-  const ok = pluginSelf({ copyBlock: async (...args) => { asked.push(args); return 'file:Weekly report'; } });
-  assert.equal(await Plugin.prototype.copyBlock.call(ok.self, 'template', 'builtin:standard', 'Weekly report'), 'file:Weekly report');
-  assert.deepEqual(asked, [['template', 'builtin:standard', 'Weekly report']]);
-  assert.deepEqual(notices, ['Saved as "Weekly report" and switched to it.']);
-  notices.length = 0;
-  const refused = pluginSelf({ copyBlock: async () => { throw new Error('Block name not available'); } });
-  assert.equal(await Plugin.prototype.copyBlock.call(refused.self, 'template', 'builtin:standard', 'Standard'), null);
-  assert.deepEqual(notices, [t('ui.block_notice_copy_failed')]);
-});
-
-test('plugin restoreBlock: the Notice names the backup and carries an Open backup button that opens it; failures keep their own Notices', async () => {
-  notices.length = 0;
-  const done = pluginSelf({ restoreBlock: async () => ({ ok: true, backup: 'WS/Styles/Backups/Standard backup.md' }) });
-  assert.equal(await Plugin.prototype.restoreBlock.call(done.self, 'template', 'builtin:standard'), true);
-  const notice = obsidian.Notice.all.at(-1);
-  assert.equal(notices.at(-1), 'Restored the built-in version. Your version is backed up at WS/Styles/Backups/Standard backup.md.');
-  assert.equal(notice.actions.length, 1);
-  assert.equal(notice.actions[0].text, 'Open backup');
-  notice.actions[0].click();
-  await flush();
-  assert.deepEqual(done.opened, [done.file], 'the backup is opened in a tab');
-  notices.length = 0;
-  const failing = pluginSelf({ restoreBlock: async () => ({ ok: false, reason: 'backup-failed' }) });
-  assert.equal(await Plugin.prototype.restoreBlock.call(failing.self, 'template', 'builtin:standard'), false);
-  assert.deepEqual(notices, [t('ui.block_notice_restore_backup_failed')]);
-});
-
-
-test('plugin openBlock: a file that Edit just made says "Created … edit, save, next AI notes use it" (path included); an existing file says "Opened"', async () => {
-  const file = new obsidian.TFile('WS/Styles/Blocks/Templates/Standard.md');
-  const make = created => {
-    const self = { noteStyles: { ensureBlockFile: async () => ({ path: file.path, base: 'Standard', created }) }, app: { vault: { getAbstractFileByPath: p => (p === file.path ? file : null) }, workspace: { getLeaf: () => ({ openFile: async () => {} }) } } };
-    return self;
-  };
-  notices.length = 0;
-  assert.equal(await Plugin.prototype.openBlock.call(make(true), 'template', 'builtin:standard'), true);
-  assert.deepEqual(notices, ['Created "Standard" for you to edit: WS/Styles/Blocks/Templates/Standard.md. Save your changes and the next AI notes will use it.']);
-  notices.length = 0;
-  await Plugin.prototype.openBlock.call(make(false), 'template', 'builtin:standard');
-  assert.deepEqual(notices, ['Opened WS/Styles/Blocks/Templates/Standard.md']);
-  assert.equal(t('ui.block_notice_created_0_1', 'Standard', 'P'), 'Created "Standard" for you to edit: P. Save your changes and the next AI notes will use it.');
-  for (const language of ['zh-TW', 'zh-CN']) {
-    const text = i18n.translate(language, 'ui.block_notice_created_0_1', '標準', 'WS/標準.md');
-    assert.ok(text.includes('標準') && text.includes('WS/標準.md'), language);
-  }
-  assert.equal(i18n.translate('zh-TW', 'ui.block_notice_created_0_1', 'A', 'B'), '已建立可編輯的「A」：B。改完存檔，下次 AI 寫筆記就會用。');
-});
-
 test('Low 2: the standard structure hint states the effect only, in three languages (no "same as today\'s default")', () => {
   assert.equal(t('ui.note_style_standard_hint'), 'Six fixed sections in a neutral, evidence-first voice.');
   assert.equal(i18n.translate('zh-TW', 'ui.note_style_standard_hint'), '六個固定分類，中性、以證據為本。');
@@ -409,11 +350,4 @@ test('Low 4: the File location description is rewritten when its update runs aft
   update();
   await flush();
   assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here.');
-});
-
-test('the four new built-in structures keep their one-line explanation in every language (en within 80 characters)', () => {
-  for (const id of ['hypothesis', 'evidence', 'action', 'atomic']) {
-    assert.ok(t(`ui.note_style_${id}_hint`).length <= 80, id);
-    for (const lang of ['zh-TW', 'zh-CN']) assert.notEqual(i18n.translate(lang, `ui.note_style_${id}_hint`), i18n.translate('en', `ui.note_style_${id}_hint`));
-  }
 });

@@ -429,13 +429,13 @@ test('counter 11 (async lifecycle): refresh() started while the conversion is wr
   await assert.doesNotReject(refreshAgain);
 });
 
-test('counter 12: a user write (copyBlock, ensureBlockFile) that starts while the conversion runs is queued behind it, and the two never take the same file name', async () => {
+test('counter 12: a user write (createPart, ensureBlockFile) that starts while the conversion runs is queued behind it, and the two never take the same file name', async () => {
   const w = world();
   let open;
   w.v.gate = new Promise(resolve => { open = resolve; });
   const migrating = w.store.migrateLegacy({ mapsWithStyle: [] });
   await new Promise(resolve => setImmediate(resolve));
-  const copying = w.store.copyBlock('template', 'file:Conclusion', 'Conclusion copy');
+  const copying = w.store.createPart('structure', 'file:Conclusion', 'Conclusion copy');
   const ensuring = w.store.ensureBlockFile('tone', 'builtin:plain');
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(w.v.creates, 0, 'nothing has been written past the gate');
@@ -519,11 +519,11 @@ test('counter 15 (was upgrade "T1 remembers the folder", decisions #32): the con
   assert.equal(failing.settings.noteStylesFolder, undefined);
 });
 
-test('counter 16 (was upgrade "T1 a user action pins the folder", decisions #32): copyBlock, ensureBlockFile and ensureBlockFolder pin the default folder, and a saved path is never replaced', async () => {
+test('counter 16 (was upgrade "T1 a user action pins the folder", decisions #32): createPart, ensureBlockFile and ensureBlockFolder pin the default folder, and a saved path is never replaced', async () => {
   const marked = { noteStyleRecipe: { migrated: 1, mapsNotified: true } };
   const w = world({ language: 'en', noteStylesFolder: undefined, ...marked });
   await w.store.refresh();
-  await w.store.copyBlock('template', 'builtin:standard');
+  await w.store.createPart('structure', 'builtin:standard');
   assert.equal(w.settings.noteStylesFolder, w.store.folder());
   const saved = w.settings.noteStylesFolder;
   w.settings.language = 'zh-CN';

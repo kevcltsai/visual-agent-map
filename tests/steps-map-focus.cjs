@@ -79,7 +79,7 @@ async function harness() {
   const notices = [], modals = [], menus = [];
   const Base = dom.makeModal();
   class Modal extends Base { open() { modals.push(this); super.open(); } }
-  class Menu { constructor() { menus.push(this); } addItem(cb) { cb({ setTitle() { return this; }, setIcon() { return this; }, onClick() { return this; }, setChecked() { return this; } }); return this; } addSeparator() { return this; } onHide(fn) { this.hide = fn; return this; } showAtMouseEvent() {} showAtPosition() {} }
+  class Menu { constructor() { menus.push(this); } addItem(cb) { cb({ setTitle() { return this; }, setIcon() { return this; }, onClick() { return this; }, setChecked() { return this; }, setWarning() { return this; } }); return this; } addSeparator() { return this; } onHide(fn) { this.hide = fn; return this; } showAtMouseEvent() {} showAtPosition() {} }
   const { VisualAgentMapView } = load('main.ts', { obsidian: { ...obsidian, Modal, Menu, Notice: dom.makeNotice(notices), Setting, setTooltip() {} } }, { createFragment: dom.createFragment, CSS: { escape: v => v }, createSvg: tag => new El(new Doc(), tag) });
   const plugin = withExpansionCoordinator({
     availableModels: () => ['gpt-6-luna'], modelLabel: model => model, subscribeModelDiscovery: () => () => {}, refreshModelDiscovery: async () => {},
@@ -407,6 +407,7 @@ const MENU_OPENERS = {
   openExportMenu: h => h.view.openExportMenu({}),
   openRelationKindMenu: h => h.view.openRelationKindMenu({}, () => {}),
   openNewMapMenu: h => h.view.openNewMapMenu({ stopPropagation() {} }),
+  openMapActions: h => h.view.openMapActions({}),
   openLayoutMenu: h => h.view.openLayoutMenu({}),
   onCanvasContextMenu_card: h => h.view.onCanvasContextMenu({ target: h.card('leaf'), clientX: 5, clientY: 5, preventDefault() {} }),
   onCanvasContextMenu_canvas: h => {

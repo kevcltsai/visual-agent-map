@@ -359,3 +359,59 @@ test('render order: toolbar overlay before the viewport, zoom controls in a seco
   assert.ok(at('const zoom = controls.createDiv("vam-zoom-controls");') > controls);
   assert.equal(render.includes('overlay.createDiv("vam-zoom-controls")'), false);
 });
+
+// ---- UX review A theme 3: zoom keeps the selected card ----
+function zoomFixture({ selected = 'a', viewport = { x: 100, y: 200, zoom: 0.4 }, tools = { left: 12, top: 12, right: 700, bottom: 50 } } = {}) {
+  const { view, nodes } = makeView();
+  Object.assign(view.map, { viewport: { ...viewport } });
+  nodes[0].x = 300; nodes[0].y = 150; nodes[1].x = 5000; nodes[1].y = 5000;
+  view.selection.setSelected(selected);
+  // Cards are drawn where the current viewport puts them (280 x 180 card units).
+  const rectOf = node => { const v = view.map.viewport; const left = 0 + node.x * v.zoom + v.x, top = node.y * v.zoom + v.y; return { left, top, right: left + 280 * v.zoom, bottom: top + 180 * v.zoom }; };
+  for (const node of nodes) view.cardEls.set(node.id, { getBoundingClientRect: () => rectOf(node), focus() {} });
+  view.contentEl = { querySelector: selector => (selector === '.vam-map-tools' ? { getBoundingClientRect: () => tools } : null) };
+  return { view, nodes, rectOf };
+}
+const centre = rect => ({ x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 });
+
+test('zoom −/+ keeps the selected card centre where it is on screen; without a selection it zooms around the canvas centre', () => {
+  const { view, nodes, rectOf } = zoomFixture();
+  const before = centre(rectOf(nodes[0]));
+  view.zoomBy(1.2, view.selectionAnchor() ?? undefined);
+  const after = centre(rectOf(nodes[0]));
+  assert.ok(Math.abs(before.x - after.x) < 1e-6 && Math.abs(before.y - after.y) < 1e-6, 'card centre did not move');
+  assert.ok(view.map.viewport.zoom > 0.4);
+  const none = zoomFixture({ selected: null });
+  assert.equal(none.view.selectionAnchor(), null, 'no selection: no anchor');
+  const v = { ...none.view.map.viewport };
+  none.view.zoomBy(2, none.view.selectionAnchor() ?? undefined);
+  assert.ok(Math.abs((500 - (500 - v.x) * (none.view.map.viewport.zoom / v.zoom)) - none.view.map.viewport.x) < 1e-6, 'centred on the 1000px canvas middle');
+});
+
+test('a selected card outside the canvas is not used as the zoom anchor', () => {
+  const { view } = zoomFixture({ viewport: { x: 5000, y: 5000, zoom: 1 } });
+  assert.equal(view.selectionAnchor(), null);
+});
+
+test('the percentage reset keeps the selected card and brings it into view when it ends up hidden', () => {
+  // Zoomed out 0.4: the card sits at the top (under the toolbar) after the reset around its centre would push it out.
+  const hidden = zoomFixture({ viewport: { x: 100, y: 20, zoom: 0.4 }, tools: { left: 12, top: 12, right: 700, bottom: 50 } });
+  hidden.nodes[0].y = 0;
+  hidden.view.resetZoom();
+  assert.equal(hidden.view.map.viewport.zoom, 1);
+  const rect = hidden.rectOf(hidden.nodes[0]);
+  assert.ok(!inset.isObscured(rect, { left: 0, top: 0, right: 1000, bottom: 600 }, [{ left: 12, top: 12, right: 700, bottom: 50 }]), `card is visible after the reset (top ${rect.top})`);
+  // A card that stays in view is left where the anchor put it (no extra camera move).
+  const fine = zoomFixture({ viewport: { x: 100, y: 200, zoom: 0.5 } });
+  const c0 = centre(fine.rectOf(fine.nodes[0]));
+  fine.view.resetZoom();
+  const c1 = centre(fine.rectOf(fine.nodes[0]));
+  assert.ok(Math.abs(c0.x - c1.x) < 1e-6 && Math.abs(c0.y - c1.y) < 1e-6);
+});
+
+test('the zoom buttons anchor on the selection and the reset is wired to resetZoom', () => {
+  const render = read('experiences/visual-map/view.ts');
+  assert.match(render, /this\.zoomBy\(1 \/ 1\.2, this\.selectionAnchor\(\) \?\? undefined\)/);
+  assert.match(render, /this\.zoomBy\(1\.2, this\.selectionAnchor\(\) \?\? undefined\)/);
+  assert.match(render, /if \(this\.map\) this\.resetZoom\(\);/);
+});

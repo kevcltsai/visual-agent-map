@@ -55761,7 +55761,10 @@ ${request.requirements}` : preset.text,
     }) : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
-    this.iconButton(zoom, "minus", t("ui.zoom_out"), () => this.zoomBy(1 / 1.2));
+    this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
+      var _a3;
+      return this.zoomBy(1 / 1.2, (_a3 = this.selectionAnchor()) != null ? _a3 : void 0);
+    });
     const zoomReset = zoom.createEl("button", {
       text: `${Math.round(this.map.viewport.zoom * 100)}%`,
       cls: "vam-zoom",
@@ -55769,10 +55772,13 @@ ${request.requirements}` : preset.text,
     });
     zoomReset.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (this.map) this.zoomBy(1 / this.map.viewport.zoom);
+      if (this.map) this.resetZoom();
     });
     this.zoomLabel = zoomReset;
-    this.iconButton(zoom, "plus", t("ui.zoom_in"), () => this.zoomBy(1.2));
+    this.iconButton(zoom, "plus", t("ui.zoom_in"), () => {
+      var _a3;
+      return this.zoomBy(1.2, (_a3 = this.selectionAnchor()) != null ? _a3 : void 0);
+    });
     this.iconButton(zoom, "maximize", t("ui.show_all"), () => this.fit());
     const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
     present.disabled = !this.canPresent();
@@ -60441,6 +60447,28 @@ ${note.detail.trim()}` : "",
     if (this.selection.state.multiSelectMode) return;
     (_a2 = this.hintEl) == null ? void 0 : _a2.remove();
     this.hintEl = null;
+  }
+  /** Where −/+ zoom around: the selected card's centre while it is on the canvas, else (undefined) the canvas centre. */
+  selectionAnchor() {
+    var _a2, _b2;
+    const selected = this.selection.state.selected;
+    const rect2 = selected ? (_a2 = this.cardEls.get(selected)) == null ? void 0 : _a2.getBoundingClientRect() : void 0;
+    const view = (_b2 = this.viewportEl) == null ? void 0 : _b2.getBoundingClientRect();
+    if (!rect2 || !view) return null;
+    const x = (rect2.left + rect2.right) / 2, y = (rect2.top + rect2.bottom) / 2;
+    if (x < view.left || x > view.right || y < view.top || y > view.bottom) return null;
+    return { x: x - view.left, y: y - view.top };
+  }
+  /** The percentage button: back to 100% around the selected card, which is brought into view if it ended up hidden. */
+  resetZoom() {
+    var _a2, _b2, _c;
+    if (!this.map) return;
+    this.zoomBy(1 / this.map.viewport.zoom, (_a2 = this.selectionAnchor()) != null ? _a2 : void 0);
+    const selected = this.selection.state.selected;
+    const node = selected ? this.map.nodes.find((item) => item.id === selected) : void 0;
+    const rect2 = selected ? (_b2 = this.cardEls.get(selected)) == null ? void 0 : _b2.getBoundingClientRect() : void 0;
+    const view = (_c = this.viewportEl) == null ? void 0 : _c.getBoundingClientRect();
+    if (node && rect2 && view && isObscured(rect2, view, this.floatingControlRects())) this.focusNode(node);
   }
   zoomBy(factor, point) {
     if (!this.map || !this.viewportEl) return;

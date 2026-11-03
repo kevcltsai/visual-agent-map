@@ -28223,6 +28223,23 @@ function previewMetrics(scaleValue) {
     padding: `${Math.round(14 * scale)}px ${Math.round(16 * scale)}px`
   };
 }
+function placeHoverPreview(host, card, preview, margin = 12) {
+  const clamp = (value, low, high) => Math.max(low, Math.min(value, Math.max(low, high)));
+  const topAligned = clamp(card.top, margin, host.height - preview.height - margin);
+  const leftAligned = clamp(card.left, margin, host.width - preview.width - margin);
+  const candidates = [
+    { left: card.right + margin, top: topAligned },
+    { left: card.left - margin - preview.width, top: topAligned },
+    { left: leftAligned, top: card.bottom + margin },
+    { left: leftAligned, top: card.top - margin - preview.height }
+  ];
+  for (const spot of candidates) {
+    const inside2 = spot.left >= margin && spot.top >= margin && spot.left + preview.width <= host.width - margin && spot.top + preview.height <= host.height - margin;
+    const overlaps2 = spot.left < card.right && card.left < spot.left + preview.width && spot.top < card.bottom && card.top < spot.top + preview.height;
+    if (inside2 && !overlaps2) return spot;
+  }
+  return null;
+}
 function markdownImages(markdown, limit = 4) {
   const images = [];
   for (const match of markdown.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi)) {
@@ -56910,9 +56927,20 @@ ${request.requirements}` : preset.text,
     const workspace = this.contentEl.querySelector(".vam-canvas");
     if (!workspace) return;
     (_a2 = this.hoverCard) == null ? void 0 : _a2.remove();
+    this.hoverCard = null;
+    const size = previewMetrics(this.plugin.settings.previewScale);
+    const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
+    const availableWidth = Math.max(180, host.width - 24);
+    const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
+    const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
+    const spot = placeHoverPreview(
+      host,
+      { left: rect2.left - host.left, top: rect2.top - host.top, right: rect2.right - host.left, bottom: rect2.bottom - host.top },
+      { width, height: visibleHeight }
+    );
+    if (!spot) return;
     const preview = workspace.createDiv("vam-hover-card");
     this.hoverCard = preview;
-    const size = previewMetrics(this.plugin.settings.previewScale);
     preview.style.maxHeight = `${size.height}px`;
     preview.style.setProperty("--vam-hover-image-max", size.image);
     preview.style.setProperty("--vam-hover-title-size", size.title);
@@ -56939,16 +56967,9 @@ ${request.requirements}` : preset.text,
     }
     const content = preview.createDiv("vam-hover-markdown");
     void import_obsidian31.MarkdownRenderer.render(this.app, note.preview || t("ui.no_preview_content_yet"), content, path, this);
-    const host = workspace.getBoundingClientRect(), rect2 = card.getBoundingClientRect();
-    const availableWidth = Math.max(180, host.width - 24);
-    const width = Math.min(size.max, Math.max(Math.min(size.min, availableWidth), availableWidth));
     preview.style.width = `${width}px`;
-    let left = rect2.right - host.left + 12;
-    if (left + width > host.width - 12) left = rect2.left - host.left - width - 12;
-    const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
-    const maxTop = Math.max(12, host.height - visibleHeight - 12);
-    preview.style.left = `${Math.max(12, Math.min(left, Math.max(12, host.width - width - 12)))}px`;
-    preview.style.top = `${Math.max(12, Math.min(rect2.top - host.top, maxTop))}px`;
+    preview.style.left = `${spot.left}px`;
+    preview.style.top = `${spot.top}px`;
   }
   refreshCard(node, redrawEdges = true) {
     var _a2, _b2, _c;

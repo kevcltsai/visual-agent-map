@@ -4039,3 +4039,34 @@ test('bug bash #03: the add-child button sits above the width handle when visibl
   assert.match(shown.body, /pointer-events:\s*auto/, 'visible: the button takes the pointer');
   assert.doesNotMatch(cssRules(css, /^\.vam-card-resize-y$|^\.vam-card-resize-corner$/).map(r => r.body).join(''), /pointer-events:\s*none/, 'height and corner handles are untouched');
 });
+// ---- bug bash A #04: the hover preview never covers the card it describes ----
+function hoverHarness(hostWidth, hostHeight, cardRect) {
+  const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, MarkdownRenderer: { render() { return Promise.resolve(); } } } }, {
+    window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o)
+  });
+  const host = dom.element('div');
+  host.getBoundingClientRect = () => ({ left: 0, top: 0, right: hostWidth, bottom: hostHeight, width: hostWidth, height: hostHeight });
+  host.createDiv = cls => { const el = dom.element('div', { cls }); el.style = { setProperty() {} }; host.children.push(el); return el; };
+  const view = Object.create(VisualAgentMapView.prototype);
+  Object.assign(view, { contentEl: { querySelector: () => host }, plugin: { settings: { previewScale: 120 }, researchProgress: null }, map: { nodes: [{ id: 'a', path: 'a.md' }] }, presentation: null, hoverCard: null });
+  const card = { dataset: { nodeId: 'a' }, getBoundingClientRect: () => cardRect };
+  view.showHoverCard(card, { title: 'T', preview: 'body' });
+  const preview = host.children.at(-1);
+  const px = key => (view.hoverCard ? parseFloat(view.hoverCard.style[key]) : NaN);
+  return { shown: !!view.hoverCard, left: px('left'), top: px('top'), width: px('width'), maxHeight: px('maxHeight'), preview };
+}
+const intersects = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+test('bug bash #04: a narrow canvas puts the preview beside, above or below the card, never over it; a wide canvas keeps it on the right', () => {
+  const card = { left: 150, top: 200, right: 250, bottom: 260 };
+  const wide = hoverHarness(1200, 800, card);
+  assert.equal(wide.shown, true);
+  assert.equal(wide.left, 250 + 12, 'wide canvas: right of the card');
+  assert.equal(wide.top, 200);
+  const narrow = hoverHarness(400, 900, card);
+  assert.equal(narrow.shown, true);
+  const box = { left: narrow.left, top: narrow.top, right: narrow.left + narrow.width, bottom: narrow.top + Math.min(narrow.maxHeight, 900 - 24) };
+  assert.equal(intersects(box, card), false, 'the preview rectangle does not intersect the card');
+  assert.ok(box.left >= 12 && box.right <= 400 - 12 && box.top >= 12 && box.bottom <= 900 - 12, 'and it lies inside the canvas');
+  const cramped = hoverHarness(300, 300, { left: 20, top: 20, right: 280, bottom: 280 });
+  assert.equal(cramped.shown, false, 'no place that clears the card: no preview');
+});

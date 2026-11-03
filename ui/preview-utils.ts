@@ -37,6 +37,50 @@ export function previewMetrics(scaleValue: number): PreviewMetrics {
   };
 }
 
+interface PreviewBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * Where the hover preview goes, in the canvas's own coordinates (`host` is its size, `card` the hovered card's rectangle
+ * relative to it). Tries the right of the card, then the left, below and above, and takes the first spot that lies fully
+ * inside the canvas (with `margin` to spare) and does not overlap the card. Null when no side has room: no preview.
+ * The right side keeps the preview's top aligned with the card's top (clamped into the canvas), as it always did.
+ */
+export function placeHoverPreview(
+  host: { width: number; height: number },
+  card: PreviewBox,
+  preview: { width: number; height: number },
+  margin = 12
+): { left: number; top: number } | null {
+  const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(value, Math.max(low, high)));
+  const topAligned = clamp(card.top, margin, host.height - preview.height - margin);
+  const leftAligned = clamp(card.left, margin, host.width - preview.width - margin);
+  const candidates = [
+    { left: card.right + margin, top: topAligned },
+    { left: card.left - margin - preview.width, top: topAligned },
+    { left: leftAligned, top: card.bottom + margin },
+    { left: leftAligned, top: card.top - margin - preview.height }
+  ];
+  for (const spot of candidates) {
+    const inside =
+      spot.left >= margin &&
+      spot.top >= margin &&
+      spot.left + preview.width <= host.width - margin &&
+      spot.top + preview.height <= host.height - margin;
+    const overlaps =
+      spot.left < card.right &&
+      card.left < spot.left + preview.width &&
+      spot.top < card.bottom &&
+      card.top < spot.top + preview.height;
+    if (inside && !overlaps) return spot;
+  }
+  return null;
+}
+
 export function markdownImages(markdown: string, limit = 4): { alt: string; url: string }[] {
   const images: { alt: string; url: string }[] = [];
   for (const match of markdown.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/gi)) {

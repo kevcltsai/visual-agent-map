@@ -47767,6 +47767,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "unbindClipboard", null);
     /** The zoom the selected card's tool row was last fitted at. */
     __publicField(this, "toolsZoom", null);
+    /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
+    __publicField(this, "toolbarClearedFor", null);
     /** True while the first message forces the window open: that is not the user's choice, so it is not saved. */
     __publicField(this, "chatForcedOpen", false);
     /** Maps the user chose to start blank ("Create an empty mind map"): they show the empty canvas, not the opening screen. */
@@ -60578,11 +60580,13 @@ ${note.detail.trim()}` : "",
   applyInitialViewport() {
     if (!this.map) return;
     const inset = this.canvasInset();
-    this.map.viewport = clearToolbar(
-      initialViewport(this.map.viewport, inset),
-      inset,
-      this.topsUnderToolbar(this.map.viewport.zoom)
-    );
+    const viewport = initialViewport(this.map.viewport, inset);
+    if (this.toolbarClearedFor === this.path) {
+      this.map.viewport = viewport;
+      return;
+    }
+    this.toolbarClearedFor = this.path;
+    this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
   /**
    * Screen tops (canvas coordinates) of the cards the saved viewport would draw under the toolbar. Computed from the

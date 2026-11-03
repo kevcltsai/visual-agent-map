@@ -348,6 +348,25 @@ test('applyInitialViewport moves a saved viewport that draws a card under the to
   }
 });
 
+test('applyInitialViewport lifts a saved viewport only on the first paint of a map; a later render leaves a view the user panned to', () => {
+  const { view } = makeView();
+  view.path = 'Maps/A/Map.md';
+  view.map.viewport = { x: 0, y: 0, zoom: 1 };
+  view.canvasNodes = () => view.map.nodes;
+  view.map.nodes[0].x = 684; view.map.nodes[0].y = 0;
+  view.map.nodes[1].x = 5000; view.map.nodes[1].y = 5000;
+  view.viewportEl.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1440, bottom: 700 });
+  view.contentEl = { querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 12, right: 720, bottom: 50 }) }) };
+  view.applyInitialViewport();
+  assert.equal(view.map.viewport.y, 58, 'first paint lifts the card clear');
+  view.map.viewport = { x: 0, y: 0, zoom: 1 }; // the user pans the card back under the toolbar
+  view.applyInitialViewport();
+  assert.equal(view.map.viewport.y, 0, 'a re-render keeps the panned view');
+  view.path = 'Maps/B/Map.md';
+  view.applyInitialViewport();
+  assert.equal(view.map.viewport.y, 58, 'another map is cleared on its first paint');
+});
+
 test('render order: toolbar overlay before the viewport, zoom controls in a second overlay after it', () => {
   const source = read('experiences/visual-map/view.ts');
   const render = source.slice(source.indexOf('  private render(): void {'));

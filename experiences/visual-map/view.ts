@@ -14873,12 +14873,17 @@ export class VisualAgentMapView extends ItemView {
   private applyInitialViewport(): void {
     if (!this.map) return;
     const inset = this.canvasInset();
-    this.map.viewport = clearToolbar(
-      initialViewport(this.map.viewport, inset),
-      inset,
-      this.topsUnderToolbar(this.map.viewport.zoom)
-    );
+    const viewport = initialViewport(this.map.viewport, inset);
+    // Only the first paint of a map clears the toolbar: a later render must not move a view the user panned to.
+    if (this.toolbarClearedFor === this.path) {
+      this.map.viewport = viewport;
+      return;
+    }
+    this.toolbarClearedFor = this.path;
+    this.map.viewport = clearToolbar(viewport, inset, this.topsUnderToolbar(this.map.viewport.zoom));
   }
+  /** The map whose saved viewport was already lifted clear of the toolbar (see applyInitialViewport). */
+  private toolbarClearedFor: string | null = null;
   /**
    * Screen tops (canvas coordinates) of the cards the saved viewport would draw under the toolbar. Computed from the
    * saved positions, as the stage is not transformed yet when this runs; a card's height is its laid-out height.

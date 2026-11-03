@@ -28253,9 +28253,12 @@ function placeHoverPreview(host, card, preview, margin = 12, options = {}) {
   const leftAligned = clamp(card.left, margin, host.width - preview.width - margin);
   const bottom = Math.max(...keepClear.map((box) => box.bottom));
   const top = Math.min(...keepClear.map((box) => box.top));
+  const sharesRows = keepClear.filter((box) => topAligned < box.bottom && box.top < topAligned + preview.height);
+  const rightEdge = Math.max(card.right, ...sharesRows.map((box) => box.right));
+  const leftEdge = Math.min(card.left, ...sharesRows.map((box) => box.left));
   const candidates = [
-    { left: card.right + margin, top: topAligned },
-    { left: card.left - margin - preview.width, top: topAligned },
+    { left: rightEdge + margin, top: topAligned },
+    { left: leftEdge - margin - preview.width, top: topAligned },
     { left: leftAligned, top: bottom + margin },
     { left: leftAligned, top: top - margin - preview.height }
   ];

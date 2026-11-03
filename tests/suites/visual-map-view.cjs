@@ -4106,6 +4106,19 @@ test('bug bash #04: the hover preview never covers the hovered card\'s tool row,
   assert.equal(intersects(boxOf(beside), wideRow), false, 'beside the card the preview clears the wider tool row too');
   assert.equal(hoverHarness(1200, 900, { left: 150, top: 200, right: 250, bottom: 260 }, { tools: { left: 40, top: 170, right: 240, bottom: 206 } }).left, 262, 'an ordinary tool row inside the card keeps the preview on the right');
 });
+// Regression (UI acceptance of f516ade): a left-aligned tool row wider than its card sticks out past the card's right edge; on a wide canvas the preview still goes to the right, starting beyond the row.
+test('bug bash #04: on a wide canvas a tool row sticking out past the card\'s right edge moves the right-hand preview\'s start beyond the row; the left side mirrors it', () => {
+  const card = { left: 100, top: 372, right: 274, bottom: 430 };
+  const tools = { left: 100, top: 355, right: 336, bottom: 376 };
+  const spot = hoverHarness(1200, 900, card, { tools });
+  assert.equal(spot.shown, true, 'the preview is shown');
+  assert.equal(spot.left, 336 + 12, 'on the right, beyond the tool row');
+  assert.equal(intersects(boxOf(spot), card), false);
+  assert.equal(intersects(boxOf(spot), tools), false);
+  const mirrored = hoverHarness(1200, 900, { left: 900, top: 372, right: 1074, bottom: 430 }, { tools: { left: 838, top: 355, right: 1074, bottom: 376 } });
+  assert.equal(mirrored.shown, true);
+  assert.equal(mirrored.left + mirrored.width, 838 - 12, 'on the left (right side has no room), beyond the row\'s left end');
+});
 // The pointer rests on a neighbour after dragging a handle of the selected card: the neighbour's preview must not cover the selected card's handles.
 test('bug bash #04: when another side is free, the hover preview does not cover the selected neighbour card (its resize handles); with no free side it still clears the hovered card', () => {
   const card = { left: 150, top: 200, right: 250, bottom: 260 };

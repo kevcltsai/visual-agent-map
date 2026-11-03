@@ -50,7 +50,7 @@ interface PreviewBox {
  * inside the canvas (with `margin` to spare) and does not overlap the card. Null when no side has room: no preview.
  * The right side keeps the preview's top aligned with the card's top (clamped into the canvas), as it always did.
  * `keepClear` are further rectangles the preview must not cover (the card's own tool row); below and above clear their
- * union with the card. `avoid` are rectangles it should not cover when some other side is free (the selected card's
+ * union with the card, and the right and left spots start beyond the ones that share their rows. `avoid` are rectangles it should not cover when some other side is free (the selected card's
  * tools and resize handles); if every side covers one, the first side that clears the card and `keepClear` wins.
  */
 export function placeHoverPreview(
@@ -67,9 +67,13 @@ export function placeHoverPreview(
   const leftAligned = clamp(card.left, margin, host.width - preview.width - margin);
   const bottom = Math.max(...keepClear.map(box => box.bottom));
   const top = Math.min(...keepClear.map(box => box.top));
+  // A tool row wider than the card sticks out past its side: the beside spots start beyond whatever shares their rows.
+  const sharesRows = keepClear.filter(box => topAligned < box.bottom && box.top < topAligned + preview.height);
+  const rightEdge = Math.max(card.right, ...sharesRows.map(box => box.right));
+  const leftEdge = Math.min(card.left, ...sharesRows.map(box => box.left));
   const candidates = [
-    { left: card.right + margin, top: topAligned },
-    { left: card.left - margin - preview.width, top: topAligned },
+    { left: rightEdge + margin, top: topAligned },
+    { left: leftEdge - margin - preview.width, top: topAligned },
     { left: leftAligned, top: bottom + margin },
     { left: leftAligned, top: top - margin - preview.height }
   ];

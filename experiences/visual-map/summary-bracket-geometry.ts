@@ -123,3 +123,52 @@ export function summaryTextBox(side: BracketSide, label: { x: number; y: number 
   if (side === "up") return { x: label.x - w / 2, y: label.y - h, w, h };
   return { x: label.x, y: label.y - h / 2, w, h };
 }
+
+/** How far the text may be pushed out at most: three card widths. */
+export const BRACKET_TEXT_MAX_PUSH = 3 * 280;
+
+/**
+ * Where the text goes once cards that are not part of the run are taken into account (decision: the layout never makes
+ * room for a bracket, so the text steps out instead). The text moves along the outward axis of `side` until its box
+ * (`size`, as `summaryTextBox` places it) no longer meets any obstacle, at most `maxPush`; if it still meets one there it stays
+ * at that last position. With no collision the label comes back unchanged.
+ */
+export function avoidBracketObstacles(
+  side: BracketSide,
+  label: { x: number; y: number },
+  size: { w: number; h: number },
+  obstacles: readonly BracketRect[],
+  maxPush: number = BRACKET_TEXT_MAX_PUSH
+): { x: number; y: number } {
+  const outward = side === "right" || side === "down" ? 1 : -1;
+  const horizontal = side === "right" || side === "left";
+  let pushed = 0;
+  for (let pass = 0; pass <= obstacles.length; pass++) {
+    const at = horizontal
+      ? { x: label.x + outward * pushed, y: label.y }
+      : { x: label.x, y: label.y + outward * pushed };
+    const box = summaryTextBox(side, at, size.w, size.h);
+    let step = 0;
+    for (const o of obstacles) {
+      if (![o.x, o.y, o.w, o.h].every(finite)) continue;
+      if (!(box.x < o.x + o.w && o.x < box.x + box.w && box.y < o.y + o.h && o.y < box.y + box.h)) continue;
+      // How far the box must move outward to sit just past this obstacle.
+      const need = horizontal
+        ? side === "right"
+          ? o.x + o.w + BRACKET_LABEL_GAP - box.x
+          : box.x + box.w - (o.x - BRACKET_LABEL_GAP)
+        : side === "down"
+          ? o.y + o.h + BRACKET_LABEL_GAP - box.y
+          : box.y + box.h - (o.y - BRACKET_LABEL_GAP);
+      step = Math.max(step, need);
+    }
+    if (step <= 0) break;
+    pushed = Math.min(maxPush, pushed + step);
+    if (pushed >= maxPush) break;
+  }
+  return pushed === 0
+    ? label
+    : horizontal
+      ? { x: round(label.x + outward * pushed), y: label.y }
+      : { x: label.x, y: round(label.y + outward * pushed) };
+}

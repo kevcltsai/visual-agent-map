@@ -42,7 +42,13 @@ import {
   type SummaryRefusal,
   type TextItem
 } from "./canvas-items";
-import { bracketGeometry, summaryTextBox, type BracketRect, type BracketResult } from "./summary-bracket-geometry";
+import {
+  avoidBracketObstacles,
+  bracketGeometry,
+  summaryTextBox,
+  type BracketRect,
+  type BracketResult
+} from "./summary-bracket-geometry";
 import { acceptImage, imageFilesFrom, imageSize, safeImageName, sniffImage, IMAGE_MAX_BYTES } from "./image-input";
 import {
   EXPORT_MAX_EDGE,
@@ -6683,7 +6689,7 @@ export class VisualAgentMapView extends ItemView {
     return !!this.map && !this.map.aim && !this.presentation;
   }
   /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
-  private summaryGeometry(parentId: string, range: readonly string[]): BracketResult | null {
+  private summaryGeometry(parentId: string, range: readonly string[], text?: string): BracketResult | null {
     if (!this.map || !range.length) return null;
     const nodes = this.map.nodes,
       children = new Map<string, string[]>();
@@ -6696,7 +6702,8 @@ export class VisualAgentMapView extends ItemView {
       return { x: box.x, y: box.y, w: box.width, h: box.height };
     };
     const rangeRects: BracketRect[] = [],
-      all: BracketRect[] = [];
+      all: BracketRect[] = [],
+      members = new Set<string>();
     for (const id of range) {
       const own = rectOf(id);
       if (!own) continue;
@@ -6707,6 +6714,7 @@ export class VisualAgentMapView extends ItemView {
         const current = stack.pop()!;
         if (seen.has(current)) continue;
         seen.add(current);
+        members.add(current);
         const rect = rectOf(current);
         if (rect) all.push(rect);
         stack.push(...(children.get(current) ?? []));
@@ -6715,7 +6723,20 @@ export class VisualAgentMapView extends ItemView {
     if (!rangeRects.length) return null;
     const parentCard = rectOf(parentId),
       direction = layoutDirectionFor(nodes, range[0], layoutOf(this.map).direction);
-    return bracketGeometry(direction, all, parentCard, rangeRects);
+    const geometry = bracketGeometry(direction, all, parentCard, rangeRects);
+    if (!geometry.ok || text === undefined) return geometry;
+    // The layout does not make room for a bracket, so its text steps outward past the cards that are not part of the run.
+    const obstacles: BracketRect[] = [];
+    for (const id of this.cardEls.keys()) {
+      if (members.has(id)) continue;
+      const rect = rectOf(id);
+      if (rect) obstacles.push(rect);
+    }
+    const lines = wrapText(text, 200 - 12).length || 1;
+    return {
+      ...geometry,
+      label: avoidBracketObstacles(geometry.side, geometry.label, { w: 200, h: lines * 18 + 4 }, obstacles)
+    };
   }
   /** Whether these topics can be bracketed now; a refusal carries the i18n key that says why (shown, announced, and the button's title). */
   private summaryEntryCheck(
@@ -6807,7 +6828,7 @@ export class VisualAgentMapView extends ItemView {
     layer.setAttr("aria-label", t("ui.summaries_group"));
     for (const { summary, isNew } of entries) {
       const range = effectiveSummaryRange(summary, map.nodes),
-        geometry = this.summaryGeometry(summary.parentId, range);
+        geometry = this.summaryGeometry(summary.parentId, range, summary.text);
       if (!geometry?.ok) continue;
       const el = layer.createDiv(`vam-summary is-side-${geometry.side}`);
       el.dataset.itemId = summary.id;
@@ -8913,7 +8934,7 @@ export class VisualAgentMapView extends ItemView {
     for (const item of map.canvasItems ?? []) {
       if (item.kind !== "summary") continue;
       const summary = item as SummaryItem;
-      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes));
+      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes), summary.text);
       if (!geometry?.ok) continue;
       const lines = wrapText(summary.text, 200 - 12);
       grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
@@ -10629,7 +10650,10 @@ export class VisualAgentMapView extends ItemView {
     const cardRect = card.getBoundingClientRect(),
       zoom = this.map?.viewport.zoom || 1;
     const chat = this.contentEl.querySelector<HTMLElement>(".vam-map-chat.is-overlay");
-    const visibleLeft = Math.max(this.viewportEl.getBoundingClientRect().left, chat ? chat.getBoundingClientRect().right : 0);
+    const visibleLeft = Math.max(
+      this.viewportEl.getBoundingClientRect().left,
+      chat ? chat.getBoundingClientRect().right : 0
+    );
     tools.toggleClass(
       "is-align-left",
       cardToolsSide(cardRect.right, tools.getBoundingClientRect().width, visibleLeft, 10 * zoom) === "left"
@@ -11041,7 +11065,12 @@ export class VisualAgentMapView extends ItemView {
     const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
     const spot = placeHoverPreview(
       host,
-      { left: rect.left - host.left, top: rect.top - host.top, right: rect.right - host.left, bottom: rect.bottom - host.top },
+      {
+        left: rect.left - host.left,
+        top: rect.top - host.top,
+        right: rect.right - host.left,
+        bottom: rect.bottom - host.top
+      },
       { width, height: visibleHeight }
     );
     if (!spot) return;

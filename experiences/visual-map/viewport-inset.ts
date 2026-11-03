@@ -78,6 +78,11 @@ export function fitViewport(
  * edge); when it is wider than the card that puts its left end under the chat window or past the canvas edge, so it hangs
  * from the card's left edge instead. All numbers are screen pixels.
  */
-export function cardToolsSide(cardRight: number, toolsWidth: number, visibleLeft: number, gap: number): "left" | "right" {
+export function cardToolsSide(
+  cardRight: number,
+  toolsWidth: number,
+  visibleLeft: number,
+  gap: number
+): "left" | "right" {
   return cardRight - gap - toolsWidth < visibleLeft ? "left" : "right";
 }

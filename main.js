@@ -17107,6 +17107,27 @@ function summaryTextBox(side, label, w, h) {
   if (side === "up") return { x: label.x - w / 2, y: label.y - h, w, h };
   return { x: label.x, y: label.y - h / 2, w, h };
 }
+var BRACKET_TEXT_MAX_PUSH = 3 * 280;
+function avoidBracketObstacles(side, label, size, obstacles, maxPush = BRACKET_TEXT_MAX_PUSH) {
+  const outward = side === "right" || side === "down" ? 1 : -1;
+  const horizontal = side === "right" || side === "left";
+  let pushed = 0;
+  for (let pass = 0; pass <= obstacles.length; pass++) {
+    const at = horizontal ? { x: label.x + outward * pushed, y: label.y } : { x: label.x, y: label.y + outward * pushed };
+    const box = summaryTextBox(side, at, size.w, size.h);
+    let step = 0;
+    for (const o of obstacles) {
+      if (![o.x, o.y, o.w, o.h].every(finite2)) continue;
+      if (!(box.x < o.x + o.w && o.x < box.x + box.w && box.y < o.y + o.h && o.y < box.y + box.h)) continue;
+      const need = horizontal ? side === "right" ? o.x + o.w + BRACKET_LABEL_GAP - box.x : box.x + box.w - (o.x - BRACKET_LABEL_GAP) : side === "down" ? o.y + o.h + BRACKET_LABEL_GAP - box.y : box.y + box.h - (o.y - BRACKET_LABEL_GAP);
+      step = Math.max(step, need);
+    }
+    if (step <= 0) break;
+    pushed = Math.min(maxPush, pushed + step);
+    if (pushed >= maxPush) break;
+  }
+  return pushed === 0 ? label : horizontal ? { x: round(label.x + outward * pushed), y: label.y } : { x: label.x, y: round(label.y + outward * pushed) };
+}
 
 // experiences/visual-map/image-input.ts
 var IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -52984,7 +53005,7 @@ ${request.requirements}` : preset.text,
     return !!this.map && !this.map.aim && !this.presentation;
   }
   /** The rectangles of the cards drawn for a run of siblings and everything shown under them; null when none is drawn (folded away). */
-  summaryGeometry(parentId, range) {
+  summaryGeometry(parentId, range, text11) {
     var _a2, _b2;
     if (!this.map || !range.length) return null;
     const nodes = this.map.nodes, children = /* @__PURE__ */ new Map();
@@ -52996,7 +53017,7 @@ ${request.requirements}` : preset.text,
       const box = boxOf(card);
       return { x: box.x, y: box.y, w: box.width, h: box.height };
     };
-    const rangeRects = [], all = [];
+    const rangeRects = [], all = [], members = /* @__PURE__ */ new Set();
     for (const id of range) {
       const own2 = rectOf(id);
       if (!own2) continue;
@@ -53006,6 +53027,7 @@ ${request.requirements}` : preset.text,
         const current = stack.pop();
         if (seen.has(current)) continue;
         seen.add(current);
+        members.add(current);
         const rect2 = rectOf(current);
         if (rect2) all.push(rect2);
         stack.push(...(_b2 = children.get(current)) != null ? _b2 : []);
@@ -53013,7 +53035,19 @@ ${request.requirements}` : preset.text,
     }
     if (!rangeRects.length) return null;
     const parentCard = rectOf(parentId), direction = layoutDirectionFor(nodes, range[0], layoutOf(this.map).direction);
-    return bracketGeometry(direction, all, parentCard, rangeRects);
+    const geometry = bracketGeometry(direction, all, parentCard, rangeRects);
+    if (!geometry.ok || text11 === void 0) return geometry;
+    const obstacles = [];
+    for (const id of this.cardEls.keys()) {
+      if (members.has(id)) continue;
+      const rect2 = rectOf(id);
+      if (rect2) obstacles.push(rect2);
+    }
+    const lines = wrapText(text11, 200 - 12).length || 1;
+    return {
+      ...geometry,
+      label: avoidBracketObstacles(geometry.side, geometry.label, { w: 200, h: lines * 18 + 4 }, obstacles)
+    };
   }
   /** Whether these topics can be bracketed now; a refusal carries the i18n key that says why (shown, announced, and the button's title). */
   summaryEntryCheck(ids) {
@@ -53097,7 +53131,7 @@ ${request.requirements}` : preset.text,
     layer.setAttr("role", "group");
     layer.setAttr("aria-label", t("ui.summaries_group"));
     for (const { summary, isNew } of entries) {
-      const range = effectiveSummaryRange(summary, map.nodes), geometry = this.summaryGeometry(summary.parentId, range);
+      const range = effectiveSummaryRange(summary, map.nodes), geometry = this.summaryGeometry(summary.parentId, range, summary.text);
       if (!(geometry == null ? void 0 : geometry.ok)) continue;
       const el = layer.createDiv(`vam-summary is-side-${geometry.side}`);
       el.dataset.itemId = summary.id;
@@ -55000,7 +55034,7 @@ ${request.requirements}` : preset.text,
     for (const item of (_h = map.canvasItems) != null ? _h : []) {
       if (item.kind !== "summary") continue;
       const summary = item;
-      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes));
+      const geometry = this.summaryGeometry(summary.parentId, effectiveSummaryRange(summary, map.nodes), summary.text);
       if (!(geometry == null ? void 0 : geometry.ok)) continue;
       const lines = wrapText(summary.text, 200 - 12);
       grow(geometry.extent.x, geometry.extent.y, geometry.extent.w, geometry.extent.h);
@@ -56533,7 +56567,10 @@ ${request.requirements}` : preset.text,
     if (!tools || !this.viewportEl) return;
     const cardRect = card.getBoundingClientRect(), zoom = ((_a2 = this.map) == null ? void 0 : _a2.viewport.zoom) || 1;
     const chat = this.contentEl.querySelector(".vam-map-chat.is-overlay");
-    const visibleLeft = Math.max(this.viewportEl.getBoundingClientRect().left, chat ? chat.getBoundingClientRect().right : 0);
+    const visibleLeft = Math.max(
+      this.viewportEl.getBoundingClientRect().left,
+      chat ? chat.getBoundingClientRect().right : 0
+    );
     tools.toggleClass(
       "is-align-left",
       cardToolsSide(cardRect.right, tools.getBoundingClientRect().width, visibleLeft, 10 * zoom) === "left"
@@ -56957,7 +56994,12 @@ ${request.requirements}` : preset.text,
     const visibleHeight = Math.min(size.height, Math.max(180, host.height - 24));
     const spot = placeHoverPreview(
       host,
-      { left: rect2.left - host.left, top: rect2.top - host.top, right: rect2.right - host.left, bottom: rect2.bottom - host.top },
+      {
+        left: rect2.left - host.left,
+        top: rect2.top - host.top,
+        right: rect2.right - host.left,
+        bottom: rect2.bottom - host.top
+      },
       { width, height: visibleHeight }
     );
     if (!spot) return;

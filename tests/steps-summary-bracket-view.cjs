@@ -51,7 +51,7 @@ async function harness({ direction, build, boxes } = {}) {
   if (build) doc.canvasItems = build(ids);
   await repo.saveMap(MAP, doc);
   await repo.rebuildDerivedData();
-  const layout = boxes ?? { [ids.root]: [100, 200], [ids.a]: [500, 0], [ids.b]: [500, 150], [ids.c]: [500, 300], [ids.d]: [500, 450], [ids.b1]: [900, 150] };
+  const layout = (typeof boxes === 'function' ? boxes(ids) : boxes) ?? { [ids.root]: [100, 200], [ids.a]: [500, 0], [ids.b]: [500, 150], [ids.c]: [500, 300], [ids.d]: [500, 450], [ids.b1]: [900, 150] };
   let pending = Promise.resolve();
   const notices = [], menus = [];
   const Menu = class { constructor() { this.items = []; menus.push(this); } addItem(cb) { const item = { setTitle(v) { this.title = v; return this; }, setIcon() { return this; }, onClick(fn) { this.click = fn; return this; } }; cb(item); this.items.push(item); return this; } showAtPosition(at) { this.at = at; return this; } showAtMouseEvent() { this.mouse = true; return this; } };
@@ -406,4 +406,34 @@ test('F2 fit: the text box of a bracket follows the side transform, and fit coun
   const viewerFit = viewer.slice(viewer.indexOf('function fit(): void'), viewer.indexOf('function center('));
   assert.ok(viewerFit.includes('.vam-summary-text') && viewerFit.includes('is-side-left'));
   assert.ok(!/import .*summary-bracket-geometry/.test(viewer));
+});
+
+// bug bash A #26: the bracket text steps outward past cards that are not part of the run; layout and braces stay as they were.
+test('bug bash #26 geometry: avoidBracketObstacles pushes the label out past every non-member card, never when nothing collides', () => {
+  const box = { w: 200, h: 22 };
+  const label = { x: 1226, y: 275 };
+  const none = geometry.avoidBracketObstacles('right', label, box, [rect(500, 0), rect(100, 200)]);
+  assert.deepEqual(plain(none), label, 'no collision: the very same position');
+  const hit = rect(1230, 250);
+  for (const [side, from] of [['right', label], ['left', { x: 454, y: 275 }], ['down', { x: 840, y: 440 }], ['up', { x: 840, y: 104 }]]) {
+    const obstacle = side === 'right' ? hit : side === 'left' ? rect(100, 250) : side === 'down' ? rect(700, 440) : rect(700, 20);
+    const pushed = geometry.avoidBracketObstacles(side, from, box, [obstacle]);
+    const text = geometry.summaryTextBox(side, pushed, box.w, box.h);
+    assert.equal(text.x < obstacle.x + obstacle.w && obstacle.x < text.x + text.w && text.y < obstacle.y + obstacle.h && obstacle.y < text.y + text.h, false, `${side}: the text box clears the card`);
+  }
+  const wall = Array.from({ length: 8 }, (_, i) => rect(1230 + i * 280, 250));
+  const capped = geometry.avoidBracketObstacles('right', label, box, wall);
+  assert.ok(capped.x - label.x <= 3 * 280 && capped.x > label.x, 'bounded push: stops at the cap and stays there');
+});
+test('bug bash #26 view: bracket text beside a card that is not a member is pushed clear of it; the brace and the other cards stay', async () => {
+  const build = ids => [{ id: 's1', kind: 'summary', parentId: ids.root, members: [ids.b, ids.c], text: 'Both too costly' }];
+  const plainRun = await harness({ build });
+  const [baseLeft, baseTop] = [find(plainRun.el('s1'), i => dom.hasCls(i, 'vam-summary-text')).style.left, find(plainRun.el('s1'), i => dom.hasCls(i, 'vam-summary-text')).style.top];
+  const h = await harness({ build, boxes: ids => ({ [ids.root]: [100, 200], [ids.a]: [500, 0], [ids.b]: [500, 150], [ids.c]: [500, 300], [ids.d]: [1230, 250], [ids.b1]: [900, 150] }) });
+  const text = find(h.el('s1'), i => dom.hasCls(i, 'vam-summary-text'));
+  const x = parseFloat(text.style.left), y = parseFloat(text.style.top);
+  assert.equal(baseLeft, '1226px'); assert.equal(baseTop, '275px');
+  assert.ok(x >= 1230 + 280, 'the text starts beyond the neighbouring card (right edge 1510)');
+  assert.equal(y, 275, 'only moved along the outward axis');
+  assert.equal(find(h.el('s1'), i => i.tag === 'path').attrs.d, find(plainRun.el('s1'), i => i.tag === 'path').attrs.d, 'the brace is unchanged');
 });

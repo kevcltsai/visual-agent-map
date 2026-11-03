@@ -23,12 +23,24 @@ const run = part => new Promise(resolve => {
 // Reads the totals node:test prints at the end of a part ("# tests 12", "# pass 12", "# fail 0").
 const total = (output, key) => output.match(new RegExp(`^(?:# |ℹ )${key} (\\d+)`, "m"))?.[1] ?? "?";
 
+// With VAM_AFFECTED_TESTS (set by scripts/test-affected.mjs), a `node --test` part keeps only the listed files and is dropped when none is left.
+// A tests/run.cjs part stays: run.cjs filters its own suites.
+export function applyAffected(list, env = process.env) {
+  if (!env.VAM_AFFECTED_TESTS) return list;
+  const affected = new Set(env.VAM_AFFECTED_TESTS.split(","));
+  return list.flatMap(part => {
+    if (part.args[0] !== "--test") return [part];
+    const files = part.args.slice(1).filter(file => affected.has(file));
+    return files.length ? [{ ...part, args: ["--test", ...files] }] : [];
+  });
+}
+
 // Runs every part at once and returns the names of the parts that exited non-zero.
 // A passing part prints one summary line; a failing part prints its whole output; VAM_TEST_VERBOSE=1 prints every part whole.
 export async function runParts(list) {
   const failed = [];
   const verbose = process.env.VAM_TEST_VERBOSE === "1";
-  await Promise.all(list.map(part => run(part).then(result => {
+  await Promise.all(applyAffected(list).map(part => run(part).then(result => {
     if (result.code === 0 && !verbose) {
       process.stdout.write(`${result.name}: tests ${total(result.output, "tests")}, pass ${total(result.output, "pass")}, fail ${total(result.output, "fail")}, ${(result.durationMs / 1000).toFixed(1)} s\n`);
     } else {

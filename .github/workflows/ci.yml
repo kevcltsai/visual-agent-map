@@ -1,10 +1,20 @@
 name: CI
 
+# The run name tells find-green-ci-run.sh which runs are full. A full run is a push to main or a manual run with full=true;
+# every other push (feature branches, pull requests) runs only the tests a change can reach (scripts/test-affected.mjs).
+run-name: CI ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}
+
 on:
   push:
     branches:
       - "**"
   pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Run the full test suite and refresh the dependency table cache"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -17,11 +27,16 @@ concurrency:
 
 jobs:
   verify:
+    name: verify (${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }})
     timeout-minutes: 30
     runs-on: ubuntu-24.04
+    env:
+      MODE: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.full)) && 'full' || 'affected' }}
     steps:
       - uses: actions/checkout@v5
-      # On main, reuse a green ci.yml run for the same head_sha (any branch). Any query failure leaves `run` empty, so verify runs.
+        with:
+          fetch-depth: 0
+      # On main, reuse a green FULL ci.yml run for the same head_sha (any branch). Any query failure leaves `run` empty, so verify runs.
       - id: reuse
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
@@ -29,10 +44,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           if id=$(sh scripts/find-green-ci-run.sh "$GITHUB_SHA"); then
-            echo "verify skipped: reusing green ci.yml run $id for $GITHUB_SHA"
+            echo "verify skipped: reusing green full ci.yml run $id for $GITHUB_SHA"
             echo "run=$id" >> "$GITHUB_OUTPUT"
           else
-            echo "no reusable green run for $GITHUB_SHA; running verify"
+            echo "no reusable green full run for $GITHUB_SHA; running verify"
           fi
       - uses: actions/setup-node@v5
         if: steps.reuse.outputs.run == ''
@@ -41,5 +56,25 @@ jobs:
           cache: npm
       - if: steps.reuse.outputs.run == ''
         run: npm ci
-      - if: steps.reuse.outputs.run == ''
+      # Affected runs read the dependency table of the latest full run (cache key test-deps-<sha>); a miss makes test:affected run everything.
+      - if: steps.reuse.outputs.run == '' && env.MODE == 'affected'
+        uses: actions/cache/restore@v4
+        with:
+          path: test-deps.json
+          key: test-deps-none-${{ github.sha }}
+          restore-keys: test-deps-
+      - if: steps.reuse.outputs.run == '' && env.MODE == 'affected'
+        run: |
+          npm run lint && npm run format:check && npm run check:i18n && npm run build && npm run test:affected \
+            && git diff --exit-code -- main.js experiences/sharing/viewer-bundle.generated.ts && npm run check:artifacts
+      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+        env:
+          VAM_TEST_DEPS_DIR: ${{ runner.temp }}/test-deps-records
         run: npm run verify
+      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+        run: node scripts/test-affected.mjs --write-deps "$RUNNER_TEMP/test-deps-records"
+      - if: steps.reuse.outputs.run == '' && env.MODE == 'full'
+        uses: actions/cache/save@v4
+        with:
+          path: test-deps.json
+          key: test-deps-${{ github.sha }}

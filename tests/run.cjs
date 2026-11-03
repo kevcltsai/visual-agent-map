@@ -49,6 +49,7 @@ const suites = [
   'sharing-translate.cjs',
   'sharing-translate-dialog.cjs',
   'sharing-mermaid-capture.cjs',
+  'test-affected.cjs',
   'check-test-timing.cjs',
   'check-test-wiring.cjs'
 ];
@@ -72,6 +73,11 @@ if (shard) {
   const [index, count] = shard.split('/').map(Number);
   assert.ok(Number.isInteger(index) && Number.isInteger(count) && count >= 1 && index >= 1 && index <= count, `bad --shard=${shard}`);
   selected = shardOf(index, count);
+}
+// `VAM_AFFECTED_TESTS=a,b` (set by scripts/test-affected.mjs) registers only the listed suites, as repo paths such as tests/suites/map-model.cjs.
+if (process.env.VAM_AFFECTED_TESTS) {
+  const affected = new Set(process.env.VAM_AFFECTED_TESTS.split(','));
+  selected = selected.filter(suite => affected.has(`tests/suites/${suite}`));
 }
 // `VAM_SUITES=aim` registers only the AIM suites (tests/suites/aim-*.cjs, every test in them); `VAM_SUITES=other` registers the rest. test:aim runs both, the second with a name pattern.
 const group = process.env.VAM_SUITES;

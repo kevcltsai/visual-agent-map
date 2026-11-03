@@ -18,6 +18,7 @@
     "test:unit": "node scripts/test-unit.mjs",
     "test:aim": "VAM_SUITES=aim node --test tests/run.cjs tests/aim-*.cjs tests/steps-aim-*.cjs tests/codex-parallel-runtime.cjs && VAM_SUITES=other node --test --test-name-pattern='AIM|Manual Planner|Planner reviews|saved-report Planner|captured malformed|coverage:|final delivery|missing or unavailable|invalid and duplicate|cancellation stops|acceptance can retain' tests/run.cjs",
     "test:aim:node": "node tests/tools/aim-node.cjs",
+    "test:affected": "node scripts/test-affected.mjs --run",
     "test:integration": "node scripts/test-integration.mjs",
     "test:runtime": "node scripts/test-runtime.mjs",
     "test:ui": "node scripts/test-harness.mjs --ui",

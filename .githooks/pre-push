@@ -3,9 +3,9 @@
 # repository: `git init` there rewrote the shared config to core.bare=true. Let every nested git find its repo from cwd.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 # Feature branches run `verify:push` (lint, format, i18n, build-artifact diff, artifacts; no tests): CI runs the full
-# `npm run verify` on every push and agents-spec WORKFLOW requires a green CI run before merging to main.
+# `npm run verify` on main and in full runs, and only the tests a change can reach on other pushes; agents-spec WORKFLOW requires a green FULL CI run before merging to main.
 # Pushes to main or a tag run the full `npm run verify` (same set as CI), unless every pushed commit already has a
-# successful ci.yml run. Missing/unauthenticated gh or a failed query runs the full verify (fail-closed).
+# successful FULL ci.yml run (find-green-ci-run.sh ignores affected runs). Missing/unauthenticated gh or a failed query runs the full verify (fail-closed).
 full=0
 reuse=1
 while read -r _local_ref local_sha remote_ref _remote_sha; do

@@ -499,16 +499,22 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
     this.unsubscribeCurrentModel = null;
     super.hide();
   }
+  /** Set when the language select fired a change; the select is focused again once the switch is done and it is enabled. */
+  private refocusLanguage = false;
   refreshAfterLanguageChange(): void {
     // The Settings window can be a popout: its focus lives in its own document, not in the global `document`.
     const active = this.containerEl.doc?.activeElement ?? null;
     const focused =
-      !!active &&
-      this.containerEl.contains(active) &&
-      active.instanceOf(HTMLSelectElement) &&
-      offersEveryLanguage(Array.from(active.options).map(option => option.value));
+      this.refocusLanguage ||
+      (!!active &&
+        this.containerEl.contains(active) &&
+        active.instanceOf(HTMLSelectElement) &&
+        offersEveryLanguage(Array.from(active.options).map(option => option.value)));
     this.update();
     if (!focused) return;
+    // While the switch is pending the new select is disabled and cannot take focus: keep the request for the last refresh.
+    if (this.plugin.languageSwitchPending) return;
+    this.refocusLanguage = false;
     const selector = Array.from(this.containerEl.querySelectorAll<HTMLSelectElement>("select")).find(select => {
       return offersEveryLanguage(Array.from(select.options).map(option => option.value));
     });
@@ -681,7 +687,11 @@ export class VisualAgentMapSettingTab extends PluginSettingTab {
                   for (const option of SUPPORTED_LANGUAGES) dropdown.addOption(option.id, option.label);
                   dropdown.setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
                   dropdown.onChange(value => {
-                    void this.plugin.changeLanguage(value);
+                    // The change comes from this select: the user is on it, even if focus has moved by the time of the redraw.
+                    this.refocusLanguage = true;
+                    void this.plugin.changeLanguage(value).finally(() => {
+                      this.refocusLanguage = false;
+                    });
                   });
                 });
             }

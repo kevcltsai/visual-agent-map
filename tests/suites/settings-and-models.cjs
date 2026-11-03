@@ -579,3 +579,29 @@ test('Bug bash E #19: committing a Codex or Claude CLI path redraws the page aft
   await tab.setControlValue('cliReasoning', 'high');
   assert.equal(seen.length, 2, 'other values do not redraw the page');
 });
+
+test('Bug bash E #18 (round 2): the language select is focused again after the redraw even though it had already lost focus when the refresh ran', async () => {
+  const log = [];
+  const pendingBox = { pending: true };
+  const { tab, plugin } = tabWithDoc({ languageSwitchPending: true, changeLanguage: async () => {} });
+  const oldSelect = languageSelect('old', log), newSelect = languageSelect('new', log);
+  const doc = { activeElement: oldSelect };
+  let selects = [oldSelect];
+  tab.containerEl = { doc, contains: el => el === oldSelect || el === newSelect, querySelectorAll: () => selects };
+  tab.onUpdate = () => { selects = [newSelect]; };
+  // render the language row and take its onChange
+  let onChange;
+  const row = flattenDefinitions(tab.getSettingDefinitions()).find(d => d.render && /Interface language|介面語言|界面语言/.test(d.name));
+  const setting = { setName() { return this; }, setDesc() { return this; }, addDropdown(cb) { cb({ addOption() {}, setValue() { return this; }, setDisabled() { return this; }, onChange: fn => { onChange = fn; }, selectEl: oldSelect }); return this; } };
+  row.render(setting);
+  onChange('zh-TW'); // the change event: the select is still the focused one here
+  doc.activeElement = { tag: 'body', instanceOf: () => false }; // ...but focus is gone when the refresh runs
+  tab.refreshAfterLanguageChange(); // first refresh: switch pending, the new select is disabled
+  assert.deepEqual(log, [], 'a disabled select cannot take the focus yet');
+  plugin.languageSwitchPending = false;
+  tab.refreshAfterLanguageChange(); // final refresh
+  assert.deepEqual(log, ['new']);
+  log.length = 0;
+  tab.refreshAfterLanguageChange();
+  assert.deepEqual(log, [], 'the request is used once');
+});

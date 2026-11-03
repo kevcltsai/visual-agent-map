@@ -406,6 +406,8 @@ export class MapChatPanel {
     return this.stage?.kind ?? null;
   }
   /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
+  /** Set when the usage notice closed before Stop was shown: the keyboard waits in the message field and moves to Stop when it appears. */
+  private stopWanted = false;
   get awaitingConsent(): boolean {
     return this.busy && this.stage?.kind === "consent";
   }
@@ -722,7 +724,26 @@ export class MapChatPanel {
     this.paintStage();
     this.speakStage();
     // Entering or leaving "consent" changes whether Stop is offered and what an empty canvas says.
-    if (kind === "consent" || current.kind === "consent") this.renderBusy();
+    if (kind === "consent") this.renderBusy();
+    else if (current.kind === "consent") {
+      this.renderBusy();
+      this.keepFocusAfterConsent();
+    }
+  }
+  /** Stop was hidden while the usage notice was open, so closing the notice left Obsidian nothing to give focus back to (C-#14). */
+  private keepFocusAfterConsent(): void {
+    if (!this.built || !this.focusFree()) return;
+    if (!this.stopEl.hidden) this.stopEl.focus();
+    else {
+      this.stopWanted = true;
+      this.inputEl.focus();
+    }
+  }
+  /** True when the keyboard is lost (nothing, the page body, a removed element) or still in the chat; never when it is somewhere else. */
+  private focusFree(): boolean {
+    const active = this.host.activeElement();
+    if (!active || (active as HTMLElement).tagName === "BODY" || this.el.contains(active)) return true;
+    return (active as HTMLElement).isConnected === false;
   }
   private currentModelLabel(): string {
     const model = this.host.model();
@@ -2140,6 +2161,11 @@ export class MapChatPanel {
     const stoppable = this.working && !this.awaitingConsent;
     this.stopEl.hidden = !stoppable;
     this.stopEl.toggleClass("is-hidden", !stoppable);
+    if (this.stopWanted && !this.working) this.stopWanted = false;
+    else if (this.stopWanted && stoppable) {
+      this.stopWanted = false;
+      if (this.focusFree()) this.stopEl.focus();
+    }
     this.renderHint();
     this.host.stateChanged?.();
   }

@@ -29613,6 +29613,9 @@ var MapChatPanel = class {
     /** The visible note the user took off the chip; it stays off until another note is visible. */
     __publicField(this, "dismissedNote", null);
     __publicField(this, "noteChip", null);
+    /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
+    /** Set when the usage notice closed before Stop was shown: the keyboard waits in the message field and moves to Stop when it appears. */
+    __publicField(this, "stopWanted", false);
   }
   /** The window is showing (docked, laid over the canvas, or as the opening screen). */
   get isOpen() {
@@ -29649,7 +29652,6 @@ var MapChatPanel = class {
     var _a2, _b2;
     return (_b2 = (_a2 = this.stage) == null ? void 0 : _a2.kind) != null ? _b2 : null;
   }
-  /** The running turn waits for the user to answer the AI usage notice: nothing is being built yet. */
   get awaitingConsent() {
     var _a2;
     return this.busy && ((_a2 = this.stage) == null ? void 0 : _a2.kind) === "consent";
@@ -29949,7 +29951,26 @@ ${typed}` : draft;
     this.stage = { kind, since: fresh ? this.clockNow() : current.since };
     this.paintStage();
     this.speakStage();
-    if (kind === "consent" || current.kind === "consent") this.renderBusy();
+    if (kind === "consent") this.renderBusy();
+    else if (current.kind === "consent") {
+      this.renderBusy();
+      this.keepFocusAfterConsent();
+    }
+  }
+  /** Stop was hidden while the usage notice was open, so closing the notice left Obsidian nothing to give focus back to (C-#14). */
+  keepFocusAfterConsent() {
+    if (!this.built || !this.focusFree()) return;
+    if (!this.stopEl.hidden) this.stopEl.focus();
+    else {
+      this.stopWanted = true;
+      this.inputEl.focus();
+    }
+  }
+  /** True when the keyboard is lost (nothing, the page body, a removed element) or still in the chat; never when it is somewhere else. */
+  focusFree() {
+    const active = this.host.activeElement();
+    if (!active || active.tagName === "BODY" || this.el.contains(active)) return true;
+    return active.isConnected === false;
   }
   currentModelLabel() {
     var _a2, _b2;
@@ -31309,6 +31330,11 @@ ${shown}` : t("ui.map_chat_model_label"));
     const stoppable = this.working && !this.awaitingConsent;
     this.stopEl.hidden = !stoppable;
     this.stopEl.toggleClass("is-hidden", !stoppable);
+    if (this.stopWanted && !this.working) this.stopWanted = false;
+    else if (this.stopWanted && stoppable) {
+      this.stopWanted = false;
+      if (this.focusFree()) this.stopEl.focus();
+    }
     this.renderHint();
     (_b2 = (_a2 = this.host).stateChanged) == null ? void 0 : _b2.call(_a2);
   }

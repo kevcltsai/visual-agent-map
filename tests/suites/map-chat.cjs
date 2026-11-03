@@ -3242,6 +3242,22 @@ test('UX B1: the "consent" stage names no model, offers no Stop, and the model\'
   f.panel.setStage('consent'); assert.equal(f.panel.awaitingConsent, false, 'a stage never goes back to consent');
 });
 
+test('C-#14: after the usage notice closes, Stop takes the keyboard that fell to the page; a Stop that is not shown yet gets it when it appears; focus elsewhere is not taken', () => {
+  const fresh = () => { const s = stageFixture(); const { f } = s; const stop = f.parts.stop(); f.panel.begin('ask', undefined, false, 'preparing'); stop.focus(); f.panel.setStage('consent'); return f; };
+  // The notice closes: Obsidian finds no visible opener (Stop is hidden) and the focus drops to the page.
+  let f = fresh(); assert.equal(f.parts.stop().hidden, true); f.page.doc.activeElement = { tagName: 'BODY' };
+  f.panel.setStage('waiting'); assert.ok(f.page.doc.activeElement === f.parts.stop(), 'Stop holds the keyboard once the run goes on');
+  // Focus still in the chat (the notice's own button was inside it) also goes to Stop.
+  f = fresh(); f.parts.input().focus(); f.panel.setStage('waiting'); assert.ok(f.page.doc.activeElement === f.parts.stop());
+  // Stop is not shown yet at that moment: the field keeps the keyboard, Stop gets it when it appears.
+  f = fresh(); f.panel.setStage('waiting'); f.page.doc.activeElement = null; f.parts.stop().hidden = true; f.panel.keepFocusAfterConsent();
+  assert.ok(f.page.doc.activeElement === f.parts.input(), 'Stop not shown: the message field holds the keyboard'); f.panel.renderBusy();
+  assert.ok(f.page.doc.activeElement === f.parts.stop(), 'and Stop gets it when it appears');
+  // Counterexample: the keyboard is in another leaf or a modal.
+  f = fresh(); const elsewhere = f.page.attach(f.page.root.createDiv('other-leaf')).createEl('input'); elsewhere.focus();
+  f.panel.setStage('waiting'); assert.ok(f.page.doc.activeElement === elsewhere, 'focus elsewhere is not stolen');
+});
+
 integrationTest('UX B1: while the usage notice is open the empty canvas waits for the user (no skeleton, no Stop); agreeing builds, declining puts the draft back', async () => {
   for (const agree of [true, false]) {
     const h = await harness({ empty: true }); await h.view.hydrate(); h.repaint(); const chat = h.view.chat; const box = element('div'); h.view.emptyMapEl = box; h.view.fillEmptyMap(box);

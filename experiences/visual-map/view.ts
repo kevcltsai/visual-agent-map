@@ -12160,8 +12160,11 @@ export class VisualAgentMapView extends ItemView {
         const box = group.createDiv(`vam-choice-group vam-topic-marker-group is-${def.single ? "single" : "multi"}`);
         box.setAttr("role", "group");
         box.setAttr("aria-label", def.single ? t("ui.topic_marker_group_single", title) : title);
+        // One-of groups (priority, progress) are a row of symbol-only segments; the full name stays in aria-label and title.
+        if (def.single) box.addClass("is-segmented");
         for (const id of def.ids) {
-          const choice = this.button(box, t(markerLabelKey(id)), () => {
+          const label = t(markerLabelKey(id));
+          const choice = this.button(box, def.single ? "" : label, () => {
             this.enqueue(async () => {
               await this.changeTopicMarker(node, id);
               paint(id);
@@ -12169,6 +12172,10 @@ export class VisualAgentMapView extends ItemView {
           });
           choice.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           choice.dataset.marker = id;
+          if (def.single) {
+            choice.setAttr("aria-label", label);
+            choice.setAttr("title", label);
+          }
           const on = active.includes(id);
           choice.setAttr("aria-pressed", String(on));
           if (on) choice.addClass("is-pressed");

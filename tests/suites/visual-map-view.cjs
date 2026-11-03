@@ -3281,6 +3281,9 @@ integrationTest('hypothesis-evidence: the type and strength options are quiet se
   assert.equal(shapeOf('atomic').tag, 'ellipse'); assert.equal(shapeOf('hypothesis').tag, 'polygon'); assert.equal(shapeOf('evidence').tag, 'polygon'); assert.equal(shapeOf('conclusion').tag, 'polygon'); assert.equal(shapeOf('topic').tag, 'rect'); assert.equal(shapeOf('action').tag, 'rect');
   const css = heCss();
   assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group'), /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented'), /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-multi'), /grid-template-columns: repeat\(auto-fill, minmax\(8\.5em, 1fr\)\)/);
+  assert.match(heRuleBody(css, '.vam-topic-modal .vam-choice-group.is-segmented .vam-marker[data-marker^="progress-"]'), /font-size: 16px/);
   const pressed = heRuleBody(css, '.vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover');
   assert.match(pressed, /box-shadow: inset 0 0 0 1px var\(--interactive-accent\)/); assert.match(pressed, /color: var\(--text-normal\)/); assert.doesNotMatch(pressed, /text-on-accent/);
 });
@@ -3486,14 +3489,16 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   const panel = dom.element('panel'); view.renderMarkerSection(panel, view.map.nodes[0]);
   const group = () => dom.find(panel, c => (c.cls ?? '').includes('vam-topic-markers'));
   assert.equal(group().attrs.role, 'group'); assert.equal(group().attrs['aria-label'], 'Markers');
-  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(c => c.text);
+  // Priority and progress buttons are symbol-only; their name is the aria-label.
+  const name = c => c.attrs['aria-label'] ?? c.text;
+  const pressed = () => dom.findAll(group(), c => c.tag === 'button' && c.attrs['aria-pressed'] === 'true').map(name);
   const { TOPIC_MARKERS, TOPIC_MARKER_GROUPS } = load('topic-markers.ts', { obsidian });
   assert.equal(dom.findAll(group(), c => c.tag === 'button').length, TOPIC_MARKERS.length);
   const sub = dom.findAll(group(), c => (c.cls ?? '').includes('vam-topic-marker-group') && c.attrs.role === 'group');
   assert.equal(sub.length, TOPIC_MARKER_GROUPS.length);
   sub.forEach((box, i) => assert.equal(dom.findAll(box, c => c.tag === 'button').length, TOPIC_MARKER_GROUPS[i].ids.length));
   assert.deepEqual(pressed(), []);
-  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => c.text.includes(name)).click();
+  const click = name => dom.findAll(group(), c => c.tag === 'button').find(c => (c.attrs['aria-label'] ?? c.text).includes(name)).click();
   click('Done'); await dom.tick(); click('Priority 1'); await dom.tick(); click('Priority 3'); await dom.tick();
   assert.deepEqual(toggled, ['done', 'priority-1', 'priority-3']);
   assert.equal(pressed().length, 2); assert.ok(pressed().some(t => t.includes('Priority 3')) && !pressed().some(t => t.includes('Priority 1')));
@@ -3502,6 +3507,15 @@ integrationTest('topic-markers: the panel has one aria-pressed toggle per marker
   click('Progress 25%'); await dom.tick(); click('Progress 50%'); await dom.tick(); click('Red flag'); await dom.tick(); click('Blue flag'); await dom.tick();
   assert.deepEqual(pressed().map(t => t.replace(/^.*?(Progress|Priority|Red|Blue)/, '$1')).sort(), ['Blue flag', 'Priority 3', 'Progress 50%', 'Red flag'].map(t => t).sort().map(t => t), 'progress is single choice, flags can coexist');
   assert.ok(sub.every(box => box.attrs['aria-label']), 'every section is a labelled group');
+  sub.forEach((box, i) => {
+    const single = TOPIC_MARKER_GROUPS[i].single;
+    assert.equal((box.cls ?? '').includes('is-segmented'), !!single, 'only one-of groups are segmented');
+    for (const b of dom.findAll(box, c => c.tag === 'button')) {
+      if (single) assert.ok(b.text === '' && b.attrs['aria-label'] && b.attrs.title === b.attrs['aria-label'], 'symbol-only segment named by aria-label and title');
+      else assert.ok(b.text && b.attrs['aria-label'] === undefined, 'many-of buttons keep their text');
+      assert.ok(['true', 'false'].includes(b.attrs['aria-pressed']), 'aria-pressed stays on every button');
+    }
+  });
   assert.equal(sub.filter(box => /choose one/.test(box.attrs['aria-label'])).length, TOPIC_MARKER_GROUPS.filter(g => g.single).length);
 });
 integrationTest('topic-markers: a toggle is one transaction; one undo restores the note, redo reapplies it, and the other keys stay put', async () => {

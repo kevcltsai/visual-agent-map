@@ -166,6 +166,12 @@ path[data-parent-line] { stroke: color-mix(in srgb, var(--interactive-accent) 35
 .vam-topic-modal .vam-inspector-section { margin: 0; }
 .vam-topic-modal .vam-inspector-section > .vam-hint, .vam-topic-modal .vam-relation-empty { margin: 8px 0 0; }
 .vam-topic-modal .vam-choice-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+/* Many-of marker groups (status, flag, face) fit as many columns as the panel allows; four flags share a row. */
+.vam-topic-modal .vam-choice-group.is-multi { grid-template-columns: repeat(auto-fill, minmax(8.5em, 1fr)); }
+/* Priority and progress are one-of groups: a row of symbol-only segments (the name is in aria-label and title). */
+.vam-topic-modal .vam-choice-group.is-segmented { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.vam-topic-modal .vam-choice-group.is-segmented button { justify-content: center; padding: 4px; }
+.vam-topic-modal .vam-choice-group.is-segmented .vam-marker[data-marker^="progress-"] { font-size: 16px; }
 .vam-topic-modal .vam-choice-group button { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 32px; padding: 4px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); box-shadow: none; background: transparent; color: var(--text-normal); font-weight: 400; text-align: start; }
 .vam-topic-modal .vam-choice-group button:hover { background: var(--background-modifier-hover); }
 .vam-topic-modal .vam-choice-group button[aria-pressed="true"], .vam-topic-modal .vam-choice-group button[aria-pressed="true"]:hover { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); background: color-mix(in srgb, var(--interactive-accent) 12%, transparent); color: var(--text-normal); }

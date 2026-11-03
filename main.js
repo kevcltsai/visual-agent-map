@@ -58059,8 +58059,10 @@ ${request.requirements}` : preset.text,
         const box = group.createDiv(`vam-choice-group vam-topic-marker-group is-${def.single ? "single" : "multi"}`);
         box.setAttr("role", "group");
         box.setAttr("aria-label", def.single ? t("ui.topic_marker_group_single", title) : title);
+        if (def.single) box.addClass("is-segmented");
         for (const id of def.ids) {
-          const choice2 = this.button(box, t(markerLabelKey(id)), () => {
+          const label = t(markerLabelKey(id));
+          const choice2 = this.button(box, def.single ? "" : label, () => {
             this.enqueue(async () => {
               await this.changeTopicMarker(node, id);
               paint(id);
@@ -58068,6 +58070,10 @@ ${request.requirements}` : preset.text,
           });
           choice2.createSpan({ cls: "vam-marker", text: markerSymbol(id), attr: { "aria-hidden": "true" } });
           choice2.dataset.marker = id;
+          if (def.single) {
+            choice2.setAttr("aria-label", label);
+            choice2.setAttr("title", label);
+          }
           const on = active.includes(id);
           choice2.setAttr("aria-pressed", String(on));
           if (on) choice2.addClass("is-pressed");

@@ -15707,14 +15707,20 @@ export class VisualAgentMapView extends ItemView {
         ...(target ? { retryWith: this.plugin.modelLabel(target) } : {})
       };
     };
-    const outline: MapChatOutlineNode[] = map.nodes.map(node => ({
-      id: node.id,
-      title: titleOf(node),
-      summary: summaryOf(node.id),
-      parentId: node.parentId,
-      depth: depthOf(node),
-      ...failureOf(node.id)
-    }));
+    // Type and strength come from the same readers the cards use, so an AIM map (and an AIM card) reads as an ordinary topic.
+    const outline: MapChatOutlineNode[] = map.nodes.map(node => {
+      const strength = this.hypothesisStrengthOf(node.id);
+      return {
+        id: node.id,
+        title: titleOf(node),
+        summary: summaryOf(node.id),
+        parentId: node.parentId,
+        depth: depthOf(node),
+        kind: this.topicKindOf(node.id),
+        ...(strength ? { strength } : {}),
+        ...failureOf(node.id)
+      };
+    });
     const ref = (id: string): MapChatTopicRef | null => {
       const node = byId.get(id);
       return node
@@ -15770,6 +15776,8 @@ export class VisualAgentMapView extends ItemView {
       files,
       userTexts: this.chatUserTexts(),
       summaries: this.chatSummaries(),
+      aim: !this.relationsEnabled(),
+      relations: this.relationsEnabled() ? (map.topicRelations ?? []) : [],
       activeFile: activeSource ? { path: activeSource.file.path, content: activeSource.text } : null,
       history: chat.turns()
     });

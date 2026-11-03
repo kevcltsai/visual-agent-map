@@ -4939,3 +4939,25 @@ for (const [language, mark, undo, redo] of [['zh-TW', '標記', '復原：標記
   view.history.undo(); view.updateHistoryButtons();
   assert.equal(buttons.redo.attrs['aria-label'], redo);
 });
+
+// ---- chat 02: the context of a real send carries topic types, strengths and relations (none on AIM) -----------------------
+const chat02Type = async (h, aimMap) => {
+  await h.repo.writeTopicKind(h.node('a').path, 'hypothesis'); await h.repo.writeHypothesisStrength(h.node('a').path, 'strong');
+  await h.repo.writeTopicKind(h.node('b').path, 'evidence');
+  const relations = [{ kind: 'supports', from: h.ids.b, to: h.ids.a, description: 'A short reason' }];
+  h.view.map.topicRelations = relations; if (aimMap) h.view.map.aim = { version: 1, branches: [], runs: [], pendingCommits: [] };
+  await h.view.hydrate();
+  h.open(); h.type('what backs this?'); await h.view.sendMapChat();
+  return JSON.parse(h.control.requests[0].context.json);
+};
+integrationTest('chat 02: a send on an ordinary map tells the model each card type, a hypothesis strength and every relation', async () => {
+  const h = await harness(); const context = await chat02Type(h, false); const outline = id => context.outline.find(n => n.id === id);
+  assert.equal(outline(h.ids.a).kind, 'hypothesis'); assert.equal(outline(h.ids.a).strength, 'strong');
+  assert.equal(outline(h.ids.b).kind, 'evidence'); assert.equal('strength' in outline(h.ids.b), false);
+  assert.equal('kind' in outline(h.ids.root), false, 'an ordinary topic sends no kind');
+  eq(context.relations, [{ kind: 'supports', from: h.ids.b, to: h.ids.a, description: 'A short reason' }]);
+});
+integrationTest('chat 02: a send on an AIM map carries no type, strength or relation', async () => {
+  const h = await harness(); const context = await chat02Type(h, true);
+  assert.equal(context.outline.some(n => 'kind' in n || 'strength' in n), false); assert.equal('relations' in context, false);
+});

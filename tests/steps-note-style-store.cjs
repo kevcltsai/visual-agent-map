@@ -262,26 +262,9 @@ test('D12 (was ensureStyleFolder): no style file is written any more; opening th
   eq(store.listBlocks('template').map(item => [item.kind, item.name]), [['builtin', 'Standard six'], ['builtin', 'Intro + six'], ['builtin', 'Claim to verdict'], ['builtin', 'Content & credibility'], ['builtin', 'Goal to done'], ['builtin', 'Definition & example'], ['builtin', 'Conclusion & basis'], ['file', 'My notes']]);
 });
 
-test('D12 (was restore default): the old restoreDefault and builtinIdOfFile are gone; restoreBlock backs a changed built-in up, then trashes it, and refuses an own block', async () => {
-  const { store, v } = makeStore({ noteStylesFolder: 'WS/Note styles' }, {
-    [`${TEMPLATES_DIR}/Intro + six.md`]: M.builtinBlockText('template', 'textbook', 'en') + '\nA line of mine.\n',
-    [`${TEMPLATES_DIR}/Mine.md`]: '## A\ntext\n'
-  });
-  assert.equal(store.restoreDefault, undefined);
-  assert.equal(store.builtinIdOfFile, undefined);
-  const order = [];
-  const trash = v.port.trash, create = v.port.create;
-  v.port.trash = async path => { order.push('trash'); return trash(path); };
-  v.port.create = async (path, content) => { order.push('create'); return create(path, content); };
-  const refused = await store.restoreBlock('template', 'file:Mine');
-  assert.deepEqual(plain(refused), { ok: false, reason: 'not-builtin' });
-  assert.equal(order.length, 0);
-  const done = await store.restoreBlock('template', 'builtin:textbook');
-  assert.equal(done.ok, true);
-  eq(order, ['create', 'trash']);
-  assert.match(v.files[done.backup], /A line of mine/);
-  eq(v.trashed.map(item => item.path), [`${TEMPLATES_DIR}/Intro + six.md`]);
-  assert.equal(v.files[`${TEMPLATES_DIR}/Mine.md`], '## A\ntext\n');
+test('D12 (was restore default; T5 P2b, decisions #22/#31): restoreDefault, builtinIdOfFile, restoreBlock, copyBlock and effectiveBlockKeys are gone from the store', () => {
+  const { store } = makeStore({ noteStylesFolder: 'WS/Note styles' });
+  for (const name of ['restoreDefault', 'builtinIdOfFile', 'restoreBlock', 'copyBlock', 'effectiveBlockKeys']) assert.equal(store[name], undefined, name);
 });
 
 test('D8 (was: the map pickers\' data source, a block at any level; grilling Q10/Q15): a structure file is picked by the dialog as file:<name> or by a style that names it; a topic id is never a part ref; a missing file is "missing"', async () => {

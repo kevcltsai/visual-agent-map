@@ -1530,6 +1530,35 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-prompt-preview-text { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; margin: 0 0 12px; padding: 8px; background: var(--background-secondary); border-radius: var(--radius-s); user-select: text; }
 .vam-prompt-preview-problem { color: var(--text-error); }
 
+/* Custom note styles window: tabs, one row per item, and the "New..." form. Colors are theme variables only. */
+.vam-manage-modal { width: min(46rem, 94vw); }
+.vam-manage-tabs { display: flex; flex-wrap: wrap; gap: var(--size-4-1); margin-bottom: var(--size-4-3); border-bottom: 1px solid var(--background-modifier-border); }
+.vam-manage-tab { background: transparent; box-shadow: none; border-radius: var(--radius-s) var(--radius-s) 0 0; color: var(--text-muted); }
+.vam-manage-tab.is-active { color: var(--text-normal); background: var(--background-modifier-hover); border-bottom: 2px solid var(--interactive-accent); }
+.vam-manage-row { flex-wrap: wrap; gap: var(--size-4-2); }
+.vam-manage-row > .setting-item-info { flex: 1 1 14em; min-width: 0; }
+.vam-manage-row > .setting-item-control { flex-wrap: wrap; justify-content: flex-end; }
+.vam-manage-badge { margin-inline-start: var(--size-4-2); padding: 0 var(--size-4-1); border-radius: var(--radius-s); background: var(--background-modifier-hover); color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.vam-manage-row .vam-block-status-error, .vam-manage-error { color: var(--text-error); }
+.vam-manage-add { margin-top: var(--size-4-3); }
+.vam-manage-form { margin-top: var(--size-4-2); padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+.vam-manage-mode { display: flex; align-items: center; gap: var(--size-4-2); }
+.vam-manage-error { min-height: 1.4em; }
+.vam-editor-modal { width: min(44rem, 94vw); }
+.vam-editor-row { flex-wrap: wrap; gap: var(--size-4-2); }
+.vam-editor-row > .setting-item-info { flex: 1 1 10em; min-width: 0; }
+.vam-editor-row > .setting-item-control { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
+.vam-editor-row select, .vam-editor-row input[type="text"] { max-width: 100%; min-width: 0; }
+.vam-editor-error { min-height: 1.4em; color: var(--text-error); }
+.vam-editor-update { margin: var(--size-4-3) 0; padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+.vam-editor-mode { display: flex; align-items: flex-start; gap: var(--size-4-2); padding: var(--size-4-1) 0; }
+.vam-editor-mode input { margin-top: var(--size-4-1); }
+.vam-editor-mode-text { min-width: 0; }
+.vam-editor-modal .modal-content { padding-bottom: var(--size-4-3); }
+/* The sample has no scroll of its own (one scroll axis, the window's), so the button row never covers its end. */
+.vam-editor-example { overflow-x: auto; padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); color: var(--text-normal); }
+.vam-editor-example h2 { font-size: var(--font-ui-medium); }
+
 /* Map search (Mod+F). Every rule starts with .vam-view so the share viewer never collects it. */
 .vam-view .vam-map-search { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 24px); padding: 4px 6px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-primary); box-shadow: var(--shadow-s); }
 .vam-view .vam-map-search-input { width: 180px; min-width: 0; flex: 1 1 auto; }

@@ -13,7 +13,6 @@ export { parseTemplateBlock, splitTemplateZones } from "./core/blocks/template-b
 export { assembleTaskPrompt, selectionFromContext, promptStepOf } from "./core/steps/task/assemble";
 export { OBSIDIAN_FORMAT, inLanguage } from "./core/steps/_shared/fragments";
 export { translate } from "./i18n";
-export { normalizeNoteTemplateByKind } from "./ai/note-style-store";
 export { TOPIC_KINDS } from "./note-values";
 export { runStyleLabelText } from "./ai/note-style-label";
 `);
@@ -307,14 +306,8 @@ test('kind level (was: a style file at the map level decides its own tone; grill
 
 test('kind level (was: a stored value that is a style file ... is dropped on load; grilling Q5): noteTemplateByKind is not read at all; a noteStyleByKind value that is not a readable style is skipped and reported, with no exception', async () => {
   const dirty = { topic: 'style:Free', action: 'standard', atomic: 'whatever', hypothesis: 'builtin:', evidence: '', conclusion: 7, bogus: 'builtin:hypothesis' };
-  assert.equal(M.normalizeNoteTemplateByKind(dirty), undefined);
-  assert.equal(M.normalizeNoteTemplateByKind([]), undefined);
-  assert.equal(M.normalizeNoteTemplateByKind('x'), undefined);
-  assert.equal(M.normalizeNoteTemplateByKind(null), undefined);
-  assert.equal(M.normalizeNoteTemplateByKind({}), undefined);
-  assert.deepEqual(plainOf(M.normalizeNoteTemplateByKind({ ...dirty, atomic: 'builtin:atomic', topic: 'file:Mine' })), { atomic: 'builtin:atomic', topic: 'file:Mine' });
   const none = await world({});
-  const old = await world({ noteTemplateByKind: { ...dirty, atomic: 'builtin:atomic', topic: 'file:Mine' } });
+  const old = await world({ noteTemplateByKind: { ...dirty, atomic: 'builtin:atomic', topic: 'file:Mine' } }); // an old data.json key: the store never sees it, and settingsFromSaved drops it (recipe test)
   const { store } = await world({ noteStyleByKind: dirty });
   for (const kind of KINDS) {
     assert.deepEqual(summaryOf(old.store.runStyle({ outputLanguage: 'en', kind })), summaryOf(none.store.runStyle({ outputLanguage: 'en', kind })), `${kind}: noteTemplateByKind is ignored`);

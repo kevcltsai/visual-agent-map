@@ -136,8 +136,6 @@ export interface Settings {
   noteTemplateBlock?: string;
   /** Workspace default tone block: `builtin:<id>` or `file:<name>` (a file in the Tones block folder). Absent = the tone of the old default. */
   noteToneBlock?: string;
-  /** The template block each topic type uses (`builtin:<id>` or `file:<name>`); a type with no entry follows the map and the workspace. */
-  noteTemplateByKind?: Partial<Record<TopicKind, string>>;
   /** The style each kind uses (a style ref); a kind with no entry uses its built-in style. Read only until the settings page writes it. */
   noteStyleByKind?: Partial<Record<StyleKind, string>>;
   /** The marker of the conversion to the recipe model, and the old id -> new ref table that implicit styles read. */

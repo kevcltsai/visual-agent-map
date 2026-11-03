@@ -218,3 +218,20 @@ test('F1: the unreadable-block and invalid-style notices never end a reason with
     }
   } finally { i18n.setUiLanguage('en'); }
 });
+
+// Note style recipe T5 P4 (decision #42 D7): the preview can show a style that is not saved (the style editor's draft).
+test('P4: the preview modal shows the style `styleOf` gives, read each time the body is drawn; without it the workspace default style is shown as before', () => {
+  const dom = require('./support-dom.cjs');
+  const S = require('./support.cjs');
+  const { PromptPreviewModal } = S.load('ui/modals/prompt-preview-modal.ts', { obsidian: { ...S.obsidian, Modal: dom.makeModal() } });
+  const textbook = M.textbookTemplate('en');
+  const store = { refresh: async () => {}, runStyle: () => ({ template: M.textbookTemplate('en'), formatText: '', contextFields: {}, issues: {} }) };
+  const draft = { template: { ...textbook, sections: [{ ...textbook.sections[0], name: 'Draft section name' }, ...textbook.sections.slice(1)] }, formatText: '', contextFields: {}, issues: {} };
+  const bodyText = modal => dom.texts(modal.contentEl).join('\n');
+  const withDraft = new PromptPreviewModal({}, store, 'en', 'codex', undefined, () => draft);
+  withDraft.open();
+  assert.match(bodyText(withDraft), /Draft section name/);
+  const plainModal = new PromptPreviewModal({}, store, 'en', 'codex');
+  plainModal.open();
+  assert.equal(/Draft section name/.test(bodyText(plainModal)), false);
+});

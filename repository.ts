@@ -2427,13 +2427,7 @@ export class Repository {
       delete fm["agent-map-references"];
       body = withoutReference(body);
     }
-    body = normalizeBodyOrder(
-      body,
-      title,
-      text(fm.summary, placeholder(textLanguage)),
-      language,
-      textLanguage
-    );
+    body = normalizeBodyOrder(body, title, text(fm.summary, placeholder(textLanguage)), language, textLanguage);
     return `---\n${stringifyYaml(fm)}---\n${withReferenceLinks(body, fm, language)}`;
   }
 

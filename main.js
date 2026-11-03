@@ -23591,13 +23591,7 @@ ${body}`);
       delete fm["agent-map-references"];
       body = withoutReference(body);
     }
-    body = normalizeBodyOrder(
-      body,
-      title,
-      text5(fm.summary, placeholder(textLanguage)),
-      language2,
-      textLanguage
-    );
+    body = normalizeBodyOrder(body, title, text5(fm.summary, placeholder(textLanguage)), language2, textLanguage);
     return `---
 ${(0, import_obsidian11.stringifyYaml)(fm)}---
 ${withReferenceLinks(body, fm, language2)}`;

@@ -56,7 +56,9 @@ export function renderNoteLocationSetting(
   const hasFiles = (): boolean =>
     (["template", "tone"] as const).some(category =>
       store.listBlocks(category).some(item => item.fileName !== undefined)
-    );
+    ) ||
+    store.listParts("format").some(item => item.fileName !== undefined) ||
+    store.listRecipes().some(item => item.fileName !== undefined);
   const describe = (): void => {
     if (missing) return;
     setting.setDesc(t(loaded && !hasFiles() ? "ui.note_style_location_empty" : "ui.note_style_location_desc"));
@@ -108,8 +110,12 @@ export function renderNoteLocationSetting(
     );
   };
   update();
+  locationUpdates.set(plugin, update);
   return update;
 }
+
+/** The File location row that is on screen for a plugin: the manage window rewrites it when it closes. */
+const locationUpdates = new WeakMap<VisualAgentMapPlugin, () => void>();
 
 /** The style ref a kind uses: the saved choice, else the kind's own built-in style. */
 export function shownStyleRef(plugin: VisualAgentMapPlugin, kind: StyleKind): string {
@@ -251,6 +257,8 @@ export function renderNoteCustomSetting(setting: Setting, plugin: VisualAgentMap
         describe();
         // The styles may have changed in the window: the topic-type rows of this page are drawn again.
         redrawKindRows(plugin);
+        // ...and the File location row says "no files yet" only while there really are none.
+        locationUpdates.get(plugin)?.();
       }).open();
     });
     button.buttonEl.setAttr("aria-label", t("ui.manage_button_aria_0", name));

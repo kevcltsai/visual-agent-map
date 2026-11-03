@@ -71,14 +71,14 @@ const errorLines = view => view.descEl.children.filter(child => child.hasClass('
 const optionsOf = view => dom.findAll(view.dropdown.selectEl, node => node.tag === 'option').map(node => [node.optionValue, node.text]);
 const groupsOf = view => dom.findAll(view.dropdown.selectEl, node => node.tag === 'optgroup').map(node => ({ label: node.attrs.label, options: node.children.map(child => child.text) }));
 
-function row({ exists = true, folder = 'WS/Styles', settings = {}, items = [] } = {}) {
+function row({ exists = true, folder = 'WS/Styles', settings = {}, items = [], recipes = [], formats = [] } = {}) {
   const { setting, view } = fakeSetting();
   const log = { saved: 0, opened: 0, refreshed: 0, previewed: [] };
   const settingsObject = { language: 'en', ...settings };
   const plugin = {
     settings: settingsObject, saveSettings: async () => { log.saved++; }, openNoteStylesFolder: async () => { log.opened++; },
     openPromptPreview: trigger => { log.previewed.push(trigger); },
-    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items }
+    noteStyles: { folderExists: () => exists, folder: () => settingsObject.noteStylesFolder ?? folder, refresh: async () => {}, listBlocks: () => items, listRecipes: () => recipes, listParts: category => (category === 'format' ? formats : []) }
   };
   return { setting, view, log, plugin, settings: settingsObject };
 }
@@ -352,6 +352,31 @@ test('Low 4: the File location description is rewritten when its update runs aft
   update();
   await flush();
   assert.equal(loc.view.desc, 'Structures and voices you edited or created are stored here.');
+});
+
+test('Bug bash E #20: a style recipe or a format rule file counts as a file in the File location row, and the row is rewritten when the manage window closes', async () => {
+  openedModals.length = 0;
+  const withRecipe = row({ items: TEMPLATES(), recipes: [{ ref: 'file:R', kind: 'file', name: 'R', fileName: 'R.md' }] });
+  renderNoteLocationSetting(withRecipe.setting, withRecipe.plugin, () => {});
+  await flush();
+  assert.equal(withRecipe.view.desc, t('ui.note_style_location_desc'), 'a recipe file alone is a file');
+  const withFormat = row({ items: TEMPLATES(), formats: [{ ref: 'file:F', kind: 'file', name: 'F', fileName: 'F.md' }] });
+  renderNoteLocationSetting(withFormat.setting, withFormat.plugin, () => {});
+  await flush();
+  assert.equal(withFormat.view.desc, t('ui.note_style_location_desc'), 'a format rule file alone is a file');
+  // the window closes after a recipe was made in it: the location row of the same page follows
+  const recipes = [];
+  const page = row({ items: TEMPLATES(), recipes });
+  renderNoteLocationSetting(page.setting, page.plugin, () => {});
+  await flush();
+  assert.equal(page.view.desc, t('ui.note_style_location_empty'));
+  const manage = fakeSetting();
+  renderNoteCustomSetting(manage.setting, page.plugin, 'recipe');
+  manage.view.buttons[0].click();
+  recipes.push({ ref: 'file:R', kind: 'file', name: 'R', fileName: 'R.md' });
+  openedModals.at(-1).onClosed();
+  await flush();
+  assert.equal(page.view.desc, t('ui.note_style_location_desc'));
 });
 
 // ---- the "Custom" rows (Note style recipe T5 P3) ----

@@ -28384,6 +28384,9 @@ function fitViewport(bounds, size, inset, maxZoom = 1.2) {
     y: inset + (availableHeight - h * zoom) / 2 - bounds.minY * zoom
   };
 }
+function cardToolsSide(cardRight, toolsWidth, visibleLeft, gap) {
+  return cardRight - gap - toolsWidth < visibleLeft ? "left" : "right";
+}
 
 // experiences/visual-map/relevance-summary-modal.ts
 var import_obsidian16 = require("obsidian");
@@ -56326,6 +56329,7 @@ ${request.requirements}` : preset.text,
       }
     });
     card.addEventListener("mouseenter", () => {
+      this.alignCardTools(card);
       if (!note || this.selection.state.multiSelectMode || this.dragging) return;
       this.clearHoverTimer();
       this.hoverTimer = window.setTimeout(() => {
@@ -56335,6 +56339,7 @@ ${request.requirements}` : preset.text,
     card.addEventListener("mouseleave", () => this.hideHoverCardSoon());
     const toolButtons = () => Array.from(card.querySelectorAll("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", (event) => {
+      this.alignCardTools(card);
       for (const button of toolButtons()) button.tabIndex = 0;
       if (this.restoringFocus || event.target !== card || !note || this.selection.state.multiSelectMode || !card.matches(":focus-visible"))
         return;
@@ -56518,6 +56523,22 @@ ${request.requirements}` : preset.text,
     }
     return depth;
   }
+  /**
+   * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
+   * or past the canvas edge (a row wider than a card on the left edge). Measured, so it follows panning and zooming.
+   */
+  alignCardTools(card) {
+    var _a2;
+    const tools = card.querySelector(":scope > .vam-node-tools");
+    if (!tools || !this.viewportEl) return;
+    const cardRect = card.getBoundingClientRect(), zoom = ((_a2 = this.map) == null ? void 0 : _a2.viewport.zoom) || 1;
+    const chat = this.contentEl.querySelector(".vam-map-chat.is-overlay");
+    const visibleLeft = Math.max(this.viewportEl.getBoundingClientRect().left, chat ? chat.getBoundingClientRect().right : 0);
+    tools.toggleClass(
+      "is-align-left",
+      cardToolsSide(cardRect.right, tools.getBoundingClientRect().width, visibleLeft, 10 * zoom) === "left"
+    );
+  }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   paintCards(ids) {
     var _a2;
@@ -56526,6 +56547,7 @@ ${request.requirements}` : preset.text,
       if (!id || !card) continue;
       const on = id === this.selection.state.selected || this.selection.state.multiSelected.has(id);
       card.toggleClass("is-selected", on);
+      if (on) this.alignCardTools(card);
       card.setAttr("aria-selected", String(on));
       card.tabIndex = id === this.selection.state.tabStopId ? 0 : -1;
       const check = this.cardChecks.get(id);
@@ -67749,6 +67771,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-node-header button { font-size: var(--font-ui-smaller); height: 24px; padding: 2px 8px; }
 .vam-node-header > .vam-collapse-button { margin-left: auto; font-variant-numeric: tabular-nums; }
 .vam-node > .vam-node-tools { position: absolute; right: 10px; bottom: calc(100% - 6px); z-index: 3; display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--background-modifier-border); border-radius: 8px; background: var(--background-primary); box-shadow: var(--shadow-s); opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; width: max-content; }
+.vam-node > .vam-node-tools.is-align-left { right: auto; left: 10px; }
 .vam-node-tools button { font-size: var(--font-ui-smaller); height: 26px; padding: 2px 8px; }
 .vam-node-tools > .vam-collapse-button { order: -1; }
 .vam-status { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0; font-size: var(--font-ui-smaller); color: var(--text-muted); white-space: nowrap; }

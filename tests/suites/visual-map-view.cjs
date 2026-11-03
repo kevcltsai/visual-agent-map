@@ -4070,3 +4070,31 @@ test('bug bash #04: a narrow canvas puts the preview beside, above or below the 
   const cramped = hoverHarness(300, 300, { left: 20, top: 20, right: 280, bottom: 280 });
   assert.equal(cramped.shown, false, 'no place that clears the card: no preview');
 });
+// ---- bug bash A #12: a card's tool row wider than the card never runs off the visible left edge ----
+function toolsHarness({ cardLeft, cardWidth = 280, toolsWidth = 345, canvasLeft = 0, chatRight = null, selected = true }) {
+  const { VisualAgentMapView } = require('../support-replay.cjs').load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, {
+    window: { setTimeout, clearTimeout }, CSS: { escape: s => s }, createDiv: o => dom.element('div', o), createEl: (tag, o) => dom.element(tag, o)
+  });
+  const classes = new Set();
+  const tools = { getBoundingClientRect: () => ({ width: toolsWidth, left: 0, right: toolsWidth }), toggleClass: (name, on) => (on ? classes.add(name) : classes.delete(name)) };
+  const card = { offsetWidth: cardWidth, getBoundingClientRect: () => ({ left: cardLeft, right: cardLeft + cardWidth, width: cardWidth }), querySelector: () => tools };
+  const chat = chatRight === null ? null : { getBoundingClientRect: () => ({ left: 0, right: chatRight }) };
+  const view = Object.create(VisualAgentMapView.prototype);
+  Object.assign(view, { map: { viewport: { x: 0, y: 0, zoom: 1 } }, viewportEl: { getBoundingClientRect: () => ({ left: canvasLeft }) }, contentEl: { querySelector: () => chat } });
+  view.alignCardTools(card);
+  // The rendered row: right edge of the tools = card right - 10; so its left = cardLeft + cardWidth - 10 - toolsWidth.
+  const align = classes.has('is-align-left') ? 'left' : 'right';
+  const toolsLeft = align === 'left' ? cardLeft + 10 : cardLeft + cardWidth - 10 - toolsWidth;
+  return { align, toolsLeft };
+}
+test('bug bash #12: a tool row wider than a card on the left edge is aligned to the card\'s left edge; an ordinary card stays right-aligned', () => {
+  const edge = toolsHarness({ cardLeft: 20, canvasLeft: 0 });
+  assert.equal(edge.align, 'left');
+  assert.ok(edge.toolsLeft >= 0, 'every button is inside the visible area');
+  const behindChat = toolsHarness({ cardLeft: 345, chatRight: 340 });
+  assert.equal(behindChat.align, 'left', 'the chat window docked over the canvas counts as hidden area');
+  assert.ok(behindChat.toolsLeft >= 340);
+  const ordinary = toolsHarness({ cardLeft: 500 });
+  assert.equal(ordinary.align, 'right');
+  assert.match(fs.readFileSync(path.join(root, 'styles.css'), 'utf8'), /\.vam-node > \.vam-node-tools\.is-align-left\s*\{[^}]*right:\s*auto;[^}]*left:\s*10px/);
+});

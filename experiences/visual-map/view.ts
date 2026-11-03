@@ -266,7 +266,7 @@ import {
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
-import { fitIsClamped, fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
+import { cardToolsSide, fitIsClamped, fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
   MapChatPanel,
@@ -10405,6 +10405,7 @@ export class VisualAgentMapView extends ItemView {
       }
     });
     card.addEventListener("mouseenter", () => {
+      this.alignCardTools(card);
       if (!note || this.selection.state.multiSelectMode || this.dragging) return;
       this.clearHoverTimer();
       this.hoverTimer = window.setTimeout(() => {
@@ -10416,6 +10417,7 @@ export class VisualAgentMapView extends ItemView {
     const toolButtons = (): HTMLElement[] =>
       Array.from(card.querySelectorAll<HTMLElement>("button, .vam-card-resize, .vam-card-resize-y"));
     card.addEventListener("focusin", event => {
+      this.alignCardTools(card);
       for (const button of toolButtons()) button.tabIndex = 0;
       if (
         this.restoringFocus ||
@@ -10617,6 +10619,22 @@ export class VisualAgentMapView extends ItemView {
     }
     return depth;
   }
+  /**
+   * Hangs the card's tool row from the card's left edge when, right-aligned, its left end would be under the chat window
+   * or past the canvas edge (a row wider than a card on the left edge). Measured, so it follows panning and zooming.
+   */
+  private alignCardTools(card: HTMLElement): void {
+    const tools = card.querySelector<HTMLElement>(":scope > .vam-node-tools");
+    if (!tools || !this.viewportEl) return;
+    const cardRect = card.getBoundingClientRect(),
+      zoom = this.map?.viewport.zoom || 1;
+    const chat = this.contentEl.querySelector<HTMLElement>(".vam-map-chat.is-overlay");
+    const visibleLeft = Math.max(this.viewportEl.getBoundingClientRect().left, chat ? chat.getBoundingClientRect().right : 0);
+    tools.toggleClass(
+      "is-align-left",
+      cardToolsSide(cardRect.right, tools.getBoundingClientRect().width, visibleLeft, 10 * zoom) === "left"
+    );
+  }
   /** Repaints only the named cards from the current selection state (class, aria-selected, roving tabindex, checkbox). */
   private paintCards(ids: Iterable<string | null>): void {
     for (const id of new Set(ids)) {
@@ -10624,6 +10642,7 @@ export class VisualAgentMapView extends ItemView {
       if (!id || !card) continue;
       const on = id === this.selection.state.selected || this.selection.state.multiSelected.has(id);
       card.toggleClass("is-selected", on);
+      if (on) this.alignCardTools(card);
       card.setAttr("aria-selected", String(on));
       card.tabIndex = id === this.selection.state.tabStopId ? 0 : -1;
       const check = this.cardChecks.get(id);

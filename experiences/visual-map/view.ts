@@ -1089,6 +1089,8 @@ export class VisualAgentMapView extends ItemView {
   private aimViewEpoch = 0;
   private mapOpenEpoch = 0;
   private headerTitle = "";
+  /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
+  private titleRefresh = false;
   private readonly aimRuns: AimRunStore;
   private readonly aimManual: AimManualFlow;
   private readonly aimRecovery: AimManualFlow;
@@ -1164,6 +1166,10 @@ export class VisualAgentMapView extends ItemView {
     if (typeof state.file === "string" && state.file !== this.path) {
       await this.openMap(state.file);
       // Another map in the same tab: ask the workspace to redraw the tab and the window title, which names the map.
+      result.layout = true;
+    }
+    if (this.titleRefresh) {
+      this.titleRefresh = false;
       result.layout = true;
     }
     await super.setState(state, result);
@@ -9171,7 +9177,9 @@ export class VisualAgentMapView extends ItemView {
     if (title !== this.headerTitle) {
       this.headerTitle = title;
       window.setTimeout(() => {
-        if (!this.closed) void this.leaf.setViewState({ type: VIEW_TYPE, state: this.getState() });
+        if (this.closed) return;
+        this.titleRefresh = true;
+        void this.leaf.setViewState({ type: VIEW_TYPE, state: this.getState() });
       }, 0);
     }
     const focusedCard = activeDocument.activeElement?.closest<HTMLElement>(".vam-node");

@@ -199,6 +199,21 @@ test('Bug bash E #35: opening another map in the same tab asks the workspace to 
   assert.equal(none.layout, undefined);
 });
 
+test('Bug bash E #35 (round 2): the header title refresh (same file, map switched through openMap) also asks for the layout refresh, once', async () => {
+  const { view } = makeView();
+  view.openMap = async () => { throw new Error('same file: no openMap'); };
+  view.path = 'Map.md';
+  view.titleRefresh = true; // what paint() sets right before it calls leaf.setViewState after the title changed
+  const refresh = { history: true };
+  await view.setState({ file: 'Map.md' }, refresh);
+  assert.equal(refresh.layout, true);
+  const again = { history: true };
+  await view.setState({ file: 'Map.md' }, again);
+  assert.equal(again.layout, undefined, 'only the refresh asked for, so no loop');
+  const src = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  assert.match(src, /this\.titleRefresh = true;\s*void this\.leaf\.setViewState/, 'paint() raises the flag right before the refresh');
+});
+
 test('the empty-map hint ignores pointer events but its Topic button receives them', () => {
   assert.match(rule('.vam-empty'), /pointer-events: none/);
   assert.match(rule('.vam-empty button'), /pointer-events: auto/);

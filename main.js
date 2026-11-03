@@ -47546,6 +47546,8 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
     __publicField(this, "aimViewEpoch", 0);
     __publicField(this, "mapOpenEpoch", 0);
     __publicField(this, "headerTitle", "");
+    /** Raised by the header title refresh: the setState it causes asks the workspace to redraw the window title too. */
+    __publicField(this, "titleRefresh", false);
     __publicField(this, "aimRuns");
     __publicField(this, "aimManual");
     __publicField(this, "aimRecovery");
@@ -47671,6 +47673,10 @@ var VisualAgentMapView = class _VisualAgentMapView extends import_obsidian31.Ite
   async setState(state, result) {
     if (typeof state.file === "string" && state.file !== this.path) {
       await this.openMap(state.file);
+      result.layout = true;
+    }
+    if (this.titleRefresh) {
+      this.titleRefresh = false;
       result.layout = true;
     }
     await super.setState(state, result);
@@ -54579,7 +54585,11 @@ ${request.requirements}` : preset.text,
     const transient = ["is-selected", "is-cut", "is-drop-target", "is-marquee-hit", "is-marquee-remove"];
     const savedLook = (el) => {
       const on = transient.filter((name) => el.hasClass(name));
-      if (on.length) el.removeClass(...on);
+      const transition = el.style.transition;
+      if (on.length) {
+        el.style.transition = "none";
+        el.removeClass(...on);
+      }
       try {
         const look = computed(el);
         return {
@@ -54588,7 +54598,10 @@ ${request.requirements}` : preset.text,
           borderTopWidth: look.borderTopWidth
         };
       } finally {
-        if (on.length) el.addClass(...on);
+        if (on.length) {
+          el.addClass(...on);
+          el.style.transition = transition;
+        }
       }
     };
     let embedded = 0;
@@ -55118,7 +55131,9 @@ ${request.requirements}` : preset.text,
     if (title !== this.headerTitle) {
       this.headerTitle = title;
       window.setTimeout(() => {
-        if (!this.closed) void this.leaf.setViewState({ type: VIEW_TYPE, state: this.getState() });
+        if (this.closed) return;
+        this.titleRefresh = true;
+        void this.leaf.setViewState({ type: VIEW_TYPE, state: this.getState() });
       }, 0);
     }
     const focusedCard = (_d = activeDocument.activeElement) == null ? void 0 : _d.closest(".vam-node");
@@ -64791,6 +64806,8 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
     __publicField(this, "modelSelects", /* @__PURE__ */ new Set());
     __publicField(this, "modelStatusEls", /* @__PURE__ */ new Set());
     __publicField(this, "unsubscribeCurrentModel", null);
+    /** Set when the language select fired a change; the select is focused again once the switch is done and it is enabled. */
+    __publicField(this, "refocusLanguage", false);
     plugin.subscribeModelDiscovery(() => {
       for (const select of [...this.modelSelects]) {
         if (!select.isConnected) {
@@ -64844,9 +64861,11 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
   refreshAfterLanguageChange() {
     var _a2, _b2;
     const active = (_b2 = (_a2 = this.containerEl.doc) == null ? void 0 : _a2.activeElement) != null ? _b2 : null;
-    const focused = !!active && this.containerEl.contains(active) && active.instanceOf(HTMLSelectElement) && offersEveryLanguage(Array.from(active.options).map((option) => option.value));
+    const focused = this.refocusLanguage || !!active && this.containerEl.contains(active) && active.instanceOf(HTMLSelectElement) && offersEveryLanguage(Array.from(active.options).map((option) => option.value));
     this.update();
     if (!focused) return;
+    if (this.plugin.languageSwitchPending) return;
+    this.refocusLanguage = false;
     const selector = Array.from(this.containerEl.querySelectorAll("select")).find((select) => {
       return offersEveryLanguage(Array.from(select.options).map((option) => option.value));
     });
@@ -65002,7 +65021,10 @@ var VisualAgentMapSettingTab = class extends import_obsidian35.PluginSettingTab 
                 for (const option of SUPPORTED_LANGUAGES) dropdown.addOption(option.id, option.label);
                 dropdown.setValue(this.plugin.settings.language).setDisabled(this.plugin.languageSwitchPending);
                 dropdown.onChange((value) => {
-                  void this.plugin.changeLanguage(value);
+                  this.refocusLanguage = true;
+                  void this.plugin.changeLanguage(value).finally(() => {
+                    this.refocusLanguage = false;
+                  });
                 });
               });
             }

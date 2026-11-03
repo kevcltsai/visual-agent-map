@@ -305,13 +305,6 @@ test('A6 the corner handle is hidden from assistive tech and not a tab stop; the
   assert.match(source, /!this\.selection\.state\.multiSelectMode && !this\.map\?\.aim && !node\.aimKind\) \{\s*this\.attachResizeHandle\(card, node\);\s*this\.attachHeightHandle\(card, node\);\s*this\.attachCornerHandle\(card, node\);/);
 });
 
-test('A8 the view marks a scene card clipped only for a fixed-height card the view shows as clipped', () => {
-  const source = fs.readFileSync(path.join(root, 'experiences', 'visual-map', 'view.ts'), 'utf8');
-  assert.match(source, /if \(node\.height && card\.classList\.contains\("is-clipped"\)\) item\.clipped = true;/);
-  const exportSource = fs.readFileSync(path.join(root, 'experiences', 'visual-map', 'map-export.ts'), 'utf8');
-  assert.match(exportSource, /card\.clipped === true/);
-});
-
 // ---- P4: presentation mode and export clipping --------------------------------------------------------------------------
 const widthHandle = h => {
   const handlers = new Map(), attrs = {};

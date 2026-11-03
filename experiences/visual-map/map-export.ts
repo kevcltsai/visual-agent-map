@@ -32,8 +32,8 @@ export interface SceneImage {
   w: number;
   h: number;
   href: string;
-  /** "cover" crops to fill the box (a card cover); anything else stretches to it (a free canvas image). */
-  fit?: "cover" | "fill";
+  /** "contain" shows the whole picture inside the box, centred (a card cover); "cover" crops to fill it; anything else stretches to it (a free canvas image). */
+  fit?: "contain" | "cover" | "fill";
 }
 export interface SceneEdge {
   d: string;
@@ -137,8 +137,8 @@ function rect(x: unknown, y: unknown, w: unknown, h: unknown): [number, number, 
 function imageElement(image: SceneImage | null | undefined): string {
   if (!image || typeof image.href !== "string" || !DATA_IMAGE.test(image.href)) return "";
   const box = rect(image.x, image.y, image.w, image.h);
-  // An image element clips to its own box, so "slice" crops a cover the way the card's object-fit: cover does.
-  const fit = image.fit === "cover" ? "xMidYMid slice" : "none";
+  // "meet" shows the whole picture, like the card cover's object-fit: contain; nothing is cropped.
+  const fit = image.fit === "contain" ? "xMidYMid meet" : image.fit === "cover" ? "xMidYMid slice" : "none";
   return box
     ? `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>`
     : "";

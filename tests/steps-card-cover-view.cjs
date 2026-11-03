@@ -166,13 +166,61 @@ test('renderNode paints the cover before the title; the header, model tag and co
   assert.match(source, /\.on\("changed"/);
 });
 
-test('the frame is 96px tall with object-fit cover, fixed before the image loads', () => {
+test('the frame shows the whole picture: 96px placeholder, then the picture ratio, never object-fit cover', () => {
   const css = read('styles.css');
   const frame = css.split('\n').find(line => line.startsWith('.vam-card-cover {'));
   assert.ok(frame);
-  assert.match(frame, /height: 96px/);
+  assert.match(frame, /height: 96px/, 'placeholder before the picture is measured');
+  const sized = css.split('\n').find(line => line.startsWith('.vam-card-cover.is-sized'));
+  assert.match(sized, /height: auto/);
   const image = css.split('\n').find(line => line.startsWith('.vam-card-cover img'));
-  assert.match(image, /object-fit: cover/);
+  assert.match(image, /object-fit: contain/);
+  assert.doesNotMatch(css.split('\n').filter(l => l.includes('.vam-card-cover')).join('\n'), /object-fit: cover/);
+});
+
+test('coverFrameRatio: portrait, landscape and square keep their shape; a very tall picture is held at 1.5x the width', () => {
+  const { coverFrameRatio, COVER_MAX_HEIGHT_RATIO } = S.load('experiences/visual-map/view.ts', { obsidian: { ...S.obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+  assert.equal(COVER_MAX_HEIGHT_RATIO, 1.5);
+  assert.equal(coverFrameRatio(300, 100), 3);
+  assert.equal(coverFrameRatio(100, 100), 1);
+  assert.equal(coverFrameRatio(200, 300), 2 / 3);
+  assert.equal(coverFrameRatio(100, 1000), 2 / 3, 'taller than 1.5x is capped');
+  for (const bad of [[0, 10], [10, 0], [NaN, 10], [-1, 5]]) assert.equal(coverFrameRatio(...bad), null);
+});
+
+test('a loaded picture sizes its frame once and relays the card out once; a redraw sizes at once from the remembered shape', () => {
+  before();
+  const view = make({ embeds: [{ link: 'img/b.jpg' }] });
+  const calls = [];
+  Object.assign(view, { map: { nodes: [] }, topicKindOf: () => 'topic', fitKindShape: (c, k) => calls.push(['fit', k]), drawEdges: () => calls.push(['edges']) });
+  const c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  const frame = frames(c)[0], img = imgs(c)[0];
+  assert.equal(frame.style['aspect-ratio'], undefined, 'unknown shape: placeholder');
+  img.naturalWidth = 200; img.naturalHeight = 1000;
+  img.fire('load');
+  img.fire('load');
+  assert.equal(frame.style['aspect-ratio'], String(2 / 3));
+  assert.ok(frame.classes.includes('is-sized'));
+  assert.deepEqual(calls, [['fit', 'topic'], ['edges']], 'one relayout and one edge redraw, not two');
+  const again = card();
+  view.paintCover(again, 'Topics/n.md');
+  assert.equal(frames(again)[0].style['aspect-ratio'], String(2 / 3), 'a redraw does not jump');
+});
+
+test('counterexample: a picture that cannot be measured keeps the placeholder and does not relayout', () => {
+  before();
+  const view = make({ embeds: [{ link: 'img/a.png' }] });
+  const calls = [];
+  Object.assign(view, { map: { nodes: [] }, topicKindOf: () => 'topic', fitKindShape: () => calls.push('fit'), drawEdges: () => calls.push('edges') });
+  const c = card();
+  c.dataset.nodeId = 'n1';
+  view.paintCover(c, 'Topics/n.md');
+  imgs(c)[0].naturalWidth = 0; imgs(c)[0].naturalHeight = 0;
+  imgs(c)[0].fire('load');
+  assert.equal(frames(c)[0].style['aspect-ratio'], undefined);
+  assert.deepEqual(calls, []);
 });
 
 // map-images P4b: the topic menu turns a topic's cover off or on again as one undoable rewriteNote transaction.

@@ -155,8 +155,10 @@ test('a cover and a free canvas image become data URIs read with readBinary; a f
   ];
   const { scene } = await h.view.collectExportScene(() => true);
   const svg = ex.buildMapSvg(scene);
+  assert.ok(scene.cards.some(c => c.cover?.fit === 'contain'), 'the scene asks for the whole picture');
   assert.equal([...svg.matchAll(/<image /g)].length, 2, 'cover + the one real free image');
-  assert.match(svg, /preserveAspectRatio="xMidYMid slice"/, 'cover crops like object-fit: cover');
+  assert.match(svg, /preserveAspectRatio="xMidYMid meet"/, 'the cover shows the whole picture like object-fit: contain');
+  assert.doesNotMatch(svg, /xMidYMid slice/, 'no cropping');
   assert.doesNotMatch(svg.replace('xmlns="http://www.w3.org/2000/svg"', ''), /evil|http/);
   assert.equal(h.counts.readBinary, 3, 'cover, free image, fake image; the missing file is never read');
 });

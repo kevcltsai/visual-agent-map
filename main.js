@@ -17492,7 +17492,7 @@ function rect(x, y, w, h) {
 function imageElement(image) {
   if (!image || typeof image.href !== "string" || !DATA_IMAGE.test(image.href)) return "";
   const box = rect(image.x, image.y, image.w, image.h);
-  const fit = image.fit === "cover" ? "xMidYMid slice" : "none";
+  const fit = image.fit === "contain" ? "xMidYMid meet" : image.fit === "cover" ? "xMidYMid slice" : "none";
   return box ? `<image x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" preserveAspectRatio="${fit}" href="${image.href}"/>` : "";
 }
 function numberIn(value, min, max) {
@@ -47915,6 +47915,11 @@ var cardLabelSequence = 0;
 var cardLabels = /* @__PURE__ */ new WeakMap();
 var cardCutLabels = /* @__PURE__ */ new WeakMap();
 var cardCovers = /* @__PURE__ */ new WeakMap();
+var COVER_MAX_HEIGHT_RATIO = 1.5;
+function coverFrameRatio(width, height) {
+  return width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height) ? Math.max(width / height, 1 / COVER_MAX_HEIGHT_RATIO) : null;
+}
+var coverRatios = /* @__PURE__ */ new Map();
 var cardModelTags = /* @__PURE__ */ new WeakMap();
 var cardMarkerRows = /* @__PURE__ */ new WeakMap();
 var cardLinkButtons = /* @__PURE__ */ new WeakMap();
@@ -55678,7 +55683,7 @@ ${request.requirements}` : preset.text,
             w: frame.offsetWidth,
             h: frame.offsetHeight,
             href,
-            fit: "cover"
+            fit: "contain"
           };
       }
       cards.push(item);
@@ -57500,6 +57505,14 @@ ${request.requirements}` : preset.text,
   markersText(markers) {
     return markers.length ? t("share.viewer_markers_0", markers.map((id) => t(markerLabelKey(id))).join(t("ui.list_separator"))) : "";
   }
+  /** A cover changed the card's height: refit its shape and clip state, and redraw the lines that end on it. */
+  afterCoverSized(card) {
+    var _a2;
+    const id = (_a2 = card.dataset) == null ? void 0 : _a2.nodeId;
+    if (!id || !this.map) return;
+    this.fitKindShape(card, this.topicKindOf(id));
+    this.drawEdges();
+  }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   releaseCovers() {
     var _a2;
@@ -57520,6 +57533,7 @@ ${request.requirements}` : preset.text,
       cardCovers.delete(card);
     }
     let source;
+    let imagePath = "";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof import_obsidian33.TFile)) return;
@@ -57530,11 +57544,17 @@ ${request.requirements}` : preset.text,
       if (!cover || !("path" in cover)) return;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof import_obsidian33.TFile ? (_c = (_b2 = this.app.vault).getResourcePath) == null ? void 0 : _c.call(_b2, image) : void 0;
+      imagePath = cover.path;
     } catch (e) {
       return;
     }
     if (!source) return;
     const frame = createDiv({ cls: "vam-card-cover" });
+    const known = coverRatios.get(imagePath);
+    if (known) {
+      frame.style.setProperty("aspect-ratio", String(known));
+      frame.addClass("is-sized");
+    }
     const img = frame.createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
@@ -57543,6 +57563,14 @@ ${request.requirements}` : preset.text,
       (_a3 = this.coverObserver) == null ? void 0 : _a3.unobserve(img);
       frame.remove();
       cardCovers.delete(card);
+    });
+    img.addEventListener("load", () => {
+      const ratio = coverFrameRatio(img.naturalWidth, img.naturalHeight);
+      if (!ratio || frame.hasClass("is-sized")) return;
+      coverRatios.set(imagePath, ratio);
+      frame.style.setProperty("aspect-ratio", String(ratio));
+      frame.addClass("is-sized");
+      this.afterCoverSized(card);
     });
     cardCovers.set(card, { frame, img });
     const title = card.querySelector(".vam-card-title");
@@ -68802,7 +68830,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .vam-status-error::before { background: var(--color-red); }
 .vam-node-header button.vam-badge-new { border: 0; cursor: pointer; }
 .vam-card-cover { height: 96px; margin: 8px 0 0; border-radius: var(--radius-s); overflow: hidden; background: var(--background-modifier-hover); }
-.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
+.vam-card-cover.is-sized { height: auto; }
+.vam-card-cover img { display: block; width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; }
 .vam-card-title { color: var(--text-normal); font-size: var(--font-ui-medium); font-weight: 650; line-height: 1.4; margin: 8px 0 4px; overflow-wrap: anywhere; }
 .vam-card-summary { margin: 0; color: var(--text-muted); font-size: var(--font-ui-small); line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .vam-card-error { margin: 6px 0 0; color: color-mix(in srgb, var(--color-red) 80%, var(--text-normal)); font-size: var(--font-ui-smaller); line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

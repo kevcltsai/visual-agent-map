@@ -5,7 +5,7 @@ function element(tag, options = {}) {
   const opts = typeof options === 'string' ? { cls: options } : options ?? {};
   const el = {
     tag, text: opts.text ?? '', cls: opts.cls ?? '', type: opts.type, children: [], listeners: {}, attrs: { ...(opts.attr ?? {}) }, dataset: {},
-    disabled: false, hidden: false, open: false, checked: false, style: {}, parent: null,
+    disabled: false, hidden: false, open: false, checked: false, style: { setProperty(name, value) { this[name] = value; } }, parent: null,
     get firstChild() { return this.children[0] ?? null; },
     get textContent() { return this.text; },
     get classes() { return this.cls.split(/\s+/).filter(Boolean); },

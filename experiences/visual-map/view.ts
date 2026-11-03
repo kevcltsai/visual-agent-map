@@ -588,6 +588,16 @@ const cardCutLabels = new WeakMap<HTMLElement, HTMLElement>();
 /** The model tag drawn in a card header, so a redraw replaces exactly it. */
 /** The cover frame and image drawn on each card, so a redraw can remove them without searching the card. */
 const cardCovers = new WeakMap<HTMLElement, { frame: HTMLElement; img: HTMLImageElement }>();
+/** A card cover is as wide as the card's content and at most this many times as tall; a taller picture is scaled down whole (letterboxed), never cropped. */
+export const COVER_MAX_HEIGHT_RATIO = 1.5;
+/** Width over height of the frame for a picture of this size (a very tall picture is held at 1 / COVER_MAX_HEIGHT_RATIO). */
+export function coverFrameRatio(width: number, height: number): number | null {
+  return width > 0 && height > 0 && Number.isFinite(width) && Number.isFinite(height)
+    ? Math.max(width / height, 1 / COVER_MAX_HEIGHT_RATIO)
+    : null;
+}
+/** Picture shapes already seen, by image path, so a redraw sizes the frame at once and nothing jumps. */
+const coverRatios = new Map<string, number>();
 const cardModelTags = new WeakMap<HTMLElement, HTMLElement>();
 /** The marker row drawn in each card header, so a refresh can replace it. */
 const cardMarkerRows = new WeakMap<HTMLElement, HTMLElement>();
@@ -9053,7 +9063,7 @@ export class VisualAgentMapView extends ItemView {
             w: frame.offsetWidth,
             h: frame.offsetHeight,
             href,
-            fit: "cover"
+            fit: "contain"
           };
       }
       cards.push(item);
@@ -11028,6 +11038,13 @@ export class VisualAgentMapView extends ItemView {
       ? t("share.viewer_markers_0", markers.map(id => t(markerLabelKey(id))).join(t("ui.list_separator")))
       : "";
   }
+  /** A cover changed the card's height: refit its shape and clip state, and redraw the lines that end on it. */
+  private afterCoverSized(card: HTMLElement): void {
+    const id = card.dataset?.nodeId;
+    if (!id || !this.map) return;
+    this.fitKindShape(card, this.topicKindOf(id));
+    this.drawEdges();
+  }
   /** Stops lazy loading for every cover; the next paint makes a fresh observer. */
   private releaseCovers(): void {
     this.coverObserver?.disconnect();
@@ -11046,6 +11063,7 @@ export class VisualAgentMapView extends ItemView {
       cardCovers.delete(card);
     }
     let source: string | undefined;
+    let imagePath = "";
     try {
       const file = this.app.vault.getAbstractFileByPath(notePath);
       if (!(file instanceof TFile)) return;
@@ -11055,11 +11073,18 @@ export class VisualAgentMapView extends ItemView {
       if (!cover || !("path" in cover)) return;
       const image = this.app.vault.getAbstractFileByPath(cover.path);
       source = image instanceof TFile ? this.app.vault.getResourcePath?.(image) : undefined;
+      imagePath = cover.path;
     } catch {
       return;
     }
     if (!source) return;
     const frame = createDiv({ cls: "vam-card-cover" });
+    // Until the picture's shape is known the frame keeps its 96 px placeholder (CSS); a known shape sizes it at once.
+    const known = coverRatios.get(imagePath);
+    if (known) {
+      frame.style.setProperty("aspect-ratio", String(known));
+      frame.addClass("is-sized");
+    }
     const img = frame.createEl("img", {
       attr: { alt: "", "data-src": source, loading: "lazy", decoding: "async", draggable: "false" }
     });
@@ -11068,6 +11093,15 @@ export class VisualAgentMapView extends ItemView {
       this.coverObserver?.unobserve(img);
       frame.remove();
       cardCovers.delete(card);
+    });
+    // The real shape arrives with the picture: size the frame once, then lay the card out and redraw the lines once.
+    img.addEventListener("load", () => {
+      const ratio = coverFrameRatio(img.naturalWidth, img.naturalHeight);
+      if (!ratio || frame.hasClass("is-sized")) return;
+      coverRatios.set(imagePath, ratio);
+      frame.style.setProperty("aspect-ratio", String(ratio));
+      frame.addClass("is-sized");
+      this.afterCoverSized(card);
     });
     cardCovers.set(card, { frame, img });
     const title = card.querySelector<HTMLElement>(".vam-card-title");

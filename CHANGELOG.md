@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Cards, links and marks
+
+A card's cover picture now shows the whole picture instead of a 96 px strip cut from the middle. For example, a book cover that used to lose its top and bottom now appears complete.
+
+- **Whole picture.** The cover is as wide as the card and as tall as the picture needs, up to 1.5 times the card width. A taller picture is scaled down to fit, with space at the sides, and is never cropped. Exported images match the canvas.
+
 ## [0.29.0] - 2026-11-04
 
 ### Note styles

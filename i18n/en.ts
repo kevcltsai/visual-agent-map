@@ -710,6 +710,7 @@ export const en = {
   "ui.zoom_out": "Zoom out",
   "ui.zoom_in": "Zoom in",
   "ui.show_all": "Show all",
+  "ui.fit_clamped": "Some cards are off screen. Drag the canvas to see the rest.",
   "ui.map_search_label": "Search topics",
   "ui.map_search_count_0": "{0} matches",
   "ui.map_search_none": "No matches",

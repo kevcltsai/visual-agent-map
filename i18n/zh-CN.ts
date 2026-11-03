@@ -657,6 +657,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.zoom_out": "缩小",
   "ui.zoom_in": "放大",
   "ui.show_all": "显示全部",
+  "ui.fit_clamped": "有些卡片在画面外，拖动画布可以看到其余部分。",
   "ui.map_search_label": "搜索议题",
   "ui.map_search_count_0": "{0} 个符合",
   "ui.map_search_none": "没有符合",

@@ -657,6 +657,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.zoom_out": "縮小",
   "ui.zoom_in": "放大",
   "ui.show_all": "顯示全部",
+  "ui.fit_clamped": "有些卡片在畫面外，拖曳畫布可以看到其餘部分。",
   "ui.map_search_label": "搜尋議題",
   "ui.map_search_count_0": "{0} 個符合",
   "ui.map_search_none": "沒有符合",

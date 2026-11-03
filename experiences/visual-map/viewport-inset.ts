@@ -40,6 +40,21 @@ export function focusViewport(
   };
 }
 
+/** The smallest zoom Show all will use; below it the text can no longer be read. */
+export const FIT_MIN_ZOOM = 0.25;
+
+/** True when the bounds need a zoom below the Show-all floor, so `fitViewport` cannot bring all of them on screen. */
+export function fitIsClamped(
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  size: { width: number; height: number },
+  inset: number
+): boolean {
+  const availableHeight = Math.max(1, size.height - inset);
+  const w = bounds.maxX - bounds.minX,
+    h = bounds.maxY - bounds.minY;
+  return Math.min((size.width - 80) / w, (availableHeight - 80) / h) < FIT_MIN_ZOOM;
+}
+
 /** Show-all viewport: the bounds are fitted and centred in the area below the inset. */
 export function fitViewport(
   bounds: { minX: number; minY: number; maxX: number; maxY: number },
@@ -50,7 +65,7 @@ export function fitViewport(
   const availableHeight = Math.max(1, size.height - inset);
   const w = bounds.maxX - bounds.minX,
     h = bounds.maxY - bounds.minY;
-  const zoom = Math.max(0.25, Math.min(maxZoom, (size.width - 80) / w, (availableHeight - 80) / h));
+  const zoom = Math.max(FIT_MIN_ZOOM, Math.min(maxZoom, (size.width - 80) / w, (availableHeight - 80) / h));
   return {
     zoom,
     x: (size.width - w * zoom) / 2 - bounds.minX * zoom,

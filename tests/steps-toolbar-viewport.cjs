@@ -65,8 +65,9 @@ test('a card at the origin sits below the toolbar after the initial viewport, fo
   }
 });
 
+const notices = [];
 function makeView() {
-  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {} } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, Notice: class { constructor(message) { notices.push(message); } } } }, { window: { setTimeout, clearTimeout }, CSS: { escape: s => s } });
   const writes = [];
   const view = Object.create(VisualAgentMapView.prototype);
   view.selection = new (load('experiences/visual-map/topic-selection.ts').TopicSelection)();
@@ -115,6 +116,59 @@ test('mouse-driven focus and Show all still persist the viewport', async () => {
   await flush();
   assert.equal(second.writes.length, 1, 'Show all persists');
   assert.ok(second.view.map.viewport.y >= 58, 'Show all leaves the toolbar inset');
+});
+
+test('Bug bash E #23: Show all and the branch frame use the width a card was resized to, not 280, so a wide rightmost card is not clipped', () => {
+  const { view, nodes } = makeView();
+  nodes[1].x = 400; nodes[1].y = 300; nodes[1].width = 560;
+  view.fit();
+  const wide = view.map.viewport;
+  assert.ok((nodes[1].x + 560) * wide.zoom + wide.x <= 1000 + 1e-6, `right edge ${(nodes[1].x + 560) * wide.zoom + wide.x} stays inside the 1000px canvas`);
+  // a card with no custom width: the same camera as with an explicit 280
+  const plain = makeView(), explicit = makeView();
+  for (const each of [plain, explicit]) { each.nodes[1].x = 400; each.nodes[1].y = 300; }
+  explicit.nodes[1].width = 280;
+  plain.view.fit(); explicit.view.fit();
+  assert.equal(JSON.stringify(plain.view.map.viewport), JSON.stringify(explicit.view.map.viewport));
+  // branch frame
+  const branch = makeView();
+  branch.nodes[1].x = 400; branch.nodes[1].y = 300; branch.nodes[1].width = 560;
+  branch.view.cardHeightOf = () => 180;
+  branch.view.frameBranch(['a', 'b']);
+  const framed = branch.view.map.viewport;
+  assert.ok((400 + 560) * framed.zoom + framed.x <= 1000 + 1e-6, 'branch frame holds the wide card');
+  // focus centres on the middle of the wide card
+  const focus = makeView();
+  focus.nodes[1].x = 400; focus.nodes[1].y = 300; focus.nodes[1].width = 560;
+  focus.view.focusNode(focus.nodes[1]);
+  const vp = focus.view.map.viewport;
+  assert.equal(Math.round((400 + 280) * vp.zoom + vp.x), 500, 'the card centre (x + width / 2) lands mid-canvas');
+});
+
+test('Bug bash E #24: Show all says so when the 25% floor keeps cards off screen, and stays quiet when everything fits', () => {
+  const { translate } = load('i18n.ts');
+  for (const language of ['en', 'zh-TW', 'zh-CN']) assert.notEqual(translate(language, 'ui.fit_clamped'), 'ui.fit_clamped', `${language} has the hint`);
+  assert.equal(translate('zh-TW', 'ui.fit_clamped'), '有些卡片在畫面外，拖曳畫布可以看到其餘部分。');
+  const big = makeView();
+  notices.length = 0;
+  const said = [];
+  big.view.announcer = { setText: text => said.push(text) };
+  big.nodes[1].x = 6000; big.nodes[1].y = 3000;
+  big.view.fit();
+  assert.equal(big.view.map.viewport.zoom, 0.25, 'the floor is kept');
+  assert.deepEqual(notices, [translate('en', 'ui.fit_clamped')]);
+  assert.deepEqual(said, [translate('en', 'ui.fit_clamped')], 'announced in the live region too');
+  const small = makeView();
+  notices.length = 0;
+  small.view.announcer = { setText: text => said.push(text) };
+  said.length = 0;
+  small.nodes[1].x = 400; small.nodes[1].y = 300;
+  small.view.fit();
+  assert.deepEqual(notices, []);
+  assert.deepEqual(said, []);
+  // the shared fit helper keeps its signature and floor (the sharing viewer uses it)
+  const inset = load('experiences/visual-map/viewport-inset.ts');
+  assert.equal(inset.fitViewport({ minX: 0, minY: 0, maxX: 9000, maxY: 9000 }, { width: 1000, height: 600 }, 0).zoom, 0.25);
 });
 
 test('the empty-map hint ignores pointer events but its Topic button receives them', () => {

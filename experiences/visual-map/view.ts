@@ -265,7 +265,7 @@ import {
 import { RELEVANCE_LABEL, renderRelevanceTagButton } from "./relevance-tag";
 import { renderHypothesisTag, STRENGTH_LABEL } from "./hypothesis-label";
 import { relevanceDisplayNodes } from "./relevance-order";
-import { fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
+import { fitIsClamped, fitViewport, focusViewport, initialViewport, insetFromRects } from "./viewport-inset";
 import { RelevanceSummaryModal } from "./relevance-summary-modal";
 import {
   MapChatPanel,
@@ -12819,7 +12819,7 @@ export class VisualAgentMapView extends ItemView {
     if (!shown.length) return;
     const bounds = {
       minX: Math.min(...shown.map(n => n.x)),
-      maxX: Math.max(...shown.map(n => n.x + 280)),
+      maxX: Math.max(...shown.map(n => n.x + (n.width ?? CARD_WIDTH))),
       minY: Math.min(...shown.map(n => n.y)),
       maxY: Math.max(...shown.map(n => n.y + (this.cardHeightOf(n.id) ?? 180)))
     };
@@ -14504,7 +14504,7 @@ export class VisualAgentMapView extends ItemView {
     const node = this.relevanceSortOn() ? (this.canvasNodes().find(item => item.id === target.id) ?? target) : target;
     this.map.viewport = focusViewport(
       this.map.viewport,
-      { x: node.x + 140, y: node.y + 80 },
+      { x: node.x + (node.width ?? CARD_WIDTH) / 2, y: node.y + 80 },
       { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
       this.canvasInset()
     );
@@ -14519,7 +14519,7 @@ export class VisualAgentMapView extends ItemView {
     const boxes = nodes.map(n => ({
       x: n.x,
       y: n.y,
-      w: 280,
+      w: n.width ?? CARD_WIDTH,
       h: this.stageEl?.querySelector<HTMLElement>(`[data-node-id="${CSS.escape(n.id)}"]`)?.offsetHeight ?? 180
     }));
     for (const item of this.map.canvasItems ?? []) {
@@ -14542,13 +14542,17 @@ export class VisualAgentMapView extends ItemView {
       maxX = Math.max(...boxes.map(b => b.x + b.w));
     const minY = Math.min(...boxes.map(b => b.y)),
       maxY = Math.max(...boxes.map(b => b.y + b.h));
-    this.map.viewport = fitViewport(
-      { minX, minY, maxX, maxY },
-      { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight },
-      this.canvasInset()
-    );
+    const fitBounds = { minX, minY, maxX, maxY };
+    const fitSize = { width: this.viewportEl.clientWidth, height: this.viewportEl.clientHeight };
+    this.map.viewport = fitViewport(fitBounds, fitSize, this.canvasInset());
     this.transform();
     this.saveViewport();
+    // The zoom floor keeps text readable; when it holds some cards off screen, say so instead of hiding them silently.
+    if (fitIsClamped(fitBounds, fitSize, this.canvasInset())) {
+      const hint = t("ui.fit_clamped");
+      this.announcer?.setText(hint);
+      new Notice(hint);
+    }
   }
   private setupPan(): void {
     const viewport = this.viewportEl!;

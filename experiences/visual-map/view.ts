@@ -9696,7 +9696,11 @@ export class VisualAgentMapView extends ItemView {
         : null;
     const controls = canvas.createDiv("vam-canvas-overlay vam-canvas-controls");
     const zoom = controls.createDiv("vam-zoom-controls");
-    this.iconButton(zoom, "minus", t("ui.zoom_out"), () => this.zoomBy(1 / 1.2, this.selectionAnchor() ?? undefined));
+    // The hint teaches pan, zoom and opening a card, so using a zoom-control button retires it too.
+    this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
+      this.markCanvasHintSeen();
+      this.zoomBy(1 / 1.2, this.selectionAnchor() ?? undefined);
+    });
     const zoomReset = zoom.createEl("button", {
       text: `${Math.round(this.map.viewport.zoom * 100)}%`,
       cls: "vam-zoom",
@@ -9704,11 +9708,18 @@ export class VisualAgentMapView extends ItemView {
     });
     zoomReset.addEventListener("click", event => {
       event.stopPropagation();
+      this.markCanvasHintSeen();
       if (this.map) this.resetZoom();
     });
     this.zoomLabel = zoomReset;
-    this.iconButton(zoom, "plus", t("ui.zoom_in"), () => this.zoomBy(1.2, this.selectionAnchor() ?? undefined));
-    this.iconButton(zoom, "maximize", t("ui.show_all"), () => this.fit());
+    this.iconButton(zoom, "plus", t("ui.zoom_in"), () => {
+      this.markCanvasHintSeen();
+      this.zoomBy(1.2, this.selectionAnchor() ?? undefined);
+    });
+    this.iconButton(zoom, "maximize", t("ui.show_all"), () => {
+      this.markCanvasHintSeen();
+      this.fit();
+    });
     const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
     present.disabled = !this.canPresent();
     const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
@@ -11090,6 +11101,8 @@ export class VisualAgentMapView extends ItemView {
     return true;
   }
   private selectMapNode(node: MapNode): void {
+    // Opening a card is one of the things the canvas hint teaches; mark it first so the repaint does not draw the hint again.
+    if (this.hintEl) this.markCanvasHintSeen();
     this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   private hideHoverCardSoon(): void {

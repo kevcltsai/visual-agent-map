@@ -1292,6 +1292,22 @@ const viewportFixture = () => {
   plugin.views = () => [view];
   return { plugin, view, counts, doc, frames, cancelled, a, b, windowValues, load: () => ({ VisualAgentMapView }) };
 };
+integrationTest('canvas hint: selecting a card (click or arrow-key focus) and using a zoom-control button dismiss it; the zoom maths itself does not', () => {
+  const { plugin, view, a } = viewportFixture();
+  let saves = 0; plugin.saveSettings = async () => { saves++; };
+  const hint = { removed: 0, remove() { this.removed++; } };
+  view.hintEl = hint;
+  view.applySelectionChange = () => {};
+  view.selection = { state: { multiSelectMode: false }, selectIfChanged: () => ({}) };
+  view.selectMapNode(a);
+  assert.equal(plugin.settings.canvasHintSeen, true, 'selecting a card marks the hint seen');
+  assert.equal(hint.removed, 1); assert.equal(view.hintEl, null); assert.equal(saves, 1);
+  const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8');
+  for (const label of ['zoom_out', 'zoom_in', 'show_all'])
+    assert.match(source, new RegExp(`t\\("ui\\.${label}"\\), \\(\\) => \\{\\s*this\\.markCanvasHintSeen\\(\\);`), `${label} button marks the hint seen`);
+  assert.match(source, /event\.stopPropagation\(\);\s*this\.markCanvasHintSeen\(\);\s*if \(this\.map\) this\.resetZoom\(\);/, 'the percentage button counts');
+  assert.match(source, /private selectMapNode\(node: MapNode\): void \{\s*\/\/[^\n]*\n\s*if \(this\.hintEl\) this\.markCanvasHintSeen\(\);/);
+});
 integrationTest('canvas hint: a solid chip that goes away after the first zoom or pan and remembers it in settings; select mode keeps its hint inside the selection bar', () => {
   const { plugin, view } = viewportFixture();
   let saves = 0; plugin.saveSettings = async () => { saves++; };

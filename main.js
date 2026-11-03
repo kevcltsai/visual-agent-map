@@ -55777,7 +55777,8 @@ ${request.requirements}` : preset.text,
     const zoom = controls.createDiv("vam-zoom-controls");
     this.iconButton(zoom, "minus", t("ui.zoom_out"), () => {
       var _a3;
-      return this.zoomBy(1 / 1.2, (_a3 = this.selectionAnchor()) != null ? _a3 : void 0);
+      this.markCanvasHintSeen();
+      this.zoomBy(1 / 1.2, (_a3 = this.selectionAnchor()) != null ? _a3 : void 0);
     });
     const zoomReset = zoom.createEl("button", {
       text: `${Math.round(this.map.viewport.zoom * 100)}%`,
@@ -55786,14 +55787,19 @@ ${request.requirements}` : preset.text,
     });
     zoomReset.addEventListener("click", (event) => {
       event.stopPropagation();
+      this.markCanvasHintSeen();
       if (this.map) this.resetZoom();
     });
     this.zoomLabel = zoomReset;
     this.iconButton(zoom, "plus", t("ui.zoom_in"), () => {
       var _a3;
-      return this.zoomBy(1.2, (_a3 = this.selectionAnchor()) != null ? _a3 : void 0);
+      this.markCanvasHintSeen();
+      this.zoomBy(1.2, (_a3 = this.selectionAnchor()) != null ? _a3 : void 0);
     });
-    this.iconButton(zoom, "maximize", t("ui.show_all"), () => this.fit());
+    this.iconButton(zoom, "maximize", t("ui.show_all"), () => {
+      this.markCanvasHintSeen();
+      this.fit();
+    });
     const present = this.iconButton(zoom, "presentation", t("ui.presentation_start"), () => this.startPresentation());
     present.disabled = !this.canPresent();
     const layout = zoom.createEl("button", { text: t("ui.layout"), cls: "vam-layout-button" });
@@ -57068,6 +57074,7 @@ ${request.requirements}` : preset.text,
     return true;
   }
   selectMapNode(node) {
+    if (this.hintEl) this.markCanvasHintSeen();
     this.applySelectionChange(this.selection.selectIfChanged(node.id));
   }
   hideHoverCardSoon() {

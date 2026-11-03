@@ -391,6 +391,7 @@ test('bug bash #05: during a presentation the card tools and the "+" do nothing;
   assert.equal(h.modals.length, 1, 'after leaving, the "+" opens its dialog again');
 });
 
+// Overlaps the tools test above on purpose: there the stylesheet assertion fails first on the old code, so this one shows the undo assertion failing on its own.
 test('bug bash #05: during a presentation a collapse click leaves no undo step and folds nothing', async () => {
   const h = await harness();
   h.recordModalsOnly();

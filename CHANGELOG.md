@@ -6,7 +6,7 @@
 
 ### Note styles
 
-A note style is a named mix of a note structure, a voice, format rules and an update mode. Settings › Note style picks one per topic type, plus the AIM conclusion note.
+Decide how VAM writes and updates each kind of note. In Settings › Note style, pick a style for each topic type, for example "Hypothesis test" for hypothesis topics.
 
 - **Built-in or your own.** Choose a built-in style, or write your own as Markdown files in the Styles, Structures, Voices and Formats folders (Manage under Custom, then New…).
 - **Three ways to update a note.** Merge and rewrite folds new findings into the whole note, keeping both sides with dates where they disagree. New on top leaves your text as it was and adds findings above it under a dated heading. Save new content only backs up the note, then replaces the Detail.
@@ -17,6 +17,8 @@ A note style is a named mix of a note structure, a voice, format rules and an up
 
 ### Cards, links and marks
 
+Make cards say more at a glance. Select a topic, bold its title in the topic panel, and attach a link to the page you read.
+
 - **Card styles.** Give a topic a bold title, small or large text, a thick border or a thick line to its parent. "Apply to whole branch" copies the styles down. Shared pages and exported images show them.
 - **Topic web links.** Attach web addresses to a topic from the card's link button or the topic panel. Shared pages list them as links that open in a new tab.
 - **More icons.** The marker menu now groups priority 1 to 5 and progress (0 to 100%) as pick-one, and status, four flags and four faces as combinable. Icons show on cards, in the outline and on shared pages.
@@ -25,12 +27,16 @@ A note style is a named mix of a note structure, a voice, format rules and an up
 
 ### Text nodes and dragging
 
+Jot things down and rearrange by hand. Right-click the canvas, add a text node, and drag a topic onto another card to make it a child.
+
 - **Free text blocks.** Add a text block anywhere on the canvas and link it to one or more topics with a dashed line. Auto layout never moves it, and the chat never rewrites your text.
 - **Text nodes on the tree.** Add a plain text note under a topic without creating a note file; it follows layout, folding and presentation. "Turn into topic card" makes it a real topic.
 - **Drag onto a card to make a child.** Release a dragged topic over another card and it moves under it with its subtopics, as one undo step. In selection mode, a checked topic drags the whole group.
 - **Drag selected topics together.** In selection mode, drag any checked topic and all checked topics move together, as one undo step.
 
 ### AI chat and first use
+
+Start with one sentence. Open the chat, type "Plan a three-day trip to Tainan", and agree to the usage notice to build your first map.
 
 - **Clear about waiting.** While the AI usage notice is open, the chat says it is waiting for your confirmation, and the map builds only after you agree. The notice says plainly what is sent and that it uses your allowance.
 - **Better suggestions.** Choosing a suggestion replaces the message box, and suggestions and examples look like buttons.
@@ -39,6 +45,8 @@ A note style is a named mix of a note structure, a voice, format rules and an up
 - **Language.** A new install follows Obsidian's language when VAM has it (English, Traditional or Simplified Chinese), otherwise English. A language you chose is kept.
 
 ### Notes, previews and running tasks
+
+Copies, previews and AI runs now behave the way you expect. Copy a topic into another map and the copy keeps the note's real title.
 
 - **Copy and paste keep the real title.** Pasting a topic into another map, or Copy to…, names the copy after the note's own title instead of its file name, and no longer edits other notes' titles.
 - **Previews follow the latest summary.** The hover preview updates when a new summary is written; one you edited or cleared yourself is kept.

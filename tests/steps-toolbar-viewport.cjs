@@ -214,6 +214,40 @@ test('Bug bash E #35 (round 2): the header title refresh (same file, map switche
   assert.match(src, /this\.titleRefresh = true;\s*void this\.leaf\.setViewState/, 'paint() raises the flag right before the refresh');
 });
 
+test('Bug bash E #35 (follow-up): through the real paint() and a leaf that behaves like Obsidian (setViewState -> view.setState(state, result) -> updateTitle when result.layout), a map switch and a rename each refresh the window title once, with no loop', async () => {
+  // paint() is run for real up to the title refresh; the first thing after it reads activeDocument, which ends the run on purpose.
+  const stop = new Error('paint stops here: the title refresh is the part under test');
+  const { VisualAgentMapView } = load('experiences/visual-map/view.ts', { obsidian: { ...obsidian, Component: class {}, MarkdownRenderChild: class {}, Notice: class {} } }, {
+    window: { setTimeout, clearTimeout, clearInterval }, CSS: { escape: s => s },
+    get activeDocument() { return { get activeElement() { throw stop; } }; }
+  });
+  const view = Object.create(VisualAgentMapView.prototype);
+  const titles = [];
+  const workspace = { updateTitle() { titles.push(view.getDisplayText()); } };
+  // what Obsidian does for leaf.setViewState: hand the state to the view with a result object, then redraw the title when the view asked for a layout refresh
+  const leaf = { setViewState: async viewState => { const result = { history: true }; await view.setState(viewState.state, result); if (result.layout) workspace.updateTitle(); } };
+  const maps = { 'A.md': { title: 'Map A', nodes: [] }, 'B.md': { title: 'Map B', nodes: [] } };
+  Object.assign(view, { leaf, path: 'A.md', map: maps['A.md'], headerTitle: 'Map A', closed: false, aimProgressEls: new Map(), paintCount: 0, plugin: { syncOutline() {} }, notes: new Map() });
+  // the switcher / openMap path: the other map is read, then painted
+  view.openMap = async file => { view.path = file; view.map = maps[file]; try { view.paint(); } catch (error) { if (error !== stop) throw error; } };
+  const settle = () => new Promise(resolve => setTimeout(resolve, 60));
+  await leaf.setViewState({ type: 'visual-agent-map', state: { file: 'B.md' } });
+  assert.deepEqual(titles, ['Map B'], 'the switch itself refreshes the window title, after the new map is the display text');
+  await settle();
+  assert.deepEqual(titles, ['Map B', 'Map B'], 'paint() then asks once more for the changed header title, which is the end of it');
+  await settle();
+  assert.equal(titles.length, 2, 'no refresh loop');
+  // a rename in place (same file): only paint()'s refresh runs
+  view.map = { ...view.map, title: 'Renamed' };
+  try { view.paint(); } catch (error) { if (error !== stop) throw error; }
+  await settle();
+  assert.deepEqual(titles.slice(2), ['Renamed']);
+  // painting again with the same title asks for nothing
+  try { view.paint(); } catch (error) { if (error !== stop) throw error; }
+  await settle();
+  assert.equal(titles.length, 3);
+});
+
 test('the empty-map hint ignores pointer events but its Topic button receives them', () => {
   assert.match(rule('.vam-empty'), /pointer-events: none/);
   assert.match(rule('.vam-empty button'), /pointer-events: auto/);

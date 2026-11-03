@@ -104,10 +104,15 @@ function evalPartial(expr, env) {
   return null;
 }
 function collectConsts(text, env) {
+  // A name declared twice, or also a function parameter, means different things in different scopes: it is left unresolved (the read counts as a run-time path).
+  const ambiguous = new Set();
+  const seen = new Set();
+  for (const match of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\b/g)) { if (seen.has(match[1])) ambiguous.add(match[1]); seen.add(match[1]); }
+  for (const match of text.matchAll(/\bfunction\b[^(]*\(([^)]*)\)|\(([^()]*)\)\s*=>|\b([A-Za-z_$][\w$]*)\s*=>/g)) for (const name of (match[1] ?? match[2] ?? match[3]).matchAll(/[A-Za-z_$][\w$]*/g)) ambiguous.add(name[0]);
   // Two passes so a const may use one declared after the first sweep resolved it.
   for (let pass = 0; pass < 3; pass++) {
     for (const match of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+)/g)) {
-      if (Object.hasOwn(env.consts, match[1])) continue;
+      if (ambiguous.has(match[1]) || Object.hasOwn(env.consts, match[1])) continue;
       const value = evalPartial(match[2], env);
       if (value?.exact) env.consts[match[1]] = value.value;
     }
@@ -218,7 +223,7 @@ export function buildDeps({ testFiles, records, bundles = {}, scans, sha, genera
       for (const entry of scans[member]?.cachedLoads ?? []) for (const source of [entry, ...(bundles[entry] ?? [])]) sources.add(source);
       for (const prefix of scans[member]?.prefixes ?? []) prefixes.add(prefix);
       // A helper's own run-time reads take their paths from the callers, whose literals are scanned; only spawning and direct esbuild carry over.
-      for (const reason of scans[member]?.reasons ?? []) if (member === file) reasons.push(reason); else if (/^(?:spawns|uses esbuild|reads files by a variable)/.test(reason)) reasons.push(`${reason} (in ${member})`);
+      for (const reason of scans[member]?.reasons ?? []) if (member === file) reasons.push(reason); else if (/^(?:spawns|uses esbuild)/.test(reason)) reasons.push(`${reason} (in ${member})`);
       if (member !== file) sources.add(member);
     }
     tests[file] = { ...(reasons.length ? { always: [...new Set(reasons)].join("; ") } : {}), sources: [...sources].sort().map(id), prefixes: [...prefixes].sort() };

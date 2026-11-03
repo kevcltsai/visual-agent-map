@@ -27,7 +27,7 @@ Do not install files from the repository's `main` branch into a production vault
 
 ## 2. Start your first map
 
-1. A fresh install opens a blank mind map: start with one sentence, or add topics yourself. VAM starts in English regardless of Obsidian's language. You can choose Traditional Chinese or Simplified Chinese in VAM settings; that choice is saved across restarts.
+1. A fresh install opens a blank mind map: start with one sentence, or add topics yourself. VAM starts in Obsidian's language when it has an interface in it (English, Traditional Chinese or Simplified Chinese), and in English otherwise. You can change the language in VAM settings; that choice is saved across restarts and is not changed by Obsidian's language afterwards.
 2. On the opening screen, select **Create an empty mind map** to skip the AI and add topics to the blank canvas yourself. You can edit maps without an AI service.
 3. Changing VAM's interface language does not change existing maps and notes; they keep their original titles and writing.
 
@@ -120,7 +120,7 @@ VAM 不需要專屬 API key。獨立 CLI 不需要 npm；只有從原始碼建�
 
 ## 2. 開始第一張心智圖
 
-1. 全新安裝會開啟一張空白心智圖：用一句話開始，或直接加議題。VAM 預設英文，與 Obsidian 語言無關；可在 VAM 設定選擇繁體中文或簡體中文，選擇會跨重啟保留。
+1. 全新安裝會開啟一張空白心智圖：用一句話開始，或直接加議題。VAM 首次啟動時跟隨 Obsidian 的語言（英文、繁體中文或簡體中文），其他語言則用英文；可在 VAM 設定改語言，選擇會跨重啟保留，之後不再跟著 Obsidian 改變。
 2. 在開場畫面選 **建立空白心智圖**，就跳過 AI，直接在空白畫布上自己加議題。沒有 AI 服務也能編輯。
 3. 切換 VAM 介面語言不會改變既有地圖與筆記；它們的名稱及內容維持原樣。
 

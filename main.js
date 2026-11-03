@@ -37,6 +37,7 @@ __export(main_exports, {
   markdownImages: () => markdownImages,
   normalizeNoteStyleByKind: () => normalizeNoteStyleByKind,
   normalizeNoteStyleRecipeMarker: () => normalizeNoteStyleRecipeMarker,
+  obsidianAppLanguage: () => obsidianAppLanguage,
   settingsFromSaved: () => settingsFromSaved,
   visualReferencesMarkdown: () => visualReferencesMarkdown
 });
@@ -7496,8 +7497,28 @@ function intlLocaleOf(locale) {
   return entryOf(locale).intl;
 }
 var language = FALLBACK_LANGUAGE;
-function initialUiLanguage(saved) {
-  return isUiLanguage(saved) ? saved : FALLBACK_LANGUAGE;
+function uiLanguageFromAppLocale(locale) {
+  if (typeof locale !== "string" || !locale.trim()) return null;
+  const tag = locale.trim().toLowerCase().replace(/_/g, "-");
+  const byId = (id) => {
+    var _a2;
+    const found = (_a2 = registry.find((item) => item.id.toLowerCase() === id)) == null ? void 0 : _a2.id;
+    return isUiLanguage(found) ? found : null;
+  };
+  const exact = byId(tag);
+  if (exact) return exact;
+  if (/^zh(-|$)/.test(tag)) {
+    const traditional = /(^|-)(hant|tw|hk|mo)(-|$)/.test(tag.slice(2));
+    const id = traditional ? "zh-TW" : "zh-CN";
+    return isUiLanguage(id) ? id : null;
+  }
+  return byId(tag.split("-")[0]);
+}
+function initialUiLanguage(saved, appLocale) {
+  var _a2;
+  if (isUiLanguage(saved)) return saved;
+  if (saved === void 0 || saved === null) return (_a2 = uiLanguageFromAppLocale(appLocale)) != null ? _a2 : FALLBACK_LANGUAGE;
+  return FALLBACK_LANGUAGE;
 }
 function uiLocale(value) {
   return isUiLanguage(value) ? value : FALLBACK_LANGUAGE;
@@ -73004,7 +73025,14 @@ function normalizeNoteStyleRecipeMarker(value) {
     } : {}
   };
 }
-function settingsFromSaved(saved) {
+function obsidianAppLanguage() {
+  try {
+    return typeof import_obsidian42.getLanguage === "function" ? (0, import_obsidian42.getLanguage)() : "en";
+  } catch (e) {
+    return "en";
+  }
+}
+function settingsFromSaved(saved, appLocale) {
   var _a2;
   const legacy = saved;
   const savedWorkspace = (saved == null ? void 0 : saved.workspaceFolder) || DEFAULT_SETTINGS.workspaceFolder;
@@ -73026,7 +73054,7 @@ function settingsFromSaved(saved) {
       (item) => !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" && typeof item.prompt === "string"
     ) : [],
     defaultCoffeeStyleId: typeof (saved == null ? void 0 : saved.defaultCoffeeStyleId) === "string" ? saved.defaultCoffeeStyleId : void 0,
-    language: initialUiLanguage(saved == null ? void 0 : saved.language),
+    language: initialUiLanguage(saved == null ? void 0 : saved.language, appLocale),
     workspaceFolder: savedWorkspace,
     topicsFolder: (saved == null ? void 0 : saved.topicsFolder) || DEFAULT_SETTINGS.topicsFolder,
     ...resolveMapFolders(saved),
@@ -73368,7 +73396,7 @@ var VisualAgentMapPlugin = class extends import_obsidian42.Plugin {
   async onload() {
     announceTestOverrides((message) => new import_obsidian42.Notice(message, 0));
     const saved = await this.loadData();
-    this.settings = settingsFromSaved(saved);
+    this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);
     registerInternalMarkerPresentation(this);

@@ -6,15 +6,37 @@ test('UI language switch translates stable semantic keys and placeholders', () =
   const {t,setUiLanguage,translate}=load('i18n.ts');setUiLanguage('en');assert.equal(t('ui.interface_language'),'Interface language');assert.equal(t('ui.expand_0',3),'Expand 3');assert.equal(translate('en','detail.core_conclusions'),'Core conclusions');assert.equal(translate('zh-TW','detail.core_conclusions'),'核心結論');assert.equal(translate('zh-TW','ui.expand_0'),'展開 {0}');assert.equal(translate('zh-TW','ui.interface_language'),'介面語言');
   assert.equal(translate('zh-TW','missing.runtime.key'), 'missing.runtime.key');
 });
-test('first install defaults to English regardless of Obsidian language while saved VAM choice wins', () => {
-  const { initialUiLanguage } = load('i18n.ts');
+// UX B5 (owner request 2026-11): this replaces "first install defaults to English regardless of Obsidian language".
+test('first install follows the Obsidian language when VAM has an interface in it, English otherwise, while a saved VAM choice wins', () => {
+  const { initialUiLanguage, uiLanguageFromAppLocale } = load('i18n.ts');
   assert.equal(DEFAULT_SETTINGS.language, 'en');
-  assert.equal(initialUiLanguage(undefined), 'en');
+  assert.equal(initialUiLanguage(undefined), 'en', 'no app language known: English');
   assert.equal(initialUiLanguage(null), 'en');
+  for (const [app, expected] of [['zh-TW', 'zh-TW'], ['zh', 'zh-CN'], ['zh-CN', 'zh-CN'], ['zh-Hant-HK', 'zh-TW'], ['zh_HK', 'zh-TW'], ['zh-Hans', 'zh-CN'], ['en', 'en'], ['en-GB', 'en'], ['fr', 'en'], ['ja', 'en'], ['', 'en']])
+    assert.equal(initialUiLanguage(undefined, app), expected, `Obsidian in ${app}`);
+  assert.equal(uiLanguageFromAppLocale('fr'), null); assert.equal(uiLanguageFromAppLocale('zh-tw'), 'zh-TW'); assert.equal(uiLanguageFromAppLocale(42), null);
+  assert.equal(initialUiLanguage('en', 'zh-TW'), 'en', 'a saved choice is never replaced by the Obsidian language');
+  assert.equal(initialUiLanguage('zh-CN', 'zh-TW'), 'zh-CN');
+  assert.equal(initialUiLanguage('invalid', 'zh-TW'), 'en', 'an invalid saved value (or one from a newer version) stays English, as before');
   assert.equal(initialUiLanguage('invalid'), 'en');
   assert.equal(initialUiLanguage('en'), 'en');
   assert.equal(initialUiLanguage('zh-TW'), 'zh-TW');
   assert.equal(initialUiLanguage('zh-CN'), 'zh-CN');
+});
+test('UX B5: settingsFromSaved starts a new install in the Obsidian language and leaves saved settings alone', () => {
+  const { settingsFromSaved } = load('main.ts', { obsidian });
+  assert.equal(settingsFromSaved(null, 'zh-TW').language, 'zh-TW', 'a new install in a Traditional Chinese Obsidian');
+  assert.equal(settingsFromSaved(null, 'zh').language, 'zh-CN');
+  assert.equal(settingsFromSaved(null, 'de').language, 'en', 'no German interface: English');
+  assert.equal(settingsFromSaved({ language: 'en' }, 'zh-TW').language, 'en', 'a saved English stays English');
+  assert.equal(settingsFromSaved({ language: 'zh-TW' }, 'en').language, 'zh-TW');
+  assert.equal(settingsFromSaved(null).language, 'en');
+});
+test('UX B5: onload reads the Obsidian language through getLanguage (and English when it cannot)', () => {
+  const withLanguage = code => load('main.ts', { obsidian: { ...obsidian, getLanguage: () => code } }).obsidianAppLanguage();
+  assert.equal(withLanguage('zh-TW'), 'zh-TW');
+  assert.equal(load('main.ts', { obsidian: { ...obsidian, getLanguage: () => { throw new Error('old app'); } } }).obsidianAppLanguage(), 'en');
+  const source = fs.readFileSync(path.join(root, 'main.ts'), 'utf8'); assert.match(source, /settingsFromSaved\(saved, obsidianAppLanguage\(\)\)/);
 });
 test('language change saves before applying and refreshes all views without mutating notes', async () => {
   const { default: Plugin, VisualAgentMapSettingTab } = load('main.ts', { obsidian });

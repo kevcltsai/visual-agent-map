@@ -22,6 +22,7 @@ import {
 } from "./i18n";
 import {
   FileSystemAdapter,
+  getLanguage,
   loadMermaid,
   MarkdownView,
   normalizePath,
@@ -189,8 +190,19 @@ export function normalizeNoteStyleRecipeMarker(value: unknown): Settings["noteSt
       : {})
   };
 }
-/** The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. */
-export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
+/** Obsidian's interface language code ("en" when it cannot be read). */
+export function obsidianAppLanguage(): string {
+  try {
+    return typeof getLanguage === "function" ? getLanguage() : "en";
+  } catch {
+    return "en";
+  }
+}
+/**
+ * The settings in effect for what was saved: every field is checked, and a missing or invalid one takes its default. A new
+ * install (no language saved) starts in `appLocale`, Obsidian's own language, when VAM has an interface in it.
+ */
+export function settingsFromSaved(saved: Partial<Settings> | null, appLocale?: string): Settings {
   const legacy: (Partial<Settings> & { cliPath?: string }) | null = saved;
   const savedWorkspace = saved?.workspaceFolder || DEFAULT_SETTINGS.workspaceFolder;
   return {
@@ -229,7 +241,7 @@ export function settingsFromSaved(saved: Partial<Settings> | null): Settings {
         )
       : [],
     defaultCoffeeStyleId: typeof saved?.defaultCoffeeStyleId === "string" ? saved.defaultCoffeeStyleId : undefined,
-    language: initialUiLanguage(saved?.language),
+    language: initialUiLanguage(saved?.language, appLocale),
     workspaceFolder: savedWorkspace,
     topicsFolder: saved?.topicsFolder || DEFAULT_SETTINGS.topicsFolder,
     ...resolveMapFolders(saved),
@@ -568,7 +580,7 @@ export default class VisualAgentMapPlugin extends Plugin {
   async onload(): Promise<void> {
     announceTestOverrides(message => new Notice(message, 0));
     const saved = (await this.loadData()) as Partial<Settings> | null;
-    this.settings = settingsFromSaved(saved);
+    this.settings = settingsFromSaved(saved, obsidianAppLanguage());
     // The removed chat-model key is migrated into cliModel above; write the data back at once so it runs only once.
     if (hasLegacyChatModel(saved)) await this.saveSettings();
     setUiLanguage(this.settings.language);

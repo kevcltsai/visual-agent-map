@@ -2316,6 +2316,10 @@ test('C8 heading language: only the managed Detail heading decides; the marker l
   const { INTERNAL_MARKER_LINE } = load('experiences/markdown-context/internal-markers.ts', { obsidian: { ...obsidian, editorLivePreviewField: {} } });
   for (const line of ['<!-- visual-agent-map:detail:start -->', '<!-- visual-agent-map:references:end -->', '<!-- aim-open-items ["a","b"] -->']) assert.ok(INTERNAL_MARKER_LINE.test(line), line);
   assert.equal(INTERNAL_MARKER_LINE.test('<!-- a user comment -->'), false, 'a user comment is left alone');
+  // Obsidian 1.15 gives every Live Preview line `display: block` through `.markdown-source-view.mod-cm6 .cm-content > *`
+  // (specificity 0,3,0); the hiding rule must out-rank it, or the markers stay visible in Live Preview.
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', 'styles.css'), 'utf8');
+  assert.match(css, /^\.markdown-source-view\.mod-cm6 \.cm-content > \.cm-line\.vam-internal-marker-line, \.vam-internal-marker-only \{ display: none; \}$/m);
 });
 integrationTest('C8 review: an unclosed code fence in Detail does not hide the localized sections after it; a renamed Detail heading keeps the note on its heading set', async () => {
   const { repo, contents } = fixture(); const n = await topicNote(repo, '圍欄');

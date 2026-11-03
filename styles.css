@@ -1134,8 +1134,9 @@ body .workspace-leaf-content.vam-topic-markdown .markdown-source-view.mod-cm6 .m
 .vam-image-working-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--interactive-accent); animation: vam-pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .vam-image-action-status.is-running::before, .vam-image-working::before, .vam-image-working::after, .vam-image-working-chip::before { animation: none; } .vam-image-working::before { background: var(--interactive-accent); } }
 
-/* Hide only VAM section boundaries; source mode retains their original text. */
-.cm-line.vam-internal-marker-line, .vam-internal-marker-only { display: none; }
+/* Hide only VAM section boundaries; source mode retains their original text. Live Preview lines get `display: block` from
+   Obsidian's `.markdown-source-view.mod-cm6 .cm-content > *`, so the marker-line rule names that chain to win over it. */
+.markdown-source-view.mod-cm6 .cm-content > .cm-line.vam-internal-marker-line, .vam-internal-marker-only { display: none; }
 
 .ct-list-selection { display:flex; flex-wrap:wrap; gap:8px; padding:12px; align-items:center; border-bottom:1px solid var(--background-modifier-border); }
 .ct-list-selection > span { flex-basis:100%; color:var(--text-muted); }

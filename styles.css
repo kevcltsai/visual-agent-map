@@ -567,6 +567,8 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-toggle:focus-visible, .vam-map-chat-close:focus-visible, .vam-map-chat-chip-remove:focus-visible, .vam-map-chat-note-remove:focus-visible, .vam-map-chat-log:focus-visible, .vam-map-chat-suggestion:focus-visible, .vam-map-chat-example:focus-visible, .vam-map-chat-retry:focus-visible, .vam-map-chat-plan-apply:focus-visible, .vam-map-chat-plan-cancel:focus-visible, .vam-map-chat-lines-toggle:focus-visible, .vam-map-chat-plan-group-title:focus-visible, .vam-map-chat-choice:focus-visible, .vam-map-chat-resizer:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 .vam-map-chat-toggle.is-hidden, .vam-map-chat-body.is-hidden, .vam-map-chat-send.is-hidden, .vam-map-chat-stop.is-hidden, .vam-map-chat-hero-title.is-hidden, .vam-map-chat-resizer.is-hidden { display: none; }
 .vam-map-chat-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; box-sizing: border-box; min-height: 0; padding: 10px 12px 12px; }
+/* The docked chat reaches the window's bottom edge, where Obsidian's status bar floats over its send button. */
+.vam-map-chat > .vam-map-chat-body { padding-bottom: calc(12px + var(--vam-status-clearance, 0px)); }
 .vam-map-chat.is-drop { outline: 2px dashed var(--interactive-accent); outline-offset: -2px; background: var(--background-modifier-hover); }
 .vam-map-chat-head { display: flex; align-items: center; gap: 8px; }
 .vam-map-chat-title { flex: 0 100 auto; min-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-semibold); }

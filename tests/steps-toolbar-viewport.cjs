@@ -440,3 +440,8 @@ test('the zoom controls, canvas hint, selection bar add the status bar clearance
   assert.match(view, /onResize\(\): void \{[^}]*this\.syncStatusBarClearance\(\);/);
   assert.match(view, /this\.statusBarObserver\?\.disconnect\(\);/);
 });
+
+test('theme 5: the chat body adds the status bar clearance to its bottom padding, after the base rule', () => {
+  assert.match(css, /^\.vam-map-chat > \.vam-map-chat-body \{ padding-bottom: calc\(12px \+ var\(--vam-status-clearance, 0px\)\); \}$/m);
+  assert.ok(css.indexOf('.vam-map-chat > .vam-map-chat-body {') > css.indexOf('.vam-map-chat-body { display: flex'), 'after the base rule');
+});

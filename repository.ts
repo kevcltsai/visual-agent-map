@@ -2356,7 +2356,10 @@ export class Repository {
     // Existing derived labels keep their language; only a note without any uses the current UI language.
     const language = this.scaffoldLanguage(content, fm);
     ensureNoteCssClass(fm);
-    fm.title = noteTitle(content, fm, file.basename);
+    // A frontmatter title is kept in step with the body heading, but a note without one does not get one: a rebuild
+    // after a paste or an added card must not write notes the operation did not touch (the copied source, for one).
+    const title = noteTitle(content, fm, file.basename);
+    if (fm.title !== undefined) fm.title = title;
     const owner = ownership.get(file.path);
     // `topic-state: inbox` is a legacy value (the Inbox concept was removed in 0.19): it is read and kept as written.
     let state: TopicState = file.path.includes("/Archive/")
@@ -2426,7 +2429,7 @@ export class Repository {
     }
     body = normalizeBodyOrder(
       body,
-      text(fm.title, file.basename),
+      title,
       text(fm.summary, placeholder(textLanguage)),
       language,
       textLanguage

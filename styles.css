@@ -615,10 +615,10 @@ button.vam-relevance-tag-button:disabled { cursor: default; opacity: .7; }
 .vam-map-chat-line.is-skipped { font-style: italic; }
 .vam-map-chat-line.is-note { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--background-modifier-border); }
 .vam-map-chat-lines-summary { color: var(--text-normal); font-weight: var(--font-semibold); }
-.vam-map-chat button.vam-map-chat-lines-toggle, .vam-map-chat button.vam-map-chat-more { align-self: flex-start; height: auto; padding: 0 6px; border: 0; background: transparent; box-shadow: none; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-smaller); }
+.vam-map-chat button.vam-map-chat-lines-toggle { align-self: flex-start; height: auto; padding: 0 6px; border: 0; background: transparent; box-shadow: none; color: color-mix(in srgb, var(--text-accent) 70%, var(--text-normal)); font-size: var(--font-ui-smaller); }
 .vam-map-chat button.vam-map-chat-retry { align-self: flex-start; height: auto; margin-top: 6px; padding: 3px 12px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-primary); box-shadow: none; color: var(--text-normal); font-size: var(--font-ui-small); }
 .vam-map-chat button.vam-map-chat-retry:hover { background: var(--background-modifier-hover); }
-.vam-map-chat button.vam-map-chat-retry:disabled, .vam-map-chat button.vam-map-chat-more:disabled { color: var(--text-faint); cursor: default; }
+.vam-map-chat button.vam-map-chat-retry:disabled { color: var(--text-faint); cursor: default; }
 .vam-map-chat-plan { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--background-modifier-border); }
 .vam-map-chat-plan-title { font-weight: var(--font-semibold); }
 .vam-map-chat-plan-group-title { cursor: pointer; font-size: var(--font-ui-small); }
@@ -1486,12 +1486,7 @@ button.vam-template-section-header:hover { background: var(--background-modifier
 .vam-share-note.vam-share-error { color: color-mix(in srgb, var(--color-red) 75%, var(--text-normal)); }
 .vam-share-publish { margin-top: 10px; }
 .vam-share-publish-text { display: block; width: 100%; margin-top: 8px; font-size: var(--font-ui-smaller); }
-.vam-map-chat-length { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.vam-map-chat-style-tag { color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
-.vam-map-chat-style { display: flex; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); overflow: hidden; }
-.vam-map-chat-style-option { flex: 1 1 auto; min-height: 24px; min-width: 24px; height: auto; padding: 2px 8px; border: 0; border-radius: 0; box-shadow: none; background: transparent; font-size: var(--font-ui-smaller); }
-.vam-map-chat-style-option.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
-.vam-map-chat-style-option:focus-visible, .vam-map-chat-more:focus-visible, .vam-map-chat-model:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.vam-map-chat-model:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
 /* The "Edit relation" dialog (decision 35, P24). Every rule starts with .vam-topic-modal, which the share viewer does not collect (scripts/viewer-css.mjs). */
 .vam-topic-modal .vam-relation-editor-summary { display: flex; align-items: center; gap: 10px; margin: 8px 0 0; padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
 .vam-topic-modal .vam-relation-editor-summary .vam-relation-sentence { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }

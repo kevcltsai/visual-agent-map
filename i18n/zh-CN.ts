@@ -1427,6 +1427,10 @@ export const zhCN: Record<TranslationKey, string> = {
     "未找到 Codex CLI：{0}。请在 VAM Settings 设置“Codex CLI 路径”。",
   "ui.codex_app_server_is_ready_0": "Codex App Server 已就绪：{0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server 检查失败：{0}",
+  "ui.ai_not_ready_model_0_1": "{1} 目前无法使用 {0}。请换一个模型，或检查连接。",
+  "ui.ai_not_ready_error_0_1": "{0} 还没准备好（{1}）。可能没有运行或尚未登录。",
+  "ui.ai_not_ready_unknown_0": "{0} 还没准备好。可能尚未登录，或没有报告可用的模型。",
+  "ui.ai_not_ready_where": "可在“设置 → Visual Agent Map → AI 连接”查看状态。",
   "ui.current_model_is_unavailable": "当前模型已不可用",
   "ui.auto": "自动 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":

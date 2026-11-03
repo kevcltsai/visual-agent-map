@@ -1429,6 +1429,10 @@ export const zhTW: Record<TranslationKey, string> = {
     "未找到 Codex CLI：{0}。請在 VAM Settings 設定「Codex CLI 路徑」。",
   "ui.codex_app_server_is_ready_0": "Codex App Server 已就緒：{0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server 檢查失敗：{0}",
+  "ui.ai_not_ready_model_0_1": "{1} 目前無法使用 {0}。請換一個模型，或檢查連線。",
+  "ui.ai_not_ready_error_0_1": "{0} 還沒準備好（{1}）。可能沒有執行或尚未登入。",
+  "ui.ai_not_ready_unknown_0": "{0} 還沒準備好。可能尚未登入，或沒有回報可用的模型。",
+  "ui.ai_not_ready_where": "可在「設定 → Visual Agent Map → AI 連線」查看狀態。",
   "ui.current_model_is_unavailable": "目前模型已不可用",
   "ui.auto": "自動 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":

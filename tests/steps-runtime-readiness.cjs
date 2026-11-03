@@ -52,19 +52,39 @@ test('C2 Claude ready with the model says yes with no UI', async () => {
   assert.deepEqual([seen.claudeGuide, seen.codexGuide, notices.length, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, 0, ['claude'], 0]);
 });
 
-test('C3 Claude ready without the model says no and shows nothing', async () => {
+// UX B8: a "no" is never silent any more: the Notice says why and where the AI connection settings are.
+const WHERE = 'Settings → Visual Agent Map → AI connection shows its status.';
+test('C3 Claude ready without the model says no with a Notice that names the model', async () => {
   const { plugin, seen } = fixture({ refresh: state('ready', ['claude:haiku']) });
+  plugin.modelLabel = id => `label(${id})`;
   assert.equal(await plugin.aiReadyForModel(CLAUDE), false);
-  assert.deepEqual([seen.claudeGuide, seen.codexGuide, notices.length, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, 0, ['claude'], 0]);
+  assert.deepEqual(notices, [`label(${CLAUDE}) is not available in Claude Code right now. Pick another model, or check the connection. ${WHERE}`]);
+  assert.deepEqual([seen.claudeGuide, seen.codexGuide, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, ['claude'], 0]);
 });
 
 for (const status of ['error', 'loading', 'idle']) {
-  test(`C4 Claude ${status} says no and shows nothing`, async () => {
+  test(`C4 Claude ${status} says no with a Notice that says it is not ready`, async () => {
     const { plugin, seen } = fixture({ refresh: state(status, [CLAUDE]) });
     assert.equal(await plugin.aiReadyForModel(CLAUDE), false);
-    assert.deepEqual([seen.claudeGuide, seen.codexGuide, notices.length, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, 0, ['claude'], 0]);
+    assert.deepEqual(notices, [`Claude Code is not ready. It may not be signed in, or it did not list its models. ${WHERE}`]);
+    assert.deepEqual([seen.claudeGuide, seen.codexGuide, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, ['claude'], 0]);
   });
 }
+
+test('UX B8 Claude discovery error: the Notice carries its own reason, the log keeps it, and "Fix connection…" rechecks that service', async () => {
+  const { plugin, seen } = fixture({ refresh: async provider => ({ provider, status: 'error', models: [], error: 'Not logged in' }) });
+  const repaired = []; plugin.repairConnection = model => repaired.push(model);
+  const actionNotices = []; const Notice = class { constructor(message) { actionNotices.push(message); } hide() {} };
+  const { default: P } = S.load('main.ts', { obsidian: { ...S.obsidian, Modal, Notice } }, { createFragment: build => { const el = require('./support-dom.cjs').element('fragment'); build(el); return el; } });
+  const live = Object.assign(new P(), { app: plugin.app, settings: plugin.settings, logs: plugin.logs, refreshModelDiscovery: plugin.refreshModelDiscovery, codexDiagnostic: plugin.codexDiagnostic, repairConnection: plugin.repairConnection });
+  assert.equal(await live.aiReadyForModel(CLAUDE), false);
+  assert.equal(actionNotices.length, 1); const fragment = actionNotices[0];
+  const dom = require('./support-dom.cjs');
+  assert.match(dom.find(fragment, i => i.tag === 'span').text, /^Claude Code is not ready \(Not logged in\)\. It may not be running or signed in\. Settings → Visual Agent Map → AI connection/);
+  const button = dom.find(fragment, i => i.tag === 'button'); assert.equal(button.text, 'Fix connection…');
+  button.click(); assert.deepEqual(repaired, [CLAUDE]);
+  assert.deepEqual(seen.logs, [['warn', 'Codex App Server is not ready yet: Not logged in']]);
+});
 
 test('C5 Claude discovery that rejects rejects with the same error; nothing is logged or opened', async () => {
   const boom = new Error('x');
@@ -93,28 +113,31 @@ test('X3 Codex missing after the refresh opens the Codex guide and no notice', a
 
 test('X4 Codex ready without the model shows the unavailable notice only', async () => {
   const { plugin, seen } = fixture({ refresh: state('ready', ['other']) });
+  plugin.modelLabel = id => `label(${id})`;
   assert.equal(await plugin.aiReadyForModel(CODEX), false);
-  assert.deepEqual(notices, ['Current model is unavailable']);
+  assert.deepEqual(notices, [`label(${CODEX}) is not available in Codex right now. Pick another model, or check the connection. ${WHERE}`]);
   assert.deepEqual([seen.codexGuide, seen.claudeGuide, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, ['codex'], 1]);
 });
 
 for (const status of ['error', 'loading', 'idle']) {
   test(`X5 Codex ${status} shows the unavailable notice only`, async () => {
     const { plugin, seen } = fixture({ refresh: state(status, [CODEX]) });
+    plugin.modelLabel = id => `label(${id})`;
     assert.equal(await plugin.aiReadyForModel(CODEX), false);
-    assert.deepEqual(notices, ['Current model is unavailable']);
+    assert.deepEqual(notices, [`label(${CODEX}) is not available in Codex right now. Pick another model, or check the connection. ${WHERE}`]);
     assert.deepEqual([seen.codexGuide, seen.claudeGuide, seen.logs.length, seen.refresh, seen.codexDiag], [0, 0, 0, ['codex'], 1]);
   });
 }
 
-test('X6 Codex discovery that throws logs one warning with the text and says no', async () => {
+test('X6 Codex discovery that throws logs one warning with the text, says it in a Notice (UX B8) and says no', async () => {
   // An Error of the plugin's own realm logs its message; anything else is logged as String(thrown) (this realm's Error
   // is "Error: boom2", a bare string is itself).
   for (const [thrown, text] of [[new PluginError('boom'), 'boom'], ['boom2', 'boom2'], [new Error('boom3'), 'Error: boom3']]) {
     const { plugin, seen } = fixture({ refresh: async () => { throw thrown; } });
     assert.equal(await plugin.aiReadyForModel(CODEX), false);
     assert.deepEqual(seen.logs, [['warn', `Codex App Server is not ready yet: ${text}`]]);
-    assert.deepEqual([notices.length, seen.codexGuide, seen.claudeGuide, seen.refresh, seen.codexDiag], [0, 0, 0, ['codex'], 1]);
+    assert.deepEqual(notices, [`Codex is not ready (${text}). It may not be running or signed in. ${WHERE}`]);
+    assert.deepEqual([seen.codexGuide, seen.claudeGuide, seen.refresh, seen.codexDiag], [0, 0, ['codex'], 1]);
   }
 });
 

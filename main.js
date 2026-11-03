@@ -1471,6 +1471,10 @@ var en = {
   "ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett": "Codex CLI was not found: {0}. Set the Codex CLI path in VAM Settings.",
   "ui.codex_app_server_is_ready_0": "Codex App Server is ready: {0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server check failed: {0}",
+  "ui.ai_not_ready_model_0_1": "{0} is not available in {1} right now. Pick another model, or check the connection.",
+  "ui.ai_not_ready_error_0_1": "{0} is not ready ({1}). It may not be running or signed in.",
+  "ui.ai_not_ready_unknown_0": "{0} is not ready. It may not be signed in, or it did not list its models.",
+  "ui.ai_not_ready_where": "Settings \u2192 Visual Agent Map \u2192 AI connection shows its status.",
   "ui.current_model_is_unavailable": "Current model is unavailable",
   "ui.auto": "Auto",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "Auto uses Low for simple tasks and Medium for complex synthesis; manual choices are preserved.",
@@ -3851,6 +3855,10 @@ var zhCN = {
   "ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett": "\u672A\u627E\u5230 Codex CLI\uFF1A{0}\u3002\u8BF7\u5728 VAM Settings \u8BBE\u7F6E\u201CCodex CLI \u8DEF\u5F84\u201D\u3002",
   "ui.codex_app_server_is_ready_0": "Codex App Server \u5DF2\u5C31\u7EEA\uFF1A{0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server \u68C0\u67E5\u5931\u8D25\uFF1A{0}",
+  "ui.ai_not_ready_model_0_1": "{1} \u76EE\u524D\u65E0\u6CD5\u4F7F\u7528 {0}\u3002\u8BF7\u6362\u4E00\u4E2A\u6A21\u578B\uFF0C\u6216\u68C0\u67E5\u8FDE\u63A5\u3002",
+  "ui.ai_not_ready_error_0_1": "{0} \u8FD8\u6CA1\u51C6\u5907\u597D\uFF08{1}\uFF09\u3002\u53EF\u80FD\u6CA1\u6709\u8FD0\u884C\u6216\u5C1A\u672A\u767B\u5F55\u3002",
+  "ui.ai_not_ready_unknown_0": "{0} \u8FD8\u6CA1\u51C6\u5907\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5F55\uFF0C\u6216\u6CA1\u6709\u62A5\u544A\u53EF\u7528\u7684\u6A21\u578B\u3002",
+  "ui.ai_not_ready_where": "\u53EF\u5728\u201C\u8BBE\u7F6E \u2192 Visual Agent Map \u2192 AI \u8FDE\u63A5\u201D\u67E5\u770B\u72B6\u6001\u3002",
   "ui.current_model_is_unavailable": "\u5F53\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
   "ui.auto": "\u81EA\u52A8 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52A8\u6A21\u5F0F\u4F1A\u5BF9\u7B80\u5355\u4EFB\u52A1\u4F7F\u7528 Low\u3001\u5BF9\u590D\u6742\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52A8\u9009\u62E9\u4E0D\u4F1A\u88AB\u8986\u76D6\u3002",
@@ -6231,6 +6239,10 @@ var zhTW = {
   "ui.codex_cli_was_not_found_0_set_the_codex_cli_path_in_vam_sett": "\u672A\u627E\u5230 Codex CLI\uFF1A{0}\u3002\u8ACB\u5728 VAM Settings \u8A2D\u5B9A\u300CCodex CLI \u8DEF\u5F91\u300D\u3002",
   "ui.codex_app_server_is_ready_0": "Codex App Server \u5DF2\u5C31\u7DD2\uFF1A{0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server \u6AA2\u67E5\u5931\u6557\uFF1A{0}",
+  "ui.ai_not_ready_model_0_1": "{1} \u76EE\u524D\u7121\u6CD5\u4F7F\u7528 {0}\u3002\u8ACB\u63DB\u4E00\u500B\u6A21\u578B\uFF0C\u6216\u6AA2\u67E5\u9023\u7DDA\u3002",
+  "ui.ai_not_ready_error_0_1": "{0} \u9084\u6C92\u6E96\u5099\u597D\uFF08{1}\uFF09\u3002\u53EF\u80FD\u6C92\u6709\u57F7\u884C\u6216\u5C1A\u672A\u767B\u5165\u3002",
+  "ui.ai_not_ready_unknown_0": "{0} \u9084\u6C92\u6E96\u5099\u597D\u3002\u53EF\u80FD\u5C1A\u672A\u767B\u5165\uFF0C\u6216\u6C92\u6709\u56DE\u5831\u53EF\u7528\u7684\u6A21\u578B\u3002",
+  "ui.ai_not_ready_where": "\u53EF\u5728\u300C\u8A2D\u5B9A \u2192 Visual Agent Map \u2192 AI \u9023\u7DDA\u300D\u67E5\u770B\u72C0\u614B\u3002",
   "ui.current_model_is_unavailable": "\u76EE\u524D\u6A21\u578B\u5DF2\u4E0D\u53EF\u7528",
   "ui.auto": "\u81EA\u52D5 (Auto)",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe": "\u81EA\u52D5\u6A21\u5F0F\u6703\u5C0D\u7C21\u55AE\u4EFB\u52D9\u4F7F\u7528 Low\u3001\u5C0D\u8907\u96DC\u6574\u5408\u4F7F\u7528 Medium\uFF1B\u624B\u52D5\u9078\u64C7\u4E0D\u6703\u88AB\u8986\u84CB\u3002",
@@ -33043,7 +33055,9 @@ function claudeCodeAiRuntime(get, checks) {
     readiness: async (model) => {
       const state = await checksOf(checks).refresh("claude");
       if (state.status === "missing") return { status: "missing" };
-      return state.status === "ready" && state.models.includes(model) ? { status: "ready" } : { status: "error" };
+      if (state.status === "ready")
+        return state.models.includes(model) ? { status: "ready" } : { status: "model-unavailable" };
+      return state.error ? { status: "error", error: state.error } : { status: "error" };
     },
     prewarm: (model, { effort, schema, webSearch }) => {
       get().prewarm(providerModelId(model), effort, schema, webSearch);
@@ -74372,8 +74386,16 @@ ${t("ui.organize_link_wait_hint")}`;
     if (readiness.status === "missing") {
       if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
       else this.openCodexSetupGuide();
-    } else if (readiness.status === "model-unavailable") new import_obsidian42.Notice(t("ui.current_model_is_unavailable"));
-    else if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+      return false;
+    }
+    const service = runtime.capabilities.id === "claude" ? "Claude Code" : "Codex";
+    if (readiness.error !== void 0) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+    const message = readiness.status === "model-unavailable" ? t("ui.ai_not_ready_model_0_1", this.modelLabel(model), service) : readiness.error ? t("ui.ai_not_ready_error_0_1", service, readiness.error) : t("ui.ai_not_ready_unknown_0", service);
+    actionNotice(
+      `${message} ${t("ui.ai_not_ready_where")}`,
+      t("ui.connection_repair"),
+      () => this.repairConnection(model)
+    );
     return false;
   }
   async codexReadyForAi() {

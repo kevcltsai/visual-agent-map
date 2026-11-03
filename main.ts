@@ -6,7 +6,7 @@ import type { CoffeeRequest, CoffeeSession } from "./experiences/coffee-tables/t
 import { CoffeeManager } from "./experiences/coffee-tables/engine";
 import { CoffeeStorage } from "./experiences/coffee-tables/storage";
 import { VisualAgentMapView, VIEW_TYPE } from "./experiences/visual-map/view";
-import { errorNotice } from "./experiences/visual-map/note-style-picker";
+import { actionNotice, errorNotice } from "./experiences/visual-map/note-style-picker";
 import { planMathRepair, applyMathRepair } from "./experiences/visual-map/math-repair";
 import type { TaskOptions } from "./experiences/visual-map/modals";
 import { selectionOutputLanguage } from "./experiences/aim/content-language";
@@ -1571,8 +1571,20 @@ export default class VisualAgentMapPlugin extends Plugin {
     if (readiness.status === "missing") {
       if (runtime.capabilities.id === "claude") this.openClaudeSetupGuide();
       else this.openCodexSetupGuide();
-    } else if (readiness.status === "model-unavailable") new Notice(t("ui.current_model_is_unavailable"));
-    else if (readiness.error !== undefined) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+      return false;
+    }
+    // The reason is said to the user, not only written to the log, with a way to fix it and where to look in the settings.
+    const service = runtime.capabilities.id === "claude" ? "Claude Code" : "Codex";
+    if (readiness.error !== undefined) this.logs.appendLog("warn", t("log.codex_not_ready_0", readiness.error));
+    const message =
+      readiness.status === "model-unavailable"
+        ? t("ui.ai_not_ready_model_0_1", this.modelLabel(model), service)
+        : readiness.error
+          ? t("ui.ai_not_ready_error_0_1", service, readiness.error)
+          : t("ui.ai_not_ready_unknown_0", service);
+    actionNotice(`${message} ${t("ui.ai_not_ready_where")}`, t("ui.connection_repair"), () =>
+      this.repairConnection(model)
+    );
     return false;
   }
   async codexReadyForAi(): Promise<boolean> {

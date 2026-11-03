@@ -1501,6 +1501,10 @@ export const en = {
     "Codex CLI was not found: {0}. Set the Codex CLI path in VAM Settings.",
   "ui.codex_app_server_is_ready_0": "Codex App Server is ready: {0}",
   "ui.codex_app_server_check_failed_0": "Codex App Server check failed: {0}",
+  "ui.ai_not_ready_model_0_1": "{0} is not available in {1} right now. Pick another model, or check the connection.",
+  "ui.ai_not_ready_error_0_1": "{0} is not ready ({1}). It may not be running or signed in.",
+  "ui.ai_not_ready_unknown_0": "{0} is not ready. It may not be signed in, or it did not list its models.",
+  "ui.ai_not_ready_where": "Settings → Visual Agent Map → AI connection shows its status.",
   "ui.current_model_is_unavailable": "Current model is unavailable",
   "ui.auto": "Auto",
   "ui.auto_uses_low_for_simple_tasks_and_medium_for_complex_synthe":

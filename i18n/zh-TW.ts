@@ -1123,7 +1123,7 @@ export const zhTW: Record<TranslationKey, string> = {
   "ui.structure_review_not_started": "結構檢視沒有開始。",
   "ui.map_chat_open": "開啟 AI 對話",
   "ui.map_chat_close": "關閉 AI 對話",
-  "ui.map_chat_title": "詢問 AI 關於這張圖",
+  "ui.map_chat_title": "問 AI",
   "ui.map_chat_references": "給 AI 的引用",
   "ui.map_chat_input_label": "傳給 AI 的訊息",
   "ui.map_chat_input_placeholder": "提問，或請 AI 修改這張圖。把議題卡或筆記拖到這裡就能引用。",

@@ -1121,7 +1121,7 @@ export const zhCN: Record<TranslationKey, string> = {
   "ui.structure_review_not_started": "结构查看没有开始。",
   "ui.map_chat_open": "打开 AI 对话",
   "ui.map_chat_close": "关闭 AI 对话",
-  "ui.map_chat_title": "询问 AI 关于这张图",
+  "ui.map_chat_title": "问 AI",
   "ui.map_chat_references": "给 AI 的引用",
   "ui.map_chat_input_label": "发给 AI 的消息",
   "ui.map_chat_input_placeholder": "提问，或请 AI 修改这张图。把议题卡或笔记拖到这里就能引用。",

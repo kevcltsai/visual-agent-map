@@ -2984,7 +2984,7 @@ integrationTest('B1 ui: Retry is disabled while a request runs, and an answer th
 
 integrationTest('B1 ui: the window is a labelled region; the log has no aria-live and no role=log; one live region says the summary once, when the turn ends', async () => {
   const h = await harness(); await h.view.hydrate(); const chat = h.open();
-  assert.equal(chat.bodyEl.attrs.role, 'region'); assert.equal(chat.bodyEl.attrs['aria-label'], 'Ask AI about this map');
+  assert.equal(chat.bodyEl.attrs.role, 'region'); assert.equal(chat.bodyEl.attrs['aria-label'], 'Ask AI');
   assert.equal(chat.logEl.attrs['aria-live'], undefined); assert.notEqual(chat.logEl.attrs.role, 'log'); assert.equal(findAll(chat.bodyEl, i => i.attrs['aria-live'] !== undefined).length, 0, 'nothing in the body is live');
   const writes = []; const live = chat.liveEl; const setText = live.setText.bind(live); live.setText = value => { writes.push(value); setText(value); };
   assert.equal(live.attrs['aria-live'], 'polite'); assert.equal(live.attrs['aria-atomic'], 'true');
@@ -3308,6 +3308,12 @@ test('B1 fix 17: the suggestions, examples, retry, "more detail" and "show all" 
   for (const bare of ['.vam-map-chat-suggestion', '.vam-map-chat-example', '.vam-map-chat-retry', '.vam-map-chat-more']) assert.equal(css.split('\n').some(line => line.startsWith(`${bare} {`)), false, `${bare} is no longer a bare class that the base style beats`);
 });
 
+test('UX B4: the chat title is short in every language and is never cut with an ellipsis (it may wrap instead)', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')) ?? '';
+  assert.doesNotMatch(rule, /text-overflow: ellipsis|white-space: nowrap/); assert.match(rule, /flex: 0 0 auto/, 'the title does not shrink; the model menu gives way');
+  for (const id of ['en', 'zh-TW', 'zh-CN']) { const text = load(`i18n/${id}.ts`)[id.replace('-', '')]['ui.map_chat_title']; assert.ok(text.length <= 8, `${id}: "${text}" is short`); }
+});
+
 test('B1 fix 9 and 10: no dead overlay rule; the Escape selector is a plain literal that the literal scan allows with a reason', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8'); assert.equal(css.includes('.vam-workspace.has-inspector > .vam-canvas-overlay'), false);
   const source = fs.readFileSync(path.join(root, 'experiences/visual-map/view.ts'), 'utf8'); assert.equal(/closest\(\[/.test(source), false, 'no selector built from parts');
@@ -3368,9 +3374,9 @@ test('B2-0 F1: the deferred scroll is dropped when the window is folded again be
 integrationTest('B2-0 F3: the model select takes the header\'s remaining width (flex 1 1 0, min-width 0), and every entry shows its full label (MS-02: no follow-default entry, no shortened default label)', async () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   const rule = css.split('\n').find(line => line.startsWith('.vam-map-chat-model {')); assert.ok(rule);
-  // B3-fix rule change: with the save button in the header the model asks for 146px (basis) and the title gives way first (flex-shrink 100, min 64px).
+  // UX B4 rule change: the title is short and keeps its width (no ellipsis); the model menu (basis 146px, min-width 0) gives way instead.
   assert.match(rule, /flex: 1 1 146px;/); assert.match(rule, /min-width: 0;/);
-  const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 100 auto;/); assert.match(title, /min-width: 64px;/); assert.doesNotMatch(rule, /min-width: 120px/);
+  const title = css.split('\n').find(line => line.startsWith('.vam-map-chat-title {')); assert.match(title, /flex: 0 0 auto;/); assert.doesNotMatch(rule, /min-width: 120px/);
   const h = await harness(); await h.view.hydrate(); h.plugin.settings.cliModel = 'gpt-6-luna'; h.plugin.modelLabel = id => id.startsWith('claude:') ? 'Claude Sonnet' : `OpenAI Codex · ${id}`;
   const choices = h.view.chatModelChoices(); const current = choices.find(c => c.value === 'gpt-6-luna');
   assert.equal(current.label, 'OpenAI Codex · gpt-6-luna', 'the full name is the label'); assert.equal(current.short, undefined); assert.equal(choices.some(c => c.value === ''), false);
@@ -4709,10 +4715,10 @@ test('bug bash #10: a language change sets the chat window\'s fixed words again,
   assert.equal(chat.sendEl.text, 'Send');
   await plugin.changeLanguage('zh-TW');
   assert.ok(chat.el === el, 'not rebuilt');
-  assert.equal(visibleText(chat.headEl.children[0]), '詢問 AI 關於這張圖');
+  assert.equal(visibleText(chat.headEl.children[0]), '問 AI');
   assert.equal(chat.sendEl.text, '送出'); assert.equal(chat.sendEl.attrs['aria-label'], '送出');
   assert.equal(chat.stopEl.text, '停止'); assert.equal(chat.inputEl.attrs['aria-label'], '傳給 AI 的訊息');
-  assert.equal(chat.bodyEl.attrs['aria-label'], '詢問 AI 關於這張圖');
+  assert.equal(chat.bodyEl.attrs['aria-label'], '問 AI');
   assert.equal(chat.toggleEl.attrs['aria-label'], '關閉 AI 對話');
   eq(findAll(chat.logEl, i => hasClass(i, 'vam-map-chat-role')).map(i => i.text), ['你', 'AI']);
   assert.ok(find(chat.bodyEl, i => hasClass(i, 'vam-map-chat-log-label') && i.text === '對話紀錄'), 'the log label follows');

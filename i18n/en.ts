@@ -1190,7 +1190,7 @@ export const en = {
   "ui.structure_review_not_started": "The structure review did not start.",
   "ui.map_chat_open": "Open AI chat",
   "ui.map_chat_close": "Close AI chat",
-  "ui.map_chat_title": "Ask AI about this map",
+  "ui.map_chat_title": "Ask AI",
   "ui.map_chat_references": "References for the AI",
   "ui.map_chat_input_label": "Message to the AI",
   "ui.map_chat_input_placeholder":

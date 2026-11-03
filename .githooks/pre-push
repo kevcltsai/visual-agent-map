@@ -2,16 +2,32 @@
 # Git exports GIT_DIR (and friends) to hooks. Tests that create throwaway repos would otherwise act on this
 # repository: `git init` there rewrote the shared config to core.bare=true. Let every nested git find its repo from cwd.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
-# Pushes to main or a tag run the full `npm run verify` (same set as CI). Feature branches run `verify:fast`
-# (everything except the integration layer); CI runs the full verify on every branch push, and agents-spec
-# WORKFLOW requires a green CI run before merging to main.
+# Feature branches run `verify:push` (lint, format, i18n, build-artifact diff, artifacts; no tests): CI runs the full
+# `npm run verify` on every push and agents-spec WORKFLOW requires a green CI run before merging to main.
+# Pushes to main or a tag run the full `npm run verify` (same set as CI), unless every pushed commit already has a
+# successful ci.yml run. Missing/unauthenticated gh or a failed query runs the full verify (fail-closed).
 full=0
-while read -r _local_ref _local_sha remote_ref _remote_sha; do
-  case "$remote_ref" in refs/heads/main|refs/tags/*) full=1 ;; esac
+reuse=1
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/tags/*)
+      full=1
+      commit=$(git rev-parse --verify "${local_sha}^{commit}" 2>/dev/null) || commit=""
+      if [ -z "$commit" ] || ! run_id=$(sh scripts/find-green-ci-run.sh "$commit"); then
+        reuse=0
+      else
+        echo "pre-push: $remote_ref commit $commit has green CI run $run_id"
+      fi
+      ;;
+  esac
 done
 if [ "$full" = 1 ]; then
+  if [ "$reuse" = 1 ]; then
+    echo "pre-push: skipping verify, reusing the green CI run(s) above"
+    exit 0
+  fi
   echo "pre-push: npm run verify"
   exec npm run verify
 fi
-echo "pre-push: npm run verify:fast (feature branch; full suite runs in CI)"
-exec npm run verify:fast
+echo "pre-push: npm run verify:push (feature branch; tests run in CI)"
+exec npm run verify:push

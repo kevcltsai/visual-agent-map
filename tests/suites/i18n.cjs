@@ -249,12 +249,10 @@ test('translate looks up the language dictionary and falls back to English', () 
   assert.equal(translate('en', 'ui.expand_0', 2), 'Expand 2');
   assert.equal(translate('zh-CN', 'ui.interface_language'), '界面语言');
 });
-test('check:i18n passes on the repository dictionaries and fails on a bad placeholder fixture', () => {
+test('check:i18n fails on bad placeholder and extra-key fixtures and passes on a good one', () => {
   const os = require('node:os');
   const { spawnSync } = require('node:child_process');
   const script = path.join(root, 'scripts', 'check-i18n.mjs');
-  const real = spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8' });
-  assert.equal(real.status, 0, real.stderr);
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vam-i18n-'));
   try {
     fs.mkdirSync(path.join(fixture, 'i18n'));

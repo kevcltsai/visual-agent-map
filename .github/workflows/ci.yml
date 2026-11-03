@@ -6,15 +6,40 @@ on:
       - "**"
   pull_request:
 
+permissions:
+  contents: read
+  actions: read
+
+# A newer push to the same ref cancels the older run; runs on main are never cancelled.
+concurrency:
+  group: ci-${{ github.ref == 'refs/heads/main' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   verify:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      # On main, reuse a green ci.yml run for the same head_sha (any branch). Any query failure leaves `run` empty, so verify runs.
+      - id: reuse
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if id=$(sh scripts/find-green-ci-run.sh "$GITHUB_SHA"); then
+            echo "verify skipped: reusing green ci.yml run $id for $GITHUB_SHA"
+            echo "run=$id" >> "$GITHUB_OUTPUT"
+          else
+            echo "no reusable green run for $GITHUB_SHA; running verify"
+          fi
       - uses: actions/setup-node@v5
+        if: steps.reuse.outputs.run == ''
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run verify
+      - if: steps.reuse.outputs.run == ''
+        run: npm ci
+      - if: steps.reuse.outputs.run == ''
+        run: npm run verify

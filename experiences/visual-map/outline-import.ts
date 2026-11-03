@@ -62,8 +62,9 @@ export function outlineTitle(raw: string): string {
   const mark = String.fromCharCode(code);
   const kept: string[] = [];
   // One left-to-right pass: backslash escapes and code spans are literal text that no later rule may touch.
+  // A code span is a backtick run closed by a run of the same length (CommonMark), so an unmatched run such as a```b stays text.
   const protectedText = raw.replace(
-    /\\([!-/:-@[-`{-~])|(`+)([^`]*?)\2/g,
+    /\\([!-/:-@[-`{-~])|(?<!`)(`+)(?!`)([\s\S]*?[^`])\2(?!`)/g,
     (_match, character: string | undefined, _ticks: string | undefined, content: string | undefined) => {
       kept.push(character ?? content ?? "");
       return `${mark}${kept.length - 1}${mark}`;

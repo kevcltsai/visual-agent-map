@@ -29,7 +29,7 @@ class FakeElement {
   remove() {}
 }
 
-function setup(initial) {
+function setup(initial, options = {}) {
   let autoOpen = initial;
   const listeners = {};
   class Component {
@@ -52,11 +52,11 @@ function setup(initial) {
   const markdown = 'Intro. Selected words here. Outro.';
   const selected = 'Selected words here.';
   const view = Object.assign(new MarkdownView(), {
-    file: { path: 'Note.md' }, containerEl: new FakeElement(), getMode: () => 'source',
-    editor: { getValue: () => markdown, getSelection: () => selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange() {} }
+    file: { path: 'Note.md' }, containerEl: new FakeElement(), getMode: () => options.mode ?? 'source',
+    editor: { getValue: () => markdown, getSelection: () => options.cursorOnly ? '' : selected, getCursor: () => ({ line: 0, ch: 0 }), posToOffset: () => markdown.indexOf(selected), replaceRange() {} }
   });
   const app = {
-    workspace: { containerEl: new FakeElement(), getLeavesOfType: () => [{ view }], getActiveViewOfType: () => view, on: () => ({}) },
+    workspace: { containerEl: new FakeElement(), getLeavesOfType: () => options.commandPalette ? [] : [{ view }], getActiveViewOfType: () => view, on: () => ({}) },
     metadataCache: { getFirstLinkpathDest: () => null }
   };
   const ai = new MarkdownSelectionAi(app, { model: () => 'test-model', autoOpen: () => autoOpen, language: () => 'English', run: async () => '' });
@@ -65,7 +65,7 @@ function setup(initial) {
   const panel = () => app.workspace.containerEl.children.find(item => item.cls === 'vam-context-ai-panel');
   const imageAction = () => app.workspace.containerEl.children.find(item => item.cls.includes('vam-image-action-pill'));
   const fire = (type, event = {}) => { for (const listener of listeners[type] ?? []) listener(event); };
-  return { ai, launcher, panel, imageAction, fire, selected, image: new HTMLImageElement(), setAutoOpen: value => { autoOpen = value; } };
+  return { ai, markdown, launcher, panel, imageAction, fire, selected, image: new HTMLImageElement(), setAutoOpen: value => { autoOpen = value; } };
 }
 
 test('auto-open on: selecting text shows the launcher', () => {
@@ -122,4 +122,21 @@ test('auto-open on: clicking an image shows only the translate-image action, not
   fire('click', { target: image });
   assert.ok(imageAction(), 'the translate-image action appeared beside the image');
   assert.equal(panel(), undefined, 'the text panel is not opened for images');
+});
+
+test('command palette: the editor selection survives when the DOM selection and focus have left the view (#07)', () => {
+  for (const autoOpen of [true, false]) {
+    const { ai, markdown, panel, selected } = setup(autoOpen, { commandPalette: true });
+    assert.equal(ai.openForSelection(false), true);
+    assert.ok(panel(), 'the panel opened');
+    assert.equal(ai.panel.snapshot.text, selected);
+    assert.equal(ai.panel.snapshot.matchAt, markdown.indexOf(selected));
+  }
+});
+
+test('command palette: a bare cursor keeps the no-selection snapshot, and reading mode refuses', () => {
+  const cursor = setup(false, { commandPalette: true, cursorOnly: true });
+  assert.equal(cursor.ai.openForSelection(false), true);
+  assert.equal(cursor.ai.panel.snapshot.text, '');
+  assert.equal(setup(false, { commandPalette: true, mode: 'preview' }).ai.openForSelection(true), false);
 });

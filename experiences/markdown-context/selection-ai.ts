@@ -263,15 +263,23 @@ export class MarkdownSelectionAi extends Component {
       const view = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (!view?.file || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
-      const matchAt = view.editor.posToOffset(view.editor.getCursor());
-      this.snapshot = {
-        view,
-        path: view.file.path,
-        text: "",
-        markdown,
-        matchAt,
-        rect: view.containerEl.getBoundingClientRect()
-      };
+      // The command palette took the focus and the DOM selection, but the editor still holds its selection: keep it.
+      const selected = view.editor.getSelection();
+      const text = selected.trim();
+      let matchAt = view.editor.posToOffset(view.editor.getCursor());
+      let rect = view.containerEl.getBoundingClientRect();
+      if (text) {
+        const start = view.editor.posToOffset(view.editor.getCursor("from")) + selected.indexOf(text);
+        matchAt = markdown.slice(start, start + text.length) === text ? start : findUnique(markdown, text);
+        // Anchor the panel at the selection highlight; without one, at the selection start's editor coordinates, else the whole view.
+        const highlight = view.containerEl.querySelector(".cm-selectionBackground")?.getBoundingClientRect();
+        const coords = (
+          view.editor as unknown as { cm?: { coordsAtPos?: (pos: number) => DOMRect | null } }
+        ).cm?.coordsAtPos?.(matchAt);
+        if (highlight && (highlight.width || highlight.height)) rect = highlight;
+        else if (coords) rect = coords;
+      }
+      this.snapshot = { view, path: view.file.path, text, markdown, matchAt, rect };
     }
     if (!checking) this.openForCurrentSelection();
     return true;

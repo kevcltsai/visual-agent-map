@@ -1114,3 +1114,14 @@ integrationTest('createOutlineMap: a model equal to the current one makes a work
   const notes = await Promise.all(map.nodes.map(node => repo.readNote(node.path)));
   assert.deepEqual(notes.map(note => note.modelSource), ['workspace', 'inherited']);
 });
+
+test('outline: a backtick run inside a title is a code span only when the opening and closing runs have the same length (#09)', () => {
+  assert.equal(api.outlineTitle('`code`'), 'code');
+  assert.equal(api.outlineTitle('``a`b``'), 'a`b');
+  assert.equal(api.outlineTitle('a```b'), 'a```b');
+  assert.equal(api.outlineTitle('[[Note|Alias]]'), 'Alias');
+  const parsed = api.parseOutline('# R\n## 也壞 a```b');
+  assert.deepEqual(keys(parsed.errors), ['ui.outline_error_title_fence:2']);
+  assert.equal(parsed.nodes[1].title, '也壞 a```b');
+  assert.deepEqual(keys(api.parseOutline('# R\n## [[Note|Alias]]').errors), []);
+});

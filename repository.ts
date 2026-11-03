@@ -1588,7 +1588,7 @@ export class Repository {
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
-    const sourceTitle = text(metadata.title, this.file(sourcePath).basename);
+    const sourceTitle = noteTitle(source, metadata, this.file(sourcePath).basename);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
     const title = options.keepTitle
       ? sourceTitle
@@ -1599,7 +1599,7 @@ export class Repository {
     metadata["agent-map-id"] = map.id;
     metadata["topic-state"] = "active";
     metadata.title = title;
-    const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
+    const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, () => `# ${title}`);
     const created = await this.createUniqueNote(folder, title, `---\n${stringifyYaml(metadata)}---\n${body}`);
     return { id, path: created.path, parentId: null, x: 80, y: 80, collapsed: false };
   }

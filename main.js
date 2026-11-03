@@ -22779,7 +22779,7 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
     await this.ensureTopicFolders(this.topicRoot(mapPath));
     const source = await this.app.vault.read(this.file(sourcePath));
     const metadata = frontmatter(source);
-    const sourceTitle = text5(metadata.title, this.file(sourcePath).basename);
+    const sourceTitle = noteTitle(source, metadata, this.file(sourcePath).basename);
     const suffixLanguage = textLanguageOf(sourceTitle, resolveMapTextLanguage(map, this.settings.language));
     const title = options.keepTitle ? sourceTitle : `${sourceTitle} ${translateNote(suffixLanguage, "note.copy_suffix")}`;
     const id = crypto.randomUUID();
@@ -22788,7 +22788,7 @@ ${noteBody(title, metadata.summary, this.noteLanguage, (_d = initial.prompt) != 
     metadata["agent-map-id"] = map.id;
     metadata["topic-state"] = "active";
     metadata.title = title;
-    const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, `# ${title}`);
+    const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").replace(/^# .*$/m, () => `# ${title}`);
     const created = await this.createUniqueNote(folder, title, `---
 ${(0, import_obsidian11.stringifyYaml)(metadata)}---
 ${body}`);
@@ -34862,7 +34862,7 @@ function outlineTitle(raw) {
   const mark = String.fromCharCode(code);
   const kept = [];
   const protectedText = raw.replace(
-    /\\([!-/:-@[-`{-~])|(`+)([^`]*?)\2/g,
+    /\\([!-/:-@[-`{-~])|(?<!`)(`+)(?!`)([\s\S]*?[^`])\2(?!`)/g,
     (_match, character, _ticks, content) => {
       var _a2;
       kept.push((_a2 = character != null ? character : content) != null ? _a2 : "");
@@ -71889,7 +71889,7 @@ var MarkdownSelectionAi = class extends import_obsidian41.Component {
     this.snapshot = null;
   }
   openForSelection(checking = false) {
-    var _a2;
+    var _a2, _b2, _c, _d;
     if ((_a2 = this.panel) == null ? void 0 : _a2.isOpen) {
       if (!checking) this.panel.focus();
       return true;
@@ -71899,15 +71899,19 @@ var MarkdownSelectionAi = class extends import_obsidian41.Component {
       const view = this.app.workspace.getActiveViewOfType(import_obsidian41.MarkdownView);
       if (!(view == null ? void 0 : view.file) || view.getMode() !== "source") return false;
       const markdown = view.editor.getValue();
-      const matchAt = view.editor.posToOffset(view.editor.getCursor());
-      this.snapshot = {
-        view,
-        path: view.file.path,
-        text: "",
-        markdown,
-        matchAt,
-        rect: view.containerEl.getBoundingClientRect()
-      };
+      const selected = view.editor.getSelection();
+      const text11 = selected.trim();
+      let matchAt = view.editor.posToOffset(view.editor.getCursor());
+      let rect2 = view.containerEl.getBoundingClientRect();
+      if (text11) {
+        const start = view.editor.posToOffset(view.editor.getCursor("from")) + selected.indexOf(text11);
+        matchAt = markdown.slice(start, start + text11.length) === text11 ? start : findUnique(markdown, text11);
+        const highlight = (_b2 = view.containerEl.querySelector(".cm-selectionBackground")) == null ? void 0 : _b2.getBoundingClientRect();
+        const coords = (_d = (_c = view.editor.cm) == null ? void 0 : _c.coordsAtPos) == null ? void 0 : _d.call(_c, matchAt);
+        if (highlight && (highlight.width || highlight.height)) rect2 = highlight;
+        else if (coords) rect2 = coords;
+      }
+      this.snapshot = { view, path: view.file.path, text: text11, markdown, matchAt, rect: rect2 };
     }
     if (!checking) this.openForCurrentSelection();
     return true;
